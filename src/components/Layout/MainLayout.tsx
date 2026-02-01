@@ -3,6 +3,8 @@ import { Box } from "@mui/material";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 
+import styles from "../../styles/sidebar.module.css";
+
 const MainLayout = () => {
   return (
     <Box
@@ -10,7 +12,7 @@ const MainLayout = () => {
         display: "flex",
         height: "100vh",
         overflow: "hidden",
-        backgroundColor: "#f9fafb",
+        bgcolor: "background.default",
       }}
     >
       <Sidebar />
@@ -23,18 +25,10 @@ const MainLayout = () => {
         }}
       >
         <Header />
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            overflow: "auto",
-            backgroundColor: "#FFFFFF",
-            borderRadius: 2,
-            m: 2,
-            p: 3,
-          }}
-        >
-          <Outlet />
+        <Box className={styles.cardWrapper} m={0}>
+          <Box className={styles.card}>
+            <Outlet />
+          </Box>
         </Box>
       </Box>
     </Box>

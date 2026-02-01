@@ -3,7 +3,7 @@ import type {} from "@mui/x-date-pickers/themeAugmentation";
 const theme = createTheme({
   palette: {
     primary: {
-      main: "#505050",
+      main: "#D86650",
       light: "#5eead4",
       dark: "#0d9488",
       contrastText: "#ffffff",
@@ -34,12 +34,12 @@ const theme = createTheme({
       dark: "#2563eb",
     },
     background: {
-      default: "#f9fafb",
-      paper: "#ffffff",
+      default: "#F0F0F0",
+      paper: "#FFFFFF",
     },
     text: {
-      primary: "#111827",
-      secondary: "#6b7280",
+      primary: "#232323",
+      secondary: "#9E9E9E",
     },
     grey: {
       50: "#f9fafb",
@@ -55,54 +55,63 @@ const theme = createTheme({
     },
   },
   typography: {
-    fontFamily: [
-      "-apple-system",
-      "BlinkMacSystemFont",
-      '"Segoe UI"',
-      "Roboto",
-      '"Helvetica Neue"',
-      "Arial",
-      "sans-serif",
-    ].join(","),
+    fontFamily:
+      "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+
     h1: {
-      fontSize: "2.25rem",
+      fontSize: "4rem",
+      lineHeight: 1.45,
       fontWeight: 700,
-      lineHeight: 1.2,
-      color: "#111827",
     },
     h2: {
-      fontSize: "1.875rem",
+      fontSize: "3rem",
+      lineHeight: 1.45,
       fontWeight: 700,
-      lineHeight: 1.3,
-      color: "#111827",
     },
     h3: {
-      fontSize: "1.5rem",
-      fontWeight: 600,
-      lineHeight: 1.4,
-      color: "#111827",
+      fontSize: "2.5rem",
+      lineHeight: 1.45,
+      fontWeight: 700,
     },
     h4: {
-      fontSize: "1.25rem",
-      fontWeight: 600,
-      lineHeight: 1.4,
-      color: "#111827",
+      fontSize: "2rem",
+      lineHeight: 1.45,
+      fontWeight: 700,
     },
     h5: {
-      fontSize: "1.125rem",
-      fontWeight: 600,
-      lineHeight: 1.5,
-      color: "#111827",
+      fontSize: "1.5rem",
+      lineHeight: 1.45,
+      fontWeight: 700,
     },
     h6: {
-      fontSize: "1rem",
-      fontWeight: 600,
-      lineHeight: 1.5,
-      color: "#111827",
+      fontSize: "1.125rem",
+      lineHeight: 1.45,
+      fontWeight: 700,
     },
-    body1: { fontSize: "1rem", lineHeight: 1.5, color: "#111827" },
-    body2: { fontSize: "0.875rem", lineHeight: 1.5, color: "#6b7280" },
-    button: { fontWeight: 500, textTransform: "none" },
+    subtitle1: {
+      fontSize: "1rem",
+      lineHeight: 1.45,
+      fontWeight: 400,
+    },
+    body1: {
+      fontSize: "1rem",
+      lineHeight: 1.45,
+      fontWeight: 400,
+    },
+    body2: {
+      fontSize: "0.875rem",
+      lineHeight: 1.45,
+      fontWeight: 400,
+    },
+    caption: {
+      fontSize: "0.75rem",
+      lineHeight: 1.45,
+      fontWeight: 400,
+    },
+    button: {
+      fontWeight: 500,
+      textTransform: "none",
+    },
   },
   shape: {
     borderRadius: 8,

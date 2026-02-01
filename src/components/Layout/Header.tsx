@@ -5,23 +5,19 @@ import {
   Typography,
   Box,
   IconButton,
-  Breadcrumbs,
-  Link,
   Menu,
   MenuItem,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import { useLocation, Link as RouterLink } from "react-router-dom";
-// import { useSelector } from "react-redux";
 
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import NotificationIcon from "@/assets/icons/notification.svg";
 import MessageQuestionIcon from "@/assets/icons/message-question.svg";
 import UserAvatarIcon from "@/assets/icons/ellipse_12.svg";
+import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 // import { RootState } from "@/store";
 
 const Header = () => {
-  const location = useLocation();
   //   const clinicName = useSelector((state: RootState) => state.clinic.data?.name);
 
   /* ================= ICON MENU STATE ================= */
@@ -48,22 +44,6 @@ const Header = () => {
     setUserAnchorEl(e.currentTarget);
   const handleUserMenuClose = () => setUserAnchorEl(null);
 
-  /* ================= BREADCRUMBS ================= */
-  const pathnames = location.pathname.split("/").filter(Boolean);
-
-  const breadcrumbMap: Record<string, string> = {
-    dashboard: "Dashboard",
-    configuration: "Configuration",
-    reports: "Reports",
-    clinical: "Clinical",
-    lab: "Lab",
-    documents: "Documents",
-    workflows: "Workflows",
-  };
-
-  const rootLabel =
-    breadcrumbMap[pathnames[0]] ?? pathnames[0]?.replace("-", " ") ?? "Home";
-
   const iconMenus = [
     { icon: CalendarIcon, type: "calendar" },
     { icon: NotificationIcon, type: "notification" },
@@ -75,39 +55,16 @@ const Header = () => {
       position="static"
       elevation={0}
       sx={{
-        backgroundColor: "#FAFAFA",
+        bgcolor: "background.default",
         borderRadius: 2,
-        color: "#111827",
+        color: "text.primary",
       }}
     >
-      <Toolbar sx={{ justifyContent: "space-between", px: 3, py: 1.5 }}>
+      <Toolbar sx={{ justifyContent: "space-between", py: 2 }}>
         {/* LEFT: Breadcrumbs */}
-        <Breadcrumbs sx={{ display: { xs: "none", sm: "flex" } }}>
-          <Typography fontWeight={500} color="#666">
-            {rootLabel}
-          </Typography>
-
-          {pathnames.slice(1).map((name, idx) => {
-            const isLast = idx === pathnames.length - 2;
-            const label = breadcrumbMap[name] || name;
-
-            return isLast ? (
-              <Typography key={name} fontWeight={700}>
-                {label}
-              </Typography>
-            ) : (
-              <Link
-                key={name}
-                component={RouterLink}
-                to={`/${pathnames.slice(0, idx + 2).join("/")}`}
-                underline="none"
-                color="#666"
-              >
-                {label}
-              </Link>
-            );
-          })}
-        </Breadcrumbs>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <DynamicBreadcrumbs />
+        </Box>
 
         {/* RIGHT */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -116,7 +73,6 @@ const Header = () => {
             sx={{ display: { xs: "none", md: "block" } }}
           >
             Clinic:
-            {activeMenu}
             {/* {clinicName || "—"} */}
           </Typography>
 
@@ -128,7 +84,7 @@ const Header = () => {
                 width: 48,
                 height: 48,
                 backgroundColor: "#fff",
-                borderRadius: 2,
+                borderRadius: 1,
               }}
             >
               <Box component="img" src={icon} width={24} />
@@ -140,7 +96,7 @@ const Header = () => {
             <Box
               component="img"
               src={UserAvatarIcon}
-              sx={{ width: 36, height: 36, borderRadius: "50%" }}
+              sx={{ width: 36, height: 36, borderRadius: "10px" }}
             />
             <Box sx={{ display: { xs: "none", sm: "block" } }}>
               <Typography fontWeight={600}>Kate Russell</Typography>
@@ -160,8 +116,16 @@ const Header = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <MenuItem disabled>No data</MenuItem>
+        {activeMenu === "calendar" && (
+          <MenuItem disabled>No events for today</MenuItem>
+        )}
+        {activeMenu === "notification" && (
+          <MenuItem disabled>No notifications</MenuItem>
+        )}
+        {activeMenu === "help" && <MenuItem disabled>No messages</MenuItem>}
       </Menu>
 
       {/* USER MENU */}
