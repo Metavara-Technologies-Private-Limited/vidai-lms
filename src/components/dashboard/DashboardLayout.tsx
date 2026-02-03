@@ -9,6 +9,12 @@ import TimeRangeSelector from "./TimeRangeSelector";
 import type { TimeRange } from "./TimeRangeSelector";
 import OverviewTabs from "./OverviewTabs";
 import type { OverviewTab } from "./OverviewTabs";
+import SourcePerformanceChart from "./SourcePerformanceChart";
+import CommunicationChart from "./CommunicationChart";
+import ConversionTrendChart from "./ConversionTrendChart";
+import LeadPipelineFunnel from "./LeadPipelineFunnel";
+import AppointmentsChart from "./AppointmentsChart";
+import TeamPerformanceTab from "./TeamPerformanceTab";
 
 const DashboardLayout = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
@@ -55,24 +61,16 @@ const DashboardLayout = () => {
 
           {/* TAB CONTENT (placeholder for now) */}
           {activeTab === "source" && (
-            <Typography>Source Performance Chart here</Typography>
-          )}
-                    {activeTab === "communication" && (
-            <Typography>communication Chart here</Typography>
-          )}
-          {activeTab === "conversion" && (
-            <Typography>Conversion Trend Chart here</Typography>
-          )}  
-          {activeTab === "pipeline" && (
-            <Typography>Lead Pipeline Funnel Chart here</Typography>
-          )}  
-          {activeTab === "appointments" && (
-            <Typography>Appointments Chart here</Typography>
-          )}  
-          {activeTab === "team" && (
-            <Typography>Team Performance Chart here</Typography>
-          )}  
+  <SourcePerformanceChart />
+)}
+                    {activeTab === "communication" && <CommunicationChart />}
+          {activeTab === "conversion" && <ConversionTrendChart />}
+
+          {activeTab === "pipeline" && <LeadPipelineFunnel />}
           
+          {activeTab === "appointments" && <AppointmentsChart />}
+
+          {activeTab === "team" && <TeamPerformanceTab />}
 
         </Card>
       </Box>
