@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Button } from "@mui/material";
-import { timeRangeSelectorStyles } from "../../styles/dashboard/TimeRangeSelector.style";
+import { timeRangeSelectorStyles } from "../../styles/dashboard/TimeRangeSelector.styles";
 
 export type TimeRange = "today" | "week" | "month" | "year" | "all";
 
