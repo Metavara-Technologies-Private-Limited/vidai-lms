@@ -3,8 +3,8 @@ import type { SxProps, Theme } from "@mui/material";
 export const slaAlertsStyles = {
   alertItem: {
     display: "flex",
-    gap: 2,
-    mb: 2,
+    gap: 1.5,
+    mb: 1.5,
   },
 
   avatar: (severity: string): SxProps<Theme> => ({
