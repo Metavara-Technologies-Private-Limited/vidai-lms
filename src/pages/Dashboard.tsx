@@ -6,9 +6,9 @@ const Dashboard = () => {
     <Box
       sx={{
         width: "100%",
-        height: "100%",
+        height: "auto",
         overflow: "hidden",
-        mb: 1,   
+        mb: 1,
       }}
     >
       <DashboardLayout />

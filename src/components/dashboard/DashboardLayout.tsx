@@ -29,7 +29,7 @@ const DashboardLayout = () => {
           md: "3fr 1fr",
         },
         gap: 2,
-        alignItems: "stretch",
+        alignItems: "start",
         height: "auto",
         overflow: "hidden",
       }}
@@ -68,44 +68,36 @@ const DashboardLayout = () => {
               Over View
             </Typography>
 
-            <TimeRangeSelector
-              value={timeRange}
-              onChange={setTimeRange}
-            />
+            <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
           </Box>
 
           {/* TABS */}
           <Box mb={2}>
-            <OverviewTabs
-              value={activeTab}
-              onChange={setActiveTab}
-            />
+            <OverviewTabs value={activeTab} onChange={setActiveTab} />
           </Box>
 
           {/* TAB CONTENT */}
-          {activeTab === "source" && (
-  <SourcePerformanceChart />
-)}
-                    {activeTab === "communication" && <CommunicationChart />}
+          {activeTab === "source" && <SourcePerformanceChart />}
+          {activeTab === "communication" && <CommunicationChart />}
           {activeTab === "conversion" && <ConversionTrendChart />}
 
           {activeTab === "pipeline" && <LeadPipelineFunnel />}
-          
+
           {activeTab === "appointments" && <AppointmentsChart />}
 
           {activeTab === "team" && <TeamPerformanceTab />}
-
         </Card>
       </Box>
 
       {/* RIGHT SLA CARD */}
       <Card
-  sx={{
-    p: 2,
-    maxHeight: "calc(100vh - 240px)",
-    overflowY: "auto",
-    alignSelf: "stretch",
-  }}
+        sx={{
+          p: 2,
+          maxHeight: "calc(100vh - 240px)",
+          overflowY: "auto",
+          alignSelf: "start",
+          minHeight: "100%",
+        }}
       >
         <SlaAlerts />
       </Card>

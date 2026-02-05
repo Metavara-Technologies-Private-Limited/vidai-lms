@@ -11,7 +11,7 @@ export const overviewTabsStyles = {
     textTransform: "none",
     px: 1,
     fontWeight: 600,
-    fontSize: 12,
+    fontSize: 11,
     backgroundColor: active ? "#FFF8F6" : "#fafafa",
     color: active ? "#E17E61" : "#9e9e9e",
     border: active ? "1px solid" : "none",

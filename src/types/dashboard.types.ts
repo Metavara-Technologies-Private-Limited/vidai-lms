@@ -2,6 +2,7 @@ export type Severity = "high" | "medium";
 
 export type KpiBreakdown = {
   label: string;
+  id: string;
   value: number;
 };
 
