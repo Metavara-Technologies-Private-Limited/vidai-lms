@@ -25,17 +25,21 @@ const MainLayout = () => {
         }}
       >
         <Header />
-        <Box className={styles.cardWrapper} m={0}>
-<Box 
-  className={styles.card} 
-  sx={{ 
-    flexGrow: 1, 
-    overflowY: "auto", 
-    height: "100%" ,
-  }}
->
-  <Outlet />
-</Box>
+        <Box
+          className={styles.cardWrapper}
+          m={0}
+          sx={{ maxHeight: "calc(100vh - 80px)", overflowY: "auto" }}
+        >
+          <Box
+            className={styles.card}
+            sx={{
+              flexGrow: 1,
+              overflowY: "auto",
+              height: "auto",
+            }}
+          >
+            <Outlet />
+          </Box>
         </Box>
       </Box>
     </Box>

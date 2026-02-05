@@ -6,9 +6,15 @@ export const mockData: MockData = {
     { id: "newLeads", label: "New Leads", value: 41 },
     { id: "appointments", label: "Appointments", value: 20 },
     { id: "followUps", label: "Follow Ups", value: 20 },
-    { id: "totalConverted", label: "Total Converted", value: 56 }, 
-    { id: "register", label: "Register", value: 36 },
-    { id: "treatment", label: "Treatment", value: 20 },
+    {
+      id: "totalConverted",
+      label: "Total Converted",
+      value: 56,
+      breakdown: [
+        { id: "register", label: "Register", value: 36 },
+        { id: "treatment", label: "Treatment", value: 20 },
+      ],
+    },
     { id: "lostLeads", label: "Lost Leads", value: 8 },
   ],
 
