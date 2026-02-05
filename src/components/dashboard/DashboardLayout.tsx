@@ -19,7 +19,6 @@ import TeamPerformanceTab from "./TeamPerformanceTab";
 const DashboardLayout = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
   const [activeTab, setActiveTab] = useState<OverviewTab>("source");
-
   return (
     <Box
       sx={{
@@ -29,28 +28,14 @@ const DashboardLayout = () => {
           md: "3fr 1fr",
         },
         gap: 2,
-        alignItems: "stretch",
-        height: "auto",
-        overflow: "hidden",
+        alignItems: "flex-start",
       }}
     >
-      {/* TITLE + KPI CARDS (FULL WIDTH) */}
-      <Box sx={{ gridColumn: "1 / -1" }}>
-        <Typography
-          sx={{ mb: 1 }}
-          fontWeight={700}
-          fontSize="18px"
-          color="#232323"
-        >
-          Refer MD Dashboard
-        </Typography>
-
-        <KpiCards />
-      </Box>
-
-      {/* LEFT CONTENT */}
+      {/* LEFT SECTION */}
       <Box>
-        <Card sx={{ p: 2 }}>
+        <KpiCards />
+
+        <Card sx={{ p: 2, mt: 2 }}>
           {/* HEADER */}
           <Box
             display="flex"
@@ -58,15 +43,7 @@ const DashboardLayout = () => {
             alignItems="center"
             mb={2}
           >
-            <Typography
-              sx={{
-                fontWeight: 650,
-                fontSize: "14px",
-                color: "#232323",
-              }}
-            >
-              Over View
-            </Typography>
+            <Typography fontWeight={600}>Over View</Typography>
 
             <TimeRangeSelector
               value={timeRange}
@@ -82,7 +59,7 @@ const DashboardLayout = () => {
             />
           </Box>
 
-          {/* TAB CONTENT */}
+          {/* TAB CONTENT (placeholder for now) */}
           {activeTab === "source" && (
   <SourcePerformanceChart />
 )}
@@ -100,12 +77,11 @@ const DashboardLayout = () => {
 
       {/* RIGHT SLA CARD */}
       <Card
-  sx={{
-    p: 2,
-    maxHeight: "calc(100vh - 240px)",
-    overflowY: "auto",
-    alignSelf: "stretch",
-  }}
+        sx={{
+          p: 2,
+          maxHeight: "calc(100vh - 120px)",
+          overflowY: "auto",
+        }}
       >
         <SlaAlerts />
       </Card>

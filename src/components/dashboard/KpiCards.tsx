@@ -43,13 +43,32 @@ const getCardStyle = (id: string) => {
 
 const KpiCards = () => {
   return (
-    <Box sx={kpiCardsStyles.grid}>
+    <Box
+      sx={{
+        ...kpiCardsStyles.grid,
+        display: "flex",
+        gap: 1.5,
+        overflowX: "auto",
+        flexWrap: "nowrap",
+        width: "100%",
+        pb: 1,
+        // Custom slim scrollbar to match the design
+        "&::-webkit-scrollbar": { height: "5px" },
+        "&::-webkit-scrollbar-thumb": {
+          backgroundColor: "#daddf0",
+          borderRadius: "10px",
+        },
+      }}
+    >
       {mockData.kpis.map((item) => (
         <Card
           key={item.id}
           sx={{
             ...kpiCardsStyles.cardBase,
             ...getCardStyle(item.id),
+            flexShrink: 0,
+            width: item.id === "totalConverted" ? "calc(50% - 12px)" : "calc(25% - 12px)",
+            minWidth: item.id === "totalConverted" ? "20px" : "20px",
           }}
         >
           {/* ICON */}

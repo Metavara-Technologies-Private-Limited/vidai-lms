@@ -106,7 +106,7 @@ const TeamPerformanceTab = () => {
         {/* 4. Low Performers Right Column */}
         <Grid item xs={4}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Low Performers</Typography>
-          <Card sx={{ p: 2, borderRadius: '16px', border: '1px solid #f0f0f0' }}>
+          <Card sx={{ p: 2, borderRadius: '16px', border: '1px solid #f0f0f0',   }}>
             {lowPerformers.map((lp, i) => (
               <Stack key={i} direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5, "&:last-child": { mb: 0 } }}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
