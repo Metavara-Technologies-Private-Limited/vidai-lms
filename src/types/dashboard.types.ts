@@ -70,7 +70,6 @@ export interface MockData {
     new: SlaAlert[];
     earlier: SlaAlert[];
   };
-<<<<<<< Updated upstream
 overview: {
   activeTab: string;
 
@@ -125,18 +124,6 @@ overview: {
       rate: string;
       revenue: string;
       sla: string;
-=======
-  overview: {
-    activeTab: string;
-    sourcePerformance: SourcePerformance[];
-    communicationPerformance: CommunicationPerformance[];
-    conversionTrendPerformance: ConversionTrend[];
-    pipelineData: PipelineStage[];
-    appointmentsPerformance: AppointmentStatus[];
-    teamPerformance: {
-      members: TeamMember[];
-      overview: Record<string, string>; // Flexible object for the stats card
->>>>>>> Stashed changes
     };
   };
 };
