@@ -5,10 +5,10 @@ const Dashboard = () => {
   return (
     <Box
       sx={{
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-        mb: 1,   
+        width: "auto",
+        height: "700px",
+        overflowY: "auto",   // ✅ THIS IS THE KEY
+        paddingBottom: 4,    // ✅ ensures bottom edge is visible
       }}
     >
       <DashboardLayout />
