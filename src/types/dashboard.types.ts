@@ -1,14 +1,9 @@
-/* =======================
-   COMMON / SHARED TYPES
-======================= */
-
 export type Severity = "high" | "medium";
 
-export interface KpiBreakdown {
-  id: string;
+export type KpiBreakdown = {
   label: string;
   value: number;
-}
+};
 
 export interface KpiItem {
   id: string;
@@ -25,120 +20,69 @@ export interface SlaAlert {
   severity: Severity;
 }
 
-/* =======================
-   PERFORMANCE TYPES
-======================= */
-
-export interface SourcePerformance {
-  name: string;
-  campaign: string;
-  hot: number;
-  warm: number;
-  cold: number;
-  convRate: number;
-  revenue: number;
-  cost: number;
-}
-
-export interface CommunicationPerformance {
-  platform: string;
-  high: number;
-  low: number;
-  no: number;
-}
-
-export interface ConversionTrend {
-  month: string;
-  rate: number;
-}
-
-export interface PipelineStage {
-  stage: string;
-  value: number;
-  color: string;
-}
-
-export interface AppointmentStatus {
-  status: string;
-  value: number;
-  color?: string;
-}
-
-/* =======================
-   TEAM PERFORMANCE
-======================= */
-
-export type MedalType = "1st" | "2nd" | "3rd";
-
-export interface TeamMember {
-  name: string;
-  role: string;
-  img: string;
-  growth: string;
-  rank?: string;
-}
-
-export interface TeamOverviewStats {
-  calls: string;
-  followUps: string;
-  appointments: string;
-  converted: string;
-  rate: string;
-  revenue: string;
-  sla: string;
-}
-
-export interface TeamPerformance {
-  members: TeamMember[];
-  overview: Record<string, string>;
-}
-
-/* =======================
-   MEMBER DETAIL VIEW
-======================= */
-
-export interface MemberStats {
-  assignedLeads: number;
-  callsMade: number;
-  followUps: number;
-  appointments: number;
-  leadConverted: number;
-  revenueGenerated: string;
-  slaCompliance: string;
-}
-
-export interface PerformanceChartPoint {
-  month: string;
-  value: number;
-}
-
-/* =======================
-   ROOT MOCK DATA SHAPE
-======================= */
-
 export interface MockData {
   kpis: KpiItem[];
   slaAlerts: {
     new: SlaAlert[];
     earlier: SlaAlert[];
   };
-  overview: {
-    activeTab: string;
-    sourcePerformance: SourcePerformance[];
-    communicationPerformance: CommunicationPerformance[];
-    conversionTrendPerformance: ConversionTrend[];
-    pipelineData: PipelineStage[];
-    appointmentsPerformance: AppointmentStatus[];
-    teamPerformance: TeamPerformance;
-  };
-}
+overview: {
+  activeTab: string;
 
-export interface CustomTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    value: number;
+  sourcePerformance: {
     name: string;
-    dataKey: string;
-  }>;
-  label?: string;
+    campaign: string;
+    hot: number;
+    warm: number;
+    cold: number;
+    convRate: number;
+    revenue: number;
+    cost: number;
+  }[];
+
+  communicationPerformance: {
+    platform: string;
+    high: number;
+    low: number;
+    no: number;
+  }[];
+
+  conversionTrendPerformance: {
+    month: string;
+    rate: number;
+  }[];
+
+  pipelineData: {
+    stage: string;
+    value: number;
+    color: string;
+  }[];
+
+  appointmentsPerformance: {
+    status: string;
+    value: number;
+    color: string;
+  }[];
+
+  teamPerformance: {
+    members: {
+      name: string;
+      role: string;
+      img: string;
+      growth: string;
+      rank?: string;
+    }[];
+    overview: {
+      calls: string;
+      followUps: string;
+      appointments: string;
+      converted: string;
+      rate: string;
+      revenue: string;
+      sla: string;
+    };
+  };
+};
+
 }
+  
