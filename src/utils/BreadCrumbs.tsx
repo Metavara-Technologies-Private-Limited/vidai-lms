@@ -12,7 +12,7 @@ const allMenus = [
   ...DOCUMENTS_MENU,
   ...RISK_MENU,
   ...COMPLIANCE_MENU,
-];
+].flatMap((menu) => [menu, ...(menu.subMenu || [])]);
 
 export const DynamicBreadcrumbs = () => {
   const location = useLocation();
@@ -48,7 +48,11 @@ export const DynamicBreadcrumbs = () => {
     const path = `/${pathnames.slice(0, idx + 1).join("/")}`;
     const menuItem = allMenus.find((m) => m.path === path);
     return {
-      label: menuItem?.label || pathnames[idx].replace(/-/g, " "),
+label:
+  menuItem?.label ||
+  pathnames[idx]
+    .replace(/-/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase()),
       path,
     };
   });

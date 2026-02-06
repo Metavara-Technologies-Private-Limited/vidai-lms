@@ -28,7 +28,7 @@ const MainLayout = () => {
         <Box
           className={styles.cardWrapper}
           m={0}
-          sx={{ maxHeight: "calc(100vh - 80px)", overflowY: "auto" }}
+          sx={{maxHeight: "calc(100vh - 80px)", overflowY: "auto" }}
         >
           <Box
             className={styles.card}
