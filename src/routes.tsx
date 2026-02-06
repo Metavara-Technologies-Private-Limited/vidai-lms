@@ -4,6 +4,10 @@ import { Suspense } from "react";
 import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 
+import Integration from "./components/Settings/Menus/Integration";
+import Templates from "./components/Settings/Menus/Templates";
+import Tickets from "./components/Settings/Menus/Tickets";
+
 // 👇 import page directly (not sidebar-driven)
 import AddNewLead from "./components/LeadsHub/AddNewLead";
 
@@ -13,6 +17,34 @@ export default function AppRoutes() {
       <Route path="/" element={<MainLayout />}>
         {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
+        {/* Settings sub routes */}
+<Route
+  path="settings/integration"
+  element={
+    <Suspense fallback={<div>Loading...</div>}>
+      <Integration />
+    </Suspense>
+  }
+/>
+
+<Route
+  path="settings/templates"
+  element={
+    <Suspense fallback={<div>Loading...</div>}>
+      <Templates />
+    </Suspense>
+  }
+/>
+
+<Route
+  path="settings/tickets"
+  element={
+    <Suspense fallback={<div>Loading...</div>}>
+      <Tickets />
+    </Suspense>
+  }
+/>
+
 
         {/* sidebar routes */}
         {SIDEBAR_TABS.flatMap((tab) =>
@@ -22,7 +54,7 @@ export default function AppRoutes() {
               path={item.path.replace("/", "")}
               element={
                 <Suspense fallback={<div>Loading...</div>}>
-                  <item.page />
+                {item.page && <item.page />}
                 </Suspense>
               }
             />
