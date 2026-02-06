@@ -1,101 +1,126 @@
-import React, { useState } from "react";
-import { Zap } from "lucide-react";
-import {
-  INTEGRATION_STYLES,
-  PLATFORMS,
-  getStatusMessage,
-} from "../../../styles/Settings/Integration.styles";
-import type { IntegrationState } from "../../../types/integration.types";
+import { useState } from "react";
+import { Card, Box, Typography, Button } from "@mui/material";
 
-const Integration: React.FC = () => {
-  const [integrations, setIntegrations] = useState<IntegrationState>({
-    facebook: { connected: true },
-  });
+import Facebook from "../../../assets/icons/Facebook.svg";
+import Instagram from "../../../assets/icons/Instagram.svg";
+import Linkedin from "../../../assets/icons/Linkedin.svg";
+import GoogleAds from "../../../assets/icons/Google_Ads.svg";
+import GoogleCalender from "../../../assets/icons/Google_Calender.svg";
 
-  const handleToggle = (key: string, isConnected: boolean): void => {
-    setIntegrations((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], connected: !isConnected },
-    }));
-  };
+import ConnectedLogo from "../../../assets/icons/Connected-Logo.svg";
+import NotConnectedLogo from "../../../assets/icons/Not-Connected-Logo.svg";
+
+import type{ IntegrationCardProps } from "../../../types/Integration.types";
+import { styles } from "../../../styles/Settings/Integration.styles";
+
+/* ------------------------------------------------------------------ */
+/* Reusable Integration Card */
+/* ------------------------------------------------------------------ */
+const IntegrationCard = ({
+  name,
+  description,
+  icon,
+  headerBgColor,
+}: IntegrationCardProps) => {
+  const [connected, setConnected] = useState(false);
 
   return (
-    <div className="p-1">
-      <h1 className="text-2xl font-bold text-slate-900">Integration</h1>
-      <p className="text-sm text-slate-500 mb-8">
-        Connect your favorite tools and platforms
-      </p>
+    <Card sx={styles.card}>
+      {/* Header */}
+      <Box sx={styles.header(headerBgColor)}>
+        <Box component="img" src={icon} alt={name} sx={styles.headerIcon} />
+        <Box>
+          <Typography sx={styles.headerTitle}>{name}</Typography>
+          <Typography sx={styles.headerDescription}>
+            {description}
+          </Typography>
+        </Box>
+      </Box>
 
-      <div className={INTEGRATION_STYLES.content.grid}>
-        {PLATFORMS.map((platform) => {
-          const isConnected = integrations[platform.key]?.connected ?? false;
+      {/* Status */}
+      <Box sx={styles.statusWrapper}>
+        <Box sx={styles.statusIconWrapper}>
+          <Box
+            component="img"
+            src={connected ? ConnectedLogo : NotConnectedLogo}
+            alt="status"
+            sx={styles.statusIcon}
+          />
+        </Box>
 
-          return (
-            <div
-              key={platform.key}
-              className={`${INTEGRATION_STYLES.card.base}`}
-            >
-              {/* Header */}
-              <div className={INTEGRATION_STYLES.cardHeader.wrapper}>
-                <div className={INTEGRATION_STYLES.cardHeader.iconWrapper}>
-                  {platform.icon}
-                </div>
-                <div>
-                  <h3 className={INTEGRATION_STYLES.cardHeader.platformName}>
-                    {platform.name}
-                  </h3>
-                  <p className={INTEGRATION_STYLES.cardHeader.description}>
-                    {platform.description}
-                  </p>
-                </div>
-              </div>
+        <Typography sx={styles.statusTitle}>
+          {connected ? "Connected" : "Not Connected"}
+        </Typography>
 
-              {/* Divider */}
-              <div className={INTEGRATION_STYLES.divider} />
+        <Typography sx={styles.statusDescription}>
+          {connected
+            ? `Awesome!! your ${name} account is all setup and connected.`
+            : `Connect Your ${name} account to get Started.`}
+        </Typography>
+      </Box>
 
-              {/* Body */}
-              <div className={INTEGRATION_STYLES.cardBody.wrapper}>
-                <div className={INTEGRATION_STYLES.cardBody.statusIconWrapper}>
-                  <Zap
-                    className={
-                      isConnected
-                        ? INTEGRATION_STYLES.cardBody.statusIcon.connected
-                        : INTEGRATION_STYLES.cardBody.statusIcon.disconnected
-                    }
-                    fill={isConnected ? "currentColor" : "none"}
-                  />
-                </div>
+      {/* Action */}
+      <Box sx={styles.buttonWrapper}>
+        <Button
+          variant="outlined"
+          sx={styles.actionButton(connected)}
+          onClick={() => setConnected(!connected)}
+          startIcon={
+            <Box component="img" src={icon} sx={styles.buttonIcon} />
+          }
+        >
+          {connected ? "Disconnect" : "Connect"}
+        </Button>
+      </Box>
+    </Card>
+  );
+};
 
-                <h4 className={INTEGRATION_STYLES.cardBody.statusText}>
-                  {isConnected ? "Connected" : "Not Connected"}
-                </h4>
+/* ------------------------------------------------------------------ */
+/* Integration Page */
+/* ------------------------------------------------------------------ */
+const Integration = () => {
+  return (
+    <Box>
+      <Typography sx={styles.pageTitle}>Integration</Typography>
 
-                <p className={INTEGRATION_STYLES.cardBody.message}>
-                  {getStatusMessage(isConnected, platform.name)}
-                </p>
+      <Box sx={styles.gridWrapper}>
+        <IntegrationCard
+          name="Facebook"
+          description="For Run campaigns, publish posts"
+          icon={Facebook}
+          headerBgColor="rgba(45, 107, 240, 0.04)"
+        />
 
-                <button
-                  onClick={() => handleToggle(platform.key, isConnected)}
-                  className={INTEGRATION_STYLES.button}
-                >
-                  {platform.icon}
-                  {isConnected ? "Disconnect" : "Connect"}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+        <IntegrationCard
+          name="Instagram"
+          description="For Run campaigns, publish posts"
+          icon={Instagram}
+          headerBgColor="rgba(243, 118, 79, 0.06)"
+        />
 
-      <div className={INTEGRATION_STYLES.infoSection.wrapper}>
-        <h3 className={INTEGRATION_STYLES.infoSection.title}>Why Connect?</h3>
-        <p className={INTEGRATION_STYLES.infoSection.description}>
-          Integrating your favorite platforms streamlines your workflow,
-          automates campaign management, and keeps all your data synchronized in
-          one place.
-        </p>
-      </div>
-    </div>
+        <IntegrationCard
+          name="LinkedIn"
+          description="For Publish"
+          icon={Linkedin}
+          headerBgColor="rgba(61, 128, 179, 0.06)"
+        />
+
+        <IntegrationCard
+          name="Google Ads"
+          description="Google Ads Account"
+          icon={GoogleAds}
+          headerBgColor="rgba(255, 193, 7, 0.06)"
+        />
+
+        <IntegrationCard
+          name="Google Calendar"
+          description="For appointments, calls, meets.."
+          icon={GoogleCalender}
+          headerBgColor="rgba(0, 133, 247, 0.04)"
+        />
+      </Box>
+    </Box>
   );
 };
 

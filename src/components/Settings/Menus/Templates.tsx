@@ -1,5 +1,5 @@
 const Templates = () => {
-  return <h1>Templates</h1>;
+  return <h3>Templates</h3>;
 };
 
 export default Templates;

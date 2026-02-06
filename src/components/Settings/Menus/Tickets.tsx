@@ -1,5 +1,5 @@
 const Tickets = () => {
-  return <h1>Tickets</h1>;
+  return <h3>Tickets</h3>;
 };
 
 export default Tickets;
