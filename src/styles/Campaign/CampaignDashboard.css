@@ -1,0 +1,336 @@
+/* ================= ROOT / PAGE ================= */
+
+.dashboard {
+  background: #f9fafb;
+  min-height: 100vh;
+  padding: 24px;
+  overflow-y: auto;              /* ✅ FIX: ENABLE SCROLL */
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ================= BACK BUTTON ================= */
+
+.back-btn {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.back-btn:hover {
+  background: #f3f4f6;
+}
+
+/* ================= HEADER CARD ================= */
+
+.campaign-header {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 28px;
+  margin-bottom: 28px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.campaign-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.campaign-icon {
+  width: 36px;
+  height: 36px;
+  background: #3b82f6;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.campaign-title-row h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  color: #111827;
+}
+
+/* ================= STATUS ================= */
+
+.status-live {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ================= INFO GRID ================= */
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 28px;
+  font-size: 13px;
+}
+
+.info-grid span {
+  display: block;
+  margin-bottom: 6px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.info-grid strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+/* ================= PLATFORM ICONS ================= */
+
+.platform-icons {
+  display: flex;
+  gap: 10px;
+}
+
+.platform-icons .fb,
+.platform-icons .insta {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.platform-icons .fb {
+  background: #1877f2;
+}
+
+.platform-icons .insta {
+  background: linear-gradient(
+    45deg,
+    #f09433 0%,
+    #e6683c 25%,
+    #dc2743 50%,
+    #cc2366 75%,
+    #bc1888 100%
+  );
+}
+
+/* ================= CREATOR ================= */
+
+.creator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ================= TAG ================= */
+
+.tag-paid {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+/* ================= METRICS GRID ================= */
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.metric-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.metric-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.metric-label {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.metric-value {
+  margin-top: 4px;
+  font-size: 30px;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* ================= CONTENT SECTION ================= */
+
+.content-box {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* ================= MAIN TABS ================= */
+
+.tabs {
+  display: flex;
+  gap: 28px;
+  border-bottom: 2px solid #f3f4f6;
+  margin-bottom: 24px;
+}
+
+.tabs button {
+  background: none;
+  border: none;
+  padding: 12px 0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.tabs .active {
+  color: #ef4444;
+  border-bottom: 2px solid #ef4444;
+  margin-bottom: -2px;
+}
+
+/* ================= PLATFORM TABS ================= */
+
+.platform-tabs {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.platform-tabs button {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.platform-tabs .active {
+  border: 2px solid #ef4444;
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* ================= CONTENT LAYOUT ================= */
+
+.content-layout {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 28px;
+}
+
+.content-layout h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 18px;
+}
+
+.content-layout p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+  margin-bottom: 16px;
+}
+
+.hashtags {
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+/* ================= AD PREVIEW ================= */
+
+.ad-preview {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.ad-preview img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ================= AD FOOTER ================= */
+
+.ad-footer {
+  padding: 18px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.ad-footer strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #111827;
+  font-weight: 600;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 1024px) {
+  .content-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}

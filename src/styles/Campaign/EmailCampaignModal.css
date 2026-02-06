@@ -1,0 +1,308 @@
+/* ================= EMAIL CAMPAIGN MODAL =================
+
+.campaign-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.campaign-modal {
+  position: relative;
+  width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 32px 36px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #777;
+  cursor: pointer;
+}
+
+.campaign-modal h2 {
+  margin: 0 0 28px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #111;
+}
+
+/* Stepper */
+.stepper {
+  display: flex;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e5e5e5;
+  color: #777;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.circle.completed {
+  background: #4caf50;
+  color: white;
+}
+
+.circle.current {
+  background: #ff9800;
+  color: white;
+}
+
+.line {
+  height: 2px;
+  background: #e5e5e5;
+  flex: 1;
+  margin: 0 16px;
+}
+
+.line.completed {
+  background: #4caf50;
+}
+
+.step span {
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+}
+
+.step.active span {
+  color: #111;
+  font-weight: 500;
+}
+
+/* Content */
+.step-content h3 {
+  margin: 0 0 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #111;
+}
+
+.form-group {
+  margin-bottom: 28px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0 16px;
+  height: 44px;
+  border: 1px solid #d0d0d0;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+
+.form-group textarea {
+  min-height: 140px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #666;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+
+.input-wrapper {
+  position: relative;
+}
+
+.ai-suggest {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #7c3aed;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Error */
+input.error,
+select.error,
+textarea.error {
+  border-color: #e53e3e !important;
+}
+
+.error-text {
+  color: #e53e3e;
+  font-size: 13px;
+  margin-top: 6px;
+  display: block;
+}
+
+/* Layout */
+.form-row {
+  display: flex;
+  gap: 24px;
+}
+
+.form-group.half {
+  flex: 1;
+}
+
+/* Step 2 */
+.email-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.secondary-btn {
+  padding: 8px 16px;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.secondary-btn:hover {
+  background: #f9f9f9;
+}
+
+.helper-text {
+  font-size: 13px;
+  color: #666;
+  margin: 6px 0 12px;
+}
+
+/* Step 3 - Schedule - Horizontal layout */
+.schedule-container {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.date-range input[type="date"] {
+  flex: 1;
+  min-width: 160px;
+}
+
+.date-range span {
+  color: #666;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.time-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.time-picker input[type="time"] {
+  flex: 1;
+}
+
+/* Buttons */
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.modal-actions button {
+  flex: 1;
+  height: 48px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cancel-btn {
+  background: #f5f5f5;
+  color: #111;
+  border: none;
+}
+
+.cancel-btn:hover {
+  background: #e8e8e8;
+}
+
+.draft-btn {
+  background: #e0e0e0;
+  color: #111;
+  border: none;
+}
+
+.draft-btn:hover {
+  background: #d0d0d0;
+}
+
+.primary-btn {
+  background: #111;
+  color: white;
+  border: none;
+}
+
+.primary-btn:hover {
+  background: #222;
+}
+
+.primary-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+} */

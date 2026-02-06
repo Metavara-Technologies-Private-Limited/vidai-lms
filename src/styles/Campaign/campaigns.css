@@ -1,0 +1,146 @@
+/* ================= PAGE ================= */
+
+.campaigns-page {
+  padding: 24px;
+  background: #fafafa;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* ================= FILTERS ================= */
+
+.filters-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 20px 0;
+  gap: 16px;
+}
+
+/* ---------- TABS ---------- */
+
+.tabs {
+  display: flex;
+  gap: 12px;
+}
+
+.tab-btn {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e5e5;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: #f9fafb;
+}
+
+.tab-btn.active {
+  border-color: #e5e5e5;
+  color: #000000;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+/* ================= RIGHT FILTERS ================= */
+
+.right-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ================= SEARCH ================= */
+
+.search-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.search-input input {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  width: 200px;
+  background: transparent;
+}
+
+.search-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* ================= STATUS DROPDOWN ================= */
+
+.right-filters select {
+  height: 40px;
+  padding: 0 36px 0 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e5e5;
+  background: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+/* ================= GRID ================= */
+
+.campaign-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(495px, 1fr));
+  gap: 16px;
+}
+
+/* ================= EMPTY STATE ================= */
+
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 1024px) {
+  .campaign-grid {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .right-filters {
+    justify-content: space-between;
+  }
+
+  .search-input input {
+    width: 100%;
+  }
+
+  .campaign-grid {
+    grid-template-columns: 1fr;
+  }
+}

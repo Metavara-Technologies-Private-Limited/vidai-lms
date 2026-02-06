@@ -1,0 +1,147 @@
+/* ================= ADD CAMPAIGN MODAL ================= */
+
+.campaign-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.campaign-modal {
+  width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.close-btn {
+  border: none;
+  background: #f1f1f1;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.modal-subtitle {
+  margin: 20px 0 12px;
+  font-weight: 600;
+}
+
+/* ================= CAMPAIGN TYPE CARD ================= */
+
+.campaign-type-card {
+  border: 1px solid #eaeaea;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.card-icon.social {
+  background: #eaf2ff;
+}
+
+.card-icon.email {
+  background: #fff3df;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.badge.paid {
+  background: #eeeeee;
+}
+
+.badge.free {
+  background: #eeeeee;
+}
+
+/* ================= GREEN CHECK LIST ================= */
+
+.campaign-type-card ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 12px 0 0;
+}
+
+.campaign-type-card li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #333333;
+}
+
+.campaign-type-card li::before {
+  content: "✓";
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e7f8ee;
+  color: #2ecc71;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.campaign-type-card h5 {
+  margin: 14px 0 6px;
+  font-size: 16px;
+}
+
+.campaign-type-card p {
+  font-size: 14px;
+  color: #666666;
+  margin-bottom: 12px;
+}
+
+.campaign-type-card ul {
+  padding-left: 18px;
+  margin: 0;
+}
+
+.campaign-type-card li {
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #333;
+}
