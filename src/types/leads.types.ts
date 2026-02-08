@@ -8,6 +8,9 @@ export type Status =
 
 export type Quality = "Hot" | "Warm" | "Cold";
 
+/* ✅ NEW TYPE */
+export type TaskStatus = "Pending" | "In Progress" | "Completed";
+
 export type Lead = {
   initials: string;
   name: string;
@@ -21,4 +24,8 @@ export type Lead = {
   score: string;
   assigned: string;
   task: string;
+
+  /* ✅ NEW FIELDS FOR TABLE */
+  taskStatus: TaskStatus;
+  activity: string;
 };

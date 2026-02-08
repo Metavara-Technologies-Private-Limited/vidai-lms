@@ -1,388 +1,580 @@
 import * as React from "react";
 import {
   Box,
+  Card,
   Typography,
-  Stepper,
-  Step,
-  StepLabel,
-  Grid,
   TextField,
+  Select,
   MenuItem,
-  Button,
-  Stack,
   RadioGroup,
   FormControlLabel,
   Radio,
-  Divider,
+  Grid,
+  Button,
+  Stepper,
+  Step,
+  StepLabel,
+  FormControl,
+  InputLabel,
+  OutlinedInput,
 } from "@mui/material";
+
+type FormState = {
+  fullName: string;
+  contact: string;
+  email: string;
+  location: string;
+  gender: string;
+  age: string;
+  marital: string;
+  address: string;
+  language: string;
+
+  partnerName: string;
+  partnerAge: string;
+  partnerGender: string;
+
+  source: string;
+  subSource: string;
+  campaign: string;
+
+  assignee: string;
+  nextType: string;
+  nextStatus: string;
+  nextDesc: string;
+
+  treatmentInterest: string;
+  treatments: string[];
+  documents: File | null;
+
+  // STEP 3
+  wantAppointment: "yes" | "no";
+  department: string;
+  personnel: string;
+  appointmentDate: string;
+  slot: string;
+  remark: string;
+};
 
 const steps = ["Patient Details", "Medical Details", "Book Appointment"];
 
-const fieldSx = {
-  "& .MuiOutlinedInput-root": {
-    height: 44,
-    borderRadius: "8px",
-    backgroundColor: "#fff",
-  },
-};
+const OutlinedSelect = ({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: any;
+  onChange: any;
+  children: React.ReactNode;
+}) => (
+  <FormControl fullWidth>
+    <InputLabel shrink>{label}</InputLabel>
+    <Select
+      value={value}
+      onChange={onChange}
+      input={<OutlinedInput notched label={label} />}
+    >
+      {children}
+    </Select>
+  </FormControl>
+);
 
-const AddNewLead: React.FC = () => {
+const patientRows = [
+  [
+    { key: "fullName", label: "Full Name" },
+    { key: "contact", label: "Contact No." },
+    { key: "email", label: "Email" },
+    { key: "location", label: "Location / Address" },
+  ],
+  [
+    {
+      key: "gender",
+      label: "Gender",
+      type: "select",
+      options: ["Male", "Female"],
+    },
+    { key: "age", label: "Age" },
+    {
+      key: "marital",
+      label: "Marital Status",
+      type: "select",
+      options: ["Married", "Single"],
+    },
+    { key: "address", label: "Address" },
+  ],
+  [
+    {
+      key: "language",
+      label: "Language",
+      type: "select",
+      options: ["English", "Hindi"],
+    },
+  ],
+];
+
+export default function AddNewLead() {
   const [activeStep, setActiveStep] = React.useState(0);
+  const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
 
-  const [form, setForm] = React.useState({
+  const [form, setForm] = React.useState<FormState>({
     fullName: "John Smith",
     contact: "+91 54211 54121",
     email: "johns@gmail.com",
-    location: "201, HM Streets, LA Jolla, California",
+    location: "California",
     gender: "Male",
     age: "32",
-    maritalStatus: "Married",
-    address: "201, HM Streets, LA Jolla, California",
+    marital: "Married",
+    address: "California",
     language: "English",
-    isCouple: "yes",
+
     partnerName: "Jennifer Smith",
     partnerAge: "29",
     partnerGender: "Female",
+
     source: "Social Media",
     subSource: "Facebook",
-    campaign: "Facebook IVF Awareness - December",
-    assignedTo: "",
-    nextActionType: "",
-    nextActionStatus: "",
-    nextActionDesc: "",
+    campaign: "Facebook IVF Awareness – December",
+
+    assignee: "Henry Cavill",
+    nextType: "Follow Up",
+    nextStatus: "To Do",
+    nextDesc: "",
+
+    treatmentInterest: "",
+    treatments: [],
+    documents: null,
+
+    // STEP 3
+    wantAppointment: "yes",
+    department: "Consultation",
+    personnel: "Dr. Alex Carrey",
+    appointmentDate: "2024-12-09",
+    slot: "12:30 PM - 01:00 PM",
+    remark: "",
   });
 
   const handleChange =
-    (key: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setForm({ ...form, [key]: e.target.value });
+    (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
-  const handleNext = () => setActiveStep((s) => s + 1);
-  const handleBack = () => setActiveStep((s) => s - 1);
+  const handleNext = () => {
+    if (activeStep === steps.length - 1) {
+      console.log("SUBMIT", form);
+      return;
+    }
+    setActiveStep((prev) => prev + 1);
+  };
+
+  const handleBack = () => setActiveStep((prev) => prev - 1);
+
+  const renderField = (field: any) => {
+    const key = field.key as keyof FormState;
+
+    if (field.type === "select") {
+      return (
+        <OutlinedSelect
+          label={field.label}
+          value={form[key]}
+          onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+        >
+          {field.options.map((opt: string) => (
+            <MenuItem key={opt} value={opt}>
+              {opt}
+            </MenuItem>
+          ))}
+        </OutlinedSelect>
+      );
+    }
+
+    return (
+      <TextField
+        fullWidth
+        label={field.label}
+        value={form[key]}
+        onChange={handleChange(key)}
+      />
+    );
+  };
 
   return (
-    <Box sx={{ p: 3, backgroundColor: "#f8fafc", minHeight: "100vh" }}>
-
-      {/* Title */}
-      <Typography fontSize={24} fontWeight={600} mb={3}>
+    <Card sx={{ p: 3 }}>
+      <Typography fontWeight={600} mb={2}>
         Add New Lead
       </Typography>
 
-      <Box
-        sx={{
-          background: "#fff",
-          borderRadius: 2,
-          p: 3,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-        }}
-      >
-        {/* STEPPER */}
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {steps.map((label, index) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
+      <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+        {steps.map((label) => (
+          <Step key={label}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
+
+      {/* STEP 1 — ALL DETAILS */}
+      {activeStep === 0 && (
+        <>
+          <Typography fontSize={13} fontWeight={600} mb={2}>
+            LEAD INFORMATION
+          </Typography>
+
+          {patientRows.map((row, i) => (
+            <Grid container spacing={2} mb={2} key={i}>
+              {row.map((field) => (
+                <Grid item xs={12 / row.length} key={field.key}>
+                  {renderField(field)}
+                </Grid>
+              ))}
+            </Grid>
           ))}
-        </Stepper>
 
-        {/* ================= STEP 1 ================= */}
-        {activeStep === 0 && (
-          <>
-            {/* LEAD INFORMATION */}
-            <Typography variant="caption" fontWeight={600} mb={2} display="block">
-              LEAD INFORMATION
-            </Typography>
+          <Typography fontSize={13} fontWeight={600} mt={3}>
+            PARTNER INFORMATION
+          </Typography>
 
-            <Grid container spacing={2} mb={4}>
-              <Grid item xs={3}>
+          <RadioGroup
+            row
+            value={isCouple}
+            onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}
+          >
+            <FormControlLabel value="yes" control={<Radio />} label="Yes" />
+            <FormControlLabel value="no" control={<Radio />} label="No" />
+          </RadioGroup>
+
+          {isCouple === "yes" && (
+            <Grid container spacing={2} mt={1}>
+              <Grid item xs={4}>
                 <TextField
+                  fullWidth
                   label="Full Name"
-                  value={form.fullName}
-                  onChange={handleChange("fullName")}
-                  fullWidth
-                  sx={fieldSx}
+                  value={form.partnerName}
+                  onChange={handleChange("partnerName")}
                 />
               </Grid>
-
-              <Grid item xs={3}>
+              <Grid item xs={4}>
                 <TextField
-                  label="Contact No."
-                  value={form.contact}
-                  onChange={handleChange("contact")}
                   fullWidth
-                  sx={fieldSx}
-                />
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Email"
-                  value={form.email}
-                  onChange={handleChange("email")}
-                  fullWidth
-                  sx={fieldSx}
-                />
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Location / Address"
-                  value={form.location}
-                  onChange={handleChange("location")}
-                  fullWidth
-                  sx={fieldSx}
-                />
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Gender"
-                  value={form.gender}
-                  onChange={handleChange("gender")}
-                  select
-                  fullWidth
-                  sx={fieldSx}
-                >
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
-                </TextField>
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
                   label="Age"
-                  value={form.age}
-                  onChange={handleChange("age")}
-                  type="number"
-                  fullWidth
-                  sx={fieldSx}
+                  value={form.partnerAge}
+                  onChange={handleChange("partnerAge")}
                 />
               </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Marital Status"
-                  value={form.maritalStatus}
-                  onChange={handleChange("maritalStatus")}
-                  select
-                  fullWidth
-                  sx={fieldSx}
+              <Grid item xs={4}>
+                <OutlinedSelect
+                  label="Gender"
+                  value={form.partnerGender}
+                  onChange={(e) =>
+                    setForm({ ...form, partnerGender: e.target.value })
+                  }
                 >
-                  <MenuItem value="Married">Married</MenuItem>
-                  <MenuItem value="Single">Single</MenuItem>
-                </TextField>
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Language Preference"
-                  value={form.language}
-                  onChange={handleChange("language")}
-                  select
-                  fullWidth
-                  sx={fieldSx}
-                >
-                  <MenuItem value="English">English</MenuItem>
-                  <MenuItem value="Hindi">Hindi</MenuItem>
-                </TextField>
+                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="Male">Male</MenuItem>
+                </OutlinedSelect>
               </Grid>
             </Grid>
+          )}
 
-            {/* PARTNER INFORMATION */}
-            <Typography variant="caption" fontWeight={600} mb={2} display="block">
-              PARTNER INFORMATION
-            </Typography>
-
-            <Typography variant="body2" fontSize={13} mb={2}>
-              Is This Inquiry For A Couple?
-            </Typography>
-
-            <RadioGroup
-              row
-              value={form.isCouple}
-              onChange={handleChange("isCouple")}
-              sx={{ mb: 2 }}
-            >
-              <FormControlLabel value="yes" control={<Radio />} label="Yes" />
-              <FormControlLabel value="no" control={<Radio />} label="No" />
-            </RadioGroup>
-
-            {form.isCouple === "yes" && (
-              <Grid container spacing={2} mb={4}>
-                <Grid item xs={4}>
-                  <TextField
-                    label="Full Name"
-                    value={form.partnerName}
-                    onChange={handleChange("partnerName")}
-                    fullWidth
-                    sx={fieldSx}
-                  />
-                </Grid>
-
-                <Grid item xs={4}>
-                  <TextField
-                    label="Age"
-                    value={form.partnerAge}
-                    onChange={handleChange("partnerAge")}
-                    type="number"
-                    fullWidth
-                    sx={fieldSx}
-                  />
-                </Grid>
-
-                <Grid item xs={4}>
-                  <TextField
-                    label="Gender"
-                    value={form.partnerGender}
-                    onChange={handleChange("partnerGender")}
-                    select
-                    fullWidth
-                    sx={fieldSx}
-                  >
-                    <MenuItem value="Male">Male</MenuItem>
-                    <MenuItem value="Female">Female</MenuItem>
-                  </TextField>
-                </Grid>
-              </Grid>
-            )}
-
-            {/* SOURCE & CAMPAIGN DETAILS */}
-            <Typography variant="caption" fontWeight={600} mb={2} display="block">
-              SOURCE & CAMPAIGN DETAILS
-            </Typography>
-
-            <Grid container spacing={2} mb={4}>
-              <Grid item xs={3}>
-                <TextField
-                  label="Source"
-                  value={form.source}
-                  onChange={handleChange("source")}
-                  select
-                  fullWidth
-                  sx={fieldSx}
-                >
-                  <MenuItem value="Social Media">Social Media</MenuItem>
-                </TextField>
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Sub Source"
-                  value={form.subSource}
-                  onChange={handleChange("subSource")}
-                  select
-                  fullWidth
-                  sx={fieldSx}
-                >
-                  <MenuItem value="Facebook">Facebook</MenuItem>
-                </TextField>
-              </Grid>
-
-              <Grid item xs={6}>
-                <TextField
-                  label="Campaign Name"
-                  value={form.campaign}
-                  onChange={handleChange("campaign")}
-                  fullWidth
-                  sx={fieldSx}
-                />
-              </Grid>
-            </Grid>
-
-            {/* ASSIGNEE & NEXT ACTION DETAILS */}
-            <Typography variant="caption" fontWeight={600} mb={2} display="block">
-              ASSIGNEE & NEXT ACTION DETAILS
-            </Typography>
-
-            <Grid container spacing={2}>
-              <Grid item xs={3}>
-                <TextField
-                  label="Assigned To"
-                  value={form.assignedTo}
-                  onChange={handleChange("assignedTo")}
-                  fullWidth
-                  sx={fieldSx}
-                />
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Next Action Type"
-                  value={form.nextActionType}
-                  onChange={handleChange("nextActionType")}
-                  fullWidth
-                  sx={fieldSx}
-                />
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Next Action Status"
-                  value={form.nextActionStatus}
-                  onChange={handleChange("nextActionStatus")}
-                  fullWidth
-                  sx={fieldSx}
-                />
-              </Grid>
-
-              <Grid item xs={3}>
-                <TextField
-                  label="Next Action Description"
-                  value={form.nextActionDesc}
-                  onChange={handleChange("nextActionDesc")}
-                  fullWidth
-                  sx={fieldSx}
-                />
-              </Grid>
-            </Grid>
-          </>
-        )}
-
-        {/* ================= STEP 2 ================= */}
-        {activeStep === 1 && (
-          <Typography variant="body1" color="textSecondary">
-            Medical Details - Coming Soon
+          <Typography fontSize={13} fontWeight={600} mt={4} mb={2}>
+            SOURCE & CAMPAIGN DETAILS
           </Typography>
-        )}
 
-        {/* ================= STEP 3 ================= */}
-        {activeStep === 2 && (
-          <Typography variant="body1" color="textSecondary">
-            Book Appointment - Coming Soon
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <OutlinedSelect
+                label="Source"
+                value={form.source}
+                onChange={(e) => setForm({ ...form, source: e.target.value })}
+              >
+                <MenuItem value="Social Media">Social Media</MenuItem>
+              </OutlinedSelect>
+            </Grid>
+            <Grid item xs={4}>
+              <OutlinedSelect
+                label="Sub-Source"
+                value={form.subSource}
+                onChange={(e) =>
+                  setForm({ ...form, subSource: e.target.value })
+                }
+              >
+                <MenuItem value="Facebook">Facebook</MenuItem>
+              </OutlinedSelect>
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                fullWidth
+                disabled
+                label="Campaign Name"
+                value={form.campaign}
+              />
+            </Grid>
+          </Grid>
+
+          <Typography fontSize={13} fontWeight={600} mt={4} mb={2}>
+            ASSIGNEE & NEXT ACTION DETAILS
           </Typography>
-        )}
 
-        {/* FOOTER BUTTONS */}
-        <Stack direction="row" justifyContent="flex-end" spacing={2} mt={4}>
-          <Button
-            variant="outlined"
-            onClick={() => {
-              setActiveStep(0);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={
-              activeStep === steps.length - 1
-                ? () => console.log("SUBMIT", form)
-                : handleNext
+          <Grid container spacing={2}>
+            <Grid item xs={3}>
+              <OutlinedSelect
+                label="Assigned To"
+                value={form.assignee}
+                onChange={(e) => setForm({ ...form, assignee: e.target.value })}
+              >
+                <MenuItem value="Henry Cavill">Henry Cavill</MenuItem>
+                <MenuItem value="Emma Watson">Emma Watson</MenuItem>
+              </OutlinedSelect>
+            </Grid>
+            <Grid item xs={3}>
+              <OutlinedSelect
+                label="Next Action Type"
+                value={form.nextType}
+                onChange={(e) => setForm({ ...form, nextType: e.target.value })}
+              >
+                <MenuItem value="Follow Up">Follow Up</MenuItem>
+                <MenuItem value="Call">Call</MenuItem>
+              </OutlinedSelect>
+            </Grid>
+            <Grid item xs={3}>
+              <OutlinedSelect
+                label="Next Action Status"
+                value={form.nextStatus}
+                onChange={(e) =>
+                  setForm({ ...form, nextStatus: e.target.value })
+                }
+              >
+                <MenuItem value="To Do">To Do</MenuItem>
+                <MenuItem value="Done">Done</MenuItem>
+              </OutlinedSelect>
+            </Grid>
+            <Grid item xs={3}>
+              <TextField
+                fullWidth
+                label="Next Action Description"
+                value={form.nextDesc}
+                onChange={handleChange("nextDesc")}
+              />
+            </Grid>
+          </Grid>
+        </>
+      )}
+
+      {/* STEP 2 */}
+
+     {activeStep === 1 && (
+  <>
+    <Typography fontSize={13} fontWeight={600} mb={2}>
+      TREATMENT INFORMATION
+    </Typography>
+
+    <Grid container spacing={2} mb={2}>
+      <Grid item xs={12}>
+        <OutlinedSelect
+          label="Treatment Interest"
+          value={form.treatmentInterest}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              treatmentInterest: e.target.value,
+              treatments: form.treatments.includes(e.target.value)
+                ? form.treatments
+                : [...form.treatments, e.target.value],
+            })
+          }
+        >
+          <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
+          <MenuItem value="IVF">IVF</MenuItem>
+          <MenuItem value="IUI">IUI</MenuItem>
+        </OutlinedSelect>
+      </Grid>
+    </Grid>
+
+    <Box display="flex" gap={1} flexWrap="wrap" mb={4}>
+      {form.treatments.map((item) => (
+        <Box
+          key={item}
+          sx={{
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 20,
+            bgcolor: "#fdecec",
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+            fontSize: 13,
+          }}
+        >
+          {item}
+          <Box
+            component="span"
+            sx={{ cursor: "pointer", color: "#ef4444", fontWeight: 600 }}
+            onClick={() =>
+              setForm({
+                ...form,
+                treatments: form.treatments.filter((t) => t !== item),
+              })
             }
+          >
+            ×
+          </Box>
+        </Box>
+      ))}
+    </Box>
+
+
+
+          <Typography fontSize={13} fontWeight={600} mb={2}>
+            DOCUMENTS & REPORTS
+          </Typography>
+
+          <Box
             sx={{
-              backgroundColor: "#1f2937",
-              "&:hover": {
-                backgroundColor: "#111827",
-              },
+              width: 360,
+              border: "1px solid #d1d5db",
+              borderRadius: 2,
+              px: 1.5,
+              py: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
             }}
           >
-            {activeStep === steps.length - 1 ? "Submit" : "Next"}
-          </Button>
-        </Stack>
-      </Box>
-    </Box>
-  );
-};
+            <Button
+              variant="contained"
+              component="label"
+              size="small"
+              sx={{
+                textTransform: "none",
+                bgcolor: "#9ca3af",
+                "&:hover": { bgcolor: "#9ca3af" },
+              }}
+            >
+              Choose File
+              <input
+                hidden
+                type="file"
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    documents: e.target.files ? e.target.files[0] : null,
+                  })
+                }
+              />
+            </Button>
 
-export default AddNewLead;
+            <Typography fontSize={12} color="text.secondary">
+              {form.documents ? form.documents.name : "No File Chosen"}
+            </Typography>
+          </Box>
+        </>
+      )}
+      {/* STEP 3 */}
+      {activeStep === 2 && (
+        <>
+          <Typography fontSize={13} fontWeight={600} mb={2}>
+            APPOINTMENT DETAILS
+          </Typography>
+
+          <Typography fontSize={12} mb={1}>
+            Want to Book an Appointment?
+          </Typography>
+
+          <RadioGroup
+            row
+            value={form.wantAppointment}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                wantAppointment: e.target.value as "yes" | "no",
+              })
+            }
+            sx={{ mb: 2 }}
+          >
+            <FormControlLabel value="yes" control={<Radio />} label="Yes" />
+            <FormControlLabel value="no" control={<Radio />} label="No" />
+          </RadioGroup>
+
+          {form.wantAppointment === "yes" && (
+            <>
+              <Grid container spacing={2} mb={2}>
+                <Grid item xs={3}>
+                  <OutlinedSelect
+                    label="Department *"
+                    value={form.department}
+                    onChange={(e) =>
+                      setForm({ ...form, department: e.target.value })
+                    }
+                  >
+                    <MenuItem value="Consultation">Consultation</MenuItem>
+                    <MenuItem value="IVF">IVF</MenuItem>
+                  </OutlinedSelect>
+                </Grid>
+
+                <Grid item xs={3}>
+                  <OutlinedSelect
+                    label="Personnel *"
+                    value={form.personnel}
+                    onChange={(e) =>
+                      setForm({ ...form, personnel: e.target.value })
+                    }
+                  >
+                    <MenuItem value="Dr. Alex Carrey">Dr. Alex Carrey</MenuItem>
+                    <MenuItem value="Dr. Emma Watson">Dr. Emma Watson</MenuItem>
+                  </OutlinedSelect>
+                </Grid>
+
+                <Grid item xs={3}>
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Date *"
+                    InputLabelProps={{ shrink: true }}
+                    value={form.appointmentDate}
+                    onChange={(e) =>
+                      setForm({ ...form, appointmentDate: e.target.value })
+                    }
+                  />
+                </Grid>
+
+                <Grid item xs={3}>
+                  <OutlinedSelect
+                    label="Select Slot *"
+                    value={form.slot}
+                    onChange={(e) => setForm({ ...form, slot: e.target.value })}
+                  >
+                    <MenuItem value="12:30 PM - 01:00 PM">
+                      12:30 PM - 01:00 PM
+                    </MenuItem>
+                    <MenuItem value="01:00 PM - 01:30 PM">
+                      01:00 PM - 01:30 PM
+                    </MenuItem>
+                  </OutlinedSelect>
+                </Grid>
+              </Grid>
+
+              <TextField
+                fullWidth
+                label="Remark"
+                placeholder="Type Here..."
+                value={form.remark}
+                onChange={(e) => setForm({ ...form, remark: e.target.value })}
+              />
+            </>
+          )}
+        </>
+      )}
+
+      <Box display="flex" justifyContent="flex-end" gap={2} mt={4}>
+        {activeStep > 0 && (
+          <Button variant="outlined" onClick={handleBack}>
+            Back
+          </Button>
+        )}
+        <Button variant="contained" onClick={handleNext}>
+          {activeStep === steps.length - 1 ? "Save" : "Next"}
+        </Button>
+      </Box>
+    </Card>
+  );
+}
