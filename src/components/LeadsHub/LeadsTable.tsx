@@ -14,116 +14,77 @@ import {
   Typography,
   Avatar,
   Paper,
-  Menu,
-  MenuItem,
-  ListItemIcon,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
-import CallIcon from "@mui/icons-material/Call";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
-import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 
 import { leadsMock } from "./leadsMock";
 import "../../styles/Leads/leads.css";
-
-import ReassignAssigneeDialog from "../../components/LeadsHub/ReassignAssigneeDialog";
-import ArchiveLeadDialog from "../../components/LeadsHub/ArchiveLeadDialog";
-import DeleteLeadDialog from "../../components/LeadsHub/DeleteLeadDialog";
-import CallDialog from "../../components/LeadsHub/CallDialog";
-
 import type { Lead } from "../../types/leads.types";
+
+import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
 
 interface Props {
   search: string;
+  tab: "active" | "archived";
 }
 
-const statusClass = (status: string) =>
-  `lead-chip status-${status.toLowerCase().replace(/\s+/g, "-")}`;
+const STORAGE_KEY = "vidai_leads_data";
 
-const qualityClass = (quality: string) =>
-  `lead-chip quality-${quality.toLowerCase()}`;
-
-const LeadsTable: React.FC<Props> = ({ search }) => {
+const LeadsTable: React.FC<Props> = ({ search, tab }) => {
   const navigate = useNavigate();
   const rowsPerPage = 10;
 
-  // ================= STATE =================
-  const [page, setPage] = React.useState(1);
-  const [filteredLeads, setFilteredLeads] = React.useState(leadsMock);
+  const [leads, setLeads] = React.useState<Lead[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+    const initial = leadsMock.map((l) => ({
+      ...l,
+      archived: l.archived ?? false,
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+    return initial;
+  });
 
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
-
-  const [openArchive, setOpenArchive] = React.useState(false);
-  const [openReassign, setOpenReassign] = React.useState(false);
-  const [openDelete, setOpenDelete] = React.useState(false);
-
-  const [openCall, setOpenCall] = React.useState(false);
-  const [callLeadName, setCallLeadName] = React.useState("");
-
-  // ================= EFFECT =================
   React.useEffect(() => {
-    const result = leadsMock.filter((lead) =>
-      `${lead.name} ${lead.id}`.toLowerCase().includes(search.toLowerCase()),
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+  }, [leads]);
+
+  const [page, setPage] = React.useState(1);
+  const [filteredLeads, setFilteredLeads] = React.useState<Lead[]>([]);
+
+  React.useEffect(() => {
+    const result = leads.filter((lead) => {
+      const matchSearch = `${lead.name} ${lead.id}`
+        .toLowerCase()
+        .includes(search.toLowerCase());
+      const matchTab = tab === "archived" ? lead.archived : !lead.archived;
+      return matchSearch && matchTab;
+    });
     setFilteredLeads(result);
     setPage(1);
-  }, [search]);
+  }, [search, leads, tab]);
 
-  // ================= PAGINATION =================
   const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
-
   const currentLeads = filteredLeads.slice(
     (page - 1) * rowsPerPage,
-    page * rowsPerPage,
+    page * rowsPerPage
   );
-
   const startEntry = (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
-  // ================= STICKY =================
-  const stickyContact = {
-    position: "sticky",
-    right: 60,
-    background: "#fff",
-    zIndex: 2,
-    minWidth: 120,
-  };
-
-  const stickyMenu = {
-    position: "sticky",
-    right: 0,
-    background: "#fff",
-    zIndex: 3,
-    width: 60,
-  };
-
   return (
     <>
-      {/* ================= TABLE ================= */}
-      <TableContainer
-        component={Paper}
-        elevation={0}
-        sx={{
-          overflowX: "auto", // ✅ horizontal scroll
-          overflowY: "hidden", // ❌ no vertical scroll
-        }}
-      >
-        <Table stickyHeader sx={{ minWidth: 1800 }}>
+      <TableContainer component={Paper} elevation={0} className="leads-table">
+        <Table stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox">
-                <Checkbox />
-              </TableCell>
+              <TableCell padding="checkbox"><Checkbox /></TableCell>
               <TableCell>Lead Name | No</TableCell>
               <TableCell>Date | Time</TableCell>
               <TableCell>Location</TableCell>
@@ -135,23 +96,26 @@ const LeadsTable: React.FC<Props> = ({ search }) => {
               <TableCell>Task Type</TableCell>
               <TableCell>Task Status</TableCell>
               <TableCell>Activity</TableCell>
-              <TableCell align="center" sx={stickyContact}>
-                Contact
-              </TableCell>
-              <TableCell align="center" sx={stickyMenu} />
+              <TableCell align="center">Contact</TableCell>
+              <TableCell align="center" />
             </TableRow>
           </TableHead>
 
           <TableBody>
             {currentLeads.map((lead) => (
-              <TableRow key={lead.id} hover>
-                <TableCell padding="checkbox">
-                  <Checkbox />
-                </TableCell>
+              <TableRow
+                key={lead.id}
+                hover
+                sx={{ cursor: "pointer" }}
+                onClick={() =>
+                  navigate(`/leads/${encodeURIComponent(lead.id.replace("#", ""))}`)
+                }
+              >
+                <TableCell padding="checkbox"><Checkbox /></TableCell>
 
                 <TableCell>
                   <Stack direction="row" spacing={2}>
-                    <Avatar>{lead.initials}</Avatar>
+                    <Avatar className="lead-avatar">{lead.initials}</Avatar>
                     <Box>
                       <Typography fontWeight={600}>{lead.name}</Typography>
                       <Typography variant="caption">{lead.id}</Typography>
@@ -170,16 +134,16 @@ const LeadsTable: React.FC<Props> = ({ search }) => {
                 <TableCell>
                   <Chip
                     label={lead.status}
-                    className={statusClass(lead.status)}
                     size="small"
+                    className={`status-${lead.status.toLowerCase().replace(" ", "-")}`}
                   />
                 </TableCell>
 
                 <TableCell>
                   <Chip
                     label={lead.quality}
-                    className={qualityClass(lead.quality)}
                     size="small"
+                    className={`quality-${lead.quality.toLowerCase()}`}
                   />
                 </TableCell>
 
@@ -193,45 +157,29 @@ const LeadsTable: React.FC<Props> = ({ search }) => {
 
                 <TableCell
                   sx={{ cursor: "pointer", color: "primary.main" }}
-                  onClick={() =>
-                    navigate("/leads/activity", { state: { lead } })
-                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/leads/activity", { state: { lead } });
+                  }}
                 >
                   {lead.activity || "View Activity"}
                 </TableCell>
 
-                {/* CONTACT */}
-                <TableCell align="center" sx={stickyContact}>
-                  <Stack direction="row" spacing={1} justifyContent="center">
-                    <IconButton
-                      onClick={() => {
-                        setCallLeadName(lead.name);
-                        setOpenCall(true);
-                      }}
-                    >
-                      <CallIcon fontSize="small" />
-                    </IconButton>
-
-                    <IconButton>
-                      <ChatBubbleOutlineIcon fontSize="small" />
-                    </IconButton>
-
-                    <IconButton>
-                      <EmailOutlinedIcon fontSize="small" />
-                    </IconButton>
+                <TableCell align="center">
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    justifyContent="center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <CallButton lead={lead} />
+                    <IconButton><ChatBubbleOutlineIcon fontSize="small" /></IconButton>
+                    <IconButton><EmailOutlinedIcon fontSize="small" /></IconButton>
                   </Stack>
                 </TableCell>
 
-                {/* MENU */}
-                <TableCell align="center" sx={stickyMenu}>
-                  <IconButton
-                    onClick={(e) => {
-                      setAnchorEl(e.currentTarget);
-                      setSelectedLead(lead);
-                    }}
-                  >
-                    <MoreVertIcon fontSize="small" />
-                  </IconButton>
+                <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                  <MenuButton lead={lead} setLeads={setLeads} tab={tab} />
                 </TableCell>
               </TableRow>
             ))}
@@ -239,17 +187,12 @@ const LeadsTable: React.FC<Props> = ({ search }) => {
         </Table>
       </TableContainer>
 
-      {/* ================= PAGINATION ================= */}
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
         <Typography>
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
-
-        <Stack direction="row" spacing={1} alignItems="center">
-          <IconButton
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
+        <Stack direction="row" spacing={1}>
+          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
             <ChevronLeftIcon />
           </IconButton>
 
@@ -272,83 +215,7 @@ const LeadsTable: React.FC<Props> = ({ search }) => {
         </Stack>
       </Stack>
 
-      {/* ================= MENU ================= */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={() => setAnchorEl(null)}
-      >
-        <MenuItem>
-          <ListItemIcon>
-            <EditOutlinedIcon fontSize="small" />
-          </ListItemIcon>
-          Edit
-        </MenuItem>
-
-        <MenuItem
-          onClick={() => {
-            setOpenReassign(true);
-            setAnchorEl(null);
-          }}
-        >
-          <ListItemIcon>
-            <PersonAddAltOutlinedIcon fontSize="small" />
-          </ListItemIcon>
-          Reassign
-        </MenuItem>
-
-        <MenuItem
-          onClick={() => {
-            setOpenArchive(true);
-            setAnchorEl(null);
-          }}
-        >
-          <ListItemIcon>
-            <ArchiveOutlinedIcon fontSize="small" />
-          </ListItemIcon>
-          Archive
-        </MenuItem>
-
-        <MenuItem
-          sx={{ color: "error.main" }}
-          onClick={() => {
-            setOpenDelete(true);
-            setAnchorEl(null);
-          }}
-        >
-          <ListItemIcon>
-            <DeleteOutlineOutlinedIcon fontSize="small" color="error" />
-          </ListItemIcon>
-          Delete
-        </MenuItem>
-      </Menu>
-
-      {/* ================= DIALOGS ================= */}
-      <ReassignAssigneeDialog
-        open={openReassign}
-        lead={selectedLead}
-        onClose={() => setOpenReassign(false)}
-      />
-
-      <ArchiveLeadDialog
-        open={openArchive}
-        leadName={selectedLead?.name}
-        onClose={() => setOpenArchive(false)}
-        onConfirm={() => setOpenArchive(false)}
-      />
-
-      <DeleteLeadDialog
-        open={openDelete}
-        leadName={selectedLead?.name}
-        onClose={() => setOpenDelete(false)}
-        onConfirm={() => setOpenDelete(false)}
-      />
-
-      <CallDialog
-        open={openCall}
-        name={callLeadName}
-        onClose={() => setOpenCall(false)}
-      />
+      <Dialogs />
     </>
   );
 };
