@@ -15,6 +15,7 @@ import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import { useNavigate } from "react-router-dom";
 
 import LeadsTable from "../components/LeadsHub/LeadsTable";
+import LeadsBoard from "../components/LeadsHub/LeadsBoard"; 
 import LeadsConversation from "../components/LeadsHub/LeadsConversation";
 import Activity from "../components/LeadsHub/Activity";
 import FilterDialog from "../components/LeadsHub/FilterDialog";
@@ -27,10 +28,11 @@ const Leads: React.FC = () => {
   const [tab, setTab] = React.useState(0);
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [viewMode, setViewMode] = React.useState<"table" | "board">("table");
 
   const tabs = [
-    "All Leads ",
-    "Follow-Ups ",
+    "All Leads",
+    "Follow-Ups",
     "Archived Leads",
     "Leads Conversation",
     "Activity",
@@ -63,11 +65,19 @@ const Leads: React.FC = () => {
             }}
           />
 
-          <IconButton className="header-icon-btn">
+          <IconButton 
+            className={`header-icon-btn ${viewMode === "table" ? "active" : ""}`}
+            onClick={() => setViewMode("table")}
+            sx={{ color: viewMode === "table" ? "#6366F1" : "inherit" }}
+          >
             <ViewListIcon fontSize="small" />
           </IconButton>
 
-          <IconButton className="header-icon-btn">
+          <IconButton 
+            className={`header-icon-btn ${viewMode === "board" ? "active" : ""}`}
+            onClick={() => setViewMode("board")}
+            sx={{ color: viewMode === "board" ? "#6366F1" : "inherit" }}
+          >
             <ViewModuleIcon fontSize="small" />
           </IconButton>
 
@@ -102,10 +112,18 @@ const Leads: React.FC = () => {
 
       {/* ================= CONTENT SWITCH ================= */}
       {tab === 3 && <LeadsConversation />}
-
       {tab === 4 && <Activity />}
-
-      {tab !== 3 && tab !== 4 && <LeadsTable search={search} />}
+      
+      {tab !== 3 && tab !== 4 && (
+        viewMode === "table" ? (
+          <LeadsTable 
+            search={search} 
+            tab={tab === 2 ? "archived" : "active"} 
+          />
+        ) : (
+          <LeadsBoard search={search} />
+        )
+      )}
 
       <FilterDialog open={filterOpen} onClose={() => setFilterOpen(false)} />
     </Box>
