@@ -234,3 +234,25 @@
   background: #111827;
   color: #fff;
 }
+
+.pill-tabs {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pill-tab {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #eee;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+}
+
+.pill-tab.active {
+  background: #ffede6;
+  border-color: #ff7849;
+  color: #ff7849;
+  font-weight: 600;
+} 
