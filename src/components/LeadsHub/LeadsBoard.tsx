@@ -17,7 +17,10 @@ import {
   MenuItem,
   Grid,
   Modal,
-  CircularProgress,
+  Menu,
+  Radio,
+  RadioGroup,
+  Fade,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -27,11 +30,27 @@ import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import BorderColorIcon from '@mui/icons-material/BorderColor';
+import TextFormatIcon from '@mui/icons-material/TextFormat';
+import InsertLinkIcon from '@mui/icons-material/InsertLink';
+import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
+import InsertPhotoIcon from '@mui/icons-material/InsertPhoto';
+import HistoryIcon from '@mui/icons-material/History';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+
+// Menu Icons
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+
 // Call Icons
 import MicOffIcon from "@mui/icons-material/MicOff";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import CallEndIcon from "@mui/icons-material/CallEnd";
+
 // Mail Icons
 import SendIcon from "@mui/icons-material/Send";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
@@ -56,9 +75,32 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
   const [openMailModal, setOpenMailModal] = React.useState(false);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
 
-  // --- NEW: Mail Step State ---
-  // 1 = Compose, 2 = Sending, 3 = Success
-  const [mailStep, setMailStep] = React.useState<1 | 2 | 3>(1);
+  // --- Menu State for 3 dots ---
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const openMenu = Boolean(anchorEl);
+
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>, lead: Lead) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+    setSelectedLead(lead);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  // --- MAIL FLOW STATES ---
+  const [mailStep, setMailStep] = React.useState<1 | 2>(1);
+  const [selectedTemplate, setSelectedTemplate] = React.useState("");
+  const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
+
+  const templates = [
+    { id: '1', title: 'IVF Next Steps Form Request', desc: 'Requests the patient to fill out a form to share medical and contact details.' },
+    { id: '2', title: 'IVF Treatment Information', desc: 'Provides an overview of IVF process, timelines, and general treatment details.' },
+    { id: '3', title: 'IVF Follow-Up Reminder', desc: 'Gentle reminder for patients who have not responded or taken action.' },
+    { id: '4', title: 'New Consultation Confirmation', desc: 'Confirms appointment date, time, and doctor details.' },
+    { id: '5', title: 'Welcome Email – Patient Inquiry', desc: 'Introduces the clinic and builds trust after the first inquiry.' },
+  ];
 
   const columns = [
     { label: "NEW LEADS", statusKey: ["New"], color: "#6366F1" },
@@ -86,35 +128,39 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
 
   const handleOpenMail = (lead: Lead) => {
     setSelectedLead(lead);
-    setMailStep(1); // Start at Compose
+    setMailStep(1); 
     setOpenMailModal(true);
   };
 
-  const handleSendMail = () => {
-    setMailStep(2); // Move to Sending
+  const handleNextToCompose = () => {
+    setMailStep(2);
+  };
+
+  const handleSaveAsTemplate = () => {
+    setShowSaveSuccess(true);
+    // Auto hide toast and close modal after success
     setTimeout(() => {
-      setMailStep(3); // Move to Success after 1.5s
-      setTimeout(() => {
-        handleCloseAll(); // Auto close after 2s of showing success
-      }, 2000);
-    }, 1500);
+      setShowSaveSuccess(false);
+      handleCloseAll();
+    }, 2500);
   };
 
   const handleCloseAll = () => {
     setOpenBookModal(false);
     setOpenCallOverlay(false);
     setOpenMailModal(false);
+    setAnchorEl(null);
     setSelectedLead(null);
-    setMailStep(1); // Reset step for next time
+    setMailStep(1);
+    setSelectedTemplate("");
   };
 
-  // Reusable styles for the modal inputs
   const modalFieldStyle = {
     "& .MuiOutlinedInput-root": {
       borderRadius: "8px",
-      "& fieldset": { borderColor: "#000000", borderWidth: "1px" },
-      "&:hover fieldset": { borderColor: "#000000" },
-      "&.Mui-focused fieldset": { borderColor: "#000000", borderWidth: "1px" },
+      "& fieldset": { borderColor: "#E2E8F0", borderWidth: "1px" },
+      "&:hover fieldset": { borderColor: "#CBD5E1" },
+      "&.Mui-focused fieldset": { borderColor: "#6366F1", borderWidth: "1px" },
     },
     "& .MuiInputBase-input": { fontSize: "0.85rem", py: 1 },
   };
@@ -173,11 +219,11 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
 
         <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}>CONTACT OPTION</Typography>
         <Stack direction="row" spacing={1.5} sx={{ mb: showButton ? 2 : 0 }}>
-          <IconButton size="small" sx={iconBtnStyle} onClick={() => handleOpenCall(lead)}>
+          <IconButton size="small" sx={iconBtnStyle} onClick={(e) => { e.stopPropagation(); handleOpenCall(lead); }}>
             <PhoneEnabledIcon sx={{ fontSize: 16 }} />
           </IconButton>
-          <IconButton size="small" sx={iconBtnStyle}><ChatBubbleOutlineIcon sx={{ fontSize: 16 }} /></IconButton>
-          <IconButton size="small" sx={iconBtnStyle} onClick={() => handleOpenMail(lead)}>
+          <IconButton size="small" sx={iconBtnStyle} onClick={(e) => e.stopPropagation()}><ChatBubbleOutlineIcon sx={{ fontSize: 16 }} /></IconButton>
+          <IconButton size="small" sx={iconBtnStyle} onClick={(e) => { e.stopPropagation(); handleOpenMail(lead); }}>
             <MailOutlineIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Stack>
@@ -187,7 +233,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
             fullWidth 
             variant="contained" 
             size="small" 
-            onClick={() => handleOpenBookModal(lead)}
+            onClick={(e) => { e.stopPropagation(); handleOpenBookModal(lead); }}
             sx={{ 
               bgcolor: "#334155", 
               textTransform: "none", 
@@ -251,14 +297,11 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
               }}
             >
               {leadsInCol.map((lead) => (
-               <Paper
-  key={lead.id}
-  onMouseEnter={() => setHoveredId(lead.id)}
-  onClick={() => navigate(`/leads/${lead.id}`)}
- sx={{ cursor: "pointer" }}
-
-
+                <Paper
+                  key={lead.id}
+                  onMouseEnter={() => setHoveredId(lead.id)}
                   onMouseLeave={() => setHoveredId(null)}
+                  onClick={() => navigate(`/leads/${lead.id}`)}
                   elevation={0}
                   sx={{ 
                     p: 2.5, 
@@ -267,6 +310,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
                     transition: "all 0.3s ease", 
                     width: '100%',
                     backgroundColor: "#FFFFFF",
+                    cursor: "pointer",
                     ...(hoveredId === lead.id && {
                       boxShadow: "0px 12px 24px -4px rgba(145, 158, 171, 0.16)",
                       borderColor: col.color,
@@ -295,7 +339,12 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
                           color: lead.quality === "Hot" ? "#B91C1C" : lead.quality === "Warm" ? "#B45309" : "#475569"
                         }} 
                       />
-                      <IconButton size="small"><MoreVertIcon sx={{ fontSize: 20, color: '#94A3B8' }} /></IconButton>
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => handleMenuClick(e, lead)}
+                      >
+                        <MoreVertIcon sx={{ fontSize: 20, color: '#94A3B8' }} />
+                      </IconButton>
                     </Stack>
                   </Stack>
                   {renderCardContent(lead, col.label, hoveredId === lead.id)}
@@ -305,6 +354,172 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
           </Box>
         );
       })}
+
+      {/* --- SUCCESS TOAST (TRIGGERED BY SAVE AS TEMPLATE) --- */}
+      <Fade in={showSaveSuccess}>
+        <Box sx={{ 
+          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)', 
+          bgcolor: '#10B981', color: 'white', px: 3, py: 1.5, borderRadius: '12px',
+          display: 'flex', alignItems: 'center', gap: 1.5, zIndex: 10000,
+          boxShadow: '0px 10px 20px rgba(16, 185, 129, 0.2)'
+        }}>
+          <CheckCircleOutlineIcon sx={{ fontSize: 20 }} />
+          <Typography variant="body2" fontWeight={600}>Saved as A Template successfully!</Typography>
+        </Box>
+      </Fade>
+
+      {/* --- MAIL MODAL FLOW --- */}
+      <Dialog 
+        open={openMailModal} 
+        onClose={handleCloseAll} 
+        fullWidth 
+        maxWidth={mailStep === 1 ? "sm" : "md"} 
+        PaperProps={{ sx: { borderRadius: '24px', overflow: 'hidden' } }}
+      >
+        {mailStep === 1 ? (
+          /* POPUP 1: INSERT TEMPLATE OR COMPOSE NEW */
+          <>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 3 }}>
+              <Typography variant="h6" fontWeight={800} color="#1E293B">New Email</Typography>
+              <IconButton onClick={handleCloseAll} size="small"><CloseIcon /></IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ p: 0 }}>
+              {/* Clicking this now correctly goes to POPUP 2 */}
+              <Box 
+                onClick={handleNextToCompose}
+                sx={{ 
+                  p: 3, textAlign: 'center', borderBottom: '1px solid #F1F5F9', cursor: 'pointer', 
+                  transition: '0.2s', '&:hover': { bgcolor: '#F8FAFC' } 
+                }}
+              >
+                 <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                    <BorderColorIcon sx={{ fontSize: 20, color: '#64748B' }} />
+                    <Typography fontWeight={600} color="#64748B">Compose New Email</Typography>
+                 </Stack>
+              </Box>
+              <Box sx={{ p: 3 }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 2 }}>SELECT EMAIL TEMPLATE</Typography>
+                <RadioGroup value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
+                  {templates.map((tmp) => (
+                    <Box 
+                      key={tmp.id} 
+                      onClick={() => setSelectedTemplate(tmp.title)}
+                      sx={{ 
+                        display: 'flex', alignItems: 'flex-start', p: 2, mb: 1.5, 
+                        border: '1px solid', borderColor: selectedTemplate === tmp.title ? '#6366F1' : '#E2E8F0', 
+                        borderRadius: '12px', cursor: 'pointer', bgcolor: selectedTemplate === tmp.title ? '#F5F7FF' : 'transparent'
+                      }}
+                    >
+                      <Radio size="small" value={tmp.title} sx={{ mt: -0.5 }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={700} color="#1E293B">{tmp.title}</Typography>
+                        <Typography variant="caption" color="text.secondary">{tmp.desc}</Typography>
+                      </Box>
+                      <IconButton size="small"><VisibilityOutlinedIcon sx={{ fontSize: 18, color: '#94A3B8' }} /></IconButton>
+                    </Box>
+                  ))}
+                </RadioGroup>
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ p: 3, borderTop: '1px solid #F1F5F9' }}>
+              <Button onClick={handleCloseAll} sx={{ color: '#64748B', textTransform: 'none', fontWeight: 700 }}>Cancel</Button>
+              <Button variant="contained" onClick={handleNextToCompose} sx={{ bgcolor: '#334155', borderRadius: '10px', px: 4, textTransform: 'none', fontWeight: 700, "&:hover": { bgcolor: "#1e293b" } }}>Next</Button>
+            </DialogActions>
+          </>
+        ) : (
+          /* POPUP 2: COMPOSE DRAFT */
+          <>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2.5 }}>
+              <Typography variant="h6" fontWeight={800} color="#1E293B">New Email</Typography>
+              <IconButton onClick={handleCloseAll} size="small"><CloseIcon /></IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ px: 3, py: 0 }}>
+              <Stack spacing={0.5}>
+                <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #F1F5F9', py: 1.5 }}>
+                  <Typography variant="body2" sx={{ width: 40, color: '#94A3B8', fontWeight: 500 }}>To :</Typography>
+                  <Chip label={selectedLead?.name} size="small" onDelete={() => {}} sx={{ bgcolor: '#EEF2FF', color: '#6366F1', fontWeight: 600, borderRadius: '6px' }} />
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #F1F5F9', py: 1.5 }}>
+                  <Typography variant="body2" sx={{ width: 70, color: '#94A3B8', fontWeight: 500 }}>Subject :</Typography>
+                  <TextField fullWidth variant="standard" defaultValue="Thank You for Your IVF Inquiry - Next Steps" InputProps={{ disableUnderline: true, sx: { fontSize: '0.85rem', fontWeight: 600 } }} />
+                </Box>
+                <Box sx={{ py: 3, minHeight: 320, overflowY: 'auto' }}>
+                  <Typography variant="body2" sx={{ mb: 2 }}>Hi {selectedLead?.name},</Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>Thank you for reaching out to <strong>Crysta IVF, Bangalore</strong>. We are honored to be part of your journey toward parenthood.</Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>To ensure we provide the most accurate guidance tailored to your medical history, please complete our secure intake form:</Typography>
+                  <Typography variant="body2" sx={{ color: '#6366F1', textDecoration: 'underline', mb: 2, display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer' }}>
+                     👉 Fill the IVF Inquiry Form <br/>
+                     https://example.com/ivf-inquiry-form
+                  </Typography>
+                  <Typography variant="body2" fontWeight={700} sx={{ mt: 2, color: '#1E293B' }}>What happens next? After you submit the form, our specialist team will:</Typography>
+                  <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', color: '#475569', lineHeight: 1.8 }}>
+                    <li><strong>Review:</strong> A senior consultant will evaluate your requirements.</li>
+                    <li><strong>Connect:</strong> We will schedule a 15-minute discovery call.</li>
+                  </ul>
+                </Box>
+              </Stack>
+            </DialogContent>
+            <DialogActions sx={{ p: 2, justifyContent: 'space-between', bgcolor: '#F8FAFC', borderTop: '1px solid #F1F5F9' }}>
+              <Stack direction="row" spacing={0.5}>
+                <IconButton size="small"><TextFormatIcon sx={{ fontSize: 20 }} /></IconButton>
+                <IconButton size="small"><AttachFileIcon sx={{ fontSize: 20 }} /></IconButton>
+                <IconButton size="small"><InsertLinkIcon sx={{ fontSize: 20 }} /></IconButton>
+                <IconButton size="small"><InsertEmoticonIcon sx={{ fontSize: 20 }} /></IconButton>
+                <IconButton size="small"><InsertPhotoIcon sx={{ fontSize: 20 }} /></IconButton>
+                <IconButton size="small"><HistoryIcon sx={{ fontSize: 20 }} /></IconButton>
+                <IconButton size="small"><AddCircleOutlineIcon sx={{ fontSize: 20 }} /></IconButton>
+              </Stack>
+              <Stack direction="row" spacing={1.5}>
+                <Button onClick={() => setMailStep(1)} sx={{ color: '#64748B', textTransform: 'none', fontWeight: 700 }}>Cancel</Button>
+                <Button variant="outlined" onClick={handleSaveAsTemplate} sx={{ borderColor: '#E2E8F0', color: '#1E293B', textTransform: 'none', borderRadius: '10px', fontWeight: 700 }}>Save as Template</Button>
+                <Button variant="contained" onClick={handleCloseAll} endIcon={<SendIcon sx={{ fontSize: 16 }} />} sx={{ bgcolor: '#334155', borderRadius: '10px', px: 3, textTransform: 'none', fontWeight: 700, "&:hover": { bgcolor: "#1e293b" } }}>Send</Button>
+              </Stack>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      {/* --- MORE MENU (POPOVER) --- */}
+      <Menu
+        anchorEl={anchorEl}
+        open={openMenu}
+        onClose={handleMenuClose}
+        onClick={(e) => e.stopPropagation()} 
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            mt: 1,
+            minWidth: 180,
+            boxShadow: '0px 10px 20px rgba(0,0,0,0.1)',
+            border: '1px solid #F1F5F9',
+            '& .MuiMenuItem-root': {
+              py: 1.5,
+              px: 2,
+              gap: 1.5,
+              '&:hover': { bgcolor: '#F8FAFC' }
+            }
+          }
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem onClick={handleMenuClose}>
+          <EditOutlinedIcon sx={{ fontSize: 20, color: '#6366F1' }} />
+          <Typography variant="body2" fontWeight={600} color="#1E293B">Edit</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleMenuClose}>
+          <PersonAddAlt1OutlinedIcon sx={{ fontSize: 20, color: '#6366F1' }} />
+          <Typography variant="body2" fontWeight={600} color="#1E293B">Reassign</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleMenuClose}>
+          <Inventory2OutlinedIcon sx={{ fontSize: 20, color: '#6366F1' }} />
+          <Typography variant="body2" fontWeight={600} color="#1E293B">Archive</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleMenuClose}>
+          <DeleteOutlineOutlinedIcon sx={{ fontSize: 20, color: '#EF4444' }} />
+          <Typography variant="body2" fontWeight={600} color="#EF4444">Delete</Typography>
+        </MenuItem>
+      </Menu>
 
       {/* --- BOOK APPOINTMENT MODAL --- */}
       <Dialog 
@@ -384,100 +599,6 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
             Save
           </Button>
         </DialogActions>
-      </Dialog>
-
-      {/* --- DYNAMIC MAIL MODAL (THE 3 POPUP STAGES) --- */}
-      <Dialog 
-        open={openMailModal} 
-        onClose={handleCloseAll} 
-        fullWidth 
-        maxWidth="sm" 
-        PaperProps={{ 
-            sx: { 
-                borderRadius: '24px', 
-                p: 1,
-                minHeight: mailStep === 1 ? 'auto' : '400px', // Animates height change
-                transition: 'min-height 0.3s ease'
-            } 
-        }}
-      >
-        {/* STAGE 1: COMPOSE */}
-        {mailStep === 1 && (
-          <>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', pb: 2 }}>
-              <Typography variant="h6" fontWeight={800} sx={{ color: '#1E293B' }}>Compose Mail</Typography>
-              <IconButton onClick={handleCloseAll} size="small"><CloseIcon fontSize="small" /></IconButton>
-            </DialogTitle>
-            <DialogContent sx={{ mt: 3 }}>
-              <Stack spacing={2.5}>
-                <Box>
-                  <Typography {...labelStyle}>To</Typography>
-                  <TextField fullWidth size="small" value={selectedLead?.name || ""} disabled sx={modalFieldStyle} />
-                </Box>
-                <Box>
-                  <Typography {...labelStyle}>Subject</Typography>
-                  <TextField fullWidth size="small" placeholder="Enter subject" sx={modalFieldStyle} />
-                </Box>
-                <Box>
-                  <Typography {...labelStyle}>Message</Typography>
-                  <TextField 
-                    fullWidth 
-                    multiline 
-                    rows={8} 
-                    placeholder="Type your message here..." 
-                    sx={{ 
-                      ...modalFieldStyle,
-                      "& .MuiOutlinedInput-root": { borderRadius: '16px' }
-                    }} 
-                  />
-                </Box>
-              </Stack>
-            </DialogContent>
-            <DialogActions sx={{ p: 3, pt: 0, justifyContent: 'space-between' }}>
-              <IconButton sx={{ color: '#64748B' }}><AttachFileIcon /></IconButton>
-              <Stack direction="row" spacing={2}>
-                <Button onClick={handleCloseAll} sx={{ color: '#64748B', textTransform: 'none', fontWeight: 700 }}>Discard</Button>
-                <Button 
-                  variant="contained" 
-                  onClick={handleSendMail}
-                  endIcon={<SendIcon />}
-                  sx={{ 
-                    bgcolor: '#6366F1', 
-                    borderRadius: '12px', 
-                    px: 4, 
-                    textTransform: 'none', 
-                    fontWeight: 700,
-                    "&:hover": { bgcolor: '#4F46E5' }
-                  }}
-                >
-                  Send
-                </Button>
-              </Stack>
-            </DialogActions>
-          </>
-        )}
-
-        {/* STAGE 2: SENDING (LOADING) */}
-        {mailStep === 2 && (
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 8 }}>
-            <CircularProgress size={64} thickness={4} sx={{ color: '#6366F1', mb: 3 }} />
-            <Typography variant="h5" fontWeight={700} color="#1E293B">Sending Email...</Typography>
-            <Typography variant="body2" color="#64748B" sx={{ mt: 1 }}>Please wait a moment.</Typography>
-          </DialogContent>
-        )}
-
-        {/* STAGE 3: SUCCESS */}
-        {mailStep === 3 && (
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 8 }}>
-            <Box sx={{ bgcolor: '#ECFDF5', borderRadius: '50%', p: 2, mb: 3 }}>
-                <CheckCircleOutlineIcon sx={{ fontSize: 60, color: '#10B981' }} />
-            </Box>
-            <Typography variant="h4" fontWeight={800} color="#1E293B">Success!</Typography>
-            <Typography variant="body1" color="#64748B" sx={{ textAlign: 'center', mt: 1, maxWidth: '280px' }}>
-              Your email has been sent to <strong>{selectedLead?.name}</strong>.
-            </Typography>
-          </DialogContent>
-        )}
       </Dialog>
 
       {/* --- CALLING OVERLAY --- */}
