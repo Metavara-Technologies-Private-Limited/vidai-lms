@@ -1,5 +1,5 @@
 import Box from "@mui/material/Box";
-import DashboardLayout from "../components/dashboard/DashboardLayout";
+import DashboardLayout from "../components/Dashboard/DashboardLayout";
 
 const Dashboard = () => {
   return (
