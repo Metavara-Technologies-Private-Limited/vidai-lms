@@ -23,6 +23,10 @@
   padding: 24px;
   background: #f9fafb;
   min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* prevent vertical scroll */
 }
 
 /* ===============================
@@ -32,7 +36,7 @@
 .leads-title {
   font-family: "Montserrat", sans-serif;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 100%;
   color: #111827;
 }
@@ -110,9 +114,16 @@
    TABLE
 ================================ */
 
+.leads-table {
+  flex: 1;
+  overflow-x: auto;   /* horizontal scroll */
+  overflow-y: hidden; /* remove vertical scroll */
+}
+
 .leads-table table {
   border-collapse: separate;
   border-spacing: 0 12px;
+  min-width: 1900px; /* adjust to your table width */
 }
 
 .leads-table thead th {
@@ -120,6 +131,10 @@
   font-weight: 600;
   color: #6b7280;
   border-bottom: none;
+  background: #f9fafb;
+  position: sticky;
+  top: 0;
+  z-index: 4;
 }
 
 .leads-table tbody tr {
@@ -200,7 +215,7 @@
 }
 
 /* ===============================
-   THREE DOT MENU (NO CIRCLE)
+   THREE DOT MENU
 ================================ */
 
 .three-dot-btn {
@@ -235,6 +250,10 @@
   color: #fff;
 }
 
+/* ===============================
+   PILL TABS
+================================ */
+
 .pill-tabs {
   display: flex;
   gap: 10px;
@@ -255,4 +274,78 @@
   border-color: #ff7849;
   color: #ff7849;
   font-weight: 600;
-} 
+}
+
+/* ===============================
+   HORIZONTAL SCROLL + FREEZE COLUMNS
+================================ */
+
+/* Table horizontal scroll */
+.leads-table::-webkit-scrollbar {
+  height: 8px;
+}
+.leads-table::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 6px;
+}
+
+/* Freeze first column (checkbox/lead name) */
+.leads-table table th:first-child,
+.leads-table table td:first-child {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 5;
+}
+
+/* Freeze last column (actions) */
+.leads-table table th:last-child,
+.leads-table table td:last-child {
+  position: sticky;
+  right: 0;
+  background: #fff;
+  z-index: 5;
+}
+
+/* Freeze contact column (if needed) */
+.leads-table table th:nth-last-child(2),
+.leads-table table td:nth-last-child(2) {
+  position: sticky;
+  right: 60px;
+  background: #fff;
+  z-index: 4;
+}
+
+/* ===============================
+   CHECKBOX STYLES (Green Tick)
+================================ */
+
+.leads-table .MuiCheckbox-root {
+  padding: 4px; /* optional spacing */
+  border-radius: 4px;
+}
+
+.leads-table .MuiCheckbox-root.Mui-checked {
+  color: #47B35F !important; /* tick color */
+  background-color: #DEEFE1 !important; /* background */
+  border-radius: 4px; /* rounded corners */
+}
+
+.leads-table .MuiCheckbox-root:hover {
+  background-color: #DEEFE1; /* keep bg on hover */
+}
+
+/* ===============================
+   BULK ACTION BAR
+================================ */
+
+.bulk-action-btn {
+  color: black !important;
+  border-color: black !important;
+  text-transform: none;
+}
+
+.bulk-action-btn:hover {
+  background-color: #f5f5f5 !important; /* light gray hover */
+  border-color: black !important;
+}
