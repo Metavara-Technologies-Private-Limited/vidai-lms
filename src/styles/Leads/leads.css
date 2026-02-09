@@ -2,7 +2,7 @@
    GLOBAL TYPOGRAPHY
 ================================ */
 
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Montserrat:wght@700&display=swap");
 
 .leads-page,
 .leads-page * {
@@ -34,7 +34,7 @@
 ================================ */
 
 .leads-title {
-  font-family: "Montserrat", sans-serif;
+  font-family: "Montserrat", sans-serif !important;
   font-weight: 700;
   font-size: 20px;
   line-height: 100%;
@@ -78,7 +78,7 @@
 }
 
 /* ===============================
-   TABS
+   TABS (MUI Tab Specific)
 ================================ */
 
 .leads-tab {
@@ -150,7 +150,7 @@
 }
 
 /* ===============================
-   AVATAR
+   AVATAR & NAME (FIGMA BOLD)
 ================================ */
 
 .lead-avatar {
@@ -160,6 +160,13 @@
   width: 32px;
   height: 32px;
   font-size: 13px;
+}
+
+/* Figma Bold Name Style */
+.lead-name-text {
+  font-weight: 800 !important;
+  font-size: 14px;
+  color: #111827;
 }
 
 /* ===============================
@@ -198,7 +205,7 @@
 
 .score {
   color: #ec4899;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ===============================
@@ -251,7 +258,7 @@
 }
 
 /* ===============================
-   PILL TABS
+   PILL TABS (NON-MUI)
 ================================ */
 
 .pill-tabs {
@@ -261,26 +268,26 @@
 }
 
 .pill-tab {
-  padding: 6px 14px;
-  border-radius: 20px;
+  padding: 8px 16px;
+  border-radius: 12px;
   border: 1px solid #eee;
   cursor: pointer;
   font-size: 13px;
   color: #555;
+  background: #fff;
+  font-weight: 700;
 }
 
 .pill-tab.active {
-  background: #ffede6;
-  border-color: #ff7849;
-  color: #ff7849;
-  font-weight: 600;
+  background: #ffede6 !important;
+  border-color: #ff7849 !important;
+  color: #ff7849 !important;
 }
 
 /* ===============================
    HORIZONTAL SCROLL + FREEZE COLUMNS
 ================================ */
 
-/* Table horizontal scroll */
 .leads-table::-webkit-scrollbar {
   height: 8px;
 }
@@ -289,7 +296,6 @@
   border-radius: 6px;
 }
 
-/* Freeze first column (checkbox/lead name) */
 .leads-table table th:first-child,
 .leads-table table td:first-child {
   position: sticky;
@@ -298,7 +304,6 @@
   z-index: 5;
 }
 
-/* Freeze last column (actions) */
 .leads-table table th:last-child,
 .leads-table table td:last-child {
   position: sticky;
@@ -307,7 +312,6 @@
   z-index: 5;
 }
 
-/* Freeze contact column (if needed) */
 .leads-table table th:nth-last-child(2),
 .leads-table table td:nth-last-child(2) {
   position: sticky;
@@ -317,22 +321,22 @@
 }
 
 /* ===============================
-   CHECKBOX STYLES (Green Tick)
+   BIG ORANGE SQUARE CHECKBOX
 ================================ */
 
 .leads-table .MuiCheckbox-root {
-  padding: 4px; /* optional spacing */
-  border-radius: 4px;
+  padding: 4px;
+  color: #D1D5DB !important;
+}
+
+.leads-table .MuiCheckbox-root .MuiSvgIcon-root {
+  font-size: 26px !important; /* Makes the square big */
 }
 
 .leads-table .MuiCheckbox-root.Mui-checked {
-  color: #47B35F !important; /* tick color */
-  background-color: #DEEFE1 !important; /* background */
-  border-radius: 4px; /* rounded corners */
-}
-
-.leads-table .MuiCheckbox-root:hover {
-  background-color: #DEEFE1; /* keep bg on hover */
+  color: #ff7849 !important; /* Orange Tick */
+  background-color: #fff7ed !important; /* Light Orange Bg */
+  border-radius: 4px;
 }
 
 /* ===============================
@@ -346,6 +350,6 @@
 }
 
 .bulk-action-btn:hover {
-  background-color: #f5f5f5 !important; /* light gray hover */
+  background-color: #f5f5f5 !important;
   border-color: black !important;
 }
