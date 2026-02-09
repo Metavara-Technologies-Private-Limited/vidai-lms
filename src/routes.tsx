@@ -6,13 +6,9 @@ import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import Integration from "./components/Settings/Menus/Integration";
 import Tickets from "./components/Settings/Menus/Tickets";
 
-<<<<<<< Updated upstream
-=======
-// 🆕 Updated import for the new Templates modular page
+// 🆕 New Templates modular page
 import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
 
-// 👇 import page directly (not sidebar-driven)
->>>>>>> Stashed changes
 import AddNewLead from "./components/LeadsHub/AddNewLead";
 import LeadView from "./components/LeadsHub/LeadView";
 
@@ -23,33 +19,7 @@ export default function AppRoutes() {
 
         {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
-<<<<<<< Updated upstream
 
-<Route
-  path="settings/tickets"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Tickets />
-    </Suspense>
-  }
-/>
-
-<Route
-  path="settings/templates"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Templates />
-    </Suspense>
-  }
-/>
-
-        <Route
-          path="settings/tickets"
-          element={<Suspense fallback={<div>Loading...</div>}><Tickets /></Suspense>}
-        />
-
-=======
-        
         {/* Settings sub routes */}
         <Route
           path="settings/integration"
@@ -60,7 +30,6 @@ export default function AppRoutes() {
           }
         />
 
-        {/* 🔥 Main Templates Route */}
         <Route
           path="settings/templates"
           element={
@@ -69,7 +38,6 @@ export default function AppRoutes() {
             </Suspense>
           }
         />
->>>>>>> Stashed changes
 
         <Route
           path="settings/tickets"
@@ -98,13 +66,21 @@ export default function AppRoutes() {
         {/* Add New Lead */}
         <Route
           path="leads/add"
-          element={<Suspense fallback={<div>Loading...</div>}><AddNewLead /></Suspense>}
+          element={
+            <Suspense fallback={<div>Loading...</div>}>
+              <AddNewLead />
+            </Suspense>
+          }
         />
 
-        {/* 🔥 Lead View Page */}
+        {/* Lead View */}
         <Route
           path="leads/:id"
-          element={<Suspense fallback={<div>Loading...</div>}><LeadView /></Suspense>}
+          element={
+            <Suspense fallback={<div>Loading...</div>}>
+              <LeadView />
+            </Suspense>
+          }
         />
 
         {/* fallback */}

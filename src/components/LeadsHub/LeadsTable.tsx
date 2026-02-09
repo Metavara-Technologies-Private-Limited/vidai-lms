@@ -6,7 +6,6 @@ import {
   IconButton,
   Stack,
   Table,
-  TableBody,
   TableCell,
   TableContainer,
   TableHead,
@@ -27,6 +26,7 @@ import "../../styles/Leads/leads.css";
 import type { Lead } from "../../types/leads.types";
 
 import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
+import BulkActionBar from "./BulkActionBar";
 
 interface Props {
   search: string;
@@ -39,13 +39,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
   const navigate = useNavigate();
   const rowsPerPage = 10;
 
+  /* ---------------- DATA ---------------- */
   const [leads, setLeads] = React.useState<Lead[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
-    const initial = leadsMock.map((l) => ({
-      ...l,
-      archived: l.archived ?? false,
-    }));
+    const initial = leadsMock.map((l) => ({ ...l, archived: l.archived ?? false }));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
     return initial;
   });
@@ -54,37 +52,72 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
   }, [leads]);
 
+  /* ---------------- SELECTION ---------------- */
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+
+  const handleSelectAll = (checked: boolean, ids: string[]) => {
+    setSelectedIds(checked ? ids : []);
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  /* ---------------- FILTER + PAGINATION ---------------- */
   const [page, setPage] = React.useState(1);
   const [filteredLeads, setFilteredLeads] = React.useState<Lead[]>([]);
 
   React.useEffect(() => {
     const result = leads.filter((lead) => {
-      const matchSearch = `${lead.name} ${lead.id}`
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      const matchSearch = `${lead.name} ${lead.id}`.toLowerCase().includes(search.toLowerCase());
       const matchTab = tab === "archived" ? lead.archived : !lead.archived;
       return matchSearch && matchTab;
     });
     setFilteredLeads(result);
     setPage(1);
+    setSelectedIds([]);
   }, [search, leads, tab]);
 
   const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
-  const currentLeads = filteredLeads.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage
-  );
+  const currentLeads = filteredLeads.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+
   const startEntry = (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
+  /* ---------------- BULK ACTIONS ---------------- */
+  const handleBulkDelete = () => {
+    setLeads((prev) => prev.filter((l) => !selectedIds.includes(l.id)));
+    setSelectedIds([]);
+  };
+
+  const handleBulkArchive = (archive: boolean) => {
+    setLeads((prev) =>
+      prev.map((l) => (selectedIds.includes(l.id) ? { ...l, archived: archive } : l))
+    );
+    setSelectedIds([]);
+  };
+
+  /* ---------------- UI ---------------- */
   return (
     <>
       <TableContainer component={Paper} elevation={0} className="leads-table">
         <Table stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox"><Checkbox /></TableCell>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  checked={selectedIds.length > 0 && selectedIds.length === currentLeads.length}
+                  indeterminate={
+                    selectedIds.length > 0 && selectedIds.length < currentLeads.length
+                  }
+                  onChange={(e) =>
+                    handleSelectAll(e.target.checked, currentLeads.map((l) => l.id))
+                  }
+                />
+              </TableCell>
               <TableCell>Lead Name | No</TableCell>
               <TableCell>Date | Time</TableCell>
               <TableCell>Location</TableCell>
@@ -101,17 +134,15 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
             </TableRow>
           </TableHead>
 
-          <TableBody>
+          <tbody>
             {currentLeads.map((lead) => (
-              <TableRow
-                key={lead.id}
-                hover
-                sx={{ cursor: "pointer" }}
-                onClick={() =>
-                  navigate(`/leads/${encodeURIComponent(lead.id.replace("#", ""))}`)
-                }
-              >
-                <TableCell padding="checkbox"><Checkbox /></TableCell>
+              <TableRow key={lead.id} hover>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    checked={selectedIds.includes(lead.id)}
+                    onChange={() => handleSelectOne(lead.id)}
+                  />
+                </TableCell>
 
                 <TableCell>
                   <Stack direction="row" spacing={2}>
@@ -147,50 +178,50 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   />
                 </TableCell>
 
-                <TableCell>{lead.score}</TableCell>
+                <TableCell>
+                  {typeof lead.score === "number" ? `${lead.score.toFixed(2)}%` : lead.score}
+                </TableCell>
+
                 <TableCell>{lead.assigned}</TableCell>
                 <TableCell>{lead.task}</TableCell>
-
                 <TableCell>
                   <Chip label={lead.taskStatus || "Pending"} size="small" />
                 </TableCell>
 
                 <TableCell
                   sx={{ cursor: "pointer", color: "primary.main" }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate("/leads/activity", { state: { lead } });
-                  }}
+                  onClick={() => navigate("/leads/activity", { state: { lead } })}
                 >
                   {lead.activity || "View Activity"}
                 </TableCell>
 
                 <TableCell align="center">
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    justifyContent="center"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <Stack direction="row" spacing={1} justifyContent="center">
                     <CallButton lead={lead} />
-                    <IconButton><ChatBubbleOutlineIcon fontSize="small" /></IconButton>
-                    <IconButton><EmailOutlinedIcon fontSize="small" /></IconButton>
+                    <IconButton>
+                      <ChatBubbleOutlineIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton>
+                      <EmailOutlinedIcon fontSize="small" />
+                    </IconButton>
                   </Stack>
                 </TableCell>
 
-                <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                <TableCell align="center">
                   <MenuButton lead={lead} setLeads={setLeads} tab={tab} />
                 </TableCell>
               </TableRow>
             ))}
-          </TableBody>
+          </tbody>
         </Table>
       </TableContainer>
 
+      {/* Pagination */}
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
         <Typography>
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
+
         <Stack direction="row" spacing={1}>
           <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
             <ChevronLeftIcon />
@@ -206,14 +237,19 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
             </Box>
           ))}
 
-          <IconButton
-            disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
+          <IconButton disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
             <ChevronRightIcon />
           </IconButton>
         </Stack>
       </Stack>
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedIds={selectedIds}
+        tab={tab}
+        onDelete={handleBulkDelete}
+        onArchive={handleBulkArchive}
+      />
 
       <Dialogs />
     </>

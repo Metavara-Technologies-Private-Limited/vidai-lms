@@ -18,6 +18,9 @@ import {
   InputLabel,
   OutlinedInput,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+
+const STORAGE_KEY = "vidai_leads_data";
 
 type FormState = {
   fullName: string;
@@ -47,7 +50,6 @@ type FormState = {
   treatments: string[];
   documents: File | null;
 
-  // STEP 3
   wantAppointment: "yes" | "no";
   department: string;
   personnel: string;
@@ -115,6 +117,7 @@ const patientRows = [
 ];
 
 export default function AddNewLead() {
+  const navigate = useNavigate();
   const [activeStep, setActiveStep] = React.useState(0);
   const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
 
@@ -146,7 +149,6 @@ export default function AddNewLead() {
     treatments: [],
     documents: null,
 
-    // STEP 3
     wantAppointment: "yes",
     department: "Consultation",
     personnel: "Dr. Alex Carrey",
@@ -162,9 +164,40 @@ export default function AddNewLead() {
 
   const handleNext = () => {
     if (activeStep === steps.length - 1) {
-      console.log("SUBMIT", form);
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const existing = stored ? JSON.parse(stored) : [];
+
+      const newLead = {
+        id: `LD-${Date.now()}`,
+        name: form.fullName,
+        initials: form.fullName
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase(),
+        date: new Date().toLocaleDateString(),
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        location: form.location,
+        source: form.source,
+        status: "New",
+        quality: "Warm",
+        score: Math.floor(Math.random() * 41) + 60,
+        assigned: form.assignee,
+        task: form.nextType,
+        taskStatus: form.nextStatus,
+        activity: "Lead Created",
+        archived: false,
+      };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([newLead, ...existing]));
+
+      navigate("/leads");
       return;
     }
+
     setActiveStep((prev) => prev + 1);
   };
 
@@ -213,7 +246,7 @@ export default function AddNewLead() {
         ))}
       </Stepper>
 
-      {/* STEP 1 — ALL DETAILS */}
+      {/* ================= STEP 1 ================= */}
       {activeStep === 0 && (
         <>
           <Typography fontSize={13} fontWeight={600} mb={2}>
@@ -360,69 +393,66 @@ export default function AddNewLead() {
         </>
       )}
 
-      {/* STEP 2 */}
+      {/* ================= STEP 2 ================= */}
+      {activeStep === 1 && (
+        <>
+          <Typography fontSize={13} fontWeight={600} mb={2}>
+            TREATMENT INFORMATION
+          </Typography>
 
-     {activeStep === 1 && (
-  <>
-    <Typography fontSize={13} fontWeight={600} mb={2}>
-      TREATMENT INFORMATION
-    </Typography>
+          <Grid container spacing={2} mb={2}>
+            <Grid item xs={12}>
+              <OutlinedSelect
+                label="Treatment Interest"
+                value={form.treatmentInterest}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    treatmentInterest: e.target.value,
+                    treatments: form.treatments.includes(e.target.value)
+                      ? form.treatments
+                      : [...form.treatments, e.target.value],
+                  })
+                }
+              >
+                <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
+                <MenuItem value="IVF">IVF</MenuItem>
+                <MenuItem value="IUI">IUI</MenuItem>
+              </OutlinedSelect>
+            </Grid>
+          </Grid>
 
-    <Grid container spacing={2} mb={2}>
-      <Grid item xs={12}>
-        <OutlinedSelect
-          label="Treatment Interest"
-          value={form.treatmentInterest}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              treatmentInterest: e.target.value,
-              treatments: form.treatments.includes(e.target.value)
-                ? form.treatments
-                : [...form.treatments, e.target.value],
-            })
-          }
-        >
-          <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
-          <MenuItem value="IVF">IVF</MenuItem>
-          <MenuItem value="IUI">IUI</MenuItem>
-        </OutlinedSelect>
-      </Grid>
-    </Grid>
-
-    <Box display="flex" gap={1} flexWrap="wrap" mb={4}>
-      {form.treatments.map((item) => (
-        <Box
-          key={item}
-          sx={{
-            px: 1.5,
-            py: 0.5,
-            borderRadius: 20,
-            bgcolor: "#fdecec",
-            display: "flex",
-            alignItems: "center",
-            gap: 0.5,
-            fontSize: 13,
-          }}
-        >
-          {item}
-          <Box
-            component="span"
-            sx={{ cursor: "pointer", color: "#ef4444", fontWeight: 600 }}
-            onClick={() =>
-              setForm({
-                ...form,
-                treatments: form.treatments.filter((t) => t !== item),
-              })
-            }
-          >
-            ×
+          <Box display="flex" gap={1} flexWrap="wrap" mb={4}>
+            {form.treatments.map((item) => (
+              <Box
+                key={item}
+                sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 20,
+                  bgcolor: "#fdecec",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  fontSize: 13,
+                }}
+              >
+                {item}
+                <Box
+                  component="span"
+                  sx={{ cursor: "pointer", color: "#ef4444", fontWeight: 600 }}
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      treatments: form.treatments.filter((t) => t !== item),
+                    })
+                  }
+                >
+                  ×
+                </Box>
+              </Box>
+            ))}
           </Box>
-        </Box>
-      ))}
-    </Box>
-
-
 
           <Typography fontSize={13} fontWeight={600} mb={2}>
             DOCUMENTS & REPORTS
@@ -469,7 +499,8 @@ export default function AddNewLead() {
           </Box>
         </>
       )}
-      {/* STEP 3 */}
+
+      {/* ================= STEP 3 ================= */}
       {activeStep === 2 && (
         <>
           <Typography fontSize={13} fontWeight={600} mb={2}>

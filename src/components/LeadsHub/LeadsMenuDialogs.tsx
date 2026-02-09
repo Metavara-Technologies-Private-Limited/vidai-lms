@@ -1,5 +1,7 @@
 import * as React from "react";
 import { Menu, MenuItem, IconButton, ListItemIcon } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
@@ -31,6 +33,8 @@ export const CallButton = ({ lead }: { lead: Lead }) => (
 
 /* ---------------- MENU BUTTON ---------------- */
 export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
+  const navigate = useNavigate();
+
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [openArchive, setOpenArchive] = React.useState(false);
   const [openDelete, setOpenDelete] = React.useState(false);
@@ -42,33 +46,60 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
         <MoreVertIcon fontSize="small" />
       </IconButton>
 
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+      >
 
         {/* 🔵 ACTIVE LEADS MENU */}
         {tab === "active" && (
           <>
-            <MenuItem onClick={() => { /* navigate to edit page */ setAnchorEl(null); }}>
+            <MenuItem
+              onClick={() => {
+                navigate(`/leads/edit/${lead.id}`, {
+                  state: { lead },
+                });
+                setAnchorEl(null);
+              }}
+            >
               <ListItemIcon>
                 <EditOutlinedIcon fontSize="small" />
               </ListItemIcon>
               Edit
             </MenuItem>
 
-            <MenuItem onClick={() => { setOpenReassign(true); setAnchorEl(null); }}>
+            <MenuItem
+              onClick={() => {
+                setOpenReassign(true);
+                setAnchorEl(null);
+              }}
+            >
               <ListItemIcon>
                 <PersonAddAltOutlinedIcon fontSize="small" />
               </ListItemIcon>
               Reassign
             </MenuItem>
 
-            <MenuItem onClick={() => { setOpenArchive(true); setAnchorEl(null); }}>
+            <MenuItem
+              onClick={() => {
+                setOpenArchive(true);
+                setAnchorEl(null);
+              }}
+            >
               <ListItemIcon>
                 <ArchiveOutlinedIcon fontSize="small" />
               </ListItemIcon>
               Archive
             </MenuItem>
 
-            <MenuItem sx={{ color: "error.main" }} onClick={() => { setOpenDelete(true); setAnchorEl(null); }}>
+            <MenuItem
+              sx={{ color: "error.main" }}
+              onClick={() => {
+                setOpenDelete(true);
+                setAnchorEl(null);
+              }}
+            >
               <ListItemIcon>
                 <DeleteOutlineOutlinedIcon fontSize="small" />
               </ListItemIcon>
@@ -82,8 +113,10 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
           <>
             <MenuItem
               onClick={() => {
-                setLeads(prev =>
-                  prev.map(l => (l.id === lead.id ? { ...l, archived: false } : l))
+                setLeads((prev) =>
+                  prev.map((l) =>
+                    l.id === lead.id ? { ...l, archived: false } : l
+                  )
                 );
                 setAnchorEl(null);
               }}
@@ -94,7 +127,13 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
               Unarchive
             </MenuItem>
 
-            <MenuItem sx={{ color: "error.main" }} onClick={() => { setOpenDelete(true); setAnchorEl(null); }}>
+            <MenuItem
+              sx={{ color: "error.main" }}
+              onClick={() => {
+                setOpenDelete(true);
+                setAnchorEl(null);
+              }}
+            >
               <ListItemIcon>
                 <DeleteOutlineOutlinedIcon fontSize="small" />
               </ListItemIcon>
@@ -102,7 +141,6 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
             </MenuItem>
           </>
         )}
-
       </Menu>
 
       <ArchiveLeadDialog
@@ -110,8 +148,10 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
         leadName={lead.name}
         onClose={() => setOpenArchive(false)}
         onConfirm={() => {
-          setLeads(prev =>
-            prev.map(l => (l.id === lead.id ? { ...l, archived: true } : l))
+          setLeads((prev) =>
+            prev.map((l) =>
+              l.id === lead.id ? { ...l, archived: true } : l
+            )
           );
           setOpenArchive(false);
         }}
@@ -122,7 +162,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
         leadName={lead.name}
         onClose={() => setOpenDelete(false)}
         onConfirm={() => {
-          setLeads(prev => prev.filter(l => l.id !== lead.id));
+          setLeads((prev) => prev.filter((l) => l.id !== lead.id));
           setOpenDelete(false);
         }}
       />
@@ -149,6 +189,10 @@ export const Dialogs = () => {
   }, []);
 
   return (
-    <CallDialog open={openCall} name={name} onClose={() => setOpenCall(false)} />
+    <CallDialog
+      open={openCall}
+      name={name}
+      onClose={() => setOpenCall(false)}
+    />
   );
 };
