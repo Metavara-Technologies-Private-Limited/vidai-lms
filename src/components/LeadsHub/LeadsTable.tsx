@@ -186,15 +186,16 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                       {lead.initials}
                     </Avatar>
                     <Box>
-                      <Typography fontWeight={600}>{lead.name}</Typography>
-                      <Typography variant="caption">{lead.id}</Typography>
+                      {/* Integrated Figma Bold Name Class */}
+                      <Typography className="lead-name-text">{lead.name}</Typography>
+                      <Typography className="lead-id-text">{lead.id}</Typography>
                     </Box>
                   </Stack>
                 </TableCell>
 
                 <TableCell>
-                  <Typography>{lead.date}</Typography>
-                  <Typography variant="caption">{lead.time}</Typography>
+                  <Typography className="lead-date">{lead.date}</Typography>
+                  <Typography className="lead-time">{lead.time}</Typography>
                 </TableCell>
 
                 <TableCell>{lead.location}</TableCell>
@@ -204,9 +205,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   <Chip
                     label={lead.status}
                     size="small"
-                    className={`status-${lead.status
+                    className={`lead-chip status-${lead.status
                       .toLowerCase()
-                      .replace(" ", "-")}`}
+                      .replace(/\s+/g, "-")}`}
                   />
                 </TableCell>
 
@@ -214,26 +215,27 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   <Chip
                     label={lead.quality}
                     size="small"
-                    className={`quality-${lead.quality.toLowerCase()}`}
+                    className={`lead-chip quality-${lead.quality.toLowerCase()}`}
                   />
                 </TableCell>
 
-                <TableCell>
-  {String(lead.score).includes("%")
-    ? lead.score
-    : `${lead.score}%`}
-</TableCell>
-
+                <TableCell className="score">
+                  {String(lead.score).includes("%") ? lead.score : `${lead.score}%`}
+                </TableCell>
 
                 <TableCell>{lead.assigned}</TableCell>
                 <TableCell>{lead.task}</TableCell>
 
                 <TableCell>
-                  <Chip label={lead.taskStatus || "Pending"} size="small" />
+                  <Chip 
+                    label={lead.taskStatus || "Pending"} 
+                    size="small" 
+                    className="lead-chip"
+                  />
                 </TableCell>
 
                 <TableCell
-                  sx={{ color: "primary.main" }}
+                  sx={{ color: "primary.main", fontWeight: 700 }}
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate("/leads/activity", { state: { lead } });
@@ -250,10 +252,10 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <CallButton lead={lead} />
-                    <IconButton>
+                    <IconButton className="action-btn">
                       <ChatBubbleOutlineIcon fontSize="small" />
                     </IconButton>
-                    <IconButton>
+                    <IconButton className="action-btn">
                       <EmailOutlinedIcon fontSize="small" />
                     </IconButton>
                   </Stack>
@@ -276,8 +278,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
       </TableContainer>
 
       {/* ---------- Pagination ---------- */}
-      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
-        <Typography>
+      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
+        <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
 
@@ -312,7 +314,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
         </Stack>
       </Stack>
 
-      {/* ---------- Bulk Action Bar ---------- */}
       <BulkActionBar
         selectedIds={selectedIds}
         tab={tab}

@@ -19,8 +19,11 @@ import LeadsBoard from "../components/LeadsHub/LeadsBoard";
 import LeadsConversation from "../components/LeadsHub/LeadsConversation";
 import Activity from "../components/LeadsHub/Activity";
 import FilterDialog from "../components/LeadsHub/FilterDialog";
+import LeadsFollowUp from "../components/LeadsHub/LeadsFollowUp";
 
 import "../styles/Leads/leads.css";
+
+const STORAGE_KEY = "vidai_leads_data";
 
 const Leads: React.FC = () => {
   const navigate = useNavigate();
@@ -30,23 +33,35 @@ const Leads: React.FC = () => {
   const [search, setSearch] = React.useState("");
   const [viewMode, setViewMode] = React.useState<"table" | "board">("table");
 
+  // Get counts for the badges dynamically
+  const [counts, setCounts] = React.useState({ all: 0, followUps: 0, archived: 0 });
+
+  React.useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const leads = JSON.parse(stored);
+      const followUpStatuses = ["new", "lost", "cycle conversion"];
+      
+      setCounts({
+        all: leads.filter((l: any) => !l.archived).length,
+        followUps: leads.filter((l: any) => !l.archived && followUpStatuses.includes(l.status.toLowerCase())).length,
+        archived: leads.filter((l: any) => l.archived).length
+      });
+    }
+  }, [tab]); 
+
   const tabs = [
-    "All Leads",
-    "Follow-Ups",
-    "Archived Leads",
-    "Leads Conversation",
-    "Activity",
+    { label: "All Leads", count: counts.all },
+    { label: "Follow-Ups", count: counts.followUps },
+    { label: "Archived Leads", count: counts.archived },
+    { label: "Leads Conversation", count: null },
+    { label: "Activity", count: null },
   ];
 
   return (
     <Box className="leads-page">
       {/* ================= HEADER ================= */}
-      <Stack
-        className="leads-header"
-        direction="row"
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
-      >
+      <Stack className="leads-header" direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography className="leads-title">Leads Hub</Typography>
 
         <Stack direction="row" spacing={1} alignItems="center">
@@ -68,7 +83,6 @@ const Leads: React.FC = () => {
           <IconButton 
             className={`header-icon-btn ${viewMode === "table" ? "active" : ""}`}
             onClick={() => setViewMode("table")}
-            sx={{ color: viewMode === "table" ? "#6366F1" : "inherit" }}
           >
             <ViewListIcon fontSize="small" />
           </IconButton>
@@ -76,50 +90,44 @@ const Leads: React.FC = () => {
           <IconButton 
             className={`header-icon-btn ${viewMode === "board" ? "active" : ""}`}
             onClick={() => setViewMode("board")}
-            sx={{ color: viewMode === "board" ? "#6366F1" : "inherit" }}
           >
             <ViewModuleIcon fontSize="small" />
           </IconButton>
 
-          <IconButton
-            className="header-icon-btn"
-            onClick={() => setFilterOpen(true)}
-          >
+          <IconButton className="header-icon-btn" onClick={() => setFilterOpen(true)}>
             <FilterAltOutlinedIcon fontSize="small" />
           </IconButton>
 
-          <Button
-            className="add-lead-btn"
-            onClick={() => navigate("/leads/add")}
-          >
+          <Button className="add-lead-btn" onClick={() => navigate("/leads/add")}>
             + Add New Lead
           </Button>
         </Stack>
       </Stack>
 
-      {/* ================= TABS ================= */}
+      {/* ================= PILL TABS WITH BADGES ================= */}
       <Stack direction="row" spacing={1} className="pill-tabs" sx={{ mb: 3 }}>
-        {tabs.map((label, i) => (
+        {tabs.map((t, i) => (
           <Box
             key={i}
             className={`pill-tab ${tab === i ? "active" : ""}`}
             onClick={() => setTab(i)}
           >
-            {label}
+            {t.label} 
+            {t.count !== null && (
+               <span className="tab-count">({t.count})</span>
+            )}
           </Box>
         ))}
       </Stack>
 
       {/* ================= CONTENT SWITCH ================= */}
+      {tab === 1 && <LeadsFollowUp search={search} />}
       {tab === 3 && <LeadsConversation />}
       {tab === 4 && <Activity />}
       
-      {tab !== 3 && tab !== 4 && (
+      {tab !== 1 && tab !== 3 && tab !== 4 && (
         viewMode === "table" ? (
-          <LeadsTable 
-            search={search} 
-            tab={tab === 2 ? "archived" : "active"} 
-          />
+          <LeadsTable search={search} tab={tab === 2 ? "archived" : "active"} />
         ) : (
           <LeadsBoard search={search} />
         )
