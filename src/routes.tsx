@@ -4,18 +4,22 @@ import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 
 import Integration from "./components/Settings/Menus/Integration";
-import Templates from "./components/Settings/Menus/Templates";
 import Tickets from "./components/Settings/Menus/Tickets";
 
-// 👇 import page directly (not sidebar-driven)
+// 🆕 New Templates modular page
+import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
+
 import AddNewLead from "./components/LeadsHub/AddNewLead";
+import LeadView from "./components/LeadsHub/LeadView";
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<MainLayout />}>
+
         {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
+
         {/* Settings sub routes */}
         <Route
           path="settings/integration"
@@ -30,7 +34,7 @@ export default function AppRoutes() {
           path="settings/templates"
           element={
             <Suspense fallback={<div>Loading...</div>}>
-              <Templates />
+              <TemplatesPage />
             </Suspense>
           }
         />
@@ -56,10 +60,10 @@ export default function AppRoutes() {
                 </Suspense>
               }
             />
-          )),
+          ))
         )}
 
-        {/* 🔥 Add New Lead page */}
+        {/* Add New Lead */}
         <Route
           path="leads/add"
           element={
@@ -69,8 +73,19 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Lead View */}
+        <Route
+          path="leads/:id"
+          element={
+            <Suspense fallback={<div>Loading...</div>}>
+              <LeadView />
+            </Suspense>
+          }
+        />
+
         {/* fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
       </Route>
     </Routes>
   );

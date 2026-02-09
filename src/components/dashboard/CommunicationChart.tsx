@@ -3,8 +3,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);
     return (
       <Box sx={chartStyles.tooltipContainer}>

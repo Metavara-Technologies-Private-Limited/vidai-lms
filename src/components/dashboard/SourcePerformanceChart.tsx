@@ -15,6 +15,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  type TooltipProps,
 } from "recharts";
 import { useState } from "react";
 import { mockData } from "./mockData";
@@ -26,8 +27,7 @@ type Metric = "volume" | "rate" | "revenue" | "cost";
 
 const CustomTooltip = ({
   active,
-  payload,
-  label,
+ 
   metric,
 }: TooltipProps<any, any> & { metric: string }) => {
   if (active && payload && payload.length) {

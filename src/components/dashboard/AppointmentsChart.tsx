@@ -4,6 +4,7 @@ import { useState } from "react";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -59,7 +60,7 @@ const AppointmentsChart = () => {
               onMouseEnter={(_, index) => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
             >
-              {data.map((entry, index) => (
+              {data.map((_entry, index) => (
                 <Cell 
                   key={`cell-${index}`} 
                   // Highlight "No-shows" (index 2) or hovered item

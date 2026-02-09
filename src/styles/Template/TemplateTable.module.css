@@ -1,0 +1,22 @@
+.container {
+  background-color: white !important;
+  border-radius: 12px !important;
+  border: 1px solid #F3F4F6 !important;
+  padding: 0 !important;
+}
+
+.headCell {
+  background-color: #F9FAFB !important;
+  color: #9CA3AF !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid #F3F4F6 !important;
+}
+
+.bodyRow:hover {
+  background-color: #F9FAFB;
+}
+
+.nameCell { font-weight: 500 !important; color: #374151 !important; font-size: 14px !important; }
+.subjectCell { color: #6B7280 !important; font-size: 14px !important; }
+.dateCell, .authorCell { color: #6B7280 !important; font-size: 13px !important; }

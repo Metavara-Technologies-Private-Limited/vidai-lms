@@ -1,0 +1,93 @@
+.mainContainer {
+  width: 100%;
+  padding-bottom: 20px;
+}
+
+.topSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.title {
+  font-weight: 700 !important;
+  color: #111827;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Search Field Styling */
+.searchField :global(.MuiOutlinedInput-root) {
+  background-color: white;
+  border-radius: 8px;
+  width: 320px;
+  font-size: 14px;
+}
+
+.searchField :global(.MuiOutlinedInput-notchedOutline) {
+  border-color: #E5E7EB;
+}
+
+/* Filter Button Styling */
+.filterBtn {
+  border: 1px solid #E5E7EB !important;
+  border-radius: 8px !important;
+  color: #4B5563 !important;
+  padding: 8px !important;
+  background-color: white !important;
+}
+
+/* New Template Button Styling */
+.newTemplateBtn {
+  background-color: #4B4B4B !important;
+  text-transform: none !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 8px 18px !important;
+  font-size: 14px !important;
+}
+
+.newTemplateBtn:hover {
+  background-color: #373737 !important;
+}
+
+/* Tabs Styling */
+.tabsWrapper {
+  margin-top: 10px;
+}
+
+.tabItem {
+  text-transform: none !important;
+  min-width: auto !important;
+  padding: 6px 24px !important;
+  border-radius: 12px !important;
+  border: 1px solid #E5E7EB !important;
+  margin-right: 15px !important;
+  font-size: 13px !important;
+  color: #6B7280 !important;
+  background-color: #F9FAFB !important;
+  min-height: 36px !important;
+  transition: all 0.2s ease;
+}
+
+.tabItem small {
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* The specific Orange/Red active state from your image */
+.activeTab {
+  background-color: #FFF7F5 !important;
+  border-color: #F87171 !important;
+  color: #F87171 !important;
+}
+
+.tabsList :global(.MuiTabs-flexContainer) {
+  gap: 0;
+}
