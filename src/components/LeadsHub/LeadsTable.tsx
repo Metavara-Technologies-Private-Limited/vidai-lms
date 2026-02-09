@@ -6,6 +6,7 @@ import {
   IconButton,
   Stack,
   Table,
+  TableBody,
   TableCell,
   TableContainer,
   TableHead,
@@ -34,16 +35,21 @@ interface Props {
 }
 
 const STORAGE_KEY = "vidai_leads_data";
+const rowsPerPage = 10;
 
 const LeadsTable: React.FC<Props> = ({ search, tab }) => {
   const navigate = useNavigate();
-  const rowsPerPage = 10;
 
-  /* ---------------- DATA ---------------- */
+  /* ---------- Leads state ---------- */
   const [leads, setLeads] = React.useState<Lead[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
-    const initial = leadsMock.map((l) => ({ ...l, archived: l.archived ?? false }));
+
+    const initial = leadsMock.map((l) => ({
+      ...l,
+      archived: l.archived ?? false,
+    }));
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
     return initial;
   });
@@ -52,42 +58,49 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
   }, [leads]);
 
-  /* ---------------- SELECTION ---------------- */
+  /* ---------- Pagination ---------- */
+  const [page, setPage] = React.useState(1);
+
+  /* ---------- Selection ---------- */
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
-  const handleSelectAll = (checked: boolean, ids: string[]) => {
-    setSelectedIds(checked ? ids : []);
-  };
-
-  const handleSelectOne = (id: string) => {
+  const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
-  /* ---------------- FILTER + PAGINATION ---------------- */
-  const [page, setPage] = React.useState(1);
-  const [filteredLeads, setFilteredLeads] = React.useState<Lead[]>([]);
+  const isSelected = (id: string) => selectedIds.includes(id);
 
-  React.useEffect(() => {
-    const result = leads.filter((lead) => {
-      const matchSearch = `${lead.name} ${lead.id}`.toLowerCase().includes(search.toLowerCase());
+  /* ---------- Filtering ---------- */
+  const filteredLeads = React.useMemo(() => {
+    return leads.filter((lead) => {
+      const matchSearch = `${lead.name} ${lead.id}`
+        .toLowerCase()
+        .includes(search.toLowerCase());
       const matchTab = tab === "archived" ? lead.archived : !lead.archived;
       return matchSearch && matchTab;
     });
-    setFilteredLeads(result);
+  }, [leads, search, tab]);
+
+  React.useEffect(() => {
     setPage(1);
     setSelectedIds([]);
-  }, [search, leads, tab]);
+  }, [search, tab]);
 
+  /* ---------- Pagination calculations ---------- */
   const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
-  const currentLeads = filteredLeads.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+
+  const currentLeads = filteredLeads.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  );
 
   const startEntry = (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
-  /* ---------------- BULK ACTIONS ---------------- */
+  /* ---------- Bulk actions ---------- */
   const handleBulkDelete = () => {
     setLeads((prev) => prev.filter((l) => !selectedIds.includes(l.id)));
     setSelectedIds([]);
@@ -95,12 +108,13 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
 
   const handleBulkArchive = (archive: boolean) => {
     setLeads((prev) =>
-      prev.map((l) => (selectedIds.includes(l.id) ? { ...l, archived: archive } : l))
+      prev.map((l) =>
+        selectedIds.includes(l.id) ? { ...l, archived: archive } : l
+      )
     );
     setSelectedIds([]);
   };
 
-  /* ---------------- UI ---------------- */
   return (
     <>
       <TableContainer component={Paper} elevation={0} className="leads-table">
@@ -109,13 +123,21 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
             <TableRow>
               <TableCell padding="checkbox">
                 <Checkbox
-                  checked={selectedIds.length > 0 && selectedIds.length === currentLeads.length}
                   indeterminate={
-                    selectedIds.length > 0 && selectedIds.length < currentLeads.length
+                    selectedIds.length > 0 &&
+                    selectedIds.length < currentLeads.length
                   }
-                  onChange={(e) =>
-                    handleSelectAll(e.target.checked, currentLeads.map((l) => l.id))
+                  checked={
+                    currentLeads.length > 0 &&
+                    selectedIds.length === currentLeads.length
                   }
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds(currentLeads.map((l) => l.id));
+                    } else {
+                      setSelectedIds([]);
+                    }
+                  }}
                 />
               </TableCell>
               <TableCell>Lead Name | No</TableCell>
@@ -134,19 +156,35 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
             </TableRow>
           </TableHead>
 
-          <tbody>
+          <TableBody>
             {currentLeads.map((lead) => (
-              <TableRow key={lead.id} hover>
-                <TableCell padding="checkbox">
+              <TableRow
+                key={lead.id}
+                hover
+                sx={{ cursor: "pointer" }}
+                onClick={() =>
+                  navigate(
+                    `/leads/${encodeURIComponent(
+                      lead.id.replace("#", "")
+                    )}`
+                  )
+                }
+              >
+                <TableCell
+                  padding="checkbox"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Checkbox
-                    checked={selectedIds.includes(lead.id)}
-                    onChange={() => handleSelectOne(lead.id)}
+                    checked={isSelected(lead.id)}
+                    onChange={() => toggleSelect(lead.id)}
                   />
                 </TableCell>
 
                 <TableCell>
                   <Stack direction="row" spacing={2}>
-                    <Avatar className="lead-avatar">{lead.initials}</Avatar>
+                    <Avatar className="lead-avatar">
+                      {lead.initials}
+                    </Avatar>
                     <Box>
                       <Typography fontWeight={600}>{lead.name}</Typography>
                       <Typography variant="caption">{lead.id}</Typography>
@@ -166,7 +204,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   <Chip
                     label={lead.status}
                     size="small"
-                    className={`status-${lead.status.toLowerCase().replace(" ", "-")}`}
+                    className={`status-${lead.status
+                      .toLowerCase()
+                      .replace(" ", "-")}`}
                   />
                 </TableCell>
 
@@ -179,24 +219,36 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                 </TableCell>
 
                 <TableCell>
-                  {typeof lead.score === "number" ? `${lead.score.toFixed(2)}%` : lead.score}
-                </TableCell>
+  {String(lead.score).includes("%")
+    ? lead.score
+    : `${lead.score}%`}
+</TableCell>
+
 
                 <TableCell>{lead.assigned}</TableCell>
                 <TableCell>{lead.task}</TableCell>
+
                 <TableCell>
                   <Chip label={lead.taskStatus || "Pending"} size="small" />
                 </TableCell>
 
                 <TableCell
-                  sx={{ cursor: "pointer", color: "primary.main" }}
-                  onClick={() => navigate("/leads/activity", { state: { lead } })}
+                  sx={{ color: "primary.main" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/leads/activity", { state: { lead } });
+                  }}
                 >
                   {lead.activity || "View Activity"}
                 </TableCell>
 
                 <TableCell align="center">
-                  <Stack direction="row" spacing={1} justifyContent="center">
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    justifyContent="center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <CallButton lead={lead} />
                     <IconButton>
                       <ChatBubbleOutlineIcon fontSize="small" />
@@ -207,43 +259,60 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   </Stack>
                 </TableCell>
 
-                <TableCell align="center">
-                  <MenuButton lead={lead} setLeads={setLeads} tab={tab} />
+                <TableCell
+                  align="center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MenuButton
+                    lead={lead}
+                    setLeads={setLeads}
+                    tab={tab}
+                  />
                 </TableCell>
               </TableRow>
             ))}
-          </tbody>
+          </TableBody>
         </Table>
       </TableContainer>
 
-      {/* Pagination */}
+      {/* ---------- Pagination ---------- */}
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
         <Typography>
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
 
         <Stack direction="row" spacing={1}>
-          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+          <IconButton
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
             <ChevronLeftIcon />
           </IconButton>
 
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Box
-              key={p}
-              onClick={() => setPage(p)}
-              className={`page-number ${page === p ? "active" : ""}`}
-            >
-              {p}
-            </Box>
-          ))}
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+            (p) => (
+              <Box
+                key={p}
+                onClick={() => setPage(p)}
+                className={`page-number ${
+                  page === p ? "active" : ""
+                }`}
+              >
+                {p}
+              </Box>
+            )
+          )}
 
-          <IconButton disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
+          <IconButton
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
             <ChevronRightIcon />
           </IconButton>
         </Stack>
       </Stack>
 
-      {/* Bulk Action Bar */}
+      {/* ---------- Bulk Action Bar ---------- */}
       <BulkActionBar
         selectedIds={selectedIds}
         tab={tab}
