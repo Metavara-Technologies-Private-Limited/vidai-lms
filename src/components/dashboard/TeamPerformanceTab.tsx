@@ -65,7 +65,7 @@ const MedalIcon = ({ type }) => {
 };
 
 // Mock data for individual performance chart
-const generateMemberPerformanceData = () => {
+const generateMemberPerformanceData = (name: any) => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return months.map(month => ({
     month,
@@ -82,7 +82,7 @@ const TeamPerformanceTab = () => {
   const lowPerformers = members.filter((m) => m.growth.startsWith("-"));
 
   // Get member data for display
-  const getMemberData = () => {
+  const getMemberData = (selectedMember: never) => {
     return {
       assignedLeads: 46,
       callsMade: 146,
@@ -415,7 +415,6 @@ const TeamPerformanceTab = () => {
         {/* Right Column: Low Performers */}
         <Grid size={{ xs: 12, md: 4 }}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Low Performers</Typography>
-<<<<<<< HEAD
           <Card sx={{ p: 2, borderRadius: "16px", border: "1px solid #f0f0f0", boxShadow: 'none' }}>
             {lowPerformers.map((lp) => (
               <Stack
@@ -425,11 +424,6 @@ const TeamPerformanceTab = () => {
                 alignItems="center"
                 sx={{ mb: 2.5, "&:last-child": { mb: 0 } }}
               >
-=======
-          <Card sx={{ p: 2, borderRadius: '16px', border: '1px solid #f0f0f0',   }}>
-            {lowPerformers.map((lp, i) => (
-              <Stack key={i} direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5, "&:last-child": { mb: 0 } }}>
->>>>>>> f20e4874b979c17906d33f13291fc627681cb265
                 <Stack direction="row" spacing={1.5} alignItems="center">
                   <Avatar src={lp.img} sx={{ width: 40, height: 40 }} />
                   <Box>

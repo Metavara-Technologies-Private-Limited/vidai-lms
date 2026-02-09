@@ -6,15 +6,9 @@ import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import Integration from "./components/Settings/Menus/Integration";
 import Tickets from "./components/Settings/Menus/Tickets";
 
-<<<<<<< Updated upstream
-=======
-// 🆕 Updated import for the new Templates modular page
-import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
-
-// 👇 import page directly (not sidebar-driven)
->>>>>>> Stashed changes
 import AddNewLead from "./components/LeadsHub/AddNewLead";
 import LeadView from "./components/LeadsHub/LeadView";
+import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
 
 export default function AppRoutes() {
   return (
@@ -23,32 +17,6 @@ export default function AppRoutes() {
 
         {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
-<<<<<<< Updated upstream
-
-<Route
-  path="settings/tickets"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Tickets />
-    </Suspense>
-  }
-/>
-
-<Route
-  path="settings/templates"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Templates />
-    </Suspense>
-  }
-/>
-
-        <Route
-          path="settings/tickets"
-          element={<Suspense fallback={<div>Loading...</div>}><Tickets /></Suspense>}
-        />
-
-=======
         
         {/* Settings sub routes */}
         <Route
@@ -69,7 +37,6 @@ export default function AppRoutes() {
             </Suspense>
           }
         />
->>>>>>> Stashed changes
 
         <Route
           path="settings/tickets"
