@@ -1,10 +1,14 @@
+/* =======================
+   COMMON / SHARED TYPES
+======================= */
+
 export type Severity = "high" | "medium";
 
-export type KpiBreakdown = {
-  label: string;
+export interface KpiBreakdown {
   id: string;
+  label: string;
   value: number;
-};
+}
 
 export interface KpiItem {
   id: string;
@@ -21,7 +25,10 @@ export interface SlaAlert {
   severity: Severity;
 }
 
-// Specific types for each Tab's performance metrics
+/* =======================
+   PERFORMANCE TYPES
+======================= */
+
 export interface SourcePerformance {
   name: string;
   campaign: string;
@@ -54,96 +61,43 @@ export interface PipelineStage {
 export interface AppointmentStatus {
   status: string;
   value: number;
-  color?: string; // Optional color for highlighting specific bars
+  color?: string;
 }
+
+/* =======================
+   TEAM PERFORMANCE
+======================= */
+
+export type MedalType = "1st" | "2nd" | "3rd";
 
 export interface TeamMember {
   name: string;
   role: string;
   img: string;
   growth: string;
-  rank?: string; // For 1st (Top), 2nd, 3rd
+  rank?: string;
 }
 
-export interface MockData {
-  kpis: KpiItem[];
-  slaAlerts: {
-    new: SlaAlert[];
-    earlier: SlaAlert[];
-  };
-<<<<<<< Updated upstream
-overview: {
-  activeTab: string;
-
-  sourcePerformance: {
-    name: string;
-    campaign: string;
-    hot: number;
-    warm: number;
-    cold: number;
-    convRate: number;
-    revenue: number;
-    cost: number;
-  }[];
-
-  communicationPerformance: {
-    platform: string;
-    high: number;
-    low: number;
-    no: number;
-  }[];
-
-  conversionTrendPerformance: {
-    month: string;
-    rate: number;
-  }[];
-
-  pipelineData: {
-    stage: string;
-    value: number;
-    color: string;
-  }[];
-
-  appointmentsPerformance: {
-    status: string;
-    value: number;
-    color: string;
-  }[];
-
-  teamPerformance: {
-    members: {
-      name: string;
-      role: string;
-      img: string;
-      growth: string;
-      rank?: string;
-    }[];
-    overview: {
-      calls: string;
-      followUps: string;
-      appointments: string;
-      converted: string;
-      rate: string;
-      revenue: string;
-      sla: string;
-=======
-  overview: {
-    activeTab: string;
-    sourcePerformance: SourcePerformance[];
-    communicationPerformance: CommunicationPerformance[];
-    conversionTrendPerformance: ConversionTrend[];
-    pipelineData: PipelineStage[];
-    appointmentsPerformance: AppointmentStatus[];
-    teamPerformance: {
-      members: TeamMember[];
-      overview: Record<string, string>; // Flexible object for the stats card
->>>>>>> Stashed changes
-    };
-interface MedalIcon {
-  type: "1st" | "2nd" | "3rd";
+export interface TeamOverviewStats {
+  calls: string;
+  followUps: string;
+  appointments: string;
+  converted: string;
+  rate: string;
+  revenue: string;
+  sla: string;
 }
 
-interface MemberStats {
+export interface TeamPerformance {
+  members: TeamMember[];
+  overview: Record<string, string>;
+}
+
+/* =======================
+   MEMBER DETAIL VIEW
+======================= */
+
+export interface MemberStats {
   assignedLeads: number;
   callsMade: number;
   followUps: number;
@@ -153,19 +107,38 @@ interface MemberStats {
   slaCompliance: string;
 }
 
-interface PerformanceData {
+export interface PerformanceChartPoint {
   month: string;
-  rate: number;
+  value: number;
 }
 
-interface Member {
-  name: string;
-  role: string;
-  img: string;
-  rank?: string;
-  growth: string;
-}
+/* =======================
+   ROOT MOCK DATA SHAPE
+======================= */
+
+export interface MockData {
+  kpis: KpiItem[];
+  slaAlerts: {
+    new: SlaAlert[];
+    earlier: SlaAlert[];
   };
-};
+  overview: {
+    activeTab: string;
+    sourcePerformance: SourcePerformance[];
+    communicationPerformance: CommunicationPerformance[];
+    conversionTrendPerformance: ConversionTrend[];
+    pipelineData: PipelineStage[];
+    appointmentsPerformance: AppointmentStatus[];
+    teamPerformance: TeamPerformance;
+  };
+}
 
+export interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    value: number;
+    name: string;
+    dataKey: string;
+  }>;
+  label?: string;
 }

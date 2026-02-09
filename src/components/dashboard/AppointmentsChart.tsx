@@ -1,21 +1,21 @@
-import { Box, Typography } from "@mui/material";
+import { Box, } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useState } from "react";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+//import type{TooltipProps} from "recharts";
+import type{CustomTooltipProps} from "../../types/dashboard.types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <Box sx={chartStyles.tooltipContainer}>
-        <Typography variant="subtitle2" fontWeight={700}>
-          {payload[0].value}
-        </Typography>
-      </Box>
-    );
-  }
-  return null;
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+  if (!active || !payload || !payload.length) return null;
+
+  return (
+    <div style={{ background: "#fff", padding: 8, border: "1px solid #eee" }}>
+      <p>{label}</p>
+      <p>{payload[0].value}</p>
+    </div>
+  );
 };
 
 const AppointmentsChart = () => {

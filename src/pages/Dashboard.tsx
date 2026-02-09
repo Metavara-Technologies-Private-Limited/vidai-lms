@@ -7,8 +7,8 @@ const Dashboard = () => {
       sx={{
         width: "auto",
         height: "700px",
-        overflowY: "auto",   // ✅ THIS IS THE KEY
-        paddingBottom: 4,    // ✅ ensures bottom edge is visible
+        overflowY: "auto",   
+        paddingBottom: 4,   
       }}
     >
       <DashboardLayout />
