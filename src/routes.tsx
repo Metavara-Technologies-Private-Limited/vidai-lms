@@ -28,6 +28,15 @@ export default function AppRoutes() {
 />
 
 <Route
+  path="settings/tickets"
+  element={
+    <Suspense fallback={<div>Loading...</div>}>
+      <Tickets />
+    </Suspense>
+  }
+/>
+
+<Route
   path="settings/templates"
   element={
     <Suspense fallback={<div>Loading...</div>}>
@@ -36,14 +45,7 @@ export default function AppRoutes() {
   }
 />
 
-<Route
-  path="settings/tickets"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Tickets />
-    </Suspense>
-  }
-/>
+
 
 
         {/* sidebar routes */}
