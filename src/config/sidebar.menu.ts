@@ -53,18 +53,19 @@ export const LEADS_MENU: MenuItem[] = [
       path: "/settings/integration",
       page: lazy(() => import("../components/Settings/Menus/Integration")),
     },
+        {
+      key: "tickets",
+      label: "Tickets",
+      path: "/settings/tickets",
+      page: lazy(() => import("../components/Settings/Menus/Tickets")),
+    },
     {
       key: "templates",
       label: "Templates",
       path: "/settings/templates",
       page: lazy(() => import("../components/Settings/Menus/Templates")),
     },
-    {
-      key: "tickets",
-      label: "Tickets",
-      path: "/settings/tickets",
-      page: lazy(() => import("../components/Settings/Menus/Tickets")),
-    },
+
   ],
 },
 

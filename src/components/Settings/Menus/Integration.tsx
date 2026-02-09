@@ -10,7 +10,7 @@ import GoogleCalender from "../../../assets/icons/Google_Calender.svg";
 import ConnectedLogo from "../../../assets/icons/Connected-Logo.svg";
 import NotConnectedLogo from "../../../assets/icons/Not-Connected-Logo.svg";
 
-import type{ IntegrationCardProps } from "../../../types/Integration.types";
+import type{ IntegrationCardProps } from "../../../types/Settings.types";
 import { styles } from "../../../styles/Settings/Integration.styles";
 
 /* ------------------------------------------------------------------ */

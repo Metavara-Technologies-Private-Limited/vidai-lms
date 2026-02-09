@@ -18,21 +18,30 @@ export default function AppRoutes() {
         {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
 
-        {/* Settings sub routes */}
-        <Route
-          path="settings/integration"
-          element={<Suspense fallback={<div>Loading...</div>}><Integration /></Suspense>}
-        />
+<Route
+  path="settings/tickets"
+  element={
+    <Suspense fallback={<div>Loading...</div>}>
+      <Tickets />
+    </Suspense>
+  }
+/>
 
-        <Route
-          path="settings/templates"
-          element={<Suspense fallback={<div>Loading...</div>}><Templates /></Suspense>}
-        />
+<Route
+  path="settings/templates"
+  element={
+    <Suspense fallback={<div>Loading...</div>}>
+      <Templates />
+    </Suspense>
+  }
+/>
 
         <Route
           path="settings/tickets"
           element={<Suspense fallback={<div>Loading...</div>}><Tickets /></Suspense>}
         />
+
+
 
         {/* sidebar routes */}
         {SIDEBAR_TABS.flatMap((tab) =>
