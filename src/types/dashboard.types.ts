@@ -82,8 +82,33 @@ overview: {
       revenue: string;
       sla: string;
     };
+interface MedalIcon {
+  type: "1st" | "2nd" | "3rd";
+}
+
+interface MemberStats {
+  assignedLeads: number;
+  callsMade: number;
+  followUps: number;
+  appointments: number;
+  leadConverted: number;
+  revenueGenerated: string;
+  slaCompliance: string;
+}
+
+interface PerformanceData {
+  month: string;
+  rate: number;
+}
+
+interface Member {
+  name: string;
+  role: string;
+  img: string;
+  rank?: string;
+  growth: string;
+}
   };
 };
 
 }
-  
