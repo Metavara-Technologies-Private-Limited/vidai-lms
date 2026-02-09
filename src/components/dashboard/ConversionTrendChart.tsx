@@ -2,10 +2,9 @@ import { Box, Typography } from "@mui/material";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import type{CustomTooltipProps} from "../../types/dashboard.types";
 
-// Custom Tooltip for the "Bubble" effect
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <Box sx={chartStyles.tooltipContainer}>

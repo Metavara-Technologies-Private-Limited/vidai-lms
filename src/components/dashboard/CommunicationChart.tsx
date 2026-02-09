@@ -2,9 +2,9 @@ import { Box, Typography, Stack } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import type{CustomTooltipProps} from "../../types/dashboard.types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);

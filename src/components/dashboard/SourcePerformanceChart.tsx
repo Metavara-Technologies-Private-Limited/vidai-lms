@@ -15,58 +15,56 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  type TooltipProps,
 } from "recharts";
 import { useState } from "react";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 
 type Metric = "volume" | "rate" | "revenue" | "cost";
+import type{CustomTooltipProps} from "../../types/dashboard.types";
 
 // Custom Tooltip
 
 const CustomTooltip = ({
   active,
- 
+  payload,
   metric,
-}: TooltipProps<any, any> & { metric: string }) => {
-  if (active && payload && payload.length) {
-    const total = payload.reduce(
-      (sum: number, entry: any) => sum + (entry.value ?? 0),
-      0,
-    );
+}: CustomTooltipProps & { metric: string }) => {
+  if (!active || !payload || !payload.length) return null;
 
-    const unit = metric === "rate" ? "%" : metric === "volume" ? "" : "$";
+  const total = payload.reduce(
+    (sum, entry) => sum + (entry.value ?? 0),
+    0
+  );
 
-    return (
-      <Box sx={chartStyles.tooltipContainer}>
-        <Typography variant="subtitle2" fontWeight={700}>
-          {metric === "revenue" || metric === "cost"
-            ? `$${total.toLocaleString()}`
-            : total}
-          {unit}
+  const unit = metric === "rate" ? "%" : metric === "volume" ? "" : "$";
+
+  return (
+    <Box sx={chartStyles.tooltipContainer}>
+      <Typography variant="subtitle2" fontWeight={700}>
+        {metric === "revenue" || metric === "cost"
+          ? `$${total.toLocaleString()}`
+          : total}
+        {unit}
+      </Typography>
+
+      {metric === "volume" && payload.length >= 3 && (
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            mt: 0.5,
+            color: "text.secondary",
+            fontSize: "10px",
+          }}
+        >
+          {payload[0].value} (Hot)&nbsp;
+          {payload[1].value} (Warm)&nbsp;
+          {payload[2].value} (Cold)
         </Typography>
-
-        {metric === "volume" && payload.length >= 3 && (
-          <Typography
-            variant="caption"
-            sx={{
-              display: "block",
-              mt: 0.5,
-              color: "text.secondary",
-              fontSize: "10px",
-            }}
-          >
-            {payload[0].value} (Hot)&nbsp;
-            {payload[1].value} (Warm)&nbsp;
-            {payload[2].value} (Cold)
-          </Typography>
-        )}
-      </Box>
-    );
-  }
-
-  return null;
+      )}
+    </Box>
+  );
 };
 
 const SourcePerformanceChart = () => {

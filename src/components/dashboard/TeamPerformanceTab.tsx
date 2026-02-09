@@ -9,9 +9,16 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import { mockData } from "./mockData";
+import type{
+  TeamMember,
+  MedalType,
+  MemberStats,
+  PerformanceChartPoint,
+} from "../../types/dashboard.types";
 
 // Medal Icon Component
-const MedalIcon = ({ type }) => {
+const MedalIcon = ({ type }: { type: MedalType }) => {
+
   const colors = {
     gold: "#FFD467",
     silver: "#C0C0C0",
@@ -65,7 +72,7 @@ const MedalIcon = ({ type }) => {
 };
 
 // Mock data for individual performance chart
-const generateMemberPerformanceData = () => {
+const generateMemberPerformanceData = (): PerformanceChartPoint[] => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return months.map(month => ({
     month,
@@ -75,14 +82,14 @@ const generateMemberPerformanceData = () => {
 
 const TeamPerformanceTab = () => {
   const { members, overview } = mockData.overview.teamPerformance;
-  const [selectedMember, setSelectedMember] = useState(null);
+const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
   const topPerformer = members.find((m) => m.rank === "1st (Top)");
   const otherTops = members.filter((m) => m.rank === "2nd" || m.rank === "3rd");
   const lowPerformers = members.filter((m) => m.growth.startsWith("-"));
 
   // Get member data for display
-  const getMemberData = () => {
+ const getMemberData = (): MemberStats => {
     return {
       assignedLeads: 46,
       callsMade: 146,
@@ -94,8 +101,12 @@ const TeamPerformanceTab = () => {
     };
   };
 
-  const performanceData = selectedMember ? generateMemberPerformanceData(selectedMember.name) : [];
-  const memberStats = selectedMember ? getMemberData(selectedMember) : null;
+const performanceData: PerformanceChartPoint[] =
+  selectedMember ? generateMemberPerformanceData() : [];
+
+const memberStats: MemberStats | null =
+  selectedMember ? getMemberData() : null;
+const stats = memberStats!;
 
   return (
     <Box sx={{ p: 2, height: "calc(100vh - 200px)", overflowY: "auto" }}>
@@ -186,31 +197,32 @@ const TeamPerformanceTab = () => {
             >
               <Box sx={{ textAlign: "center", minWidth: "100px" }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", display: "block" }}>Assigned Leads</Typography>
-                <Typography variant="h6" fontWeight={700}>{memberStats.assignedLeads}</Typography>
+                <Typography variant="h6" fontWeight={700}>{stats.assignedLeads}
+</Typography>
               </Box>
               <Box sx={{ textAlign: "center", minWidth: "100px" }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", display: "block" }}>Calls Made</Typography>
-                <Typography variant="h6" fontWeight={700}>{memberStats.callsMade}</Typography>
+                <Typography variant="h6" fontWeight={700}>{stats.callsMade}</Typography>
               </Box>
               <Box sx={{ textAlign: "center", minWidth: "100px" }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", display: "block" }}>Follow-Ups</Typography>
-                <Typography variant="h6" fontWeight={700}>{memberStats.followUps}</Typography>
+                <Typography variant="h6" fontWeight={700}>{stats.followUps}</Typography>
               </Box>
               <Box sx={{ textAlign: "center", minWidth: "100px" }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", display: "block" }}>Appointments</Typography>
-                <Typography variant="h6" fontWeight={700}>{memberStats.appointments}</Typography>
+                <Typography variant="h6" fontWeight={700}>{stats.appointments}</Typography>
               </Box>
               <Box sx={{ textAlign: "center", minWidth: "100px" }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", display: "block" }}>Lead Converted</Typography>
-                <Typography variant="h6" fontWeight={700}>{memberStats.leadConverted}</Typography>
+                <Typography variant="h6" fontWeight={700}>{stats.leadConverted}</Typography>
               </Box> 
               <Box sx={{ textAlign: "center", minWidth: "100px" }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", display: "block" }}>Revenue Generated</Typography>
-                <Typography variant="h6" fontWeight={700}>{memberStats.revenueGenerated}</Typography>
+                <Typography variant="h6" fontWeight={700}>{stats.revenueGenerated}</Typography>
               </Box>
               <Box sx={{ textAlign: "center", minWidth: "100px" }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", display: "block" }}>SLA Compliance</Typography>
-                <Typography variant="h6" fontWeight={700}>{memberStats.slaCompliance}</Typography>
+                <Typography variant="h6" fontWeight={700}>{stats.slaCompliance}</Typography>
               </Box>
             </Stack>
           </Card>
@@ -229,7 +241,7 @@ const TeamPerformanceTab = () => {
               <Box sx={{ position: "absolute", left: 30, right: 0, top: 0, bottom: 0 }}>
                 <svg width="100%" height="100%" viewBox="0 0 800 300" preserveAspectRatio="none">
                   {/* Grid lines */}
-                  {[0, 20, 40, 60, 80, 100].map((val, i) => (
+                  {[0, 20, 40, 60, 80, 100].map((val) => (
                     <line
                       key={val}
                       x1="0"
@@ -415,38 +427,39 @@ const TeamPerformanceTab = () => {
         {/* Right Column: Low Performers */}
         <Grid size={{ xs: 12, md: 4 }}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Low Performers</Typography>
-<<<<<<< HEAD
-          <Card sx={{ p: 2, borderRadius: "16px", border: "1px solid #f0f0f0", boxShadow: 'none' }}>
-            {lowPerformers.map((lp) => (
-              <Stack
-                key={lp.name}
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-                sx={{ mb: 2.5, "&:last-child": { mb: 0 } }}
-              >
-=======
-          <Card sx={{ p: 2, borderRadius: '16px', border: '1px solid #f0f0f0',   }}>
-            {lowPerformers.map((lp, i) => (
-              <Stack key={i} direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5, "&:last-child": { mb: 0 } }}>
->>>>>>> f20e4874b979c17906d33f13291fc627681cb265
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar src={lp.img} sx={{ width: 40, height: 40 }} />
-                  <Box>
-                    <Typography variant="caption" fontWeight={700} sx={{ display: "block" }}>{lp.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{lp.role}</Typography>
-                  </Box>
-                </Stack>
-                <Chip
-                  label={lp.growth}
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  sx={{ height: 20, fontSize: "10px", fontWeight: 700 }}
-                />
-              </Stack>
-            ))}
-          </Card>
+
+<Card sx={{ p: 2, borderRadius: "16px", border: "1px solid #f0f0f0", boxShadow: 'none' }}>
+  {lowPerformers.map((lp, i) => (
+    <Stack
+      key={i}
+      direction="row"
+      justifyContent="space-between"
+      alignItems="center"
+      sx={{ mb: 2.5, "&:last-child": { mb: 0 } }}
+    >
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Avatar src={lp.img} sx={{ width: 40, height: 40 }} />
+        <Box>
+          <Typography variant="caption" fontWeight={700} sx={{ display: "block" }}>
+            {lp.name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {lp.role}
+          </Typography>
+        </Box>
+      </Stack>
+
+      <Chip
+        label={lp.growth}
+        size="small"
+        variant="outlined"
+        color="error"
+        sx={{ height: 20, fontSize: "10px", fontWeight: 700 }}
+      />
+    </Stack>
+  ))}
+</Card>
+
         </Grid>
       </Grid>
         </>
