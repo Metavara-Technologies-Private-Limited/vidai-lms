@@ -27,7 +27,7 @@ type Metric = "volume" | "rate" | "revenue" | "cost";
 
 const CustomTooltip = ({
   active,
- 
+  payload,
   metric,
 }: TooltipProps<any, any> & { metric: string }) => {
   if (active && payload && payload.length) {

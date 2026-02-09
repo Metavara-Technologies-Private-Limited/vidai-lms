@@ -11,6 +11,7 @@ import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
 
 import AddNewLead from "./components/LeadsHub/AddNewLead";
 import LeadView from "./components/LeadsHub/LeadView";
+import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
 
 export default function AppRoutes() {
   return (
@@ -19,6 +20,7 @@ export default function AppRoutes() {
 
         {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
+        
 
         {/* Settings sub routes */}
         <Route
