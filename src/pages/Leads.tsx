@@ -105,7 +105,12 @@ const Leads: React.FC = () => {
 
       {tab === 4 && <Activity />}
 
-      {tab !== 3 && tab !== 4 && <LeadsTable search={search} />}
+      {tab !== 3 && tab !== 4 && (
+        <LeadsTable
+          search={search}
+          tab={tab === 2 ? "archived" : "active"} // ⭐ ARCHIVE CONNECTION
+        />
+      )}
 
       <FilterDialog open={filterOpen} onClose={() => setFilterOpen(false)} />
     </Box>

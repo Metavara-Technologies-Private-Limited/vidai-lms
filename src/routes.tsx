@@ -1,4 +1,3 @@
-
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Suspense } from "react";
 import MainLayout from "./components/Layout/MainLayout";
@@ -18,33 +17,32 @@ export default function AppRoutes() {
         {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
         {/* Settings sub routes */}
-<Route
-  path="settings/integration"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Integration />
-    </Suspense>
-  }
-/>
+        <Route
+          path="settings/integration"
+          element={
+            <Suspense fallback={<div>Loading...</div>}>
+              <Integration />
+            </Suspense>
+          }
+        />
 
-<Route
-  path="settings/templates"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Templates />
-    </Suspense>
-  }
-/>
+        <Route
+          path="settings/templates"
+          element={
+            <Suspense fallback={<div>Loading...</div>}>
+              <Templates />
+            </Suspense>
+          }
+        />
 
-<Route
-  path="settings/tickets"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Tickets />
-    </Suspense>
-  }
-/>
-
+        <Route
+          path="settings/tickets"
+          element={
+            <Suspense fallback={<div>Loading...</div>}>
+              <Tickets />
+            </Suspense>
+          }
+        />
 
         {/* sidebar routes */}
         {SIDEBAR_TABS.flatMap((tab) =>
@@ -54,11 +52,11 @@ export default function AppRoutes() {
               path={item.path.replace("/", "")}
               element={
                 <Suspense fallback={<div>Loading...</div>}>
-                {item.page && <item.page />}
+                  {item.page && <item.page />}
                 </Suspense>
               }
             />
-          ))
+          )),
         )}
 
         {/* 🔥 Add New Lead page */}

@@ -15,7 +15,7 @@ import CloseIcon from "@mui/icons-material/Close";
 interface FilterDialogProps {
   open: boolean;
   onClose: () => void;
-  onApply: (filters: {
+  onApply?: (filters: {
     fromDate?: string;
     toDate?: string;
     quality?: string;
@@ -56,16 +56,18 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   const [subSource, setSubSource] = React.useState("");
 
   const handleApply = () => {
-    onApply({
-      fromDate,
-      toDate,
-      quality,
-      status,
-      location,
-      assignee,
-      source,
-      subSource,
-    });
+    if (onApply) {
+      onApply({
+        fromDate,
+        toDate,
+        quality,
+        status,
+        location,
+        assignee,
+        source,
+        subSource,
+      });
+    }
     onClose();
   };
 
@@ -157,6 +159,8 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
             >
               <MenuItem value="">All</MenuItem>
               <MenuItem value="New">New</MenuItem>
+              <MenuItem value="Appointment">Appointment</MenuItem>
+              <MenuItem value="Follow-Ups">Follow-Ups</MenuItem>
               <MenuItem value="Converted">Converted</MenuItem>
               <MenuItem value="Lost">Lost</MenuItem>
             </TextField>
@@ -173,8 +177,9 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
               onChange={(e) => setLocation(e.target.value)}
             >
               <MenuItem value="">All</MenuItem>
-              <MenuItem value="LA">LA Jolla, California</MenuItem>
-              <MenuItem value="NY">New York</MenuItem>
+              <MenuItem value="California">California</MenuItem>
+              <MenuItem value="San Diego">San Diego</MenuItem>
+              <MenuItem value="Los Angeles">Los Angeles</MenuItem>
             </TextField>
 
             <TextField
@@ -186,8 +191,9 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
               onChange={(e) => setAssignee(e.target.value)}
             >
               <MenuItem value="">All</MenuItem>
-              <MenuItem value="Henry">Henry Cavill</MenuItem>
-              <MenuItem value="Chris">Chris Evans</MenuItem>
+              <MenuItem value="Henry Cavill">Henry Cavill</MenuItem>
+              <MenuItem value="Chris Evans">Chris Evans</MenuItem>
+              <MenuItem value="Tom Hardy">Tom Hardy</MenuItem>
             </TextField>
           </Stack>
 
@@ -202,8 +208,9 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
               onChange={(e) => setSource(e.target.value)}
             >
               <MenuItem value="">All</MenuItem>
-              <MenuItem value="Social">Social Media</MenuItem>
-              <MenuItem value="Website">Website</MenuItem>
+              <MenuItem value="Social Media">Social Media</MenuItem>
+              <MenuItem value="Email Campaign">Email Campaign</MenuItem>
+              <MenuItem value="Referral">Referral</MenuItem>
             </TextField>
 
             <TextField
@@ -217,6 +224,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
               <MenuItem value="">All</MenuItem>
               <MenuItem value="Facebook">Facebook</MenuItem>
               <MenuItem value="Instagram">Instagram</MenuItem>
+              <MenuItem value="Website">Website</MenuItem>
             </TextField>
           </Stack>
 
