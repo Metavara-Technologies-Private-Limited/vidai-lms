@@ -110,4 +110,5 @@ lostLeads: {
     fontWeight: 600,
     color: "#232323",
   },
+  
 };

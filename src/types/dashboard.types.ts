@@ -21,12 +21,57 @@ export interface SlaAlert {
   severity: Severity;
 }
 
+// Specific types for each Tab's performance metrics
+export interface SourcePerformance {
+  name: string;
+  campaign: string;
+  hot: number;
+  warm: number;
+  cold: number;
+  convRate: number;
+  revenue: number;
+  cost: number;
+}
+
+export interface CommunicationPerformance {
+  platform: string;
+  high: number;
+  low: number;
+  no: number;
+}
+
+export interface ConversionTrend {
+  month: string;
+  rate: number;
+}
+
+export interface PipelineStage {
+  stage: string;
+  value: number;
+  color: string;
+}
+
+export interface AppointmentStatus {
+  status: string;
+  value: number;
+  color?: string; // Optional color for highlighting specific bars
+}
+
+export interface TeamMember {
+  name: string;
+  role: string;
+  img: string;
+  growth: string;
+  rank?: string; // For 1st (Top), 2nd, 3rd
+}
+
 export interface MockData {
   kpis: KpiItem[];
   slaAlerts: {
     new: SlaAlert[];
     earlier: SlaAlert[];
   };
+<<<<<<< Updated upstream
 overview: {
   activeTab: string;
 
@@ -81,9 +126,46 @@ overview: {
       rate: string;
       revenue: string;
       sla: string;
+=======
+  overview: {
+    activeTab: string;
+    sourcePerformance: SourcePerformance[];
+    communicationPerformance: CommunicationPerformance[];
+    conversionTrendPerformance: ConversionTrend[];
+    pipelineData: PipelineStage[];
+    appointmentsPerformance: AppointmentStatus[];
+    teamPerformance: {
+      members: TeamMember[];
+      overview: Record<string, string>; // Flexible object for the stats card
+>>>>>>> Stashed changes
     };
+interface MedalIcon {
+  type: "1st" | "2nd" | "3rd";
+}
+
+interface MemberStats {
+  assignedLeads: number;
+  callsMade: number;
+  followUps: number;
+  appointments: number;
+  leadConverted: number;
+  revenueGenerated: string;
+  slaCompliance: string;
+}
+
+interface PerformanceData {
+  month: string;
+  rate: number;
+}
+
+interface Member {
+  name: string;
+  role: string;
+  img: string;
+  rank?: string;
+  growth: string;
+}
   };
 };
 
 }
-  
