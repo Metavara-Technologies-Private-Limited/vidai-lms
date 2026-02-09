@@ -17,31 +17,29 @@ export default function AppRoutes() {
 
         {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
-
-<Route
-  path="settings/tickets"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Tickets />
-    </Suspense>
-  }
-/>
-
-<Route
-  path="settings/templates"
-  element={
-    <Suspense fallback={<div>Loading...</div>}>
-      <Templates />
-    </Suspense>
-  }
-/>
+{/* Settings pages routes */}
+        <Route
+          path="settings/integration"
+          element={
+            <Suspense fallback={<div>Loading...</div>}>
+              <Integration />
+            </Suspense>
+          }
+        />
 
         <Route
           path="settings/tickets"
           element={<Suspense fallback={<div>Loading...</div>}><Tickets /></Suspense>}
         />
 
-
+      <Route
+        path="settings/templates"
+        element={
+          <Suspense fallback={<div>Loading...</div>}>
+            <Templates />
+          </Suspense>
+        }
+      />
 
         {/* sidebar routes */}
         {SIDEBAR_TABS.flatMap((tab) =>
@@ -64,7 +62,7 @@ export default function AppRoutes() {
           element={<Suspense fallback={<div>Loading...</div>}><AddNewLead /></Suspense>}
         />
 
-        {/* 🔥 Lead View Page */}
+        {/*  Lead View Page */}
         <Route
           path="leads/:id"
           element={<Suspense fallback={<div>Loading...</div>}><LeadView /></Suspense>}
