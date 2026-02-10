@@ -19,7 +19,7 @@
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
     "@mui/x-data-grid": "^8.26.0",
-    "@mui/x-date-pickers": "^8.26.0",
+    "@mui/x-date-pickers": "^8.27.0",
     "@reduxjs/toolkit": "^2.11.2",
     "axios": "^1.13.4",
     "bootstrap": "^5.3.8",
@@ -34,6 +34,7 @@
     "react-router-dom": "^7.13.0",
     "react-toastify": "^11.0.5",
     "recharts": "^3.7.0",
+    "uuid": "^13.0.0",
     "xlsx": "^0.18.5",
     "yup": "^1.7.1"
   },
