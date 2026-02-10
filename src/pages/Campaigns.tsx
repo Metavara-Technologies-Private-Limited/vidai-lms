@@ -102,6 +102,22 @@ const INITIAL_CAMPAIGNS: Campaign[] = [
     platforms: ["gmail"],
     leads: 3,
   },
+  {
+    id: "5",
+    name: "IVF Awareness – December",
+    type: "email",
+    status: "Live",
+    start: "01/12/2025",
+    end: "07/12/2025",
+    platforms: ["gmail"],
+    leads: 14,
+    objective: "Leads Generation",
+    totalImpressions: 2000,
+    totalClicks: 500,
+    totalSpend: 400,
+    ctr: 4,
+    conversionRate: 6.7,
+  }
 ];
 
 export default function CampaignsScreen() {

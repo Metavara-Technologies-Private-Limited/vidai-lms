@@ -9,8 +9,9 @@ export default function CampaignHeader({ onAddNew }: CampaignHeaderProps) {
     <div className="page-header">
       <h2>Campaigns</h2>
       <button className="primary-btn" onClick={onAddNew}>
-        ＋ Add New Campaign
+       Add New Campaign
       </button>
+      
     </div>
   );
 }

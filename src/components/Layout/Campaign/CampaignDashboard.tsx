@@ -1,162 +1,227 @@
-import React from "react";
 import "../../../../src/styles/Campaign/CampaignDashboard.css";
+import React from "react";
 
-/* ===== METRIC CARD ===== */
-interface MetricCardProps {
-  icon: string;
-  label: string;
-  value: string | number;
-  color: string;
-}
+import instagramIcon from "./Icons/instagram.png";
+import facebookIcon from "./Icons/facebook.png";
+import globeIcon from "./Images/globe.png";
+import contentImage from"./Images/vidai.png";
+import impressionsIcon from "./Icons/impressions.png";
+import clicksIcon from "./Icons/clicks.png";
+import conversionsIcon from "./Icons/conversions.png";
+import spendIcon from "./Icons/spend.png";
+import ctrIcon from "./Icons/ctr.png";
+import conversionRateIcon from "./Icons/conversion-rate.png";
+import cpcIcon from "./Icons/cpc.png";
+import cpaIcon from "./Icons/cpa.png";
 
-const MetricCard: React.FC<MetricCardProps> = ({
-  icon,
-  label,
-  value,
-  color,
-}) => (
-  <div className="metric-card">
-    <div className="metric-icon" style={{ backgroundColor: color }}>
-      {icon}
-    </div>
-    <div className="metric-label">{label}</div>
-    <div className="metric-value">{value}</div>
-  </div>
-);
+import { useNavigate } from "react-router-dom";
 
-/* ===== DASHBOARD PROPS ===== */
-interface CampaignDashboardProps {
-  campaign?: any;     // optional for now
-  onBack?: () => void;
-}
+const CampaignDashboard = () => {
+  const navigate = useNavigate();
+const [activeTab, setActiveTab] = React.useState("Content");
+const [activeSubTab, setActiveSubTab] = React.useState("Facebook");
 
-/* ===== DASHBOARD ===== */
-const CampaignDashboard: React.FC<CampaignDashboardProps> = ({
-  campaign,
-  onBack,
-}) => {
   return (
-    <div className="dashboard">
-      {/* Back Button */}
-      <button className="back-btn" onClick={onBack}>
-        ←
-      </button>
+    <div className="cd-wrapper">
 
-      {/* Header Section */}
-      <div className="campaign-header">
-        <div className="campaign-title-row">
-          <div className="campaign-icon">🌐</div>
-          <h1>{campaign?.name ?? "IVF Awareness – December"}</h1>
-          <span className="status-live">
-            {campaign?.status ?? "Live"}
-          </span>
-        </div>
+      {/* ================= HEADER SECTION ================= */}
+      <div className="cd-header-section">
 
-        <div className="info-grid">
-          <div>
-            <span>Campaign Duration</span>
-            <strong>
-              {campaign?.start ?? "01/12/2025"} - {campaign?.end ?? "07/12/2025"}
-            </strong>
-          </div>
-          <div>
-            <span>Schedule Time</span>
-            <strong>{campaign?.scheduledAt ?? "12:30 PM"}</strong>
-          </div>
-          <div>
-            <span>Campaign Objective</span>
-            <strong>{campaign?.objective ?? "Leads Generation"}</strong>
-          </div>
-          <div>
-            <span>Platform</span>
-            <div className="platform-icons">
-              <div className="fb">f</div>
-              <div className="insta">📷</div>
+        {/* BACK BUTTON */}
+        <button
+          className="cd-back-btn"
+          onClick={() => navigate("/campaigns")}
+          aria-label="Back to campaigns"
+        >
+          <span className="cd-arrow"></span>
+        </button>
+
+        {/* HEADER CARD */}
+        <div className="cd-header-card">
+          <div className="cd-header-top">
+            <div className="cd-header-left">
+              <div className="cd-globe">
+                <img src={globeIcon} alt="Global" />
+              </div>
+              <span className="cd-header-title">
+                IVF Awareness – December
+              </span>
+              <span className="cd-live">Live</span>
             </div>
           </div>
-          <div>
-            <span>Created by & Date</span>
-            <div className="creator">
-              <div className="avatar">👤</div>
-              <strong>{campaign?.createdBy ?? "Henry Cavill"} | {campaign?.createdDate ?? "7/11/2025"}</strong>
-            </div>
-          </div>
-          <div>
-            <span>Campaign Mode</span>
-            <span className="tag-paid">
-              {campaign?.campaignMode ?? "Paid"}
-            </span>
-          </div>
-          <div>
-            <span>Total Budget</span>
-            <strong>${campaign?.totalBudget ?? 250}</strong>
-          </div>
-          <div>
-            <span>Leads Generated</span>
-            <strong>{campaign?.leads ?? 14}</strong>
-          </div>
-        </div>
-      </div>
 
-      {/* Metrics */}
-      <div className="metrics-grid">
-        <MetricCard icon="👁️" label="Total Impressions" value={campaign?.totalImpressions ?? 2000} color="#dbeafe" />
-        <MetricCard icon="👆" label="Total Clicks" value={campaign?.totalClicks ?? 5000} color="#d1fae5" />
-        <MetricCard icon="👥" label="Conversions" value={campaign?.conversions ?? 200} color="#fee2e2" />
-        <MetricCard icon="💰" label="Total Spend" value={`$${campaign?.totalSpend ?? 400}`} color="#fef3c7" />
-        <MetricCard icon="📊" label="CTR (Click-Through Rate)" value={`${campaign?.ctr ?? 4}%`} color="#dbeafe" />
-        <MetricCard icon="📈" label="Conversion Rate" value={`${campaign?.conversionRate ?? 6.7}%`} color="#dcfce7" />
-        <MetricCard icon="🎯" label="CPC (Cost per Click)" value={`$${campaign?.cpc ?? 12}`} color="#e9d5ff" />
-        <MetricCard icon="🔍" label="CPA (Cost per Lead)" value={`$${campaign?.cpa ?? 40}`} color="#fed7aa" />
-      </div>
-
-      {/* Content Section */}
-      <div className="content-box">
-        <div className="tabs">
-          <button className="active">Content</button>
-          <button>Performance</button>
-          <button>Platform Breakdown</button>
-          <button>AI Insights</button>
-        </div>
-
-        <div className="platform-tabs">
-          <button className="active">Facebook</button>
-          <button>Instagram</button>
-        </div>
-
-        <div className="content-layout">
-          <div>
-            <h2>{campaign?.name ?? "IVF Awareness"}</h2>
-            <p>
-              Struggling to conceive can feel overwhelming—but you're not alone.
-              Millions of couples face fertility challenges, and IVF offers a
-              proven path toward parenthood.
-            </p>
-            <p>
-              Our fertility experts support you at every stage with personalized
-              treatment plans and compassionate care.
-            </p>
-            <p>Take the first step today and explore your IVF journey.</p>
-            <p className="hashtags">
-              #IVFAwareness #FertilityCare #ParenthoodJourney
-            </p>
-          </div>
-
-          <div className="ad-preview">
-            <img
-              src="data:image/svg+xml,%3Csvg width='300' height='400' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='300' height='400' fill='%23fef2f2'/%3E%3Ctext x='50%25' y='30%25' text-anchor='middle' fill='%23991b1b' font-size='24' font-weight='bold'%3EUIDEAL%3C/text%3E%3C/svg%3E"
-              alt="Campaign Ad"
+          <div className="cd-header-meta">
+            <Meta label="Campaign Duration" value="01/12/2025 - 07/12/2025" />
+            <Meta label="Schedule Time" value="12:30 PM" />
+            <Meta label="Campaign objective" value="Leads Generation" />
+            <Meta
+              label="Platform"
+              value={
+                <div className="cd-platform-icons">
+                  <img src={facebookIcon} alt="Facebook" />
+                  <img src={instagramIcon} alt="Instagram" />
+                </div>
+              }
             />
-            <div className="ad-footer">
-              <strong>Get In Touch</strong>
-              <p>☎ +1 (541) 754-3010</p>
-              <p>🌐 www.vidailiferates.com</p>
-            </div>
+            <Meta
+              label="Created by & Date"
+              value={
+                <>
+                  <span className="avatar"></span>
+                  Henry Cavil | 7/11/2025
+                </>
+              }
+            />
+            <Meta label="Campaign Mode" value={<span className="cd-paid">Paid</span>} />
+            <Meta label="Total Budget" value="$250" />
+            <Meta label="Leads Generated" value={<span className="green">14</span>} />
           </div>
+        </div>
+      </div>
+
+      {/* ================= METRICS ROW ================= */}
+      <div className="cd-metrics-row">
+        <Metric title="Total Impressions" value="2000" icon={impressionsIcon} />
+        <Metric title="Total Clicks" value="5000" icon={clicksIcon} />
+        <Metric title="Conversions" value="200" icon={conversionsIcon} />
+        <Metric title="Total Spend" value="$400" icon={spendIcon} />
+        <Metric title="CTR (Click-Through Rate)" value="4%" icon={ctrIcon} />
+        <Metric title="Conversion Rate" value="6.7%" icon={conversionRateIcon} />
+        <Metric title="CPC (Cost per Click)" value="$12" icon={cpcIcon} />
+        <Metric title="CPA (Cost per Lead)" value="$40" icon={cpaIcon} />
+      </div>
+                  {/* ================= TABS CONTAINER (FIGMA 5th LEVEL) ================= */}
+      <div className="cd-tabs-container">
+
+        <button
+          className={`cd-tab ${activeTab === "Content" ? "cd-tab-active" : ""}`}
+          onClick={() => setActiveTab("Content")}
+        >
+          Content
+        </button>
+
+        <button
+          className={`cd-tab ${activeTab === "Performance" ? "cd-tab-active" : ""}`}
+          onClick={() => setActiveTab("Performance")}
+        >
+          Performance
+        </button>
+
+        <button
+          className={`cd-tab ${activeTab === "Platform Breakdown" ? "cd-tab-active" : ""}`}
+          onClick={() => setActiveTab("Platform Breakdown")}
+        >
+          Platform Breakdown
+        </button>
+
+        <button
+          className={`cd-tab ${activeTab === "AI Insights" ? "cd-tab-active" : ""}`}
+          onClick={() => setActiveTab("AI Insights")}
+        >
+          AI Insights
+        </button>
+
+      </div>
+
+            {/* ================= SUB TABS (FACEBOOK / INSTAGRAM) ================= */}
+      <div className="cd-subtabs-container">
+
+        <button
+          className={`cd-subtab ${activeSubTab === "Facebook" ? "cd-subtab-active" : ""
+          }`}
+          onClick={() => setActiveSubTab("Facebook")}
+        >
+          Facebook
+        </button>
+
+        <button
+          className={`cd-subtab ${activeSubTab === "Instagram" ? "cd-subtab-active" : ""
+          }`}
+          onClick={() => setActiveSubTab("Instagram")}
+        >
+          Instagram
+        </button>
+      </div>
+
+            {/* ================= CONTENT SECTION ================= */}
+      <div className="cd-content-card">
+
+        {/* LEFT CONTENT */}
+        <div className="cd-content-text">
+          <h3 className="cd-content-title">IVF Awareness</h3>
+
+          <p>
+            Struggling to conceive can feel overwhelming—but you’re not alone.
+            Millions of couples across the world face fertility challenges, and
+            IVF has become a proven, safe, and effective path toward parenthood.
+            With the right medical guidance, advanced technology, and compassionate
+            care, many families have successfully taken their first step toward
+            a brighter future.
+            
+          </p>
+
+          <p>
+            Our fertility experts are here to support you at every stage of your
+            journey—helping you understand your options, address concerns, and
+            choose a treatment plan tailored to your needs. Early consultation
+            can make a meaningful difference, and informed decisions lead to
+            better outcomes.
+          </p>
+
+          <p>
+            Take the first step today. Talk to our fertility specialists and explore
+            how IVF can help you move closer to your dream of parenthood.
+          </p>
+
+          <p className="cd-content-tags">
+            #IVFAwareness #FertilityCare #ParenthoodJourney #IVFSupport #HopeStartsHere
+          </p>
+        </div>
+
+        {/* RIGHT IMAGE */}
+        <div className="cd-content-image">
+        <img
+            src={contentImage}
+            alt="IVF Awareness Ad"
+        />
         </div>
       </div>
     </div>
   );
 };
+
+/* ================= META ================= */
+const Meta = ({ label, value }: { label: string; value: any }) => (
+  <div className="cd-meta-block">
+    <span className="cd-meta-label">{label}</span>
+    <span className="cd-meta-value">{value}</span>
+  </div>
+);
+
+/* ================= METRIC (FIXED & MATCHES FIGMA) ================= */
+const Metric = ({
+  title,
+  value,
+  icon
+}: {
+  title: string;
+  value: string;
+  icon: string;
+}) => (
+  <div className="cd-metric-card">
+
+    {/* ICON TOP */}
+    <div className="cd-metric-icon">
+      <img src={icon} alt={title} />
+    </div>
+
+    {/* TEXT BOTTOM */}
+    <div className="cd-metric-text">
+      <span className="cd-metric-label">{title}</span>
+      <span className="cd-metric-value">{value}</span>
+    </div>
+
+  </div>
+);
 
 export default CampaignDashboard;
