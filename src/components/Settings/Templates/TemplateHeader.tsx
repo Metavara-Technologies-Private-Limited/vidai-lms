@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, TextField, InputAdornment, IconButton, Tabs, Tab } from '@mui/material';
-import { Search, FilterList, Add } from '@mui/icons-material';
+import { Search, Add } from '@mui/icons-material';
 import styles from '../../../styles/Template/TemplateHeader.module.css';
-import { TemplateFilterPopover } from './TemplateFilterPopover';
+import { TemplateFilterPopover, type Filters } from './TemplateFilterPopover';
+import FilterLeadsIcon from '../../../assets/icons/Filter_Leads.svg';
 
 interface TemplateHeaderProps {
   onTabChange: (tabName: string) => void;
   onNewTemplate: () => void;
   onSearch: (query: string) => void;
-  onApplyFilters: (filters: any) => void;
+  onApplyFilters: (filters: Filters | null) => void;
   counts: { email: number; sms: number; whatsapp: number };
 }
 
@@ -48,8 +49,9 @@ export const TemplateHeader: React.FC<TemplateHeaderProps> = ({
           <IconButton 
             className={styles.filterBtn}
             onClick={() => setIsFilterOpen(true)} // 🆕 Open centered dialog
+            sx={{ p: 0.75, border: 'none', bgcolor: 'transparent', '&:hover': { bgcolor: 'transparent' } }}
           >
-            <FilterList fontSize="small" />
+            <img src={FilterLeadsIcon} alt="Filter" style={{ width: '40px', height: '40px' }} />
           </IconButton>
 
           <TemplateFilterPopover 

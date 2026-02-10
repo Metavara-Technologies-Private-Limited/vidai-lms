@@ -4,11 +4,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import styles from "../../../styles/Template/NewTemplateModal.module.css";
 import { PreviewWhatsAppTemplateModal } from './PreviewWhatsAppTemplateModal';
+import type { Template } from '../templateMockData';
 
 interface Props {
   onClose: () => void;
-  onSave: (template: any) => void;
-  initialData?: any;
+  onSave: (template: Template & { body?: string }) => void;
+  initialData?: Partial<Template & { body?: string }>;
   mode: 'create' | 'edit' | 'view';
 }
 
@@ -44,7 +45,7 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
       useCase: formData.useCase,
       lastUpdatedAt: new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       createdBy: initialData?.createdBy || 'System',
-      type: 'whatsapp'
+      type: 'whatsapp' as const
     };
     onSave(template);
     onClose();
@@ -96,13 +97,21 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
             IconComponent={KeyboardArrowDownIcon}
             sx={{ borderRadius: '8px', backgroundColor: isViewOnly ? '#F9FAFB' : '#fff' }}
           >
+            <MenuItem value="Appointment">
+              <Box component="span" sx={{ color: '#16A34A', bgcolor: '#F0FDF4', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
+                Appointment
+              </Box>
+            </MenuItem>
             <MenuItem value="Feedback">
               <Box component="span" sx={{ color: '#EA580C', bgcolor: '#FFF7ED', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
                 Feedback
               </Box>
             </MenuItem>
-            <MenuItem value="Appointment">Appointment</MenuItem>
-            <MenuItem value="Marketing">Marketing</MenuItem>
+            <MenuItem value="Marketing">
+              <Box component="span" sx={{ color: '#7C3AED', bgcolor: '#F5F3FF', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
+                Marketing
+              </Box>
+            </MenuItem>
           </Select>
         </Box>
 

@@ -36,10 +36,31 @@ export const PreviewWhatsAppTemplateModal: React.FC<PreviewProps> = ({
         <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
       </Box>
 
-      <Box className={styles.previewContent}>
-        <Box className={styles.whatsappBubble}>
-          {renderBody(templateData.body)}
-          <span className={styles.timestamp}>5:47 AM</span>
+      <Box className={styles.previewContent} sx={{ 
+        m: 2,
+        border: '1px solid #E5E7EB',
+        borderRadius: '12px',
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden',
+        display: 'flex', 
+        justifyContent: 'flex-end', 
+        alignItems: 'flex-end', 
+        minHeight: '300px', 
+        p: 3 
+      }}>
+        <Box sx={{ 
+          backgroundColor: '#E3F2FD',
+          borderRadius: '12px',
+          padding: '12px 16px',
+          maxWidth: '60%',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+        }}>
+          <Box sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', mb: 1, color: '#000000', fontSize: '14px', lineHeight: 1.5 }}>
+            {renderBody(templateData.body)}
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+            <span className={styles.timestamp} style={{ fontSize: '12px', color: '#999999', marginTop: '4px' }}>5:47 AM</span>
+          </Box>
         </Box>
       </Box>
 
