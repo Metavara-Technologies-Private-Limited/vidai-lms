@@ -9,9 +9,11 @@ import {
   Button,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
-import ViewListIcon from "@mui/icons-material/ViewList";
-import ViewModuleIcon from "@mui/icons-material/ViewModule";
+//import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
+import Filter_Leads from "../assets/icons/Filter_Leads.svg";
+import Leads_Gridview from "../assets/icons/Leads_Gridview.svg";
+import Leads_Tableview_icon from "../assets/icons/Leads_Tableview_icon.svg";
+
 import { useNavigate } from "react-router-dom";
 
 import LeadsTable from "../components/LeadsHub/LeadsTable";
@@ -80,22 +82,27 @@ const Leads: React.FC = () => {
             }}
           />
 
-          <IconButton 
-            className={`header-icon-btn ${viewMode === "table" ? "active" : ""}`}
-            onClick={() => setViewMode("table")}
-          >
-            <ViewListIcon fontSize="small" />
-          </IconButton>
+<div className="header-icon-container">
+  <IconButton
+    className="header-icon-btn"
+    onClick={() => setViewMode("table")}
+  >
+<img
+  src={Leads_Tableview_icon}
+  style={{ width: 18, height: 18 }}
+/>
+  </IconButton>
 
-          <IconButton 
-            className={`header-icon-btn ${viewMode === "board" ? "active" : ""}`}
-            onClick={() => setViewMode("board")}
-          >
-            <ViewModuleIcon fontSize="small" />
-          </IconButton>
+  <IconButton
+    className="header-icon-btn"
+    onClick={() => setViewMode("board")}
+  >
+    <img src={Leads_Gridview}  style={{ width: 22, height: 22 }}/>
+  </IconButton>
+</div>
 
-          <IconButton className="header-icon-btn" onClick={() => setFilterOpen(true)}>
-            <FilterAltOutlinedIcon fontSize="small" />
+          <IconButton sx={{ padding: "4px" }} onClick={() => setFilterOpen(true)}>
+            <img src={Filter_Leads} height={36} width={36} />
           </IconButton>
 
           <Button className="add-lead-btn" onClick={() => navigate("/leads/add")}>

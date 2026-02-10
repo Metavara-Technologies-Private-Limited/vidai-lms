@@ -45,21 +45,39 @@
   width: 260px;
 }
 
-.header-icon-btn {
-  width: 36px;
-  height: 36px;
+.header-icon-container {
+  display: flex;
+  align-items: center;
+
+  background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
+  border-radius: 10px;
+  gap: 4px;            /* space between icons */
 }
 
+.header-icon-btn {
+  width: 30px;
+  height: 36px;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
 .add-lead-btn {
-  background: #3f3f46;
+  background: #505050;
   color: #fff;
   text-transform: none;
   border-radius: 8px;
   padding: 6px 14px;
 }
+
+.add-lead-btn:hover {
+  background: #232323;
+}
+
 
 /* ===============================
    DATE & TIME
@@ -330,7 +348,7 @@
 }
 
 .leads-table .MuiCheckbox-root .MuiSvgIcon-root {
-  font-size: 26px !important; /* Makes the square big */
+  font-size: "26px !important"; /* Makes the square big */
 }
 
 .leads-table .MuiCheckbox-root.Mui-checked {
