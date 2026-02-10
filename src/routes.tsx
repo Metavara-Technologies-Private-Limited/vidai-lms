@@ -31,7 +31,7 @@ export default function AppRoutes() {
           path="settings/templates"
           element={
             <Suspense fallback={<div>Loading...</div>}>
-              <Templates />
+              <TemplatesPage />
             </Suspense>
           }
         />
