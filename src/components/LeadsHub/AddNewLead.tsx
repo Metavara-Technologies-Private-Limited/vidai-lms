@@ -602,10 +602,12 @@ export default function AddNewLead() {
             Back
           </Button>
         )}
+
+        
         <Button variant="contained" onClick={handleNext}>
           {activeStep === steps.length - 1 ? "Save" : "Next"}
         </Button>
       </Box>
     </Card>
-  );
-}
+  );}
+
