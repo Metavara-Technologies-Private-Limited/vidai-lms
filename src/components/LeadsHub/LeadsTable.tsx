@@ -66,7 +66,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -94,7 +94,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
 
   const currentLeads = filteredLeads.slice(
     (page - 1) * rowsPerPage,
-    page * rowsPerPage
+    page * rowsPerPage,
   );
 
   const startEntry = (page - 1) * rowsPerPage + 1;
@@ -109,8 +109,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
   const handleBulkArchive = (archive: boolean) => {
     setLeads((prev) =>
       prev.map((l) =>
-        selectedIds.includes(l.id) ? { ...l, archived: archive } : l
-      )
+        selectedIds.includes(l.id) ? { ...l, archived: archive } : l,
+      ),
     );
     setSelectedIds([]);
   };
@@ -164,9 +164,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                 sx={{ cursor: "pointer" }}
                 onClick={() =>
                   navigate(
-                    `/leads/${encodeURIComponent(
-                      lead.id.replace("#", "")
-                    )}`
+                    `/leads/${encodeURIComponent(lead.id.replace("#", ""))}`,
                   )
                 }
               >
@@ -182,13 +180,15 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
 
                 <TableCell>
                   <Stack direction="row" spacing={2}>
-                    <Avatar className="lead-avatar">
-                      {lead.initials}
-                    </Avatar>
+                    <Avatar className="lead-avatar">{lead.initials}</Avatar>
                     <Box>
                       {/* Integrated Figma Bold Name Class */}
-                      <Typography className="lead-name-text">{lead.name}</Typography>
-                      <Typography className="lead-id-text">{lead.id}</Typography>
+                      <Typography className="lead-name-text">
+                        {lead.name}
+                      </Typography>
+                      <Typography className="lead-id-text">
+                        {lead.id}
+                      </Typography>
                     </Box>
                   </Stack>
                 </TableCell>
@@ -220,16 +220,18 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                 </TableCell>
 
                 <TableCell className="score">
-                  {String(lead.score).includes("%") ? lead.score : `${lead.score}%`}
+                  {String(lead.score).includes("%")
+                    ? lead.score
+                    : `${lead.score}%`}
                 </TableCell>
 
                 <TableCell>{lead.assigned}</TableCell>
                 <TableCell>{lead.task}</TableCell>
 
                 <TableCell>
-                  <Chip 
-                    label={lead.taskStatus || "Pending"} 
-                    size="small" 
+                  <Chip
+                    label={lead.taskStatus || "Pending"}
+                    size="small"
                     className="lead-chip"
                   />
                 </TableCell>
@@ -261,15 +263,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   </Stack>
                 </TableCell>
 
-                <TableCell
-                  align="center"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MenuButton
-                    lead={lead}
-                    setLeads={setLeads}
-                    tab={tab}
-                  />
+                <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                  <MenuButton lead={lead} setLeads={setLeads} tab={tab} />
                 </TableCell>
               </TableRow>
             ))}
@@ -278,7 +273,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
       </TableContainer>
 
       {/* ---------- Pagination ---------- */}
-      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        sx={{ mt: 2, px: 2 }}
+      >
         <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
@@ -291,19 +290,15 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
             <ChevronLeftIcon />
           </IconButton>
 
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-            (p) => (
-              <Box
-                key={p}
-                onClick={() => setPage(p)}
-                className={`page-number ${
-                  page === p ? "active" : ""
-                }`}
-              >
-                {p}
-              </Box>
-            )
-          )}
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <Box
+              key={p}
+              onClick={() => setPage(p)}
+              className={`page-number ${page === p ? "active" : ""}`}
+            >
+              {p}
+            </Box>
+          ))}
 
           <IconButton
             disabled={page === totalPages}
