@@ -1,313 +1,645 @@
-/* ================= SOCIAL CAMPAIGN MODAL ================= */
+/* ================= MODAL OVERLAY ================= */
 
 .campaign-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0,0,0,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
 }
+
+/* ================= MODAL ================= */
 
 .campaign-modal {
-  width: 720px;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 28px 32px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  width: 1000px;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  font-family: 'Montserrat', sans-serif;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh; 
 }
 
-/* Header */
-.campaign-modal h2 {
-  margin: 0 0 24px;
-  font-size: 24px;
-  font-weight: 600;
-  color: #111;
+/* ================= HEADER ================= */
+
+.modal-header {
+  position: relative;
+  height: 62px;
+  padding: 16px;
+  border-bottom: 1px solid #E2E3E5;
+  flex-shrink: 0;
 }
 
-/* Stepper */
+.modal-title {
+  font-size: 18px;
+  font-weight: 650;
+  color: #232323;
+}
+
+.modal-close {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 30px;
+  height: 30px;
+  background: #F2F2F2;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+/* ================= STEPPER ================= */
+
 .stepper {
+  margin: 24px 32px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
   display: flex;
   align-items: center;
-  margin-bottom: 32px;
+  flex-shrink: 0;
 }
 
 .step {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  flex: 1;
-  position: relative;
+  gap: 8px;
 }
 
-.circle {
-  width: 32px;
-  height: 32px;
+/* Circle default */
+.step .circle {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: #e5e5e5;
-  color: #777;
-  font-size: 14px;
-  font-weight: 600;
+  background: #E5E7EB;
+  color: #6B7280;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
-  transition: all 0.2s;
-}
-
-.circle.completed {
-  background: #4caf50;
-  color: white;
-}
-
-.step.active .circle {
-  background: #333;
-  color: white;
-}
-
-.line {
-  height: 2px;
-  background: #e5e5e5;
-  flex: 1;
-  margin: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .step span {
-  font-size: 13px;
-  color: #666;
-  text-align: center;
+  font-size: 14px;
+  color: #9CA3AF;
+}
+
+/* Active */
+.step.active .circle {
+  background: #FFEDE7;
+  color: #F26A3E;
 }
 
 .step.active span {
-  color: #111;
-  font-weight: 500;
-}
-
-/* Form Content */
-.step-content {
-  margin-bottom: 32px;
-}
-
-.step-content h3 {
-  margin: 0 0 20px;
-  font-size: 18px;
+  color: #F26A3E;
   font-weight: 600;
-  color: #111;
 }
 
-/* Form Groups */
+/* Completed */
+.step.completed .circle {
+  background: #22C55E;
+  color: #ffffff;
+}
+
+.step.completed span {
+  color: #22C55E;
+  font-weight: 600;
+}
+
+.line {
+  flex: 1;
+  height: 1px;
+  background: #E5E7EB;
+  margin: 0 12px;
+}
+
+/* ================= CONTENT ================= */
+
+.step-content {
+  flex: 1;               /* takes remaining space */
+  overflow-y: auto;      /* enables scrolling */
+  padding-bottom: 24px; /* space before footer */
+}
+
+
+/* ================= FORM ================= */
+
 .form-group {
+  position: relative;
   margin-bottom: 24px;
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  width: 100%;
-  height: 44px;
-  padding: 0 14px;
-  border: 1px solid #d0d0d0;
-  border-radius: 10px;
-  font-size: 14px;
-  background: #fff;
-  transition: border-color 0.2s;
-}
-
-.form-group textarea {
-  height: 100px;
-  padding-top: 12px;
-  resize: vertical;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #666;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
-}
-
-/* AI Suggest Button */
-.input-wrapper {
-  position: relative;
-}
-
-.ai-suggest {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #6b46c1;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 0;
-}
-
-/* Error States */
-input.error,
-select.error {
-  border-color: #e53e3e !important;
-}
-
-.error-text {
-  color: #e53e3e;
-  font-size: 13px;
-  margin-top: 6px;
-  display: block;
-}
-
-/* Form Row (2 columns) */
 .form-row {
   display: flex;
   gap: 20px;
 }
 
 .form-group.half {
-  flex: 1;
+  flex: 0 0 calc(50% - 10px); /* 🔒 FIXED DATE WIDTH */
 }
 
-/* Platforms */
-.platforms {
-  display: flex;
-  gap: 28px;
-  flex-wrap: wrap;
-  margin-top: 8px;
+/* ================= NOTCHED LABEL ================= */
+
+.form-group > label {
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  background: #ffffff;
+  padding: 2px 8px;
+  font-size: 13px;
+  color: #6B6B6B;
+  z-index: 2;
+  pointer-events: none;
 }
 
-.platform-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ================= INPUTS ================= */
+
+.form-group input,
+.form-group select,
+.MuiOutlinedInput-root {
+  width: 100%;
+  height: 56px;
+  border-radius: 16px;
+  border: 1.5px solid #E2E3E5;
+  padding: 20px 14px 8px;
   font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  user-select: none;
+  background: #fff;
+  box-shadow: none;
+  outline: none;
 }
 
-.platform-label input[type="checkbox"] {
-  accent-color: #333;
-  width: 18px;
-  height: 18px;
+input:invalid,
+select:invalid {
+  box-shadow: none;
+  outline: none;
 }
 
-/* Campaign Mode Cards */
-.mode-options {
-  display: flex;
-  gap: 16px;
-  margin-top: 12px;
+/* ================= ERROR STATE ================= */
+
+.form-group.error input,
+.form-group.error select {
+  border-color: #E11D48;
 }
 
-.mode-card {
-  flex: 1;
-  border: 2px solid #e5e5e5;
-  border-radius: 12px;
-  padding: 16px 20px;
-  cursor: pointer;
-  transition: all 0.2s;
+.form-group.error > label {
+  color: #E11D48;
 }
 
-.mode-card:hover {
-  border-color: #ccc;
-}
-
-.mode-card.selected {
-  border-color: #333;
-  background: #f9f9f9;
-}
-
-.mode-card input {
+.form-error {
   display: none;
 }
 
-.mode-card strong {
-  display: block;
-  font-size: 15px;
-  margin-bottom: 4px;
-}
+/* ================= FOOTER ================= */
 
-.mode-card span {
-  font-size: 13px;
-  color: #666;
-}
-
-/* Helper Text */
-.helper-text {
-  font-size: 13px;
-  color: #666;
-  margin: 8px 0 0;
-}
-
-/* Schedule Row */
-.schedule-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 12px;
-}
-
-.schedule-row input {
-  flex: 1;
-}
-
-.schedule-row span {
-  color: #666;
-  font-weight: 500;
-}
-
-/* Buttons */
 .modal-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 32px;
-}
-
-.modal-actions button {
-  flex: 1;
-  height: 48px;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 12px 20px 20px;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  /* border-top: 1px solid #E5E7EB; */
+  z-index: 10;
 }
 
 .cancel-btn {
-  background: #f5f5f5;
-  color: #111;
+  width: 160px;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid #6B6B6B;
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.next-btn {
+  width: 160px;
+  height: 46px;
+  border-radius: 12px;
   border: none;
+  background: #4A4A4A;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.cancel-btn:hover {
-  background: #e8e8e8;
-}
-
-.primary-btn {
-  background: #111;
-  color: white;
-  border: none;
-}
-
-.primary-btn:hover {
-  background: #222;
-}
-
-.primary-btn:disabled {
-  background: #ccc;
+.next-btn:disabled {
+  background: #BDBDBD;
   cursor: not-allowed;
-  opacity: 0.7;
+}
+
+/* =================================================
+   STEP 2 – CONTENT & CONFIGURATION (FIGMA MATCH)
+   ================================================= */
+
+.section-card {
+  border: 1.5px solid #E5E7EB;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 28px;
+}
+
+.section-card.error {
+  border-color: #E11D48;
+}
+
+.section-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.section-subtitle {
+  font-size: 14px;
+  color: #9CA3AF;
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+/* ---------- Ad Accounts ---------- */
+
+.account-row {
+  display: flex;
+  gap: 20px;
+}
+
+.account-card {
+  flex: 1;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.account-card.selected {
+  border-color: black;
+}
+
+.section-card.error .account-card {
+  border-color: #E11D48;
+}
+
+.account-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account-left img {
+  width: 28px;
+  height: 28px;
+}
+
+/* Checkbox */
+.account-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid #CBD5E1;
+}
+
+.account-checkbox.checked {
+  background:#F26A3E;
+  border-color:#F26A3E;
+}
+
+/* ================= CAMPAIGN MODE – FIGMA EXACT ================= */
+
+.mode-row {
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.mode-card {
+  flex: 0 0 calc(50% - 10px);
+  max-width: 430px;
+  height: 76px;                  /* Figma exact */
+  border: 1.5px solid #CBD5E1;
+  border-radius: 12px;
+  padding: 14px 16px;            /* slightly tighter */
+  display: flex;
+  align-items: flex-start;       /* 🔥 top aligned */
+  justify-content: space-between;
+  background: #ffffff;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+
+/* Selected */
+.mode-card.selected {
+  border-color: #F26A3E;
+}
+
+/* LEFT CONTENT */
+.mode-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+
+/* RADIO */
+.radio {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #B0B7C3;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.radio.checked {
+  border-color: #F26A3E;
+}
+
+.radio.checked::after {
+  content: "";
+  position: absolute;
+  inset: 20%;
+  background: #F26A3E;
+  border-radius: 50%;
+}
+
+.mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-text h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 22px;
+  color: #232323;
+}
+
+.mode-text p {
+  font-size: 12px;
+  color: #9CA3AF;
+  margin: 0;
+  line-height: 18px;
+
+  white-space: nowrap;        /* ✅ force single line */
+  overflow: hidden;           /* ✅ prevent overflow */
+  text-overflow: ellipsis;    /* ✅ clean cut like Figma */
+}
+
+
+
+/* BADGE */
+/* BADGE – compact height like Figma */
+/* BASE BADGE – used by BOTH */
+.mode-card .badge {
+  align-self: flex-start;
+  padding: 2px 10px;
+  height: 18px;
+  line-height: 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  background: #F1F5F9;
+  color: #111827;
+  border: 1px solid ;               /* ✅ ensure no border */
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 🔥 OVERRIDE outlined so it looks IDENTICAL */
+.mode-card .badge.outlined {
+  background: #F1F5F9;        /* same background */
+  color: #111827;             /* same text */
+  border: 1px solid ;               /* remove outline */
+}
+
+/* =================================================
+   CAMPAIGN CONTENT (STEP 2)
+   ================================================= */
+
+.content-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* Social icons (Instagram / Facebook / LinkedIn) */
+.content-row img {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* Textarea & input wrapper */
+.content-row textarea,
+.content-row input {
+  flex: 1;
+  min-height: 52px;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  color: #232323;
+  outline: none;
+  background: #ffffff;
+}
+
+/* Instagram textarea larger (like Figma) */
+.content-row textarea {
+  min-height: 140px;
+  resize: none;
+}
+
+/* Placeholder styling */
+.content-row textarea::placeholder,
+.content-row input::placeholder {
+  color: #9CA3AF;
+  font-size: 14px;
+}
+
+/* Focus state */
+.content-row textarea:focus,
+.content-row input:focus {
+  border-color: #F26A3E;
+}
+
+/* Divider lines between rows (subtle like Figma) */
+.content-row:not(:last-child) {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+
+/* ================= STEP 3 ================= */
+
+.schedule-row {
+  display: flex;
+  gap: 20px;
+}
+
+/* ================= MUI DATE PICKER OVERRIDES ================= */
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
+.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
+  border-color: #E2E3E5 !important;
+}
+
+.form-group.error .MuiOutlinedInput-notchedOutline {
+  border-color: #E11D48 !important;
+}
+
+.MuiFormLabel-root {
+  color: #6B6B6B !important;
+}
+
+.form-group.error .MuiFormLabel-root {
+  color: #E11D48 !important;
+}
+/* =================================================
+   STEP 3 – SCHEDULE CAMPAIGN
+   ================================================= */
+
+.schedule-card {
+  border: 1.5px solid #E5E7EB;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 28px;
+  background: #ffffff;
+}
+
+/* ---------- Header ---------- */
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.schedule-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule-title h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #232323;
+}
+
+.schedule-title p {
+  font-size: 14px;
+  color: #9CA3AF;
+  margin: 0;
+}
+
+/* ---------- AI Optimization Button ---------- */
+
+.ai-opt-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: 1.5px solid #E0C7FF;
+  background: #F8F5FF;
+  color: #232323;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- Inputs Row ---------- */
+
+.schedule-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* ---------- Field Wrapper ---------- */
+
+.schedule-field {
+  flex: 1;
+  position: relative;
+}
+
+/* ---------- Floating Label ---------- */
+
+.schedule-field label {
+  position: absolute;
+  top: -9px;
+  left: 18px;
+  background: #ffffff;
+  padding: 2px 6px;
+  font-size: 13px;
+  color: #9CA3AF;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ---------- Input Box (DATE & TIME SAME STYLE) ---------- */
+
+.schedule-input {
+  width: 100%;
+  height: 56px;
+  border-radius: 16px;
+  border: 1.5px solid #D1D5DB;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+  color: #232323;
+  box-sizing: border-box;
+}
+
+/* ---------- Icons ---------- */
+
+.schedule-input svg,
+.schedule-input img {
+  width: 22px;
+  height: 22px;
+  color: #232323;
+  flex-shrink: 0;
+}
+
+/* ---------- Hover / Focus ---------- */
+
+.schedule-input:hover,
+.schedule-input:focus-within {
+  border-color: #D1D5DB;
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 900px) {
+  .schedule-row {
+    flex-direction: column;
+  }
 }
