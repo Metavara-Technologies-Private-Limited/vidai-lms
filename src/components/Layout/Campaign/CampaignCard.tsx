@@ -14,6 +14,7 @@ import stopIcon from "./Icons/stop.png";
 
 type CampaignStatus =
   | "Live"
+  
   | "Draft"
   | "Schedule"
   | "Paused"

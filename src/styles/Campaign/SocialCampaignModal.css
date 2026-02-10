@@ -309,6 +309,7 @@ select:invalid {
 }
 
 .account-checkbox.checked {
+  
   background:#F26A3E;
   border-color:#F26A3E;
 }

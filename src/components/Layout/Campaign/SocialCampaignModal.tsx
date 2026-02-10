@@ -309,6 +309,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
         </div>
 
       </div>
+      
     </div>
   );
 }

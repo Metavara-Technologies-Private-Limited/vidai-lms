@@ -11,6 +11,7 @@ export default function CampaignHeader({ onAddNew }: CampaignHeaderProps) {
       <button className="primary-btn" onClick={onAddNew}>
        Add New Campaign
       </button>
+      
     </div>
   );
 }

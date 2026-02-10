@@ -321,6 +321,8 @@
 //                     onChange={(e) => setEndDate(e.target.value)}
 //                     onBlur={() => markTouched("endDate")}
 //                     className={getError("endDate", endDate) || getDateError() ? "error" : ""}
+
+
 //                     placeholder="End Date"
 //                   />
 //                   {getError("endDate", endDate) && <span className="error-text">Required</span>}
