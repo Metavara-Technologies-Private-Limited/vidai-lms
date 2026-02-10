@@ -4,11 +4,13 @@ import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 
 import Integration from "./components/Settings/Menus/Integration";
-import TemplatesPage from "./components/Settings/Menus/Templates";
+
+
 import Tickets from "./components/Settings/Menus/Tickets";
 
 import AddNewLead from "./components/LeadsHub/AddNewLead";
 import LeadView from "./components/LeadsHub/LeadView";
+import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
 
 export default function AppRoutes() {
   return (
