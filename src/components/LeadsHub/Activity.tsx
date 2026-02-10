@@ -19,96 +19,55 @@ import {
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
-interface ActivityRow {
-  assignee: string;
-  assigneeAvatar: string;
-  leadName: string;
-  leadId: string;
-  leadStatus: string;
-  lastActivity: string;
-  lastActivityTime: string;
-  nextAction: string;
-  nextActionHint: string;
-  dueDate: string;
-  taskStatus: string;
-}
+const STORAGE_KEY = "vidai_leads_data";
+const ROWS_PER_PAGE = 10;
 
-const activityData: ActivityRow[] = [
-  {
-    assignee: "Emilia Clarke",
-    assigneeAvatar: "EC",
-    leadName: "Alex Johnson",
-    leadId: "#LN-201",
-    leadStatus: "New",
-    lastActivity: "WhatsApp — Message Sent",
-    lastActivityTime: "10 min ago",
-    nextAction: "Call Patient",
-    nextActionHint: "Call patient to confirm preferred consultation time",
-    dueDate: "17/01/2026",
-    taskStatus: "To Do",
-  },
-  {
-    assignee: "Lily Foster",
-    assigneeAvatar: "LF",
-    leadName: "Daniel Wilson",
-    leadId: "#LN-201",
-    leadStatus: "Appointment",
-    lastActivity: "Call — Connected",
-    lastActivityTime: "2 hours ago",
-    nextAction: "Book Appointment",
-    nextActionHint: "Book initial IVF consultation",
-    dueDate: "18/01/2026",
-    taskStatus: "To Do",
-  },
-  {
-    assignee: "Merry Parker",
-    assigneeAvatar: "MP",
-    leadName: "Sophia Davis",
-    leadId: "#LN-201",
-    leadStatus: "Cycle Conversion",
-    lastActivity: "No activity from last 30 days",
-    lastActivityTime: "Needs Attention",
-    nextAction: "Book Appointment",
-    nextActionHint: "Book initial IVF consultation",
-    dueDate: "22/01/2026",
-    taskStatus: "To Do",
-  },
-  // 👉 duplicate more rows if needed to test pagination
-];
-
-const leadStatusColor = (status: string) => {
-  switch (status) {
-    case "New":
-      return "primary";
-    case "Appointment":
-      return "info";
-    case "Converted":
-      return "success";
-    case "Lost":
-      return "error";
-    default:
-      return "success";
-  }
+/* ---------- Status Chip Colors ---------- */
+const statusMap: Record<string, any> = {
+  New: { bg: "#F3F3FF", color: "#6C6CFF", border: "#7C7CFF" },
+  Appointment: { bg: "#EEF4FF", color: "#2F6FFF", border: "#4C8DFF" },
+  "Follow-Ups": { bg: "#FFF6E5", color: "#FF9F0A", border: "#FFB020" },
+  Converted: { bg: "#EAFBF1", color: "#16A34A", border: "#22C55E" },
+  Lost: { bg: "#FDECEC", color: "#E5484D", border: "#FF5A5F" },
 };
 
-const Activity: React.FC = () => {
-  const rowsPerPage = 5;
+const Activity = () => {
   const [page, setPage] = React.useState(1);
+  const [leads, setLeads] = React.useState<any[]>([]);
 
-  const totalEntries = activityData.length;
-  const totalPages = Math.ceil(totalEntries / rowsPerPage);
+  /* ---------- Fetch REAL Leads ---------- */
+  React.useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) {
+      setLeads([]);
+      return;
+    }
 
-  const currentRows = activityData.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage
+    const allLeads = JSON.parse(stored);
+
+    // Only To Do activities
+    const todoLeads = allLeads.filter(
+      (lead: any) =>
+        lead.taskStatus === "To Do" && lead.archived !== true,
+    );
+
+    setLeads(todoLeads);
+  }, []);
+
+  /* ---------- Pagination ---------- */
+  const total = leads.length;
+  const totalPages = Math.ceil(total / ROWS_PER_PAGE);
+
+  const visibleRows = leads.slice(
+    (page - 1) * ROWS_PER_PAGE,
+    page * ROWS_PER_PAGE,
   );
 
-  const startEntry = (page - 1) * rowsPerPage + 1;
-  const endEntry = Math.min(page * rowsPerPage, totalEntries);
+  const start = total === 0 ? 0 : (page - 1) * ROWS_PER_PAGE + 1;
+  const end = Math.min(page * ROWS_PER_PAGE, total);
 
   return (
     <Card sx={{ p: 2, borderRadius: "16px" }}>
-      {/* ===== TABLE ===== */}
       <TableContainer component={Paper} elevation={0}>
         <Table>
           <TableHead>
@@ -124,75 +83,103 @@ const Activity: React.FC = () => {
           </TableHead>
 
           <TableBody>
-            {currentRows.map((row, index) => (
-              <TableRow key={index}>
-                <TableCell>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Avatar sx={{ width: 32, height: 32 }}>
-                      {row.assigneeAvatar}
-                    </Avatar>
-                    <Typography>{row.assignee}</Typography>
-                  </Stack>
-                </TableCell>
+            {visibleRows.map((lead) => {
+              const status =
+                statusMap[lead.status] || statusMap["New"];
 
-                <TableCell>
-                  <Typography fontWeight={600}>{row.leadName}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {row.leadId}
-                  </Typography>
-                </TableCell>
+              return (
+                <TableRow key={lead.id}>
+                  {/* Assignee */}
+                  <TableCell>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Avatar sx={{ width: 32, height: 32 }}>
+                        {lead.assigned?.charAt(0)}
+                      </Avatar>
+                      <Typography fontWeight={500}>
+                        {lead.assigned || "-"}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
 
-                <TableCell>
-                  <Chip
-                    label={row.leadStatus}
-                    size="small"
-                    color={leadStatusColor(row.leadStatus)}
-                    variant="outlined"
-                  />
-                </TableCell>
+                  {/* Lead Info */}
+                  <TableCell>
+                    <Typography fontWeight={600}>
+                      {lead.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {lead.id}
+                    </Typography>
+                  </TableCell>
 
-                <TableCell>
-                  <Typography fontWeight={500}>
-                    {row.lastActivity}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color={
-                      row.lastActivity.includes("No activity")
-                        ? "error"
-                        : "text.secondary"
-                    }
-                  >
-                    {row.lastActivityTime}
-                  </Typography>
-                </TableCell>
+                  {/* Lead Status */}
+                  <TableCell>
+                    <Chip
+                      label={lead.status}
+                      size="small"
+                      sx={{
+                        bgcolor: status.bg,
+                        color: status.color,
+                        border: `1px solid ${status.border}`,
+                        height: 22,
+                      }}
+                    />
+                  </TableCell>
 
-                <TableCell>
-                  <Typography fontWeight={500}>
-                    {row.nextAction}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" noWrap>
-                    {row.nextActionHint}
-                  </Typography>
-                </TableCell>
+                  {/* Last Activity */}
+                  <TableCell>
+                    <Typography fontWeight={500}>
+                      {lead.activity || "No activity"}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color:
+                          lead.activity === "No activity"
+                            ? "#E5484D"
+                            : "#6B7280",
+                      }}
+                    >
+                      {lead.activityTime || "Needs Attention"}
+                    </Typography>
+                  </TableCell>
 
-                <TableCell>{row.dueDate}</TableCell>
+                  {/* Next Action */}
+                  <TableCell>
+                    <Typography fontWeight={500}>
+                      {lead.task}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                    >
+                      {lead.taskHint}
+                    </Typography>
+                  </TableCell>
 
-                <TableCell>
-                  <Chip
-                    label={row.taskStatus}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
+                  {/* Due Date */}
+                  <TableCell>{lead.dueDate}</TableCell>
+
+                  {/* Task Status */}
+                  <TableCell>
+                    <Chip
+                      label="To Do"
+                      size="small"
+                      sx={{
+                        bgcolor: "#EEF4FF",
+                        color: "#2F6FFF",
+                        border: "1px solid #4C8DFF",
+                        height: 22,
+                      }}
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* ===== PAGINATION ===== */}
+      {/* ---------- Pagination ---------- */}
       <Stack
         direction="row"
         justifyContent="space-between"
@@ -200,40 +187,42 @@ const Activity: React.FC = () => {
         sx={{ mt: 2 }}
       >
         <Typography variant="caption">
-          Showing {startEntry} to {endEntry} of {totalEntries}
+          Showing {start} to {end} of {total} entries
         </Typography>
 
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1}>
           <IconButton
             size="small"
             disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => setPage(page - 1)}
           >
             <ChevronLeftIcon />
           </IconButton>
 
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Box
-              key={p}
-              onClick={() => setPage(p)}
-              sx={{
-                px: 1.2,
-                py: 0.4,
-                borderRadius: "6px",
-                cursor: "pointer",
-                bgcolor: page === p ? "#111" : "transparent",
-                color: page === p ? "#fff" : "#555",
-                fontSize: "13px",
-              }}
-            >
-              {p}
-            </Box>
-          ))}
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+            (p) => (
+              <Box
+                key={p}
+                onClick={() => setPage(p)}
+                sx={{
+                  px: 1.2,
+                  py: 0.4,
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  bgcolor: page === p ? "#111" : "transparent",
+                  color: page === p ? "#FFF" : "#6B7280",
+                  fontSize: "13px",
+                }}
+              >
+                {p}
+              </Box>
+            ),
+          )}
 
           <IconButton
             size="small"
             disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage(page + 1)}
           >
             <ChevronRightIcon />
           </IconButton>
