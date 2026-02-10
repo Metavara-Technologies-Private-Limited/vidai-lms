@@ -1,10 +1,11 @@
 import React from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, Stack } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import type { Template } from '../templateMockData';
 
 interface Props {
   open: boolean;
-  template: any;
+  template: Template;
   onClose: () => void;
   onCopySuccess: () => void; // 🆕 Callback for toast
 }

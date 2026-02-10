@@ -14,6 +14,7 @@ import styles from "../../../styles/Template/NewTemplateModal.module.css";
 import { NewEmailTemplateForm } from "./NewEmailTemplateForm";
 import { NewSMSTemplateForm } from "./NewSMSTemplateForm";
 import { NewWhatsAppTemplateForm } from "./NewWhatsAppTemplateForm";
+import type { Template } from "../templateMockData";
 
 interface ModalProps {
   open: boolean;
@@ -36,9 +37,9 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 
   useEffect(() => {
     if (open) {
-      if (initialData) {
+      if (initialData && typeof initialData === "object" && "type" in initialData) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setView(initialData.type);
+        setView((initialData as { type: "select" | "email" | "sms" | "whatsapp" }).type);
       } else {
         setView("select");
       }
@@ -61,7 +62,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
         <NewEmailTemplateForm
           onClose={handleClose}
           onSave={handleFormSave}
-          initialData={initialData}
+          initialData={initialData as Partial<Template & { body?: string }>}
           mode={mode}
         />
       </Dialog>
@@ -72,7 +73,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
         <NewSMSTemplateForm
           onClose={handleClose}
           onSave={handleFormSave}
-          initialData={initialData}
+          initialData={initialData as Partial<Template & { body?: string }>}
           mode={mode}
         />
       </Dialog>
@@ -83,7 +84,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
         <NewWhatsAppTemplateForm
           onClose={handleClose}
           onSave={handleFormSave}
-          initialData={initialData}
+          initialData={initialData as Partial<Template & { body?: string }>}
           mode={mode}
         />
       </Dialog>

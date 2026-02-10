@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Box, Typography, Button, IconButton, TextField, MenuItem, Select, Popover } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -34,12 +34,12 @@ import { Image as TiptapImage } from '@tiptap/extension-image';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import { PreviewTemplateModal } from './PreviewEmailTemplateModal';
-import styles from '../../../styles/Template/NewTemplateModal.module.css';
+import type { Template } from '../templateMockData';
 
 interface FormProps {
   onClose: () => void;
-  onSave: (template: any) => void;
-  initialData?: any;
+  onSave: (template: Template & { body?: string }) => void;
+  initialData?: Partial<Template & { body?: string }>;
   mode: 'create' | 'edit' | 'view';
 }
 
@@ -55,6 +55,8 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
   const [showPreview, setShowPreview] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [colorAnchor, setColorAnchor] = useState<HTMLButtonElement | null>(null);
+  const [currentFont] = useState('Nunito');
+  const [currentHeading] = useState('Tt');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +94,21 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
     editable: !isViewOnly,
   });
 
+  // force re-render when editor state/selection changes so toolbar reflects active states, undo/redo, font etc.
+  const [, setToolbarTick] = useState(0);
+  useEffect(() => {
+    if (!editor) return;
+    const update = () => setToolbarTick(t => t + 1);
+    editor.on('transaction', update);
+    editor.on('selectionUpdate', update);
+    editor.on('update', update);
+    return () => {
+      editor.off('transaction', update);
+      editor.off('selectionUpdate', update);
+      editor.off('update', update);
+    };
+  }, [editor]);
+
   const handleColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setColorAnchor(event.currentTarget);
   };
@@ -107,11 +124,47 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
     handleColorClose();
   };
 
-  const insertVariable = (variable: string) => {
-    if (editor) {
-      editor.chain().focus().insertContent(`{${variable}}`).run();
-    }
+  // --- New handlers to wire toolbar controls ---
+  const handleFontChange = (value: string) => {
+    if (!editor) return;
+    // apply font family via textStyle mark
+    editor.chain().focus().setMark('textStyle', { fontFamily: value }).run();
   };
+
+  const handleHeadingChange = (value: string) => {
+    if (!editor) return;
+    if (value === 'Tt') {
+      // set paragraph
+      // setParagraph helper may exist; fallback to toggling heading off
+      try {
+      
+         
+        editor.chain().focus().setParagraph().run();
+      } catch {
+        editor.chain().focus().toggleHeading({ level: 1 }).run(); // harmless fallback
+        editor.chain().focus().toggleHeading({ level: 1 }).run();
+      }
+      return;
+    }
+    if (value === 'H1') editor.chain().focus().toggleHeading({ level: 1 }).run();
+    if (value === 'H2') editor.chain().focus().toggleHeading({ level: 2 }).run();
+  };
+
+  const adjustIndent = (delta: number) => {
+    if (!editor) return;
+    const { selection } = editor.state;
+    const { $from } = selection;
+    const node = $from.parent;
+    const style = (node.attrs && node.attrs.style) || '';
+    const match = /margin-left:\s*(\d+)px/.exec(style);
+    const curr = match ? parseInt(match[1], 10) : 0;
+    const next = Math.max(0, curr + delta);
+    const cleaned = style.replace(/margin-left:\s*\d+px;?/g, '').trim();
+    const newStyle = (cleaned ? cleaned + '; ' : '') + `margin-left: ${next}px`;
+    // update attributes for paragraph node at selection
+    editor.chain().focus().updateAttributes('paragraph', { style: newStyle }).run();
+  };
+  // --- end new handlers ---
 
   const addLink = () => {
     const url = window.prompt('Enter URL:');
@@ -165,7 +218,7 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
       useCase: formData.useCase,
       lastUpdatedAt: new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       createdBy: initialData?.createdBy || 'System',
-      type: 'email'
+      type: 'email' as const
     };
 
     onSave(template);
@@ -173,13 +226,25 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
   };
 
   if (showPreview) {
+    const previewTemplate: Template & { body: string } = {
+      // eslint-disable-next-line react-hooks/purity
+      id: initialData?.id || Math.random().toString(36).substr(2, 9),
+      name: formData.name,
+      subject: formData.subject,
+      body: editor?.getHTML() || '',
+      useCase: formData.useCase,
+      lastUpdatedAt: initialData?.lastUpdatedAt || new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      createdBy: initialData?.createdBy || 'System',
+      type: 'email' as const
+    };
+
     return (
       <PreviewTemplateModal 
         open={showPreview}
         onClose={onClose}
         onBackToEdit={handleBackToEdit}
         onSave={handleSave}
-        templateData={{ ...formData, body: editor?.getHTML() || '' }}
+        templateData={previewTemplate}
       />
     );
   }
@@ -363,65 +428,164 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
                     <RedoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
                   </IconButton>
 
-                  <Select size="small" defaultValue="Nunito" sx={{ width: 120, height: 28, fontSize: '12px', ml: 1, '& fieldset': { border: 'none' } }}>
+                  {/* Font family selector -> wired */}
+                  <Select
+                    size="small"
+                    value={currentFont}
+                    onChange={(e) => handleFontChange(e.target.value as string)}
+                    sx={{ width: 120, height: 28, fontSize: '12px', ml: 1, '& fieldset': { border: 'none' } }}
+                  >
                     <MenuItem value="Nunito">Nunito</MenuItem>
                     <MenuItem value="Arial">Arial</MenuItem>
-                    <MenuItem value="Times">Times</MenuItem>
+                    <MenuItem value="Times New Roman">Times</MenuItem>
                   </Select>
 
-                  <Select size="small" defaultValue="Tt" sx={{ width: 60, height: 28, fontSize: '12px', '& fieldset': { border: 'none' } }}>
+                  {/* Size / Heading selector -> wired */}
+                  <Select
+                    size="small"
+                    value={currentHeading}
+                    onChange={(e) => handleHeadingChange(e.target.value as string)}
+                    sx={{ width: 60, height: 28, fontSize: '12px', '& fieldset': { border: 'none' } }}
+                  >
                     <MenuItem value="Tt">Tt</MenuItem>
                     <MenuItem value="H1">H1</MenuItem>
                     <MenuItem value="H2">H2</MenuItem>
                   </Select>
 
-                  <IconButton size="small" onClick={() => editor.chain().focus().toggleBold().run()} sx={{ p: 0.5, bgcolor: editor.isActive('bold') ? '#E5E7EB' : 'transparent' }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().toggleBold().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('bold') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('bold')}
+                  >
                     <FormatBoldIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().toggleItalic().run()} sx={{ p: 0.5, bgcolor: editor.isActive('italic') ? '#E5E7EB' : 'transparent' }}>
+
+                  {/* Undo / Redo now update correctly because of the editor listeners above */}
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().undo().run()}
+                    disabled={!editor.can().undo()}
+                    sx={{ p: 0.5 }}
+                  >
+                    <UndoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().redo().run()}
+                    disabled={!editor.can().redo()}
+                    sx={{ p: 0.5 }}
+                  >
+                    <RedoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                  </IconButton>
+
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().toggleItalic().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('italic') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('italic')}
+                  >
                     <FormatItalicIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().toggleUnderline().run()} sx={{ p: 0.5, bgcolor: editor.isActive('underline') ? '#E5E7EB' : 'transparent' }}>
+
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().toggleUnderline().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('underline') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('underline')}
+                  >
                     <FormatUnderlinedIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().toggleStrike().run()} sx={{ p: 0.5, bgcolor: editor.isActive('strike') ? '#E5E7EB' : 'transparent' }}>
+
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().toggleStrike().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('strike') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('strike')}
+                  >
                     <StrikethroughSIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={handleColorClick} sx={{ p: 0.5 }}>
+
+                  <IconButton
+                    size="small"
+                    onClick={handleColorClick}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatColorTextIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
 
-                  <IconButton size="small" onClick={() => editor.chain().focus().setTextAlign('left').run()} sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatAlignLeftIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().setTextAlign('center').run()} sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatAlignCenterIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().setTextAlign('right').run()} sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatAlignRightIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().setTextAlign('justify').run()} sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatAlignJustifyIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
 
-                  <IconButton size="small" onClick={() => editor.chain().focus().toggleBulletList().run()} sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().toggleBulletList().run()}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatListBulletedIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().toggleOrderedList().run()} sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatListNumberedIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
 
-                  <IconButton size="small" sx={{ p: 0.5 }}>
+                  {/* Indent controls wired to adjust paragraph margin-left */}
+                  <IconButton
+                    size="small"
+                    onClick={() => adjustIndent(-20)}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatIndentDecreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => adjustIndent(20)}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatIndentIncreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
 
-                  <IconButton size="small" onClick={() => editor.chain().focus().toggleBlockquote().run()} sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                    sx={{ p: 0.5 }}
+                  >
                     <FormatQuoteIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().toggleCodeBlock().run()} sx={{ p: 0.5 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+                    sx={{ p: 0.5 }}
+                  >
                     <CodeIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
                 </Box>
