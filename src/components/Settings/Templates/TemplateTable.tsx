@@ -22,10 +22,11 @@ const TemplatesPage: React.FC = () => {
   return (
     <Box className={styles.pageContainer}>
       <TemplateHeader 
-        onTabChange={(tab) => setActiveTab(tab)} 
-        onNewTemplate={() => setModalOpen(true)} 
-        counts={counts}
-      />
+              onTabChange={(tab) => setActiveTab(tab)}
+              onNewTemplate={() => setModalOpen(true)}
+              counts={counts} onSearch={function (): void {
+                  throw new Error('Function not implemented.');
+              } }      />
 
       <Box className={styles.tableWrapper}>
         {/* Render the correct table for the active tab */}
@@ -35,9 +36,10 @@ const TemplatesPage: React.FC = () => {
       </Box>
 
       <NewTemplateModal 
-        open={isModalOpen} 
-        onClose={() => setModalOpen(false)} 
-      />
+              open={isModalOpen}
+              onClose={() => setModalOpen(false)} onSave={function (): void {
+                  throw new Error('Function not implemented.');
+              } } mode={'create'}      />
     </Box>
   );
 };

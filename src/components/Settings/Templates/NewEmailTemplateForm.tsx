@@ -1,13 +1,17 @@
 import React, { useState, useRef } from 'react';
-import { Box, Typography, Button, IconButton, TextField, MenuItem, Select, Divider } from '@mui/material';
+import { Box, Typography, Button, IconButton, TextField, MenuItem, Select, Popover } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import FormatBoldIcon from '@mui/icons-material/FormatBold';
 import FormatItalicIcon from '@mui/icons-material/FormatItalic';
 import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined';
 import StrikethroughSIcon from '@mui/icons-material/StrikethroughS';
+import FormatColorTextIcon from '@mui/icons-material/FormatColorText';
 import FormatAlignLeftIcon from '@mui/icons-material/FormatAlignLeft';
 import FormatAlignCenterIcon from '@mui/icons-material/FormatAlignCenter';
 import FormatAlignRightIcon from '@mui/icons-material/FormatAlignRight';
+import FormatAlignJustifyIcon from '@mui/icons-material/FormatAlignJustify';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import FormatIndentDecreaseIcon from '@mui/icons-material/FormatIndentDecrease';
@@ -16,72 +20,120 @@ import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import CodeIcon from '@mui/icons-material/Code';
 import LinkIcon from '@mui/icons-material/Link';
 import ImageIcon from '@mui/icons-material/Image';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
+import AttachmentIcon from '@mui/icons-material/Attachment';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
-import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import EditIcon from '@mui/icons-material/Edit';
+import UndoIcon from '@mui/icons-material/Undo';
+import RedoIcon from '@mui/icons-material/Redo';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { TextAlign } from '@tiptap/extension-text-align';
+import { Underline } from '@tiptap/extension-underline';
+import { Link as TiptapLink } from '@tiptap/extension-link';
+import { Image as TiptapImage } from '@tiptap/extension-image';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
 import { PreviewTemplateModal } from './PreviewEmailTemplateModal';
 import styles from '../../../styles/Template/NewTemplateModal.module.css';
 
-export const NewEmailTemplateForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+interface FormProps {
+  onClose: () => void;
+  onSave: (template: any) => void;
+  initialData?: any;
+  mode: 'create' | 'edit' | 'view';
+}
+
+export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, initialData, mode }) => {
+  const isViewOnly = mode === 'view';
+
   const [formData, setFormData] = useState({
-    name: 'Appointment Confirmation',
-    useCase: 'Appointment',
-    subject: 'Your Consultation is Confirmed - {appointment_date}',
-    body: `Hi {lead_first_name},
-
-Thank you for choosing {clinic_name}.
-Your fertility consultation has been successfully scheduled!
-
-- Date: {appointment_date}
-- Time: {appointment_time}
-- Location: {clinic_name} {clinic_address}
-
-Please arrive 10 minutes early and bring any relevant medical reports.
-
-If you need to reschedule, please let us know.
-
-Warm regards,
-The Vidal Team`
+    name: initialData?.name || 'Appointment Confirmation',
+    useCase: initialData?.useCase || 'Appointment',
+    subject: initialData?.subject || 'Your Consultation is Confirmed - {appointment_date}',
   });
 
   const [showPreview, setShowPreview] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [colorAnchor, setColorAnchor] = useState<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const applyFormatting = (command: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+  // Rainbow color palette
+  const colors = [
+    '#FF0000', // Red
+    '#FF7F00', // Orange
+    '#FFFF00', // Yellow
+    '#00FF00', // Green
+    '#0000FF', // Blue
+    '#4B0082', // Indigo
+    '#9400D3', // Violet
+    '#FF1493', // Pink
+    '#000000', // Black
+    '#808080', // Gray
+    '#FFFFFF', // White
+    '#8B4513', // Brown
+  ];
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = formData.body.substring(start, end);
-    let newText = formData.body;
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
+      TiptapLink.configure({
+        openOnClick: false,
+      }),
+      TiptapImage,
+      TextStyle,
+      Color,
+    ],
+    content: initialData?.body || `<p>Hi {lead_first_name},</p><p><br></p><p>Thank you for choosing {clinic_name}.</p><p>Your fertility consultation has been successfully scheduled!</p><p><br></p><ul><li><p>Date : {appointment_date}</p></li><li><p>Time : {appointment_time}</p></li><li><p>Location : {clinic_name} {clinic_address}</p></li></ul><p><br></p><p>Please arrive 10 minutes early and bring any relevant medical reports.</p><p><br></p><p>If you need to reschedule, please let us know.</p><p><br></p><p>Warm regards,</p><p>The Vidal Team</p>`,
+    editable: !isViewOnly,
+  });
 
-    switch (command) {
-      case 'bold':
-        newText = formData.body.substring(0, start) + `**${selectedText}**` + formData.body.substring(end);
-        break;
-      case 'italic':
-        newText = formData.body.substring(0, start) + `*${selectedText}*` + formData.body.substring(end);
-        break;
-      case 'underline':
-        newText = formData.body.substring(0, start) + `__${selectedText}__` + formData.body.substring(end);
-        break;
-      case 'strikethrough':
-        newText = formData.body.substring(0, start) + `~~${selectedText}~~` + formData.body.substring(end);
-        break;
-      default:
-        break;
+  const handleColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setColorAnchor(event.currentTarget);
+  };
+
+  const handleColorClose = () => {
+    setColorAnchor(null);
+  };
+
+  const handleColorSelect = (color: string) => {
+    if (editor) {
+      editor.chain().focus().setColor(color).run();
     }
+    handleColorClose();
+  };
 
-    setFormData({ ...formData, body: newText });
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start, end + 4);
-    }, 0);
+  const insertVariable = (variable: string) => {
+    if (editor) {
+      editor.chain().focus().insertContent(`{${variable}}`).run();
+    }
+  };
+
+  const addLink = () => {
+    const url = window.prompt('Enter URL:');
+    if (url && editor) {
+      editor.chain().focus().setLink({ href: url }).run();
+    }
+  };
+
+  const addImage = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && editor) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const url = e.target?.result as string;
+        editor.chain().focus().setImage({ src: url }).run();
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,12 +156,22 @@ The Vidal Team`
   };
 
   const handleSave = () => {
-    // Add your save logic here
-    console.log('Saving template:', formData);
+    const template = {
+      ...initialData,
+      id: initialData?.id || Math.random().toString(36).substr(2, 9),
+      name: formData.name,
+      subject: formData.subject,
+      body: editor?.getHTML() || '',
+      useCase: formData.useCase,
+      lastUpdatedAt: new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      createdBy: initialData?.createdBy || 'System',
+      type: 'email'
+    };
+
+    onSave(template);
     onClose();
   };
 
-  // If preview is shown, only show preview modal
   if (showPreview) {
     return (
       <PreviewTemplateModal 
@@ -117,221 +179,332 @@ The Vidal Team`
         onClose={onClose}
         onBackToEdit={handleBackToEdit}
         onSave={handleSave}
-        templateData={formData}
+        templateData={{ ...formData, body: editor?.getHTML() || '' }}
       />
     );
   }
 
-  // Otherwise show the form
+  if (!editor) {
+    return null;
+  }
+
+  const openColorPicker = Boolean(colorAnchor);
+
   return (
-    <Box>
-      <Box className={styles.modalHeader}>
-        <Typography className={styles.modalTitle}>New Email Template</Typography>
-        <IconButton onClick={onClose} size="small" className={styles.closeBtn}>
-          <CloseIcon />
+    <Box sx={{ width: '100%', bgcolor: 'white', borderRadius: '12px' }}>
+      {/* Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        p: 2.5, 
+        borderBottom: '1px solid #E5E7EB' 
+      }}>
+        <Typography sx={{ fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+          {isViewOnly ? 'View Email Template' : mode === 'edit' ? 'Edit Email Template' : 'New Email Template'}
+        </Typography>
+        <IconButton onClick={onClose} size="small" sx={{ color: '#6B7280' }}>
+          <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
 
-      <Box className={styles.modalBody}>
+      {/* Body */}
+      <Box sx={{ p: 3, maxHeight: '70vh', overflowY: 'auto' }}>
         {/* Name Field */}
-        <Box className={styles.formGroup}>
-          <Typography className={styles.fieldLabel}>Name</Typography>
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+            Name
+          </Typography>
           <TextField 
             fullWidth 
             size="small" 
             value={formData.name}
+            disabled={isViewOnly}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className={styles.textField}
+            sx={{ 
+              '& .MuiOutlinedInput-root': {
+                fontSize: '14px',
+                bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+                '& fieldset': { borderColor: '#E5E7EB' }
+              }
+            }}
           />
         </Box>
 
-        {/* Use Case with green chip */}
-        <Box className={styles.formGroup}>
-          <Typography className={styles.fieldLabel}>Use Case</Typography>
-          <Box className={styles.useCaseWrapper}>
-            <span className={styles.useCaseChip}>{formData.useCase}</span>
-            <Select 
-              fullWidth 
-              size="small" 
-              value={formData.useCase}
-              onChange={(e) => setFormData({ ...formData, useCase: e.target.value })}
-              className={styles.selectField}
-            >
-              <MenuItem value="Appointment">Appointment</MenuItem>
-              <MenuItem value="Follow-up">Follow-up</MenuItem>
-              <MenuItem value="Reminder">Reminder</MenuItem>
-            </Select>
-          </Box>
+        {/* Use Case */}
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+            Use Case
+          </Typography>
+          <Select 
+            fullWidth 
+            size="small" 
+            value={formData.useCase}
+            disabled={isViewOnly}
+            onChange={(e) => setFormData({ ...formData, useCase: e.target.value })}
+            IconComponent={KeyboardArrowDownIcon}
+            sx={{ 
+              fontSize: '14px',
+              borderRadius: '6px', 
+              bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+              '& fieldset': { borderColor: '#E5E7EB' }
+            }}
+          >
+            <MenuItem value="Appointment">
+               <Box component="span" sx={{ 
+                 color: '#16A34A', 
+                 bgcolor: '#F0FDF4', 
+                 px: 1.5, 
+                 py: 0.5, 
+                 borderRadius: '4px', 
+                 fontSize: '12px', 
+                 fontWeight: 600 
+               }}>
+                 Appointment
+               </Box>
+            </MenuItem>
+            <MenuItem value="Follow-up">
+               <Box component="span" sx={{ 
+                 color: '#3B82F6', 
+                 bgcolor: '#EFF6FF', 
+                 px: 1.5, 
+                 py: 0.5, 
+                 borderRadius: '4px', 
+                 fontSize: '12px', 
+                 fontWeight: 600 
+               }}>
+                 Follow-up
+               </Box>
+            </MenuItem>
+            <MenuItem value="Reminder">
+               <Box component="span" sx={{ 
+                 color: '#D97706', 
+                 bgcolor: '#FFFBEB', 
+                 px: 1.5, 
+                 py: 0.5, 
+                 borderRadius: '4px', 
+                 fontSize: '12px', 
+                 fontWeight: 600 
+               }}>
+                 Reminder
+               </Box>
+            </MenuItem>
+          </Select>
         </Box>
 
         {/* Subject Field */}
-        <Box className={styles.formGroup}>
-          <Typography className={styles.fieldLabel}>Subject</Typography>
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+            Subject
+          </Typography>
           <TextField 
             fullWidth 
             size="small" 
             value={formData.subject}
+            disabled={isViewOnly}
             onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-            className={styles.textField}
+            sx={{ 
+              '& .MuiOutlinedInput-root': {
+                fontSize: '14px',
+                bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+                '& fieldset': { borderColor: '#E5E7EB' }
+              }
+            }}
           />
         </Box>
 
-        {/* Body Area with toolbar */}
-        <Box className={styles.formGroup}>
-          <Typography className={styles.fieldLabel}>Body</Typography>
-          <Box className={styles.editorBox}>
-            <textarea 
-              ref={textareaRef}
-              value={formData.body}
-              onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-              className={styles.textArea}
-            />
-            
-            <Divider />
-            
-            {/* Toolbar Row */}
-            <Box className={styles.toolbarRow}>
-              {/* Font Selector */}
-              <Select
-                size="small"
-                defaultValue="Nunito"
-                variant="standard"
-                disableUnderline
-                className={styles.fontSelector}
-              >
-                <MenuItem value="Nunito">Nunito</MenuItem>
-                <MenuItem value="Arial">Arial</MenuItem>
-                <MenuItem value="Times New Roman">Times New Roman</MenuItem>
-              </Select>
-
-              <Divider orientation="vertical" flexItem className={styles.divider} />
-
-              {/* Text Size */}
-              <Select
-                size="small"
-                defaultValue="normal"
-                variant="standard"
-                disableUnderline
-                className={styles.fontSelector}
-              >
-                <MenuItem value="small">Tt</MenuItem>
-                <MenuItem value="normal">Tt</MenuItem>
-                <MenuItem value="large">Tt</MenuItem>
-              </Select>
-
-              <Divider orientation="vertical" flexItem className={styles.divider} />
-
-              {/* Text Formatting */}
-              <IconButton size="small" className={styles.toolbarBtn} onClick={() => applyFormatting('bold')}>
-                <FormatBoldIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn} onClick={() => applyFormatting('italic')}>
-                <FormatItalicIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn} onClick={() => applyFormatting('underline')}>
-                <FormatUnderlinedIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn} onClick={() => applyFormatting('strikethrough')}>
-                <StrikethroughSIcon />
-              </IconButton>
-
-              <Divider orientation="vertical" flexItem className={styles.divider} />
-
-              {/* Alignment */}
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <FormatAlignLeftIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <FormatAlignCenterIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <FormatAlignRightIcon />
-              </IconButton>
-
-              <Divider orientation="vertical" flexItem className={styles.divider} />
-
-              {/* Lists */}
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <FormatListBulletedIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <FormatListNumberedIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <FormatIndentDecreaseIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <FormatIndentIncreaseIcon />
-              </IconButton>
-
-              <Divider orientation="vertical" flexItem className={styles.divider} />
-
-              {/* Quote & Code */}
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <FormatQuoteIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <CodeIcon />
-              </IconButton>
-
-              <Divider orientation="vertical" flexItem className={styles.divider} />
-
-              {/* Insert Options */}
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <LinkIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <EmojiEmotionsIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <AlternateEmailIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <ImageIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <InsertDriveFileIcon />
-              </IconButton>
-              <IconButton size="small" className={styles.toolbarBtn}>
-                <EditIcon />
-              </IconButton>
+        {/* Body Editor */}
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+            Body
+          </Typography>
+          
+          <Box sx={{ 
+            border: '1px solid #E5E7EB', 
+            borderRadius: '8px',
+            bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+          }}>
+            {/* Editor Content */}
+            <Box sx={{
+              '& .ProseMirror': {
+                minHeight: '200px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+                padding: '12px 16px',
+                outline: 'none',
+                fontSize: '13px',
+                lineHeight: 1.6,
+                color: '#374151',
+                '& p': { margin: '0 0 4px 0' },
+                '& ul, & ol': { paddingLeft: '20px', margin: '4px 0' },
+                '& li p': { margin: 0 },
+                '& a': { color: '#6366F1', textDecoration: 'underline' },
+                '& img': { maxWidth: '100%', height: 'auto', borderRadius: '4px' },
+              }
+            }}>
+              <EditorContent editor={editor} />
             </Box>
+
+            {/* Toolbar - First Row */}
+            {!isViewOnly && (
+              <>
+                <Box sx={{
+                  display: 'flex',
+                  gap: 0.5,
+                  p: 1,
+                  borderTop: '1px solid #E5E7EB',
+                  bgcolor: '#FAFBFC',
+                  flexWrap: 'wrap'
+                }}>
+                  <IconButton size="small" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} sx={{ p: 0.5 }}>
+                    <UndoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} sx={{ p: 0.5 }}>
+                    <RedoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                  </IconButton>
+
+                  <Select size="small" defaultValue="Nunito" sx={{ width: 120, height: 28, fontSize: '12px', ml: 1, '& fieldset': { border: 'none' } }}>
+                    <MenuItem value="Nunito">Nunito</MenuItem>
+                    <MenuItem value="Arial">Arial</MenuItem>
+                    <MenuItem value="Times">Times</MenuItem>
+                  </Select>
+
+                  <Select size="small" defaultValue="Tt" sx={{ width: 60, height: 28, fontSize: '12px', '& fieldset': { border: 'none' } }}>
+                    <MenuItem value="Tt">Tt</MenuItem>
+                    <MenuItem value="H1">H1</MenuItem>
+                    <MenuItem value="H2">H2</MenuItem>
+                  </Select>
+
+                  <IconButton size="small" onClick={() => editor.chain().focus().toggleBold().run()} sx={{ p: 0.5, bgcolor: editor.isActive('bold') ? '#E5E7EB' : 'transparent' }}>
+                    <FormatBoldIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().toggleItalic().run()} sx={{ p: 0.5, bgcolor: editor.isActive('italic') ? '#E5E7EB' : 'transparent' }}>
+                    <FormatItalicIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().toggleUnderline().run()} sx={{ p: 0.5, bgcolor: editor.isActive('underline') ? '#E5E7EB' : 'transparent' }}>
+                    <FormatUnderlinedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().toggleStrike().run()} sx={{ p: 0.5, bgcolor: editor.isActive('strike') ? '#E5E7EB' : 'transparent' }}>
+                    <StrikethroughSIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={handleColorClick} sx={{ p: 0.5 }}>
+                    <FormatColorTextIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton size="small" onClick={() => editor.chain().focus().setTextAlign('left').run()} sx={{ p: 0.5 }}>
+                    <FormatAlignLeftIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().setTextAlign('center').run()} sx={{ p: 0.5 }}>
+                    <FormatAlignCenterIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().setTextAlign('right').run()} sx={{ p: 0.5 }}>
+                    <FormatAlignRightIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().setTextAlign('justify').run()} sx={{ p: 0.5 }}>
+                    <FormatAlignJustifyIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton size="small" onClick={() => editor.chain().focus().toggleBulletList().run()} sx={{ p: 0.5 }}>
+                    <FormatListBulletedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().toggleOrderedList().run()} sx={{ p: 0.5 }}>
+                    <FormatListNumberedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <FormatIndentDecreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <FormatIndentIncreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton size="small" onClick={() => editor.chain().focus().toggleBlockquote().run()} sx={{ p: 0.5 }}>
+                    <FormatQuoteIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => editor.chain().focus().toggleCodeBlock().run()} sx={{ p: 0.5 }}>
+                    <CodeIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                </Box>
+
+                {/* Toolbar - Second Row */}
+                <Box sx={{
+                  display: 'flex',
+                  gap: 0.5,
+                  px: 1,
+                  pb: 1,
+                  bgcolor: '#FAFBFC',
+                  borderBottomLeftRadius: '8px',
+                  borderBottomRightRadius: '8px'
+                }}>
+                  <IconButton size="small" onClick={handleColorClick} sx={{ p: 0.5 }}>
+                    <FormatColorTextIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ p: 0.5 }}>
+                    <AttachmentIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={addLink} sx={{ p: 0.5 }}>
+                    <LinkIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <EmojiEmotionsIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <AttachFileIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" onClick={addImage} sx={{ p: 0.5 }}>
+                    <ImageIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <AttachFileIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton size="small" sx={{ p: 0.5 }}>
+                    <EditIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                </Box>
+              </>
+            )}
           </Box>
         </Box>
 
-        {/* Upload Documents Section */}
-        <Box className={styles.formGroup}>
-          <Typography className={styles.fieldLabel}>Upload Documents</Typography>
-          <Box className={styles.uploadSection}>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-            <Button
-              variant="contained"
-              className={styles.attachBtn}
-              onClick={() => fileInputRef.current?.click()}
+        {/* Upload Documents */}
+        <Box>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+            Upload Documents
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+            <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+            <Button 
+              variant="contained" 
+              onClick={() => !isViewOnly && fileInputRef.current?.click()} 
+              disabled={isViewOnly}
+              sx={{ 
+                bgcolor: '#6B7280',
+                textTransform: 'none',
+                fontSize: '13px',
+                px: 2,
+                py: 0.75,
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#4B5563' }
+              }}
             >
               Choose File
             </Button>
-            <Typography className={styles.uploadHint}>
-              Use File Chooser
+            <Typography sx={{ color: '#9CA3AF', fontSize: '12px' }}>
+              No File Chosen
             </Typography>
           </Box>
-          
-          {/* Display uploaded files */}
           {uploadedFiles.length > 0 && (
-            <Box className={styles.fileList}>
+            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
               {uploadedFiles.map((file, index) => (
-                <Box key={index} className={styles.fileItem}>
-                  <AttachFileIcon className={styles.fileIcon} />
-                  <Typography className={styles.fileName}>{file.name}</Typography>
-                  <IconButton size="small" onClick={() => removeFile(index)} className={styles.removeFileBtn}>
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
+                <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: '#F9FAFB', borderRadius: '6px' }}>
+                  <AttachFileIcon sx={{ fontSize: 16, color: '#6B7280' }} />
+                  <Typography sx={{ flex: 1, fontSize: '12px', color: '#374151' }}>{file.name}</Typography>
+                  {!isViewOnly && (
+                    <IconButton size="small" onClick={() => removeFile(index)} sx={{ p: 0.5 }}>
+                      <CloseIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  )}
                 </Box>
               ))}
             </Box>
@@ -340,29 +513,97 @@ The Vidal Team`
       </Box>
 
       {/* Footer */}
-      <Box className={styles.modalFooter}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'flex-end', 
+        gap: 1.5, 
+        p: 2.5, 
+        borderTop: '1px solid #E5E7EB' 
+      }}>
         <Button 
           onClick={onClose} 
           variant="outlined"
-          className={styles.cancelBtn}
+          sx={{
+            textTransform: 'none',
+            fontSize: '14px',
+            borderColor: '#D1D5DB',
+            color: '#374151',
+            px: 3,
+            '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+          }}
         >
           Cancel
         </Button>
-        <Button 
-          variant="outlined"
-          className={styles.previewBtn}
-          onClick={handlePreview}
-        >
-          Preview
-        </Button>
-        <Button 
-          variant="contained"
-          className={styles.saveBtn}
-          onClick={handleSave}
-        >
-          Save
-        </Button>
+        {!isViewOnly && (
+          <>
+            <Button 
+              variant="outlined" 
+              onClick={handlePreview}
+              sx={{
+                textTransform: 'none',
+                fontSize: '14px',
+                borderColor: '#D1D5DB',
+                color: '#374151',
+                px: 3,
+                '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+              }}
+            >
+              Preview
+            </Button>
+            <Button 
+              variant="contained" 
+              onClick={handleSave} 
+              sx={{ 
+                textTransform: 'none',
+                fontSize: '14px',
+                bgcolor: '#111827',
+                px: 3,
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#000' }
+              }}
+            >
+              Save
+            </Button>
+          </>
+        )}
       </Box>
+
+      {/* Color Picker Popover */}
+      <Popover
+        open={openColorPicker}
+        anchorEl={colorAnchor}
+        onClose={handleColorClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <Box sx={{ p: 2, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1, maxWidth: '220px' }}>
+          {colors.map((color) => (
+            <Box
+              key={color}
+              onClick={() => handleColorSelect(color)}
+              sx={{
+                width: 30,
+                height: 30,
+                bgcolor: color,
+                borderRadius: '4px',
+                cursor: 'pointer',
+                border: color === '#FFFFFF' ? '1px solid #E5E7EB' : 'none',
+                transition: 'transform 0.2s',
+                '&:hover': {
+                  transform: 'scale(1.1)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                }
+              }}
+            />
+          ))}
+        </Box>
+      </Popover>
     </Box>
   );
 };
