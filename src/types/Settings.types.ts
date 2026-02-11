@@ -23,7 +23,13 @@ export interface Ticket {
   priority: Priority;
   assignedTo: string;
   status: TicketStatus;
+  timeline: {
+    type: "received" | "assigned" | "resolved" | "pending" | "closed";
+    time: string;
+    user?: string; 
+  }[];
 }
+
 
 export interface CreateTicketProps {
   open: boolean;
@@ -42,3 +48,8 @@ export interface FilterTicketsProps {
   onClose: () => void;
   onApply?: (filters: TicketFilters | null) => void;
 }
+
+export type TicketTimelineItem = {
+  title: string;
+  time: string;
+};
