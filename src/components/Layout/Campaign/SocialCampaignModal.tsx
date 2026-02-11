@@ -1,5 +1,5 @@
 import { useState } from "react";
-// import { v4 as uuid } from "uuid";
+import { v4 as uuid } from "uuid";
 import "../../../../src/styles/Campaign/SocialCampaignModal.css";
 
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -16,6 +16,7 @@ import linkedinIcon from "../../../components/Layout/Campaign/Icons/linkedin.png
 export default function SocialCampaignModal({ onClose, onSave }: any) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
+  
 
   /* ================= STEP 1 ================= */
   const [campaignName, setCampaignName] = useState("");
@@ -58,6 +59,25 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     }
   };
 
+  const handleSaveAndPost = () => {
+  setSubmitted(true);
+  if (!step1Valid || !step2Valid) return;
+
+  const newCampaign = {
+    id: uuid(),
+    name: campaignName,
+    type: "social",
+    status: "Live",
+    start: startDate,
+    end: endDate,
+    platforms: accounts, // facebook / instagram / linkedin
+    leads: 0,
+    scheduledAt: undefined,
+  };
+
+  onSave(newCampaign);
+};
+
   return (
     <div className="campaign-modal-overlay">
       <div className="campaign-modal">
@@ -93,7 +113,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
         {/* ================= STEP 1 ================= */}
         {step === 1 && (
           <div className="step-content">
-            <h3>Campaign Details</h3>
+            <h2>Campaign Details</h2>
 
             <div className={`form-group ${submitted && !campaignName ? "error" : ""}`}>
               <label>Campaign Name *</label>
@@ -158,7 +178,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 {/* ================= STEP 2 ================= */}
 {step === 2 && (
   <div className="step-content">
-
+    <h2>Content & Configuration</h2>
     {/* SELECT AD ACCOUNTS */}
     <div className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}>
       <h3>Select Ad Accounts</h3>
@@ -233,7 +253,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     {/* ================= CAMPAIGN CONTENT ================= */}
 {mode && (
   <div className="section-card">
-    <h3>Campaign Content</h3>
+    <h2>Campaign Content</h2>
     <p className="section-subtitle">
       Create your post content with AI assistance
     </p>
@@ -263,7 +283,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 {/* ================= STEP 3 ================= */}
 {step === 3 && (
   <div className="step-content">
-
+  <h3>Schedule Campaign</h3>
     <div className="section-card">
       {/* HEADER */}
       <div className="schedule-header">
@@ -302,14 +322,21 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
         {/* ================= FOOTER ================= */}
         <div className="modal-actions">
-          <button className="cancel-btn" onClick={onClose}>Cancel</button>
-          <button className="next-btn" onClick={step === 3 ? onSave : handleNext}>
-            {step === 3 ? "Save & Post" : "Next"}
-          </button>
-        </div>
+  <button className="cancel-btn" onClick={onClose}>
+    Cancel
+  </button>
 
-      </div>
-      
+  {step === 3 ? (
+    <button className="next-btn" onClick={handleSaveAndPost}>
+      Save & Post
+    </button>
+  ) : (
+    <button className="next-btn" onClick={handleNext}>
+      Next
+    </button>
+  )}
+</div>
+      </div>     
     </div>
   );
 }

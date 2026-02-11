@@ -1,0 +1,67 @@
+/* ================= CAMPAIGN PAGE ================= */
+
+.campaign-page {
+  padding: 24px;
+  background: #fafafa;
+  min-height: 100vh;
+}
+
+/* ================= PAGE ACTIONS ================= */
+
+/* Container for Add buttons */
+.campaign-actions {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* Add Campaign button (primary) */
+.add-campaign-btn {
+  padding: 10px 18px;
+  height: 44px;
+  background: #4A4A4A;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Secondary button (Email Campaign) */
+.add-campaign-btn.secondary {
+  background: #E5E7EB;
+  color: #232323;
+}
+
+/* Hover states */
+.add-campaign-btn:hover {
+  opacity: 0.9;
+}
+
+.add-campaign-btn.secondary:hover {
+  background: #D1D5DB;
+}
+
+/* ================= CAMPAIGN GRID ================= */
+
+.campaign-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 768px) {
+  .campaign-actions {
+    flex-direction: column;
+  }
+
+  .campaign-grid {
+    grid-template-columns: 1fr;
+  }
+}

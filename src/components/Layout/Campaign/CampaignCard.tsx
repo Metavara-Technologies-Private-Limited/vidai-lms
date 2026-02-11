@@ -11,10 +11,11 @@ import moreIcon from "./Icons/more.png";
 import editIcon from "./Icons/edit.png";
 import duplicateIcon from "./Icons/duplicate.png";
 import stopIcon from "./Icons/stop.png";
+import { useEffect, useRef } from "react";
+
 
 type CampaignStatus =
   | "Live"
-  
   | "Draft"
   | "Schedule"
   | "Paused"
@@ -50,11 +51,31 @@ export default function CampaignCard({
   onViewDetail,
 }: CampaignCardProps) {
   const isMenuOpen = openMenuId === c.id;
+  const menuRef = useRef<HTMLDivElement>(null);
+
 
   const toggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
     setOpenMenuId(isMenuOpen ? null : c.id);
   };
+
+  useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      menuRef.current &&
+      !menuRef.current.contains(event.target as Node)
+    ) {
+      setOpenMenuId(null);
+    }
+  };
+
+  document.addEventListener("mousedown", handleClickOutside);
+
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, [setOpenMenuId]);
+
 
   return (
     <div className="campaign-card">
@@ -67,14 +88,14 @@ export default function CampaignCard({
 
       <div className="card-row">
         <div>
-          <label>Campaign Duration</label>
+          <label>Campaign Duration:</label>
           <span>
             {c.start} - {c.end}
           </span>
         </div>
 
         <div>
-          <label>Platform</label>
+          <label>Platform:</label>
           <div className="platform-icons">
             {c.platforms.includes("facebook") && (
               <img src={facebookIcon} className="platform-icon" alt="Facebook" />
@@ -91,6 +112,9 @@ export default function CampaignCard({
           </div>
         </div>
       </div>
+
+      {/* DIVIDER */}
+      <div className="card-divider" />
 
       <div className="card-footer">
         <span>
@@ -113,7 +137,7 @@ export default function CampaignCard({
             <img src={pauseIcon} alt="Pause" width={20} height={20} />
           </button>
 
-          <div className="more-container">
+          <div className="more-container" ref={menuRef}>
             <button className="action-btn more-btn" onClick={toggleMenu}>
               <img src={moreIcon} alt="More" width={20} height={20} />
             </button>
@@ -139,4 +163,4 @@ export default function CampaignCard({
       </div>
     </div>
   );
-}
+} 
