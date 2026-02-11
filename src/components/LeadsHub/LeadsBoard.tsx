@@ -14,16 +14,11 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem,
-  Grid,
-  Modal,
-  Menu,
   Radio,
   RadioGroup,
   Fade,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PhoneEnabledIcon from "@mui/icons-material/PhoneEnabled";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
@@ -39,23 +34,19 @@ import InsertPhotoIcon from '@mui/icons-material/InsertPhoto';
 import HistoryIcon from '@mui/icons-material/History';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 
-// Menu Icons
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
-
-// Call Icons
-import MicOffIcon from "@mui/icons-material/MicOff";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import VolumeUpIcon from "@mui/icons-material/VolumeUp";
-import CallEndIcon from "@mui/icons-material/CallEnd";
-
 // Mail Icons
 import SendIcon from "@mui/icons-material/Send";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 
 import { useNavigate } from "react-router-dom";
+
+/**
+ * ✅ INTEGRATION: Importing MenuButton, CallButton, and Dialogs from LeadsMenuDialogs
+ * - MenuButton: Edit, Reassign, Archive, Delete (syncs with LeadsTable via localStorage)
+ * - CallButton: Opens call dialog
+ * - Dialogs: Renders the CallDialog component
+ */
+import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
 
 // Importing your data and type
 import { leadsMock } from "./leadsMock";
@@ -65,34 +56,45 @@ interface Props {
   search: string;
 }
 
+// ✅ INTEGRATION: Same storage key as LeadsTable for sync
+const STORAGE_KEY = "vidai_leads_data";
+
 const LeadsBoard: React.FC<Props> = ({ search }) => {
   const navigate = useNavigate();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
-  // --- Modal & Overlay States ---
+  // ✅ INTEGRATION: Using localStorage-synced state
+  const [leads, setLeads] = React.useState<Lead[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+    
+    const initial = leadsMock.map((l) => ({
+      ...l,
+      archived: l.archived ?? false,
+    }));
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+    return initial;
+  });
+
+  // ✅ INTEGRATION: Keep localStorage updated
+  React.useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+  }, [leads]);
+
+  // --- Modal States ---
   const [openBookModal, setOpenBookModal] = React.useState(false);
-  const [openCallOverlay, setOpenCallOverlay] = React.useState(false);
   const [openMailModal, setOpenMailModal] = React.useState(false);
+  const [openSmsModal, setOpenSmsModal] = React.useState(false);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
-
-  // --- Menu State for 3 dots ---
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const openMenu = Boolean(anchorEl);
-
-  const handleMenuClick = (event: React.MouseEvent<HTMLElement>, lead: Lead) => {
-    event.stopPropagation();
-    setAnchorEl(event.currentTarget);
-    setSelectedLead(lead);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
 
   // --- MAIL FLOW STATES ---
   const [mailStep, setMailStep] = React.useState<1 | 2>(1);
   const [selectedTemplate, setSelectedTemplate] = React.useState("");
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
+
+  // --- SMS STATES ---
+  const [smsMessage, setSmsMessage] = React.useState("");
 
   const templates = [
     { id: '1', title: 'IVF Next Steps Form Request', desc: 'Requests the patient to fill out a form to share medical and contact details.' },
@@ -111,19 +113,17 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
     { label: "LOST LEADS", statusKey: ["Lost"], color: "#64748B" },
   ];
 
-  const filteredLeads = leadsMock.filter((l) =>
-    `${l.name} ${l.id}`.toLowerCase().includes(search.toLowerCase())
-  );
+  // ✅ INTEGRATION: Filter from state (not mock) and exclude archived
+  const filteredLeads = leads.filter((l) => {
+    const matchSearch = `${l.name} ${l.id}`.toLowerCase().includes(search.toLowerCase());
+    const isActive = !l.archived; // Don't show archived leads on board
+    return matchSearch && isActive;
+  });
 
   // Handlers
   const handleOpenBookModal = (lead: Lead) => {
     setSelectedLead(lead);
     setOpenBookModal(true);
-  };
-
-  const handleOpenCall = (lead: Lead) => {
-    setSelectedLead(lead);
-    setOpenCallOverlay(true);
   };
 
   const handleOpenMail = (lead: Lead) => {
@@ -132,27 +132,38 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
     setOpenMailModal(true);
   };
 
+  const handleOpenSms = (lead: Lead) => {
+    setSelectedLead(lead);
+    setSmsMessage("");
+    setOpenSmsModal(true);
+  };
+
   const handleNextToCompose = () => {
     setMailStep(2);
   };
 
   const handleSaveAsTemplate = () => {
     setShowSaveSuccess(true);
-    // Auto hide toast and close modal after success
     setTimeout(() => {
       setShowSaveSuccess(false);
       handleCloseAll();
     }, 2500);
   };
 
+  const handleSendSms = () => {
+    // SMS send logic here
+    console.log("Sending SMS to:", selectedLead?.name, "Message:", smsMessage);
+    handleCloseAll();
+  };
+
   const handleCloseAll = () => {
     setOpenBookModal(false);
-    setOpenCallOverlay(false);
     setOpenMailModal(false);
-    setAnchorEl(null);
+    setOpenSmsModal(false);
     setSelectedLead(null);
     setMailStep(1);
     setSelectedTemplate("");
+    setSmsMessage("");
   };
 
   const modalFieldStyle = {
@@ -219,10 +230,13 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
 
         <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}>CONTACT OPTION</Typography>
         <Stack direction="row" spacing={1.5} sx={{ mb: showButton ? 2 : 0 }}>
-          <IconButton size="small" sx={iconBtnStyle} onClick={(e) => { e.stopPropagation(); handleOpenCall(lead); }}>
-            <PhoneEnabledIcon sx={{ fontSize: 16 }} />
+          {/* ✅ INTEGRATION: Using CallButton from LeadsMenuDialogs */}
+          <Box sx={iconBtnStyle} onClick={(e) => e.stopPropagation()}>
+            <CallButton lead={lead} />
+          </Box>
+          <IconButton size="small" sx={iconBtnStyle} onClick={(e) => { e.stopPropagation(); handleOpenSms(lead); }}>
+            <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
           </IconButton>
-          <IconButton size="small" sx={iconBtnStyle} onClick={(e) => e.stopPropagation()}><ChatBubbleOutlineIcon sx={{ fontSize: 16 }} /></IconButton>
           <IconButton size="small" sx={iconBtnStyle} onClick={(e) => { e.stopPropagation(); handleOpenMail(lead); }}>
             <MailOutlineIcon sx={{ fontSize: 16 }} />
           </IconButton>
@@ -301,7 +315,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
                   key={lead.id}
                   onMouseEnter={() => setHoveredId(lead.id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => navigate(`/leads/${lead.id}`)}
+                  onClick={() => navigate(`/leads/${lead.id.replace("#", "")}`)}
                   elevation={0}
                   sx={{ 
                     p: 2.5, 
@@ -339,12 +353,10 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
                           color: lead.quality === "Hot" ? "#B91C1C" : lead.quality === "Warm" ? "#B45309" : "#475569"
                         }} 
                       />
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => handleMenuClick(e, lead)}
-                      >
-                        <MoreVertIcon sx={{ fontSize: 20, color: '#94A3B8' }} />
-                      </IconButton>
+                      {/* ✅ INTEGRATION: MenuButton syncs with LeadsTable */}
+                      <Box onClick={(e) => e.stopPropagation()}>
+                        <MenuButton lead={lead} setLeads={setLeads} tab="active" />
+                      </Box>
                     </Stack>
                   </Stack>
                   {renderCardContent(lead, col.label, hoveredId === lead.id)}
@@ -355,7 +367,10 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
         );
       })}
 
-      {/* --- SUCCESS TOAST (TRIGGERED BY SAVE AS TEMPLATE) --- */}
+      {/* ✅ INTEGRATION: Dialogs component renders CallDialog */}
+      <Dialogs />
+
+      {/* --- SUCCESS TOAST --- */}
       <Fade in={showSaveSuccess}>
         <Box sx={{ 
           position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)', 
@@ -368,6 +383,94 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
         </Box>
       </Fade>
 
+      {/* --- SMS MODAL --- */}
+      <Dialog 
+        open={openSmsModal} 
+        onClose={handleCloseAll} 
+        fullWidth 
+        maxWidth="sm" 
+        PaperProps={{ sx: { borderRadius: '24px', overflow: 'hidden' } }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 3 }}>
+          <Typography variant="h6" fontWeight={800} color="#1E293B">Send SMS</Typography>
+          <IconButton onClick={handleCloseAll} size="small"><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" fontWeight={600} color="#475569" sx={{ mb: 1 }}>To:</Typography>
+            <Chip 
+              label={selectedLead?.name} 
+              size="small" 
+              sx={{ 
+                bgcolor: '#EEF2FF', 
+                color: '#6366F1', 
+                fontWeight: 600, 
+                borderRadius: '8px',
+                height: 32,
+                fontSize: '0.875rem'
+              }} 
+            />
+          </Box>
+          <Box>
+            <Typography variant="body2" fontWeight={600} color="#475569" sx={{ mb: 1 }}>Message:</Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={6}
+              placeholder="Type your message here..."
+              value={smsMessage}
+              onChange={(e) => setSmsMessage(e.target.value)}
+              sx={{
+                ...modalFieldStyle,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "12px",
+                  "& fieldset": { borderColor: "#E2E8F0", borderWidth: "1px" },
+                  "&:hover fieldset": { borderColor: "#CBD5E1" },
+                  "&.Mui-focused fieldset": { borderColor: "#6366F1", borderWidth: "2px" },
+                },
+              }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'right' }}>
+              {smsMessage.length} / 160 characters
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, borderTop: '1px solid #F1F5F9', gap: 2 }}>
+          <Button 
+            onClick={handleCloseAll} 
+            sx={{ 
+              flex: 1,
+              color: '#64748B', 
+              textTransform: 'none', 
+              fontWeight: 700,
+              borderRadius: '12px',
+              border: '1px solid #E2E8F0',
+              py: 1.2
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSendSms}
+            disabled={!smsMessage.trim()}
+            endIcon={<SendIcon sx={{ fontSize: 16 }} />}
+            sx={{ 
+              flex: 1,
+              bgcolor: '#334155', 
+              borderRadius: '12px', 
+              textTransform: 'none', 
+              fontWeight: 700,
+              py: 1.2,
+              "&:hover": { bgcolor: "#1e293b" },
+              "&:disabled": { bgcolor: "#CBD5E1" }
+            }}
+          >
+            Send
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* --- MAIL MODAL FLOW --- */}
       <Dialog 
         open={openMailModal} 
@@ -377,14 +480,12 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
         PaperProps={{ sx: { borderRadius: '24px', overflow: 'hidden' } }}
       >
         {mailStep === 1 ? (
-          /* POPUP 1: INSERT TEMPLATE OR COMPOSE NEW */
           <>
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 3 }}>
               <Typography variant="h6" fontWeight={800} color="#1E293B">New Email</Typography>
               <IconButton onClick={handleCloseAll} size="small"><CloseIcon /></IconButton>
             </DialogTitle>
             <DialogContent sx={{ p: 0 }}>
-              {/* Clicking this now correctly goes to POPUP 2 */}
               <Box 
                 onClick={handleNextToCompose}
                 sx={{ 
@@ -427,7 +528,6 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
             </DialogActions>
           </>
         ) : (
-          /* POPUP 2: COMPOSE DRAFT */
           <>
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2.5 }}>
               <Typography variant="h6" fontWeight={800} color="#1E293B">New Email</Typography>
@@ -479,48 +579,6 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
         )}
       </Dialog>
 
-      {/* --- MORE MENU (POPOVER) --- */}
-      <Menu
-        anchorEl={anchorEl}
-        open={openMenu}
-        onClose={handleMenuClose}
-        onClick={(e) => e.stopPropagation()} 
-        PaperProps={{
-          sx: {
-            borderRadius: '16px',
-            mt: 1,
-            minWidth: 180,
-            boxShadow: '0px 10px 20px rgba(0,0,0,0.1)',
-            border: '1px solid #F1F5F9',
-            '& .MuiMenuItem-root': {
-              py: 1.5,
-              px: 2,
-              gap: 1.5,
-              '&:hover': { bgcolor: '#F8FAFC' }
-            }
-          }
-        }}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-      >
-        <MenuItem onClick={handleMenuClose}>
-          <EditOutlinedIcon sx={{ fontSize: 20, color: '#6366F1' }} />
-          <Typography variant="body2" fontWeight={600} color="#1E293B">Edit</Typography>
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          <PersonAddAlt1OutlinedIcon sx={{ fontSize: 20, color: '#6366F1' }} />
-          <Typography variant="body2" fontWeight={600} color="#1E293B">Reassign</Typography>
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          <Inventory2OutlinedIcon sx={{ fontSize: 20, color: '#6366F1' }} />
-          <Typography variant="body2" fontWeight={600} color="#1E293B">Archive</Typography>
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          <DeleteOutlineOutlinedIcon sx={{ fontSize: 20, color: '#EF4444' }} />
-          <Typography variant="body2" fontWeight={600} color="#EF4444">Delete</Typography>
-        </MenuItem>
-      </Menu>
-
       {/* --- BOOK APPOINTMENT MODAL --- */}
       <Dialog 
         open={openBookModal} 
@@ -545,30 +603,30 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
             APPOINTMENT DETAILS FOR {selectedLead?.name.toUpperCase()}
           </Typography>
           
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box>
               <Typography {...labelStyle}>Department *</Typography>
               <TextField select fullWidth size="small" defaultValue="Consultation" sx={modalFieldStyle}>
-                <MenuItem value="Consultation">Consultation</MenuItem>
+                <option value="Consultation">Consultation</option>
               </TextField>
-            </Grid>
-            <Grid item xs={6}>
+            </Box>
+            <Box>
               <Typography {...labelStyle}>Personnel *</Typography>
               <TextField select fullWidth size="small" defaultValue="Dr. Alex Carey" sx={modalFieldStyle}>
-                <MenuItem value="Dr. Alex Carey">Dr. Alex Carey</MenuItem>
+                <option value="Dr. Alex Carey">Dr. Alex Carey</option>
               </TextField>
-            </Grid>
-            <Grid item xs={6}>
+            </Box>
+            <Box>
               <Typography {...labelStyle}>Date *</Typography>
               <TextField type="date" fullWidth size="small" InputLabelProps={{ shrink: true }} sx={modalFieldStyle} />
-            </Grid>
-            <Grid item xs={6}>
+            </Box>
+            <Box>
               <Typography {...labelStyle}>Select Slot *</Typography>
               <TextField select fullWidth size="small" defaultValue="12:30" sx={modalFieldStyle}>
-                <MenuItem value="12:30">12:30 PM - 01:00 PM</MenuItem>
+                <option value="12:30">12:30 PM - 01:00 PM</option>
               </TextField>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
           <Box sx={{ mt: 1.5 }}>
             <Typography {...labelStyle}>Remark</Typography>
@@ -600,54 +658,6 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* --- CALLING OVERLAY --- */}
-      <Modal
-        open={openCallOverlay}
-        onClose={handleCloseAll}
-        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Box sx={{
-          bgcolor: 'white',
-          width: '100%',
-          maxWidth: 480,
-          borderRadius: '40px',
-          p: 6,
-          textAlign: 'center',
-          position: 'relative',
-          outline: 'none',
-          boxShadow: '0px 24px 48px rgba(0,0,0,0.1)'
-        }}>
-          <IconButton 
-            onClick={handleCloseAll} 
-            sx={{ position: 'absolute', top: 24, right: 24, color: '#94A3B8' }}
-          >
-            <CloseIcon />
-          </IconButton>
-
-          <Typography variant="body2" sx={{ color: '#94A3B8', fontWeight: 600, mb: 1, mt: 2 }}>Calling</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: '#1E293B', mb: 6 }}>{selectedLead?.name}</Typography>
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 8 }}>
-            <Avatar sx={{ width: 140, height: 140, bgcolor: '#EEF2FF', color: '#6366F1', fontSize: '3rem', fontWeight: 700 }}>
-              {selectedLead?.initials}
-            </Avatar>
-          </Box>
-
-          <Stack direction="row" spacing={3} justifyContent="center" sx={{ mb: 6 }}>
-            <IconButton sx={{ bgcolor: '#F8FAFC', p: 2 }}><MicOffIcon sx={{ color: '#64748B' }} /></IconButton>
-            <IconButton sx={{ bgcolor: '#F8FAFC', p: 2 }}><PersonAddIcon sx={{ color: '#64748B' }} /></IconButton>
-            <IconButton sx={{ bgcolor: '#F8FAFC', p: 2 }}><VolumeUpIcon sx={{ color: '#64748B' }} /></IconButton>
-          </Stack>
-
-          <IconButton 
-            onClick={handleCloseAll}
-            sx={{ bgcolor: '#EF4444', color: 'white', width: 72, height: 72, '&:hover': { bgcolor: '#DC2626' } }}
-          >
-            <CallEndIcon sx={{ fontSize: 32 }} />
-          </IconButton>
-        </Box>
-      </Modal>
     </Box>
   );
 };
