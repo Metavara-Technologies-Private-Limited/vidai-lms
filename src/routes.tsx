@@ -6,6 +6,7 @@ import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import Integration from "./components/Settings/Menus/Integration";
 import TemplatesPage from "./components/Settings/Menus/Templates";
 import Tickets from "./components/Settings/Menus/Tickets";
+import TicketView from "./components/Settings/Menus/TicketView";
 
 import AddNewLead from "./components/LeadsHub/AddNewLead";
 import LeadView from "./components/LeadsHub/LeadView";
@@ -44,6 +45,9 @@ export default function AppRoutes() {
             </Suspense>
           }
         />
+
+<Route path="/settings/tickets/:id" element={<TicketView />} />
+
 
         {/* sidebar routes */}
         {SIDEBAR_TABS.flatMap((tab) =>
