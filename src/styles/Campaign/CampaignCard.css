@@ -78,20 +78,24 @@
 .card-row {
   height: 41px;
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
+  justify-content: flex-start;
+  gap: 140px;
 }
 
 .card-row label {
   font-size: 12px;
   color: #999999;
   margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   display: block;
 }
 
 .card-row span {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: #333333;
 }
 
@@ -116,6 +120,13 @@
   align-items: center;
   position: relative;
 }
+/* ================= CARD DIVIDER ================= */
+
+.card-divider {
+  height: 1px;
+  background: #EEF0F3;
+  margin: 12px 0;
+}
 
 .leads {
   color: #2ecc71;
@@ -127,15 +138,17 @@
 .action-buttons {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+
 }
 
 .action-btn {
   background: none;
   border: none;
-  padding: 4px;
+  padding: 5px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 50%;
+  background-color: #F5F8FC;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -143,7 +156,7 @@
 }
 
 .action-btn:hover {
-  background-color: #f5f5f5;
+  background-color: #3B82F6;
 }
 
 .action-btn img {
@@ -152,22 +165,22 @@
   object-fit: contain;
 }
 
-.view-btn:hover {
+/* .view-btn:hover {
   background-color: #e3f2fd;
-}
+} */
 
-.pause-btn:hover {
+/* .pause-btn:hover {
   background-color: #fff3cd;
-}
+} */
 
 /* More button & menu container */
 .more-container {
   position: relative;
 }
 
-.more-btn:hover {
+/* .more-btn:hover {
   background-color: #f0f0f0;
-}
+} */
 
 /* ================= CONTEXT MENU (Dropdown) ================= */
 

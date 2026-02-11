@@ -1,155 +1,763 @@
-/* ================= EMAIL CAMPAIGN MODAL =================
+/* ================= MODAL OVERLAY ================= */
 
 .campaign-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0,0,0,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
 }
 
+/* ================= MODAL ================= */
+
 .campaign-modal {
-  position: relative;
-  width: 720px;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: #ffffff;
+  width: 1000px;
+  background: #fff;
   border-radius: 16px;
-  padding: 32px 36px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  font-family: 'Montserrat', sans-serif;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh; 
+}
+
+/* ================= HEADER ================= */
+
+.modal-header {
+  position: relative;
+  height: 62px;
+  padding: 16px;
+  border-bottom: 1px solid #E2E3E5;
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #232323;
 }
 
 .modal-close {
   position: absolute;
+  right: 16px;
   top: 16px;
-  right: 24px;
-  background: none;
+  width: 30px;
+  height: 30px;
+  background: #F2F2F2;
+  border-radius: 50%;
   border: none;
-  font-size: 28px;
-  color: #777;
   cursor: pointer;
 }
 
-.campaign-modal h2 {
-  margin: 0 0 28px;
-  font-size: 24px;
-  font-weight: 600;
-  color: #111;
+/* ================= STEPPER ================= */
+
+.stepper {
+  width: 98%;
+  margin: 24px auto 18px;
+  padding: 18px 28px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  display: flex;
+  border: 1px solid lightgrey;
+  align-items: center;
 }
 
-/* Stepper */
-.stepper {
-  display: flex;
-  align-items: center;
-  margin-bottom: 32px;
-}
 
 .step {
-  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  position: relative;
+  gap: 8px;
 }
 
-.circle {
-  width: 32px;
-  height: 32px;
+/* Circle default */
+.step .circle {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: #e5e5e5;
-  color: #777;
-  font-size: 14px;
-  font-weight: 600;
+  background: #E5E7EB;
+  color: #6B7280;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 6px;
-}
-
-.circle.completed {
-  background: #4caf50;
-  color: white;
-}
-
-.circle.current {
-  background: #ff9800;
-  color: white;
-}
-
-.line {
-  height: 2px;
-  background: #e5e5e5;
-  flex: 1;
-  margin: 0 16px;
-}
-
-.line.completed {
-  background: #4caf50;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .step span {
-  font-size: 13px;
-  color: #888;
-  text-align: center;
+  font-size: 14px;
+  color: #9CA3AF;
+}
+
+/* Active */
+.step.active .circle {
+  background: #FFEDE7;
+  color: #F26A3E;
 }
 
 .step.active span {
-  color: #111;
-  font-weight: 500;
+  color: #F26A3E;
+  font-weight: 600;
 }
 
-/* Content */
-.step-content h3 {
-  margin: 0 0 24px;
-  font-size: 20px;
-  font-weight: 600;
-  color: #111;
+/* Completed */
+.step.completed .circle {
+  background: #22C55E;
+  color: #ffffff;
 }
+
+.step.completed span {
+  color: #22C55E;
+  font-weight: 600;
+}
+
+.line {
+  flex: 1;
+  height: 1px;
+  background: #E5E7EB;
+  margin: 0 12px;
+}
+
+/* ================= CONTENT ================= */
+
+.step-content {
+  flex: 1;               /* takes remaining space */
+  overflow-y: auto;      /* enables scrolling */
+  padding-bottom: 20px; /* space before footer */
+}
+.step-content h2 {
+  margin-top: 8px;
+}
+
+
+
+/* ================= FORM ================= */
 
 .form-group {
-  margin-bottom: 28px;
+  position: relative;
+  margin-bottom: 24px;
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
+.form-row {
+  display: flex;
+  gap: 20px;
 }
+
+.form-group.half {
+  flex: 0 0 calc(50% - 10px); /* 🔒 FIXED DATE WIDTH */
+}
+
+/* ================= NOTCHED LABEL ================= */
+
+.form-group > label {
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  background: #ffffff;
+  padding: 2px 8px;
+  font-size: 13px;
+  color: #6B6B6B;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ================= INPUTS ================= */
 
 .form-group input,
 .form-group select,
-.form-group textarea {
+.MuiOutlinedInput-root {
   width: 100%;
-  padding: 0 16px;
-  height: 44px;
-  border: 1px solid #d0d0d0;
-  border-radius: 10px;
+  height: 56px;
+  border-radius: 16px;
+  border: 1.5px solid #E2E3E5;
+  padding: 20px 14px 8px;
   font-size: 14px;
   background: #fff;
-  transition: border-color 0.2s;
+  box-shadow: none;
+  outline: none;
 }
+
+input:invalid,
+select:invalid {
+  box-shadow: none;
+  outline: none;
+}
+
+/* ================= ERROR STATE ================= */
+
+.form-group.error input,
+.form-group.error select {
+  border-color: #E11D48;
+}
+
+.form-group.error > label {
+  color: #E11D48;
+}
+
+.form-error {
+  display: none;
+}
+
+/* ================= FOOTER ================= */
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 12px 20px 20px;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  /* border-top: 1px solid #E5E7EB; */
+  z-index: 10;
+}
+
+.cancel-btn {
+  width: 160px;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid #6B6B6B;
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.next-btn {
+  width: 160px;
+  height: 46px;
+  border-radius: 12px;
+  border: none;
+  background: #4A4A4A;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.next-btn:disabled {
+  background: #BDBDBD;
+  cursor: not-allowed;
+}
+
+/* =================================================
+   STEP 2 – CONTENT & CONFIGURATION (FIGMA MATCH)
+   ================================================= */
+
+.section-card {
+  border: 1.5px solid #E5E7EB;
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+.section-card.error {
+  border-color: #E11D48;
+}
+
+.section-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.section-subtitle {
+  font-size: 14px;
+  color: #9CA3AF;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+/* ---------- Ad Accounts ---------- */
+
+.account-row {
+  display: flex;
+  gap: 20px;
+}
+
+.account-card {
+  flex: 1;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.account-card.selected {
+  border-color: black;
+}
+
+.section-card.error .account-card {
+  border-color: #E11D48;
+}
+
+.account-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account-left img {
+  width: 28px;
+  height: 28px;
+}
+
+/* Checkbox */
+.account-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid #CBD5E1;
+}
+
+.account-checkbox.checked {
+  
+  background:#F26A3E;
+  border-color:#F26A3E;
+}
+
+/* ================= CAMPAIGN MODE – FIGMA EXACT ================= */
+
+.mode-row {
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.mode-card {
+  flex: 0 0 calc(50% - 10px);
+  max-width: 430px;
+  height: 76px;                  /* Figma exact */
+  border: 1.5px solid #CBD5E1;
+  border-radius: 12px;
+  padding: 14px 16px;            /* slightly tighter */
+  display: flex;
+  align-items: flex-start;       /* 🔥 top aligned */
+  justify-content: space-between;
+  background: #ffffff;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+
+/* Selected */
+.mode-card.selected {
+  border-color: #F26A3E;
+}
+
+/* LEFT CONTENT */
+.mode-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+
+/* RADIO */
+.radio {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #B0B7C3;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.radio.checked {
+  border-color: #F26A3E;
+}
+
+.radio.checked::after {
+  content: "";
+  position: absolute;
+  inset: 20%;
+  background: #F26A3E;
+  border-radius: 50%;
+}
+
+.mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-text h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 22px;
+  color: #232323;
+}
+
+.mode-text p {
+  font-size: 12px;
+  color: #9CA3AF;
+  margin: 0;
+  line-height: 18px;
+
+  white-space: nowrap;        /* ✅ force single line */
+  overflow: hidden;           /* ✅ prevent overflow */
+  text-overflow: ellipsis;    /* ✅ clean cut like Figma */
+}
+
+
+
+/* BADGE */
+/* BADGE – compact height like Figma */
+/* BASE BADGE – used by BOTH */
+.mode-card .badge {
+  align-self: flex-start;
+  padding: 2px 10px;
+  height: 18px;
+  line-height: 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  background: #F1F5F9;
+  color: #111827;
+  border: 1px solid ;               /* ✅ ensure no border */
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 🔥 OVERRIDE outlined so it looks IDENTICAL */
+.mode-card .badge.outlined {
+  background: #F1F5F9;        /* same background */
+  color: #111827;             /* same text */
+  border: 1px solid ;               /* remove outline */
+}
+
+/* =================================================
+   CAMPAIGN CONTENT (STEP 2)
+   ================================================= */
+
+.content-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* Social icons (Instagram / Facebook / LinkedIn) */
+.content-row img {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* Textarea & input wrapper */
+.content-row textarea,
+.content-row input {
+  flex: 1;
+  min-height: 52px;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  color: #232323;
+  outline: none;
+  background: #ffffff;
+}
+
+/* Instagram textarea larger (like Figma) */
+.content-row textarea {
+  min-height: 140px;
+  resize: none;
+}
+
+/* Placeholder styling */
+.content-row textarea::placeholder,
+.content-row input::placeholder {
+  color: #9CA3AF;
+  font-size: 14px;
+}
+
+/* Focus state */
+.content-row textarea:focus,
+.content-row input:focus {
+  border-color: #F26A3E;
+}
+
+/* Divider lines between rows (subtle like Figma) */
+.content-row:not(:last-child) {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+
+/* ================= STEP 3 ================= */
+
+.schedule-row {
+  display: flex;
+  gap: 20px;
+}
+
+/* ================= MUI DATE PICKER OVERRIDES ================= */
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
+.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
+  border-color: #E2E3E5 !important;
+}
+
+.form-group.error .MuiOutlinedInput-notchedOutline {
+  border-color: #E11D48 !important;
+}
+
+.MuiFormLabel-root {
+  color: #6B6B6B !important;
+}
+
+.form-group.error .MuiFormLabel-root {
+  color: #E11D48 !important;
+}
+/* =================================================
+   STEP 3 – SCHEDULE CAMPAIGN
+   ================================================= */
+
+.schedule-card {
+  border: 1.5px solid #E5E7EB;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 28px;
+  background: #ffffff;
+}
+
+/* ---------- Header ---------- */
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.schedule-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule-title h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #232323;
+}
+
+.schedule-title p {
+  font-size: 14px;
+  color: #9CA3AF;
+  margin: 0;
+}
+
+/* ---------- AI Optimization Button ---------- */
+
+.ai-opt-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: 1.5px solid #E0C7FF;
+  background: #F8F5FF;
+  color: #232323;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- Inputs Row ---------- */
+
+.schedule-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* ---------- Field Wrapper ---------- */
+
+.schedule-field {
+  flex: 1;
+  position: relative;
+}
+
+/* ---------- Floating Label ---------- */
+
+.schedule-field label {
+  position: absolute;
+  top: -9px;
+  left: 18px;
+  background: #ffffff;
+  padding: 2px 6px;
+  font-size: 13px;
+  color: #9CA3AF;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ---------- Input Box (DATE & TIME SAME STYLE) ---------- */
+
+.schedule-input {
+  width: 100%;
+  height: 56px;
+  border-radius: 16px;
+  border: 1.5px solid #D1D5DB;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+  color: #232323;
+  box-sizing: border-box;
+}
+
+/* ---------- Icons ---------- */
+
+.schedule-input svg,
+.schedule-input img {
+  width: 22px;
+  height: 22px;
+  color: #232323;
+  flex-shrink: 0;
+}
+
+/* ---------- Hover / Focus ---------- */
+
+.schedule-input:hover,
+.schedule-input:focus-within {
+  border-color: #D1D5DB;
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 900px) {
+  .schedule-row {
+    flex-direction: column;
+  }
+}
+
+/* Email specific subtitle spacing */
+.section-subtitle {
+  margin-bottom: 16px;
+}
+
+/* Schedule input alignment (same as social) */
+.schedule-field input[type="time"] {
+  border: 1.5px solid #E2E3E5;
+  border-radius: 16px;
+  height: 56px;
+  padding: 0 16px;
+  font-size: 16px;
+}
+ 
+/* =================================================
+   EMAIL CAMPAIGN – TEXTAREA (FIGMA MATCH)
+   ================================================= */
 
 .form-group textarea {
-  min-height: 140px;
-  padding-top: 12px;
-  resize: vertical;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 16px;
+  border: 1.5px solid #E2E3E5;
+  padding: 14px 16px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  color: #232323;
+  background: #ffffff;
+  resize: none;
   outline: none;
-  border-color: #666;
-  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+  box-sizing: border-box;
 }
 
-.input-wrapper {
-  position: relative;
+/* Placeholder */
+.form-group textarea::placeholder {
+  color: #9CA3AF;
+  font-size: 14px;
+}
+
+/* Focus state */
+.form-group textarea:focus {
+  border-color: #F26A3E;
+}
+
+/* Error state */
+.form-group.error textarea {
+  border-color: #E11D48;
+}
+/* ===== EMAIL CONTENT HEADER ===== */
+
+.email-content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+/* Right side buttons container */
+.email-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Outline button – Preview Email */
+.outline-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #6B6B6B;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.outline-btn img {
+  width: 18px;
+  height: 18px;
+}
+
+/* Light button – Email Template */
+.light-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: none;
+  background: #F3F4F6;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Hover effects */
+.outline-btn:hover {
+  background: #F9FAFB;
+}
+
+.light-btn:hover {
+  background: #E5E7EB;
+}
+.form-group input,
+.form-group textarea {
+  padding-right: 120px; 
 }
 
 .ai-suggest {
@@ -157,153 +765,20 @@
   right: 16px;
   top: 50%;
   transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #7c3aed;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  color: #6B7280;
   cursor: pointer;
-}
-
-/* Error */
-input.error,
-select.error,
-textarea.error {
-  border-color: #e53e3e !important;
-}
-
-.error-text {
-  color: #e53e3e;
-  font-size: 13px;
-  margin-top: 6px;
-  display: block;
-}
-
-/* Layout */
-.form-row {
-  display: flex;
-  gap: 24px;
-}
-
-.form-group.half {
-  flex: 1;
-}
-
-/* Step 2 */
-.email-actions {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.secondary-btn {
-  padding: 8px 16px;
-  border: 1px solid #d0d0d0;
-  border-radius: 8px;
-  background: white;
-  font-size: 13px;
-  color: #333;
-  cursor: pointer;
-}
-
-.secondary-btn:hover {
-  background: #f9f9f9;
-}
-
-.helper-text {
-  font-size: 13px;
-  color: #666;
-  margin: 6px 0 12px;
-}
-
-/* Step 3 - Schedule - Horizontal layout */
-.schedule-container {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.date-range {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-
-.date-range input[type="date"] {
-  flex: 1;
-  min-width: 160px;
-}
-
-.date-range span {
-  color: #666;
-  font-weight: 500;
   white-space: nowrap;
 }
 
-.time-picker {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 220px;
+/* For textarea — align near top instead of center */
+.form-group textarea + .ai-suggest {
+  top: 20px;
+  transform: none;
 }
 
-.time-picker input[type="time"] {
-  flex: 1;
+/* Hover effect */
+.ai-suggest:hover {
+  color: #F26A3E;
 }
-
-/* Buttons */
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 32px;
-}
-
-.modal-actions button {
-  flex: 1;
-  height: 48px;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.cancel-btn {
-  background: #f5f5f5;
-  color: #111;
-  border: none;
-}
-
-.cancel-btn:hover {
-  background: #e8e8e8;
-}
-
-.draft-btn {
-  background: #e0e0e0;
-  color: #111;
-  border: none;
-}
-
-.draft-btn:hover {
-  background: #d0d0d0;
-}
-
-.primary-btn {
-  background: #111;
-  color: white;
-  border: none;
-}
-
-.primary-btn:hover {
-  background: #222;
-}
-
-.primary-btn:disabled {
-  
-  background: #ccc;
-  cursor: not-allowed;
-  opacity: 0.7;
-} */

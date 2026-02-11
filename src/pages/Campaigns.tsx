@@ -10,7 +10,7 @@ import CampaignCard from "../components/Layout/Campaign/CampaignCard";
 import AddNewCampaign from "../components/Layout/Campaign/AddNewCampaign";
 import SocialCampaignModal from "../components/Layout/Campaign/SocialCampaignModal";
 import CampaignDashboard from "../components/Layout/Campaign/CampaignDashboard";
-// import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
+import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
 
 /* ===== TYPES ===== */
 type CampaignStatus =

@@ -1,361 +1,336 @@
-// import { useState } from "react";
-// import { v4 as uuid } from "uuid";
-// import "../../../../src/styles/Campaign/EmailCampaignModal.css";
+import { useState } from "react";
+import { v4 as uuid } from "uuid";
+import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 
-// // Import the Campaign type from the parent (adjust path if needed)
-// import { Campaign } from "../../../pages/Campaigns"; // Assuming this path; copy the interface if import fails
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import dayjs from "dayjs";
+import viewIcon from "./Icons/view.png"; // adjust path if needed
 
-// interface EmailCampaignModalProps {
-//   onClose: () => void;
-//   onSave: (campaign: Campaign) => void; // Updated to match Campaign type
-// }
+export default function EmailCampaignModal({ onClose, onSave }: any) {
+  const [step, setStep] = useState(1);
+  const [submitted, setSubmitted] = useState(false);
 
-// export default function EmailCampaignModal({ onClose, onSave }: EmailCampaignModalProps) {
-//   const [step, setStep] = useState(1);
-//   const [touched, setTouched] = useState<Record<string, boolean>>({});
-//   const [isSaving, setIsSaving] = useState(false); // For loading state
+  /* ================= STEP 1 – DETAILS ================= */
+  const [campaignName, setCampaignName] = useState("");
+  const [campaignDescription, setCampaignDescription] = useState("");
+  const [objective, setObjective] = useState("");
+  const [audience, setAudience] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-//   // Step 1 - Campaign Details
-//   const [name, setName] = useState("");
-//   const [description, setDescription] = useState("");
-//   const [objective, setObjective] = useState("");
-//   const [targetAudience, setTargetAudience] = useState("");
-//   const [startDate, setStartDate] = useState("");
-//   const [endDate, setEndDate] = useState("");
+  const step1Valid =
+    campaignName.trim() &&
+    campaignDescription.trim() &&
+    objective &&
+    audience &&
+    startDate &&
+    endDate;
 
-//   // Step 2 - Email Setup
-//   const [audienceList, setAudienceList] = useState("");
-//   const [subject, setSubject] = useState("");
-//   const [emailContent, setEmailContent] = useState("");
+  /* ================= STEP 2 – EMAIL SETUP ================= */
+  const [subject, setSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
 
-//   const markTouched = (field: string) => {
-//     setTouched((prev) => ({ ...prev, [field]: true }));
-//   };
+  const step2Valid = audience && subject.trim() && emailBody.trim();
 
-//   const getError = (field: string, value: string) => {
-//     if (!touched[field]) return "";
-//     return value.trim() === "" ? "Required" : "";
-//   };
+  /* ================= STEP 3 – SCHEDULE ================= */
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
 
-//   const getDateError = () => {
-//     if (!touched.startDate || !touched.endDate) return "";
-//     if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-//       return "Start date must be before or equal to end date";
-//     }
-//     return "";
-//   };
+  const step3Valid = scheduleDate && scheduleTime;
 
-//   const isStep1Valid =
-//     name.trim() !== "" &&
-//     objective !== "" &&
-//     targetAudience !== "" &&
-//     startDate !== "" &&
-//     endDate !== "" &&
-//     new Date(startDate) <= new Date(endDate);
+  /* ================= NAVIGATION ================= */
+  const handleNext = () => {
+    setSubmitted(true);
 
-//   const isStep2Valid = audienceList !== "" && subject.trim() !== "" && emailContent.trim() !== "";
+    if (step === 1 && step1Valid) {
+      setStep(2);
+      setSubmitted(false);
+    } else if (step === 2 && step2Valid) {
+      setStep(3);
+      setSubmitted(false);
+      
+    }
+  };
 
-//   const isStep3Valid = 
-//     startDate !== "" && 
-//     endDate !== "" && 
-//     new Date(startDate) <= new Date(endDate);
+  const handleSave = (status: "Draft" | "Scheduled") => {
+    setSubmitted(true);
+    if (!step3Valid) return;
 
-//   const handleNext = () => {
-//     if (step === 1 && isStep1Valid) setStep(2);
-//     if (step === 2 && isStep2Valid) setStep(3);
-//   };
+    const newCampaign = {
+      id: uuid(),
+      name: campaignName,
+      type: "email",
+      status,
+      start: startDate,
+      end: endDate,
+      platforms: ["gmail"],
+      leads: 0,
+      scheduledAt: `${scheduleDate} ${scheduleTime}`,
+    };
 
-//   // Updated: Async, loading, builds full Campaign object matching parent type
-//   const handleSave = async (status: "Schedule" | "Draft") => {
-//     if (isSaving) return;
-//     setIsSaving(true);
-//     try {
-//       const campaign: Campaign = {
-//         id: uuid(),
-//         name,
-//         type: "email",
-//         status, // "Schedule" or "Draft" to match parent
-//         start: startDate,
-//         end: endDate,
-//         platforms: ["gmail"], // Required for email campaigns
-//         leads: 0, // Default for new campaigns
-//         scheduledAt: status === "Schedule" ? startDate : undefined, // Set for scheduled campaigns
-//       };
-//       await onSave(campaign);
-//     } catch (error) {
-//       console.error("Error saving campaign:", error);
-//       alert("Failed to save campaign. Please check your inputs and try again.");
-//     } finally {
-//       setIsSaving(false);
-//       if (!error) onClose(); // Close only on success
-//     }
-//   };
+    onSave(newCampaign);
+  };
 
-//   return (
-//     <div className="campaign-modal-overlay">
-//       <div className="campaign-modal">
-//         <button className="modal-close" onClick={onClose}>×</button>
+  return (
+    <div className="campaign-modal-overlay">
+      <div className="campaign-modal">
 
-//         <h2>Add Email Campaigns</h2>
+        {/* ================= HEADER ================= */}
+        <div className="modal-header">
+          <span className="modal-title">Add Email Campaigns</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
 
-//         {/* Stepper */}
-//         <div className="stepper">
-//           <div className={`step ${step >= 1 ? "active" : ""}`}>
-//             <div className={`circle ${step > 1 ? "completed" : step === 1 ? "current" : ""}`}>
-//               {step > 1 ? "✓" : "1"}
-//             </div>
-//             <span>Campaign Details</span>
-//           </div>
-//           <div className={`line ${step > 1 ? "completed" : ""}`} />
-//           <div className={`step ${step >= 2 ? "active" : ""}`}>
-//             <div className={`circle ${step > 2 ? "completed" : step === 2 ? "current" : ""}`}>
-//               {step > 2 ? "✓" : "2"}
-//             </div>
-//             <span>Email Setup</span>
-//           </div>
-//           <div className={`line ${step > 2 ? "completed" : ""}`} />
-//           <div className={`step ${step >= 3 ? "active" : ""}`}>
-//             <div className={`circle ${step === 3 ? "current" : ""}`}>3</div>
-//             <span>Schedule Email</span>
-//           </div>
-//         </div>
+        {/* ================= STEPPER ================= */}
+        <div className="stepper">
+          <div className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}>
+            <div className="circle">{step > 1 ? "✓" : "1"}</div>
+            <span>Campaign Details</span>
+          </div>
 
-//         {/* Step 1 */}
-//         {step === 1 && (
-//           <div className="step-content">
-//             <h3>Campaign Details</h3>
+          <div className="line" />
 
-//             <div className="form-group">
-//               <label>Campaign Name</label>
-//               <div className="input-wrapper">
-//                 <input
-//                   type="text"
-//                   value={name}
-//                   onChange={(e) => setName(e.target.value)}
-//                   onBlur={() => markTouched("name")}
-//                   placeholder="e.g. New Product Launch"
-//                   className={getError("name", name) !== "" ? "error" : ""}
-//                 />
-//                 <button className="ai-suggest">✨ AI Suggest</button>
-//               </div>
-//               {getError("name", name) && <span className="error-text">Required</span>}
-//             </div>
+          <div className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}>
+            <div className="circle">{step > 2 ? "✓" : "2"}</div>
+            <span>Email Setup</span>
+          </div>
 
-//             <div className="form-group">
-//               <label>Campaign Description</label>
-//               <div className="input-wrapper">
-//                 <textarea
-//                   value={description}
-//                   onChange={(e) => setDescription(e.target.value)}
-//                   placeholder="e.g. Contains records of routine checks..."
-//                 />
-//                 <button className="ai-suggest">✨ AI Suggest</button>
-//               </div>
-//             </div>
+          <div className="line" />
 
-//             <div className="form-row">
-//               <div className="form-group half">
-//                 <label>Campaign Objective</label>
-//                 <select
-//                   value={objective}
-//                   onChange={(e) => setObjective(e.target.value)}
-//                   onBlur={() => markTouched("objective")}
-//                   className={getError("objective", objective) ? "error" : ""}
-//                 >
-//                   <option value="">Select Objective</option>
-//                   <option value="leads">Lead Generation</option>
-//                   <option value="engagement">Engagement</option>
-//                   <option value="sales">Sales</option>
-//                 </select>
-//                 {getError("objective", objective) && <span className="error-text">Required</span>}
-//               </div>
+          <div className={`step ${step === 3 ? "active" : ""}`}>
+            <div className="circle">3</div>
+            <span>Schedule Email</span>
+          </div>
+        </div>
 
-//               <div className="form-group half">
-//                 <label>Target Audience</label>
-//                 <select
-//                   value={targetAudience}
-//                   onChange={(e) => setTargetAudience(e.target.value)}
-//                   onBlur={() => markTouched("targetAudience")}
-//                   className={getError("targetAudience", targetAudience) ? "error" : ""}
-//                 >
-//                   <option value="">Select Audience</option>
-//                   <option value="all">All Subscribers</option>
-//                   <option value="active">Active Users</option>
-//                   <option value="new">New Users</option>
-//                 </select>
-//                 {getError("targetAudience", targetAudience) && <span className="error-text">Required</span>}
-//               </div>
-//             </div>
+        {/* ================= STEP 1 ================= */}
+        {step === 1 && (
+          <div className="step-content">
+            <h2>Campaign Details</h2>
 
-//             <div className="form-row">
-//               <div className="form-group half">
-//                 <label>Start Date</label>
-//                 <input
-//                   type="date"
-//                   value={startDate}
-//                   onChange={(e) => setStartDate(e.target.value)}
-//                   onBlur={() => markTouched("startDate")}
-//                   className={getError("startDate", startDate) ? "error" : ""}
-//                 />
-//                 {getError("startDate", startDate) && <span className="error-text">Required</span>}
-//               </div>
+            <div className={`form-group ${submitted && !campaignName ? "error" : ""}`}>
+              <label>Campaign Name *</label>
+              <input
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="e.g. New Product Launch"
+              />
+            </div>
 
-//               <div className="form-group half">
-//                 <label>End Date</label>
-//                 <input
-//                   type="date"
-//                   value={endDate}
-//                   onChange={(e) => setEndDate(e.target.value)}
-//                   onBlur={() => markTouched("endDate")}
-//                   className={getError("endDate", endDate) ? "error" : ""}
-//                 />
-//                 {getError("endDate", endDate) && <span className="error-text">Required</span>}
-//                 {getDateError() && <span className="error-text">{getDateError()}</span>}
-//               </div>
-//             </div>
+            <div className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}>
+              <label>Campaign Description *</label>
+              <input
+                value={campaignDescription}
+                onChange={(e) => setCampaignDescription(e.target.value)}
+                placeholder="Short description of campaign"
+              />
+            </div>
 
-//             <div className="modal-actions">
-//               <button className="cancel-btn" onClick={onClose}>Cancel</button>
-//               <button className="primary-btn" onClick={handleNext} disabled={!isStep1Valid}>
-//                 Next
-//               </button>
-//             </div>
-//           </div>
-//         )}
+            <div className="form-row">
+              <div className={`form-group half ${submitted && !objective ? "error" : ""}`}>
+                <label>Campaign Objective *</label>
+                <select value={objective} onChange={(e) => setObjective(e.target.value)}>
+                  <option value="">Select Objective</option>
+                  <option value="awareness">Awareness</option>
+                  <option value="leads">Lead Generation</option>
+                </select>
+              </div>
 
-//         {/* Step 2: Email Setup */}
-//         {step === 2 && (
-//           <div className="step-content">
-//             <h3>Email Setup</h3>
+              <div className={`form-group half ${submitted && !audience ? "error" : ""}`}>
+                <label>Target Audience *</label>
+                <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+                  <option value="">Select Audience</option>
+                  <option value="all">All Subscribers</option>
+                  <option value="active">Active Users</option>
+                </select>
+              </div>
+            </div>
 
-//             <div className="form-group">
-//               <label>Select Audience</label>
-//               <p className="helper-text">Choose which audience list to send this email to</p>
-//               <select
-//                 value={audienceList}
-//                 onChange={(e) => setAudienceList(e.target.value)}
-//                 onBlur={() => markTouched("audienceList")}
-//                 className={getError("audienceList", audienceList) ? "error" : ""}
-//               >
-//                 <option value="">Select Audience List</option>
-//                 <option value="all">All Subscribers</option>
-//                 <option value="active">Active Customers</option>
-//                 <option value="recent">Recent Purchasers</option>
-//               </select>
-//               {getError("audienceList", audienceList) && <span className="error-text">Required</span>}
-//             </div>
+            <div className="form-row">
+              <div className={`form-group half ${submitted && !startDate ? "error" : ""}`}>
+                <label>Start Date *</label>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    format="DD/MM/YYYY"
+                    value={startDate ? dayjs(startDate) : null}
+                    onChange={(v) =>
+                      setStartDate(v ? v.format("YYYY-MM-DD") : "")
+                    }
+                    slots={{ openPickerIcon: CalendarTodayIcon }}
+                  />
+                </LocalizationProvider>
+              </div>
 
-//             <div className="form-group">
-//               <label>Email Content</label>
-//               <div className="email-actions">
-//                 <button className="secondary-btn">Preview Email</button>
-//                 <button className="secondary-btn">Email Template</button>
-//               </div>
-//               <p className="helper-text">Design your email with AI assistance</p>
+              <div className={`form-group half ${submitted && !endDate ? "error" : ""}`}>
+                <label>End Date *</label>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    format="DD/MM/YYYY"
+                    value={endDate ? dayjs(endDate) : null}
+                    onChange={(v) =>
+                      setEndDate(v ? v.format("YYYY-MM-DD") : "")
+                    }
+                    slots={{ openPickerIcon: CalendarTodayIcon }}
+                  />
+                </LocalizationProvider>
+              </div>
+            </div>
+          </div>
+        )}
 
-//               <div className="form-group">
-//                 <label>Subject Line</label>
-//                 <div className="input-wrapper">
-//                   <input
-//                     type="text"
-//                     value={subject}
-//                     onChange={(e) => setSubject(e.target.value)}
-//                     onBlur={() => markTouched("subject")}
-//                     placeholder="New Product Launch"
-//                     className={getError("subject", subject) ? "error" : ""}
-//                   />
-//                   <button className="ai-suggest">✨ AI Suggest</button>
-//                 </div>
-//                 {getError("subject", subject) && <span className="error-text">Required</span>}
-//               </div>
+        {/* ================= STEP 2 ================= */}
+{step === 2 && (
+        <div className="step-content">
+        <h2>Email Setup</h2>
 
-//               <div className="form-group">
-//                 <label>Email</label>
-//                 <div className="input-wrapper">
-//                   <textarea
-//                     value={emailContent}
-//                     onChange={(e) => setEmailContent(e.target.value)}
-//                     onBlur={() => markTouched("emailContent")}
-//                     placeholder="Write your email content here..."
-//                     className={getError("emailContent", emailContent) ? "error" : ""}
-//                   />
-//                   <button className="ai-suggest">✨ AI Suggest</button>
-//                 </div>
-//                 {getError("emailContent", emailContent) && <span className="error-text">Required</span>}
-//               </div>
-//             </div>
+    {/* ===== SELECT AUDIENCE ===== */}
+    <div className={`section-card ${submitted && !audience ? "error" : ""}`}>
+      <h3>Select Audience</h3>
+      <p className="section-subtitle">
+        Choose which audience list to send this email to
+      </p>
 
-//             <div className="modal-actions">
-//               <button className="cancel-btn" onClick={onClose}>Cancel</button>
-//               <button className="primary-btn" onClick={handleNext} disabled={!isStep2Valid}>
-//                 Next
-//               </button>
-//             </div>
-//           </div>
-//         )}
+      <div className={`form-group ${submitted && !audience ? "error" : ""}`}>
+        <label>Audience List *</label>
+        <select
+          value={audience}
+          onChange={(e) => setAudience(e.target.value)}
+        >
+          <option value="">Select Audience List</option>
+          <option value="all">All Subscribers</option>
+          <option value="active">Active Users</option>
+        </select>
+      </div>
+    </div>
 
-//         {/* Step 3: Schedule Email */}
-//         {step === 3 && (
-//           <div className="step-content">
-//             <h3>Schedule Email</h3>
+    {/* ===== EMAIL CONTENT ===== */}
+    <div className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}>
 
-//             <div className="form-group">
-//               <label>Schedule</label>
-//               <p className="helper-text">Select a date range and time for when to send your email campaign</p>
+      {/* HEADER ROW */}
+      <div className="email-content-header">
+        <div>
+          <h3>Email Content</h3>
+          <p className="section-subtitle">
+            Design your email with AI assistance
+          </p>
+        </div>
 
-//               <div className="schedule-container">
-//                 <div className="date-range">
-//                   <input
-//                     type="date"
-//                     value={startDate}
-//                     onChange={(e) => setStartDate(e.target.value)}
-//                     onBlur={() => markTouched("startDate")}
-//                     className={getError("startDate", startDate) || getDateError() ? "error" : ""}
-//                     placeholder="Start Date"
-//                   />
-//                   {getError("startDate", startDate) && <span className="error-text">Required</span>}
-//                   <span>to</span>
-//                   <input
-//                     type="date"
-//                     value={endDate}
-//                     onChange={(e) => setEndDate(e.target.value)}
-//                     onBlur={() => markTouched("endDate")}
-//                     className={getError("endDate", endDate) || getDateError() ? "error" : ""}
+        <div className="email-actions">
+          <button className="outline-btn">
+            <img src={viewIcon} alt="View" width={20} height={20} />
+            Preview Email
+          </button>
 
+          <button className="light-btn">
+            + Email Template
+          </button>
+        </div>
+      </div>
 
-//                     placeholder="End Date"
-//                   />
-//                   {getError("endDate", endDate) && <span className="error-text">Required</span>}
-//                   {getDateError() && <span className="error-text">{getDateError()}</span>}
-//                 </div>
+      {/* SUBJECT */}
+      <div className={`form-group ${submitted && !subject ? "error" : ""}`}>
+        <label>Subject Line *</label>
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="New Product Launch"
+        />
+        <span className="ai-suggest">✨ AI Suggest</span>
+      </div>
 
-//                 <div className="time-picker">
-//                   <input type="time" defaultValue="12:30" />
-//                   <button className="ai-suggest">✨ AI-Optimization Timing</button>
-//                 </div>
-//               </div>
-//             </div>
+      {/* EMAIL BODY */}
+      <div className={`form-group ${submitted && !emailBody ? "error" : ""}`}>
+        <label>Email *</label>
+        <textarea
+          value={emailBody}
+          onChange={(e) => setEmailBody(e.target.value)}
+          placeholder="New Product Launch"
+        />
+        <span className="ai-suggest">✨ AI Suggest</span>
+      </div>
+    </div>
 
-//             <div className="modal-actions">
-//               <button className="cancel-btn" onClick={onClose}>Cancel</button>
-//               <button 
-//                 className="draft-btn" 
-//                 onClick={() => handleSave("Draft")}
-//                 disabled={isSaving}
-//               >
-//                 {isSaving ? "Saving..." : "Save as Draft"}
-//               </button>
-//               <button
-//                 className="primary-btn"
-//                 onClick={() => handleSave("Schedule")}
-//                 disabled={isSaving || !isStep3Valid}
-//               >
-//                 {isSaving ? "Scheduling..." : "Schedule"}
-//               </button>
-//             </div>
-//           </div>
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
+  </div>
+)}
+
+        {/* ================= STEP 3 ================= */}
+        {step === 3 && (
+          <div className="step-content">
+            <h2>Schedule Email</h2>
+            <div className="schedule-card">
+              <div className="schedule-header">
+                <div className="schedule-title">
+                  <h3>Schedule</h3>
+                  <p>Select date and time to send the email</p>
+                </div>
+
+                <button className="ai-opt-btn">
+                  ✨ AI-Optimization Timing
+                </button>
+              </div>
+
+              <div className="schedule-row">
+                <div className={`schedule-field ${submitted && !scheduleDate ? "error" : ""}`}>
+                  <label>Select Date</label>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      format="DD/MM/YYYY"
+                      value={scheduleDate ? dayjs(scheduleDate) : null}
+                      onChange={(v) =>
+                        setScheduleDate(v ? v.format("YYYY-MM-DD") : "")
+                      }
+                      slots={{ openPickerIcon: CalendarTodayIcon }}
+                    />
+                  </LocalizationProvider>
+                </div>
+
+                <div className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}>
+                  <label>Enter Time</label>
+                  <input
+                    className="schedule-input"
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= FOOTER ================= */}
+        <div className="modal-actions">
+          <button className="cancel-btn" onClick={onClose}>
+            Cancel
+          </button>
+
+          {step === 3 ? (
+            <>
+              <button
+                className="next-btn"
+                style={{ background: "#E5E7EB", color: "#111" }}
+                onClick={() => handleSave("Draft")}
+              >
+                Save as Draft
+              </button>
+              <button
+                className="next-btn"
+                onClick={() => handleSave("Scheduled")}
+              >
+                Schedule
+              </button>
+            </>
+          ) : (
+            <button className="next-btn" onClick={handleNext}>
+              Next
+            </button>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}

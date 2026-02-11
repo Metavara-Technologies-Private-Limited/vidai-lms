@@ -13,7 +13,8 @@ body {
 
 /* ================= HEADER SECTION ================= */
 .cd-header-section {
-  width: 1380px;
+   width: 100%;
+  max-width: 1380px;
   min-height: 209px;
   background: #ffffff;
   border-radius: 16px;
@@ -25,7 +26,6 @@ body {
 
 /* ================= BACK BUTTON ================= */
 .cd-back-btn {
-  box-sizing: border-box;
   width: 24px;
   height: 24px;
   padding: 4px;
@@ -39,7 +39,7 @@ body {
   cursor: pointer;
 }
 
-/* ================= BACK ARROW VECTOR ================= */
+/* ================= BACK ARROW ================= */
 .cd-arrow {
   position: relative;
   width: 10.67px;
@@ -71,7 +71,7 @@ body {
 
 /* ================= HEADER CARD ================= */
 .cd-header-card {
-  width: 1250px;
+  width: 100%;
   min-height: 143px;
   background: #ffffff;
   border-radius: 12px;
@@ -79,7 +79,6 @@ body {
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.04);
 }
 
-/* ================= TITLE ================= */
 .cd-header-left {
   display: flex;
   align-items: center;
@@ -145,7 +144,6 @@ body {
   gap: 6px;
 }
 
-/* ================= PLATFORM ================= */
 .cd-platform-icons {
   display: flex;
   gap: 8px;
@@ -156,31 +154,7 @@ body {
   height: 20px;
 }
 
-/* ================= AVATAR ================= */
-.avatar {
-  width: 20px;
-  height: 20px;
-  background: #d9d9d9;
-  border-radius: 6px;
-}
-
-/* ================= PAID ================= */
-.cd-paid {
-  padding: 4px 12px;
-  border-radius: 100px;
-  border: 1px solid #5a8aea;
-  background: #eff4fd;
-  color: #5a8aea;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.green {
-  color: #47b35f;
-  font-weight: 700;
-}
-
-/* ================= METRICS ROW ================= */
+/* ================= METRICS ================= */
 .cd-metrics-row {
   width: 100%;
   height: 128px;
@@ -190,7 +164,6 @@ body {
   margin-top: 12px;
 }
 
-/* ================= METRIC CARD ================= */
 .cd-metric-card {
   height: 128px;
   border-radius: 16px;
@@ -202,41 +175,24 @@ body {
   justify-content: space-between;
 }
 
-/* ================= METRIC ICON (FIGMA EXACT) ================= */
 .cd-metric-icon {
   width: 44px;
   height: 44px;
   padding: 10px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   border-radius: 12px;
-
-  /* Background */
-  background: rgba(255, 255, 255, 0.8);
-
-  /* Border */
+  background: rgba(255,255,255,0.8);
   border: 1px solid #ffffff;
-
-  /* Shadows (Inner + Drop) */
   box-shadow:
-    inset 0px -2px 4px rgba(255, 255, 255, 0.4), /* inner shadow */
-    0px 8px 10px rgba(0, 0, 0, 0.04);             /* drop shadow */
+    inset 0px -2px 4px rgba(255,255,255,0.4),
+    0px 8px 10px rgba(0,0,0,0.04);
 }
 
 .cd-metric-icon img {
   width: 24px;
   height: 24px;
-  object-fit: contain;
-}
-
-/* ================= METRIC TEXT ================= */
-.cd-metric-text {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .cd-metric-label {
@@ -250,20 +206,16 @@ body {
   color: #232323;
 }
 
-/* ================= TABS CONTAINER (5th LEVEL) ================= */
+/* ================= TABS ================= */
 .cd-tabs-container {
   display: flex;
-  align-items: center;
-   margin-top: 16px; 
-
-  width: 480px;
+  margin-top: 16px;
+  width: 500px;
   height: 44px;
-
   padding: 4px 5.5px;
   gap: 4px;
-
-  background: rgba(226, 227, 229, 0.16);
-  border: 1px solid rgba(226, 227, 229, 0.2);
+  background: rgba(226,227,229,0.16);
+  border: 1px solid rgba(226,227,229,0.2);
   border-radius: 12px;
 }
 
@@ -274,10 +226,7 @@ body {
   background: transparent;
   border: none;
   font-size: 14px;
-  font-weight: 500;
-  color: #232323;
   cursor: pointer;
-  white-space: nowrap;
 }
 
 .cd-tab-active {
@@ -285,108 +234,29 @@ body {
   border-radius: 10px;
   font-weight: 700;
   color: #ff6b35;
-  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.10);
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
 }
 
-.cd-tab:hover {
-  background: rgba(255, 255, 255, 0.6);
-}
-/* ================= SUB TABS CONTAINER ================= */
+/* ================= SUB TABS ================= */
 .cd-subtabs-container {
   display: flex;
-  align-items: center;
   gap: 8px;
+  margin-top: 10px;
+}
 
-  margin-top: 10px; /* gap from main tabs */
-}  
-/* ================= SUB TAB (UNSELECTED) ================= */
 .cd-subtab {
   height: 33px;
-
   padding: 8px 16px;
   border-radius: 31px;
-
   background: #ffffff;
-  border: 1px solid rgba(226, 227, 229, 0.6);
-
+  border: 1px solid rgba(226,227,229,0.6);
   font-size: 14px;
-  font-weight: 500;
-  color: #9e9e9e;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
   cursor: pointer;
-  white-space: nowrap;
+  color: #9e9e9e;
 }
- /* ================= SUB TAB (ACTIVE) ================= */
-.cd-subtab-active {
-  background: rgba(255, 107, 53, 0.1);
-  border: 1px;
 
+.cd-subtab-active {
+  background: rgba(255,107,53,0.1);
   color: #ff6b35;
   font-weight: 600;
-} 
-
-/* ================= CONTENT CARD ================= */
-.cd-content-card {
-  width: 100%;
-  min-height: 424px;
-
-  display: flex;
-  gap: 48px;
-
-  padding: 20px;
-  margin-top: 16px;
-
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid #f1f1f1;
-}
-/* ================= CONTENT TEXT ================= */
-.cd-content-text {
-  flex: 1;
-  max-width: 700px;
-
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  font-size: 14px;
-  line-height: 1.6;
-  color: #4a4a4a;
-}
-
-.cd-content-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #232323;
-}
-
-.cd-content-tags {
-  font-weight: 500;
-  color: #232323;
-}
-/* ================= CONTENT IMAGE ================= */
-.cd-content-image {
-  width: 300px;
-  height: 350px;
-
-  border-radius: 16px;
-  border: 1px solid #f1f1f1;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  background: #ffffff;
-}
-
-.cd-content-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  
-  border-radius: 16px;
 }
