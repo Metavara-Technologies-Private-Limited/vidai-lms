@@ -122,27 +122,27 @@ export default function AddNewLead() {
   const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
 
   const [form, setForm] = React.useState<FormState>({
-    fullName: "John Smith",
-    contact: "+91 54211 54121",
-    email: "johns@gmail.com",
-    location: "California",
-    gender: "Male",
-    age: "32",
-    marital: "Married",
-    address: "California",
-    language: "English",
+    fullName: "",
+    contact: "",
+    email: "",
+    location: "",
+    gender: "",
+    age: "",
+    marital: "",
+    address: "",
+    language: "",
 
-    partnerName: "Jennifer Smith",
-    partnerAge: "29",
-    partnerGender: "Female",
+    partnerName: "",
+    partnerAge: "",
+    partnerGender: "",
 
-    source: "Social Media",
-    subSource: "Facebook",
-    campaign: "Facebook IVF Awareness – December",
+    source: "",
+    subSource: "",
+    campaign: "",
 
-    assignee: "Henry Cavill",
-    nextType: "Follow Up",
-    nextStatus: "To Do",
+    assignee: "",
+    nextType: "",
+    nextStatus: "",
     nextDesc: "",
 
     treatmentInterest: "",
@@ -150,10 +150,10 @@ export default function AddNewLead() {
     documents: null,
 
     wantAppointment: "yes",
-    department: "Consultation",
-    personnel: "Dr. Alex Carrey",
-    appointmentDate: "2024-12-09",
-    slot: "12:30 PM - 01:00 PM",
+    department: "",
+    personnel: "",
+    appointmentDate: "",
+    slot: "",
     remark: "",
   });
 
