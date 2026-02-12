@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { v4 as uuid } from "uuid";
 import "../../../../src/styles/Campaign/SocialCampaignModal.css";
+import { CampaignAPI } from "../../../../src/services/campaign.api";
+
 
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -45,6 +47,8 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
         : [...prev, id]
     );
   };
+const [scheduleDate, setScheduleDate] = useState("");
+const [scheduleTime, setScheduleTime] = useState("");
 
   /* ================= NAVIGATION ================= */
   const handleNext = () => {
@@ -59,24 +63,77 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     }
   };
 
-  const handleSaveAndPost = () => {
+  // const handleSaveAndPost = () => {
+  // setSubmitted(true);
+  // if (!step1Valid || !step2Valid) return;
+
+  const handleSaveAndPost = async () => {
   setSubmitted(true);
-  if (!step1Valid || !step2Valid) return;
 
-  const newCampaign = {
-    id: uuid(),
-    name: campaignName,
-    type: "social",
-    status: "Live",
-    start: startDate,
-    end: endDate,
-    platforms: accounts, // facebook / instagram / linkedin
-    leads: 0,
-    scheduledAt: undefined,
-  };
+  if (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime)
+    return;
 
-  onSave(newCampaign);
+  try {
+    const scheduledDateTime = dayjs(
+      `${scheduleDate} ${scheduleTime}`,
+      "YYYY-MM-DD HH:mm"
+    ).format("YYYY-MM-DDTHH:mm:ss");
+
+    const payload = {
+      clinic: 1, // replace dynamically if needed
+
+      campaign_name: campaignName,
+      campaign_description: "",
+      campaign_objective: objective,
+      target_audience: audience,
+
+      start_date: startDate,
+      end_date: endDate,
+
+      campaign_mode: 1, // 🔥 1 = SOCIAL
+
+      selected_start: scheduledDateTime,
+      selected_end: scheduledDateTime,
+      enter_time: scheduleTime,
+
+      social_media: accounts.map((platform) => ({
+        platform_name: platform, // instagram | facebook | linkedin
+        is_active: true,
+      })),
+    };
+
+    const response = await CampaignAPI.create(payload);
+
+    const apiData = response.data;
+
+    // 🔥 MAP BACKEND → UI MODEL
+    const formattedCampaign = {
+      id: apiData.id,
+      name: apiData.campaign_name,
+      type: "social",
+      status: apiData.is_active ? "Live" : "Draft",
+      start: apiData.start_date,
+      end: apiData.end_date,
+      platforms: accounts,
+      leads: 0,
+      scheduledAt: apiData.selected_start,
+    };
+
+    onSave(formattedCampaign);
+    onClose();
+
+  } catch (error: any) {
+    console.error(error.response?.data || error.message);
+  }
 };
+
+const [instagramBudget, setInstagramBudget] = useState(350);
+const [facebookBudget, setFacebookBudget] = useState(250);
+const [linkedinBudget, setLinkedinBudget] = useState(150);
+
+const totalBudget =
+  instagramBudget + facebookBudget + linkedinBudget;
+
 
   return (
     <div className="campaign-modal-overlay">
@@ -305,15 +362,112 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
           <label>Select Date Range</label>
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
-              format="DD/MM/YYYY"
-              slots={{ openPickerIcon: CalendarTodayIcon }}
-            />
+  format="DD/MM/YYYY"
+  value={scheduleDate ? dayjs(scheduleDate) : null}
+  onChange={(v) =>
+    setScheduleDate(v ? v.format("YYYY-MM-DD") : "")
+  }
+  slots={{ openPickerIcon: CalendarTodayIcon }}
+/>
+
           </LocalizationProvider>
         </div>
 
         <div className="form-group half">
           <label>Enter Time</label>
-          <input type="time" />
+          <input
+  type="time"
+  value={scheduleTime}
+  onChange={(e) => setScheduleTime(e.target.value)}
+/>
+
+        </div>
+      </div>
+            {/* 🔥 THIN DIVIDER */}
+      <div className="budget-divider" />
+
+      {/* ===== BUDGET SECTION ===== */}
+      <div className="budget-section">
+        <h3>Budget Allocation</h3>
+
+        <div className="budget-row">
+
+          {/* Instagram */}
+          <div className="budget-card">
+            <div className="budget-title">
+              <img src={instagramIcon} alt="Instagram" />
+              <span>Instagram (Estimate CPC : $3.5)</span>
+            </div>
+
+            <div className="budget-input-wrapper">
+              <label>Enter Amount ($)</label>
+              <input
+                type="number"
+                min="0"
+                step="10"
+                value={instagramBudget}
+                onChange={(e) =>
+                  setInstagramBudget(Number(e.target.value))
+                }
+                className="budget-input"
+              />
+            </div>
+          </div>
+
+          {/* Facebook */}
+          <div className="budget-card">
+            <div className="budget-title">
+              <img src={facebookIcon} alt="Facebook" />
+              <span>Facebook (Estimate CPC : $2.5)</span>
+            </div>
+
+            <div className="budget-input-wrapper">
+              <label>Enter Amount ($)</label>
+              <input
+                type="number"
+                min="0"
+                step="10"
+                value={facebookBudget}
+                onChange={(e) =>
+                  setFacebookBudget(Number(e.target.value))
+                }
+                className="budget-input"
+              />
+            </div>
+          </div>
+
+          {/* LinkedIn */}
+          <div className="budget-card">
+            <div className="budget-title">
+              <img src={linkedinIcon} alt="LinkedIn" />
+              <span>LinkedIn (Estimate CPC : $1.5)</span>
+            </div>
+
+            <div className="budget-input-wrapper">
+              <label>Enter Amount ($)</label>
+              <input
+                type="number"
+                min="0"
+                step="10"
+                value={linkedinBudget}
+                onChange={(e) =>
+                  setLinkedinBudget(Number(e.target.value))
+                }
+                className="budget-input"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* TOTAL */}
+        <div className="total-budget">
+          <div>
+            <h4>Total Budget : ${totalBudget}</h4>
+            <p>
+              Ad spend is charged directly by each connected
+              social media platform. We don’t handle payments.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -339,4 +493,4 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       </div>     
     </div>
   );
-}
+}  

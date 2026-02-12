@@ -45,7 +45,7 @@ body {
 
   font-family: "Montserrat", sans-serif;
   font-size: 14px;
-  
+
   font-weight: 500;
   color: #9e9e9e;
 
@@ -107,6 +107,7 @@ body {
   border: none;
   outline: none;
   font-size: 14px;
+  font-family: "Montserrat", sans-serif;
   width: 200px;
   background: transparent;
 }
@@ -123,13 +124,14 @@ body {
 /* ===== WRAPPER ===== */
 .status-dropdown {
   position: relative;
-  width: 180px;
+  width: 140px;
 }
 
 /* ===== BUTTON (CLOSED STATE) ===== */
 .status-btn {
+  position: relative;
   height: 40px;
-  padding: 0 36px 0 14px;
+  padding: 0 18px 0 14px;
 
   display: flex;
   align-items: center;
@@ -155,20 +157,25 @@ body {
 
 /* Active / Open */
 .status-btn.active {
-  border-color: #ff6b35;
-  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.15);
+  border-color:grey;
+  /* box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.15); */
 }
 
 /* Dropdown Arrow */
 .status-btn::after {
   content: "";
+  position: absolute;
+  right: 12px;   /* ⬅ move to right corner */
+  top: 50%;
+  transform: translateY(-50%);
+
   width: 12px;
   height: 8px;
-  margin-left: 8px;
 
   background: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")
     no-repeat center;
 }
+
 
 /* ===== DROPDOWN MENU ===== */
 .status-menu {
@@ -183,7 +190,7 @@ body {
   border: 1px solid #f1f1f1;
   border-radius: 12px;
 
-  box-shadow: 0px 12px 24px rgba(0, 0, 0, 0.08);
+  /* box-shadow: 0px 12px 24px rgba(0, 0, 0, 0.08); */
   z-index: 100;
 }
 
@@ -209,7 +216,7 @@ body {
 
 /* Selected */
 .status-item.selected {
-  background: rgba(255, 107, 53, 0.1);
+  background:white;
   font-weight: 600;
 }
 
