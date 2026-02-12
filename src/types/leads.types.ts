@@ -49,3 +49,42 @@ export type LeadActivity = {
 
   taskStatus: TaskStatus;
 };
+
+/*=====================Add New Lead=====================*/
+export type FormState = {
+  fullName: string;
+  contact: string;
+  email: string;
+  location: string;
+  gender: string;
+  age: string;
+  marital: string;
+  address: string;
+  language: string;
+
+  partnerName: string;
+  partnerAge: string;
+  partnerGender: string;
+
+  source: string;
+  subSource: string;
+  campaign: string;
+
+  assignee: string;
+  nextType: string;
+  nextStatus: string;
+  nextDesc: string;
+
+  treatmentInterest: string;
+  treatments: string[];
+  documents: File | null;
+
+  wantAppointment: "yes" | "no";
+  department: string;
+  personnel: string;
+  appointmentDate: string;
+  slot: string;
+  remark: string;
+};
+
+export const steps = ["Patient Details", "Medical Details", "Book Appointment"];
