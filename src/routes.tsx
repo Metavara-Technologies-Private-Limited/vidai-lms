@@ -4,12 +4,11 @@ import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 
 import Integration from "./components/Settings/Menus/Integration";
-
-
 import Tickets from "./components/Settings/Menus/Tickets";
 import TicketView from "./components/Settings/Menus/TicketView";
 
 import AddNewLead from "./components/LeadsHub/AddNewLead";
+import EditLead from "./components/LeadsHub/EditLead";
 import LeadView from "./components/LeadsHub/LeadView";
 import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
 
@@ -48,8 +47,7 @@ export default function AppRoutes() {
           }
         />
 
-<Route path="/settings/tickets/:id" element={<TicketView />} />
-
+        <Route path="/settings/tickets/:id" element={<TicketView />} />
 
         {/* sidebar routes */}
         {SIDEBAR_TABS.flatMap((tab) =>
@@ -72,6 +70,16 @@ export default function AppRoutes() {
           element={
             <Suspense fallback={<div>Loading...</div>}>
               <AddNewLead />
+            </Suspense>
+          }
+        />
+
+        {/* 🔥 Edit Lead Page */}
+        <Route
+          path="leads/edit/:id"
+          element={
+            <Suspense fallback={<div>Loading...</div>}>
+              <EditLead />
             </Suspense>
           }
         />
