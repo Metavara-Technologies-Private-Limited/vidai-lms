@@ -15,11 +15,6 @@ import {
   InputAdornment,
   Dialog,
   DialogContent,
-  DialogActions,
-  MenuItem,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -33,7 +28,9 @@ import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import SendIcon from "@mui/icons-material/Send";
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import CloseIcon from '@mui/icons-material/Close';
+
+// Import BOTH CallButton AND Dialogs from LeadsMenuDialogs
+import { CallButton, Dialogs } from "./LeadsMenuDialogs";
 
 type Lead = {
   id: string;
@@ -58,42 +55,27 @@ export default function LeadDetailView() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState("Patient Info");
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
-  const [openEditPopup, setOpenEditPopup] = React.useState(false);
-  const [activeStep, setActiveStep] = React.useState(1); // New state for dialog steps
+  const [historyView, setHistoryView] = React.useState<"chatbot" | "call" | "email">("chatbot");
 
   const leads: Lead[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
   const lead = leads.find(
     (l) => l.id.replace("#", "") === decodeURIComponent(id || "")
   );
 
-  // Form State
-  const [formData, setFormData] = React.useState({
-    name: lead?.name || "John Smith",
-    phone: lead?.phone || "+91 54211 54121",
-    email: lead?.email || "johns@gmail.com",
-    location: lead?.location || "201, HM Streets, LA Jolla, California",
-    gender: "Male",
-    age: "32",
-    maritalStatus: "Married",
-    isCouple: "Yes",
-    partnerName: "Jennifer Smith",
-    partnerAge: "29",
-    partnerGender: "Female",
-  });
-
   if (!lead) return <Typography p={4}>Lead not found</Typography>;
 
   const handleOpenPopup = () => setOpenConvertPopup(true);
   const handleClosePopup = () => setOpenConvertPopup(false);
 
-  const handleNext = () => {
-    if (activeStep < 3) setActiveStep(activeStep + 1);
-    else setOpenEditPopup(false);
+  // Helper function to clean lead ID for URL
+  const getCleanLeadId = (leadId: string) => {
+    return leadId.replace("#", "").replace("LN-", "").replace("LD-", "");
   };
 
-  const handleBack = () => {
-    if (activeStep > 1) setActiveStep(activeStep - 1);
-    else setOpenEditPopup(false);
+  const handleEdit = () => {
+    navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, {
+      state: { lead },
+    });
   };
 
   return (
@@ -174,7 +156,7 @@ export default function LeadDetailView() {
           <Button 
             variant="outlined" 
             startIcon={<EditOutlinedIcon />} 
-            onClick={() => { setOpenEditPopup(true); setActiveStep(1); }}
+            onClick={handleEdit}
             sx={{ borderRadius: '8px', textTransform: 'none', color: 'text.primary', borderColor: '#E2E8F0' }}
           >
             Edit
@@ -276,29 +258,180 @@ export default function LeadDetailView() {
           <Card sx={{ flex: 1, p: 3, borderRadius: "16px" }}>
             <Typography variant="subtitle1" fontWeight={700} mb={3}>Activity Timeline</Typography>
             <Stack spacing={0}>
-              <TimelineItem icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: '#6366F1' }} />} title="Appointment Booked - Confirmation sent (SMS)" time="20/12/2024 | 12:49 PM" />
-              <TimelineItem icon={<CallOutlinedIcon sx={{ fontSize: 16, color: '#10B981' }} />} title="Outgoing call attempted - Connected" time="11/12/2024 | 04:10 PM" />
-              <TimelineItem icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: '#F59E0B' }} />} title="Patient shared contact number and email" time="11/12/2024 | 12:59 PM" />
-              <TimelineItem icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: '#3B82F6' }} />} title="Sent an Welcome Email" time="11/12/2024 | 12:57 PM" />
-              <TimelineItem isAvatar avatarInitial={lead.assigned.charAt(0)} title={`Assigned to ${lead.assigned}`} time="11/12/2024 | 12:56 PM" />
-              <TimelineItem icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: '#8B5CF6' }} />} title="Lead arrived from Website Chatbot" time="11/12/2024 | 12:56 PM" isLast />
+              <TimelineItem 
+                icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: '#6366F1' }} />} 
+                title="Appointment Booked - Confirmation sent (SMS)" 
+                time="20/12/2024 | 12:49 PM" 
+              />
+              <TimelineItem 
+                icon={<CallOutlinedIcon sx={{ fontSize: 16, color: '#10B981' }} />} 
+                title="Outgoing call attempted - Connected" 
+                time="11/12/2024 | 04:10 PM"
+                onClick={() => setHistoryView("call")}
+                isClickable
+              />
+              <TimelineItem 
+                icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: '#F59E0B' }} />} 
+                title="Patient shared contact number and email" 
+                time="11/12/2024 | 12:59 PM"
+                onClick={() => setHistoryView("email")}
+                isClickable
+              />
+              <TimelineItem 
+                icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: '#3B82F6' }} />} 
+                title="Sent an Welcome Email" 
+                time="11/12/2024 | 12:57 PM"
+                onClick={() => setHistoryView("email")}
+                isClickable
+              />
+              <TimelineItem 
+                isAvatar 
+                avatarInitial={lead.assigned.charAt(0)} 
+                title={`Assigned to ${lead.assigned}`} 
+                time="11/12/2024 | 12:56 PM" 
+              />
+              <TimelineItem 
+                icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: '#8B5CF6' }} />} 
+                title="Lead arrived from Website Chatbot" 
+                time="11/12/2024 | 12:56 PM" 
+                onClick={() => setHistoryView("chatbot")}
+                isClickable
+                isLast 
+              />
             </Stack>
           </Card>
+          
+          {/* Right Panel - Dynamic Content Based on historyView */}
           <Card sx={{ flex: 2, borderRadius: "16px", display: 'flex', flexDirection: 'column', maxHeight: '600px' }}>
-            <Box p={2} borderBottom="1px solid #E2E8F0"><Typography variant="subtitle1" fontWeight={700}>Chatbot</Typography></Box>
-            <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#F8FAFC' }}>
-              <Stack spacing={3}>
-                <Typography variant="caption" align="center" color="text.secondary" display="block">SUN, 14 DEC</Typography>
-                <ChatBubble side="left" text="Hello! How can I help you today?" time="9:41 AM" />
-                <ChatBubble side="right" text="I'm looking for a general health check-up" time="9:42 AM" />
-                <ChatBubble side="left" text="Great! I can help you schedule that." time="9:43 AM" />
-                <ChatBubble side="right" text="Sometime this week, preferably in the morning" time="9:44 AM" />
-                <ChatBubble side="right" text={`My name is ${lead.name}, and my number is ${lead.phone || '(555) 555-0128'}`} time="9:46 AM" />
-              </Stack>
-            </Box>
-            <Box p={2} borderTop="1px solid #E2E8F0">
-              <TextField fullWidth placeholder="Type your message..." size="small" InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton color="primary"><SendIcon sx={{ fontSize: 18 }} /></IconButton></InputAdornment>) }} />
-            </Box>
+            {historyView === "chatbot" && (
+              <>
+                <Box p={2} borderBottom="1px solid #E2E8F0"><Typography variant="subtitle1" fontWeight={700}>Chatbot</Typography></Box>
+                <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#F8FAFC' }}>
+                  <Stack spacing={3}>
+                    <Typography variant="caption" align="center" color="text.secondary" display="block">SUN, 14 DEC</Typography>
+                    <ChatBubble side="left" text="Hello! How can I help you today?" time="9:41 AM" />
+                    <ChatBubble side="right" text="I'm looking for a general health check-up" time="9:42 AM" />
+                    <ChatBubble side="left" text="Great! I can help you schedule that." time="9:43 AM" />
+                    <ChatBubble side="right" text="Sometime this week, preferably in the morning" time="9:44 AM" />
+                    <ChatBubble side="right" text={`My name is ${lead.name}, and my number is ${lead.phone || '(555) 555-0128'}`} time="9:46 AM" />
+                  </Stack>
+                </Box>
+                <Box p={2} borderTop="1px solid #E2E8F0">
+                  <TextField fullWidth placeholder="Type your message..." size="small" InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton color="primary"><SendIcon sx={{ fontSize: 18 }} /></IconButton></InputAdornment>) }} />
+                </Box>
+              </>
+            )}
+            
+            {historyView === "call" && (
+              <>
+                <Box p={2} borderBottom="1px solid #E2E8F0">
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle1" fontWeight={700}>Call Transcript</Typography>
+                    <CallButton lead={lead} />
+                  </Stack>
+                </Box>
+                <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#F8FAFC' }}>
+                  <Stack spacing={3}>
+                    <Typography variant="caption" align="center" color="text.secondary" display="block">CALL - DEC 11, 2024</Typography>
+                    <CallMessage speaker="Mike" time="0:03" text="Good morning! You've reached Bloom Fertility Center. This is Mike. How can I help you today?" />
+                    <CallMessage speaker="John" time="0:15" text="Hi Mike, I'm calling to get some information about IVF. My wife and I are considering starting treatment." />
+                    <CallMessage speaker="Mike" time="0:25" text="Of course, John. I'd be happy to guide you. May I know your wife's age and how long you both have been trying to conceive?" />
+                    <CallMessage speaker="John" time="0:32" text="She's 32, and we've been trying for about four years now." />
+                    <CallMessage speaker="Mike" time="0:35" text="Thank you. Have you undergone any treatments earlier, like IUI or IVF?" />
+                    <CallMessage speaker="John" time="0:39" text="We tried two IVIs this year, but they weren't successful. No IVF yet." />
+                    <CallMessage speaker="Mike" time="0:46" text="Thank you. Have AMH or ultrasound tests been done for your wife?" />
+                    <CallMessage speaker="John" time="1:03" text="Yes, that would be great. Preferably sometime this week in the morning." />
+                  </Stack>
+                </Box>
+              </>
+            )}
+            
+            {historyView === "email" && (
+              <>
+                <Box p={2} borderBottom="1px solid #E2E8F0">
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle1" fontWeight={700}>Email History</Typography>
+                    <IconButton 
+                      onClick={() => window.location.href = `mailto:${lead.email || 'johnson@gmail.com'}`}
+                      sx={{ 
+                        bgcolor: '#EFF6FF',
+                        '&:hover': { bgcolor: '#DBEAFE' }
+                      }}
+                    >
+                      <EmailOutlinedIcon sx={{ color: '#3B82F6' }} />
+                    </IconButton>
+                  </Stack>
+                </Box>
+                <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#F8FAFC' }}>
+                  <Stack spacing={3}>
+                    {/* Email from John Smith */}
+                    <Card sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                      <Stack direction="row" justifyContent="space-between" mb={2}>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar sx={{ width: 40, height: 40, bgcolor: '#EEF2FF', color: '#6366F1' }}>JS</Avatar>
+                          <Box>
+                            <Typography variant="body2" fontWeight={700}>John Smith</Typography>
+                            <Typography variant="caption" color="text.secondary">johnsa@gmail.com</Typography>
+                          </Box>
+                        </Stack>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography variant="caption" color="text.secondary">Fri, Nov 12, 6:25 PM</Typography>
+                          <IconButton size="small"><ShortcutIcon sx={{ fontSize: 16 }} /></IconButton>
+                        </Stack>
+                      </Stack>
+                      <Typography variant="body2" color="text.primary" mb={1}>Hello,</Typography>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        I came across Crysta IVF while searching online and would like to know more about fertility check-up consultations.
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        Could you please let me know the consultation process and available appointment slots this week?
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={2}>
+                        Looking forward to your response.
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">Regards,</Typography>
+                      <Typography variant="body2" color="text.secondary">John Smith</Typography>
+                      <Typography variant="body2" color="text.secondary">(555) 555-0128</Typography>
+                    </Card>
+                    
+                    {/* Email from Crysta Clinic */}
+                    <Card sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                      <Stack direction="row" justifyContent="space-between" mb={2}>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar sx={{ width: 40, height: 40, bgcolor: '#FEF2F2', color: '#EF4444' }}>CC</Avatar>
+                          <Box>
+                            <Typography variant="body2" fontWeight={700}>Crysta Clinic</Typography>
+                            <Typography variant="caption" color="text.secondary">team@crystaivf.com</Typography>
+                          </Box>
+                        </Stack>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography variant="caption" color="text.secondary">Fri, Nov 12, 6:35 PM</Typography>
+                          <IconButton size="small"><ShortcutIcon sx={{ fontSize: 16 }} /></IconButton>
+                        </Stack>
+                      </Stack>
+                      <Typography variant="body2" color="text.primary" mb={1}>Hello John,</Typography>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        Thank you for reaching out to Crysta IVF.
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        Our fertility consultation includes an initial discussion with our specialist, followed by basic investigations if required. The consultation typically lasts 30-45 minutes.
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        We currently have availability this week on:
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={0.5}>• Wednesday – 10:30 AM</Typography>
+                      <Typography variant="body2" color="text.secondary" mb={0.5}>• Thursday – 2:00 PM</Typography>
+                      <Typography variant="body2" color="text.secondary" mb={2}>• Friday – 11:00 AM</Typography>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        Please let us know your preferred slot, and we'll be happy to assist with the booking.
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">Best regards,</Typography>
+                      <Typography variant="body2" color="text.secondary">Crysta IVF Team</Typography>
+                    </Card>
+                  </Stack>
+                </Box>
+              </>
+            )}
           </Card>
         </Stack>
       )}
@@ -328,7 +461,7 @@ export default function LeadDetailView() {
                       <Typography variant="body2" mb={2}>Call patient to confirm preferred consultation time.</Typography>
                       <Stack direction="row" spacing={1}>
                         <Button variant="outlined" size="small" sx={{ textTransform: 'none', borderRadius: '6px', borderColor: '#E2E8F0' }}>Mark Done</Button>
-                        <Button variant="contained" size="small" startIcon={<CallOutlinedIcon sx={{ fontSize: 14 }}/>} sx={{ textTransform: 'none', borderRadius: '6px', bgcolor: '#1E293B' }}>Call Now</Button>
+                        <CallButton lead={lead} />
                       </Stack>
                    </Box>
                 </Stack>
@@ -343,220 +476,6 @@ export default function LeadDetailView() {
           </Box>
         </Stack>
       )}
-
-      {/* --- SCROLLABLE EDIT DIALOG --- */}
-      <Dialog 
-        open={openEditPopup} 
-        onClose={() => setOpenEditPopup(false)}
-        maxWidth="xl" 
-        fullWidth
-        PaperProps={{ sx: { borderRadius: '24px' } }}
-      >
-        <Box p={3}>
-          {/* Header */}
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-            <Typography variant="h6" fontWeight={700}>
-              Edit Lead Details <Typography component="span" variant="h6" color="text.secondary" fontWeight={400}>(#LN 201)</Typography>
-            </Typography>
-            <IconButton onClick={() => setOpenEditPopup(false)} size="small" sx={{ bgcolor: '#F1F5F9' }}>
-              <CloseIcon sx={{ fontSize: 20 }} />
-            </IconButton>
-          </Stack>
-
-          {/* Stepper Header */}
-          <Stack direction="row" spacing={3} mb={3} justifyContent="center" alignItems="center">
-            {/* Step 1 */}
-            <Stack direction="row" spacing={1} alignItems="center">
-                <Box sx={{ width: 22, height: 22, borderRadius: '50%', border: activeStep >= 1 ? '2px solid #F97316' : '1px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Box sx={{ width: 8, height: 8, bgcolor: activeStep >= 1 ? '#F97316' : 'transparent', borderRadius: '50%' }} />
-                </Box>
-                <Typography variant="body2" fontWeight={activeStep === 1 ? 700 : 400} color={activeStep >= 1 ? "#F97316" : "text.secondary"}>Patient Details</Typography>
-            </Stack>
-            <Box sx={{ width: 60, height: 1, bgcolor: activeStep >= 2 ? '#F97316' : '#E2E8F0' }} />
-            
-            {/* Step 2 */}
-            <Stack direction="row" spacing={1} alignItems="center">
-                <Box sx={{ width: 22, height: 22, borderRadius: '50%', border: activeStep >= 2 ? '2px solid #F97316' : '1px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeStep >= 2 ? '#F97316' : '#94A3B8', fontSize: '12px' }}>
-                  {activeStep > 2 ? <Box sx={{ width: 8, height: 8, bgcolor: '#F97316', borderRadius: '50%' }} /> : "2"}
-                </Box>
-                <Typography variant="body2" fontWeight={activeStep === 2 ? 700 : 400} color={activeStep >= 2 ? "#F97316" : "text.secondary"}>Medical Details</Typography>
-            </Stack>
-            <Box sx={{ width: 60, height: 1, bgcolor: activeStep >= 3 ? '#F97316' : '#E2E8F0' }} />
-            
-            {/* Step 3 */}
-            <Stack direction="row" spacing={1} alignItems="center">
-                <Box sx={{ width: 22, height: 22, borderRadius: '50%', border: activeStep === 3 ? '2px solid #F97316' : '1px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeStep === 3 ? '#F97316' : '#94A3B8', fontSize: '12px' }}>3</Box>
-                <Typography variant="body2" fontWeight={activeStep === 3 ? 700 : 400} color={activeStep === 3 ? "#F97316" : "text.secondary"}>Book Appointment</Typography>
-            </Stack>
-          </Stack>
-          
-          <Divider sx={{ mb: 4 }} />
-
-          {/* SCROLLABLE CONTENT AREA */}
-          <DialogContent sx={{ 
-            maxHeight: '65vh', 
-            overflowY: 'auto', 
-            py: 1,
-            '&::-webkit-scrollbar': { width: '6px' },
-            '&::-webkit-scrollbar-thumb': { bgcolor: '#E2E8F0', borderRadius: '10px' }
-          }}>
-            {activeStep === 1 && (
-              <Stack spacing={4}>
-                {/* Lead Information */}
-                <Box>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, display: 'block', letterSpacing: '0.5px' }}>
-                      Lead Information
-                  </Typography>
-                  <Stack direction="row" spacing={2} mb={2.5}>
-                      <TextField fullWidth size="small" label="Full Name" value={formData.name} />
-                      <TextField fullWidth size="small" label="Contact No" value={formData.phone} />
-                      <TextField fullWidth size="small" label="Email" value={formData.email} />
-                      <TextField fullWidth size="small" label="Location/Address" value="201, HM Streets, LA Jolla, California" />
-                  </Stack>
-                  <Stack direction="row" spacing={2} mb={2.5}>
-                      <TextField select fullWidth size="small" label="Gender" defaultValue="Male">
-                          <MenuItem value="Male">Male</MenuItem>
-                          <MenuItem value="Female">Female</MenuItem>
-                      </TextField>
-                      <TextField fullWidth size="small" label="Age" defaultValue="32" />
-                      <TextField select fullWidth size="small" label="Marital Status" defaultValue="Married">
-                          <MenuItem value="Married">Married</MenuItem>
-                          <MenuItem value="Single">Single</MenuItem>
-                      </TextField>
-                      <TextField fullWidth size="small" label="Address" value="201, HM Streets, LA Jolla, California" />
-                  </Stack>
-                  <TextField select sx={{ width: '24.3%' }} size="small" label="Language Preference" defaultValue="English">
-                      <MenuItem value="English">English</MenuItem>
-                      <MenuItem value="Spanish">Spanish</MenuItem>
-                  </TextField>
-                </Box>
-
-                <Divider />
-
-                {/* Partner Information */}
-                <Box>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, display: 'block', letterSpacing: '0.5px' }}>
-                      Partner Information
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#475569', mb: 1 }}>Is this inquiry for a couple?</Typography>
-                  <RadioGroup row value={formData.isCouple} onChange={(e) => setFormData({...formData, isCouple: e.target.value})}>
-                      <FormControlLabel value="Yes" control={<Radio size="small" sx={{ color: '#F87171', '&.Mui-checked': { color: '#EF4444' } }} />} label={<Typography variant="body2">Yes</Typography>} />
-                      <FormControlLabel value="No" control={<Radio size="small" sx={{ color: '#F87171', '&.Mui-checked': { color: '#EF4444' } }} />} label={<Typography variant="body2">No</Typography>} />
-                  </RadioGroup>
-                  
-                  {formData.isCouple === "Yes" && (
-                      <Stack direction="row" spacing={2} mt={2}>
-                          <TextField fullWidth size="small" label="Full Name" value={formData.partnerName} />
-                          <TextField fullWidth size="small" label="Age" value={formData.partnerAge} />
-                          <TextField select fullWidth size="small" label="Gender" value={formData.partnerGender}>
-                              <MenuItem value="Female">Female</MenuItem>
-                              <MenuItem value="Male">Male</MenuItem>
-                          </TextField>
-                          <Box sx={{ flex: 1 }} />
-                      </Stack>
-                  )}
-                </Box>
-
-                <Divider />
-
-                {/* Source Details */}
-                <Box>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, display: 'block', letterSpacing: '0.5px' }}>
-                      Source & Campaign Details
-                  </Typography>
-                  <Stack direction="row" spacing={2}>
-                      <TextField select fullWidth size="small" label="Source" defaultValue="Social Media">
-                          <MenuItem value="Social Media">Social Media</MenuItem>
-                      </TextField>
-                      <TextField select fullWidth size="small" label="Sub-Source" defaultValue="Facebook">
-                          <MenuItem value="Facebook">Facebook</MenuItem>
-                      </TextField>
-                      <TextField fullWidth size="small" label="Campaign Name" defaultValue="Facebook IVF Awareness - December" />
-                  </Stack>
-                </Box>
-
-                <Divider />
-
-                {/* Assignee Section */}
-                <Box>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, display: 'block', letterSpacing: '0.5px' }}>
-                      Assignee & Next Action Details
-                  </Typography>
-                  <Stack direction="row" spacing={2} mb={2.5}>
-                      <TextField select fullWidth size="small" label="Assigned To" defaultValue="Henry Cavill">
-                          <MenuItem value="Henry Cavill">Henry Cavill</MenuItem>
-                      </TextField>
-                      <TextField select fullWidth size="small" label="Next Action Type" defaultValue="Follow Up">
-                          <MenuItem value="Follow Up">Follow Up</MenuItem>
-                      </TextField>
-                      <TextField select fullWidth size="small" label="Next Action Status" defaultValue="To Do">
-                          <MenuItem value="To Do">To Do</MenuItem>
-                      </TextField>
-                      <TextField fullWidth size="small" label="Next Action Description" placeholder="Enter Description" />
-                  </Stack>
-                </Box>
-              </Stack>
-            )}
-
-            {activeStep === 2 && (
-              <Stack spacing={4}>
-                 <Box>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, display: 'block', letterSpacing: '0.5px' }}>
-                      Medical Interests
-                  </Typography>
-                  <Stack direction="row" spacing={2}>
-                      <TextField select fullWidth size="small" label="Primary Concern" defaultValue="Infertility">
-                          <MenuItem value="Infertility">Infertility</MenuItem>
-                          <MenuItem value="Checkup">General Checkup</MenuItem>
-                      </TextField>
-                      <TextField select fullWidth size="small" label="Treatment Interest" defaultValue="IVF">
-                          <MenuItem value="IVF">IVF</MenuItem>
-                          <MenuItem value="IUI">IUI</MenuItem>
-                      </TextField>
-                  </Stack>
-                </Box>
-                <Box>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, display: 'block', letterSpacing: '0.5px' }}>
-                      Past Medical History
-                  </Typography>
-                  <TextField fullWidth multiline rows={4} placeholder="Enter any relevant medical history..." />
-                </Box>
-              </Stack>
-            )}
-
-            {activeStep === 3 && (
-              <Stack spacing={4}>
-                 <Box>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, display: 'block', letterSpacing: '0.5px' }}>
-                      Schedule Appointment
-                  </Typography>
-                  <Stack direction="row" spacing={2} mb={2.5}>
-                      <TextField fullWidth size="small" type="date" label="Preferred Date" InputLabelProps={{ shrink: true }} />
-                      <TextField fullWidth size="small" type="time" label="Preferred Time" InputLabelProps={{ shrink: true }} />
-                  </Stack>
-                  <Stack direction="row" spacing={2}>
-                    <TextField select fullWidth size="small" label="Consultant/Doctor" defaultValue="Dr. Alex Carey">
-                          <MenuItem value="Dr. Alex Carey">Dr. Alex Carey</MenuItem>
-                    </TextField>
-                    <TextField select fullWidth size="small" label="Department" defaultValue="Gynaecology">
-                          <MenuItem value="Gynaecology">Gynaecology</MenuItem>
-                    </TextField>
-                  </Stack>
-                </Box>
-              </Stack>
-            )}
-          </DialogContent>
-
-          <DialogActions sx={{ pt: 3, pb: 1, px: 2 }}>
-            <Button onClick={handleBack} variant="outlined" sx={{ borderRadius: '10px', textTransform: 'none', px: 5, borderColor: '#E2E8F0', color: '#475569', fontWeight: 600 }}>
-              {activeStep === 1 ? "Cancel" : "Back"}
-            </Button>
-            <Button onClick={handleNext} variant="contained" sx={{ borderRadius: '10px', textTransform: 'none', px: 6, bgcolor: '#475569', fontWeight: 600, '&:hover': { bgcolor: '#334155' } }}>
-              {activeStep === 3 ? "Save Details" : "Next"}
-            </Button>
-          </DialogActions>
-        </Box>
-      </Dialog>
 
       {/* CONVERT POPUP */}
       <Dialog 
@@ -594,11 +513,24 @@ export default function LeadDetailView() {
           </Stack>
         </DialogContent>
       </Dialog>
+
+      {/* CRITICAL: Add Dialogs component at the end for CallButton to work */}
+      <Dialogs />
     </Box>
   );
 }
 
 // Sub-components
+const CallMessage = ({ speaker, time, text }: any) => (
+  <Box>
+    <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
+      <Typography variant="caption" fontWeight={700} color="text.primary">{speaker}</Typography>
+      <Typography variant="caption" color="text.secondary">{time}</Typography>
+    </Stack>
+    <Typography variant="body2" color="text.secondary">{text}</Typography>
+  </Box>
+);
+
 const NoteItem = ({ title, content, time }: any) => (
   <Box sx={{ p: 2, border: '1px solid #F1F5F9', borderRadius: '12px', mb: 2 }}>
     <Typography variant="body2" fontWeight={700} mb={0.5}>{title}</Typography>
@@ -607,7 +539,7 @@ const NoteItem = ({ title, content, time }: any) => (
   </Box>
 );
 
-const TimelineItem = ({ icon, title, time, isAvatar, avatarInitial, isLast }: any) => (
+const TimelineItem = ({ icon, title, time, isAvatar, avatarInitial, isLast, onClick, isClickable }: any) => (
   <Stack direction="row" spacing={2}>
     <Stack alignItems="center">
       <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -615,7 +547,14 @@ const TimelineItem = ({ icon, title, time, isAvatar, avatarInitial, isLast }: an
       </Box>
       {!isLast && <Box sx={{ width: '2px', flexGrow: 1, bgcolor: '#E2E8F0', my: 0.5 }} />}
     </Stack>
-    <Box pb={3}>
+    <Box 
+      pb={3} 
+      onClick={onClick}
+      sx={{ 
+        cursor: isClickable ? 'pointer' : 'default',
+        '&:hover': isClickable ? { opacity: 0.7 } : {}
+      }}
+    >
       <Typography variant="body2" fontWeight={600}>{title}</Typography>
       <Typography variant="caption" color="text.secondary">{time}</Typography>
     </Box>
