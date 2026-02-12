@@ -52,7 +52,7 @@ export type LeadActivity = {
 
 /*=====================Add New Lead=====================*/
 export type FormState = {
-  fullName: string;
+  full_name: string;
   contact: string;
   email: string;
   location: string;
