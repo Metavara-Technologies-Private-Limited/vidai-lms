@@ -40,6 +40,11 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
   const [openDelete, setOpenDelete] = React.useState(false);
   const [openReassign, setOpenReassign] = React.useState(false);
 
+  // Helper function to clean lead ID for URL
+  const getCleanLeadId = (leadId: string) => {
+    return leadId.replace("#", "").replace("LN-", "").replace("LD-", "");
+  };
+
   return (
     <>
       <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
@@ -57,7 +62,8 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
           <>
             <MenuItem
               onClick={() => {
-                navigate(`/leads/edit/${lead.id}`, {
+                // Clean the ID and pass the full lead object in state
+                navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, {
                   state: { lead },
                 });
                 setAnchorEl(null);
