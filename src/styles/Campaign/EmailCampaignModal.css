@@ -593,6 +593,10 @@ select:invalid {
   flex: 1;
   position: relative;
 }
+.schedule-field .MuiInputBase-root {
+  height: 56px;
+  border-radius: 16px;
+}
 
 /* ---------- Floating Label ---------- */
 

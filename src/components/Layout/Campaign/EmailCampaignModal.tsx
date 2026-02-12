@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { v4 as uuid } from "uuid";
+// import { v4 as uuid } from "uuid";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -8,6 +8,9 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import dayjs from "dayjs";
 import viewIcon from "./Icons/view.png"; // adjust path if needed
+
+import { CampaignAPI } from "../../../../src/services/campaign.api";
+
 
 export default function EmailCampaignModal({ onClose, onSave }: any) {
   const [step, setStep] = useState(1);
@@ -55,24 +58,79 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
     }
   };
 
-  const handleSave = (status: "Draft" | "Scheduled") => {
-    setSubmitted(true);
-    if (!step3Valid) return;
+  const handleSave = async (status: "Draft" | "Scheduled") => {
+  setSubmitted(true);
+  if (!step3Valid) return;
 
-    const newCampaign = {
-      id: uuid(),
-      name: campaignName,
-      type: "email",
-      status,
-      start: startDate,
-      end: endDate,
-      platforms: ["gmail"],
-      leads: 0,
-      scheduledAt: `${scheduleDate} ${scheduleTime}`,
+  try {
+    const scheduledDateTime = dayjs(
+      `${scheduleDate} ${scheduleTime}`,
+      "YYYY-MM-DD HH:mm"
+    ).format("YYYY-MM-DDTHH:mm:ss");
+
+    const payload = {
+      clinic: 1,
+      campaign_name: campaignName,
+      campaign_description: campaignDescription,
+      campaign_objective: objective,
+      target_audience: audience,
+      start_date: startDate,
+      end_date: endDate,
+      campaign_mode: 2,
+
+      selected_start: scheduledDateTime,
+      selected_end: scheduledDateTime,
+      enter_time: scheduleTime,
+
+      email: [
+        {
+          audience_name: audience,
+          subject: subject,
+          email_body: emailBody,
+          template_name: "EMAIL",
+          sender_email: "noreply@clinic.com", // ✅ REQUIRED
+          scheduled_at:
+            status === "Scheduled"
+              ? scheduledDateTime
+              : null,
+          is_active: status === "Scheduled",
+        },
+      ],
     };
 
-    onSave(newCampaign);
-  };
+    console.log("PAYLOAD:", payload);
+
+   const response = await CampaignAPI.create(payload);
+
+const apiData = response.data;
+
+const formattedCampaign = {
+  id: apiData.id,
+  name: apiData.campaign_name,
+  type: apiData.campaign_mode === 2 ? "email" : "social",
+  status: apiData.is_active ? "Live" : "Draft",
+  start: apiData.start_date,
+  end: apiData.end_date,
+  platforms:
+    apiData.campaign_mode === 2
+      ? ["gmail"]
+      : ["facebook", "instagram"],
+  leads: 0,
+  scheduledAt: apiData.selected_start,
+};
+
+onSave(formattedCampaign); // 👈 pass new campaign
+onClose();
+
+  } catch (error: any) {
+    console.error(error.response?.data);
+  }
+};
+
+
+
+//     onSave(newCampaign);
+//   };
 
   return (
     <div className="campaign-modal-overlay">

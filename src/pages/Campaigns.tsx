@@ -125,6 +125,7 @@ export default function CampaignsScreen() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CampaignStatus | "all">("all");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [openStatus, setOpenStatus] = useState(false);
 
   const [campaigns, setCampaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
 
@@ -142,7 +143,7 @@ export default function CampaignsScreen() {
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
       const tabOk = tab === "all" || c.type === tab;
-      const searchOk = c.name.toLowerCase().includes(search.toLowerCase());
+      const searchOk =(c.name ?? "").toLowerCase().includes(search.toLowerCase());
       const statusOk = status === "all" || c.status === status;
       return tabOk && searchOk && statusOk;
     });
@@ -190,21 +191,43 @@ export default function CampaignsScreen() {
             />
           </div>
 
-          <select
-            value={status}
-            onChange={(e) =>
-              setStatus(e.target.value as CampaignStatus | "all")
-            }
-          >
-            <option value="all">All Status</option>
-            <option value="Live">Live</option>
-            <option value="Draft">Draft</option>
-            <option value="Schedule">Schedule</option>
-            <option value="Paused">Paused</option>
-            <option value="Stopped">Stopped</option>
-            <option value="Completed">Completed</option>
-            <option value="Failed">Failed</option>
-          </select>
+          <div className="status-dropdown">
+  <div
+    className={`status-btn ${openStatus ? "active" : ""}`}
+    onClick={() => setOpenStatus((prev) => !prev)}
+  >
+    {status === "all" ? "All Status" : status}
+  </div>
+
+  {openStatus && (
+    <div className="status-menu">
+      {[
+        { label: "All Status", value: "all" },
+        { label: "Live", value: "Live" },
+        { label: "Draft", value: "Draft" },
+        { label: "Schedule", value: "Schedule" },
+        { label: "Paused", value: "Paused" },
+        { label: "Stopped", value: "Stopped" },
+        { label: "Completed", value: "Completed" },
+        { label: "Failed", value: "Failed" },
+      ].map((item) => (
+        <div
+          key={item.value}
+          className={`status-item ${
+            status === item.value ? "selected" : ""
+          }`}
+          onClick={() => {
+            setStatus(item.value as CampaignStatus | "all");
+            setOpenStatus(false);
+          }}
+        >
+          {item.label}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
         </div>
       </div>
 
