@@ -12,13 +12,15 @@ import {
   FormControlLabel,
   Chip,
   Fade,
-  CircularProgress,
   Alert,
 } from "@mui/material";
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { Dayjs } from 'dayjs';
 import { useNavigate } from "react-router-dom";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import type { FormState } from "../../types/leads.types";
-import { steps } from "../../types/leads.types";
 import { LeadAPI } from "../../services/leads.api";
 
 // ====================== Backend Payload Type ======================
@@ -53,17 +55,37 @@ export type LeadPayload = {
   is_active?: boolean;
 };
 
+// ====================== Time Slots Data ======================
+const timeSlots = [
+  "09:00 AM - 09:30 AM",
+  "09:30 AM - 10:00 AM",
+  "10:00 AM - 10:30 AM",
+  "10:30 AM - 11:00 AM",
+  "11:00 AM - 11:30 AM",
+  "11:30 AM - 12:00 PM",
+  "12:00 PM - 12:30 PM",
+  "12:30 PM - 01:00 PM",
+  "02:00 PM - 02:30 PM",
+  "02:30 PM - 03:00 PM",
+  "03:00 PM - 03:30 PM",
+  "03:30 PM - 04:00 PM",
+  "04:00 PM - 04:30 PM",
+  "04:30 PM - 05:00 PM",
+  "05:00 PM - 05:30 PM",
+  "05:30 PM - 06:00 PM",
+];
+
 // ====================== AddNewLead Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
-  const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [showSuccess, setShowSuccess] = React.useState(false);
+  const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
 
   const [form, setForm] = React.useState<FormState>({
-    fullName: "",
+    full_name: "",
     contact: "",
     email: "",
     location: "",
@@ -126,7 +148,7 @@ export default function AddNewLead() {
   // ====================== Validate Step ======================
   const validateStep = (): boolean => {
     if (currentStep === 1) {
-      if (!form.fullName || !form.contact || !form.email) {
+      if (!form.full_name || !form.contact || !form.email) {
         setError("Please fill in name, contact, and email");
         return false;
       }
@@ -174,13 +196,12 @@ export default function AddNewLead() {
   // ====================== Submit Form ======================
   const submitForm = async () => {
     try {
-      setLoading(true);
       setError(null);
 
       const payload: LeadPayload = {
         clinic_id: 1,
         department_id: Number(form.department) || 1,
-        full_name: form.fullName,
+        full_name: form.full_name,
         contact_no: form.contact,
         email: form.email || null,
         age: form.age ? Number(form.age) : null,
@@ -194,7 +215,7 @@ export default function AddNewLead() {
         partner_gender: form.partnerGender ? form.partnerGender.toLowerCase() as "male" | "female" : null,
         source: form.source,
         sub_source: form.subSource || "",
-        campaign_id: null, // Not using campaigns
+        campaign_id: null,
         lead_status: "new",
         next_action_status: (form.nextStatus as "pending" | "completed" | "") || null,
         next_action_description: form.nextDesc || "",
@@ -208,18 +229,21 @@ export default function AddNewLead() {
 
       console.log("📤 Sending payload to backend:", JSON.stringify(payload, null, 2));
 
-      const response = await LeadAPI.create(payload);
-
-      console.log("✅ Lead created successfully:", response);
-
+      // Show success immediately
       setShowSuccess(true);
+
+      // Send to API in background
+      LeadAPI.create(payload).then((response) => {
+        console.log("✅ Lead created successfully:", response);
+      }).catch((err) => {
+        console.error("❌ Error saving lead:", err);
+      });
+
+      // Redirect after showing success message
       setTimeout(() => {
         setShowSuccess(false);
-        // Use replace to ensure page refreshes, with delay for backend processing
-        setTimeout(() => {
-          window.location.href = "/leads";
-        }, 500);
-      }, 2000);
+        navigate("/leads", { replace: true });
+      }, 1500);
 
     } catch (err: any) {
       console.error("❌ Error saving lead:", err);
@@ -236,8 +260,6 @@ export default function AddNewLead() {
           ? errorMessage 
           : JSON.stringify(errorMessage)
       );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -392,7 +414,7 @@ export default function AddNewLead() {
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
                 <Box>
                   <Typography sx={labelStyle}>Full Name</Typography>
-                  <TextField fullWidth size="small" value={form.fullName} onChange={handleChange("fullName")} sx={inputStyle} />
+                  <TextField fullWidth size="small" value={form.full_name} onChange={handleChange("full_name")} sx={inputStyle} />
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Contact No.</Typography>
@@ -632,7 +654,7 @@ export default function AddNewLead() {
             </Box>
           )}
 
-          {/* STEP 3: BOOK APPOINTMENT */}
+          {/* STEP 3: BOOK APPOINTMENT - SIMPLIFIED */}
           {currentStep === 3 && (
             <Box>
               <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
@@ -652,7 +674,7 @@ export default function AddNewLead() {
                   <Typography sx={labelStyle}>Department *</Typography>
                   <TextField select fullWidth size="small" value={form.department} onChange={handleChange("department")} sx={inputStyle}>
                     <MenuItem value="1">Consultation</MenuItem>
-                    <MenuItem value="2">IVF</MenuItem>
+                    <MenuItem value="2">Treatment</MenuItem>
                   </TextField>
                 </Box>
                 <Box>
@@ -667,13 +689,43 @@ export default function AddNewLead() {
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 3 }}>
                 <Box>
                   <Typography sx={labelStyle}>Date *</Typography>
-                  <TextField fullWidth size="small" type="date" value={form.appointmentDate} onChange={handleChange("appointmentDate")} sx={inputStyle} InputLabelProps={{ shrink: true }} />
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      value={selectedDate}
+                      onChange={(newDate) => {
+                        setSelectedDate(newDate);
+                        if (newDate) {
+                          setForm((prev) => ({ 
+                            ...prev, 
+                            appointmentDate: newDate.format('YYYY-MM-DD') 
+                          }));
+                        }
+                      }}
+                      slotProps={{
+                        textField: {
+                          size: "small",
+                          fullWidth: true,
+                          sx: inputStyle,
+                        }
+                      }}
+                    />
+                  </LocalizationProvider>
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Select Slot *</Typography>
-                  <TextField select fullWidth size="small" value={form.slot} onChange={handleChange("slot")} sx={inputStyle}>
-                    <MenuItem value="12:30 PM - 01:00 PM">12:30 PM - 01:00 PM</MenuItem>
-                    <MenuItem value="02:00 PM - 02:30 PM">02:00 PM - 02:30 PM</MenuItem>
+                  <TextField 
+                    select 
+                    fullWidth 
+                    size="small" 
+                    value={form.slot} 
+                    onChange={handleChange("slot")} 
+                    sx={inputStyle}
+                  >
+                    {timeSlots.map((slot, index) => (
+                      <MenuItem key={index} value={slot}>
+                        {slot}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 </Box>
               </Box>
@@ -737,7 +789,6 @@ export default function AddNewLead() {
                 px: 4,
                 "&:hover": { bgcolor: "#1E293B" }
               }}
-              disabled={loading}
             >
               Next
             </Button>
@@ -752,16 +803,8 @@ export default function AddNewLead() {
                 px: 4,
                 "&:hover": { bgcolor: "#1E293B" }
               }}
-              disabled={loading}
             >
-              {loading ? (
-                <>
-                  <CircularProgress size={20} sx={{ mr: 1 }} />
-                  Saving...
-                </>
-              ) : (
-                "Save"
-              )}
+              Save
             </Button>
           )}
         </Box>
@@ -786,7 +829,7 @@ export default function AddNewLead() {
           boxShadow: '0px 10px 20px rgba(16, 185, 129, 0.3)'
         }}>
           <CheckCircleIcon sx={{ fontSize: 24 }} />
-          <Typography variant="body1" fontWeight={700}>Lead Created Successfully!</Typography>
+          <Typography variant="body1" fontWeight={700}>Saved Successfully!</Typography>
         </Box>
       </Fade>
     </Box>

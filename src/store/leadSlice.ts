@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { LeadAPI } from "../services/leads.api";
 import type { Lead } from "../types/leads.types";
 
-// Slice state
+// ====================== Type Definitions ======================
 interface LeadState {
   leads: Lead[];
   loading: boolean;
@@ -15,7 +15,7 @@ const initialState: LeadState = {
   error: null,
 };
 
-// Async thunk to fetch leads
+// ====================== Async Thunk ======================
 export const fetchLeads = createAsyncThunk<
   Lead[],
   void,
@@ -25,16 +25,25 @@ export const fetchLeads = createAsyncThunk<
     const res = await LeadAPI.list();
     return res.data;
   } catch (err: unknown) {
-    if (err instanceof Error) return rejectWithValue(err.message);
+    if (err instanceof Error) {
+      return rejectWithValue(err.message);
+    }
     return rejectWithValue("Failed to fetch leads");
   }
 });
 
-// Slice
+// ====================== Slice ======================
 const leadSlice = createSlice({
   name: "leads",
   initialState,
-  reducers: {},
+  reducers: {
+    clearLeads: (state) => {
+      state.leads = [];
+    },
+    clearError: (state) => {
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchLeads.pending, (state) => {
@@ -47,16 +56,15 @@ const leadSlice = createSlice({
       })
       .addCase(fetchLeads.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || "Something went wrong";
+        state.error = action.payload || "Failed to fetch leads";
       });
   },
 });
 
+export const { clearLeads, clearError } = leadSlice.actions;
 export default leadSlice.reducer;
 
-// Selectors
-export const selectLeads = (state: { leads: LeadState }) => state.leads.leads;
-export const selectLeadsLoading = (state: { leads: LeadState }) =>
-  state.leads.loading;
-export const selectLeadsError = (state: { leads: LeadState }) =>
-  state.leads.error;
+// ====================== Selectors ======================
+export const selectLeads = (state: any) => state.leads.leads;
+export const selectLeadsLoading = (state: any) => state.leads.loading;
+export const selectLeadsError = (state: any) => state.leads.error;
