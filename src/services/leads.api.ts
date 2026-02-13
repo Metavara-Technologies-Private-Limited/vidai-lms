@@ -41,7 +41,7 @@ export type Lead = {
   partner_gender?: "male" | "female";
   source: string;
   sub_source?: string;
-  lead_status?: "new" | "contacted";
+  lead_status?: "New" | "Contacted" | "Follow-Ups" | "Converted" | "Lost" | "Cycle Conversion" | "Appointment";
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;

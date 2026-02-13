@@ -45,10 +45,10 @@ export type LeadPayload = {
   partner_age: number | null;
   partner_gender: "male" | "female" | null;
   source: string;
-  sub_source: string;
-  lead_status: "new" | "contacted";
-  next_action_status: "pending" | "completed" | null;
-  next_action_description: string;
+  sub_source?: string;
+  lead_status?: "New" | "Contacted" | "Lost" | "Converted" | "Cycle Conversion" | "Follow-Ups";
+  next_action_status?: "pending" | "completed" | null;
+  next_action_description?: string;
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;
