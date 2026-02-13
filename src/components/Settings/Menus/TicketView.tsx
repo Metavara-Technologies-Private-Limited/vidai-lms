@@ -39,10 +39,13 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import Menu from "@mui/material/Menu";
 import Reply_Mail from "../../../assets/icons/Reply_Ticket_Mail.svg";
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
+import { useDispatch } from "react-redux";
+import { setSelectedTemplate } from "../../../store/emailTemplateSlice";
 
 const TicketView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+const dispatch = useDispatch();
 
 const initialTicket = TICKETS_MOCK.find((t) => t.ticketNo === id);
 const [ticket, setTicket] = useState(initialTicket);
@@ -76,15 +79,21 @@ const assigneeList = Array.from(
 );
 
 const handleInsertTemplate = (template: Template | null) => {
-  if (template) {
-    // Uses template.content or template.body based on your mock structure
-    const bodyToAdd = template.content || template.body || "";
-    setReplyBody((prev) => prev + "\n\n" + bodyToAdd);
-  }
-  // Close both dialogs
+  if (!template) return;
+
+  const content = template.content || template.body || "";
+
+  dispatch(
+    setSelectedTemplate({
+      subject: template.subject,
+      content,
+    })
+  );
+
   setPreviewOpen(false);
   setTemplateOpen(false);
 };
+
 
   //  ONLY AFTER ALL HOOKS
   if (!ticket) {
