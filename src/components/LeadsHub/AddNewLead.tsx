@@ -540,24 +540,26 @@ export default function AddNewLead() {
                 </RadioGroup>
               </Box>
 
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
-                <Box>
-                  <Typography sx={labelStyle}>Full Name</Typography>
-                  <TextField fullWidth size="small" value={form.partnerName} onChange={handleChange("partnerName")} sx={inputStyle} />
+              {isCouple === "yes" && (
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
+                  <Box>
+                    <Typography sx={labelStyle}>Full Name</Typography>
+                    <TextField fullWidth size="small" value={form.partnerName} onChange={handleChange("partnerName")} sx={inputStyle} />
+                  </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Age</Typography>
+                    <TextField fullWidth size="small" type="number" value={form.partnerAge} onChange={handleChange("partnerAge")} sx={inputStyle} />
+                  </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Gender</Typography>
+                    <TextField select fullWidth size="small" value={form.partnerGender} onChange={handleChange("partnerGender")} sx={inputStyle}>
+                      <MenuItem value="">-- Select --</MenuItem>
+                      <MenuItem value="Male">Male</MenuItem>
+                      <MenuItem value="Female">Female</MenuItem>
+                    </TextField>
+                  </Box>
                 </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Age</Typography>
-                  <TextField fullWidth size="small" type="number" value={form.partnerAge} onChange={handleChange("partnerAge")} sx={inputStyle} />
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Gender</Typography>
-                  <TextField select fullWidth size="small" value={form.partnerGender} onChange={handleChange("partnerGender")} sx={inputStyle}>
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Male">Male</MenuItem>
-                    <MenuItem value="Female">Female</MenuItem>
-                  </TextField>
-                </Box>
-              </Box>
+              )}
 
               <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>SOURCE & CAMPAIGN DETAILS</Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
