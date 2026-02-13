@@ -34,21 +34,45 @@ import { Image as TiptapImage } from '@tiptap/extension-image';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import { PreviewTemplateModal } from './PreviewEmailTemplateModal';
-import type { Template } from '../templateMockData';
 
 interface FormProps {
   onClose: () => void;
-  onSave: (template: Template & { body?: string }) => void;
-  initialData?: Partial<Template & { body?: string }>;
+  onSave: (template: any) => void;
+  initialData?: any;
   mode: 'create' | 'edit' | 'view';
 }
 
 export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, initialData, mode }) => {
   const isViewOnly = mode === 'view';
 
+  // Get clinic ID from various possible sources
+  const getClinicId = (): number => {
+    // Try localStorage first
+    const storedClinicId = localStorage.getItem("clinic_id");
+    if (storedClinicId) return parseInt(storedClinicId, 10);
+    
+    // Try from user data
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        if (user.clinic_id) return user.clinic_id;
+      } catch (e) {
+        console.error("Failed to parse user data");
+      }
+    }
+    
+    // Try from initial data
+    if (initialData?.clinic) return initialData.clinic;
+    
+    // Default fallback - you should replace this with actual clinic ID
+    console.warn("No clinic ID found, using default. Please set clinic_id in localStorage or context.");
+    return 1;
+  };
+
   const [formData, setFormData] = useState({
     name: initialData?.name || 'Appointment Confirmation',
-    useCase: initialData?.useCase || 'Appointment',
+    useCase: initialData?.use_case || initialData?.useCase || 'Appointment',
     subject: initialData?.subject || 'Your Consultation is Confirmed - {appointment_date}',
   });
 
@@ -90,7 +114,7 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
       TextStyle,
       Color,
     ],
-    content: initialData?.body || `<p>Hi {lead_first_name},</p><p><br></p><p>Thank you for choosing {clinic_name}.</p><p>Your fertility consultation has been successfully scheduled!</p><p><br></p><ul><li><p>Date : {appointment_date}</p></li><li><p>Time : {appointment_time}</p></li><li><p>Location : {clinic_name} {clinic_address}</p></li></ul><p><br></p><p>Please arrive 10 minutes early and bring any relevant medical reports.</p><p><br></p><p>If you need to reschedule, please let us know.</p><p><br></p><p>Warm regards,</p><p>The Vidal Team</p>`,
+    content: initialData?.body || initialData?.email_body || `<p>Hi {lead_first_name},</p><p><br></p><p>Thank you for choosing {clinic_name}.</p><p>Your fertility consultation has been successfully scheduled!</p><p><br></p><ul><li><p>Date : {appointment_date}</p></li><li><p>Time : {appointment_time}</p></li><li><p>Location : {clinic_name} {clinic_address}</p></li></ul><p><br></p><p>Please arrive 10 minutes early and bring any relevant medical reports.</p><p><br></p><p>If you need to reschedule, please let us know.</p><p><br></p><p>Warm regards,</p><p>The Vidal Team</p>`,
     editable: !isViewOnly,
   });
 
@@ -124,24 +148,18 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
     handleColorClose();
   };
 
-  // --- New handlers to wire toolbar controls ---
   const handleFontChange = (value: string) => {
     if (!editor) return;
-    // apply font family via textStyle mark
     editor.chain().focus().setMark('textStyle', { fontFamily: value }).run();
   };
 
   const handleHeadingChange = (value: string) => {
     if (!editor) return;
     if (value === 'Tt') {
-      // set paragraph
-      // setParagraph helper may exist; fallback to toggling heading off
       try {
-      
-         
         editor.chain().focus().setParagraph().run();
       } catch {
-        editor.chain().focus().toggleHeading({ level: 1 }).run(); // harmless fallback
+        editor.chain().focus().toggleHeading({ level: 1 }).run();
         editor.chain().focus().toggleHeading({ level: 1 }).run();
       }
       return;
@@ -161,10 +179,8 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
     const next = Math.max(0, curr + delta);
     const cleaned = style.replace(/margin-left:\s*\d+px;?/g, '').trim();
     const newStyle = (cleaned ? cleaned + '; ' : '') + `margin-left: ${next}px`;
-    // update attributes for paragraph node at selection
     editor.chain().focus().updateAttributes('paragraph', { style: newStyle }).run();
   };
-  // --- end new handlers ---
 
   const addLink = () => {
     const url = window.prompt('Enter URL:');
@@ -209,25 +225,24 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
   };
 
   const handleSave = () => {
-    const template = {
-      ...initialData,
-      id: initialData?.id || Math.random().toString(36).substr(2, 9),
+    const clinicId = getClinicId();
+    
+    const apiPayload = {
       name: formData.name,
-      subject: formData.subject,
+      use_case: formData.useCase,
       body: editor?.getHTML() || '',
-      useCase: formData.useCase,
-      lastUpdatedAt: new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      createdBy: initialData?.createdBy || 'System',
-      type: 'email' as const
+      subject: formData.subject,
+      clinic: clinicId,
     };
 
-    onSave(template);
+    console.log("📧 Email Template Payload:", JSON.stringify(apiPayload, null, 2));
+
+    onSave(apiPayload);
     onClose();
   };
 
   if (showPreview) {
-    const previewTemplate: Template & { body: string } = {
-      // eslint-disable-next-line react-hooks/purity
+    const previewTemplate = {
       id: initialData?.id || Math.random().toString(36).substr(2, 9),
       name: formData.name,
       subject: formData.subject,
@@ -428,7 +443,7 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
                     <RedoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
                   </IconButton>
 
-                  {/* Font family selector -> wired */}
+                  {/* Font family selector */}
                   <Select
                     size="small"
                     value={currentFont}
@@ -440,7 +455,7 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
                     <MenuItem value="Times New Roman">Times</MenuItem>
                   </Select>
 
-                  {/* Size / Heading selector -> wired */}
+                  {/* Size / Heading selector */}
                   <Select
                     size="small"
                     value={currentHeading}
@@ -459,24 +474,6 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
                     aria-pressed={editor.isActive('bold')}
                   >
                     <FormatBoldIcon sx={{ fontSize: 18, color: '#374151' }} />
-                  </IconButton>
-
-                  {/* Undo / Redo now update correctly because of the editor listeners above */}
-                  <IconButton
-                    size="small"
-                    onClick={() => editor.chain().focus().undo().run()}
-                    disabled={!editor.can().undo()}
-                    sx={{ p: 0.5 }}
-                  >
-                    <UndoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => editor.chain().focus().redo().run()}
-                    disabled={!editor.can().redo()}
-                    sx={{ p: 0.5 }}
-                  >
-                    <RedoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
                   </IconButton>
 
                   <IconButton
@@ -558,7 +555,7 @@ export const NewEmailTemplateForm: React.FC<FormProps> = ({ onClose, onSave, ini
                     <FormatListNumberedIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
 
-                  {/* Indent controls wired to adjust paragraph margin-left */}
+                  {/* Indent controls */}
                   <IconButton
                     size="small"
                     onClick={() => adjustIndent(-20)}

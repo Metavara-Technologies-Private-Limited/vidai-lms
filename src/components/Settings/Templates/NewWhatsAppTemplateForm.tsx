@@ -4,12 +4,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import styles from "../../../styles/Template/NewTemplateModal.module.css";
 import { PreviewWhatsAppTemplateModal } from './PreviewWhatsAppTemplateModal';
-import type { Template } from '../templateMockData';
 
 interface Props {
   onClose: () => void;
-  onSave: (template: Template & { body?: string }) => void;
-  initialData?: Partial<Template & { body?: string }>;
+  onSave: (template: any) => void;
+  initialData?: any;
   mode: 'create' | 'edit' | 'view';
 }
 
@@ -19,10 +18,28 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // ✅ HELPER DEFINED INSIDE COMPONENT
+  const getClinicId = (): number => {
+    const storedClinicId = localStorage.getItem("clinic_id");
+    if (storedClinicId) return parseInt(storedClinicId, 10);
+    
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        if (user.clinic_id) return user.clinic_id;
+      } catch (e) {
+        console.error("Failed to parse user data");
+      }
+    }
+    return initialData?.clinic || 1; 
+  };
+
+  // ✅ Fields handle both DB keys and UI keys
   const [formData, setFormData] = useState({
-    name: initialData?.name || "IVF Consultation Feedback Collection",
-    useCase: initialData?.useCase || "Feedback",
-    body: initialData?.subject || "Hello {{Patient Name}} 👋\n\nThank you for visiting {{Clinic / Hospital Name}} for your recent consultation.\n\nWe'd love to hear about your experience.\nYour feedback helps us improve our care.\n\nShare your feedback here:\n{{Short Review Link}}\n\nIt will take less than a minute.\nThank you for your time!"
+    name: initialData?.name || initialData?.audience_name || "",
+    useCase: initialData?.useCase || initialData?.use_case || "",
+    body: initialData?.body || initialData?.email_body || initialData?.subject || ""
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -31,26 +48,32 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-    }
+    if (file) setSelectedFile(file);
   };
 
   const handleSave = () => {
-    const template = {
-      ...initialData,
-      id: initialData?.id || Math.random().toString(36).substr(2, 9),
-      name: formData.name,
-      subject: formData.body,
-      useCase: formData.useCase,
-      lastUpdatedAt: new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      createdBy: initialData?.createdBy || 'System',
-      type: 'whatsapp' as const
-    };
-    onSave(template);
-    onClose();
+  // Ensure this helper is defined inside the component
+  const getClinicId = (): number => {
+    const stored = localStorage.getItem("clinic_id");
+    return stored ? parseInt(stored, 10) : (initialData?.clinic || 1);
   };
 
+  const clinicId = getClinicId();
+  
+  // THE FIX: Use the keys your backend validation is looking for
+  const apiPayload = {
+    name: formData.name,        // Changed from audience_name
+    body: formData.body,        // Changed from email_body
+    use_case: formData.useCase,  // Backend usually prefers snake_case
+    clinic: clinicId,           // Must be an integer
+    subject: "WhatsApp Message", // Backend often requires a subject placeholder
+    is_active: true
+  };
+
+  console.log("🚀 WhatsApp Save Payload:", apiPayload);
+  onSave(apiPayload);
+  onClose();
+};
   if (showPreview) {
     return (
       <PreviewWhatsAppTemplateModal
@@ -79,6 +102,7 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
           <Typography className={styles.fieldLabel}>Name</Typography>
           <OutlinedInput 
             fullWidth size="small" 
+            placeholder="Enter template name"
             value={formData.name}
             disabled={isViewOnly}
             onChange={(e) => handleInputChange('name', e.target.value)}
@@ -92,26 +116,16 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
           <Select
             fullWidth size="small"
             value={formData.useCase}
+            displayEmpty
             disabled={isViewOnly}
             onChange={(e) => handleInputChange('useCase', e.target.value)}
             IconComponent={KeyboardArrowDownIcon}
             sx={{ borderRadius: '8px', backgroundColor: isViewOnly ? '#F9FAFB' : '#fff' }}
           >
-            <MenuItem value="Appointment">
-              <Box component="span" sx={{ color: '#16A34A', bgcolor: '#F0FDF4', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
-                Appointment
-              </Box>
-            </MenuItem>
-            <MenuItem value="Feedback">
-              <Box component="span" sx={{ color: '#EA580C', bgcolor: '#FFF7ED', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
-                Feedback
-              </Box>
-            </MenuItem>
-            <MenuItem value="Marketing">
-              <Box component="span" sx={{ color: '#7C3AED', bgcolor: '#F5F3FF', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
-                Marketing
-              </Box>
-            </MenuItem>
+            <MenuItem value="" disabled>Select Use Case</MenuItem>
+            <MenuItem value="Appointment">Appointment</MenuItem>
+            <MenuItem value="Feedback">Feedback</MenuItem>
+            <MenuItem value="Marketing">Marketing</MenuItem>
           </Select>
         </Box>
 
@@ -121,6 +135,7 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
           <textarea 
             className={styles.textArea} 
             rows={8}
+            placeholder="Hi {{1}}, thank you for choosing our clinic..."
             value={formData.body}
             disabled={isViewOnly}
             onChange={(e) => handleInputChange('body', e.target.value)}
@@ -135,32 +150,15 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
         <Box className={styles.formGroup}>
           <Typography className={styles.fieldLabel}>Upload Documents</Typography>
           <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2, 
-            p: 2, 
-            border: '1px dashed #E5E7EB', 
-            borderRadius: '8px',
-            backgroundColor: isViewOnly ? '#F9FAFB' : 'transparent'
+            display: 'flex', alignItems: 'center', gap: 2, p: 2, border: '1px dashed #E5E7EB', 
+            borderRadius: '8px', backgroundColor: isViewOnly ? '#F9FAFB' : 'transparent'
           }}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              hidden
-            />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} hidden />
             <Button 
               variant="contained" 
               onClick={() => fileInputRef.current?.click()}
               disabled={isViewOnly}
-              sx={{ 
-                bgcolor: '#F3F4F6', 
-                color: '#374151', 
-                '&:hover': { bgcolor: '#E5E7EB' }, 
-                textTransform: 'none', 
-                boxShadow: 'none',
-                borderRadius: '6px'
-              }}
+              sx={{ bgcolor: '#F3F4F6', color: '#374151', textTransform: 'none', boxShadow: 'none' }}
             >
               Choose File
             </Button>

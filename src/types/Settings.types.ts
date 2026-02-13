@@ -53,3 +53,12 @@ export type TicketTimelineItem = {
   title: string;
   time: string;
 };
+export interface Template {
+  id: string;
+  name: string;
+  subject: string;
+  useCase: string;
+  lastUpdatedAt: string;
+  createdBy: string;
+  type: string;
+}

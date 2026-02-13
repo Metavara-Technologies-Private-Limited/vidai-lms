@@ -4,13 +4,13 @@ import { Visibility, Edit, ContentCopy } from '@mui/icons-material';
 import TrashIcon from '../../../assets/icons/trash.svg';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import type { Template } from '../templateMockData';
 import styles from '../../../styles/Template/TemplateTable.module.css';
 
-const HighlightText = ({ text, highlight }: { text: string; highlight: string }) => {
-  if (!highlight.trim()) return <>{text}</>;
+const HighlightText = ({ text, highlight }: { text: string | undefined; highlight: string }) => {
+  const safeText = text || ""; 
+  if (!highlight.trim()) return <>{safeText}</>;
   const regex = new RegExp(`(${highlight})`, 'gi');
-  const parts = text.split(regex);
+  const parts = safeText.split(regex);
   return (
     <>
       {parts.map((part, i) => regex.test(part) ? (
@@ -21,21 +21,19 @@ const HighlightText = ({ text, highlight }: { text: string; highlight: string })
 };
 
 interface Props {
-  data: Template[];
+  data: any[]; // Changed to any to support API/DB response objects
   searchQuery: string;
-  onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: Template) => void;
+  onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: any) => void;
 }
 
-export const SmsTemplateTable: React.FC<Props> = ({ data, searchQuery, onAction }) => {
-  const [page, setPage] = useState(0); // 0-based
+export const SmsTemplateTable: React.FC<Props> = ({ data = [], searchQuery, onAction }) => {
+  const [page, setPage] = useState(0); 
   const rowsPerPage = 10;
   const totalPages = data.length === 0 ? 0 : Math.ceil(data.length / rowsPerPage);
   const visibleRows = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-  // clamp page when data changes
   useEffect(() => {
     if (totalPages === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPage(0);
       return;
     }
@@ -51,8 +49,10 @@ export const SmsTemplateTable: React.FC<Props> = ({ data, searchQuery, onAction 
   const handleNext = () => setPage((p) => Math.min(totalPages - 1, p + 1));
   const goToPage = (idx: number) => setPage(Math.min(Math.max(0, idx), Math.max(0, totalPages - 1)));
 
-  const getUseCaseStyles = (useCase: string) => {
-    switch (useCase.toLowerCase()) {
+  const getUseCaseStyles = (useCase: string | undefined) => {
+    // FIX: Added safe check to prevent toLowerCase() undefined crash
+    const safeCase = (useCase || 'default').toLowerCase();
+    switch (safeCase) {
       case 'appointment': return { color: '#16A34A', bgColor: '#F0FDF4', borderColor: '#DCFCE7' };
       case 'reminder': return { color: '#D97706', bgColor: '#FFFBEB', borderColor: '#FEF3C7' };
       case 'feedback': return { color: '#EA580C', bgColor: '#FFF7ED', borderColor: '#FFEDD5' };
@@ -75,28 +75,69 @@ export const SmsTemplateTable: React.FC<Props> = ({ data, searchQuery, onAction 
             </TableRow>
           </TableHead>
           <TableBody>
-            {visibleRows.map((row) => {
-              const ui = getUseCaseStyles(row.useCase);
-              return (
-                <TableRow key={row.id} className={styles.bodyRow}>
-                  <TableCell className={styles.nameCell}><HighlightText text={row.name} highlight={searchQuery} /></TableCell>
-                  <TableCell className={styles.subjectCell}><HighlightText text={row.subject} highlight={searchQuery} /></TableCell>
-                  <TableCell>
-                    <Chip label={row.useCase} sx={{ color: ui.color, bgcolor: ui.bgColor, border: `1px solid ${ui.borderColor}`, fontWeight: 600, fontSize: '11px', height: '24px', borderRadius: '100px' }} />
-                  </TableCell>
-                  <TableCell className={styles.dateCell}>{row.lastUpdatedAt}</TableCell>
-                  <TableCell className={styles.authorCell}>{row.createdBy}</TableCell>
-                  <TableCell align="right">
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                      <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('view', row)}><Visibility fontSize="inherit" /></IconButton>
-                      <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('edit', row)}><Edit fontSize="inherit" /></IconButton>
-                      <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('copy', row)}><ContentCopy fontSize="inherit" /></IconButton>
-                      <IconButton size="small" onClick={() => onAction('delete', row)} sx={{ p: 0.5 }}><img src={TrashIcon} alt="Delete" style={{ width: '18px', height: '18px' }} /></IconButton>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {visibleRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 3, color: '#6B7280' }}>
+                  No SMS templates found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              visibleRows.map((row) => {
+                // DB Field Mapping: Map audience_name and email_body from your API
+                const templateName = row.audience_name || row.name || 'Untitled SMS';
+                const bodyContent = row.email_body || row.subject || row.body || '--';
+                const useCase = row.use_case || row.useCase || 'General';
+                const date = row.modified_at || row.lastUpdatedAt || 'N/A';
+                const author = row.created_by_name || row.createdBy || 'System';
+
+                const ui = getUseCaseStyles(useCase);
+
+                return (
+                  <TableRow key={row.id} className={styles.bodyRow}>
+                    <TableCell className={styles.nameCell}>
+                      <HighlightText text={templateName} highlight={searchQuery} />
+                    </TableCell>
+                    <TableCell className={styles.subjectCell}>
+                      <HighlightText text={bodyContent} highlight={searchQuery} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={useCase} 
+                        sx={{ 
+                          color: ui.color, 
+                          bgcolor: ui.bgColor, 
+                          border: `1px solid ${ui.borderColor}`, 
+                          fontWeight: 600, 
+                          fontSize: '11px', 
+                          height: '24px', 
+                          borderRadius: '100px' 
+                        }} 
+                      />
+                    </TableCell>
+                    <TableCell className={styles.dateCell}>
+                      {date.includes('T') ? new Date(date).toLocaleDateString() : date}
+                    </TableCell>
+                    <TableCell className={styles.authorCell}>{author}</TableCell>
+                    <TableCell align="right">
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('view', row)}>
+                          <Visibility fontSize="inherit" />
+                        </IconButton>
+                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('edit', row)}>
+                          <Edit fontSize="inherit" />
+                        </IconButton>
+                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('copy', row)}>
+                          <ContentCopy fontSize="inherit" />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => onAction('delete', row)} sx={{ p: 0.5 }}>
+                          <img src={TrashIcon} alt="Delete" style={{ width: '18px', height: '18px' }} />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -107,7 +148,9 @@ export const SmsTemplateTable: React.FC<Props> = ({ data, searchQuery, onAction 
         </Typography>
 
         <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto' }}>
-          <IconButton onClick={handlePrev} disabled={page === 0} className={styles.arrowBtn}><ChevronLeftIcon fontSize="small" /></IconButton>
+          <IconButton onClick={handlePrev} disabled={page === 0} className={styles.arrowBtn}>
+            <ChevronLeftIcon fontSize="small" />
+          </IconButton>
 
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p, idx) => (
             <Box
@@ -116,14 +159,14 @@ export const SmsTemplateTable: React.FC<Props> = ({ data, searchQuery, onAction 
               className={`${styles.pageNumber} ${page === idx ? styles.activePage : ''}`}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToPage(idx); }}
-              aria-current={page === idx ? 'page' : undefined}
             >
               {p}
             </Box>
           ))}
 
-          <IconButton onClick={handleNext} disabled={page === totalPages - 1 || totalPages === 0} className={styles.arrowBtn}><ChevronRightIcon fontSize="small" /></IconButton>
+          <IconButton onClick={handleNext} disabled={page === totalPages - 1 || totalPages === 0} className={styles.arrowBtn}>
+            <ChevronRightIcon fontSize="small" />
+          </IconButton>
         </Stack>
       </Box>
     </Box>
