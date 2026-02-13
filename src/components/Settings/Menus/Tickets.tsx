@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@mui/icons-material/Search";
-import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
+import Filter_Leads from "../../../assets/icons/Filter_Leads.svg";
 import AddIcon from "@mui/icons-material/Add";
 import CreateTicket from "./CreateTicket";
 import FilterTickets from "./FilterTicket";
@@ -110,7 +110,7 @@ const paginatedTickets = filteredTickets.slice(
           </Box>
 
           <IconButton onClick={() => setOpenFilter(true)}>
-            <FilterAltOutlinedIcon />
+            <img src={Filter_Leads} />
           </IconButton>
 
           <Button
@@ -166,14 +166,14 @@ const paginatedTickets = filteredTickets.slice(
             px={2}
             py={1.5}
             alignItems="center"
-            sx={ticketsRowSx}
+            onClick={() => navigate(`/settings/tickets/${t.ticketNo}`)}
+            sx={{ ...ticketsRowSx, cursor: "pointer" }}
           >
 <Box
   flex={1}
   color="#5a8aea"
   fontWeight="500"
-  sx={{ cursor: "pointer" }}
-  onClick={() => navigate(`/settings/tickets/${t.ticketNo}`)}
+  
 >
   {t.ticketNo}
 </Box>

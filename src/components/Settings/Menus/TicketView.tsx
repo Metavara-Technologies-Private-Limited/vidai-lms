@@ -1,8 +1,15 @@
 import { useState } from "react";
 import {
   Box,
-  Typography,
-  Divider,
+  Typography,  Dialog, Divider,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Radio,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   Button,
   Chip,
   TextField,
@@ -12,6 +19,8 @@ import {
   Select, FormControl, InputLabel, OutlinedInput
 } from "@mui/material";
 import { TICKETS_MOCK } from "./mockData";
+import type { Template } from "../templateMockData";
+import { TEMPLATES_MOCK_DATA } from '../templateMockData';
 import { useParams } from "react-router-dom";
 import BackwardIcon from "../../../assets/icons/Backward_icon.svg";
 import DeleteIcon from "../../../assets/icons/Delete_icon.svg";
@@ -28,14 +37,17 @@ import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined";
 import { useRef } from "react";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import Menu from "@mui/material/Menu";
+import Reply_Mail from "../../../assets/icons/Reply_Ticket_Mail.svg";
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 
 const TicketView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const ticket = TICKETS_MOCK.find((t) => t.ticketNo === id);
+const initialTicket = TICKETS_MOCK.find((t) => t.ticketNo === id);
+const [ticket, setTicket] = useState(initialTicket);
 
-  // ✅ ALL HOOKS FIRST
+  //  ALL HOOKS FIRST
   const [tab, setTab] = useState(0);
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyTo, setReplyTo] = useState("");
@@ -52,8 +64,29 @@ const TicketView = () => {
 
   const [sendAnchorEl, setSendAnchorEl] = useState<null | HTMLElement>(null);
   const openSendMenu = Boolean(sendAnchorEl);
+const [templateOpen, setTemplateOpen] = useState(false);
+const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
+const [previewOpen, setPreviewOpen] = useState(false);
+const [emojiOpen, setEmojiOpen] = useState(false);
+const [scheduleTime, setScheduleTime] = useState<string | null>(null);
 
-  // ✅ ONLY AFTER ALL HOOKS
+const assigneeList = Array.from(
+  new Set(TICKETS_MOCK.map(t => t.assignedTo))
+);
+
+const handleInsertTemplate = (template: Template | null) => {
+  if (template) {
+    // Uses template.content or template.body based on your mock structure
+    const bodyToAdd = template.content || template.body || "";
+    setReplyBody((prev) => prev + "\n\n" + bodyToAdd);
+  }
+  // Close both dialogs
+  setPreviewOpen(false);
+  setTemplateOpen(false);
+};
+
+  //  ONLY AFTER ALL HOOKS
   if (!ticket) {
     return (
       <Typography p={3} color="error">
@@ -81,17 +114,38 @@ const TicketView = () => {
           </Typography>
         </Box>
 <Box
-  sx={{
-    backgroundColor: "#ffffff",
-    p: 2,
-    borderRadius: 1.5,
-    mt: 2,
-  }}
->
-            <Typography mt={1}>
-              The laboratory report has not been received within the expected
-              turnaround time. Kindly provide an update.
-            </Typography>
+    sx={{
+      backgroundColor: "#ffffff",
+      p: 3, // Increased padding to match expected image
+      borderRadius: 2,
+      mt: 2,
+      boxShadow: "0px 2px 8px rgba(0,0,0,0.05)"
+    }}
+  >
+    {/* NEW HEADER: AVATAR + NAME (from requestedBy) */}
+    <Box display="flex" alignItems="center" gap={2} mb={2}>
+      <Box
+        component="img"
+        src={`https://ui-avatars.com/api/?name=${ticket.requestedBy}&background=random`} // Dynamic Avatar
+        sx={{ width: 44, height: 44, borderRadius: "50%" }}
+      />
+      <Box>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#232323" }}>
+          {ticket.requestedBy}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {ticket.createdDate} | Ticket Requestor
+        </Typography>
+      </Box>
+    </Box>
+
+    <Typography 
+      variant="body1" 
+      sx={{ color: "#454545", lineHeight: 1.6, mb: 2 }}
+    >
+      The laboratory report has not been received within the expected
+      turnaround time. Kindly provide an update.
+    </Typography>
 
             {/* Attachments */}
 
@@ -103,13 +157,7 @@ const TicketView = () => {
         {/* Reply */}
         {!showReplyBox && (
           <Box mt={4}>
-            <Button
-            sx={{ backgroundColor:"#505050",
-                "&:hover":{backgroundColor:"#232323"}
-            }}
-             variant="contained" onClick={() => setShowReplyBox(true)}>
-              Reply
-            </Button>
+<img src={Reply_Mail} onClick={() => setShowReplyBox(true)}/>
           </Box>
         )}
 
@@ -122,28 +170,32 @@ const TicketView = () => {
             bgcolor="#fff"
           >
  {/* HIDDEN FILE INPUTS */}
-    <input
-      ref={fileInputRef}
-      type="file"
-      hidden
-      onChange={(e) => {
-        if (e.target.files?.[0]) {
-          alert(`File attached: ${e.target.files[0].name}`);
-        }
-      }}
-    />
+ <input
+  ref={fileInputRef}
+  type="file"
+  hidden
+  onChange={(e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReplyBody(prev => prev + `\n📎 Attachment: ${file.name}`);
+    }
+  }}
+/>
 
-    <input
-      ref={imageInputRef}
-      type="file"
-      accept="image/*"
-      hidden
-      onChange={(e) => {
-        if (e.target.files?.[0]) {
-          alert(`Image selected: ${e.target.files[0].name}`);
-        }
-      }}
-    />
+
+<input
+  ref={imageInputRef}
+  type="file"
+  accept="image/*"
+  hidden
+  onChange={(e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReplyBody(prev => prev + `\n🖼 Image: ${file.name}`);
+    }
+  }}
+/>
+
 
             {/* TO */}
             <TextField
@@ -179,13 +231,11 @@ const TicketView = () => {
   mb={1}
   color="#616161"
 >
-  {/* Text size toggle */}
+  {/* Paragraph spacing */}
   <FormatSizeIcon
     fontSize="small"
     sx={{ cursor: "pointer" }}
-    onClick={() =>
-      setReplyBody((prev) => prev + "\n\n")
-    }
+    onClick={() => setReplyBody(prev => prev + "\n\n")}
   />
 
   {/* Attachment */}
@@ -200,8 +250,11 @@ const TicketView = () => {
     fontSize="small"
     sx={{ cursor: "pointer" }}
     onClick={() => {
-      const url = prompt("Enter link");
-      if (url) setReplyBody((prev) => prev + `\n${url}`);
+      const url = prompt("Enter URL");
+      const text = prompt("Enter display text");
+      if (url) {
+        setReplyBody(prev => prev + `\n${text || url} (${url})`);
+      }
     }}
   />
 
@@ -209,9 +262,7 @@ const TicketView = () => {
   <EmojiEmotionsOutlinedIcon
     fontSize="small"
     sx={{ cursor: "pointer" }}
-    onClick={() =>
-      setReplyBody((prev) => prev + " 😊")
-    }
+    onClick={() => setEmojiOpen(prev => !prev)}
   />
 
   {/* Image */}
@@ -221,45 +272,76 @@ const TicketView = () => {
     onClick={() => imageInputRef.current?.click()}
   />
 
-  {/* Google Drive */}
-  <CloudOutlinedIcon
-    fontSize="small"
-    sx={{ cursor: "pointer" }}
-    onClick={() =>
-      alert("Connect to Google Drive (coming soon)")
-    }
-  />
+  {/* Drive */}
+<CloudOutlinedIcon
+  fontSize="small"
+  sx={{ cursor: "pointer" }}
+  onClick={() =>
+    window.open("https://drive.google.com", "_blank")
+  }
+/>
+
 
   {/* Schedule */}
   <ScheduleOutlinedIcon
     fontSize="small"
     sx={{ cursor: "pointer" }}
-    onClick={() =>
-      alert("Schedule send – feature coming soon")
-    }
+    onClick={() => {
+      const time = prompt("Enter schedule time");
+      if (time) setScheduleTime(time);
+    }}
   />
 
-  {/* Edit / Signature */}
+  {/* Signature */}
   <EditOutlinedIcon
     fontSize="small"
     sx={{ cursor: "pointer" }}
     onClick={() =>
-      setReplyBody(
-        (prev) =>
-          prev +
-          "\n\n—\nCrysta IVF, Bangalore"
+      setReplyBody(prev =>
+        prev +
+        "\n\n—\nBest regards,\nCrysta IVF Team"
       )
     }
   />
 
-  {/* More */}
+  {/* Templates */}
   <AddOutlinedIcon
     fontSize="small"
     sx={{ cursor: "pointer" }}
-    onClick={() => alert("More options")}
+    onClick={() => setTemplateOpen(true)}
   />
 </Box>
 
+
+{emojiOpen && (
+  <Box
+    sx={{
+      border: "1px solid #ddd",
+      borderRadius: 2,
+      p: 1,
+      mb: 1,
+      background: "#fff",
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 1,
+      maxWidth: 250
+    }}
+  >
+    {["😊","👍","🙏","✔️","🎉","🔥","💡","📅","⭐","❤️","😁","✉️"]
+      .map(e => (
+        <span
+          key={e}
+          style={{ cursor: "pointer", fontSize: 18 }}
+          onClick={() => {
+            setReplyBody(prev => prev + e);
+            setEmojiOpen(false);
+          }}
+        >
+          {e}
+        </span>
+      ))}
+  </Box>
+)}
 
             {/* BODY */}
             <TextField
@@ -271,6 +353,11 @@ const TicketView = () => {
               onChange={(e) => setReplyBody(e.target.value)}
               sx={{ mb: 2 }}
             />
+            {scheduleTime && (
+  <Typography variant="caption" color="text.secondary">
+    Scheduled for: {scheduleTime}
+  </Typography>
+)}
           </Box>
         )}
 
@@ -291,25 +378,29 @@ const TicketView = () => {
 />
 
 <Box display="flex" alignItems="center">
+
   {/* MAIN SEND BUTTON */}
   <Button
-    variant="contained"
-    //disabled={!replyBody.trim()}
-    sx={{
-      bgcolor: "#505050",
-      "&:hover": { bgcolor: "#232323" },
-      borderTopRightRadius: 0,
-      borderBottomRightRadius: 0,
-      px: 3,
-    }}
-    onClick={() => {
-      console.log("Send only");
-      setReplyBody("");
-      setShowReplyBox(false);
-    }}
-  >
-    Send
-  </Button>
+  variant="contained"
+  startIcon={<SendOutlinedIcon sx={{ transform: 'rotate(-45deg)', mb: 0.5 }} />} 
+  sx={{
+    bgcolor: "#505050",
+    textTransform: "none", 
+    fontWeight: 600,
+    borderRadius: "8px", 
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+    px: 3,
+    "&:hover": { bgcolor: "#232323" },
+  }}
+  onClick={() => {
+    console.log("Send only");
+    setReplyBody("");
+    setShowReplyBox(false);
+  }}
+>
+  Send
+</Button>
 
   {/* DROPDOWN ARROW */}
   <Button
@@ -449,7 +540,7 @@ const TicketView = () => {
 <FormControl
   fullWidth
   variant="outlined"
-  size="small"          // ⬅ IMPORTANT
+  size="small"          
   sx={{ mt: 2 }}
 >
   <InputLabel size="small">Type</InputLabel>
@@ -515,20 +606,44 @@ const TicketView = () => {
     input={<OutlinedInput label="Assign To" />}
     sx={{ bgcolor: "#ffffff", height: 40 }}
   >
+{assigneeList.map(name => (
+  <MenuItem key={name} value={name}>
+    {name}
+  </MenuItem>
+))}
 
-    <MenuItem value="John Grant">John Grant</MenuItem>
-    <MenuItem value="Emily Carter">Emily Carter</MenuItem>
   </Select>
 </FormControl>
 
 
 
-            <Button fullWidth 
-            sx={{ mt: 3, backgroundColor:"#505050", 
-            "&:hover":{backgroundColor:"#232323"}
-            }} variant="contained">
-              Update
-            </Button>
+<Button
+  fullWidth
+  sx={{
+    mt: 3,
+    backgroundColor: "#505050",
+    "&:hover": { backgroundColor: "#232323" }
+  }}
+  variant="contained"
+  onClick={() => {
+    if (!ticket) return;
+
+    const updatedTimeline = ticket.timeline.map(entry =>
+      entry.type === "assigned"
+        ? { ...entry, user: assignTo }
+        : entry
+    );
+
+    setTicket({
+      ...ticket,
+      assignedTo: assignTo,
+      timeline: updatedTimeline
+    });
+  }}
+>
+  Update
+</Button>
+
           </Box>
         )}
 
@@ -557,7 +672,96 @@ const TicketView = () => {
           </Box>
         )}
       </Box>
+{/* SINGLE DYNAMIC DIALOG */}
+<Dialog
+  open={templateOpen || previewOpen}
+  onClose={() => {
+    setTemplateOpen(false);
+    setPreviewOpen(false);
+  }}
+  fullWidth
+  maxWidth={previewOpen ? "md" : "sm"}
+>
+  <DialogTitle>
+    {previewOpen ? previewTemplate?.name : "Select Email Template"}
+  </DialogTitle>
+
+  <DialogContent dividers>
+    {previewOpen ? (
+      /* PREVIEW MODE CONTENT */
+      <>
+        <Typography fontWeight={600} mb={1}>Subject</Typography>
+        <Typography mb={2}>{previewTemplate?.subject}</Typography>
+        <Divider sx={{ mb: 2 }} />
+        <Typography sx={{ whiteSpace: "pre-line" }}>
+          {previewTemplate?.content || previewTemplate?.body || "No content available"}
+        </Typography>
+      </>
+    ) : (
+      /* SELECTION MODE CONTENT */
+      <List>
+        {(TEMPLATES_MOCK_DATA as Template[])
+          .filter((t) => t.type === "email")
+          .map((template) => (
+            <ListItemButton
+              key={template.id}
+              selected={selectedTemplateId === template.id}
+              onClick={() => {
+                setSelectedTemplateId(template.id);
+                setPreviewTemplate(template);
+                setPreviewOpen(true); // Switches to Preview mode
+              }}
+            >
+              <ListItemIcon>
+                <Radio checked={selectedTemplateId === template.id} />
+              </ListItemIcon>
+              <ListItemText primary={template.name} secondary={template.subject} />
+            </ListItemButton>
+          ))}
+      </List>
+    )}
+  </DialogContent>
+
+<DialogActions>
+  <Button 
+  variant="outlined"
+  onClick={() => {
+    setPreviewOpen(false);
+    setTemplateOpen(false);
+  }}
+  sx={{
+    textTransform: "none",
+    borderRadius: "12px",
+    backgroundColor: "#FFFFFF", 
+    borderColor: "#505050",    
+    color: "#505050",           
+    fontWeight: 600,
+    px: 3,
+    "&:hover": {
+      borderColor: "#232323",
+      color: "#232323",         
+      backgroundColor: "#FFFFFF", 
+      boxShadow: "0px 2px 4px rgba(0,0,0,0.05)" 
+    },
+  }}
+>
+  Cancel
+</Button>
+  
+  <Button
+    variant="contained"
+    disabled={!previewTemplate}
+    // Using the shared function we created
+    onClick={() => handleInsertTemplate(previewTemplate)}
+    sx={{backgroundColor:"#505050", "&:hover":{backgroundColor:"#232323"}}}
+  >
+    Insert
+  </Button>
+</DialogActions>
+</Dialog>
+
     </Box>
+    
   );
 };
 
