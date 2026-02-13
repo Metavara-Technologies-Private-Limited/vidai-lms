@@ -2,19 +2,18 @@ import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
-
-import KpiCards from "./KpiCards";
-import SlaAlerts from "./SlaAlerts";
-import TimeRangeSelector from "./TimeRangeSelector";
-import type { TimeRange } from "./TimeRangeSelector";
-import OverviewTabs from "./OverviewTabs";
-import type { OverviewTab } from "./OverviewTabs";
-import SourcePerformanceChart from "./SourcePerformanceChart";
-import CommunicationChart from "./CommunicationChart";
-import ConversionTrendChart from "./ConversionTrendChart";
-import LeadPipelineFunnel from "./LeadPipelineFunnel";
-import AppointmentsChart from "./AppointmentsChart";
-import TeamPerformanceTab from "./TeamPerformanceTab";
+import KpiCards from "../dashboard/KpiCards";
+import SlaAlerts from "../dashboard/SlaAlerts";
+import TimeRangeSelector from "../dashboard/TimeRangeSelector";
+import type { TimeRange } from "../dashboard/TimeRangeSelector";
+import OverviewTabs from "../dashboard/OverviewTabs";
+import type { OverviewTab } from "../dashboard/OverviewTabs";
+import SourcePerformanceChart from "../dashboard/SourcePerformanceChart";
+import CommunicationChart from "../dashboard/CommunicationChart";
+import ConversionTrendChart from "../dashboard/ConversionTrendChart";
+import LeadPipelineFunnel from "../dashboard/LeadPipelineFunnel";
+import AppointmentsChart from "../dashboard/AppointmentsChart";
+import TeamPerformanceTab from "../dashboard/TeamPerformanceTab";
 
 const DashboardLayout = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>("month");

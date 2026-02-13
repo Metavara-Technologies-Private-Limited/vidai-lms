@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Box, Typography, Button, IconButton, Select, MenuItem, OutlinedInput } from '@mui/material';
+import { Box, Typography, Button, IconButton, Select, MenuItem, OutlinedInput, Chip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import styles from "../../../styles/Template/NewTemplateModal.module.css";
@@ -18,24 +18,28 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // ✅ HELPER DEFINED INSIDE COMPONENT
-  const getClinicId = (): number => {
-    const storedClinicId = localStorage.getItem("clinic_id");
-    if (storedClinicId) return parseInt(storedClinicId, 10);
-    
-    const userData = localStorage.getItem("user");
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        if (user.clinic_id) return user.clinic_id;
-      } catch (e) {
-        console.error("Failed to parse user data");
-      }
+  // Helper to get styling for the chips (matched to Table styles)
+  const getUseCaseStyles = (useCase: string | undefined) => {
+    const safeCase = (useCase || 'default').toLowerCase();
+    switch (safeCase) {
+      case 'appointment': 
+        return { color: '#16A34A', bgColor: '#F0FDF4', borderColor: '#DCFCE7' };
+      case 'reminder': 
+        return { color: '#D97706', bgColor: '#FFFBEB', borderColor: '#FEF3C7' };
+      case 'feedback': 
+        return { color: '#EA580C', bgColor: '#FFF7ED', borderColor: '#FFEDD5' };
+      case 'marketing': 
+        return { color: '#7C3AED', bgColor: '#F5F3FF', borderColor: '#EDE9FE' };
+      default: 
+        return { color: '#6B7280', bgColor: '#F9FAFB', borderColor: '#F3F4F6' };
     }
-    return initialData?.clinic || 1; 
   };
 
-  // ✅ Fields handle both DB keys and UI keys
+  const getClinicId = (): number => {
+    const stored = localStorage.getItem("clinic_id");
+    return stored ? parseInt(stored, 10) : (initialData?.clinic || 1);
+  };
+
   const [formData, setFormData] = useState({
     name: initialData?.name || initialData?.audience_name || "",
     useCase: initialData?.useCase || initialData?.use_case || "",
@@ -52,28 +56,19 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
   };
 
   const handleSave = () => {
-  // Ensure this helper is defined inside the component
-  const getClinicId = (): number => {
-    const stored = localStorage.getItem("clinic_id");
-    return stored ? parseInt(stored, 10) : (initialData?.clinic || 1);
+    const clinicId = getClinicId();
+    const apiPayload = {
+      name: formData.name,
+      body: formData.body,
+      use_case: formData.useCase,
+      clinic: clinicId,
+      subject: "WhatsApp Message",
+      is_active: true
+    };
+    onSave(apiPayload);
+    onClose();
   };
 
-  const clinicId = getClinicId();
-  
-  // THE FIX: Use the keys your backend validation is looking for
-  const apiPayload = {
-    name: formData.name,        // Changed from audience_name
-    body: formData.body,        // Changed from email_body
-    use_case: formData.useCase,  // Backend usually prefers snake_case
-    clinic: clinicId,           // Must be an integer
-    subject: "WhatsApp Message", // Backend often requires a subject placeholder
-    is_active: true
-  };
-
-  console.log("🚀 WhatsApp Save Payload:", apiPayload);
-  onSave(apiPayload);
-  onClose();
-};
   if (showPreview) {
     return (
       <PreviewWhatsAppTemplateModal
@@ -97,7 +92,6 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
       </Box>
 
       <Box className={styles.formBody} sx={{ p: 3 }}>
-        {/* Name Field */}
         <Box className={styles.formGroup} sx={{ mb: 2.5 }}>
           <Typography className={styles.fieldLabel}>Name</Typography>
           <OutlinedInput 
@@ -110,26 +104,57 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
           />
         </Box>
 
-        {/* Use Case Field */}
+        {/* ✅ UPDATED: Use Case Field with Styled Chips */}
         <Box className={styles.formGroup} sx={{ mb: 2.5 }}>
           <Typography className={styles.fieldLabel}>Use Case</Typography>
           <Select
-            fullWidth size="small"
+            fullWidth
+            size="small"
             value={formData.useCase}
             displayEmpty
             disabled={isViewOnly}
             onChange={(e) => handleInputChange('useCase', e.target.value)}
             IconComponent={KeyboardArrowDownIcon}
+            renderValue={(selected) => {
+              if (!selected) return <Typography color="#9CA3AF" sx={{ fontSize: '14px' }}>Select Use Case</Typography>;
+              const ui = getUseCaseStyles(selected as string);
+              return (
+                <Chip 
+                  label={selected as string} 
+                  sx={{ 
+                    color: ui.color, 
+                    bgcolor: ui.bgColor, 
+                    border: `1px solid ${ui.borderColor}`, 
+                    fontWeight: 600, 
+                    fontSize: '11px', 
+                    height: '24px', 
+                    borderRadius: '100px' 
+                  }} 
+                />
+              );
+            }}
             sx={{ borderRadius: '8px', backgroundColor: isViewOnly ? '#F9FAFB' : '#fff' }}
           >
             <MenuItem value="" disabled>Select Use Case</MenuItem>
-            <MenuItem value="Appointment">Appointment</MenuItem>
-            <MenuItem value="Feedback">Feedback</MenuItem>
-            <MenuItem value="Marketing">Marketing</MenuItem>
+            
+            <MenuItem value="Appointment">
+              <Chip label="Appointment" sx={{ color: '#16A34A', bgcolor: '#F0FDF4', border: '1px solid #DCFCE7', fontWeight: 600, fontSize: '11px', height: '24px' }} />
+            </MenuItem>
+            
+            <MenuItem value="Reminder">
+              <Chip label="Reminder" sx={{ color: '#D97706', bgcolor: '#FFFBEB', border: '1px solid #FEF3C7', fontWeight: 600, fontSize: '11px', height: '24px' }} />
+            </MenuItem>
+            
+            <MenuItem value="Feedback">
+              <Chip label="Feedback" sx={{ color: '#EA580C', bgcolor: '#FFF7ED', border: '1px solid #FFEDD5', fontWeight: 600, fontSize: '11px', height: '24px' }} />
+            </MenuItem>
+
+            <MenuItem value="Marketing">
+              <Chip label="Marketing" sx={{ color: '#7C3AED', bgcolor: '#F5F3FF', border: '1px solid #EDE9FE', fontWeight: 600, fontSize: '11px', height: '24px' }} />
+            </MenuItem>
           </Select>
         </Box>
 
-        {/* Body Area */}
         <Box className={styles.formGroup} sx={{ mb: 2.5 }}>
           <Typography className={styles.fieldLabel}>Body</Typography>
           <textarea 
@@ -146,7 +171,6 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
           />
         </Box>
 
-        {/* Upload Section */}
         <Box className={styles.formGroup}>
           <Typography className={styles.fieldLabel}>Upload Documents</Typography>
           <Box sx={{ 

@@ -1,11 +1,61 @@
-import { Box, Typography } from "@mui/material";
-import { useState } from "react";
-import { mockData } from "./mockData";
+import { Box, Typography, CircularProgress } from "@mui/material";
+import { useState, useEffect, useMemo } from "react";
+// ✅ Integration Imports
+import { LeadAPI } from "../../services/leads.api";
+import type { Lead } from "../../types/leads.types";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 
 const LeadPipelineFunnel = () => {
-  const data = mockData.overview.pipelineData;
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // ✅ Fetch dynamic data from your LeadAPI
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        const response = await LeadAPI.list();
+        // Since list() returns http.get<Lead[]>, access data directly
+        setLeads(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Funnel API Error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLeads();
+  }, []);
+
+  // ✅ Process leads into the specific SVG stages matching your Status types
+  const data = useMemo(() => {
+    // These keys match your export type Status = "New" | "Appointment" | "Follow-Ups" | "Converted" | "Lost" | "Cycle Conversion"
+    const stages = [
+      { stage: 'New Leads', key: 'New', color: '#7d859d' },
+      { stage: 'Appointments', key: 'Appointment', color: '#8e97ae' },
+      { stage: 'Follow-Ups', key: 'Follow-Ups', color: '#a3abc1' },
+      { stage: 'Converted Leads', key: 'Converted', color: '#b8bdd4' },
+      { stage: 'Cycle Conversion', key: 'Cycle Conversion', color: '#daddf0' },
+      { stage: 'Lost Leads', key: 'Lost', color: '#eceff8' }
+    ];
+
+    return stages.map(item => {
+      // ✅ Filtering based on lead.status from your backend data
+      const count = leads.filter(l => l.status === item.key).length;
+
+      return {
+        ...item,
+        value: count || 0
+      };
+    });
+  }, [leads]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+        <CircularProgress size={40} sx={{ color: '#7d859d' }} />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={chartStyles.container}>
@@ -14,6 +64,7 @@ const LeadPipelineFunnel = () => {
         flexDirection: "column", alignItems: "center", 
         justifyContent: "center", overflow: "hidden" 
       }}>
+        {/* SVG Funnel Design matching your visual requirements */}
         <svg width="750" height="380" viewBox="0 0 750 380">
           <defs>
             {/* 3D Shading Gradients */}
@@ -47,7 +98,7 @@ const LeadPipelineFunnel = () => {
                 onMouseLeave={() => setHoveredIndex(null)}
                 style={{ cursor: 'pointer' }}
               >
-                {/* 3D Tapered Path */}
+                {/* 3D Tapered Path based on tapering math */}
                 <path
                   d={`M ${x} ${y1} L ${x + segmentWidth} ${ny1} L ${x + segmentWidth} ${ny2} L ${x} ${y2} Z`}
                   fill={`url(#grad-${index})`}
@@ -56,9 +107,9 @@ const LeadPipelineFunnel = () => {
                   style={{ transition: 'all 0.3s ease', filter: isHovered ? 'brightness(1.1)' : 'none' }}
                 />
                 
-                {/* Vertical Label */}
+                {/* Vertical Stage Label - Color flips to dark for lighter end stages */}
                 <text
-                  x={x + segmentWidth / 2} y="190" fill="white"
+                  x={x + segmentWidth / 2} y="190" fill={index > 3 ? "#7d859d" : "white"}
                   fontSize="11" fontWeight="500" textAnchor="middle"
                   transform={`rotate(-90, ${x + segmentWidth / 2}, 190)`}
                   style={{ pointerEvents: 'none', opacity: 0.9 }}
@@ -66,7 +117,7 @@ const LeadPipelineFunnel = () => {
                   {item.stage}
                 </text>
 
-                {/* Interactive Data Bubble */}
+                {/* Interactive Data Bubble showing REAL Backend count */}
                 {isHovered && (
                   <g transform={`translate(${x + (segmentWidth / 2) - 40}, 155)`} style={{ pointerEvents: 'none' }}>
                     <rect width="80" height="50" rx="12" fill="white" filter="url(#bubbleShadow)" />

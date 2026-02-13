@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, IconButton, Box, Stack, Typography } from '@mui/material';
+import { 
+  Table, TableBody, TableCell, TableContainer, TableHead, 
+  TableRow, Paper, Chip, IconButton, Box, Stack, Typography 
+} from '@mui/material';
 import { Visibility, Edit, ContentCopy } from '@mui/icons-material';
 import TrashIcon from '../../../assets/icons/trash.svg';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -32,9 +35,13 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
   const totalPages = data.length === 0 ? 0 : Math.ceil(data.length / rowsPerPage);
   const visibleRows = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
+  const start = data.length === 0 ? 0 : page * rowsPerPage + 1;
+  const end = Math.min((page + 1) * rowsPerPage, data.length);
+
   // Pagination Handlers
   const handlePrev = () => setPage((p) => Math.max(0, p - 1));
   const handleNext = () => setPage((p) => Math.min(totalPages - 1, p + 1));
+  const goToPage = (pageIndex: number) => setPage(pageIndex);
 
   useEffect(() => {
     if (page > 0 && totalPages > 0 && page > totalPages - 1) {
@@ -42,16 +49,23 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
     }
   }, [data.length, totalPages, page]);
 
-  const start = data.length === 0 ? 0 : page * rowsPerPage + 1;
-  const end = Math.min((page + 1) * rowsPerPage, data.length);
-
+  /**
+   * ✅ Use Case Styles: 
+   * Synchronized with SmsTemplateTable colors and borders.
+   */
   const getUseCaseStyles = (useCase: string | undefined) => {
     const safeCase = (useCase || 'default').toLowerCase();
     switch (safeCase) {
-      case 'appointment': return { color: '#16A34A', bgColor: '#F0FDF4', borderColor: '#DCFCE7' };
-      case 'marketing': return { color: '#7C3AED', bgColor: '#F5F3FF', borderColor: '#EDE9FE' };
-      case 'feedback': return { color: '#EA580C', bgColor: '#FFF7ED', borderColor: '#FFEDD5' };
-      default: return { color: '#6B7280', bgColor: '#F9FAFB', borderColor: '#F3F4F6' };
+      case 'appointment': 
+        return { color: '#16A34A', bgColor: '#F0FDF4', borderColor: '#DCFCE7' };
+      case 'reminder': 
+        return { color: '#D97706', bgColor: '#FFFBEB', borderColor: '#FEF3C7' };
+      case 'feedback': 
+        return { color: '#EA580C', bgColor: '#FFF7ED', borderColor: '#FFEDD5' };
+      case 'marketing': 
+        return { color: '#7C3AED', bgColor: '#F5F3FF', borderColor: '#EDE9FE' };
+      default: 
+        return { color: '#6B7280', bgColor: '#F9FAFB', borderColor: '#F3F4F6' };
     }
   };
 
@@ -78,16 +92,15 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
               </TableRow>
             ) : (
               visibleRows.map((row) => {
-                const useCase = row.use_case || row.useCase;
+                const useCase = row.use_case || row.useCase || 'General';
                 const ui = getUseCaseStyles(useCase);
-                const templateName = row.audience_name || row.name;
-                const bodyContent = row.email_body || row.subject || row.body;
+                const templateName = row.audience_name || row.name || 'Untitled WhatsApp';
+                const bodyContent = row.email_body || row.subject || row.body || '--';
                 
-                // Safe date parsing
-                const rawDate = row.modified_at || row.lastUpdatedAt;
-                const formattedDate = (rawDate && rawDate !== 'N/A') 
+                const rawDate = row.modified_at || row.lastUpdatedAt || 'N/A';
+                const formattedDate = (rawDate && rawDate !== 'N/A' && rawDate.includes('T')) 
                   ? new Date(rawDate).toLocaleDateString('en-GB') 
-                  : 'N/A';
+                  : rawDate;
 
                 return (
                   <TableRow key={row.id} className={styles.bodyRow}>
@@ -95,14 +108,22 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
                       <HighlightText text={templateName} highlight={searchQuery} />
                     </TableCell>
                     <TableCell className={styles.subjectCell}>
-                      <Typography variant="body2" noWrap sx={{ maxWidth: '250px' }}>
+                      <Typography variant="body2" noWrap sx={{ maxWidth: '250px', fontSize: '13px' }}>
                         <HighlightText text={bodyContent} highlight={searchQuery} />
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Chip 
-                        label={useCase || 'General'} 
-                        sx={{ ...ui, fontWeight: 600, fontSize: '11px', height: '24px', borderRadius: '100px' }} 
+                        label={useCase} 
+                        sx={{ 
+                          color: ui.color, 
+                          bgcolor: ui.bgColor, 
+                          border: `1px solid ${ui.borderColor}`, 
+                          fontWeight: 600, 
+                          fontSize: '11px', 
+                          height: '24px', 
+                          borderRadius: '100px' 
+                        }} 
                       />
                     </TableCell>
                     <TableCell className={styles.dateCell}>{formattedDate}</TableCell>
@@ -118,7 +139,7 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
                         <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('copy', row)}>
                           <ContentCopy fontSize="inherit" />
                         </IconButton>
-                        <IconButton size="small" onClick={() => onAction('delete', row)}>
+                        <IconButton size="small" onClick={() => onAction('delete', row)} sx={{ p: 0.5 }}>
                           <img src={TrashIcon} alt="Delete" style={{ width: '18px' }} />
                         </IconButton>
                       </Box>
@@ -131,21 +152,74 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
         </Table>
       </TableContainer>
 
-      <Box className={styles.paginationWrapper} sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
-        <Typography variant="caption" sx={{ color: '#6B7280' }}>
-          Showing {start} to {end} of {data.length} entries
+      {/* Pagination Section */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        mt: 3,
+        px: 1 
+      }}>
+        <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '13px' }}>
+          Showing <strong>{start}</strong> to <strong>{end}</strong> of <strong>{data.length}</strong> entries
         </Typography>
-        <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
-          <IconButton onClick={handlePrev} disabled={page === 0} className={styles.arrowBtn}>
+
+        <Stack direction="row" spacing={1} alignItems="center">
+          <IconButton 
+            onClick={handlePrev} 
+            disabled={page === 0} 
+            sx={{ 
+              border: '1px solid #E5E7EB', 
+              borderRadius: '8px', 
+              p: '6px',
+              '&.Mui-disabled': { border: '1px solid #F3F4F6' }
+            }}
+          >
             <ChevronLeftIcon fontSize="small" />
           </IconButton>
           
-          {/* Current Page Display */}
-          <Typography sx={{ fontSize: '13px', alignSelf: 'center', px: 1 }}>
-            {page + 1}
-          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {Array.from({ length: totalPages }, (_, i) => i).map((index) => {
+              const isCurrentPage = page === index;
+              return (
+                <Box
+                  key={index}
+                  onClick={() => goToPage(index)}
+                  sx={{
+                    minWidth: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: isCurrentPage ? 700 : 500,
+                    borderRadius: '8px',
+                    bgcolor: isCurrentPage ? '#000000' : 'transparent',
+                    color: isCurrentPage ? '#fff' : '#374151',
+                    border: isCurrentPage ? '1px solid #000000' : '1px solid #E5E7EB',
+                    transition: '0.2s',
+                    '&:hover': {
+                      bgcolor: isCurrentPage ? '#000000' : '#F9FAFB',
+                    }   
+                  }}
+                >
+                  {index + 1}
+                </Box>
+              );
+            })}
+          </Box>
 
-          <IconButton onClick={handleNext} disabled={page >= totalPages - 1} className={styles.arrowBtn}>
+          <IconButton 
+            onClick={handleNext} 
+            disabled={page >= totalPages - 1 || totalPages === 0} 
+            sx={{ 
+              border: '1px solid #E5E7EB', 
+              borderRadius: '8px', 
+              p: '6px',
+              '&.Mui-disabled': { border: '1px solid #F3F4F6' }
+            }}
+          >
             <ChevronRightIcon fontSize="small" />
           </IconButton>
         </Stack>
