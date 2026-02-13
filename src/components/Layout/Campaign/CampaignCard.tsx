@@ -1,4 +1,5 @@
 import "../../../../src/styles/Campaign/CampaignCard.css";
+import StopCampaignModal from "../../../components/Layout/Campaign/StopCampaignModal";
 
 /* ===== ICON IMPORTS ===== */
 import instagramIcon from "./Icons/instagram.png";
@@ -11,8 +12,9 @@ import moreIcon from "./Icons/more.png";
 import editIcon from "./Icons/edit.png";
 import duplicateIcon from "./Icons/duplicate.png";
 import stopIcon from "./Icons/stop.png";
-import { useEffect, useRef } from "react";
+import playIcon from "./Icons/play-button.png";
 
+import { useEffect, useRef, useState } from "react";
 
 type CampaignStatus =
   | "Live"
@@ -41,7 +43,8 @@ interface CampaignCardProps {
   campaign: Campaign;
   openMenuId: string | null;
   setOpenMenuId: (id: string | null) => void;
-  onViewDetail: (campaign: Campaign) => void; // ✅ ADDED
+  onViewDetail: (campaign: Campaign) => void;
+  onStatusChange: (id: string, status: CampaignStatus) => void; // already added in your file
 }
 
 export default function CampaignCard({
@@ -49,10 +52,11 @@ export default function CampaignCard({
   openMenuId,
   setOpenMenuId,
   onViewDetail,
+  onStatusChange, // ✅ receive prop properly
 }: CampaignCardProps) {
   const isMenuOpen = openMenuId === c.id;
   const menuRef = useRef<HTMLDivElement>(null);
-
+  const [showStopModal, setShowStopModal] = useState(false);
 
   const toggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -60,25 +64,28 @@ export default function CampaignCard({
   };
 
   useEffect(() => {
-  const handleClickOutside = (event: MouseEvent) => {
-    if (
-      menuRef.current &&
-      !menuRef.current.contains(event.target as Node)
-    ) {
-      setOpenMenuId(null);
-    }
-  };
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node)
+      ) {
+        setOpenMenuId(null);
+      }
+    };
 
-  document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
 
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  };
-}, [setOpenMenuId]);
-
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [setOpenMenuId]);
 
   return (
-    <div className="campaign-card">
+    <div
+      className="campaign-card"
+      onClick={() => onViewDetail(c)}
+      style={{ cursor: "pointer" }}
+    >
       <div className="card-header">
         <div className="title">{c.name}</div>
         <span className={`status ${c.status.toLowerCase()}`}>
@@ -113,7 +120,6 @@ export default function CampaignCard({
         </div>
       </div>
 
-      {/* DIVIDER */}
       <div className="card-divider" />
 
       <div className="card-footer">
@@ -133,8 +139,25 @@ export default function CampaignCard({
             <img src={viewIcon} alt="View" width={20} height={20} />
           </button>
 
-          <button className="action-btn pause-btn">
-            <img src={pauseIcon} alt="Pause" width={20} height={20} />
+          {/* ✅ Pause / Play Toggle */}
+          <button
+            className="action-btn pause-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+
+              if (c.status === "Stopped") {
+                onStatusChange(c.id, "Live"); // play
+              } else {
+                setShowStopModal(true); // open stop modal
+              }
+            }}
+          >
+            <img
+              src={c.status === "Stopped" ? playIcon : pauseIcon}
+              alt="Toggle"
+              width={20}
+              height={20}
+            />
           </button>
 
           <div className="more-container" ref={menuRef}>
@@ -161,6 +184,19 @@ export default function CampaignCard({
           </div>
         </div>
       </div>
+
+      {/* ✅ Stop Modal */}
+      {showStopModal && (
+        <StopCampaignModal
+          campaignName={c.name}
+          platforms={c.platforms}
+          onClose={() => setShowStopModal(false)}
+          onStop={() => {
+            onStatusChange(c.id, "Stopped");
+            setShowStopModal(false);
+          }}
+        />
+      )}
     </div>
   );
-} 
+}
