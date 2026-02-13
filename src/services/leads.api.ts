@@ -1,36 +1,195 @@
-// api/leads.ts
-import type { Lead } from "../types/leads.types";
-import type { LeadPayload } from "../components/LeadsHub/AddNewLead";
-import { http } from "./http";
+// services/leads.api.ts
+import axios from 'axios';
 
-export const LeadAPI = {
-  /**
-   * Get all leads
-   * GET /leads/list/
-   */
-  list: () => http.get<Lead[]>("/leads/list/"),
-
-  /**
-   * Create a new lead
-   * POST /leads/
-   * 
-   * Required fields:
-   * - clinic_id: number
-   * - department_id: number
-   * - full_name: string (max 255 chars)
-   * - contact_no: string (max 20 chars)
-   * - source: string (max 100 chars)
-   * - treatment_interest: string (comma-separated values)
-   * - appointment_date: string (YYYY-MM-DD format)
-   * - slot: string (max 50 chars)
-   */
-  create: (data: LeadPayload) => http.post<Lead>("/leads/", data),
-
-  /**
-   * Get lead by ID
-   * GET /leads/{lead_id}/
-   */
-  getById: (leadId: string) => http.get<Lead>(`/leads/${leadId}/`),
-
- 
+// ====================== Types ======================
+export type Department = {
+  id: number;
+  name: string;
+  is_active: boolean;
 };
+
+export type Clinic = {
+  id: number;
+  name: string;
+  department: Department[];
+};
+
+// ✅ Matches real API response exactly — no department_id field
+export type Employee = {
+  id: number;
+  emp_name: string;
+  emp_type: string;
+  department_name: string;
+};
+
+export type Lead = {
+  id: string;
+  clinic_id: number;
+  clinic_name: string;
+  department_id: number;
+  department_name: string;
+  full_name: string;
+  contact_no: string;
+  email?: string;
+  age?: number;
+  marital_status?: "single" | "married";
+  location?: string;
+  address?: string;
+  partner_inquiry: boolean;
+  partner_full_name?: string;
+  partner_age?: number;
+  partner_gender?: "male" | "female";
+  source: string;
+  sub_source?: string;
+  lead_status?: "new" | "contacted";
+  treatment_interest: string;
+  book_appointment: boolean;
+  appointment_date: string;
+  slot: string;
+  remark?: string;
+  is_active: boolean;
+  created_at: string;
+  modified_at: string;
+};
+
+// ====================== Axios Instance ======================
+const api = axios.create({
+  baseURL: 'http://127.0.0.1:8000/api',
+  headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = error?.config?.url;
+    const detail = error?.response?.data?.detail || error?.response?.data || error?.message;
+    console.error(`❌ API Error [${status}] ${url}:`, detail);
+    return Promise.reject(error);
+  }
+);
+
+// ====================== Lead API ======================
+export const LeadAPI = {
+  list: async (): Promise<Lead[]> => {
+    const response = await api.get<Lead[]>('/leads/list/');
+    return response.data;
+  },
+
+  create: async (data: any): Promise<Lead> => {
+    const response = await api.post<Lead>('/leads/', data);
+    console.log("✅ Lead created:", response.data);
+    return response.data;
+  },
+
+  getById: async (leadId: string): Promise<Lead> => {
+    const response = await api.get<Lead>(`/leads/${leadId}/`);
+    return response.data;
+  },
+
+  update: async (leadId: string, data: any): Promise<Lead> => {
+    const response = await api.put<Lead>(`/leads/${leadId}/update/`, data);
+    return response.data;
+  },
+
+  delete: async (leadId: string): Promise<void> => {
+    await api.patch(`/leads/${leadId}/delete/`);
+  },
+
+  activate: async (leadId: string): Promise<void> => {
+    await api.post(`/leads/${leadId}/activate/`);
+  },
+
+  inactivate: async (leadId: string): Promise<void> => {
+    await api.patch(`/leads/${leadId}/inactivate/`);
+  },
+};
+
+// ====================== Clinic API ======================
+export const ClinicAPI = {
+  getById: async (clinicId: number): Promise<Clinic> => {
+    try {
+      const response = await api.get<Clinic>(`/clinics/${clinicId}/detail/`);
+      return response.data;
+    } catch {
+      const fallback = await api.get<Clinic>(`/get_clinic/${clinicId}/`);
+      return fallback.data;
+    }
+  },
+
+  create: async (data: { name: string; department: string[] }): Promise<Clinic> => {
+    const response = await api.post<Clinic>("/clinics", data);
+    return response.data;
+  },
+
+  update: async (clinicId: number, data: { name: string; department: string[] }): Promise<Clinic> => {
+    const response = await api.put<Clinic>(`/clinics/${clinicId}/`, data);
+    return response.data;
+  },
+
+  getEmployees: async (clinicId: number): Promise<Employee[]> => {
+    const response = await api.get<Employee[]>(`/clinics/${clinicId}/employees/`);
+    const data = response.data;
+
+    if (!Array.isArray(data)) {
+      if (data && typeof data === 'object' && Array.isArray((data as any).results)) {
+        return (data as any).results as Employee[];
+      }
+      return [];
+    }
+
+    // ✅ Log exact department_name values so mismatches are visible
+    console.log("=== EMPLOYEES FROM API ===");
+    data.forEach(e =>
+      console.log(`  id=${e.id} | emp_name="${e.emp_name}" | department_name="${e.department_name}"`)
+    );
+
+    return data;
+  },
+};
+
+// ====================== Department API ======================
+export const DepartmentAPI = {
+  listByClinic: async (clinicId: number): Promise<Department[]> => {
+    const clinic = await ClinicAPI.getById(clinicId);
+
+    // ✅ Log exact department name values so mismatches are visible
+    console.log("=== DEPARTMENTS FROM API ===");
+    (clinic.department || []).forEach(d =>
+      console.log(`  id=${d.id} | name="${d.name}" | is_active=${d.is_active}`)
+    );
+
+    return clinic.department || [];
+  },
+
+  listActiveByClinic: async (clinicId: number): Promise<Department[]> => {
+    const departments = await DepartmentAPI.listByClinic(clinicId);
+    return departments.filter((dept) => dept.is_active);
+  },
+};
+
+// ====================== Employee API ======================
+export const EmployeeAPI = {
+  listByClinic: async (clinicId: number): Promise<Employee[]> => {
+    return ClinicAPI.getEmployees(clinicId);
+  },
+
+  create: async (data: {
+    user_id: number;
+    clinic_id: number;
+    department_id: number;
+    emp_type: string;
+    emp_name: string;
+  }): Promise<Employee> => {
+    const response = await api.post<Employee>("/employees/", data);
+    return response.data;
+  },
+};
+
+export { api };

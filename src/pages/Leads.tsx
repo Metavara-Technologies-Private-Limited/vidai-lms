@@ -45,12 +45,9 @@ const Leads: React.FC = () => {
   });
 
   // ====================== Fetch Leads on Mount ======================
- 
-
-React.useEffect(() => {
-  dispatch(fetchLeads());
-}, [dispatch]);
-
+  React.useEffect(() => {
+    dispatch(fetchLeads() as any);
+  }, [dispatch]);
 
   // ====================== Calculate Counts ======================
   React.useEffect(() => {
@@ -58,15 +55,25 @@ React.useEffect(() => {
       const followUpStatuses = ["new", "lost", "cycle conversion"];
 
       const allCount = leads.filter((l) => !l.archived).length;
-      const followUpCount = leads.filter(
-        (l) => !l.archived && followUpStatuses.includes(l.status?.toLowerCase() || "")
-      ).length;
+
+      // ✅ FIXED: use lead_status instead of status
+      const followUpCount = leads.filter((l) => {
+        const status = (l.lead_status || "").toLowerCase().trim();
+        return !l.archived && followUpStatuses.includes(status);
+      }).length;
+
       const archivedCount = leads.filter((l) => l.archived).length;
 
       setCounts({
         all: allCount,
         followUps: followUpCount,
         archived: archivedCount,
+      });
+    } else {
+      setCounts({
+        all: 0,
+        followUps: 0,
+        archived: 0,
       });
     }
   }, [leads]);

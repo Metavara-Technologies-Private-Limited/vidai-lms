@@ -22,13 +22,17 @@ export const fetchLeads = createAsyncThunk<
   { rejectValue: string }
 >("leads/fetchAll", async (_, { rejectWithValue }) => {
   try {
-    const res = await LeadAPI.list();
-    return res.data;
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      return rejectWithValue(err.message);
-    }
-    return rejectWithValue("Failed to fetch leads");
+    // ✅ FIXED: LeadAPI.list() already returns Lead[] directly — no .data needed
+    const leads = await LeadAPI.list();
+    return leads;
+  } catch (err: any) {
+    // ✅ FIXED: also handle axios errors which aren't instanceof Error
+    const message =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      err?.message ||
+      "Failed to fetch leads";
+    return rejectWithValue(message);
   }
 });
 
@@ -56,7 +60,7 @@ const leadSlice = createSlice({
       })
       .addCase(fetchLeads.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || "Failed to fetch leads";
+        state.error = action.payload ?? "Failed to fetch leads";
       });
   },
 });
@@ -65,6 +69,6 @@ export const { clearLeads, clearError } = leadSlice.actions;
 export default leadSlice.reducer;
 
 // ====================== Selectors ======================
-export const selectLeads = (state: any) => state.leads.leads;
-export const selectLeadsLoading = (state: any) => state.leads.loading;
-export const selectLeadsError = (state: any) => state.leads.error;
+export const selectLeads = (state: { leads: LeadState }) => state.leads.leads;
+export const selectLeadsLoading = (state: { leads: LeadState }) => state.leads.loading;
+export const selectLeadsError = (state: { leads: LeadState }) => state.leads.error;
