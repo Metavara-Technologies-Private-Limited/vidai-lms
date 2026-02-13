@@ -54,27 +54,36 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
   const error = useSelector(selectLeadsError);
 
   // ====================== Local State ======================
-  const [localLeads, setLocalLeads] = React.useState<Lead[]>([]);
+  const [localLeads, setLocalLeads] = React.useState<any[]>([]);
   const [page, setPage] = React.useState(1);
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   // ====================== Fetch Leads ======================
   React.useEffect(() => {
-    // Dispatch the async thunk to fetch leads from API
     dispatch(fetchLeads() as any);
   }, [dispatch]);
 
   // ====================== Sync Redux leads to Local State ======================
   React.useEffect(() => {
-    if (leads && leads.length > 0) {
-      // Ensure archived property exists
-      const leadsWithArchived = leads.map((lead) => ({
-        ...lead,
-        archived: lead.archived ?? false,
-      }));
-      setLocalLeads(leadsWithArchived);
-    }
-  }, [leads]);
+  if (leads) {
+    const leadsWithFix = leads.map((lead: any) => ({
+      ...lead,
+      archived:
+        lead.archived !== undefined
+          ? lead.archived
+          : lead.is_active === false,
+
+      // ✅ FIX: Use assigned_to_name from API to show employee name
+      assigned: lead.assigned_to_name || "Unassigned",
+
+      status: lead.status || lead.lead_status || "New",
+      name: lead.name || lead.full_name || "",
+    }));
+
+    setLocalLeads(leadsWithFix);
+  }
+}, [leads]);
+
 
   // ====================== Toggle Selection ======================
   const toggleSelect = (id: string) => {
@@ -242,7 +251,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
           </TableHead>
 
           <TableBody>
-            {currentLeads.map((lead) => (
+            {currentLeads.map((lead: any) => (
               <TableRow
                 key={lead.id}
                 hover
@@ -266,7 +275,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                 <TableCell>
                   <Stack direction="row" spacing={2}>
                     <Avatar className="lead-avatar">
-                      {lead.initials || lead.name?.charAt(0).toUpperCase()}
+                      {lead.initials || lead.full_name?.charAt(0)?.toUpperCase()}
                     </Avatar>
                     <Box>
                       <Typography className="lead-name-text">
@@ -301,13 +310,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
 
                 <TableCell>
                   <Chip
-                    label={lead.status || "New"}
+                    label={lead.status}
                     size="small"
-                    className={`lead-chip status-${
-                      (lead.status || "")
-                        ?.toLowerCase()
-                        ?.replace(/\s+/g, "-") || ""
-                    }`}
+                    className={`lead-chip status-${lead.status
+                      ?.toLowerCase()
+                      ?.replace(/\s+/g, "-")}`}
                   />
                 </TableCell>
 
@@ -315,9 +322,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   <Chip
                     label={lead.quality || "N/A"}
                     size="small"
-                    className={`lead-chip quality-${
-                      (lead.quality || "")?.toLowerCase() || ""
-                    }`}
+                    className={`lead-chip quality-${lead.quality
+                      ?.toLowerCase()}`}
                   />
                 </TableCell>
 
@@ -327,7 +333,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                     : `${lead.score || 0}%`}
                 </TableCell>
 
-                <TableCell>{lead.assigned || "Unassigned"}</TableCell>
+                <TableCell>{lead.assigned}</TableCell>
+
                 <TableCell>{lead.task || "N/A"}</TableCell>
 
                 <TableCell>
@@ -374,21 +381,13 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
         </Table>
       </TableContainer>
 
-      {/* ====================== Pagination ====================== */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        sx={{ mt: 2, px: 2 }}
-      >
+      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
         <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
 
         <Stack direction="row" spacing={1}>
-          <IconButton
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
+          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
             <ChevronLeftIcon />
           </IconButton>
 

@@ -21,6 +21,11 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { Dayjs } from "dayjs";
 import { useNavigate } from "react-router-dom";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+
+// ── Redux ──────────────────────────────────────────────────────────
+import { useSelector } from "react-redux";
+import { selectCampaign } from "../../store/campaignSlice";
+
 import type { FormState } from "../../types/leads.types";
 import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import type { Department, Employee } from "../../services/leads.api";
@@ -58,18 +63,14 @@ export type LeadPayload = {
 };
 
 // ====================== Helpers ======================
-
-/** Converts "" | undefined | null → null, otherwise returns the string */
 const strOrNull = (val: string | undefined | null): string | null =>
   val && val.trim() !== "" ? val.trim() : null;
 
-/** Converts a string number to integer, or null if invalid/zero */
 const intOrNull = (val: string | undefined | null): number | null => {
   const n = Number(val);
   return val && val.trim() !== "" && !isNaN(n) ? n : null;
 };
 
-/** Converts a string number to integer, falls back to fallback value */
 const intOrFallback = (val: string | undefined | null, fallback: number): number => {
   const n = Number(val);
   return val && val.trim() !== "" && !isNaN(n) && n > 0 ? n : fallback;
@@ -77,21 +78,11 @@ const intOrFallback = (val: string | undefined | null, fallback: number): number
 
 // ====================== Time Slots ======================
 const timeSlots = [
-  "09:00 AM - 09:30 AM",
-  "09:30 AM - 10:00 AM",
-  "10:00 AM - 10:30 AM",
-  "10:30 AM - 11:00 AM",
-  "11:00 AM - 11:30 AM",
-  "11:30 AM - 12:00 PM",
-  "12:00 PM - 12:30 PM",
-  "12:30 PM - 01:00 PM",
-  "02:00 PM - 02:30 PM",
-  "02:30 PM - 03:00 PM",
-  "03:00 PM - 03:30 PM",
-  "03:30 PM - 04:00 PM",
-  "04:00 PM - 04:30 PM",
-  "04:30 PM - 05:00 PM",
-  "05:00 PM - 05:30 PM",
+  "09:00 AM - 09:30 AM", "09:30 AM - 10:00 AM", "10:00 AM - 10:30 AM",
+  "10:30 AM - 11:00 AM", "11:00 AM - 11:30 AM", "11:30 AM - 12:00 PM",
+  "12:00 PM - 12:30 PM", "12:30 PM - 01:00 PM", "02:00 PM - 02:30 PM",
+  "02:30 PM - 03:00 PM", "03:00 PM - 03:30 PM", "03:30 PM - 04:00 PM",
+  "04:00 PM - 04:30 PM", "04:30 PM - 05:00 PM", "05:00 PM - 05:30 PM",
   "05:30 PM - 06:00 PM",
 ];
 
@@ -113,6 +104,27 @@ export default function AddNewLead() {
   const [employeeError, setEmployeeError] = React.useState<string | null>(null);
   const [clinicId] = React.useState(1);
 
+  // ── Pull campaigns from Redux (already fetched by CampaignsScreen) ──
+  const rawCampaigns = useSelector(selectCampaign);
+
+  // Normalise Redux shape → UI model
+  // source  : campaign_mode 1 → "Social Media", else → "Email"
+  // subSource: first platform name for social, "gmail" for email
+  const allCampaigns = React.useMemo(
+    () =>
+      (rawCampaigns || []).map((api: any) => ({
+        id: api.id as string,
+        name: api.campaign_name ?? "",
+        source: api.campaign_mode === 1 ? "Social Media" : "Email",
+        subSource:
+          api.campaign_mode === 1
+            ? (api.social_media?.[0]?.platform_name ?? "")
+            : "gmail",
+        isActive: Boolean(api.is_active),
+      })),
+    [rawCampaigns]
+  );
+
   const [form, setForm] = React.useState<FormState>({
     full_name: "",
     contact: "",
@@ -128,7 +140,8 @@ export default function AddNewLead() {
     partnerGender: "",
     source: "",
     subSource: "",
-    campaign: "",
+    campaign: "",       // UUID of the matched / selected campaign
+    campaignName: "",   // display name — read-only, derived
     assignee: "",
     nextType: "",
     nextStatus: "",
@@ -146,99 +159,125 @@ export default function AddNewLead() {
 
   // ====================== Fetch Departments ======================
   React.useEffect(() => {
-    const fetchDepartments = async () => {
+    const fetch = async () => {
       try {
         setLoadingDepartments(true);
         const depts = await DepartmentAPI.listActiveByClinic(clinicId);
         setDepartments(depts);
-        console.log("=== DEPARTMENTS FROM API ===");
-        depts.forEach(d => console.log(`  id=${d.id} | name="${d.name}"`));
       } catch (err: any) {
-        const msg = err?.response?.data?.detail || err?.message || "Failed to load departments";
-        setError(`Departments: ${msg}`);
+        setError(`Departments: ${err?.response?.data?.detail || err?.message || "Failed to load"}`);
       } finally {
         setLoadingDepartments(false);
       }
     };
-    fetchDepartments();
+    fetch();
   }, [clinicId]);
 
   // ====================== Fetch Employees ======================
   React.useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetch = async () => {
       try {
         setLoadingEmployees(true);
         setEmployeeError(null);
         const emps = await EmployeeAPI.listByClinic(clinicId);
         setEmployees(Array.isArray(emps) ? emps : []);
-        console.log("=== EMPLOYEES FROM API ===");
-        emps.forEach(e => console.log(`  id=${e.id} | emp_name="${e.emp_name}" | department_name="${e.department_name}"`));
       } catch (err: any) {
         const status = err?.response?.status;
         const msg = err?.response?.data?.detail || err?.message || "Failed to load employees";
-        const displayMsg =
+        setEmployeeError(
           status === 401 ? "Unauthorized — please log in again" :
-          status === 404 ? `Employees endpoint not found (clinic ${clinicId})` : msg;
-        setEmployeeError(displayMsg);
+          status === 404 ? `Employees endpoint not found (clinic ${clinicId})` : msg
+        );
         setEmployees([]);
       } finally {
         setLoadingEmployees(false);
       }
     };
-    fetchEmployees();
+    fetch();
   }, [clinicId]);
 
-  // ====================== Filter Personnel ======================
-  React.useEffect(() => {
-    if (!form.department || employees.length === 0) {
-      setFilteredPersonnel([]);
-      return;
-    }
+  // ====================== Auto-match campaign from source + subSource ======================
+  // Watches source and subSource. Finds campaigns in Redux that match BOTH.
+  // • If exactly one match  → auto-set campaign UUID + name (read-only)
+  // • If multiple matches   → let user pick from a filtered dropdown
+  // • If no match / cleared → reset campaign fields
+  const matchedCampaigns = React.useMemo(() => {
+    if (!form.source) return [];
 
+    return allCampaigns.filter((c) => {
+      const sourceMatch =
+        c.source.toLowerCase() === form.source.toLowerCase();
+
+      // If subSource is also filled, require it to match too
+      const subSourceMatch =
+        !form.subSource ||
+        c.subSource.toLowerCase() === form.subSource.toLowerCase();
+
+      return sourceMatch && subSourceMatch;
+    });
+  }, [form.source, form.subSource, allCampaigns]);
+
+  React.useEffect(() => {
+    if (matchedCampaigns.length === 1) {
+      // Exactly one match → auto-fill silently
+      const c = matchedCampaigns[0];
+      setForm((prev) => ({
+        ...prev,
+        campaign: c.id,
+        campaignName: c.name,
+      }));
+      console.log(`=== Campaign auto-matched: "${c.name}" (id=${c.id}) ===`);
+    } else {
+      // 0 or multiple matches → clear campaign so user can pick / leave blank
+      setForm((prev) => ({
+        ...prev,
+        campaign: "",
+        campaignName: "",
+      }));
+    }
+  }, [matchedCampaigns]);
+
+  // ====================== Filter Personnel by Department ======================
+  React.useEffect(() => {
+    if (!form.department || employees.length === 0) { setFilteredPersonnel([]); return; }
     const selectedDeptId = Number(form.department);
     const selectedDept = departments.find((d) => d.id === selectedDeptId);
-
-    if (!selectedDept) {
-      setFilteredPersonnel([]);
-      return;
-    }
-
-    const normalize = (s: string) =>
-      (s ?? "").trim().toLowerCase().normalize("NFC");
-
+    if (!selectedDept) { setFilteredPersonnel([]); return; }
+    const normalize = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
     const selectedName = normalize(selectedDept.name);
-    const filtered = employees.filter(
-      (emp) => normalize(emp.department_name) === selectedName
-    );
-
-    console.log("=== FILTER DEBUG ===");
-    console.log(`  Dept id=${selectedDeptId} name="${selectedDept.name}" → "${selectedName}"`);
-    employees.forEach((e) =>
-      console.log(`  emp="${e.emp_name}" dept="${e.department_name}" → "${normalize(e.department_name)}" MATCH=${normalize(e.department_name) === selectedName}`)
-    );
-    console.log(`  Matched: ${filtered.length}`);
-
-    setFilteredPersonnel(filtered);
+    setFilteredPersonnel(employees.filter((emp) => normalize(emp.department_name) === selectedName));
   }, [form.department, employees, departments]);
 
   // ====================== Styles ======================
   const inputStyle = {
     "& .MuiOutlinedInput-root": {
-      borderRadius: "8px",
-      fontSize: "0.875rem",
+      borderRadius: "8px", fontSize: "0.875rem",
       "& fieldset": { borderColor: "#E2E8F0" },
       "&:hover fieldset": { borderColor: "#CBD5E1" },
       "&.Mui-focused fieldset": { borderColor: "#6366F1" },
     },
   };
 
-  const labelStyle = {
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    color: "#475569",
-    mb: 0.5,
-    display: "block",
+  // Grey background for auto-filled / read-only fields
+  const readOnlyStyle = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px", fontSize: "0.875rem",
+      bgcolor: "#F1F5F9",
+      "& fieldset": { borderColor: "#E2E8F0" },
+      "&:hover fieldset": { borderColor: "#E2E8F0" },
+      "&.Mui-focused fieldset": { borderColor: "#E2E8F0" },
+    },
   };
+
+  const labelStyle = {
+    fontSize: "0.75rem", fontWeight: 600, color: "#475569", mb: 0.5, display: "block",
+  };
+
+  const autoTag = (
+    <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+      auto-filled
+    </Typography>
+  );
 
   // ====================== Handlers ======================
   const handleChange =
@@ -248,13 +287,31 @@ export default function AddNewLead() {
       setError(null);
     };
 
-  const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Changing source resets subSource and campaign so matching re-runs cleanly
+  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({
       ...prev,
-      department: e.target.value,
-      personnel: "",
-      assignee: "",
+      source: e.target.value,
+      subSource: "",
+      campaign: "",
+      campaignName: "",
     }));
+    setError(null);
+  };
+
+  // Changing subSource resets campaign so matching re-runs
+  const handleSubSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({
+      ...prev,
+      subSource: e.target.value,
+      campaign: "",
+      campaignName: "",
+    }));
+    setError(null);
+  };
+
+  const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, department: e.target.value, personnel: "", assignee: "" }));
     setError(null);
   };
 
@@ -269,10 +326,7 @@ export default function AddNewLead() {
       if (!form.source) { setError("Source is required"); return false; }
     }
     if (currentStep === 2) {
-      if (form.treatments.length === 0) {
-        setError("Please select at least one treatment");
-        return false;
-      }
+      if (form.treatments.length === 0) { setError("Please select at least one treatment"); return false; }
     }
     if (currentStep === 3) {
       if (!form.department) { setError("Department is required"); return false; }
@@ -288,74 +342,42 @@ export default function AddNewLead() {
     setCurrentStep((prev) => prev + 1);
   };
 
-  const handleBack = () => {
-    if (currentStep > 1) setCurrentStep((prev) => prev - 1);
-  };
+  const handleBack = () => { if (currentStep > 1) setCurrentStep((prev) => prev - 1); };
 
   // ====================== Build Payload ======================
   const buildPayload = (): LeadPayload => {
     const payload: LeadPayload = {
-      // ── Required integers ──────────────────────────────────────────
       clinic_id: clinicId,
       department_id: intOrFallback(form.department, 1),
-
-      // ── Required strings ──────────────────────────────────────────
       full_name: form.full_name.trim(),
       contact_no: form.contact.trim(),
       source: form.source,
+      sub_source: form.subSource || "",
       treatment_interest: form.treatments.join(","),
-      appointment_date: form.appointmentDate,   // already "YYYY-MM-DD" from DatePicker
+      appointment_date: form.appointmentDate,
       slot: form.slot,
-
-      // ── Nullable strings ──────────────────────────────────────────
+      campaign_id: strOrNull(form.campaign),   // UUID or null — never ""
       email: strOrNull(form.email),
       language_preference: form.language || "",
       location: form.location || "",
       address: form.address || "",
-      sub_source: form.subSource || "",
       remark: form.remark || "",
       partner_full_name: form.partnerName || "",
       next_action_description: form.nextDesc || "",
-
-      // ── Nullable — must be exact enum or null, NEVER empty string ──
-      // ✅ marital_status: lowercase "single"|"married" or null
-      marital_status: form.marital
-        ? (form.marital.toLowerCase() as "single" | "married")
-        : null,
-
-      // ✅ partner_gender: lowercase "male"|"female" or null
-      partner_gender: form.partnerGender
-        ? (form.partnerGender.toLowerCase() as "male" | "female")
-        : null,
-
-      // ✅ next_action_status: "pending"|"completed" or null — NEVER ""
-      next_action_status: (form.nextStatus === "pending" || form.nextStatus === "completed")
-        ? form.nextStatus
-        : null,
-
-      // ✅ campaign_id: must be UUID or null — NEVER empty string
-      campaign_id: null,
-
-      // ── Nullable integers ─────────────────────────────────────────
+      marital_status: form.marital ? (form.marital.toLowerCase() as "single" | "married") : null,
+      partner_gender: form.partnerGender ? (form.partnerGender.toLowerCase() as "male" | "female") : null,
+      next_action_status:
+        form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : null,
       assigned_to_id: intOrNull(form.assignee),
       personal_id: null,
       age: intOrNull(form.age),
       partner_age: intOrNull(form.partnerAge),
-
-      // ── Booleans ──────────────────────────────────────────────────
       partner_inquiry: isCouple === "yes",
       book_appointment: form.wantAppointment === "yes",
       is_active: true,
-
-      // ── Fixed values ──────────────────────────────────────────────
       lead_status: "new",
     };
-
-    // 🔍 Log exact payload before sending — makes 500 diagnosis easy
-    console.log("=== PAYLOAD BEING SENT TO /leads/ ===");
-    console.log(JSON.stringify(payload, null, 2));
-    console.log("=====================================");
-
+    console.log("=== PAYLOAD ===", JSON.stringify(payload, null, 2));
     return payload;
   };
 
@@ -364,43 +386,21 @@ export default function AddNewLead() {
     try {
       setError(null);
       setIsSubmitting(true);
-
-      const payload = buildPayload();
-      const response = await LeadAPI.create(payload);
+      const response = await LeadAPI.create(buildPayload());
       console.log("✅ Lead created:", response);
-
       setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        navigate("/leads", { replace: true });
-      }, 1500);
+      setTimeout(() => { setShowSuccess(false); navigate("/leads", { replace: true }); }, 1500);
     } catch (err: any) {
       console.error("❌ Lead create error:", err?.response?.data || err?.message);
-
-      // Extract the most useful error message from the response
       const data = err?.response?.data;
       let msg = "Failed to save lead";
-
       if (data) {
-        if (typeof data === "string") {
-          msg = data;
-        } else if (data.detail) {
-          msg = data.detail;
-        } else if (data.message) {
-          msg = data.message;
-        } else if (data.error) {
-          // ✅ Handles { error: "Internal Server Error", request_id: "..." }
-          msg = `${data.error}${data.request_id ? ` (request_id: ${data.request_id})` : ""}`;
-        } else {
-          // Show first field-level validation error
-          const firstKey = Object.keys(data)[0];
-          const firstVal = data[firstKey];
-          msg = `${firstKey}: ${Array.isArray(firstVal) ? firstVal[0] : firstVal}`;
-        }
-      } else {
-        msg = err?.message || msg;
-      }
-
+        if (typeof data === "string") msg = data;
+        else if (data.detail) msg = data.detail;
+        else if (data.message) msg = data.message;
+        else if (data.error) msg = `${data.error}${data.request_id ? ` (request_id: ${data.request_id})` : ""}`;
+        else { const k = Object.keys(data)[0]; msg = `${k}: ${Array.isArray(data[k]) ? data[k][0] : data[k]}`; }
+      } else msg = err?.message || msg;
       setError(msg);
     } finally {
       setIsSubmitting(false);
@@ -430,11 +430,7 @@ export default function AddNewLead() {
         {/* Step Indicator */}
         <Box sx={{ bgcolor: "white", px: 6, pt: 3, pb: 2, borderBottom: "1px solid #F1F5F9" }}>
           <Box sx={{ display: "inline-flex", alignItems: "center", gap: 3, bgcolor: "#F8FAFC", px: 3, py: 1.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
-            {[
-              { label: "Patient Details", step: 1 },
-              { label: "Medical Details", step: 2 },
-              { label: "Book Appointment", step: 3 },
-            ].map(({ label, step }) => (
+            {[{ label: "Patient Details", step: 1 }, { label: "Medical Details", step: 2 }, { label: "Book Appointment", step: 3 }].map(({ label, step }) => (
               <Box key={step} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Box sx={{
                   width: 24, height: 24, borderRadius: "50%",
@@ -443,10 +439,7 @@ export default function AddNewLead() {
                 }}>
                   {currentStep > step ? "✓" : step}
                 </Box>
-                <Typography variant="body2" fontWeight={600} sx={{
-                  fontSize: "0.875rem",
-                  color: currentStep > step ? "#10B981" : currentStep === step ? (step === 3 ? "#3B82F6" : "#F97316") : "#94A3B8",
-                }}>
+                <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.875rem", color: currentStep > step ? "#10B981" : currentStep === step ? (step === 3 ? "#3B82F6" : "#F97316") : "#94A3B8" }}>
                   {label}
                 </Typography>
               </Box>
@@ -455,15 +448,8 @@ export default function AddNewLead() {
         </Box>
 
         {/* Form Body */}
-        <Box sx={{
-          bgcolor: "white", p: 3,
-          maxHeight: "calc(100vh - 400px)", overflowY: "auto",
-          "&::-webkit-scrollbar": { width: "8px" },
-          "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
-        }}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>{error}</Alert>
-          )}
+        <Box sx={{ bgcolor: "white", p: 3, maxHeight: "calc(100vh - 400px)", overflowY: "auto", "&::-webkit-scrollbar": { width: "8px" }, "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" } }}>
+          {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>{error}</Alert>}
           {employeeError && (
             <Alert severity="warning" sx={{ mb: 3 }} onClose={() => setEmployeeError(null)}>
               Could not load employees: <strong>{employeeError}</strong>
@@ -539,7 +525,6 @@ export default function AddNewLead() {
                   <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
                 </RadioGroup>
               </Box>
-
               {isCouple === "yes" && (
                 <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
                   <Box>
@@ -561,31 +546,88 @@ export default function AddNewLead() {
                 </Box>
               )}
 
+              {/* ===== SOURCE & CAMPAIGN DETAILS ===== */}
               <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>SOURCE & CAMPAIGN DETAILS</Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
+
+                {/* 1. Source — user picks this first */}
                 <Box>
                   <Typography sx={labelStyle}>Source *</Typography>
-                  <TextField select fullWidth size="small" value={form.source} onChange={handleChange("source")} sx={inputStyle}>
+                  <TextField select fullWidth size="small" value={form.source} onChange={handleSourceChange} sx={inputStyle}>
                     <MenuItem value="">-- Select --</MenuItem>
                     <MenuItem value="Social Media">Social Media</MenuItem>
                     <MenuItem value="Website">Website</MenuItem>
                     <MenuItem value="Referral">Referral</MenuItem>
                     <MenuItem value="Direct">Direct</MenuItem>
+                    <MenuItem value="Email">Email</MenuItem>
                   </TextField>
                 </Box>
+
+                {/* 2. Sub-Source — user picks this second */}
                 <Box>
                   <Typography sx={labelStyle}>Sub-Source</Typography>
-                  <TextField select fullWidth size="small" value={form.subSource} onChange={handleChange("subSource")} sx={inputStyle}>
+                  <TextField select fullWidth size="small" value={form.subSource} onChange={handleSubSourceChange} sx={inputStyle} disabled={!form.source}>
                     <MenuItem value="">-- Select --</MenuItem>
                     <MenuItem value="Facebook">Facebook</MenuItem>
                     <MenuItem value="Instagram">Instagram</MenuItem>
                     <MenuItem value="Google">Google</MenuItem>
                     <MenuItem value="LinkedIn">LinkedIn</MenuItem>
+                    <MenuItem value="gmail">Gmail</MenuItem>
                   </TextField>
                 </Box>
+
+                {/* 3. Campaign Name — derived from source + subSource, read-only */}
                 <Box>
-                  <Typography sx={labelStyle}>Campaign Name</Typography>
-                  <TextField fullWidth size="small" value={form.campaign} onChange={handleChange("campaign")} sx={inputStyle} />
+                  <Typography sx={labelStyle}>
+                    Campaign Name
+                    {form.campaignName && autoTag}
+                  </Typography>
+
+                  {matchedCampaigns.length > 1 ? (
+                    // Multiple matches → let user pick which campaign
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      value={form.campaign}
+                      onChange={(e) => {
+                        const chosen = matchedCampaigns.find((c) => c.id === e.target.value);
+                        setForm((prev) => ({
+                          ...prev,
+                          campaign: e.target.value,
+                          campaignName: chosen?.name ?? "",
+                        }));
+                      }}
+                      sx={inputStyle}
+                    >
+                      <MenuItem value="">-- Select campaign --</MenuItem>
+                      {matchedCampaigns.map((c) => (
+                        <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                      ))}
+                    </TextField>
+                  ) : (
+                    // 0 or 1 match → read-only display field
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={form.campaignName || (form.source && matchedCampaigns.length === 0 ? "No matching campaign" : "")}
+                      placeholder="Filled automatically"
+                      InputProps={{ readOnly: true }}
+                      sx={readOnlyStyle}
+                    />
+                  )}
+
+                  {/* Helper hint */}
+                  {form.source && matchedCampaigns.length === 0 && (
+                    <Typography sx={{ fontSize: "0.68rem", color: "#94A3B8", mt: 0.5 }}>
+                      No active campaign matches this source
+                    </Typography>
+                  )}
+                  {matchedCampaigns.length > 1 && (
+                    <Typography sx={{ fontSize: "0.68rem", color: "#F97316", mt: 0.5 }}>
+                      {matchedCampaigns.length} campaigns match — please select one
+                    </Typography>
+                  )}
                 </Box>
               </Box>
 
@@ -602,9 +644,7 @@ export default function AddNewLead() {
                       <MenuItem value="" disabled>{employeeError ? "Failed to load" : "No employees"}</MenuItem>
                     ) : (
                       employees.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id.toString()}>
-                          {emp.emp_name} ({emp.emp_type})
-                        </MenuItem>
+                        <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
                       ))
                     )}
                   </TextField>
@@ -643,9 +683,8 @@ export default function AddNewLead() {
                   onChange={(e) => {
                     const value = e.target.value;
                     setForm((prev) => ({ ...prev, treatmentInterest: value }));
-                    if (value && !form.treatments.includes(value)) {
+                    if (value && !form.treatments.includes(value))
                       setForm((prev) => ({ ...prev, treatments: [...prev.treatments, value] }));
-                    }
                   }}
                   sx={{ ...inputStyle, maxWidth: "50%" }} displayEmpty>
                   <MenuItem value="" disabled>Select</MenuItem>
@@ -655,7 +694,6 @@ export default function AddNewLead() {
                   <MenuItem value="Consultation">Consultation</MenuItem>
                 </TextField>
               </Box>
-
               {form.treatments.length > 0 && (
                 <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
                   {form.treatments.map((t) => (
@@ -666,7 +704,6 @@ export default function AddNewLead() {
                   ))}
                 </Stack>
               )}
-
               <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>DOCUMENTS & REPORTS</Typography>
               <Box sx={{ mb: 2 }}>
                 <Typography sx={labelStyle}>Upload Documents</Typography>
@@ -694,7 +731,6 @@ export default function AddNewLead() {
                   <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
                 </RadioGroup>
               </Box>
-
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
                 <Box>
                   <Typography sx={labelStyle}>Department *</Typography>
@@ -714,8 +750,7 @@ export default function AddNewLead() {
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField select fullWidth size="small" value={form.assignee} onChange={handleChange("assignee")} sx={inputStyle}
-                    disabled={loadingEmployees || !form.department}>
+                  <TextField select fullWidth size="small" value={form.assignee} onChange={handleChange("assignee")} sx={inputStyle} disabled={loadingEmployees || !form.department}>
                     {!form.department ? (
                       <MenuItem value="" disabled>Select department first</MenuItem>
                     ) : loadingEmployees ? (
@@ -724,15 +759,12 @@ export default function AddNewLead() {
                       <MenuItem value="" disabled>{employeeError ? "Failed to load" : "No employees in this department"}</MenuItem>
                     ) : (
                       filteredPersonnel.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id.toString()}>
-                          {emp.emp_name} ({emp.emp_type})
-                        </MenuItem>
+                        <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
                       ))
                     )}
                   </TextField>
                 </Box>
               </Box>
-
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 3 }}>
                 <Box>
                   <Typography sx={labelStyle}>Date *</Typography>
@@ -750,13 +782,10 @@ export default function AddNewLead() {
                 <Box>
                   <Typography sx={labelStyle}>Select Slot *</Typography>
                   <TextField select fullWidth size="small" value={form.slot} onChange={handleChange("slot")} sx={inputStyle}>
-                    {timeSlots.map((slot, i) => (
-                      <MenuItem key={i} value={slot}>{slot}</MenuItem>
-                    ))}
+                    {timeSlots.map((slot, i) => <MenuItem key={i} value={slot}>{slot}</MenuItem>)}
                   </TextField>
                 </Box>
               </Box>
-
               <Box>
                 <Typography sx={labelStyle}>Remark</Typography>
                 <TextField fullWidth size="small" multiline rows={2} placeholder="Type Here..." value={form.remark} onChange={handleChange("remark")} sx={inputStyle} />
