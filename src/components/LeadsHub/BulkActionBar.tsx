@@ -12,7 +12,10 @@ import {
   IconButton,
   Radio,
   Divider,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
+import { useDispatch, useSelector } from "react-redux";
 
 // Main Action Icons
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
@@ -30,16 +33,19 @@ import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import EmojiEmotionsOutlinedIcon from "@mui/icons-material/EmojiEmotionsOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
-import ChangeHistoryIcon from "@mui/icons-material/ChangeHistory"; // Represents Drive Triangle
-import LockClockOutlinedIcon from "@mui/icons-material/LockClockOutlined"; // Represents Lock/Time
-import CreateOutlinedIcon from "@mui/icons-material/CreateOutlined"; // Represents Pen
+import ChangeHistoryIcon from "@mui/icons-material/ChangeHistory";
+import LockClockOutlinedIcon from "@mui/icons-material/LockClockOutlined";
+import CreateOutlinedIcon from "@mui/icons-material/CreateOutlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+
+// ✅ Import delete actions and REFETCH from Redux
+import { deleteLeads, selectDeletingIds, fetchLeads } from "../../store/leadSlice";
 
 interface Props {
   selectedIds: string[];
   tab: "active" | "archived";
   onDelete: () => void;
   onArchive: (archive: boolean) => void;
-  // Callback function to handle sending the finalized email
   onSendEmail?: (
     to: string,
     subject: string,
@@ -56,7 +62,6 @@ const templates = [
   { id: "5", title: "Welcome Email – Patient Inquiry" },
 ];
 
-/* ---------- Reusable dialog icon ---------- */
 const DialogIcon = ({
   icon,
   bg,
@@ -90,22 +95,55 @@ const BulkActionBar: React.FC<Props> = ({
   onArchive,
   onSendEmail,
 }) => {
+  const dispatch = useDispatch();
+  const deletingIds = useSelector(selectDeletingIds);
+
   const [openDelete, setOpenDelete] = useState(false);
   const [openArchive, setOpenArchive] = useState(false);
   const [openEmail, setOpenEmail] = useState(false);
   const [openComposer, setOpenComposer] = useState(false);
 
-  // --- State for Functionality ---
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [toAddress, setToAddress] = useState("");
   const [subject, setSubject] = useState("");
-  const [messageBody, setMessageBody] = useState(""); // State for the actual message text
+  const [messageBody, setMessageBody] = useState("");
 
   if (selectedIds.length === 0) return null;
 
-  const handleDelete = () => {
-    onDelete();
-    setOpenDelete(false);
+  // ✅ Updated handleDelete with REFETCH
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      setDeleteError(null);
+
+      console.log("🗑️ Deleting leads:", selectedIds);
+
+      // Dispatch bulk delete action
+      const result = await dispatch(deleteLeads(selectedIds) as any);
+
+      if (deleteLeads.fulfilled.match(result)) {
+        console.log("✅ All leads deleted successfully");
+        
+        // ✅ IMPORTANT: Refetch all leads from backend
+        await dispatch(fetchLeads() as any);
+        
+        // Close dialog and call parent onDelete
+        setOpenDelete(false);
+        onDelete(); // This clears selectedIds and updates local state
+      } else {
+        const errorMsg = result.payload as string || "Failed to delete leads";
+        console.error("❌ Failed to delete leads:", errorMsg);
+        setDeleteError(errorMsg);
+      }
+    } catch (err: any) {
+      console.error("❌ Delete error:", err);
+      setDeleteError(err.message || "Failed to delete leads");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleArchive = () => {
@@ -122,7 +160,6 @@ const BulkActionBar: React.FC<Props> = ({
         selectedTemplate || undefined,
       );
     }
-    // Reset state after sending
     setOpenComposer(false);
     setOpenEmail(false);
     setSelectedTemplate(null);
@@ -130,6 +167,8 @@ const BulkActionBar: React.FC<Props> = ({
     setSubject("");
     setMessageBody("");
   };
+
+  const someDeleting = selectedIds.some((id) => deletingIds.includes(id));
 
   return (
     <Box
@@ -144,15 +183,31 @@ const BulkActionBar: React.FC<Props> = ({
         zIndex: 20,
       }}
     >
-      {/* ---------- Action buttons ---------- */}
       <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
         <Button
           variant="outlined"
-          startIcon={<DeleteOutlineOutlinedIcon />}
-          onClick={() => setOpenDelete(true)}
-          sx={{ color: "black", borderColor: "black" }}
+          startIcon={
+            someDeleting || isDeleting ? (
+              <CircularProgress size={16} sx={{ color: "black" }} />
+            ) : (
+              <DeleteOutlineOutlinedIcon />
+            )
+          }
+          onClick={() => {
+            setOpenDelete(true);
+            setDeleteError(null);
+          }}
+          disabled={someDeleting || isDeleting}
+          sx={{ 
+            color: "black", 
+            borderColor: "black",
+            "&:disabled": {
+              color: "#9CA3AF",
+              borderColor: "#E5E7EB",
+            },
+          }}
         >
-          Delete
+          {someDeleting || isDeleting ? "Deleting..." : "Delete"}
         </Button>
 
         <Button
@@ -165,6 +220,7 @@ const BulkActionBar: React.FC<Props> = ({
             )
           }
           onClick={() => setOpenArchive(true)}
+          disabled={someDeleting || isDeleting}
           sx={{ color: "black", borderColor: "black" }}
         >
           {tab === "active" ? "Archive" : "Restore"}
@@ -173,6 +229,7 @@ const BulkActionBar: React.FC<Props> = ({
         <Button
           variant="outlined"
           startIcon={<ChatBubbleOutlineIcon />}
+          disabled={someDeleting || isDeleting}
           sx={{ color: "black", borderColor: "black" }}
         >
           SMS
@@ -183,16 +240,17 @@ const BulkActionBar: React.FC<Props> = ({
           startIcon={<EmailOutlinedIcon />}
           sx={{ color: "black", borderColor: "black" }}
           onClick={() => setOpenEmail(true)}
+          disabled={someDeleting || isDeleting}
         >
           Email
         </Button>
       </Stack>
 
-      {/* ---------- Delete Dialog ---------- */}
+      {/* Delete Dialog */}
       <Dialog
         open={openDelete}
-        onClose={() => setOpenDelete(false)}
-        maxWidth="xs"
+        onClose={() => !isDeleting && setOpenDelete(false)}
+        maxWidth="sm"
         fullWidth
       >
         <DialogContent sx={{ textAlign: "center", pt: 4 }}>
@@ -203,23 +261,85 @@ const BulkActionBar: React.FC<Props> = ({
           />
 
           <Typography variant="h6" fontWeight={600} mb={1}>
-            Delete Lead
+            Delete {selectedIds.length} Lead{selectedIds.length > 1 ? "s" : ""}
           </Typography>
 
-          <Typography color="text.secondary">
-            This action cannot be undone. Are you sure you want to delete the
-            selected lead permanently?
+          {deleteError && (
+            <Alert severity="error" sx={{ mb: 2, textAlign: "left" }}>
+              <Typography variant="body2" fontWeight={600}>
+                {deleteError}
+              </Typography>
+            </Alert>
+          )}
+
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            This action cannot be undone. Are you sure you want to delete{" "}
+            {selectedIds.length > 1 ? "these leads" : "this lead"} permanently?
           </Typography>
+
+          <Box
+            sx={{
+              p: 2,
+              bgcolor: "#FEE2E2",
+              borderRadius: 2,
+              border: "1px solid #FCA5A5",
+              maxHeight: "150px",
+              overflowY: "auto",
+              mb: 2,
+              textAlign: "left",
+            }}
+          >
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }} color="#991B1B">
+              Selected leads:
+            </Typography>
+            {selectedIds.slice(0, 10).map((id) => (
+              <Typography
+                key={id}
+                variant="caption"
+                sx={{ display: "block" }}
+                color="text.secondary"
+              >
+                • {id}
+              </Typography>
+            ))}
+            {selectedIds.length > 10 && (
+              <Typography variant="caption" color="text.secondary">
+                ... and {selectedIds.length - 10} more
+              </Typography>
+            )}
+          </Box>
+
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              p: 1.5,
+              bgcolor: "#FEF3C7",
+              borderRadius: 2,
+              border: "1px solid #FCD34D",
+              textAlign: "left",
+            }}
+          >
+            <WarningAmberIcon sx={{ color: "#D97706", fontSize: 20, mt: 0.2 }} />
+            <Typography variant="caption" color="#92400E">
+              All selected leads will be permanently removed from the system.
+            </Typography>
+          </Stack>
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
           <Button
             fullWidth
             onClick={() => setOpenDelete(false)}
+            disabled={isDeleting}
             sx={{
               backgroundColor: "#F3F4F6",
               color: "black",
               "&:hover": { backgroundColor: "#E5E7EB" },
+              "&:disabled": {
+                backgroundColor: "#F9FAFB",
+                color: "#D1D5DB",
+              },
             }}
           >
             Cancel
@@ -228,18 +348,32 @@ const BulkActionBar: React.FC<Props> = ({
           <Button
             fullWidth
             onClick={handleDelete}
+            disabled={isDeleting}
+            startIcon={
+              isDeleting ? (
+                <CircularProgress size={16} sx={{ color: "white" }} />
+              ) : (
+                <DeleteOutlineOutlinedIcon />
+              )
+            }
             sx={{
-              backgroundColor: "#111827",
+              backgroundColor: "#DC2626",
               color: "white",
-              "&:hover": { backgroundColor: "#000" },
+              "&:hover": { backgroundColor: "#B91C1C" },
+              "&:disabled": {
+                backgroundColor: "#FCA5A5",
+                color: "white",
+              },
             }}
           >
-            Delete
+            {isDeleting
+              ? `Deleting ${selectedIds.length}...`
+              : `Delete ${selectedIds.length} Lead${selectedIds.length > 1 ? "s" : ""}`}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* ---------- Archive / Restore Dialog ---------- */}
+      {/* Archive Dialog */}
       <Dialog
         open={openArchive}
         onClose={() => setOpenArchive(false)}
@@ -297,7 +431,7 @@ const BulkActionBar: React.FC<Props> = ({
         </DialogActions>
       </Dialog>
 
-      {/* ---------- Email Selector ---------- */}
+      {/* Email Selector */}
       <Dialog
         open={openEmail}
         onClose={() => setOpenEmail(false)}
@@ -400,14 +534,13 @@ const BulkActionBar: React.FC<Props> = ({
         </DialogActions>
       </Dialog>
 
-      {/* ---------- COMPOSE EMAIL ---------- */}
+      {/* Compose Email Dialog */}
       <Dialog
         open={openComposer}
         onClose={() => setOpenComposer(false)}
         maxWidth="md"
         fullWidth
       >
-        {/* Header */}
         <Box
           sx={{
             px: 3,
@@ -445,7 +578,6 @@ const BulkActionBar: React.FC<Props> = ({
             sx={{ py: 1, borderBottom: "1px solid #E5E7EB", mt: 1 }}
           />
 
-          {/* MESSAGE BODY FIELD - Makes typing possible */}
           <TextField
             fullWidth
             multiline
@@ -458,7 +590,6 @@ const BulkActionBar: React.FC<Props> = ({
           />
         </DialogContent>
 
-        {/* Footer */}
         <Box
           sx={{
             px: 3,
@@ -469,7 +600,6 @@ const BulkActionBar: React.FC<Props> = ({
             alignItems: "center",
           }}
         >
-          {/* Left toolbar */}
           <Box
             sx={{
               display: "flex",
@@ -482,39 +612,22 @@ const BulkActionBar: React.FC<Props> = ({
             }}
           >
             <IconButton size="small">
-              <Typography fontWeight="bold" fontSize="1.2rem">
-                A
-              </Typography>
+              <Typography fontWeight="bold" fontSize="1.2rem">A</Typography>
             </IconButton>
-            <IconButton size="small">
-              <AttachFileOutlinedIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small">
-              <LinkOutlinedIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small">
-              <EmojiEmotionsOutlinedIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small">
-              <ChangeHistoryIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small">
-              <ImageOutlinedIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small">
-              <LockClockOutlinedIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small">
-              <CreateOutlinedIcon fontSize="small" />
-            </IconButton>
+            <IconButton size="small"><AttachFileOutlinedIcon fontSize="small" /></IconButton>
+            <IconButton size="small"><LinkOutlinedIcon fontSize="small" /></IconButton>
+            <IconButton size="small"><EmojiEmotionsOutlinedIcon fontSize="small" /></IconButton>
+            <IconButton size="small"><ChangeHistoryIcon fontSize="small" /></IconButton>
+            <IconButton size="small"><ImageOutlinedIcon fontSize="small" /></IconButton>
+            <IconButton size="small"><LockClockOutlinedIcon fontSize="small" /></IconButton>
+            <IconButton size="small"><CreateOutlinedIcon fontSize="small" /></IconButton>
           </Box>
 
-          {/* Right buttons */}
           <Stack direction="row" spacing={1}>
             <Button
               onClick={() => {
                 setOpenComposer(false);
-                setOpenEmail(true); // Go back to template selection
+                setOpenEmail(true);
               }}
               variant="outlined"
               sx={{

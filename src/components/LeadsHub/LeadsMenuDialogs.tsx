@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Menu, MenuItem, IconButton, ListItemIcon } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -16,6 +17,9 @@ import ReassignAssigneeDialog from "../../components/LeadsHub/ReassignAssigneeDi
 import CallDialog from "../../components/LeadsHub/CallDialog";
 import type { Lead } from "../../types/leads.types";
 
+// ✅ Import delete actions from Redux
+import { deleteLead, selectIsLeadDeleting } from "../../store/leadSlice";
+
 interface MenuProps {
   lead: Lead;
   setLeads: React.Dispatch<React.SetStateAction<Lead[]>>;
@@ -26,7 +30,7 @@ let openCallSetter: ((name: string) => void) | null = null;
 
 /* ---------------- CALL BUTTON ---------------- */
 export const CallButton = ({ lead }: { lead: Lead }) => (
-  <IconButton onClick={() => openCallSetter?.(lead.name)}>
+  <IconButton onClick={() => openCallSetter?.(lead.full_name || lead.name)}>
     <CallIcon fontSize="small" />
   </IconButton>
 );
@@ -34,15 +38,54 @@ export const CallButton = ({ lead }: { lead: Lead }) => (
 /* ---------------- MENU BUTTON ---------------- */
 export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [openArchive, setOpenArchive] = React.useState(false);
   const [openDelete, setOpenDelete] = React.useState(false);
   const [openReassign, setOpenReassign] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+
+  // ✅ Check if this lead is being deleted
+  const isDeleting = useSelector(selectIsLeadDeleting(lead.id));
 
   // Helper function to clean lead ID for URL
   const getCleanLeadId = (leadId: string) => {
     return leadId.replace("#", "").replace("LN-", "").replace("LD-", "");
+  };
+
+  // ✅ Handle delete with API integration
+  const handleDeleteConfirm = async () => {
+    try {
+      setDeleteError(null);
+
+      console.log("🗑️ Deleting lead:", lead.id);
+
+      // Dispatch delete action to Redux
+      const result = await dispatch(deleteLead(lead.id) as any);
+
+      if (deleteLead.fulfilled.match(result)) {
+        console.log("✅ Lead deleted successfully");
+        
+        // ✅ Redux already removed it from state
+        // Just update local state for immediate UI feedback
+        setLeads((prev) => prev.filter((l) => l.id !== lead.id));
+        setOpenDelete(false);
+
+        // Emit event for sync with other components
+        const event = new CustomEvent("lead-deleted", {
+          detail: { id: lead.id },
+        });
+        window.dispatchEvent(event);
+      } else {
+        // Error - show message in dialog
+        console.error("❌ Delete failed:", result.payload);
+        setDeleteError(result.payload as string || "Failed to delete lead");
+      }
+    } catch (err: any) {
+      console.error("❌ Delete error:", err);
+      setDeleteError(err.message || "Failed to delete lead");
+    }
   };
 
   return (
@@ -56,18 +99,17 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
         open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
       >
-
         {/* 🔵 ACTIVE LEADS MENU */}
         {tab === "active" && (
           <>
             <MenuItem
               onClick={() => {
-                // Clean the ID and pass the full lead object in state
                 navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, {
                   state: { lead },
                 });
                 setAnchorEl(null);
               }}
+              disabled={isDeleting}
             >
               <ListItemIcon>
                 <EditOutlinedIcon fontSize="small" />
@@ -80,6 +122,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
                 setOpenReassign(true);
                 setAnchorEl(null);
               }}
+              disabled={isDeleting}
             >
               <ListItemIcon>
                 <PersonAddAltOutlinedIcon fontSize="small" />
@@ -92,6 +135,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
                 setOpenArchive(true);
                 setAnchorEl(null);
               }}
+              disabled={isDeleting}
             >
               <ListItemIcon>
                 <ArchiveOutlinedIcon fontSize="small" />
@@ -103,13 +147,18 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
               sx={{ color: "error.main" }}
               onClick={() => {
                 setOpenDelete(true);
+                setDeleteError(null);
                 setAnchorEl(null);
               }}
+              disabled={isDeleting}
             >
               <ListItemIcon>
-                <DeleteOutlineOutlinedIcon fontSize="small" />
+                <DeleteOutlineOutlinedIcon 
+                  fontSize="small" 
+                  sx={{ color: "error.main" }}
+                />
               </ListItemIcon>
-              Delete
+              {isDeleting ? "Deleting..." : "Delete"}
             </MenuItem>
           </>
         )}
@@ -126,6 +175,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
                 );
                 setAnchorEl(null);
               }}
+              disabled={isDeleting}
             >
               <ListItemIcon>
                 <UnarchiveOutlinedIcon fontSize="small" />
@@ -137,21 +187,27 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
               sx={{ color: "error.main" }}
               onClick={() => {
                 setOpenDelete(true);
+                setDeleteError(null);
                 setAnchorEl(null);
               }}
+              disabled={isDeleting}
             >
               <ListItemIcon>
-                <DeleteOutlineOutlinedIcon fontSize="small" />
+                <DeleteOutlineOutlinedIcon 
+                  fontSize="small" 
+                  sx={{ color: "error.main" }}
+                />
               </ListItemIcon>
-              Delete
+              {isDeleting ? "Deleting..." : "Delete"}
             </MenuItem>
           </>
         )}
       </Menu>
 
+      {/* Archive Dialog */}
       <ArchiveLeadDialog
         open={openArchive}
-        leadName={lead.name}
+        leadName={lead.full_name || lead.name}
         onClose={() => setOpenArchive(false)}
         onConfirm={() => {
           setLeads((prev) =>
@@ -163,16 +219,21 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
         }}
       />
 
+      {/* Delete Dialog */}
       <DeleteLeadDialog
         open={openDelete}
-        leadName={lead.name}
-        onClose={() => setOpenDelete(false)}
-        onConfirm={() => {
-          setLeads((prev) => prev.filter((l) => l.id !== lead.id));
+        leadName={lead.full_name || lead.name}
+        leadId={lead.id}
+        isDeleting={isDeleting}
+        error={deleteError}
+        onClose={() => {
           setOpenDelete(false);
+          setDeleteError(null);
         }}
+        onConfirm={handleDeleteConfirm}
       />
 
+      {/* Reassign Dialog */}
       <ReassignAssigneeDialog
         open={openReassign}
         lead={lead}

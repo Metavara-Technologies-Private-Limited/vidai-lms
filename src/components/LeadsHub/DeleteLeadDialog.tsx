@@ -1,14 +1,25 @@
-import { Dialog, Box, Typography, Button, Stack } from "@mui/material";
+import { Dialog, Box, Typography, Button, Stack, Alert, CircularProgress } from "@mui/material";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   leadName?: string;
+  leadId?: string; // ✅ Added: Display lead ID
+  isDeleting?: boolean; // ✅ Added: Loading state during deletion
+  error?: string | null; // ✅ Added: Error message from API
   onConfirm: () => void;
 }
 
-const DeleteLeadDialog = ({ open, onClose, leadName, onConfirm }: Props) => {
+const DeleteLeadDialog = ({ 
+  open, 
+  onClose, 
+  leadName, 
+  leadId, 
+  isDeleting = false, 
+  error = null, 
+  onConfirm 
+}: Props) => {
   return (
     <Dialog
       open={open}
@@ -44,11 +55,44 @@ const DeleteLeadDialog = ({ open, onClose, leadName, onConfirm }: Props) => {
           Delete Lead
         </Typography>
 
+        {/* ✅ Error Alert - Shows if API call fails */}
+        {error && (
+          <Alert 
+            severity="error" 
+            sx={{ 
+              mb: 2, 
+              textAlign: "left",
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="body2" fontWeight={600}>
+              {error}
+            </Typography>
+          </Alert>
+        )}
+
         {/* Description */}
-        <Typography fontSize={14} color="#6B7280" mb={3}>
+        <Typography fontSize={14} color="#6B7280" mb={leadId ? 1 : 3}>
           This action cannot be undone. Are you sure you want to delete{" "}
           <strong>{leadName}</strong> Lead permanently?
         </Typography>
+
+        {/* ✅ Lead ID Display */}
+        {leadId && (
+          <Typography 
+            fontSize={12} 
+            color="#9CA3AF" 
+            mb={3}
+            sx={{
+              p: 1,
+              bgcolor: "#F9FAFB",
+              borderRadius: 1,
+              border: "1px solid #E5E7EB",
+            }}
+          >
+            ID: {leadId}
+          </Typography>
+        )}
 
         {/* Actions */}
         <Stack direction="row" spacing={2}>
@@ -56,6 +100,7 @@ const DeleteLeadDialog = ({ open, onClose, leadName, onConfirm }: Props) => {
             fullWidth
             variant="outlined"
             onClick={onClose}
+            disabled={isDeleting} // ✅ Disable during deletion
             sx={{
               textTransform: "none",
               borderRadius: 2,
@@ -65,6 +110,10 @@ const DeleteLeadDialog = ({ open, onClose, leadName, onConfirm }: Props) => {
                 borderColor: "#D1D5DB",
                 background: "#F9FAFB",
               },
+              "&:disabled": {
+                borderColor: "#F3F4F6",
+                color: "#D1D5DB",
+              },
             }}
           >
             Cancel
@@ -73,19 +122,31 @@ const DeleteLeadDialog = ({ open, onClose, leadName, onConfirm }: Props) => {
           <Button
             fullWidth
             onClick={onConfirm}
+            disabled={isDeleting} // ✅ Disable during deletion
+            startIcon={
+              isDeleting ? (
+                <CircularProgress size={16} sx={{ color: "white" }} />
+              ) : (
+                <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
+              )
+            }
             sx={{
               textTransform: "none",
               borderRadius: 2,
-              backgroundColor: "#3F3F46",
+              backgroundColor: "#DC2626", // ✅ Changed to red for delete action
               color: "#FFFFFF",
               boxShadow: "none",
               "&:hover": {
-                backgroundColor: "#27272A",
+                backgroundColor: "#B91C1C",
                 boxShadow: "none",
+              },
+              "&:disabled": {
+                backgroundColor: "#FCA5A5",
+                color: "#FFFFFF",
               },
             }}
           >
-            Delete
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
         </Stack>
       </Box>
