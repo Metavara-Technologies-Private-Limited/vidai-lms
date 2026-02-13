@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { CampaignAPI } from "../services/campaign.api";
+
 import "../styles/Campaign/campaigns.css";
 
 /* ===== ICONS ===== */
@@ -35,90 +37,8 @@ export interface Campaign {
   platforms: ("facebook" | "instagram" | "linkedin" | "gmail")[];
   leads: number;
   scheduledAt?: string;
-
-  /* ===== DASHBOARD FIELDS (OPTIONAL) ===== */
-  totalBudget?: number;
-  totalImpressions?: number;
-  totalClicks?: number;
-  conversions?: number;
-  totalSpend?: number;
-  ctr?: number;
-  conversionRate?: number;
-  cpc?: number;
-  cpa?: number;
-  createdBy?: string;
-  createdDate?: string;
-  campaignMode?: string;
   objective?: string;
 }
-
-/* ===== INITIAL DATA ===== */
-const INITIAL_CAMPAIGNS: Campaign[] = [
-  {
-    id: "1",
-    name: "IVF Awareness – December",
-    type: "social",
-    status: "Live",
-    start: "01/12/2025",
-    end: "07/12/2025",
-    platforms: ["facebook", "instagram", "linkedin"],
-    leads: 14,
-    objective: "Leads Generation",
-    totalImpressions: 2000,
-    totalClicks: 500,
-    totalSpend: 400,
-    ctr: 4,
-    conversionRate: 6.7,
-  },
-  {
-    id: "2",
-    name: "Your Fertility Consultation – Next Steps",
-    type: "email",
-    status: "Failed",
-    start: "01/12/2025",
-    end: "07/12/2025",
-    platforms: ["gmail"],
-    leads: 0,
-    objective: "Email Engagement",
-  },
-  {
-    id: "3",
-    name: "IVF Awareness – December",
-    type: "social",
-    status: "Schedule",
-    start: "01/12/2025",
-    end: "07/12/2025",
-    platforms: ["facebook", "instagram"],
-    leads: 0,
-    scheduledAt: "01 Dec at 10:00 AM",
-  },
-  {
-    id: "4",
-    name: "IVF Consultation Follow-up",
-    type: "email",
-    status: "Draft",
-    start: "02/12/2025",
-    end: "08/12/2025",
-    platforms: ["gmail"],
-    leads: 3,
-  },
-  {
-    id: "5",
-    name: "IVF Awareness – December",
-    type: "email",
-    status: "Live",
-    start: "01/12/2025",
-    end: "07/12/2025",
-    platforms: ["gmail"],
-    leads: 14,
-    objective: "Leads Generation",
-    totalImpressions: 2000,
-    totalClicks: 500,
-    totalSpend: 400,
-    ctr: 4,
-    conversionRate: 6.7,
-  }
-];
 
 export default function CampaignsScreen() {
   const [tab, setTab] = useState<Tab>("all");
@@ -127,8 +47,6 @@ export default function CampaignsScreen() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [openStatus, setOpenStatus] = useState(false);
 
-  const [campaigns, setCampaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
-
   const [showAddCampaign, setShowAddCampaign] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -136,20 +54,74 @@ export default function CampaignsScreen() {
   const [selectedCampaign, setSelectedCampaign] =
     useState<Campaign | null>(null);
 
-  const handleCreateCampaign = (newCampaign: Campaign) => {
-    setCampaigns((prev) => [newCampaign, ...prev]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+
+  /* ================= FETCH ================= */
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  const fetchCampaigns = async () => {
+    try {
+      const res = await CampaignAPI.list();
+
+      const mapped = res.data.map((api: any) => ({
+        id: api.id,
+        name: api.campaign_name,
+        type: api.campaign_mode === 1 ? "social" : "email",
+        status: api.is_active ? "Live" : "Draft",
+        start: api.start_date,
+        end: api.end_date,
+        platforms:
+          api.campaign_mode === 1
+            ? api.social_media?.map((s: any) => s.platform_name) || []
+            : ["gmail"],
+        leads: 0,
+        scheduledAt: api.selected_start,
+        objective: api.campaign_objective,
+      }));
+
+      setCampaigns(mapped);
+    } catch (error) {
+      console.error("Failed to fetch campaigns", error);
+    }
   };
 
+  /* ================= STATUS CHANGE (NEW) ================= */
+  const handleStatusChange = (id: string, newStatus: CampaignStatus) => {
+    setCampaigns((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, status: newStatus } : c
+      )
+    );
+
+    // 🔔 Toast
+    const toast = document.createElement("div");
+    toast.className = "success-toast";
+    toast.innerText = `Campaign ${newStatus}`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.remove();
+    }, 3000);
+  };
+
+  /* ================= FILTERS ================= */
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
       const tabOk = tab === "all" || c.type === tab;
-      const searchOk =(c.name ?? "").toLowerCase().includes(search.toLowerCase());
+      const searchOk =
+        (c.name ?? "").toLowerCase().includes(search.toLowerCase());
       const statusOk = status === "all" || c.status === status;
       return tabOk && searchOk && statusOk;
     });
   }, [campaigns, tab, search, status]);
 
-  /* ===== DASHBOARD VIEW ===== */
+  const allCount = campaigns.length;
+  const socialCount = campaigns.filter((c) => c.type === "social").length;
+  const emailCount = campaigns.filter((c) => c.type === "email").length;
+
+  /* ================= DASHBOARD ================= */
   if (selectedCampaign) {
     return (
       <CampaignDashboard
@@ -159,28 +131,37 @@ export default function CampaignsScreen() {
     );
   }
 
-  /* ===== LIST VIEW ===== */
+  /* ================= LIST VIEW ================= */
   return (
     <div className="campaigns-page">
       <CampaignHeader onAddNew={() => setShowAddCampaign(true)} />
 
       <div className="filters-row">
+        {/* TABS */}
         <div className="tabs">
-          {(["all", "social", "email"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              className={`tab-btn ${tab === t ? "active" : ""}`}
-              onClick={() => setTab(t)}
-            >
-              {t === "all"
-                ? "All Campaigns"
-                : t === "social"
-                ? "Social Media Campaigns"
-                : "Email Campaigns"}
-            </button>
-          ))}
+          <button
+            className={`tab-btn ${tab === "all" ? "active" : ""}`}
+            onClick={() => setTab("all")}
+          >
+            All Campaigns ({allCount})
+          </button>
+
+          <button
+            className={`tab-btn ${tab === "social" ? "active" : ""}`}
+            onClick={() => setTab("social")}
+          >
+            Social Media Campaigns ({socialCount})
+          </button>
+
+          <button
+            className={`tab-btn ${tab === "email" ? "active" : ""}`}
+            onClick={() => setTab("email")}
+          >
+            Email Campaigns ({emailCount})
+          </button>
         </div>
 
+        {/* SEARCH + STATUS (UNCHANGED) */}
         <div className="right-filters">
           <div className="search-input">
             <img src={searchIcon} alt="Search" className="search-icon" />
@@ -192,45 +173,45 @@ export default function CampaignsScreen() {
           </div>
 
           <div className="status-dropdown">
-  <div
-    className={`status-btn ${openStatus ? "active" : ""}`}
-    onClick={() => setOpenStatus((prev) => !prev)}
-  >
-    {status === "all" ? "All Status" : status}
-  </div>
+            <div
+              className={`status-btn ${openStatus ? "active" : ""}`}
+              onClick={() => setOpenStatus((prev) => !prev)}
+            >
+              {status === "all" ? "All Status" : status}
+            </div>
 
-  {openStatus && (
-    <div className="status-menu">
-      {[
-        { label: "All Status", value: "all" },
-        { label: "Live", value: "Live" },
-        { label: "Draft", value: "Draft" },
-        { label: "Schedule", value: "Schedule" },
-        { label: "Paused", value: "Paused" },
-        { label: "Stopped", value: "Stopped" },
-        { label: "Completed", value: "Completed" },
-        { label: "Failed", value: "Failed" },
-      ].map((item) => (
-        <div
-          key={item.value}
-          className={`status-item ${
-            status === item.value ? "selected" : ""
-          }`}
-          onClick={() => {
-            setStatus(item.value as CampaignStatus | "all");
-            setOpenStatus(false);
-          }}
-        >
-          {item.label}
-        </div>
-      ))}
-    </div>
-  )}
-</div>
-
+            {openStatus && (
+              <div className="status-menu">
+                {[
+                  { label: "All Status", value: "all" },
+                  { label: "Live", value: "Live" },
+                  { label: "Draft", value: "Draft" },
+                  { label: "Schedule", value: "Schedule" },
+                  { label: "Paused", value: "Paused" },
+                  { label: "Stopped", value: "Stopped" },
+                  { label: "Completed", value: "Completed" },
+                  { label: "Failed", value: "Failed" },
+                ].map((item) => (
+                  <div
+                    key={item.value}
+                    className={`status-item ${
+                      status === item.value ? "selected" : ""
+                    }`}
+                    onClick={() => {
+                      setStatus(item.value as CampaignStatus | "all");
+                      setOpenStatus(false);
+                    }}
+                  >
+                    {item.label}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* CARDS */}
       <div className="campaign-grid">
         {filteredCampaigns.length === 0 ? (
           <div className="empty-state">No campaigns found</div>
@@ -241,12 +222,14 @@ export default function CampaignsScreen() {
               campaign={campaign}
               openMenuId={openMenuId}
               setOpenMenuId={setOpenMenuId}
-              onViewDetail={setSelectedCampaign} // ✅ ONLY ADDITION
+              onViewDetail={setSelectedCampaign}
+              onStatusChange={handleStatusChange}
             />
           ))
         )}
       </div>
 
+      {/* MODALS */}
       {showAddCampaign && (
         <AddNewCampaign
           onClose={() => setShowAddCampaign(false)}
@@ -264,8 +247,8 @@ export default function CampaignsScreen() {
       {showSocialModal && (
         <SocialCampaignModal
           onClose={() => setShowSocialModal(false)}
-          onSave={(newCampaign: Campaign) => {
-            handleCreateCampaign(newCampaign);
+          onSave={() => {
+            fetchCampaigns();
             setShowSocialModal(false);
           }}
         />
@@ -274,8 +257,8 @@ export default function CampaignsScreen() {
       {showEmailModal && (
         <EmailCampaignModal
           onClose={() => setShowEmailModal(false)}
-          onSave={(newCampaign: Campaign) => {
-            handleCreateCampaign(newCampaign);
+          onSave={() => {
+            fetchCampaigns();
             setShowEmailModal(false);
           }}
         />

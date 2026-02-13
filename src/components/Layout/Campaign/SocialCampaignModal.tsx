@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { v4 as uuid } from "uuid";
 import "../../../../src/styles/Campaign/SocialCampaignModal.css";
 import { CampaignAPI } from "../../../../src/services/campaign.api";
-
-
+import {FormControl,InputLabel,Select,MenuItem} from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
@@ -184,20 +182,36 @@ const totalBudget =
             <div className="form-row">
               <div className={`form-group half ${submitted && !objective ? "error" : ""}`}>
                 <label>Campaign Objective *</label>
-                <select value={objective} onChange={(e) => setObjective(e.target.value)}>
-                  <option value="">Select Objective</option>
-                  <option value="leads">Lead Generation</option>
-                  <option value="awareness">Brand Awareness</option>
-                </select>
+                <FormControl fullWidth variant="outlined">
+                  <Select
+                    value={objective}
+                    onChange={(e) => setObjective(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="">
+                      Select Objective
+                    </MenuItem>
+                    <MenuItem value="leads">Lead Generation</MenuItem>
+                    <MenuItem value="awareness">Brand Awareness</MenuItem>
+                  </Select>
+                </FormControl>
               </div>
 
-              <div className={`form-group half ${submitted && !audience ? "error" : ""}`}>
-                <label>Target Audience *</label>
-                <select value={audience} onChange={(e) => setAudience(e.target.value)}>
-                  <option value="">Select Audience</option>
-                  <option value="all">All Users</option>
-                </select>
-              </div>
+            <div className={`form-group half ${submitted && !audience ? "error" : ""}`}>
+              <label>Target Audience *</label>
+              <FormControl fullWidth variant="outlined">
+                <Select
+                  value={audience}
+                  onChange={(e) => setAudience(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="">
+                    Select Audience
+                  </MenuItem>
+                  <MenuItem value="all">All Users</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
             </div>
 
             <div className="form-row">

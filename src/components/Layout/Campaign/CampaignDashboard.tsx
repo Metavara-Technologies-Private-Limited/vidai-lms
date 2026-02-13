@@ -1,6 +1,5 @@
 import "../../../../src/styles/Campaign/CampaignDashboard.css";
 import React from "react";
-import { useNavigate } from "react-router-dom";
 
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
@@ -16,8 +15,8 @@ import cpaIcon from "./Icons/cpa.png";
 
 import CampaignTabContent from "./CampaignTabContent";
 
-const CampaignDashboard = () => {
-  const navigate = useNavigate();
+const CampaignDashboard = ({ onBack }: { onBack: () => void }) => {
+
 
   const [activeTab, setActiveTab] = React.useState("Content");
   const [activeSubTab, setActiveSubTab] = React.useState("Facebook");
@@ -29,12 +28,12 @@ const CampaignDashboard = () => {
       <div className="cd-header-section">
 
         <button
-          className="cd-back-btn"
-          onClick={() => navigate("/campaigns")}
-          aria-label="Back to campaigns"
-        >
-          <span className="cd-arrow"></span>
-        </button>
+  className="cd-back-btn"
+  onClick={onBack}
+  aria-label="Back to campaigns"
+>
+  <span className="cd-arrow">←</span>
+</button>
 
         <div className="cd-header-card">
           <div className="cd-header-top">

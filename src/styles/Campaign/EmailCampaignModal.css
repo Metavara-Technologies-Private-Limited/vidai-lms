@@ -164,9 +164,7 @@
 
 /* ================= INPUTS ================= */
 
-.form-group input,
-.form-group select,
-.MuiOutlinedInput-root {
+.form-group input {
   width: 100%;
   height: 56px;
   border-radius: 16px;
@@ -212,6 +210,13 @@ select:invalid {
   background: #ffffff;
   /* border-top: 1px solid #E5E7EB; */
   z-index: 10;
+  align-items: center;
+}
+.modal-actions button {
+  width: 160px !important;
+  min-width: 160px !important;
+  max-width: 160px !important;
+  flex: none !important;
 }
 
 .cancel-btn {
@@ -495,7 +500,40 @@ select:invalid {
   padding-bottom: 20px;
   border-bottom: 1px solid #F1F5F9;
 }
+/* Normal state */
+.MuiOutlinedInput-notchedOutline {
+  border: 1px solid #E2E3E5 !important;
+}
 
+/* Hover state */
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border: 1px solid #E2E3E5 !important;
+}
+
+/* Focus state — remove thick border */
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border:0.5px solid #E2E3E5 !important;
+}
+
+/* Error state */
+.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
+  border: 1px solid #E11D48 !important;
+}
+
+/* Rounded corners */
+.MuiOutlinedInput-root {
+  border-radius: 16px !important;
+  height: 56px !important;
+}
+
+.MuiSelect-select {
+  display: flex;
+  align-items: center;
+}
+
+.MuiInputLabel-root {
+  font-size: 10px !important;
+}
 
 /* ================= STEP 3 ================= */
 

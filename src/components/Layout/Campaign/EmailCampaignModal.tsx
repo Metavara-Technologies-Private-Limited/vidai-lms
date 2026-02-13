@@ -6,6 +6,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import {FormControl,InputLabel,Select,MenuItem} from "@mui/material";
 import dayjs from "dayjs";
 import viewIcon from "./Icons/view.png"; // adjust path if needed
 
@@ -190,20 +191,36 @@ onClose();
             <div className="form-row">
               <div className={`form-group half ${submitted && !objective ? "error" : ""}`}>
                 <label>Campaign Objective *</label>
-                <select value={objective} onChange={(e) => setObjective(e.target.value)}>
-                  <option value="">Select Objective</option>
-                  <option value="awareness">Awareness</option>
-                  <option value="leads">Lead Generation</option>
-                </select>
+                <FormControl fullWidth>
+  <InputLabel>Campaign Objective *</InputLabel>
+  <Select
+    value={objective}
+    label="Campaign Objective *"
+    onChange={(e) => setObjective(e.target.value)}
+  >
+    <MenuItem value="">Select Objective</MenuItem>
+    <MenuItem value="awareness">Awareness</MenuItem>
+    <MenuItem value="leads">Lead Generation</MenuItem>
+  </Select>
+</FormControl>
+
               </div>
 
               <div className={`form-group half ${submitted && !audience ? "error" : ""}`}>
                 <label>Target Audience *</label>
-                <select value={audience} onChange={(e) => setAudience(e.target.value)}>
-                  <option value="">Select Audience</option>
-                  <option value="all">All Subscribers</option>
-                  <option value="active">Active Users</option>
-                </select>
+                <FormControl fullWidth>
+  <InputLabel>Target Audience *</InputLabel>
+  <Select
+    value={audience}
+    label="Target Audience *"
+    onChange={(e) => setAudience(e.target.value)}
+  >
+    <MenuItem value="">Select Audience</MenuItem>
+    <MenuItem value="all">All Subscribers</MenuItem>
+    <MenuItem value="active">Active Users</MenuItem>
+  </Select>
+</FormControl>
+
               </div>
             </div>
 
@@ -253,14 +270,19 @@ onClose();
 
       <div className={`form-group ${submitted && !audience ? "error" : ""}`}>
         <label>Audience List *</label>
-        <select
-          value={audience}
-          onChange={(e) => setAudience(e.target.value)}
-        >
-          <option value="">Select Audience List</option>
-          <option value="all">All Subscribers</option>
-          <option value="active">Active Users</option>
-        </select>
+        <FormControl fullWidth>
+  <InputLabel>Audience List *</InputLabel>
+  <Select
+    value={audience}
+    label="Audience List *"
+    onChange={(e) => setAudience(e.target.value)}
+  >
+    <MenuItem value="">Select Audience List</MenuItem>
+    <MenuItem value="all">All Subscribers</MenuItem>
+    <MenuItem value="active">Active Users</MenuItem>
+  </Select>
+</FormControl>
+
       </div>
     </div>
 

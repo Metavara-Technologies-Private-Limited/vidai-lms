@@ -124,13 +124,11 @@
   flex: 1;               /* takes remaining space */
   overflow-y: auto;      /* enables scrolling */
   padding-bottom: 20px; /* space before footer */
+  
 }
 .step-content h2 {
   margin-top: 8px;
 }
-
-
-
 /* ================= FORM ================= */
 
 .form-group {
@@ -163,9 +161,7 @@
 
 /* ================= INPUTS ================= */
 
-.form-group input,
-.form-group select,
-.MuiOutlinedInput-root {
+.form-group input {
   width: 100%;
   height: 56px;
   border-radius: 16px;
@@ -211,6 +207,13 @@ select:invalid {
   background: #ffffff;
   /* border-top: 1px solid #E5E7EB; */
   z-index: 10;
+  align-items: center;
+}
+.modal-actions button {
+  width: 160px !important;
+  min-width: 160px !important;
+  max-width: 160px !important;
+  flex: none !important;
 }
 
 .cancel-btn {
@@ -237,6 +240,62 @@ select:invalid {
 .next-btn:disabled {
   background: #BDBDBD;
   cursor: not-allowed;
+}
+/* Normal state */
+.MuiOutlinedInput-notchedOutline {
+  border: 1px solid #E2E3E5 !important;
+}
+
+/* Hover */
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border: 1.5px solid #E2E3E5 !important;
+}
+
+/* Focus */
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border: 1.5px solid #E2E3E5 !important;
+}
+
+/* Error */
+.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
+  border: 1.5px solid #E11D48 !important;
+}
+
+
+/* Focus state — remove thick border */
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border:1px solid #E2E3E5 !important;
+}
+
+/* Error state */
+.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
+  border: 1px solid #E11D48 !important;
+}
+
+/* Rounded corners */
+.MuiOutlinedInput-root {
+  border-radius: 16px !important;
+  height: 56px !important;
+}
+
+.MuiSelect-select {
+  display: flex;
+  align-items: center;
+  padding: 20px 14px 8px !important;
+  font-family: 'Montserrat', sans-serif !important;
+}
+.MuiInputBase-root {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+/* Dropdown menu items */
+.MuiMenuItem-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-size: 14px !important;
+}
+/* Remove italic look when no value selected */
+.MuiSelect-select.MuiSelect-select {
+  font-style: normal !important;
 }
 
 /* =================================================
