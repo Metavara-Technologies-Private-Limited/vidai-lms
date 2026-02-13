@@ -17,6 +17,8 @@ import {
   Radio,
   RadioGroup,
   Fade,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import PhoneEnabledIcon from "@mui/icons-material/PhoneEnabled";
@@ -39,6 +41,7 @@ import SendIcon from "@mui/icons-material/Send";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 
 /**
  * ✅ INTEGRATION: Importing MenuButton, CallButton, and Dialogs from LeadsMenuDialogs
@@ -48,39 +51,59 @@ import { useNavigate } from "react-router-dom";
  */
 import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
 
-// Importing your data and type
-import { leadsMock } from "./leadsMock";
+// ✅ INTEGRATION: Import Redux actions and selectors
+import {
+  fetchLeads,
+  selectLeads,
+  selectLeadsLoading,
+  selectLeadsError,
+} from "../../store/leadSlice";
+
 import type { Lead } from "../../types/leads.types";
 
 interface Props {
   search: string;
 }
 
-// ✅ INTEGRATION: Same storage key as LeadsTable for sync
-const STORAGE_KEY = "vidai_leads_data";
-
 const LeadsBoard: React.FC<Props> = ({ search }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
-  // ✅ INTEGRATION: Using localStorage-synced state
-  const [leads, setLeads] = React.useState<Lead[]>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-    
-    const initial = leadsMock.map((l) => ({
-      ...l,
-      archived: l.archived ?? false,
-    }));
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
-  });
+  // ✅ INTEGRATION: Using Redux state instead of mock data
+  const reduxLeads = useSelector(selectLeads);
+  const loading = useSelector(selectLeadsLoading);
+  const error = useSelector(selectLeadsError);
 
-  // ✅ INTEGRATION: Keep localStorage updated
+  // ✅ INTEGRATION: Local state for managing leads
+  const [leads, setLeads] = React.useState<Lead[]>([]);
+
+  // ✅ INTEGRATION: Fetch leads on mount
   React.useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
-  }, [leads]);
+    dispatch(fetchLeads() as any);
+  }, [dispatch]);
+
+  // ✅ INTEGRATION: Sync Redux leads to local state
+  React.useEffect(() => {
+    if (reduxLeads && reduxLeads.length > 0) {
+      const leadsWithArchived = reduxLeads.map((lead) => ({
+        ...lead,
+        archived: lead.archived ?? false,
+      }));
+      setLeads(leadsWithArchived);
+      
+      // 🔍 Debug: Log lead statuses
+      console.log("📊 Total leads:", leadsWithArchived.length);
+      console.log("📊 Lead statuses:", leadsWithArchived.map(l => ({ id: l.id, status: l.status, archived: l.archived })));
+      
+      const statusCounts = leadsWithArchived.reduce((acc, lead) => {
+        const status = (lead.status || "No Status").toLowerCase();
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log("📊 Status distribution:", statusCounts);
+    }
+  }, [reduxLeads]);
 
   // --- Modal States ---
   const [openBookModal, setOpenBookModal] = React.useState(false);
@@ -105,7 +128,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
   ];
 
   const columns = [
-    { label: "NEW LEADS", statusKey: ["New"], color: "#6366F1" },
+    { label: "NEW LEADS", statusKey: ["New", "no status", ""], color: "#6366F1" }, // ✅ Handle "no status" as New
     { label: "FOLLOW-UPS", statusKey: ["Follow-Ups", "Follow-up"], color: "#F59E0B" },
     { label: "APPOINTMENT", statusKey: ["Appointment"], color: "#10B981" },
     { label: "CONVERTED LEADS", statusKey: ["Converted"], color: "#8B5CF6" },
@@ -113,9 +136,9 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
     { label: "LOST LEADS", statusKey: ["Lost"], color: "#64748B" },
   ];
 
-  // ✅ INTEGRATION: Filter from state (not mock) and exclude archived
+  // ✅ INTEGRATION: Filter from Redux state (not mock) and exclude archived
   const filteredLeads = leads.filter((l) => {
-    const matchSearch = `${l.name} ${l.id}`.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = `${l.full_name || l.name} ${l.id}`.toLowerCase().includes(search.toLowerCase());
     const isActive = !l.archived; // Don't show archived leads on board
     return matchSearch && isActive;
   });
@@ -152,7 +175,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
 
   const handleSendSms = () => {
     // SMS send logic here
-    console.log("Sending SMS to:", selectedLead?.name, "Message:", smsMessage);
+    console.log("Sending SMS to:", selectedLead?.full_name || selectedLead?.name, "Message:", smsMessage);
     handleCloseAll();
   };
 
@@ -196,22 +219,37 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
       return (
         <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
           <Typography variant="caption" fontWeight={600} sx={{ color: '#64748B', fontSize: '0.7rem' }}>
-            Score: <Box component="span" sx={{ color: '#1E293B' }}>{lead.score}</Box>
+            Score: <Box component="span" sx={{ color: '#1E293B' }}>{lead.score || 0}%</Box>
           </Typography>
         </Box>
       );
     }
+
+    // Format date and time from created_at
+    const formattedDate = lead.created_at 
+      ? new Date(lead.created_at).toLocaleDateString("en-GB")
+      : "Not specified";
+    const formattedTime = lead.created_at
+      ? new Date(lead.created_at).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
 
     return (
       <Box sx={{ width: '100%', mt: 1.5 }}>
         <Stack spacing={1} sx={{ mb: 1 }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <LocationOnIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>{lead.location || "Not specified"}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+              {lead.location || "Not specified"}
+            </Typography>
           </Stack>
           <Stack direction="row" spacing={1} alignItems="center">
             <CalendarMonthIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>{`${lead.date}, ${lead.time}`}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+              {`${formattedDate}${formattedTime ? `, ${formattedTime}` : ''}`}
+            </Typography>
           </Stack>
         </Stack>
         
@@ -219,16 +257,26 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
         
         <Stack direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
           <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700 }}>ASSIGNED TO</Typography>
-            <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: '0.75rem' }}>{lead.assigned || "Unassigned"}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700 }}>
+              ASSIGNED TO
+            </Typography>
+            <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: '0.75rem' }}>
+              {lead.assigned || "Unassigned"}
+            </Typography>
           </Box>
           <Box sx={{ textAlign: "right" }}>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700 }}>LEAD SOURCE</Typography>
-            <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: '0.75rem' }}>{lead.source || "Unknown"}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700 }}>
+              LEAD SOURCE
+            </Typography>
+            <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: '0.75rem' }}>
+              {lead.source || "Unknown"}
+            </Typography>
           </Box>
         </Stack>
 
-        <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}>CONTACT OPTION</Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}>
+          CONTACT OPTION
+        </Typography>
         <Stack direction="row" spacing={1.5} sx={{ mb: showButton ? 2 : 0 }}>
           {/* ✅ INTEGRATION: Using CallButton from LeadsMenuDialogs */}
           <Box sx={iconBtnStyle} onClick={(e) => e.stopPropagation()}>
@@ -265,6 +313,70 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
     );
   };
 
+  // ====================== Loading State ======================
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
+        <Stack alignItems="center" spacing={2}>
+          <CircularProgress />
+          <Typography color="text.secondary">Loading leads...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  // ====================== Error State ======================
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ mb: 3 }}>
+        <Typography fontWeight={600}>Failed to load leads</Typography>
+        <Typography variant="body2">{error}</Typography>
+        <Typography
+          variant="body2"
+          sx={{
+            mt: 1,
+            color: "primary.main",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+          onClick={() => dispatch(fetchLeads() as any)}
+        >
+          Try again
+        </Typography>
+      </Alert>
+    );
+  }
+
+  // ====================== Empty State ======================
+  if (leads.length === 0) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
+        <Stack alignItems="center" spacing={2}>
+          <Typography variant="h6" color="text.secondary">
+            No leads found
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Create your first lead to get started
+          </Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ 
       display: "flex", 
@@ -278,7 +390,13 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
       "&::-webkit-scrollbar-thumb": { backgroundColor: '#CBD5E1', borderRadius: '10px' }
     }}>
       {columns.map((col) => {
-        const leadsInCol = filteredLeads.filter((l) => col.statusKey.some((key) => l.status === key));
+        // ✅ Case-insensitive status matching with null/undefined handling
+        const leadsInCol = filteredLeads.filter((l) => {
+          const leadStatus = (l.status || "no status").toLowerCase().trim();
+          return col.statusKey.some((key) => 
+            leadStatus === (key || "no status").toLowerCase().trim()
+          );
+        });
         return (
           <Box 
             key={col.label} 
@@ -336,16 +454,20 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Avatar sx={{ width: 36, height: 36, fontSize: "0.8rem", bgcolor: '#EEF2FF', color: '#6366F1', fontWeight: 700 }}>
-                        {lead.initials}
+                        {lead.initials || (lead.full_name || lead.name)?.charAt(0).toUpperCase()}
                       </Avatar>
                       <Box>
-                        <Typography variant="subtitle2" fontWeight={700} sx={{ fontSize: '0.9rem', color: '#1E293B' }}>{lead.name}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>{lead.id}</Typography>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ fontSize: '0.9rem', color: '#1E293B' }}>
+                          {lead.full_name || lead.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                          {lead.id}
+                        </Typography>
                       </Box>
                     </Stack>
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <Chip 
-                        label={lead.quality} 
+                        label={lead.quality || "N/A"} 
                         size="small" 
                         sx={{ 
                           height: 20, fontSize: "0.65rem", fontWeight: 700,
@@ -399,7 +521,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
           <Box sx={{ mb: 3 }}>
             <Typography variant="body2" fontWeight={600} color="#475569" sx={{ mb: 1 }}>To:</Typography>
             <Chip 
-              label={selectedLead?.name} 
+              label={selectedLead?.full_name || selectedLead?.name} 
               size="small" 
               sx={{ 
                 bgcolor: '#EEF2FF', 
@@ -537,14 +659,14 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
               <Stack spacing={0.5}>
                 <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #F1F5F9', py: 1.5 }}>
                   <Typography variant="body2" sx={{ width: 40, color: '#94A3B8', fontWeight: 500 }}>To :</Typography>
-                  <Chip label={selectedLead?.name} size="small" onDelete={() => {}} sx={{ bgcolor: '#EEF2FF', color: '#6366F1', fontWeight: 600, borderRadius: '6px' }} />
+                  <Chip label={selectedLead?.full_name || selectedLead?.name} size="small" onDelete={() => {}} sx={{ bgcolor: '#EEF2FF', color: '#6366F1', fontWeight: 600, borderRadius: '6px' }} />
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #F1F5F9', py: 1.5 }}>
                   <Typography variant="body2" sx={{ width: 70, color: '#94A3B8', fontWeight: 500 }}>Subject :</Typography>
                   <TextField fullWidth variant="standard" defaultValue="Thank You for Your IVF Inquiry - Next Steps" InputProps={{ disableUnderline: true, sx: { fontSize: '0.85rem', fontWeight: 600 } }} />
                 </Box>
                 <Box sx={{ py: 3, minHeight: 320, overflowY: 'auto' }}>
-                  <Typography variant="body2" sx={{ mb: 2 }}>Hi {selectedLead?.name},</Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>Hi {selectedLead?.full_name || selectedLead?.name},</Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>Thank you for reaching out to <strong>Crysta IVF, Bangalore</strong>. We are honored to be part of your journey toward parenthood.</Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>To ensure we provide the most accurate guidance tailored to your medical history, please complete our secure intake form:</Typography>
                   <Typography variant="body2" sx={{ color: '#6366F1', textDecoration: 'underline', mb: 2, display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer' }}>
@@ -600,7 +722,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
 
         <DialogContent sx={{ pb: 1 }}>
           <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1.5, display: 'block', letterSpacing: 0.5 }}>
-            APPOINTMENT DETAILS FOR {selectedLead?.name.toUpperCase()}
+            APPOINTMENT DETAILS FOR {(selectedLead?.full_name || selectedLead?.name)?.toUpperCase()}
           </Typography>
           
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>

@@ -15,8 +15,11 @@ import {
   InputAdornment,
   Dialog,
   DialogContent,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ShortcutIcon from "@mui/icons-material/Shortcut";
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -32,37 +35,50 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 // Import BOTH CallButton AND Dialogs from LeadsMenuDialogs
 import { CallButton, Dialogs } from "./LeadsMenuDialogs";
 
-type Lead = {
-  id: string;
-  name: string;
-  initials: string;
-  phone?: string;
-  email?: string;
-  location: string;
-  source: string;
-  assigned: string;
-  status: string;
-  quality: string;
-  score: string;
-  date?: string;
-  time?: string;
-};
-
-const STORAGE_KEY = "vidai_leads_data";
+// ✅ INTEGRATION: Import Redux actions and selectors
+import {
+  fetchLeads,
+  selectLeads,
+  selectLeadsLoading,
+  selectLeadsError,
+} from "../../store/leadSlice";
+import type { Lead } from "../../types/leads.types";
 
 export default function LeadDetailView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // ✅ INTEGRATION: Using Redux state
+  const leads = useSelector(selectLeads);
+  const loading = useSelector(selectLeadsLoading);
+  const error = useSelector(selectLeadsError);
+
   const [activeTab, setActiveTab] = React.useState("Patient Info");
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
   const [historyView, setHistoryView] = React.useState<"chatbot" | "call" | "email">("chatbot");
 
-  const leads: Lead[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  const lead = leads.find(
-    (l) => l.id.replace("#", "") === decodeURIComponent(id || "")
-  );
+  // ✅ INTEGRATION: Fetch leads on mount
+  React.useEffect(() => {
+    if (!leads || leads.length === 0) {
+      dispatch(fetchLeads() as any);
+    }
+  }, [dispatch, leads]);
 
-  if (!lead) return <Typography p={4}>Lead not found</Typography>;
+  // ✅ INTEGRATION: Find lead from Redux state
+  const lead = React.useMemo(() => {
+    if (!leads || leads.length === 0) return null;
+    
+    const cleanId = decodeURIComponent(id || "")
+      .replace("#", "")
+      .replace("LN-", "")
+      .replace("LD-", "");
+    
+    return leads.find((l) => {
+      const leadCleanId = l.id.replace("#", "").replace("LN-", "").replace("LD-", "");
+      return leadCleanId === cleanId;
+    });
+  }, [leads, id]);
 
   const handleOpenPopup = () => setOpenConvertPopup(true);
   const handleClosePopup = () => setOpenConvertPopup(false);
@@ -73,10 +89,98 @@ export default function LeadDetailView() {
   };
 
   const handleEdit = () => {
+    if (!lead) return;
     navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, {
       state: { lead },
     });
   };
+
+  // ====================== Loading State ======================
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
+        <Stack alignItems="center" spacing={2}>
+          <CircularProgress />
+          <Typography color="text.secondary">Loading lead details...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  // ====================== Error State ======================
+  if (error) {
+    return (
+      <Box p={3}>
+        <Alert severity="error">
+          <Typography fontWeight={600}>Failed to load lead</Typography>
+          <Typography variant="body2">{error}</Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              mt: 1,
+              color: "primary.main",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+            onClick={() => dispatch(fetchLeads() as any)}
+          >
+            Try again
+          </Typography>
+        </Alert>
+      </Box>
+    );
+  }
+
+  // ====================== Lead Not Found ======================
+  if (!lead) {
+    return (
+      <Box p={3}>
+        <Alert severity="warning">
+          <Typography fontWeight={600}>Lead not found</Typography>
+          <Typography variant="body2">
+            The lead you're looking for doesn't exist or may have been deleted.
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              mt: 1,
+              color: "primary.main",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+            onClick={() => navigate("/leads")}
+          >
+            Go back to Leads Hub
+          </Typography>
+        </Alert>
+      </Box>
+    );
+  }
+
+  // ✅ Extract lead data with fallbacks
+  const leadName = lead.full_name || lead.name || "Unknown";
+  const leadInitials = lead.initials || leadName.charAt(0).toUpperCase();
+  const leadPhone = lead.phone || lead.contact_number || "(555) 555-0128";
+  const leadEmail = lead.email || "johnson@gmail.com";
+  const leadStatus = lead.status || "New";
+  const leadQuality = lead.quality || "N/A";
+  const leadScore = String(lead.score || 0).includes("%") ? lead.score : `${lead.score || 0}%`;
+  const leadCreatedAt = lead.created_at 
+    ? new Date(lead.created_at).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "N/A";
 
   return (
     <Box p={3} bgcolor="#F8FAFC" minHeight="100vh">
@@ -88,7 +192,7 @@ export default function LeadDetailView() {
         <Link underline="hover" color="inherit" onClick={() => navigate("/leads")} sx={{ cursor: 'pointer', fontSize: '12px' }}>
           Leads Hub
         </Link>
-        <Typography color="text.primary" sx={{ fontSize: '12px', fontWeight: 600 }}>{lead.name}</Typography>
+        <Typography color="text.primary" sx={{ fontSize: '12px', fontWeight: 600 }}>{leadName}</Typography>
       </Breadcrumbs>
 
       {/* 2. TOP SUMMARY CARD */}
@@ -96,11 +200,11 @@ export default function LeadDetailView() {
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Stack direction="row" spacing={3} alignItems="center">
             <Avatar sx={{ bgcolor: "#EEF2FF", color: "#6366F1", width: 56, height: 56, fontSize: '20px', fontWeight: 700 }}>
-              {lead.initials}
+              {leadInitials}
             </Avatar>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Lead Name</Typography>
-              <Typography fontWeight={700} variant="body1">{lead.name}</Typography>
+              <Typography fontWeight={700} variant="body1">{leadName}</Typography>
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Lead ID</Typography>
@@ -110,20 +214,29 @@ export default function LeadDetailView() {
               <Typography variant="caption" color="text.secondary">Source</Typography>
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 <Box sx={{ width: 16, height: 16, bgcolor: '#FFB800', borderRadius: '50%' }} />
-                <Typography fontWeight={600} variant="body1">{lead.source}</Typography>
+                <Typography fontWeight={600} variant="body1">{lead.source || "Unknown"}</Typography>
               </Stack>
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Lead Status</Typography>
-              <Chip label={lead.status} size="small" sx={{ bgcolor: '#EFF6FF', color: '#3B82F6', fontWeight: 600, borderRadius: '6px' }} />
+              <Chip label={leadStatus} size="small" sx={{ bgcolor: '#EFF6FF', color: '#3B82F6', fontWeight: 600, borderRadius: '6px' }} />
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Lead Quality</Typography>
-              <Chip label={lead.quality} size="small" sx={{ bgcolor: '#FEF2F2', color: '#EF4444', fontWeight: 600, borderRadius: '6px' }} />
+              <Chip 
+                label={leadQuality} 
+                size="small" 
+                sx={{ 
+                  bgcolor: leadQuality === "Hot" ? '#FEF2F2' : leadQuality === "Warm" ? '#FEF3C7' : '#F1F5F9',
+                  color: leadQuality === "Hot" ? '#EF4444' : leadQuality === "Warm" ? '#F59E0B' : '#64748B',
+                  fontWeight: 600, 
+                  borderRadius: '6px' 
+                }} 
+              />
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">AI Lead Score</Typography>
-              <Typography fontWeight={700} color="#EC4899">{lead.score}</Typography>
+              <Typography fontWeight={700} color="#EC4899">{leadScore}</Typography>
             </Stack>
           </Stack>
         </Stack>
@@ -183,39 +296,39 @@ export default function LeadDetailView() {
               </Typography>
               <Stack spacing={3}>
                 <Stack direction="row" spacing={6}>
-                  <Info label="CONTACT NO" value={lead.phone || "(555) 555-0128"} />
-                  <Info label="EMAIL" value={lead.email || "johnson@gmail.com"} />
-                  <Info label="LOCATION" value={lead.location} />
+                  <Info label="CONTACT NO" value={leadPhone} />
+                  <Info label="EMAIL" value={leadEmail} />
+                  <Info label="LOCATION" value={lead.location || "N/A"} />
                 </Stack>
                 <Stack direction="row" spacing={6}>
-                  <Info label="GENDER" value="Male" />
-                  <Info label="AGE" value="32" />
-                  <Info label="MARITAL STATUS" value="Married" />
+                  <Info label="GENDER" value={lead.gender || "Male"} />
+                  <Info label="AGE" value={lead.age?.toString() || "32"} />
+                  <Info label="MARITAL STATUS" value={lead.marital_status || "Married"} />
                 </Stack>
                 <Stack direction="row" spacing={6}>
-                  <Info label="ADDRESS" value="201, HV Streets, LA Jola, California" />
-                  <Info label="LANGUAGE PREFERENCE" value="English" />
-                  <Info label="ASSIGNED TO" value={lead.assigned} isAvatar />
+                  <Info label="ADDRESS" value={lead.address || "201, HV Streets, LA Jola, California"} />
+                  <Info label="LANGUAGE PREFERENCE" value={lead.language_preference || "English"} />
+                  <Info label="ASSIGNED TO" value={lead.assigned || "Unassigned"} isAvatar />
                 </Stack>
-                <Info label="CREATED DATE & TIME" value="11/12/2024, 12:36 PM" />
+                <Info label="CREATED DATE & TIME" value={leadCreatedAt} />
               </Stack>
               <Divider sx={{ my: 4 }} />
               <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={2} sx={{ textTransform: 'uppercase', letterSpacing: '1px' }}>
                 Partner Information
               </Typography>
               <Stack direction="row" spacing={6}>
-                <Info label="FULL NAME" value="Jennifer Smith" />
-                <Info label="AGE" value="29" />
-                <Info label="GENDER" value="Female" />
+                <Info label="FULL NAME" value={lead.partner_name || "Jennifer Smith"} />
+                <Info label="AGE" value={lead.partner_age?.toString() || "29"} />
+                <Info label="GENDER" value={lead.partner_gender || "Female"} />
               </Stack>
               <Divider sx={{ my: 4 }} />
               <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={2} sx={{ textTransform: 'uppercase', letterSpacing: '1px' }}>
                 Source & Campaign Details
               </Typography>
               <Stack direction="row" spacing={6}>
-                <Info label="SUB-SOURCE" value="Facebook" />
-                <Info label="CAMPAIGN NAME" value="Facebook IVF Awareness - December" />
-                <Info label="CAMPAIGN DURATION" value="01/12/2025 - 07/12/2025" />
+                <Info label="SUB-SOURCE" value={lead.sub_source || "Facebook"} />
+                <Info label="CAMPAIGN NAME" value={lead.campaign_name || "Facebook IVF Awareness - December"} />
+                <Info label="CAMPAIGN DURATION" value={lead.campaign_duration || "01/12/2025 - 07/12/2025"} />
               </Stack>
             </Card>
           </Box>
@@ -261,39 +374,39 @@ export default function LeadDetailView() {
               <TimelineItem 
                 icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: '#6366F1' }} />} 
                 title="Appointment Booked - Confirmation sent (SMS)" 
-                time="20/12/2024 | 12:49 PM" 
+                time={leadCreatedAt}
               />
               <TimelineItem 
                 icon={<CallOutlinedIcon sx={{ fontSize: 16, color: '#10B981' }} />} 
                 title="Outgoing call attempted - Connected" 
-                time="11/12/2024 | 04:10 PM"
+                time={leadCreatedAt}
                 onClick={() => setHistoryView("call")}
                 isClickable
               />
               <TimelineItem 
                 icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: '#F59E0B' }} />} 
                 title="Patient shared contact number and email" 
-                time="11/12/2024 | 12:59 PM"
+                time={leadCreatedAt}
                 onClick={() => setHistoryView("email")}
                 isClickable
               />
               <TimelineItem 
                 icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: '#3B82F6' }} />} 
                 title="Sent an Welcome Email" 
-                time="11/12/2024 | 12:57 PM"
+                time={leadCreatedAt}
                 onClick={() => setHistoryView("email")}
                 isClickable
               />
               <TimelineItem 
                 isAvatar 
-                avatarInitial={lead.assigned.charAt(0)} 
-                title={`Assigned to ${lead.assigned}`} 
-                time="11/12/2024 | 12:56 PM" 
+                avatarInitial={(lead.assigned || "U").charAt(0)} 
+                title={`Assigned to ${lead.assigned || "Unassigned"}`} 
+                time={leadCreatedAt}
               />
               <TimelineItem 
                 icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: '#8B5CF6' }} />} 
                 title="Lead arrived from Website Chatbot" 
-                time="11/12/2024 | 12:56 PM" 
+                time={leadCreatedAt}
                 onClick={() => setHistoryView("chatbot")}
                 isClickable
                 isLast 
@@ -308,12 +421,14 @@ export default function LeadDetailView() {
                 <Box p={2} borderBottom="1px solid #E2E8F0"><Typography variant="subtitle1" fontWeight={700}>Chatbot</Typography></Box>
                 <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#F8FAFC' }}>
                   <Stack spacing={3}>
-                    <Typography variant="caption" align="center" color="text.secondary" display="block">SUN, 14 DEC</Typography>
+                    <Typography variant="caption" align="center" color="text.secondary" display="block">
+                      {lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-US", { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase() : "TODAY"}
+                    </Typography>
                     <ChatBubble side="left" text="Hello! How can I help you today?" time="9:41 AM" />
                     <ChatBubble side="right" text="I'm looking for a general health check-up" time="9:42 AM" />
                     <ChatBubble side="left" text="Great! I can help you schedule that." time="9:43 AM" />
                     <ChatBubble side="right" text="Sometime this week, preferably in the morning" time="9:44 AM" />
-                    <ChatBubble side="right" text={`My name is ${lead.name}, and my number is ${lead.phone || '(555) 555-0128'}`} time="9:46 AM" />
+                    <ChatBubble side="right" text={`My name is ${leadName}, and my number is ${leadPhone}`} time="9:46 AM" />
                   </Stack>
                 </Box>
                 <Box p={2} borderTop="1px solid #E2E8F0">
@@ -332,15 +447,17 @@ export default function LeadDetailView() {
                 </Box>
                 <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#F8FAFC' }}>
                   <Stack spacing={3}>
-                    <Typography variant="caption" align="center" color="text.secondary" display="block">CALL - DEC 11, 2024</Typography>
+                    <Typography variant="caption" align="center" color="text.secondary" display="block">
+                      CALL - {lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-US", { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase() : "TODAY"}
+                    </Typography>
                     <CallMessage speaker="Mike" time="0:03" text="Good morning! You've reached Bloom Fertility Center. This is Mike. How can I help you today?" />
-                    <CallMessage speaker="John" time="0:15" text="Hi Mike, I'm calling to get some information about IVF. My wife and I are considering starting treatment." />
-                    <CallMessage speaker="Mike" time="0:25" text="Of course, John. I'd be happy to guide you. May I know your wife's age and how long you both have been trying to conceive?" />
-                    <CallMessage speaker="John" time="0:32" text="She's 32, and we've been trying for about four years now." />
+                    <CallMessage speaker={leadName.split(' ')[0]} time="0:15" text="Hi Mike, I'm calling to get some information about IVF. My wife and I are considering starting treatment." />
+                    <CallMessage speaker="Mike" time="0:25" text="Of course. I'd be happy to guide you. May I know your wife's age and how long you both have been trying to conceive?" />
+                    <CallMessage speaker={leadName.split(' ')[0]} time="0:32" text="She's 32, and we've been trying for about four years now." />
                     <CallMessage speaker="Mike" time="0:35" text="Thank you. Have you undergone any treatments earlier, like IUI or IVF?" />
-                    <CallMessage speaker="John" time="0:39" text="We tried two IVIs this year, but they weren't successful. No IVF yet." />
+                    <CallMessage speaker={leadName.split(' ')[0]} time="0:39" text="We tried two IVIs this year, but they weren't successful. No IVF yet." />
                     <CallMessage speaker="Mike" time="0:46" text="Thank you. Have AMH or ultrasound tests been done for your wife?" />
-                    <CallMessage speaker="John" time="1:03" text="Yes, that would be great. Preferably sometime this week in the morning." />
+                    <CallMessage speaker={leadName.split(' ')[0]} time="1:03" text="Yes, that would be great. Preferably sometime this week in the morning." />
                   </Stack>
                 </Box>
               </>
@@ -352,7 +469,7 @@ export default function LeadDetailView() {
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Typography variant="subtitle1" fontWeight={700}>Email History</Typography>
                     <IconButton 
-                      onClick={() => window.location.href = `mailto:${lead.email || 'johnson@gmail.com'}`}
+                      onClick={() => window.location.href = `mailto:${leadEmail}`}
                       sx={{ 
                         bgcolor: '#EFF6FF',
                         '&:hover': { bgcolor: '#DBEAFE' }
@@ -364,18 +481,20 @@ export default function LeadDetailView() {
                 </Box>
                 <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#F8FAFC' }}>
                   <Stack spacing={3}>
-                    {/* Email from John Smith */}
+                    {/* Email from Lead */}
                     <Card sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                       <Stack direction="row" justifyContent="space-between" mb={2}>
                         <Stack direction="row" spacing={1.5} alignItems="center">
-                          <Avatar sx={{ width: 40, height: 40, bgcolor: '#EEF2FF', color: '#6366F1' }}>JS</Avatar>
+                          <Avatar sx={{ width: 40, height: 40, bgcolor: '#EEF2FF', color: '#6366F1' }}>{leadInitials}</Avatar>
                           <Box>
-                            <Typography variant="body2" fontWeight={700}>John Smith</Typography>
-                            <Typography variant="caption" color="text.secondary">johnsa@gmail.com</Typography>
+                            <Typography variant="body2" fontWeight={700}>{leadName}</Typography>
+                            <Typography variant="caption" color="text.secondary">{leadEmail}</Typography>
                           </Box>
                         </Stack>
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography variant="caption" color="text.secondary">Fri, Nov 12, 6:25 PM</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : "Today"}
+                          </Typography>
                           <IconButton size="small"><ShortcutIcon sx={{ fontSize: 16 }} /></IconButton>
                         </Stack>
                       </Stack>
@@ -390,8 +509,8 @@ export default function LeadDetailView() {
                         Looking forward to your response.
                       </Typography>
                       <Typography variant="body2" color="text.secondary">Regards,</Typography>
-                      <Typography variant="body2" color="text.secondary">John Smith</Typography>
-                      <Typography variant="body2" color="text.secondary">(555) 555-0128</Typography>
+                      <Typography variant="body2" color="text.secondary">{leadName}</Typography>
+                      <Typography variant="body2" color="text.secondary">{leadPhone}</Typography>
                     </Card>
                     
                     {/* Email from Crysta Clinic */}
@@ -405,11 +524,13 @@ export default function LeadDetailView() {
                           </Box>
                         </Stack>
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography variant="caption" color="text.secondary">Fri, Nov 12, 6:35 PM</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : "Today"}
+                          </Typography>
                           <IconButton size="small"><ShortcutIcon sx={{ fontSize: 16 }} /></IconButton>
                         </Stack>
                       </Stack>
-                      <Typography variant="body2" color="text.primary" mb={1}>Hello John,</Typography>
+                      <Typography variant="body2" color="text.primary" mb={1}>Hello {leadName.split(' ')[0]},</Typography>
                       <Typography variant="body2" color="text.secondary" mb={1}>
                         Thank you for reaching out to Crysta IVF.
                       </Typography>
@@ -471,7 +592,7 @@ export default function LeadDetailView() {
           <Box sx={{ flex: 2 }}>
             <Card sx={{ p: 2.5, borderRadius: "16px", minHeight: '500px' }}>
               <Typography variant="subtitle1" fontWeight={700} mb={3}>Notes</Typography>
-              <NoteItem title="Lead Inquired" content="Lead inquired via chatbot for general fertility check-up." time="FRI, NOV 12, 1:15 PM" />
+              <NoteItem title="Lead Inquired" content="Lead inquired via chatbot for general fertility check-up." time={leadCreatedAt} />
             </Card>
           </Box>
         </Stack>
@@ -499,7 +620,7 @@ export default function LeadDetailView() {
             <Box>
                 <Typography variant="h6" fontWeight={700} gutterBottom>Convert Lead</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ px: 2, lineHeight: 1.6 }}>
-                    Are you sure you want to Convert <b>"{lead.name}"</b> lead into a patient & register it?
+                    Are you sure you want to Convert <b>"{leadName}"</b> lead into a patient & register it?
                 </Typography>
             </Box>
             <Stack direction="row" spacing={2} sx={{ width: '100%', mt: 2 }}>
@@ -575,7 +696,7 @@ const Info = ({ label, value, isAvatar }: any) => (
     <Typography variant="caption" color="text.secondary" fontWeight={500} display="block" mb={0.5}>{label}</Typography>
     {isAvatar ? (
       <Stack direction="row" spacing={1} alignItems="center">
-        <Avatar sx={{ width: 20, height: 20, fontSize: '10px' }}>HC</Avatar>
+        <Avatar sx={{ width: 20, height: 20, fontSize: '10px' }}>{value?.charAt(0) || "U"}</Avatar>
         <Typography fontWeight={600} variant="body2">{value}</Typography>
       </Stack>
     ) : <Typography fontWeight={600} variant="body2">{value}</Typography>}
