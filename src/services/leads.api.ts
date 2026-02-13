@@ -14,7 +14,6 @@ export type Clinic = {
   department: Department[];
 };
 
-// ✅ Matches real API response exactly — no department_id field
 export type Employee = {
   id: number;
   emp_name: string;
@@ -102,10 +101,12 @@ export const LeadAPI = {
     await api.patch(`/leads/${leadId}/delete/`);
   },
 
+  // ✅ ARCHIVE: POST /leads/{lead_id}/activate/
   activate: async (leadId: string): Promise<void> => {
     await api.post(`/leads/${leadId}/activate/`);
   },
 
+  // ✅ UNARCHIVE: PATCH /leads/{lead_id}/inactivate/
   inactivate: async (leadId: string): Promise<void> => {
     await api.patch(`/leads/${leadId}/inactivate/`);
   },
@@ -144,7 +145,6 @@ export const ClinicAPI = {
       return [];
     }
 
-    // ✅ Log exact department_name values so mismatches are visible
     console.log("=== EMPLOYEES FROM API ===");
     data.forEach(e =>
       console.log(`  id=${e.id} | emp_name="${e.emp_name}" | department_name="${e.department_name}"`)
@@ -159,7 +159,6 @@ export const DepartmentAPI = {
   listByClinic: async (clinicId: number): Promise<Department[]> => {
     const clinic = await ClinicAPI.getById(clinicId);
 
-    // ✅ Log exact department name values so mismatches are visible
     console.log("=== DEPARTMENTS FROM API ===");
     (clinic.department || []).forEach(d =>
       console.log(`  id=${d.id} | name="${d.name}" | is_active=${d.is_active}`)

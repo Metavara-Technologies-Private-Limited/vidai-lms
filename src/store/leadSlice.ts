@@ -7,7 +7,7 @@ interface LeadState {
   leads: Lead[];
   loading: boolean;
   error: string | null;
-  deletingIds: string[]; // Track which leads are being deleted
+  deletingIds: string[];
 }
 
 const initialState: LeadState = {
@@ -29,23 +29,8 @@ export const fetchLeads = createAsyncThunk<
 >("leads/fetchAll", async (_, { rejectWithValue }) => {
   try {
     const leads = await LeadAPI.list();
-    
-    // ✅ IMPORTANT: Filter out deleted leads from the response
-    // The API returns leads with is_active and is_deleted fields
-    const activeLeads = leads.filter((lead: any) => {
-      // Keep leads that are:
-      // 1. is_active === true (or undefined for backward compatibility)
-      // 2. is_deleted === false (or undefined for backward compatibility)
-      const isActive = lead.is_active !== false;
-      const isNotDeleted = lead.is_deleted !== true;
-      return isActive && isNotDeleted;
-    });
-    
-    console.log("📊 Total leads from API:", leads.length);
-    console.log("✅ Active leads (filtered):", activeLeads.length);
-    console.log("🗑️ Deleted/inactive leads (filtered out):", leads.length - activeLeads.length);
-    
-    return activeLeads;
+    console.log("📊 Fetched leads from API:", leads.length);
+    return leads;
   } catch (err: any) {
     const message =
       err?.response?.data?.detail ||
@@ -61,8 +46,8 @@ export const fetchLeads = createAsyncThunk<
  * PATCH /leads/{lead_id}/delete/
  */
 export const deleteLead = createAsyncThunk<
-  string, // Returns the deleted lead ID
-  string, // Takes lead ID as parameter
+  string,
+  string,
   { rejectValue: string }
 >("leads/delete", async (leadId, { rejectWithValue }) => {
   try {
@@ -85,16 +70,13 @@ export const deleteLead = createAsyncThunk<
  * Delete multiple leads at once
  */
 export const deleteLeads = createAsyncThunk<
-  string[], // Returns array of deleted lead IDs
-  string[], // Takes array of lead IDs
+  string[],
+  string[],
   { rejectValue: string }
 >("leads/deleteMultiple", async (leadIds, { rejectWithValue }) => {
   try {
     console.log("🗑️ Deleting leads:", leadIds);
-    
-    // Delete all leads in parallel
     await Promise.all(leadIds.map((id) => LeadAPI.delete(id)));
-    
     console.log("✅ All leads deleted successfully");
     return leadIds;
   } catch (err: any) {
@@ -119,16 +101,6 @@ const leadSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    // Optimistic delete - remove from UI immediately
-    removeLeadLocally: (state, action: { payload: string }) => {
-      state.leads = state.leads.filter((lead) => lead.id !== action.payload);
-    },
-    // Optimistic delete multiple - remove from UI immediately
-    removeLeadsLocally: (state, action: { payload: string[] }) => {
-      state.leads = state.leads.filter(
-        (lead) => !action.payload.includes(lead.id)
-      );
-    },
   },
   extraReducers: (builder) => {
     builder
@@ -139,7 +111,6 @@ const leadSlice = createSlice({
       })
       .addCase(fetchLeads.fulfilled, (state, action) => {
         state.loading = false;
-        // ✅ Payload is already filtered in the thunk
         state.leads = action.payload;
       })
       .addCase(fetchLeads.rejected, (state, action) => {
@@ -149,20 +120,16 @@ const leadSlice = createSlice({
       
       // ========== Delete Single Lead ==========
       .addCase(deleteLead.pending, (state, action) => {
-        // Add to deletingIds to show loading state
         state.deletingIds.push(action.meta.arg);
         state.error = null;
       })
       .addCase(deleteLead.fulfilled, (state, action) => {
-        // Remove from deletingIds
         state.deletingIds = state.deletingIds.filter(
           (id) => id !== action.payload
         );
-        // ✅ IMMEDIATELY remove from leads array (don't wait for refetch)
         state.leads = state.leads.filter((lead) => lead.id !== action.payload);
       })
       .addCase(deleteLead.rejected, (state, action) => {
-        // Remove from deletingIds
         state.deletingIds = state.deletingIds.filter(
           (id) => id !== action.meta.arg
         );
@@ -171,22 +138,18 @@ const leadSlice = createSlice({
       
       // ========== Delete Multiple Leads ==========
       .addCase(deleteLeads.pending, (state, action) => {
-        // Add all IDs to deletingIds
         state.deletingIds.push(...action.meta.arg);
         state.error = null;
       })
       .addCase(deleteLeads.fulfilled, (state, action) => {
-        // Remove from deletingIds
         state.deletingIds = state.deletingIds.filter(
           (id) => !action.payload.includes(id)
         );
-        // ✅ IMMEDIATELY remove from leads array (don't wait for refetch)
         state.leads = state.leads.filter(
           (lead) => !action.payload.includes(lead.id)
         );
       })
       .addCase(deleteLeads.rejected, (state, action) => {
-        // Remove from deletingIds
         state.deletingIds = state.deletingIds.filter(
           (id) => !action.meta.arg.includes(id)
         );
@@ -195,8 +158,7 @@ const leadSlice = createSlice({
   },
 });
 
-export const { clearLeads, clearError, removeLeadLocally, removeLeadsLocally } =
-  leadSlice.actions;
+export const { clearLeads, clearError } = leadSlice.actions;
 export default leadSlice.reducer;
 
 // ====================== Selectors ======================
@@ -208,7 +170,6 @@ export const selectLeadsError = (state: { leads: LeadState }) =>
 export const selectDeletingIds = (state: { leads: LeadState }) =>
   state.leads.deletingIds;
 
-// Helper selector to check if a specific lead is being deleted
 export const selectIsLeadDeleting = (leadId: string) => (state: {
   leads: LeadState;
 }) => state.leads.deletingIds.includes(leadId);

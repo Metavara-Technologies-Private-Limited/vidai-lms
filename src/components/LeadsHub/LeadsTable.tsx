@@ -44,6 +44,27 @@ interface Props {
 
 const rowsPerPage = 10;
 
+// ====================== Quality Derivation ======================
+// Rules (based on assignee + next action):
+//   Hot  → has assignee AND has next_action_description AND next_action_status = "pending"
+//   Warm → has assignee OR has next_action_description (but not all three above)
+//   Cold → no assignee AND no next_action_description
+const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
+  const hasAssignee = Boolean(
+    lead.assigned_to_id || lead.assigned_to_name
+  );
+  const hasNextAction = Boolean(
+    lead.next_action_description &&
+    lead.next_action_description.trim() !== ""
+  );
+  const nextActionPending =
+    lead.next_action_status === "pending";
+
+  if (hasAssignee && hasNextAction && nextActionPending) return "Hot";
+  if (hasAssignee || hasNextAction) return "Warm";
+  return "Cold";
+};
+
 const LeadsTable: React.FC<Props> = ({ search, tab }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -63,32 +84,34 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     dispatch(fetchLeads() as any);
   }, [dispatch]);
 
-  // ====================== Sync Redux leads to Local State ======================
+  // ====================== Sync Redux leads → Local State ======================
   React.useEffect(() => {
-  if (leads) {
-    const leadsWithFix = leads.map((lead: any) => ({
-      ...lead,
-      archived:
-        lead.archived !== undefined
-          ? lead.archived
-          : lead.is_active === false,
+    if (leads) {
+      const leadsWithFix = leads.map((lead: any) => ({
+        ...lead,
+        archived:
+          lead.archived !== undefined
+            ? lead.archived
+            : lead.is_active === false,
 
-      // ✅ FIX: Use assigned_to_name from API to show employee name
-      assigned: lead.assigned_to_name || "Unassigned",
+        // Employee name from API
+        assigned: lead.assigned_to_name || "Unassigned",
 
-      status: lead.status || lead.lead_status || "New",
-      name: lead.name || lead.full_name || "",
-    }));
+        status: lead.status || lead.lead_status || "New",
+        name: lead.name || lead.full_name || "",
 
-    setLocalLeads(leadsWithFix);
-  }
-}, [leads]);
+        // ── Quality derived from assignee + next action ────────────
+        quality: deriveQuality(lead),
+      }));
 
+      setLocalLeads(leadsWithFix);
+    }
+  }, [leads]);
 
   // ====================== Toggle Selection ======================
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
@@ -110,19 +133,17 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     setSelectedIds([]);
   }, [search, tab]);
 
-  // ====================== Pagination Calculations ======================
+  // ====================== Pagination ======================
   const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
 
   React.useEffect(() => {
-    if (page > totalPages && totalPages > 0) {
-      setPage(totalPages);
-    }
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [totalPages, page]);
 
   const currentLeads = filteredLeads.slice(
     (page - 1) * rowsPerPage,
-    page * rowsPerPage,
+    page * rowsPerPage
   );
 
   const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
@@ -137,23 +158,16 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
   const handleBulkArchive = (archive: boolean) => {
     setLocalLeads((prev) =>
       prev.map((l) =>
-        selectedIds.includes(l.id) ? { ...l, archived: archive } : l,
-      ),
+        selectedIds.includes(l.id) ? { ...l, archived: archive } : l
+      )
     );
     setSelectedIds([]);
   };
 
-  // ====================== Loading State ======================
+  // ====================== Loading ======================
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
           <Typography color="text.secondary">Loading leads...</Typography>
@@ -162,7 +176,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     );
   }
 
-  // ====================== Error State ======================
+  // ====================== Error ======================
   if (error) {
     return (
       <Alert severity="error" sx={{ mb: 3 }}>
@@ -170,12 +184,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
         <Typography variant="body2">{error}</Typography>
         <Typography
           variant="body2"
-          sx={{
-            mt: 1,
-            color: "primary.main",
-            cursor: "pointer",
-            textDecoration: "underline",
-          }}
+          sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
           onClick={() => dispatch(fetchLeads() as any)}
         >
           Try again
@@ -184,25 +193,14 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     );
   }
 
-  // ====================== Empty State ======================
+  // ====================== Empty ======================
   if (localLeads.length === 0) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
-          <Typography variant="h6" color="text.secondary">
-            No leads found
-          </Typography>
+          <Typography variant="h6" color="text.secondary">No leads found</Typography>
           <Typography variant="body2" color="text.secondary">
-            {tab === "archived"
-              ? "No archived leads yet"
-              : "Create your first lead to get started"}
+            {tab === "archived" ? "No archived leads yet" : "Create your first lead to get started"}
           </Typography>
         </Stack>
       </Box>
@@ -226,11 +224,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                     currentLeads.every((l) => selectedIds.includes(l.id))
                   }
                   onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedIds(currentLeads.map((l) => l.id));
-                    } else {
-                      setSelectedIds([]);
-                    }
+                    if (e.target.checked) setSelectedIds(currentLeads.map((l) => l.id));
+                    else setSelectedIds([]);
                   }}
                 />
               </TableCell>
@@ -257,19 +252,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                 hover
                 sx={{ cursor: "pointer" }}
                 onClick={() =>
-                  navigate(
-                    `/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`,
-                  )
+                  navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)
                 }
               >
-                <TableCell
-                  padding="checkbox"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Checkbox
-                    checked={isSelected(lead.id)}
-                    onChange={() => toggleSelect(lead.id)}
-                  />
+                <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox checked={isSelected(lead.id)} onChange={() => toggleSelect(lead.id)} />
                 </TableCell>
 
                 <TableCell>
@@ -278,12 +265,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                       {lead.initials || lead.full_name?.charAt(0)?.toUpperCase()}
                     </Avatar>
                     <Box>
-                      <Typography className="lead-name-text">
-                        {lead.full_name}
-                      </Typography>
-                      <Typography className="lead-id-text">
-                        {lead.id}
-                      </Typography>
+                      <Typography className="lead-name-text">{lead.full_name}</Typography>
+                      <Typography className="lead-id-text">{lead.id}</Typography>
                     </Box>
                   </Stack>
                 </TableCell>
@@ -294,7 +277,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                       ? new Date(lead.created_at).toLocaleDateString("en-GB")
                       : "N/A"}
                   </Typography>
-
                   <Typography className="lead-time">
                     {lead.created_at
                       ? new Date(lead.created_at).toLocaleTimeString("en-IN", {
@@ -312,18 +294,16 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   <Chip
                     label={lead.status}
                     size="small"
-                    className={`lead-chip status-${lead.status
-                      ?.toLowerCase()
-                      ?.replace(/\s+/g, "-")}`}
+                    className={`lead-chip status-${lead.status?.toLowerCase()?.replace(/\s+/g, "-")}`}
                   />
                 </TableCell>
 
+                {/* Quality chip — now always Hot / Warm / Cold, never N/A */}
                 <TableCell>
                   <Chip
-                    label={lead.quality || "N/A"}
+                    label={lead.quality}
                     size="small"
-                    className={`lead-chip quality-${lead.quality
-                      ?.toLowerCase()}`}
+                    className={`lead-chip quality-${lead.quality?.toLowerCase()}`}
                   />
                 </TableCell>
 
@@ -334,7 +314,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                 </TableCell>
 
                 <TableCell>{lead.assigned}</TableCell>
-
                 <TableCell>{lead.task || "N/A"}</TableCell>
 
                 <TableCell>
@@ -385,12 +364,10 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
         <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
-
         <Stack direction="row" spacing={1}>
           <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
             <ChevronLeftIcon />
           </IconButton>
-
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <Box
               key={p}
@@ -400,7 +377,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
               {p}
             </Box>
           ))}
-
           <IconButton
             disabled={page === totalPages || totalPages === 0}
             onClick={() => setPage((p) => p + 1)}

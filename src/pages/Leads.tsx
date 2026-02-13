@@ -54,20 +54,29 @@ const Leads: React.FC = () => {
     if (leads && leads.length > 0) {
       const followUpStatuses = ["new", "lost", "cycle conversion"];
 
-      const allCount = leads.filter((l) => !l.archived).length;
+      // ✅ FIXED: Use is_active instead of archived
+      // Active leads: is_active !== false (true or undefined)
+      // Archived leads: is_active === false
+      const allCount = leads.filter((l) => l.is_active !== false).length;
 
-      // ✅ FIXED: use lead_status instead of status
       const followUpCount = leads.filter((l) => {
         const status = (l.lead_status || "").toLowerCase().trim();
-        return !l.archived && followUpStatuses.includes(status);
+        return l.is_active !== false && followUpStatuses.includes(status);
       }).length;
 
-      const archivedCount = leads.filter((l) => l.archived).length;
+      const archivedCount = leads.filter((l) => l.is_active === false).length;
 
       setCounts({
         all: allCount,
         followUps: followUpCount,
         archived: archivedCount,
+      });
+
+      console.log("📊 Counts updated:", {
+        all: allCount,
+        followUps: followUpCount,
+        archived: archivedCount,
+        total: leads.length,
       });
     } else {
       setCounts({
