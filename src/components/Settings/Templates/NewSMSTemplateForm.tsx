@@ -7,30 +7,44 @@ import { PreviewSMSTemplateModal } from './PreviewSMSTemplateModal';
 
 interface Props {
   onClose: () => void;
-  onSave: (template: any) => void;
-  initialData?: any; 
-  mode: 'create' | 'edit' | 'view'; 
+  onSave: (template: any) => void; 
+  initialData?: any;
+  mode: 'create' | 'edit' | 'view';
 }
 
 export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialData, mode }) => {
   const isViewOnly = mode === 'view'; 
   const [showPreview, setShowPreview] = useState(false);
   
-  // 🆕 Added Refs and State for File Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  const getClinicId = (): number => {
+    const storedClinicId = localStorage.getItem("clinic_id");
+    if (storedClinicId) return parseInt(storedClinicId, 10);
+    
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        if (user.clinic_id) return user.clinic_id;
+      } catch (e) {
+        console.error("Failed to parse user data");
+      }
+    }
+    return initialData?.clinic || 1; 
+  };
+
   const [formData, setFormData] = useState({
-    name: initialData?.name || "Appointment Confirmation",
-    useCase: initialData?.useCase || "Appointment",
-    body: initialData?.subject || "Hi {lead_first_name}, your appointment at {clinic_name} is on {appointment_date} at {appointment_time}. Reply YES to confirm."
+    name: initialData?.name || initialData?.audience_name || "",
+    useCase: initialData?.useCase || initialData?.use_case || "",
+    body: initialData?.body || initialData?.email_body || initialData?.subject || ""
   });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // 🆕 Logic to handle file selection
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -39,17 +53,27 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
   };
 
   const handleSave = () => {
-    const template = {
-      ...initialData, 
-      id: initialData?.id || Math.random().toString(36).substr(2, 9),
-      name: formData.name,
-      subject: formData.body, 
-      useCase: formData.useCase,
-      lastUpdatedAt: new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      createdBy: initialData?.createdBy || 'System',
-      type: 'sms' 
-    };
-    onSave(template);
+    const clinicId = getClinicId();
+    
+    // ✅ Use FormData for file upload compatibility
+    const apiPayload = new FormData();
+    
+    // Append data fields (using keys verified by your backend)
+    apiPayload.append('name', formData.name);
+    apiPayload.append('body', formData.body);
+    apiPayload.append('use_case', formData.useCase);
+    apiPayload.append('clinic', String(clinicId));
+    apiPayload.append('is_active', 'true');
+    apiPayload.append('subject', "SMS Template");
+
+    // ✅ Append the file only if one is selected
+    if (selectedFile) {
+      // Ensure 'file_attachment' matches the field name in your Django Serializer
+      apiPayload.append('file_attachment', selectedFile); 
+    }
+
+    console.log("🚀 Saving SMS with File:", selectedFile?.name || "No file");
+    onSave(apiPayload); 
     onClose();
   };
 
@@ -81,6 +105,7 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
           <Typography className={styles.fieldLabel}>Name</Typography>
           <OutlinedInput 
             fullWidth size="small" 
+            placeholder="Enter template name"
             value={formData.name}
             disabled={isViewOnly} 
             onChange={(e) => handleInputChange('name', e.target.value)}
@@ -97,20 +122,22 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
           <Select
             fullWidth size="small"
             value={formData.useCase}
+            displayEmpty
             disabled={isViewOnly} 
             onChange={(e) => handleInputChange('useCase', e.target.value as string)}
             IconComponent={KeyboardArrowDownIcon}
             sx={{ borderRadius: '8px', backgroundColor: isViewOnly ? '#F9FAFB' : '#fff' }}
           >
+            <MenuItem value="" disabled>Select Use Case</MenuItem>
             <MenuItem value="Appointment">
-               <Box component="span" sx={{ color: '#16A34A', bgcolor: '#F0FDF4', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
-                 Appointment
-               </Box>
+              <Box component="span" sx={{ color: '#16A34A', bgcolor: '#F0FDF4', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
+                Appointment
+              </Box>
             </MenuItem>
             <MenuItem value="Feedback">
-               <Box component="span" sx={{ color: '#3B82F6', bgcolor: '#EFF6FF', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
-                 Feedback
-               </Box>
+              <Box component="span" sx={{ color: '#3B82F6', bgcolor: '#EFF6FF', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
+                Feedback
+              </Box>
             </MenuItem>
           </Select>
         </Box>
@@ -120,6 +147,7 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
           <textarea 
             className={styles.textArea}
             rows={6}
+            placeholder="Write your SMS message here..."
             value={formData.body}
             disabled={isViewOnly} 
             onChange={(e) => handleInputChange('body', e.target.value)}
@@ -130,7 +158,6 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
           />
         </Box>
 
-        {/* 🆕 Integrated Upload Section */}
         <Box className={styles.formGroup}>
           <Typography className={styles.fieldLabel}>Upload Documents</Typography>
           <Box sx={{ 

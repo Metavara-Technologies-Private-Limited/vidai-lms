@@ -4,10 +4,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import styles from '../../../styles/Template/PreviewSMSTemplateModal.module.css';
 
 interface PreviewProps {
+  open: boolean;
   onClose: () => void;
   onBackToEdit: () => void;
   onSave: () => void;
-  templateData: { body: string };
+  templateData: { name?: string; useCase?: string; body: string };
 }
 
 export const PreviewSMSTemplateModal: React.FC<PreviewProps> = ({ 
