@@ -18,6 +18,8 @@ import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClinic, selectClinic } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
+import { fetchCampaign } from "../../store/campaignSlice";
+
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -33,6 +35,7 @@ const Header = () => {
 
   useEffect(() => {
     dispatch(fetchClinic(1));
+    dispatch(fetchCampaign());
   }, [dispatch]);
 
   const handleIconClick = (
