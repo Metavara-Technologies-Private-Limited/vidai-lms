@@ -31,6 +31,7 @@ import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import SendIcon from "@mui/icons-material/Send";
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import type { RootState } from "../../store";
 
 // Import BOTH CallButton AND Dialogs from LeadsMenuDialogs
 import { CallButton, Dialogs } from "./LeadsMenuDialogs";
@@ -48,6 +49,9 @@ export default function LeadDetailView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+const selectedTemplate = useSelector(
+  (state: RootState) => state.emailTemplate.selectedTemplate
+);
 
   // ✅ INTEGRATION: Using Redux state
   const leads = useSelector(selectLeads);
@@ -479,6 +483,8 @@ export default function LeadDetailView() {
                     </IconButton>
                   </Stack>
                 </Box>
+
+
                 <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', bgcolor: '#F8FAFC' }}>
                   <Stack spacing={3}>
                     {/* Email from Lead */}
@@ -514,41 +520,40 @@ export default function LeadDetailView() {
                     </Card>
                     
                     {/* Email from Crysta Clinic */}
-                    <Card sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                      <Stack direction="row" justifyContent="space-between" mb={2}>
-                        <Stack direction="row" spacing={1.5} alignItems="center">
-                          <Avatar sx={{ width: 40, height: 40, bgcolor: '#FEF2F2', color: '#EF4444' }}>CC</Avatar>
-                          <Box>
-                            <Typography variant="body2" fontWeight={700}>Crysta Clinic</Typography>
-                            <Typography variant="caption" color="text.secondary">team@crystaivf.com</Typography>
-                          </Box>
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography variant="caption" color="text.secondary">
-                            {lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : "Today"}
-                          </Typography>
-                          <IconButton size="small"><ShortcutIcon sx={{ fontSize: 16 }} /></IconButton>
-                        </Stack>
-                      </Stack>
-                      <Typography variant="body2" color="text.primary" mb={1}>Hello {leadName.split(' ')[0]},</Typography>
-                      <Typography variant="body2" color="text.secondary" mb={1}>
-                        Thank you for reaching out to Crysta IVF.
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" mb={1}>
-                        Our fertility consultation includes an initial discussion with our specialist, followed by basic investigations if required. The consultation typically lasts 30-45 minutes.
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" mb={1}>
-                        We currently have availability this week on:
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" mb={0.5}>• Wednesday – 10:30 AM</Typography>
-                      <Typography variant="body2" color="text.secondary" mb={0.5}>• Thursday – 2:00 PM</Typography>
-                      <Typography variant="body2" color="text.secondary" mb={2}>• Friday – 11:00 AM</Typography>
-                      <Typography variant="body2" color="text.secondary" mb={1}>
-                        Please let us know your preferred slot, and we'll be happy to assist with the booking.
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">Best regards,</Typography>
-                      <Typography variant="body2" color="text.secondary">Crysta IVF Team</Typography>
-                    </Card>
+{selectedTemplate && (
+  <Card sx={{ p: 2.5, borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+    <Stack direction="row" justifyContent="space-between" mb={2}>
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Avatar sx={{ width: 40, height: 40, bgcolor: '#FEF2F2', color: '#EF4444' }}>
+          CC
+        </Avatar>
+        <Box>
+          <Typography variant="body2" fontWeight={700}>
+            Crysta Clinic
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            team@crystaivf.com
+          </Typography>
+        </Box>
+      </Stack>
+    </Stack>
+
+    <Typography variant="body2" fontWeight={700} mb={1}>
+      {selectedTemplate.subject}
+    </Typography>
+
+    <Typography
+      variant="body2"
+      color="text.secondary"
+      sx={{ whiteSpace: "pre-line" }}
+    >
+      {selectedTemplate.content}
+    </Typography>
+  </Card>
+)}
+
+
+
                   </Stack>
                 </Box>
               </>
