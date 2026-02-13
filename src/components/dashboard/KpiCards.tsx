@@ -16,7 +16,7 @@ import LostLeadsIcon from "../../assets/icons/lostLeads.svg";
 import { kpiCardsStyles } from "../../styles/dashboard/KpiCards.styles";
 // ✅ Integration: Import your API and Type
 import { LeadAPI } from "../../.././src/services/leads.api";
-import type { Lead } from "../../.././src/types/leads.types";
+import type { Lead } from "../../.././src/services/leads.api";
 
 /* KPI → ICON MAP */
 const KPI_ICONS: Record<string, string> = {
@@ -65,20 +65,34 @@ const KpiCards = () => {
   });
 
   // ✅ Fetch Logic: Map API data to the counts state
+ // ✅ Fetch Logic: Updated to match restapi_lead status values strictly
   const fetchKpiData = useCallback(async () => {
     try {
       const response = await LeadAPI.list();
-      const leads: Lead[] = Array.isArray(response.data) ? response.data : [];
+      const leads: Lead[] = Array.isArray(response) ? response : [];
 
       setCounts({
         totalLeads: leads.length || 0,
-        newLeads: leads.filter(l => l.status === "New").length || 0,
-        appointments: leads.filter(l => l.status === "Appointment").length || 0,
-        followUps: leads.filter(l => l.status === "Follow-Ups").length || 0,
-        totalConverted: leads.filter(l => l.status === "Converted" || l.status === "Cycle Conversion").length || 0,
-        lostLeads: leads.filter(l => l.status === "Lost").length || 0,
-        registered: leads.filter(l => l.status === "Converted").length || 0,
-        treatment: leads.filter(l => l.status === "Cycle Conversion").length || 0
+        
+        
+        newLeads: leads.filter(l => l.lead_status === "New").length || 0,
+        
+  
+        appointments: leads.filter(l => l.lead_status === "Appointment").length || 0,
+        
+    
+        followUps: leads.filter(l => l.lead_status === "Follow-Ups").length || 0,
+       
+        totalConverted: leads.filter(l => 
+          l.lead_status === "Converted" || l.lead_status === "Cycle Conversion"
+        ).length || 0,
+        
+       
+        lostLeads: leads.filter(l => l.lead_status === "Lost").length || 0,
+        
+    
+        registered: leads.filter(l => l.lead_status === "Converted").length || 0,
+        treatment: leads.filter(l => l.lead_status === "Cycle Conversion").length || 0
       });
     } catch (error) {
       console.error("Failed to fetch lead KPIs:", error);
@@ -86,6 +100,7 @@ const KpiCards = () => {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchKpiData();
   }, [fetchKpiData]);
 

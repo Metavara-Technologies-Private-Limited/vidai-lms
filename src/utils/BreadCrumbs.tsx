@@ -39,8 +39,8 @@ export const DynamicBreadcrumbs = () => {
 
   // Start with fixed "Admin > Referral MD"
   const fixedCrumbs = [
-    { label: "Admin", path: "/admin" },
-    { label: "Referral MD", path: "/admin/referral" },
+    { label: "VIDAI Leads", path: "/admin" },
+ 
   ];
 
   // Map current path to menu label if exists

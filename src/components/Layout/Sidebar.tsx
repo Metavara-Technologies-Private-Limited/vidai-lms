@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Drawer,
@@ -20,15 +20,33 @@ import styles from "../../styles/sidebar.module.css";
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-const [openSettings, setOpenSettings] = useState(false);
-
+  const [openSettings, setOpenSettings] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+
   const tab = SIDEBAR_TABS[activeTab];
-const isSettingsRoute = location.pathname.startsWith("/settings/");
-const showSettingsMenu = isSettingsRoute || openSettings;
+  const isSettingsRoute = location.pathname.startsWith("/settings");
+  const showSettingsMenu = isSettingsRoute || openSettings;
+ 
+  useEffect(() => {
+     
+    const currentTabIndex = SIDEBAR_TABS.findIndex((t) =>
+      t.menu.some(
+        (m) =>
+          location.pathname.startsWith(m.path) ||
+          (m.subMenu && m.subMenu.some((s) => location.pathname === s.path))
+      )
+    );
 
-  // keep sidebar in sync with URL
+    if (currentTabIndex !== -1) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab(currentTabIndex);
+    }
 
+   
+    if (isSettingsRoute) {
+      setOpenSettings(true);
+    }
+  }, [location.pathname, isSettingsRoute]);
 
   return (
     <Drawer
@@ -70,7 +88,6 @@ const showSettingsMenu = isSettingsRoute || openSettings;
         <Box className={styles.iconrowbox}>
           {SIDEBAR_TABS.map((t, idx) => {
             const size = 35 * t.icon.baseScale;
-
             return (
               <Box key={t.key}>
                 <IconButton
@@ -95,31 +112,27 @@ const showSettingsMenu = isSettingsRoute || openSettings;
             {tab.label}
           </Typography>
 
-          {/* MENU */}
           <List>
             {tab.menu.map((item) => {
               const isSettings = item.key === "settings";
-
-              // CORRECT place for isActive
               const isActive =
                 location.pathname === item.path ||
                 (item.subMenu &&
-                  item.subMenu.some(
-                    (sub) => sub.path === location.pathname,
-                  ));
+                  item.subMenu.some((sub) => sub.path === location.pathname));
 
               return (
                 <Box key={item.key}>
                   <ListItemButton
-onClick={() => {
-  if (isSettings) {
-    setOpenSettings((prev) => !prev);
-  } else {
-    setOpenSettings(false); 
-    navigate(item.path);
-  }
-}}
-
+                    onClick={() => {
+                      if (isSettings) {
+                        setOpenSettings((prev) => !prev);
+                        // ✅ FIX: Navigate to Integration by default when clicking Settings
+                        navigate("/settings/integration");
+                      } else {
+                        setOpenSettings(false);
+                        navigate(item.path);
+                      }
+                    }}
                   >
                     <Typography
                       sx={{
@@ -131,62 +144,59 @@ onClick={() => {
                     </Typography>
                   </ListItemButton>
 
-{isSettings && item.subMenu && (
-<Collapse in={showSettingsMenu}>
-    {item.subMenu.map((sub) => {
-      const isSubActive = location.pathname === sub.path;
+                  {isSettings && item.subMenu && (
+                    <Collapse in={showSettingsMenu}>
+                      {item.subMenu.map((sub) => {
+                        const isSubActive = location.pathname === sub.path;
 
-      return (
-        <ListItemButton
-          key={sub.key}
-          onClick={() => navigate(sub.path)}
-          sx={{
-            pl: 4,
-            display: "flex",
-            alignItems: "center",
-            gap: 1.5,
-          }}
-        >
-          {/* Custom radio circle */}
-          <Box
-            sx={{
-              width: 18,
-              height: 18,
-              borderRadius: "50%",
-              backgroundColor: "#FFFFFF",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Box
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                backgroundColor: isSubActive
-                  ? "#E17E61"
-                  : "#CFD1D4",
-              }}
-            />
-          </Box>
+                        return (
+                          <ListItemButton
+                            key={sub.key}
+                            onClick={() => navigate(sub.path)}
+                            sx={{
+                              pl: 4,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.5,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: "50%",
+                                backgroundColor: "#FFFFFF",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: "50%",
+                                  backgroundColor: isSubActive
+                                    ? "#E17E61"
+                                    : "#CFD1D4",
+                                }}
+                              />
+                            </Box>
 
-          {/* Label */}
-          <Typography
-            sx={{
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              color: isSubActive ? "#232323" : "#9e9e9e",
-            }}
-          >
-            {sub.label}
-          </Typography>
-        </ListItemButton>
-      );
-    })}
-  </Collapse>
-)}
-
+                            <Typography
+                              sx={{
+                                fontSize: "0.95rem",
+                                fontWeight: 600,
+                                color: isSubActive ? "#232323" : "#9e9e9e",
+                              }}
+                            >
+                              {sub.label}
+                            </Typography>
+                          </ListItemButton>
+                        );
+                      })}
+                    </Collapse>
+                  )}
                 </Box>
               );
             })}
