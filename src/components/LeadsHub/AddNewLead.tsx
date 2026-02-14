@@ -71,18 +71,31 @@ const intOrNull = (val: string | undefined | null): number | null => {
   return val && val.trim() !== "" && !isNaN(n) ? n : null;
 };
 
-const intOrFallback = (val: string | undefined | null, fallback: number): number => {
+const intOrFallback = (
+  val: string | undefined | null,
+  fallback: number,
+): number => {
   const n = Number(val);
   return val && val.trim() !== "" && !isNaN(n) && n > 0 ? n : fallback;
 };
 
 // ====================== Time Slots ======================
 const timeSlots = [
-  "09:00 AM - 09:30 AM", "09:30 AM - 10:00 AM", "10:00 AM - 10:30 AM",
-  "10:30 AM - 11:00 AM", "11:00 AM - 11:30 AM", "11:30 AM - 12:00 PM",
-  "12:00 PM - 12:30 PM", "12:30 PM - 01:00 PM", "02:00 PM - 02:30 PM",
-  "02:30 PM - 03:00 PM", "03:00 PM - 03:30 PM", "03:30 PM - 04:00 PM",
-  "04:00 PM - 04:30 PM", "04:30 PM - 05:00 PM", "05:00 PM - 05:30 PM",
+  "09:00 AM - 09:30 AM",
+  "09:30 AM - 10:00 AM",
+  "10:00 AM - 10:30 AM",
+  "10:30 AM - 11:00 AM",
+  "11:00 AM - 11:30 AM",
+  "11:30 AM - 12:00 PM",
+  "12:00 PM - 12:30 PM",
+  "12:30 PM - 01:00 PM",
+  "02:00 PM - 02:30 PM",
+  "02:30 PM - 03:00 PM",
+  "03:00 PM - 03:30 PM",
+  "03:30 PM - 04:00 PM",
+  "04:00 PM - 04:30 PM",
+  "04:30 PM - 05:00 PM",
+  "05:00 PM - 05:30 PM",
   "05:30 PM - 06:00 PM",
 ];
 
@@ -98,31 +111,33 @@ export default function AddNewLead() {
 
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>([]);
+  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>(
+    [],
+  );
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
   const [employeeError, setEmployeeError] = React.useState<string | null>(null);
   const [clinicId] = React.useState(1);
 
-  // ── Pull campaigns from Redux (already fetched by CampaignsScreen) ──
+  // ── Pull campaigns directly from Redux (already fetched by CampaignsScreen) ──
   const rawCampaigns = useSelector(selectCampaign);
 
-  // Normalise Redux shape → UI model
-  // source  : campaign_mode 1 → "Social Media", else → "Email"
-  // subSource: first platform name for social, "gmail" for email
-  const allCampaigns = React.useMemo(
+  // Map raw Redux shape → simple UI model with source + subSource derived
+  const campaigns = React.useMemo(
     () =>
       (rawCampaigns || []).map((api: any) => ({
-        id: api.id as string,
+        id: api.id as string, // UUID
         name: api.campaign_name ?? "",
+        // campaign_mode === 1 → Social Media, else → Email
         source: api.campaign_mode === 1 ? "Social Media" : "Email",
+        // first platform name for social, "gmail" for email
         subSource:
           api.campaign_mode === 1
             ? (api.social_media?.[0]?.platform_name ?? "")
             : "gmail",
-        isActive: Boolean(api.is_active),
+        isActive: api.is_active as boolean,
       })),
-    [rawCampaigns]
+    [rawCampaigns],
   );
 
   const [form, setForm] = React.useState<FormState>({
@@ -140,8 +155,8 @@ export default function AddNewLead() {
     partnerGender: "",
     source: "",
     subSource: "",
-    campaign: "",       // UUID of the matched / selected campaign
-    campaignName: "",   // display name — read-only, derived
+    campaign: "", // stores the campaign UUID
+    campaignName: "", // read-only display label
     assignee: "",
     nextType: "",
     nextStatus: "",
@@ -159,23 +174,27 @@ export default function AddNewLead() {
 
   // ====================== Fetch Departments ======================
   React.useEffect(() => {
-    const fetch = async () => {
+    const fetchDepartments = async () => {
       try {
         setLoadingDepartments(true);
         const depts = await DepartmentAPI.listActiveByClinic(clinicId);
         setDepartments(depts);
       } catch (err: any) {
-        setError(`Departments: ${err?.response?.data?.detail || err?.message || "Failed to load"}`);
+        const msg =
+          err?.response?.data?.detail ||
+          err?.message ||
+          "Failed to load departments";
+        setError(`Departments: ${msg}`);
       } finally {
         setLoadingDepartments(false);
       }
     };
-    fetch();
+    fetchDepartments();
   }, [clinicId]);
 
   // ====================== Fetch Employees ======================
   React.useEffect(() => {
-    const fetch = async () => {
+    const fetchEmployees = async () => {
       try {
         setLoadingEmployees(true);
         setEmployeeError(null);
@@ -183,85 +202,94 @@ export default function AddNewLead() {
         setEmployees(Array.isArray(emps) ? emps : []);
       } catch (err: any) {
         const status = err?.response?.status;
-        const msg = err?.response?.data?.detail || err?.message || "Failed to load employees";
-        setEmployeeError(
-          status === 401 ? "Unauthorized — please log in again" :
-          status === 404 ? `Employees endpoint not found (clinic ${clinicId})` : msg
-        );
+        const msg =
+          err?.response?.data?.detail ||
+          err?.message ||
+          "Failed to load employees";
+        const displayMsg =
+          status === 401
+            ? "Unauthorized — please log in again"
+            : status === 404
+              ? `Employees endpoint not found (clinic ${clinicId})`
+              : msg;
+        setEmployeeError(displayMsg);
         setEmployees([]);
       } finally {
         setLoadingEmployees(false);
       }
     };
-    fetch();
+    fetchEmployees();
   }, [clinicId]);
 
-  // ====================== Auto-match campaign from source + subSource ======================
-  // Watches source and subSource. Finds campaigns in Redux that match BOTH.
-  // • If exactly one match  → auto-set campaign UUID + name (read-only)
-  // • If multiple matches   → let user pick from a filtered dropdown
-  // • If no match / cleared → reset campaign fields
-  const matchedCampaigns = React.useMemo(() => {
-    if (!form.source) return [];
-
-    return allCampaigns.filter((c) => {
-      const sourceMatch =
-        c.source.toLowerCase() === form.source.toLowerCase();
-
-      // If subSource is also filled, require it to match too
-      const subSourceMatch =
-        !form.subSource ||
-        c.subSource.toLowerCase() === form.subSource.toLowerCase();
-
-      return sourceMatch && subSourceMatch;
-    });
-  }, [form.source, form.subSource, allCampaigns]);
-
+  // ====================== Auto-fill source & sub_source when campaign changes ======================
+  // Watches form.campaign (UUID). When set, copies source + subSource from the
+  // matching Redux campaign record into form state — making those fields read-only.
+  // When cleared, resets them so the user can fill them in manually.
   React.useEffect(() => {
-    if (matchedCampaigns.length === 1) {
-      // Exactly one match → auto-fill silently
-      const c = matchedCampaigns[0];
+    if (!form.campaign) {
       setForm((prev) => ({
         ...prev,
-        campaign: c.id,
-        campaignName: c.name,
-      }));
-      console.log(`=== Campaign auto-matched: "${c.name}" (id=${c.id}) ===`);
-    } else {
-      // 0 or multiple matches → clear campaign so user can pick / leave blank
-      setForm((prev) => ({
-        ...prev,
-        campaign: "",
         campaignName: "",
+        source: "",
+        subSource: "",
       }));
+      return;
     }
-  }, [matchedCampaigns]);
+
+    const matched = campaigns.find((c) => c.id === form.campaign);
+    if (!matched) return;
+
+    setForm((prev) => ({
+      ...prev,
+      campaignName: matched.name,
+      source: matched.source,
+      subSource: matched.subSource,
+    }));
+
+    console.log(`=== Campaign selected: "${matched.name}" ===`);
+    console.log(
+      `  source="${matched.source}" | subSource="${matched.subSource}"`,
+    );
+  }, [form.campaign, campaigns]);
 
   // ====================== Filter Personnel by Department ======================
   React.useEffect(() => {
-    if (!form.department || employees.length === 0) { setFilteredPersonnel([]); return; }
+    if (!form.department || employees.length === 0) {
+      setFilteredPersonnel([]);
+      return;
+    }
     const selectedDeptId = Number(form.department);
     const selectedDept = departments.find((d) => d.id === selectedDeptId);
-    if (!selectedDept) { setFilteredPersonnel([]); return; }
-    const normalize = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
+    if (!selectedDept) {
+      setFilteredPersonnel([]);
+      return;
+    }
+
+    const normalize = (s: string) =>
+      (s ?? "").trim().toLowerCase().normalize("NFC");
     const selectedName = normalize(selectedDept.name);
-    setFilteredPersonnel(employees.filter((emp) => normalize(emp.department_name) === selectedName));
+    const filtered = employees.filter(
+      (emp) => normalize(emp.department_name) === selectedName,
+    );
+    setFilteredPersonnel(filtered);
   }, [form.department, employees, departments]);
 
   // ====================== Styles ======================
   const inputStyle = {
     "& .MuiOutlinedInput-root": {
-      borderRadius: "8px", fontSize: "0.875rem",
+      borderRadius: "8px",
+      fontSize: "0.875rem",
       "& fieldset": { borderColor: "#E2E8F0" },
       "&:hover fieldset": { borderColor: "#CBD5E1" },
       "&.Mui-focused fieldset": { borderColor: "#6366F1" },
     },
   };
 
-  // Grey background for auto-filled / read-only fields
+  // Greyed-out read-only style for auto-filled fields
   const readOnlyStyle = {
     "& .MuiOutlinedInput-root": {
-      borderRadius: "8px", fontSize: "0.875rem",
+      borderRadius: "8px",
+      fontSize: "0.875rem",
       bgcolor: "#F1F5F9",
       "& fieldset": { borderColor: "#E2E8F0" },
       "&:hover fieldset": { borderColor: "#E2E8F0" },
@@ -270,79 +298,99 @@ export default function AddNewLead() {
   };
 
   const labelStyle = {
-    fontSize: "0.75rem", fontWeight: 600, color: "#475569", mb: 0.5, display: "block",
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    color: "#475569",
+    mb: 0.5,
+    display: "block",
   };
-
-  const autoTag = (
-    <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
-      auto-filled
-    </Typography>
-  );
 
   // ====================== Handlers ======================
   const handleChange =
-    (field: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
       setError(null);
     };
 
-  // Changing source resets subSource and campaign so matching re-runs cleanly
-  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({
-      ...prev,
-      source: e.target.value,
-      subSource: "",
-      campaign: "",
-      campaignName: "",
-    }));
-    setError(null);
-  };
-
-  // Changing subSource resets campaign so matching re-runs
-  const handleSubSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({
-      ...prev,
-      subSource: e.target.value,
-      campaign: "",
-      campaignName: "",
-    }));
+  // Selecting a campaign UUID — useEffect handles the downstream auto-fill
+  const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, campaign: e.target.value }));
     setError(null);
   };
 
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, department: e.target.value, personnel: "", assignee: "" }));
+    setForm((prev) => ({
+      ...prev,
+      department: e.target.value,
+      personnel: "",
+      assignee: "",
+    }));
     setError(null);
   };
 
   // ====================== Validate ======================
   const validateStep = (): boolean => {
     if (currentStep === 1) {
-      if (!form.full_name.trim()) { setError("Full name is required"); return false; }
-      if (!form.contact.trim()) { setError("Contact number is required"); return false; }
-      if (!form.email.trim()) { setError("Email is required"); return false; }
-      if (!form.gender) { setError("Gender is required"); return false; }
-      if (!form.age) { setError("Age is required"); return false; }
-      if (!form.source) { setError("Source is required"); return false; }
+      if (!form.full_name.trim()) {
+        setError("Full name is required");
+        return false;
+      }
+      if (!form.contact.trim()) {
+        setError("Contact number is required");
+        return false;
+      }
+      if (!form.email.trim()) {
+        setError("Email is required");
+        return false;
+      }
+      if (!form.gender) {
+        setError("Gender is required");
+        return false;
+      }
+      if (!form.age) {
+        setError("Age is required");
+        return false;
+      }
+      if (!form.source) {
+        setError("Source is required");
+        return false;
+      }
     }
     if (currentStep === 2) {
-      if (form.treatments.length === 0) { setError("Please select at least one treatment"); return false; }
+      if (form.treatments.length === 0) {
+        setError("Please select at least one treatment");
+        return false;
+      }
     }
     if (currentStep === 3) {
-      if (!form.department) { setError("Department is required"); return false; }
-      if (!form.appointmentDate) { setError("Appointment date is required"); return false; }
-      if (!form.slot) { setError("Time slot is required"); return false; }
+      if (!form.department) {
+        setError("Department is required");
+        return false;
+      }
+      if (!form.appointmentDate) {
+        setError("Appointment date is required");
+        return false;
+      }
+      if (!form.slot) {
+        setError("Time slot is required");
+        return false;
+      }
     }
     return true;
   };
 
   const handleNext = async () => {
     if (!validateStep()) return;
-    if (currentStep === 3) { await submitForm(); return; }
+    if (currentStep === 3) {
+      await submitForm();
+      return;
+    }
     setCurrentStep((prev) => prev + 1);
   };
 
-  const handleBack = () => { if (currentStep > 1) setCurrentStep((prev) => prev - 1); };
+  const handleBack = () => {
+    if (currentStep > 1) setCurrentStep((prev) => prev - 1);
+  };
 
   // ====================== Build Payload ======================
   const buildPayload = (): LeadPayload => {
@@ -356,7 +404,8 @@ export default function AddNewLead() {
       treatment_interest: form.treatments.join(","),
       appointment_date: form.appointmentDate,
       slot: form.slot,
-      campaign_id: strOrNull(form.campaign),   // UUID or null — never ""
+      // campaign_id is the UUID stored in form.campaign, or null
+      campaign_id: strOrNull(form.campaign),
       email: strOrNull(form.email),
       language_preference: form.language || "",
       location: form.location || "",
@@ -364,10 +413,16 @@ export default function AddNewLead() {
       remark: form.remark || "",
       partner_full_name: form.partnerName || "",
       next_action_description: form.nextDesc || "",
-      marital_status: form.marital ? (form.marital.toLowerCase() as "single" | "married") : null,
-      partner_gender: form.partnerGender ? (form.partnerGender.toLowerCase() as "male" | "female") : null,
+      marital_status: form.marital
+        ? (form.marital.toLowerCase() as "single" | "married")
+        : null,
+      partner_gender: form.partnerGender
+        ? (form.partnerGender.toLowerCase() as "male" | "female")
+        : null,
       next_action_status:
-        form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : null,
+        form.nextStatus === "pending" || form.nextStatus === "completed"
+          ? form.nextStatus
+          : null,
       assigned_to_id: intOrNull(form.assignee),
       personal_id: null,
       age: intOrNull(form.age),
@@ -377,7 +432,11 @@ export default function AddNewLead() {
       is_active: true,
       lead_status: "new",
     };
-    console.log("=== PAYLOAD ===", JSON.stringify(payload, null, 2));
+
+    console.log("=== PAYLOAD BEING SENT TO /leads/ ===");
+    console.log(JSON.stringify(payload, null, 2));
+    console.log("=====================================");
+
     return payload;
   };
 
@@ -386,60 +445,150 @@ export default function AddNewLead() {
     try {
       setError(null);
       setIsSubmitting(true);
-      const response = await LeadAPI.create(buildPayload());
+      const payload = buildPayload();
+      const response = await LeadAPI.create(payload);
       console.log("✅ Lead created:", response);
       setShowSuccess(true);
-      setTimeout(() => { setShowSuccess(false); navigate("/leads", { replace: true }); }, 1500);
+      setTimeout(() => {
+        setShowSuccess(false);
+        navigate("/leads", { replace: true });
+      }, 1500);
     } catch (err: any) {
-      console.error("❌ Lead create error:", err?.response?.data || err?.message);
+      console.error(
+        "❌ Lead create error:",
+        err?.response?.data || err?.message,
+      );
       const data = err?.response?.data;
       let msg = "Failed to save lead";
       if (data) {
         if (typeof data === "string") msg = data;
         else if (data.detail) msg = data.detail;
         else if (data.message) msg = data.message;
-        else if (data.error) msg = `${data.error}${data.request_id ? ` (request_id: ${data.request_id})` : ""}`;
-        else { const k = Object.keys(data)[0]; msg = `${k}: ${Array.isArray(data[k]) ? data[k][0] : data[k]}`; }
-      } else msg = err?.message || msg;
+        else if (data.error)
+          msg = `${data.error}${data.request_id ? ` (request_id: ${data.request_id})` : ""}`;
+        else {
+          const firstKey = Object.keys(data)[0];
+          const firstVal = data[firstKey];
+          msg = `${firstKey}: ${Array.isArray(firstVal) ? firstVal[0] : firstVal}`;
+        }
+      } else {
+        msg = err?.message || msg;
+      }
       setError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Derived: is a campaign currently selected?
+  const campaignSelected = Boolean(form.campaign);
+
   // ====================== Render ======================
   return (
-    <Box sx={{ bgcolor: "#F8FAFC", minHeight: "100vh", p: 4 }}>
+    <Box
+      sx={{
+        bgcolor: "#F8FAFC",
+        minHeight: "100vh",
+        px: 4,
+        py: 2, // controlled spacing
+      }}
+    >
+      {/* Remove breadcrumb if empty */}
 
-      {/* Breadcrumb */}
-      <Stack direction="row" spacing={1} sx={{ mb: 3, alignItems: "center" }}>
-        <Typography variant="body2" color="text.secondary" sx={{ cursor: "pointer" }} onClick={() => navigate("/leads")}>VIDAI Leads</Typography>
-        <Typography variant="body2" color="text.secondary">›</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ cursor: "pointer" }} onClick={() => navigate("/leads")}>Leads Hub</Typography>
-        <Typography variant="body2" color="text.secondary">›</Typography>
-        <Typography variant="body2" fontWeight={600} color="#1E293B">Add New Lead</Typography>
-      </Stack>
-
-      <Paper sx={{ borderRadius: "16px", overflow: "hidden" }}>
-
-        {/* Header */}
-        <Box sx={{ bgcolor: "white", p: 3, borderBottom: "1px solid #F1F5F9" }}>
-          <Typography variant="h6" fontWeight={700} color="#1E293B">Add New Lead</Typography>
+      <Paper
+        sx={{
+          borderRadius: "16px",
+          overflow: "hidden",
+          mt: 0,
+        }}
+      >
+        <Box
+          sx={{
+            bgcolor: "white",
+            px: 3,
+            py: 2,
+            borderBottom: "1px solid #F1F5F9",
+          }}
+        >
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            color="#1E293B"
+            sx={{ m: 0 }}
+          >
+            Add New Lead
+          </Typography>
         </Box>
 
         {/* Step Indicator */}
-        <Box sx={{ bgcolor: "white", px: 6, pt: 3, pb: 2, borderBottom: "1px solid #F1F5F9" }}>
-          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 3, bgcolor: "#F8FAFC", px: 3, py: 1.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
-            {[{ label: "Patient Details", step: 1 }, { label: "Medical Details", step: 2 }, { label: "Book Appointment", step: 3 }].map(({ label, step }) => (
-              <Box key={step} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Box sx={{
-                  width: 24, height: 24, borderRadius: "50%",
-                  bgcolor: currentStep > step ? "#10B981" : currentStep === step ? (step === 3 ? "#3B82F6" : "#F97316") : "#E2E8F0",
-                  color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "0.75rem",
-                }}>
+        <Box
+          sx={{
+            bgcolor: "white",
+            px: 6,
+            pt: 3,
+            pb: 2,
+            borderBottom: "1px solid #F1F5F9",
+          }}
+        >
+          <Box
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              bgcolor: "#F8FAFC",
+              px: 3,
+              py: 1.5,
+              borderRadius: "12px",
+              border: "1px solid #E2E8F0",
+            }}
+          >
+            {[
+              { label: "Patient Details", step: 1 },
+              { label: "Medical Details", step: 2 },
+              { label: "Book Appointment", step: 3 },
+            ].map(({ label, step }) => (
+              <Box
+                key={step}
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <Box
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    bgcolor:
+                      currentStep > step
+                        ? "#10B981"
+                        : currentStep === step
+                          ? step === 3
+                            ? "#3B82F6"
+                            : "#F97316"
+                          : "#E2E8F0",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                  }}
+                >
                   {currentStep > step ? "✓" : step}
                 </Box>
-                <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.875rem", color: currentStep > step ? "#10B981" : currentStep === step ? (step === 3 ? "#3B82F6" : "#F97316") : "#94A3B8" }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={600}
+                  sx={{
+                    fontSize: "0.875rem",
+                    color:
+                      currentStep > step
+                        ? "#10B981"
+                        : currentStep === step
+                          ? step === 3
+                            ? "#3B82F6"
+                            : "#F97316"
+                          : "#94A3B8",
+                  }}
+                >
                   {label}
                 </Typography>
               </Box>
@@ -448,10 +597,34 @@ export default function AddNewLead() {
         </Box>
 
         {/* Form Body */}
-        <Box sx={{ bgcolor: "white", p: 3, maxHeight: "calc(100vh - 400px)", overflowY: "auto", "&::-webkit-scrollbar": { width: "8px" }, "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" } }}>
-          {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>{error}</Alert>}
+        <Box
+          sx={{
+            bgcolor: "white",
+            p: 3,
+            maxHeight: "calc(100vh - 400px)",
+            overflowY: "auto",
+            "&::-webkit-scrollbar": { width: "8px" },
+            "&::-webkit-scrollbar-thumb": {
+              backgroundColor: "#CBD5E1",
+              borderRadius: "4px",
+            },
+          }}
+        >
+          {error && (
+            <Alert
+              severity="error"
+              sx={{ mb: 3 }}
+              onClose={() => setError(null)}
+            >
+              {error}
+            </Alert>
+          )}
           {employeeError && (
-            <Alert severity="warning" sx={{ mb: 3 }} onClose={() => setEmployeeError(null)}>
+            <Alert
+              severity="warning"
+              sx={{ mb: 3 }}
+              onClose={() => setEmployeeError(null)}
+            >
               Could not load employees: <strong>{employeeError}</strong>
             </Alert>
           )}
@@ -459,31 +632,83 @@ export default function AddNewLead() {
           {/* ===== STEP 1 ===== */}
           {currentStep === 1 && (
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>LEAD INFORMATION</Typography>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color="#1E293B"
+                sx={{ mb: 2 }}
+              >
+                LEAD INFORMATION
+              </Typography>
 
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
                 <Box>
                   <Typography sx={labelStyle}>Full Name *</Typography>
-                  <TextField fullWidth size="small" value={form.full_name} onChange={handleChange("full_name")} sx={inputStyle} />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={form.full_name}
+                    onChange={handleChange("full_name")}
+                    sx={inputStyle}
+                  />
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Contact No. *</Typography>
-                  <TextField fullWidth size="small" value={form.contact} onChange={handleChange("contact")} sx={inputStyle} />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={form.contact}
+                    onChange={handleChange("contact")}
+                    sx={inputStyle}
+                  />
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Email *</Typography>
-                  <TextField fullWidth size="small" value={form.email} onChange={handleChange("email")} sx={inputStyle} />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={form.email}
+                    onChange={handleChange("email")}
+                    sx={inputStyle}
+                  />
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Location</Typography>
-                  <TextField fullWidth size="small" value={form.location} onChange={handleChange("location")} sx={inputStyle} />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={form.location}
+                    onChange={handleChange("location")}
+                    sx={inputStyle}
+                  />
                 </Box>
               </Box>
 
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 4 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 2,
+                  mb: 4,
+                }}
+              >
                 <Box>
                   <Typography sx={labelStyle}>Gender *</Typography>
-                  <TextField select fullWidth size="small" value={form.gender} onChange={handleChange("gender")} sx={inputStyle}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.gender}
+                    onChange={handleChange("gender")}
+                    sx={inputStyle}
+                  >
                     <MenuItem value="Male">Male</MenuItem>
                     <MenuItem value="Female">Female</MenuItem>
                     <MenuItem value="Other">Other</MenuItem>
@@ -491,11 +716,25 @@ export default function AddNewLead() {
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Age *</Typography>
-                  <TextField fullWidth size="small" type="number" value={form.age} onChange={handleChange("age")} sx={inputStyle} />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    value={form.age}
+                    onChange={handleChange("age")}
+                    sx={inputStyle}
+                  />
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Marital Status</Typography>
-                  <TextField select fullWidth size="small" value={form.marital} onChange={handleChange("marital")} sx={inputStyle}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.marital}
+                    onChange={handleChange("marital")}
+                    sx={inputStyle}
+                  >
                     <MenuItem value="">-- Select --</MenuItem>
                     <MenuItem value="Married">Married</MenuItem>
                     <MenuItem value="Single">Single</MenuItem>
@@ -503,13 +742,26 @@ export default function AddNewLead() {
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Address</Typography>
-                  <TextField fullWidth size="small" value={form.address} onChange={handleChange("address")} sx={inputStyle} />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={form.address}
+                    onChange={handleChange("address")}
+                    sx={inputStyle}
+                  />
                 </Box>
               </Box>
 
               <Box sx={{ mb: 4 }}>
                 <Typography sx={labelStyle}>Language Preference</Typography>
-                <TextField select fullWidth size="small" value={form.language} onChange={handleChange("language")} sx={{ ...inputStyle, maxWidth: "25%" }}>
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={form.language}
+                  onChange={handleChange("language")}
+                  sx={{ ...inputStyle, maxWidth: "25%" }}
+                >
                   <MenuItem value="">-- Select --</MenuItem>
                   <MenuItem value="English">English</MenuItem>
                   <MenuItem value="Hindi">Hindi</MenuItem>
@@ -517,27 +769,76 @@ export default function AddNewLead() {
                 </TextField>
               </Box>
 
-              <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>PARTNER INFORMATION</Typography>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color="#1E293B"
+                sx={{ mb: 2 }}
+              >
+                PARTNER INFORMATION
+              </Typography>
               <Box sx={{ mb: 2 }}>
-                <Typography sx={{ ...labelStyle, mb: 1 }}>Is This Inquiry For A Couple?</Typography>
-                <RadioGroup row value={isCouple} onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}>
-                  <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
-                  <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+                <Typography sx={{ ...labelStyle, mb: 1 }}>
+                  Is This Inquiry For A Couple?
+                </Typography>
+                <RadioGroup
+                  row
+                  value={isCouple}
+                  onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}
+                >
+                  <FormControlLabel
+                    value="yes"
+                    control={<Radio size="small" />}
+                    label="Yes"
+                  />
+                  <FormControlLabel
+                    value="no"
+                    control={<Radio size="small" />}
+                    label="No"
+                  />
                 </RadioGroup>
               </Box>
+
               {isCouple === "yes" && (
-                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: 2,
+                    mb: 4,
+                  }}
+                >
                   <Box>
                     <Typography sx={labelStyle}>Full Name</Typography>
-                    <TextField fullWidth size="small" value={form.partnerName} onChange={handleChange("partnerName")} sx={inputStyle} />
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={form.partnerName}
+                      onChange={handleChange("partnerName")}
+                      sx={inputStyle}
+                    />
                   </Box>
                   <Box>
                     <Typography sx={labelStyle}>Age</Typography>
-                    <TextField fullWidth size="small" type="number" value={form.partnerAge} onChange={handleChange("partnerAge")} sx={inputStyle} />
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      value={form.partnerAge}
+                      onChange={handleChange("partnerAge")}
+                      sx={inputStyle}
+                    />
                   </Box>
                   <Box>
                     <Typography sx={labelStyle}>Gender</Typography>
-                    <TextField select fullWidth size="small" value={form.partnerGender} onChange={handleChange("partnerGender")} sx={inputStyle}>
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      value={form.partnerGender}
+                      onChange={handleChange("partnerGender")}
+                      sx={inputStyle}
+                    >
                       <MenuItem value="">-- Select --</MenuItem>
                       <MenuItem value="Male">Male</MenuItem>
                       <MenuItem value="Female">Female</MenuItem>
@@ -547,111 +848,197 @@ export default function AddNewLead() {
               )}
 
               {/* ===== SOURCE & CAMPAIGN DETAILS ===== */}
-              <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>SOURCE & CAMPAIGN DETAILS</Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color="#1E293B"
+                sx={{ mb: 2 }}
+              >
+                SOURCE & CAMPAIGN DETAILS
+              </Typography>
 
-                {/* 1. Source — user picks this first */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 2,
+                  mb: 4,
+                }}
+              >
+                {/* 1. Campaign dropdown — pick a campaign to auto-fill source & sub-source */}
                 <Box>
-                  <Typography sx={labelStyle}>Source *</Typography>
-                  <TextField select fullWidth size="small" value={form.source} onChange={handleSourceChange} sx={inputStyle}>
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Social Media">Social Media</MenuItem>
-                    <MenuItem value="Website">Website</MenuItem>
-                    <MenuItem value="Referral">Referral</MenuItem>
-                    <MenuItem value="Direct">Direct</MenuItem>
-                    <MenuItem value="Email">Email</MenuItem>
+                  <Typography sx={labelStyle}>Campaign Name</Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.campaign}
+                    onChange={handleCampaignChange}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- None --</MenuItem>
+                    {campaigns.length === 0 ? (
+                      <MenuItem value="" disabled>
+                        No campaigns available
+                      </MenuItem>
+                    ) : (
+                      campaigns.map((c) => (
+                        <MenuItem key={c.id} value={c.id}>
+                          {c.name}
+                        </MenuItem>
+                      ))
+                    )}
                   </TextField>
                 </Box>
 
-                {/* 2. Sub-Source — user picks this second */}
-                <Box>
-                  <Typography sx={labelStyle}>Sub-Source</Typography>
-                  <TextField select fullWidth size="small" value={form.subSource} onChange={handleSubSourceChange} sx={inputStyle} disabled={!form.source}>
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Facebook">Facebook</MenuItem>
-                    <MenuItem value="Instagram">Instagram</MenuItem>
-                    <MenuItem value="Google">Google</MenuItem>
-                    <MenuItem value="LinkedIn">LinkedIn</MenuItem>
-                    <MenuItem value="gmail">Gmail</MenuItem>
-                  </TextField>
-                </Box>
-
-                {/* 3. Campaign Name — derived from source + subSource, read-only */}
+                {/* 2. Source — read-only (grey) when campaign selected, editable dropdown otherwise */}
                 <Box>
                   <Typography sx={labelStyle}>
-                    Campaign Name
-                    {form.campaignName && autoTag}
+                    Source *
+                    {campaignSelected && (
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontSize: "0.65rem",
+                          color: "#6366F1",
+                          ml: 1,
+                          fontWeight: 500,
+                        }}
+                      >
+                        auto-filled from campaign
+                      </Typography>
+                    )}
                   </Typography>
-
-                  {matchedCampaigns.length > 1 ? (
-                    // Multiple matches → let user pick which campaign
+                  {campaignSelected ? (
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={form.source}
+                      InputProps={{ readOnly: true }}
+                      sx={readOnlyStyle}
+                    />
+                  ) : (
                     <TextField
                       select
                       fullWidth
                       size="small"
-                      value={form.campaign}
-                      onChange={(e) => {
-                        const chosen = matchedCampaigns.find((c) => c.id === e.target.value);
-                        setForm((prev) => ({
-                          ...prev,
-                          campaign: e.target.value,
-                          campaignName: chosen?.name ?? "",
-                        }));
-                      }}
+                      value={form.source}
+                      onChange={handleChange("source")}
                       sx={inputStyle}
                     >
-                      <MenuItem value="">-- Select campaign --</MenuItem>
-                      {matchedCampaigns.map((c) => (
-                        <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-                      ))}
+                      <MenuItem value="">-- Select --</MenuItem>
+                      <MenuItem value="Social Media">Social Media</MenuItem>
+                      <MenuItem value="Website">Website</MenuItem>
+                      <MenuItem value="Referral">Referral</MenuItem>
+                      <MenuItem value="Direct">Direct</MenuItem>
                     </TextField>
-                  ) : (
-                    // 0 or 1 match → read-only display field
+                  )}
+                </Box>
+
+                {/* 3. Sub-Source — read-only when campaign selected, editable otherwise */}
+                <Box>
+                  <Typography sx={labelStyle}>
+                    Sub-Source
+                    {campaignSelected && (
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontSize: "0.65rem",
+                          color: "#6366F1",
+                          ml: 1,
+                          fontWeight: 500,
+                        }}
+                      >
+                        auto-filled from campaign
+                      </Typography>
+                    )}
+                  </Typography>
+                  {campaignSelected ? (
                     <TextField
                       fullWidth
                       size="small"
-                      value={form.campaignName || (form.source && matchedCampaigns.length === 0 ? "No matching campaign" : "")}
-                      placeholder="Filled automatically"
+                      value={form.subSource}
                       InputProps={{ readOnly: true }}
                       sx={readOnlyStyle}
                     />
-                  )}
-
-                  {/* Helper hint */}
-                  {form.source && matchedCampaigns.length === 0 && (
-                    <Typography sx={{ fontSize: "0.68rem", color: "#94A3B8", mt: 0.5 }}>
-                      No active campaign matches this source
-                    </Typography>
-                  )}
-                  {matchedCampaigns.length > 1 && (
-                    <Typography sx={{ fontSize: "0.68rem", color: "#F97316", mt: 0.5 }}>
-                      {matchedCampaigns.length} campaigns match — please select one
-                    </Typography>
+                  ) : (
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      value={form.subSource}
+                      onChange={handleChange("subSource")}
+                      sx={inputStyle}
+                    >
+                      <MenuItem value="">-- Select --</MenuItem>
+                      <MenuItem value="Facebook">Facebook</MenuItem>
+                      <MenuItem value="Instagram">Instagram</MenuItem>
+                      <MenuItem value="Google">Google</MenuItem>
+                      <MenuItem value="LinkedIn">LinkedIn</MenuItem>
+                    </TextField>
                   )}
                 </Box>
               </Box>
 
-              <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>ASSIGNEE & NEXT ACTION DETAILS</Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 2 }}>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color="#1E293B"
+                sx={{ mb: 2 }}
+              >
+                ASSIGNEE & NEXT ACTION DETAILS
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 2,
+                  mb: 2,
+                }}
+              >
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField select fullWidth size="small" value={form.assignee} onChange={handleChange("assignee")} sx={inputStyle}
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.assignee}
+                    onChange={handleChange("assignee")}
+                    sx={inputStyle}
                     disabled={loadingEmployees}
-                    InputProps={{ endAdornment: loadingEmployees ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null }}>
+                    InputProps={{
+                      endAdornment: loadingEmployees ? (
+                        <CircularProgress size={20} sx={{ mr: 1 }} />
+                      ) : null,
+                    }}
+                  >
                     {loadingEmployees ? (
-                      <MenuItem value="" disabled>Loading...</MenuItem>
+                      <MenuItem value="" disabled>
+                        Loading...
+                      </MenuItem>
                     ) : employees.length === 0 ? (
-                      <MenuItem value="" disabled>{employeeError ? "Failed to load" : "No employees"}</MenuItem>
+                      <MenuItem value="" disabled>
+                        {employeeError ? "Failed to load" : "No employees"}
+                      </MenuItem>
                     ) : (
                       employees.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
+                        <MenuItem key={emp.id} value={emp.id.toString()}>
+                          {emp.emp_name} ({emp.emp_type})
+                        </MenuItem>
                       ))
                     )}
                   </TextField>
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Next Action Type</Typography>
-                  <TextField select fullWidth size="small" value={form.nextType} onChange={handleChange("nextType")} sx={inputStyle}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.nextType}
+                    onChange={handleChange("nextType")}
+                    sx={inputStyle}
+                  >
                     <MenuItem value="">-- Select --</MenuItem>
                     <MenuItem value="Follow Up">Follow Up</MenuItem>
                     <MenuItem value="Call">Call</MenuItem>
@@ -659,7 +1046,14 @@ export default function AddNewLead() {
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Next Action Status</Typography>
-                  <TextField select fullWidth size="small" value={form.nextStatus} onChange={handleChange("nextStatus")} sx={inputStyle}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.nextStatus}
+                    onChange={handleChange("nextStatus")}
+                    sx={inputStyle}
+                  >
                     <MenuItem value="">-- Select --</MenuItem>
                     <MenuItem value="pending">Pending</MenuItem>
                     <MenuItem value="completed">Completed</MenuItem>
@@ -668,7 +1062,13 @@ export default function AddNewLead() {
               </Box>
               <Box sx={{ mb: 2 }}>
                 <Typography sx={labelStyle}>Next Action Description</Typography>
-                <TextField fullWidth size="small" value={form.nextDesc} onChange={handleChange("nextDesc")} sx={inputStyle} />
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={form.nextDesc}
+                  onChange={handleChange("nextDesc")}
+                  sx={inputStyle}
+                />
               </Box>
             </Box>
           )}
@@ -676,43 +1076,122 @@ export default function AddNewLead() {
           {/* ===== STEP 2 ===== */}
           {currentStep === 2 && (
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>TREATMENT INFORMATION</Typography>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color="#1E293B"
+                sx={{ mb: 2 }}
+              >
+                TREATMENT INFORMATION
+              </Typography>
               <Box sx={{ mb: 3 }}>
                 <Typography sx={labelStyle}>Treatment Interest *</Typography>
-                <TextField select fullWidth size="small" value={form.treatmentInterest}
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={form.treatmentInterest}
                   onChange={(e) => {
                     const value = e.target.value;
                     setForm((prev) => ({ ...prev, treatmentInterest: value }));
-                    if (value && !form.treatments.includes(value))
-                      setForm((prev) => ({ ...prev, treatments: [...prev.treatments, value] }));
+                    if (value && !form.treatments.includes(value)) {
+                      setForm((prev) => ({
+                        ...prev,
+                        treatments: [...prev.treatments, value],
+                      }));
+                    }
                   }}
-                  sx={{ ...inputStyle, maxWidth: "50%" }} displayEmpty>
-                  <MenuItem value="" disabled>Select</MenuItem>
+                  sx={{ ...inputStyle, maxWidth: "50%" }}
+                  displayEmpty
+                >
+                  <MenuItem value="" disabled>
+                    Select
+                  </MenuItem>
                   <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
                   <MenuItem value="IVF">IVF</MenuItem>
                   <MenuItem value="IUI">IUI</MenuItem>
                   <MenuItem value="Consultation">Consultation</MenuItem>
                 </TextField>
               </Box>
+
               {form.treatments.length > 0 && (
                 <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
                   {form.treatments.map((t) => (
-                    <Chip key={t} label={t}
-                      onDelete={() => setForm((prev) => ({ ...prev, treatments: prev.treatments.filter((x) => x !== t) }))}
-                      sx={{ bgcolor: "#FEE2E2", color: "#B91C1C", fontWeight: 600, border: "1px solid #FCA5A5", "& .MuiChip-deleteIcon": { color: "#B91C1C", "&:hover": { color: "#991B1B" } } }}
+                    <Chip
+                      key={t}
+                      label={t}
+                      onDelete={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          treatments: prev.treatments.filter((x) => x !== t),
+                        }))
+                      }
+                      sx={{
+                        bgcolor: "#FEE2E2",
+                        color: "#B91C1C",
+                        fontWeight: 600,
+                        border: "1px solid #FCA5A5",
+                        "& .MuiChip-deleteIcon": {
+                          color: "#B91C1C",
+                          "&:hover": { color: "#991B1B" },
+                        },
+                      }}
                     />
                   ))}
                 </Stack>
               )}
-              <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>DOCUMENTS & REPORTS</Typography>
+
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color="#1E293B"
+                sx={{ mb: 2 }}
+              >
+                DOCUMENTS & REPORTS
+              </Typography>
               <Box sx={{ mb: 2 }}>
                 <Typography sx={labelStyle}>Upload Documents</Typography>
-                <Box sx={{ border: "2px dashed #E2E8F0", borderRadius: "12px", p: 3, display: "inline-block", textAlign: "center", bgcolor: "#F8FAFC", minWidth: "400px" }}>
-                  <Button variant="contained" component="label" sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, px: 3, py: 1, "&:hover": { bgcolor: "#475569" } }}>
+                <Box
+                  sx={{
+                    border: "2px dashed #E2E8F0",
+                    borderRadius: "12px",
+                    p: 3,
+                    display: "inline-block",
+                    textAlign: "center",
+                    bgcolor: "#F8FAFC",
+                    minWidth: "400px",
+                  }}
+                >
+                  <Button
+                    variant="contained"
+                    component="label"
+                    sx={{
+                      bgcolor: "#64748B",
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      fontWeight: 600,
+                      px: 3,
+                      py: 1,
+                      "&:hover": { bgcolor: "#475569" },
+                    }}
+                  >
                     Choose File
-                    <input type="file" hidden onChange={(e) => setForm((prev) => ({ ...prev, documents: e.target.files ? e.target.files[0] : null }))} />
+                    <input
+                      type="file"
+                      hidden
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          documents: e.target.files ? e.target.files[0] : null,
+                        }))
+                      }
+                    />
                   </Button>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mt: 1 }}
+                  >
                     {form.documents ? form.documents.name : "No File Chosen"}
                   </Typography>
                 </Box>
@@ -723,49 +1202,126 @@ export default function AddNewLead() {
           {/* ===== STEP 3 ===== */}
           {currentStep === 3 && (
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>APPOINTMENT DETAILS</Typography>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color="#1E293B"
+                sx={{ mb: 2 }}
+              >
+                APPOINTMENT DETAILS
+              </Typography>
               <Box sx={{ mb: 3 }}>
-                <Typography sx={{ ...labelStyle, mb: 1 }}>Want to Book an Appointment?</Typography>
-                <RadioGroup row value={form.wantAppointment} onChange={(e) => setForm((prev) => ({ ...prev, wantAppointment: e.target.value as "yes" | "no" }))}>
-                  <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
-                  <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+                <Typography sx={{ ...labelStyle, mb: 1 }}>
+                  Want to Book an Appointment?
+                </Typography>
+                <RadioGroup
+                  row
+                  value={form.wantAppointment}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      wantAppointment: e.target.value as "yes" | "no",
+                    }))
+                  }
+                >
+                  <FormControlLabel
+                    value="yes"
+                    control={<Radio size="small" />}
+                    label="Yes"
+                  />
+                  <FormControlLabel
+                    value="no"
+                    control={<Radio size="small" />}
+                    label="No"
+                  />
                 </RadioGroup>
               </Box>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: 2,
+                  mb: 2,
+                }}
+              >
                 <Box>
                   <Typography sx={labelStyle}>Department *</Typography>
-                  <TextField select fullWidth size="small" value={form.department} onChange={handleDepartmentChange} sx={inputStyle}
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.department}
+                    onChange={handleDepartmentChange}
+                    sx={inputStyle}
                     disabled={loadingDepartments}
-                    InputProps={{ endAdornment: loadingDepartments ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null }}>
+                    InputProps={{
+                      endAdornment: loadingDepartments ? (
+                        <CircularProgress size={20} sx={{ mr: 1 }} />
+                      ) : null,
+                    }}
+                  >
                     {loadingDepartments ? (
-                      <MenuItem value="" disabled>Loading...</MenuItem>
+                      <MenuItem value="" disabled>
+                        Loading...
+                      </MenuItem>
                     ) : departments.length === 0 ? (
-                      <MenuItem value="" disabled>No departments available</MenuItem>
+                      <MenuItem value="" disabled>
+                        No departments available
+                      </MenuItem>
                     ) : (
                       departments.map((dept) => (
-                        <MenuItem key={dept.id} value={dept.id.toString()}>{dept.name}</MenuItem>
+                        <MenuItem key={dept.id} value={dept.id.toString()}>
+                          {dept.name}
+                        </MenuItem>
                       ))
                     )}
                   </TextField>
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField select fullWidth size="small" value={form.assignee} onChange={handleChange("assignee")} sx={inputStyle} disabled={loadingEmployees || !form.department}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.assignee}
+                    onChange={handleChange("assignee")}
+                    sx={inputStyle}
+                    disabled={loadingEmployees || !form.department}
+                  >
                     {!form.department ? (
-                      <MenuItem value="" disabled>Select department first</MenuItem>
+                      <MenuItem value="" disabled>
+                        Select department first
+                      </MenuItem>
                     ) : loadingEmployees ? (
-                      <MenuItem value="" disabled>Loading...</MenuItem>
+                      <MenuItem value="" disabled>
+                        Loading...
+                      </MenuItem>
                     ) : filteredPersonnel.length === 0 ? (
-                      <MenuItem value="" disabled>{employeeError ? "Failed to load" : "No employees in this department"}</MenuItem>
+                      <MenuItem value="" disabled>
+                        {employeeError
+                          ? "Failed to load"
+                          : "No employees in this department"}
+                      </MenuItem>
                     ) : (
                       filteredPersonnel.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
+                        <MenuItem key={emp.id} value={emp.id.toString()}>
+                          {emp.emp_name} ({emp.emp_type})
+                        </MenuItem>
                       ))
                     )}
                   </TextField>
                 </Box>
               </Box>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 3 }}>
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
                 <Box>
                   <Typography sx={labelStyle}>Date *</Typography>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -773,45 +1329,130 @@ export default function AddNewLead() {
                       value={selectedDate}
                       onChange={(newDate) => {
                         setSelectedDate(newDate);
-                        if (newDate) setForm((prev) => ({ ...prev, appointmentDate: newDate.format("YYYY-MM-DD") }));
+                        if (newDate)
+                          setForm((prev) => ({
+                            ...prev,
+                            appointmentDate: newDate.format("YYYY-MM-DD"),
+                          }));
                       }}
-                      slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
+                      slotProps={{
+                        textField: {
+                          size: "small",
+                          fullWidth: true,
+                          sx: inputStyle,
+                        },
+                      }}
                     />
                   </LocalizationProvider>
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Select Slot *</Typography>
-                  <TextField select fullWidth size="small" value={form.slot} onChange={handleChange("slot")} sx={inputStyle}>
-                    {timeSlots.map((slot, i) => <MenuItem key={i} value={slot}>{slot}</MenuItem>)}
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={form.slot}
+                    onChange={handleChange("slot")}
+                    sx={inputStyle}
+                  >
+                    {timeSlots.map((slot, i) => (
+                      <MenuItem key={i} value={slot}>
+                        {slot}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 </Box>
               </Box>
+
               <Box>
                 <Typography sx={labelStyle}>Remark</Typography>
-                <TextField fullWidth size="small" multiline rows={2} placeholder="Type Here..." value={form.remark} onChange={handleChange("remark")} sx={inputStyle} />
+                <TextField
+                  fullWidth
+                  size="small"
+                  multiline
+                  rows={2}
+                  placeholder="Type Here..."
+                  value={form.remark}
+                  onChange={handleChange("remark")}
+                  sx={inputStyle}
+                />
               </Box>
             </Box>
           )}
         </Box>
 
         {/* Footer */}
-        <Box sx={{ bgcolor: "white", p: 3, borderTop: "1px solid #F1F5F9", display: "flex", justifyContent: "flex-end", gap: 2 }}>
-          <Button onClick={() => navigate("/leads")} sx={{ textTransform: "none", color: "#64748B", fontWeight: 700, px: 3 }}>Cancel</Button>
+        <Box
+          sx={{
+            bgcolor: "white",
+            p: 3,
+            borderTop: "1px solid #F1F5F9",
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 2,
+          }}
+        >
+          <Button
+            onClick={() => navigate("/leads")}
+            sx={{
+              textTransform: "none",
+              color: "#64748B",
+              fontWeight: 700,
+              px: 3,
+            }}
+          >
+            Cancel
+          </Button>
           {currentStep > 1 && (
-            <Button onClick={handleBack} variant="outlined" disabled={isSubmitting}
-              sx={{ textTransform: "none", borderColor: "#E2E8F0", color: "#1E293B", fontWeight: 700, px: 3, "&:hover": { borderColor: "#CBD5E1" } }}>
+            <Button
+              onClick={handleBack}
+              variant="outlined"
+              disabled={isSubmitting}
+              sx={{
+                textTransform: "none",
+                borderColor: "#E2E8F0",
+                color: "#1E293B",
+                fontWeight: 700,
+                px: 3,
+                "&:hover": { borderColor: "#CBD5E1" },
+              }}
+            >
               Back
             </Button>
           )}
           {currentStep < 3 ? (
-            <Button onClick={handleNext} variant="contained"
-              sx={{ bgcolor: "#334155", textTransform: "none", fontWeight: 700, px: 4, "&:hover": { bgcolor: "#1E293B" } }}>
+            <Button
+              onClick={handleNext}
+              variant="contained"
+              sx={{
+                bgcolor: "#334155",
+                textTransform: "none",
+                fontWeight: 700,
+                px: 4,
+                "&:hover": { bgcolor: "#1E293B" },
+              }}
+            >
               Next
             </Button>
           ) : (
-            <Button onClick={handleNext} variant="contained" disabled={isSubmitting}
-              sx={{ bgcolor: "#334155", textTransform: "none", fontWeight: 700, px: 4, minWidth: "100px", "&:hover": { bgcolor: "#1E293B" } }}>
-              {isSubmitting ? <CircularProgress size={20} sx={{ color: "white" }} /> : "Save"}
+            <Button
+              onClick={handleNext}
+              variant="contained"
+              disabled={isSubmitting}
+              sx={{
+                bgcolor: "#334155",
+                textTransform: "none",
+                fontWeight: 700,
+                px: 4,
+                minWidth: "100px",
+                "&:hover": { bgcolor: "#1E293B" },
+              }}
+            >
+              {isSubmitting ? (
+                <CircularProgress size={20} sx={{ color: "white" }} />
+              ) : (
+                "Save"
+              )}
             </Button>
           )}
         </Box>
@@ -819,14 +1460,28 @@ export default function AddNewLead() {
 
       {/* Success Toast */}
       <Fade in={showSuccess}>
-        <Box sx={{
-          position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-          bgcolor: "#10B981", color: "white", px: 4, py: 2, borderRadius: "12px",
-          display: "flex", alignItems: "center", gap: 1.5, zIndex: 10000,
-          boxShadow: "0px 10px 20px rgba(16, 185, 129, 0.3)",
-        }}>
+        <Box
+          sx={{
+            position: "fixed",
+            top: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            bgcolor: "#10B981",
+            color: "white",
+            px: 4,
+            py: 2,
+            borderRadius: "12px",
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            zIndex: 10000,
+            boxShadow: "0px 10px 20px rgba(16, 185, 129, 0.3)",
+          }}
+        >
           <CheckCircleIcon sx={{ fontSize: 24 }} />
-          <Typography variant="body1" fontWeight={700}>Saved Successfully!</Typography>
+          <Typography variant="body1" fontWeight={700}>
+            Saved Successfully!
+          </Typography>
         </Box>
       </Fade>
     </Box>
