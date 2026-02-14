@@ -6,8 +6,23 @@ export type LeadStatus = "new" | "contacted";
 /** Next action status */
 export type NextActionStatus = "pending" | "completed";
 
-/** Partner gender */
-export type Gender = "male" | "female";
+export type Lead = {
+  initials: string;
+  name: string;
+  id: string;
+  date: string;
+  time: string;
+  location: string;
+  source: string;
+  lead_status: Status;
+  quality: Quality;
+  score: number;
+  assigned: string;
+  task: string;
+  taskStatus: TaskStatus;
+  activity: string;
+  archived?: boolean;
+};
 
 /** Marital status */
 export type MaritalStatus = "single" | "married";
