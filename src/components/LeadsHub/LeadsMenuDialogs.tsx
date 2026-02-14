@@ -15,7 +15,6 @@ import ArchiveLeadDialog from "../../components/LeadsHub/ArchiveLeadDialog";
 import DeleteLeadDialog from "../../components/LeadsHub/DeleteLeadDialog";
 import ReassignAssigneeDialog from "../../components/LeadsHub/ReassignAssigneeDialog";
 import CallDialog from "../../components/LeadsHub/CallDialog";
-import type { Lead } from "../../types/leads.types";
 
 // ✅ Import delete actions and API from Redux
 import { deleteLead, selectIsLeadDeleting, fetchLeads } from "../../store/leadSlice";
@@ -24,15 +23,15 @@ import { deleteLead, selectIsLeadDeleting, fetchLeads } from "../../store/leadSl
 import { LeadAPI } from "../../services/leads.api";
 
 interface MenuProps {
-  lead: Lead;
-  setLeads: React.Dispatch<React.SetStateAction<Lead[]>>;
+  lead: any;
+  setLeads: React.Dispatch<React.SetStateAction<any[]>>;
   tab: "active" | "archived";
 }
 
 let openCallSetter: ((name: string) => void) | null = null;
 
 /* ---------------- CALL BUTTON ---------------- */
-export const CallButton = ({ lead }: { lead: Lead }) => (
+export const CallButton = ({ lead }: { lead: any }) => (
   <IconButton onClick={() => openCallSetter?.(lead.full_name || lead.name)}>
     <CallIcon fontSize="small" />
   </IconButton>
@@ -66,7 +65,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
 
       console.log("🗑️ Permanently deleting lead:", lead.id);
 
-      // ✅ OPTION 1: Use Redux delete action
+      // ✅ Use Redux delete action
       const result = await dispatch(deleteLead(lead.id) as any);
 
       if (deleteLead.fulfilled.match(result)) {
