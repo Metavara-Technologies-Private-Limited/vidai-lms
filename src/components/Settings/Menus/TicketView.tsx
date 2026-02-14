@@ -15,6 +15,7 @@ const TicketView = () => {
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false); // New state for update button loading
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
 
@@ -23,32 +24,69 @@ const TicketView = () => {
   const [priority, setPriority] = useState<TicketPriority>("low");
   const [assignTo, setAssignTo] = useState<number | "">("");
 
+  const loadData = async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const [ticketData, empData] = await Promise.all([
+        ticketsApi.getTicketById(id),
+        clinicsApi.getClinicEmployees("1") 
+      ]);
+      
+      setTicket(ticketData);
+      setEmployees(empData);
+      
+      setStatus(ticketData.status);
+      setPriority(ticketData.priority);
+      setAssignTo(ticketData.assigned_to || "");
+    } catch (err) {
+      setError("Failed to load ticket details from server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      try {
-        setLoading(true);
-        // GET /api/tickets/{ticket_id}/ and /api/clinics/{id}/employees/
-        const [ticketData, empData] = await Promise.all([
-          ticketsApi.getTicketById(id),
-          clinicsApi.getClinicEmployees("1") // Using hardcoded clinic ID per earlier context
-        ]);
-        
-        setTicket(ticketData);
-        setEmployees(empData);
-        
-        // Synchronize local UI state with database response
-        setStatus(ticketData.status);
-        setPriority(ticketData.priority);
-        setAssignTo(ticketData.assigned_to || "");
-      } catch (err) {
-        setError("Failed to load ticket details from server.");
-      } finally {
-        setLoading(false);
-      }
-    };
     loadData();
   }, [id]);
+
+  // ✅ New: Function to persist changes to the Database
+  const handleUpdate = async () => {
+    if (!id || !ticket) return;
+    setUpdating(true);
+    setError(null);
+
+    try {
+      // 1. Update Status if changed (POST /api/tickets/{id}/status/)
+      if (status !== ticket.status) {
+        await ticketsApi.updateTicketStatus(id, status);
+      }
+
+      // 2. Update Assignee if changed (POST /api/tickets/{id}/assign/)
+      if (assignTo !== (ticket.assigned_to || "")) {
+        await ticketsApi.assignTicket(id, String(assignTo));
+      }
+
+      // 3. Update Priority if changed (PUT /api/tickets/{id}/update/)
+      if (priority !== ticket.priority) {
+        // Full update required for generic fields per Swagger definition
+        await ticketsApi.updateTicket(id, {
+          ...ticket,
+          priority: priority,
+          lab: ticket.lab, // UUID required by backend
+          department: ticket.department // Integer required by backend
+        });
+      }
+
+      // Refresh data to show timeline updates and confirm DB sync
+      await loadData();
+      alert("Ticket updated successfully!");
+    } catch (err) {
+      setError("Failed to save changes to the database.");
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   if (loading) return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
   if (error || !ticket) return <Alert severity="error" sx={{ m: 3 }}>{error || "Ticket not found."}</Alert>;
@@ -85,13 +123,7 @@ const TicketView = () => {
           {/* Documents Section */}
           <Stack direction="row" spacing={2} mb={4}>
             {ticket.documents?.map((doc) => (
-              <Box 
-                key={doc.id} 
-                sx={{ 
-                  p: 1.5, border: '1px solid #E0E0E0', borderRadius: 2, 
-                  display: 'flex', alignItems: 'center', gap: 2 
-                }}
-              >
+              <Box key={doc.id} sx={{ p: 1.5, border: '1px solid #E0E0E0', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Typography variant="body2" fontWeight={600}>{doc.file?.split('/').pop()}</Typography>
                 <Button size="small" component="a" href={doc.file} target="_blank">View</Button>
               </Box>
@@ -147,6 +179,7 @@ const TicketView = () => {
 
                 <PropertyField label="Assign To">
                   <Select value={assignTo} onChange={(e) => setAssignTo(e.target.value as number)} size="small" fullWidth sx={{ bgcolor: '#fff' }}>
+                    <MenuItem value=""><em>Unassigned</em></MenuItem>
                     {employees.map(emp => (
                       <MenuItem key={emp.id} value={emp.id}>{emp.emp_name}</MenuItem>
                     ))}
@@ -154,9 +187,30 @@ const TicketView = () => {
                 </PropertyField>
               </Box>
 
-              <Button variant="contained" fullWidth sx={{ bgcolor: "#505050", py: 1.5, borderRadius: 2 }}>
-                Update
+              {/* ✅ Updated: Button calls handleUpdate */}
+              <Button 
+                variant="contained" 
+                fullWidth 
+                onClick={handleUpdate}
+                disabled={updating}
+                sx={{ bgcolor: "#505050", py: 1.5, borderRadius: 2 }}
+              >
+                {updating ? <CircularProgress size={24} color="inherit" /> : "Update"}
               </Button>
+            </Stack>
+          )}
+
+          {/* Activity Timeline Section */}
+          {tab === 1 && (
+            <Stack spacing={2}>
+               {ticket.timeline?.map((item) => (
+                 <Box key={item.id} sx={{ borderLeft: '2px solid #5a8aea', pl: 2, py: 1 }}>
+                   <Typography variant="caption" fontWeight={700}>{item.action}</Typography>
+                   <Typography variant="displayBlock" fontSize="0.75rem" color="text.secondary">
+                     By {item.done_by_name} • {dayjs(item.created_at).format("DD MMM, hh:mm A")}
+                   </Typography>
+                 </Box>
+               ))}
             </Stack>
           )}
         </Box>
@@ -165,7 +219,7 @@ const TicketView = () => {
   );
 };
 
-// Helper Components for Sidebar
+ 
 const DetailRow = ({ label, value, color }: { label: string; value: string; color?: string }) => (
   <Box display="flex" justifyContent="space-between" mb={1.5}>
     <Typography variant="body2" color="text.secondary">{label} :</Typography>
