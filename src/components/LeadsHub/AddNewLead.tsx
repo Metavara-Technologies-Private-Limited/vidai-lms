@@ -430,7 +430,7 @@ export default function AddNewLead() {
       partner_inquiry: isCouple === "yes",
       book_appointment: form.wantAppointment === "yes",
       is_active: true,
-      lead_status: "new",
+      lead_status: "New",
     };
 
     console.log("=== PAYLOAD BEING SENT TO /leads/ ===");
