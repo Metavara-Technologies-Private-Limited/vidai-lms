@@ -1,57 +1,67 @@
-import { Dialog, Box, Typography, Button, Stack, Alert, CircularProgress } from "@mui/material";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import * as React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogActions,
+  Typography,
+  Button,
+  Box,
+  CircularProgress,
+  Alert,
+} from "@mui/material";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 
 interface Props {
   open: boolean;
+  leadName: string;
+  leadId?: string;
+  isDeleting?: boolean;
+  error?: string | null;
   onClose: () => void;
-  leadName?: string;
-  leadId?: string; // ✅ Added: Display lead ID
-  isDeleting?: boolean; // ✅ Added: Loading state during deletion
-  error?: string | null; // ✅ Added: Error message from API
   onConfirm: () => void;
 }
 
-const DeleteLeadDialog = ({ 
-  open, 
-  onClose, 
-  leadName, 
-  leadId, 
-  isDeleting = false, 
-  error = null, 
-  onConfirm 
-}: Props) => {
+const DeleteLeadDialog: React.FC<Props> = ({
+  open,
+  leadName,
+  leadId,
+  isDeleting = false,
+  error,
+  onClose,
+  onConfirm,
+}) => {
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="xs"
+    <Dialog 
+      open={open} 
+      onClose={!isDeleting ? onClose : undefined} 
+      maxWidth="xs" 
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: "16px",
         },
       }}
     >
-      <Box sx={{ p: 3, textAlign: "center" }}>
+      <DialogContent sx={{ textAlign: "center", pt: 4, pb: 3, px: 3 }}>
         {/* Icon */}
         <Box
           sx={{
-            width: 56,
-            height: 56,
-            mx: "auto",
-            mb: 2,
+            width: 64,
+            height: 64,
             borderRadius: "50%",
-            backgroundColor: "#FDECEC",
+            backgroundColor: "#FEE2E2",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            mx: "auto",
+            mb: 2,
           }}
         >
-          <DeleteOutlineRoundedIcon sx={{ color: "#E54848", fontSize: 28 }} />
+          <DeleteOutlineOutlinedIcon sx={{ fontSize: 32, color: "#DC2626" }} />
         </Box>
 
         {/* Title */}
-        <Typography fontWeight={600} fontSize={18} color="#111827" mb={1}>
+        <Typography variant="h6" fontWeight={600} mb={1} sx={{ fontSize: "1.125rem" }}>
           Delete Lead
         </Typography>
 
@@ -71,19 +81,21 @@ const DeleteLeadDialog = ({
           </Alert>
         )}
 
-        {/* Description */}
-        <Typography fontSize={14} color="#6B7280" mb={leadId ? 1 : 3}>
-          This action cannot be undone. Are you sure you want to delete{" "}
-          <strong>{leadName}</strong> Lead permanently?
+        {/* Message */}
+        <Typography 
+          color="text.secondary" 
+          sx={{ fontSize: "14px", lineHeight: 1.6, px: 1, mb: leadId ? 1 : 0 }}
+        >
+          This action cannot be undone. Are you sure you want to Delete selected Lead permanently ?
         </Typography>
 
-        {/* ✅ Lead ID Display */}
+        {/* ✅ Lead ID Display (optional) */}
         {leadId && (
           <Typography 
             fontSize={12} 
             color="#9CA3AF" 
-            mb={3}
             sx={{
+              mt: 1,
               p: 1,
               bgcolor: "#F9FAFB",
               borderRadius: 1,
@@ -93,63 +105,58 @@ const DeleteLeadDialog = ({
             ID: {leadId}
           </Typography>
         )}
+      </DialogContent>
 
-        {/* Actions */}
-        <Stack direction="row" spacing={2}>
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={onClose}
-            disabled={isDeleting} // ✅ Disable during deletion
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              borderColor: "#E5E7EB",
-              color: "#111827",
-              "&:hover": {
-                borderColor: "#D1D5DB",
-                background: "#F9FAFB",
-              },
-              "&:disabled": {
-                borderColor: "#F3F4F6",
-                color: "#D1D5DB",
-              },
-            }}
-          >
-            Cancel
-          </Button>
+      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+        <Button
+          fullWidth
+          onClick={onClose}
+          disabled={isDeleting}
+          sx={{
+            height: 44,
+            backgroundColor: "#F3F4F6",
+            color: "black",
+            fontWeight: 500,
+            textTransform: "none",
+            borderRadius: "8px",
+            "&:hover": { backgroundColor: "#E5E7EB" },
+            "&:disabled": {
+              backgroundColor: "#F9FAFB",
+              color: "#D1D5DB",
+            },
+          }}
+        >
+          Cancel
+        </Button>
 
-          <Button
-            fullWidth
-            onClick={onConfirm}
-            disabled={isDeleting} // ✅ Disable during deletion
-            startIcon={
-              isDeleting ? (
-                <CircularProgress size={16} sx={{ color: "white" }} />
-              ) : (
-                <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
-              )
-            }
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              backgroundColor: "#DC2626", // ✅ Changed to red for delete action
-              color: "#FFFFFF",
-              boxShadow: "none",
-              "&:hover": {
-                backgroundColor: "#B91C1C",
-                boxShadow: "none",
-              },
-              "&:disabled": {
-                backgroundColor: "#FCA5A5",
-                color: "#FFFFFF",
-              },
-            }}
-          >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </Button>
-        </Stack>
-      </Box>
+        <Button
+          fullWidth
+          onClick={onConfirm}
+          disabled={isDeleting}
+          startIcon={
+            isDeleting ? (
+              <CircularProgress size={16} sx={{ color: "white" }} />
+            ) : (
+              <DeleteOutlineOutlinedIcon sx={{ fontSize: 18 }} />
+            )
+          }
+          sx={{
+            height: 44,
+            backgroundColor: "#1F2937",
+            color: "white",
+            fontWeight: 500,
+            textTransform: "none",
+            borderRadius: "8px",
+            "&:hover": { backgroundColor: "#111827" },
+            "&:disabled": {
+              backgroundColor: "#9CA3AF",
+              color: "white",
+            },
+          }}
+        >
+          {isDeleting ? "Deleting..." : "Delete"}
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 };
