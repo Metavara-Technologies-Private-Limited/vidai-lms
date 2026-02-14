@@ -16,13 +16,10 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<MainLayout />}>
-     
+        {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
 
-       
-        <Route path="settings" element={<Navigate to="/settings/integration" replace />} />
-
-     
+        {/* Settings sub routes */}
         <Route
           path="settings/integration"
           element={
@@ -50,8 +47,9 @@ export default function AppRoutes() {
           }
         />
 
-        <Route path="settings/tickets/:id" element={<TicketView />} />
- 
+        <Route path="/settings/tickets/:id" element={<TicketView />} />
+
+        {/* sidebar routes */}
         {SIDEBAR_TABS.flatMap((tab) =>
           tab.menu.map((item) => (
             <Route
@@ -63,9 +61,10 @@ export default function AppRoutes() {
                 </Suspense>
               }
             />
-          ))
+          )),
         )}
 
+        {/* Add New Lead */}
         <Route
           path="leads/add"
           element={
@@ -75,6 +74,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* 🔥 Edit Lead Page */}
         <Route
           path="leads/edit/:id"
           element={
@@ -84,6 +84,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* 🔥 Lead View Page */}
         <Route
           path="leads/:id"
           element={
@@ -93,6 +94,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
