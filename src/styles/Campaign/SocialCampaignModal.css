@@ -13,14 +13,17 @@
 
 .campaign-modal {
   width: 1000px;
+  max-width: 1000px;
+  min-width: 1000px;
   background: #fff;
   border-radius: 16px;
-  overflow: hidden;
+  overflow: hidden;              /* lock container */
   font-family: 'Montserrat', sans-serif;
   display: flex;
   flex-direction: column;
-  max-height: 90vh; 
+  max-height: 90vh;
 }
+
 
 /* ================= HEADER ================= */
 
@@ -123,6 +126,7 @@
 .step-content {
   flex: 1;               /* takes remaining space */
   overflow-y: auto;      /* enables scrolling */
+  overflow-x: hidden; 
   padding-bottom: 20px; /* space before footer */
   
 }
@@ -241,9 +245,48 @@ select:invalid {
   background: #BDBDBD;
   cursor: not-allowed;
 }
-/* Normal state */
+.MuiInputBase-root {
+  font-family: 'Montserrat', sans-serif !important;
+  background-color: #ffffff !important;
+}
+
+/* =========================================
+   MATCH MUI DATEPICKER TO NORMAL INPUT STYLE
+   ========================================= */
+
+/* Full width like other inputs */
+.MuiFormControl-root {
+  width: 100% !important;
+}
+
+/* Same height + padding */
+.MuiOutlinedInput-root {
+  height: 56px !important;
+  border-radius: 8px !important;
+  padding: 20px 14px 8px !important;
+  box-sizing: border-box;
+}
+
+/* Make text vertically aligned like your inputs */
+.MuiOutlinedInput-input {
+  padding: 0 !important;
+  font-size: 14px !important;
+}
+
+/* Keep icon properly aligned */
+.MuiInputAdornment-root {
+  margin-right: 4px !important;
+}
+
+/* Remove extra spacing */
 .MuiOutlinedInput-notchedOutline {
-  border: 1px solid #E2E3E5 !important;
+  border-width: 1.5px !important;
+}
+
+
+/* Normal */
+.MuiOutlinedInput-notchedOutline {
+  border: 1.5px solid #E2E3E5 !important;
 }
 
 /* Hover */
@@ -251,41 +294,43 @@ select:invalid {
   border: 1.5px solid #E2E3E5 !important;
 }
 
-/* Focus */
+/* Focus — keep same */
 .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
+  background-color: #ffffff !important;
 }
-
-/* Error */
+/* 🔥 Prevent MUI from turning border red automatically */
 .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
-  border: 1.5px solid #E11D48 !important;
+  border: 1.5px solid #E2E3E5 !important;
+}
+.MuiOutlinedInput-root.Mui-focused.Mui-error .MuiOutlinedInput-notchedOutline {
+  border: 1.5px solid #E2E3E5 !important;
+}
+/* Error only when wrapper has .error */
+.form-group.error .MuiOutlinedInput-notchedOutline {
+  border: 1px solid #6B6B6B !important;
 }
 
-
-/* Focus state — remove thick border */
-.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-  border:1px solid #E2E3E5 !important;
+.MuiFormLabel-root {
+  color: #6B6B6B !important;
 }
 
-/* Error state */
-.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
-  border: 1px solid #E11D48 !important;
+.form-group.error .MuiFormLabel-root {
+  color: #E11D48 !important;
 }
 
-/* Rounded corners */
-.MuiOutlinedInput-root {
-  border-radius: 16px !important;
-  height: 56px !important;
-}
-
-.MuiSelect-select {
-  display: flex;
-  align-items: center;
-  padding: 20px 14px 8px !important;
+/* Calendar popup styling */
+.MuiPickersLayout-root {
   font-family: 'Montserrat', sans-serif !important;
 }
-.MuiInputBase-root {
-  font-family: 'Montserrat', sans-serif !important;
+
+.MuiPickersDay-root.Mui-selected {
+  background-color: #F26A3E !important;
+  color: #ffffff !important;
+}
+
+.MuiPickersDay-root.Mui-selected:hover {
+  background-color: #F26A3E !important;
 }
 
 /* Dropdown menu items */
@@ -562,24 +607,6 @@ select:invalid {
   gap: 20px;
 }
 
-/* ================= MUI DATE PICKER OVERRIDES ================= */
-
-.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
-.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
-  border-color: #E2E3E5 !important;
-}
-
-.form-group.error .MuiOutlinedInput-notchedOutline {
-  border-color: #E11D48 !important;
-}
-
-.MuiFormLabel-root {
-  color: #6B6B6B !important;
-}
-
-.form-group.error .MuiFormLabel-root {
-  color: #E11D48 !important;
-}
 /* =================================================
    STEP 3 – SCHEDULE CAMPAIGN
    ================================================= */
@@ -802,6 +829,33 @@ select:invalid {
   font-size: 14px;
   color: #2563EB;
   margin: 0;
+}
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Draft */
+.status-draft {
+  background: #E0ECFF;
+  color: #2563EB;
+  border: 1px solid #93C5FD;
+}
+
+/* Live */
+.status-live {
+  background: #DCFCE7;
+  color: #16A34A;
+  border: 1px solid #86EFAC;
+}
+
+/* Scheduled */
+.status-scheduled {
+  background: #F3E8FF;
+  color: #7C3AED;
+  border: 1px solid #D8B4FE;
 }
 
 /* Mobile responsive */

@@ -13,13 +13,13 @@ import editIcon from "./Icons/edit.png";
 import duplicateIcon from "./Icons/duplicate.png";
 import stopIcon from "./Icons/stop.png";
 import playIcon from "./Icons/play-button.png";
-
 import { useEffect, useRef, useState } from "react";
+import dayjs from "dayjs";
 
 type CampaignStatus =
   | "Live"
   | "Draft"
-  | "Schedule"
+  | "Scheduled"
   | "Paused"
   | "Stopped"
   | "Completed"
@@ -57,6 +57,7 @@ export default function CampaignCard({
   const isMenuOpen = openMenuId === c.id;
   const menuRef = useRef<HTMLDivElement>(null);
   const [showStopModal, setShowStopModal] = useState(false);
+
 
   const toggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -123,9 +124,16 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-        <span>
-          Leads Generated: <b className="leads">{c.leads}</b>
-        </span>
+       {c.status === "Scheduled" && c.scheduledAt ? (
+  <span>
+    <label>SCHEDULED:</label>{" "}
+    {dayjs(c.scheduledAt).format("DD MMM [at] hh:mm A")}
+  </span>
+) : (
+  <span>
+    Leads Generated: <b className="leads">{c.leads}</b>
+  </span>
+)}
 
         <div className="action-buttons">
           <button
