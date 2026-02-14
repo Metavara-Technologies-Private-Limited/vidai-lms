@@ -89,11 +89,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     if (leads) {
       const leadsWithFix = leads.map((lead: any) => ({
         ...lead,
-        archived:
-          lead.archived !== undefined
-            ? lead.archived
-            : lead.is_active === false,
-
         // Employee name from API
         assigned: lead.assigned_to_name || "Unassigned",
 
@@ -122,7 +117,14 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     return localLeads.filter((lead) => {
       const searchStr = `${lead.name || ""} ${lead.id || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
-      const matchTab = tab === "archived" ? lead.archived : !lead.archived;
+      
+      // ✅ FIXED: Filter by is_active status based on tab
+      // Active tab: show is_active !== false (true or undefined)
+      // Archived tab: show is_active === false
+      const matchTab = tab === "archived" 
+        ? lead.is_active === false 
+        : lead.is_active !== false;
+      
       return matchSearch && matchTab;
     });
   }, [localLeads, search, tab]);
@@ -158,7 +160,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
   const handleBulkArchive = (archive: boolean) => {
     setLocalLeads((prev) =>
       prev.map((l) =>
-        selectedIds.includes(l.id) ? { ...l, archived: archive } : l
+        selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l
       )
     );
     setSelectedIds([]);
@@ -201,6 +203,26 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
           <Typography variant="h6" color="text.secondary">No leads found</Typography>
           <Typography variant="body2" color="text.secondary">
             {tab === "archived" ? "No archived leads yet" : "Create your first lead to get started"}
+          </Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  // ====================== Empty Filtered State ======================
+  if (filteredLeads.length === 0) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
+        <Stack alignItems="center" spacing={2}>
+          <Typography variant="h6" color="text.secondary">
+            No {tab === "archived" ? "archived" : "active"} leads found
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {search
+              ? `No results for "${search}"`
+              : tab === "archived"
+              ? "No archived leads yet"
+              : "No active leads"}
           </Typography>
         </Stack>
       </Box>

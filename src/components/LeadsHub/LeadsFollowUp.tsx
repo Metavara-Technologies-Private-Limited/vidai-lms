@@ -50,26 +50,27 @@ const LeadsFollowUp: React.FC<Props> = ({ search }) => {
   // ✅ INTEGRATION: Sync Redux leads to local state
   React.useEffect(() => {
     if (reduxLeads && reduxLeads.length > 0) {
-      const leadsWithArchived = reduxLeads.map((lead) => ({
-        ...lead,
-        archived: lead.archived ?? false,
-      }));
-      setLeads(leadsWithArchived);
+      setLeads(reduxLeads);
     }
   }, [reduxLeads]);
 
-  // ✅ INTEGRATION: FILTER LOGIC - Status must be "New", "Lost", or "Cycle Conversion"
+  // ✅ FIXED: FILTER LOGIC - Status must be "New", "Lost", or "Cycle Conversion" AND is_active !== false
   const filteredLeads = React.useMemo(() => {
-    const followUpStatuses = ["new", "lost", "cycle conversion", "no status"];
+    const followUpStatuses = ["new", "lost", "cycle conversion"];
     
     return leads.filter((lead) => {
-      const leadStatus = (lead.status || "no status").toLowerCase().trim();
+      // Use lead_status (matching Leads.tsx logic)
+      const leadStatus = (lead.lead_status || "").toLowerCase().trim();
       const matchesStatus = followUpStatuses.includes(leadStatus);
       
       const searchStr = `${lead.full_name || lead.name || ""} ${lead.id || ""}`.toLowerCase();
       const matchesSearch = searchStr.includes(search.toLowerCase());
       
-      return matchesStatus && matchesSearch && !lead.archived;
+      // ✅ FIXED: Filter out archived leads using is_active
+      // Active leads: is_active !== false (true or undefined)
+      const isActive = lead.is_active !== false;
+      
+      return matchesStatus && matchesSearch && isActive;
     });
   }, [leads, search]);
 
@@ -166,6 +167,31 @@ const LeadsFollowUp: React.FC<Props> = ({ search }) => {
     );
   }
 
+  // ====================== Empty Filtered State ======================
+  if (filteredLeads.length === 0) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
+        <Stack alignItems="center" spacing={2}>
+          <Typography variant="h6" color="text.secondary">
+            No follow-ups found
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {search
+              ? `No results for "${search}"`
+              : "No active follow-ups requiring attention"}
+          </Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
   return (
     <>
       <TableContainer component={Paper} elevation={0} className="leads-table">
@@ -222,11 +248,11 @@ const LeadsFollowUp: React.FC<Props> = ({ search }) => {
                 <TableCell>
                   <Stack direction="row" spacing={2}>
                     <Avatar className="lead-avatar">
-                      {lead.initials || (lead.full_name || lead.name)?.charAt(0).toUpperCase()}
+                      {(lead as any).initials || (lead.full_name || (lead as any).name)?.charAt(0).toUpperCase()}
                     </Avatar>
                     <Box>
                       <Typography className="lead-name-text">
-                        {lead.full_name || lead.name}
+                        {lead.full_name || (lead as any).name}
                       </Typography>
                       <Typography className="lead-id-text">
                         {lead.id}
@@ -238,7 +264,7 @@ const LeadsFollowUp: React.FC<Props> = ({ search }) => {
                   <Typography className="lead-date">
                     {lead.created_at
                       ? new Date(lead.created_at).toLocaleDateString("en-GB")
-                      : lead.date || "N/A"}
+                      : (lead as any).date || "N/A"}
                   </Typography>
                   <Typography className="lead-time">
                     {lead.created_at
@@ -246,15 +272,15 @@ const LeadsFollowUp: React.FC<Props> = ({ search }) => {
                           hour: "2-digit",
                           minute: "2-digit",
                         })
-                      : lead.time || "N/A"}
+                      : (lead as any).time || "N/A"}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Chip 
-                    label={lead.status || "New"} 
+                    label={(lead as any).status || lead.lead_status || "New"} 
                     size="small" 
                     className={`lead-chip status-${
-                      (lead.status || "new")
+                      ((lead as any).status || lead.lead_status || "new")
                         .toLowerCase()
                         .replace(/\s+/g, "-")
                     }`} 
@@ -262,19 +288,19 @@ const LeadsFollowUp: React.FC<Props> = ({ search }) => {
                 </TableCell>
                 <TableCell>
                   <Chip 
-                    label={lead.quality || "N/A"} 
+                    label={(lead as any).quality || "N/A"} 
                     size="small" 
                     className={`lead-chip quality-${
-                      (lead.quality || "")?.toLowerCase() || ""
+                      ((lead as any).quality || "")?.toLowerCase() || ""
                     }`} 
                   />
                 </TableCell>
                 <TableCell className="score">
-                  {String(lead.score || 0).includes("%")
-                    ? lead.score
-                    : `${lead.score || 0}%`}
+                  {String((lead as any).score || 0).includes("%")
+                    ? (lead as any).score
+                    : `${(lead as any).score || 0}%`}
                 </TableCell>
-                <TableCell>{lead.assigned || "Unassigned"}</TableCell>
+                <TableCell>{(lead as any).assigned || "Unassigned"}</TableCell>
                 <TableCell align="center">
                   <Stack 
                     direction="row" 
