@@ -48,8 +48,9 @@ import {
 // API imports
 import { LeadAPI } from "../../services/leads.api";
 
-// Dialog component
+// Dialog components
 import ArchiveLeadDialog from "./ArchiveLeadDialog";
+import DeleteLeadDialog from "./DeleteLeadDialog";
 
 interface Props {
   selectedIds: string[];
@@ -71,32 +72,6 @@ const templates = [
   { id: "4", title: "New Consultation Confirmation" },
   { id: "5", title: "Welcome Email – Patient Inquiry" },
 ];
-
-const DialogIcon = ({
-  icon,
-  bg,
-  color,
-}: {
-  icon: React.ReactNode;
-  bg: string;
-  color: string;
-}) => (
-  <Box
-    sx={{
-      width: 64,
-      height: 64,
-      borderRadius: "50%",
-      backgroundColor: bg,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      mx: "auto",
-      mb: 2,
-    }}
-  >
-    <Box sx={{ color }}>{icon}</Box>
-  </Box>
-);
 
 const BulkActionBar: React.FC<Props> = ({
   selectedIds,
@@ -330,134 +305,24 @@ const BulkActionBar: React.FC<Props> = ({
         </Button>
       </Stack>
 
-      {/* Delete Dialog */}
-      <Dialog
+      {/* ✅ Delete Dialog - Using new component */}
+      <DeleteLeadDialog
         open={openDelete}
-        onClose={() => !isDeleting && setOpenDelete(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogContent sx={{ textAlign: "center", pt: 4 }}>
-          <DialogIcon
-            icon={<DeleteOutlineOutlinedIcon fontSize="large" />}
-            bg="#FEE2E2"
-            color="#DC2626"
-          />
+        leadName={
+          selectedIds.length === 1
+            ? selectedIds[0]
+            : `${selectedIds.length} leads`
+        }
+        isDeleting={isDeleting}
+        error={deleteError}
+        onClose={() => {
+          setOpenDelete(false);
+          setDeleteError(null);
+        }}
+        onConfirm={handleDelete}
+      />
 
-          <Typography variant="h6" fontWeight={600} mb={1}>
-            Delete {selectedIds.length} Lead{selectedIds.length > 1 ? "s" : ""}
-          </Typography>
-
-          {deleteError && (
-            <Alert severity="error" sx={{ mb: 2, textAlign: "left" }}>
-              <Typography variant="body2" fontWeight={600}>
-                {deleteError}
-              </Typography>
-            </Alert>
-          )}
-
-          <Typography color="text.secondary" sx={{ mb: 2 }}>
-            This action cannot be undone. Are you sure you want to delete{" "}
-            {selectedIds.length > 1 ? "these leads" : "this lead"} permanently?
-          </Typography>
-
-          <Box
-            sx={{
-              p: 2,
-              bgcolor: "#FEE2E2",
-              borderRadius: 2,
-              border: "1px solid #FCA5A5",
-              maxHeight: "150px",
-              overflowY: "auto",
-              mb: 2,
-              textAlign: "left",
-            }}
-          >
-            <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }} color="#991B1B">
-              Selected leads:
-            </Typography>
-            {selectedIds.slice(0, 10).map((id) => (
-              <Typography
-                key={id}
-                variant="caption"
-                sx={{ display: "block" }}
-                color="text.secondary"
-              >
-                • {id}
-              </Typography>
-            ))}
-            {selectedIds.length > 10 && (
-              <Typography variant="caption" color="text.secondary">
-                ... and {selectedIds.length - 10} more
-              </Typography>
-            )}
-          </Box>
-
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{
-              p: 1.5,
-              bgcolor: "#FEF3C7",
-              borderRadius: 2,
-              border: "1px solid #FCD34D",
-              textAlign: "left",
-            }}
-          >
-            <WarningAmberIcon sx={{ color: "#D97706", fontSize: 20, mt: 0.2 }} />
-            <Typography variant="caption" color="#92400E">
-              All selected leads will be permanently removed from the system.
-            </Typography>
-          </Stack>
-        </DialogContent>
-
-        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-          <Button
-            fullWidth
-            onClick={() => setOpenDelete(false)}
-            disabled={isDeleting}
-            sx={{
-              backgroundColor: "#F3F4F6",
-              color: "black",
-              "&:hover": { backgroundColor: "#E5E7EB" },
-              "&:disabled": {
-                backgroundColor: "#F9FAFB",
-                color: "#D1D5DB",
-              },
-            }}
-          >
-            Cancel
-          </Button>
-
-          <Button
-            fullWidth
-            onClick={handleDelete}
-            disabled={isDeleting}
-            startIcon={
-              isDeleting ? (
-                <CircularProgress size={16} sx={{ color: "white" }} />
-              ) : (
-                <DeleteOutlineOutlinedIcon />
-              )
-            }
-            sx={{
-              backgroundColor: "#DC2626",
-              color: "white",
-              "&:hover": { backgroundColor: "#B91C1C" },
-              "&:disabled": {
-                backgroundColor: "#FCA5A5",
-                color: "white",
-              },
-            }}
-          >
-            {isDeleting
-              ? `Deleting ${selectedIds.length}...`
-              : `Delete ${selectedIds.length} Lead${selectedIds.length > 1 ? "s" : ""}`}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Archive/Unarchive Dialog */}
+      {/* ✅ Archive/Unarchive Dialog - Using new component */}
       <ArchiveLeadDialog
         open={openArchive}
         onClose={() => !isArchiving && setOpenArchive(false)}
@@ -468,6 +333,8 @@ const BulkActionBar: React.FC<Props> = ({
         }
         onConfirm={handleArchiveConfirm}
         isUnarchive={tab === "archived"}
+        isArchiving={isArchiving}
+        error={archiveError}
       />
 
       {/* Email Selector Dialog */}

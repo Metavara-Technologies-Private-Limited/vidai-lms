@@ -281,6 +281,8 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
         onClose={() => !isArchiving && setOpenArchive(false)}
         onConfirm={handleArchiveConfirm}
         isUnarchive={false}
+        isArchiving={isArchiving}
+        error={archiveError}
       />
 
       {/* Delete Dialog */}

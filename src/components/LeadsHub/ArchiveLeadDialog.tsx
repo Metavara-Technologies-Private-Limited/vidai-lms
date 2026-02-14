@@ -1,150 +1,159 @@
 import * as React from "react";
 import {
   Dialog,
-  Box,
+  DialogContent,
+  DialogActions,
   Typography,
   Button,
-  Stack,
-  useTheme,
-  useMediaQuery,
+  Box,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
 import UnarchiveOutlinedIcon from "@mui/icons-material/UnarchiveOutlined";
 
 interface Props {
   open: boolean;
+  leadName: string;
   onClose: () => void;
-  leadName?: string;
   onConfirm: () => void;
-  isUnarchive?: boolean; // ✅ Support both archive and unarchive
+  isUnarchive?: boolean;
+  isArchiving?: boolean;
+  error?: string | null;
 }
 
 const ArchiveLeadDialog: React.FC<Props> = ({
   open,
-  onClose,
   leadName,
+  onClose,
   onConfirm,
-  isUnarchive = false, // ✅ Default to archive action
+  isUnarchive = false,
+  isArchiving = false,
+  error = null,
 }) => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-  // Dynamic width
-  const dialogWidth = isMobile ? "90vw" : 420;
-
   // ✅ Dynamic content based on action type
-  const title = isUnarchive ? "Restore Lead" : "Archive Lead";
-  const actionText = isUnarchive ? "Restore" : "Archive";
+  const title = isUnarchive ? "Unarchive Lead" : "Archive Lead";
+  const actionText = isUnarchive ? "Unarchive" : "Archive";
   const description = isUnarchive
-    ? `Are you sure you want to restore "${leadName}" lead? It will be moved back to active leads.`
-    : `Are you sure you want to archive "${leadName}" lead? You can restore it anytime.`;
-  const iconBgColor = isUnarchive ? "#DBEAFE" : "#FFF7ED";
-  const iconColor = isUnarchive ? "#3B82F6" : "#F97316";
-  const buttonBgColor = isUnarchive ? "#3B82F6" : "#4B5563";
-  const buttonHoverColor = isUnarchive ? "#2563EB" : "#374151";
+    ? `Are you sure you want to Unarchive selected Lead ? You can restore it anytime.`
+    : `Are you sure you want to Archive selected Lead ? You can restore it anytime.`;
+  const iconBgColor = isUnarchive ? "#DBEAFE" : "#FEF3C7";
+  const iconColor = isUnarchive ? "#3B82F6" : "#F59E0B";
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
+    <Dialog 
+      open={open} 
+      onClose={!isArchiving ? onClose : undefined} 
+      maxWidth="xs" 
+      fullWidth
       PaperProps={{
         sx: {
-          width: dialogWidth,
-          maxWidth: "95vw",
-          borderRadius: "24px", // ✅ Increased for consistency
-          p: 4, // ✅ Increased padding
-          textAlign: "center",
-          boxShadow: "0px 20px 25px -5px rgba(0,0,0,0.1)", // ✅ Better shadow
+          borderRadius: "16px",
         },
       }}
     >
-      <Stack spacing={2.5} alignItems="center" textAlign="center">
+      <DialogContent sx={{ textAlign: "center", pt: 4, pb: 3, px: 3 }}>
         {/* Icon */}
         <Box
           sx={{
-            width: 64, // ✅ Slightly larger
+            width: 64,
             height: 64,
             borderRadius: "50%",
             backgroundColor: iconBgColor,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            mx: "auto",
+            mb: 2,
           }}
         >
           {isUnarchive ? (
-            <UnarchiveOutlinedIcon sx={{ color: iconColor, fontSize: 32 }} />
+            <UnarchiveOutlinedIcon sx={{ fontSize: 32, color: iconColor }} />
           ) : (
-            <ArchiveOutlinedIcon sx={{ color: iconColor, fontSize: 32 }} />
+            <ArchiveOutlinedIcon sx={{ fontSize: 32, color: iconColor }} />
           )}
         </Box>
 
         {/* Title */}
-        <Typography 
-          variant="h6" 
-          fontWeight={700} 
-          sx={{ fontSize: "1.125rem" }}
-        >
+        <Typography variant="h6" fontWeight={600} mb={1} sx={{ fontSize: "1.125rem" }}>
           {title}
         </Typography>
 
-        {/* Description */}
+        {/* ✅ Error Alert - Shows if API call fails */}
+        {error && (
+          <Alert 
+            severity="error" 
+            sx={{ 
+              mb: 2, 
+              textAlign: "left",
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="body2" fontWeight={600}>
+              {error}
+            </Typography>
+          </Alert>
+        )}
+
+        {/* Message */}
         <Typography 
-          variant="body2" 
           color="text.secondary" 
-          lineHeight={1.6}
-          sx={{ px: 2 }}
+          sx={{ fontSize: "14px", lineHeight: 1.6, px: 1 }}
         >
           {description}
         </Typography>
+      </DialogContent>
 
-        {/* Buttons */}
-        <Stack 
-          direction={isMobile ? "column" : "row"} 
-          spacing={2} 
-          width="100%" 
-          sx={{ mt: 2 }}
+      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+        <Button
+          fullWidth
+          onClick={onClose}
+          disabled={isArchiving}
+          sx={{
+            height: 44,
+            backgroundColor: "#F3F4F6",
+            color: "black",
+            fontWeight: 500,
+            textTransform: "none",
+            borderRadius: "8px",
+            "&:hover": { backgroundColor: "#E5E7EB" },
+            "&:disabled": {
+              backgroundColor: "#F9FAFB",
+              color: "#D1D5DB",
+            },
+          }}
         >
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={onClose}
-            sx={{
-              height: 44,
-              borderRadius: "12px", // ✅ Rounded for consistency
-              borderColor: "#E2E8F0",
-              color: "#475569",
-              fontWeight: 600,
-              textTransform: "none",
-              "&:hover": {
-                borderColor: "#CBD5E1",
-                backgroundColor: "#F8FAFC",
-              },
-            }}
-          >
-            Cancel
-          </Button>
+          Cancel
+        </Button>
 
-          <Button
-            fullWidth
-            variant="contained"
-            onClick={onConfirm}
-            sx={{
-              height: 44,
-              borderRadius: "12px",
-              backgroundColor: buttonBgColor,
-              fontWeight: 600,
-              textTransform: "none",
-              boxShadow: "none",
-              "&:hover": {
-                backgroundColor: buttonHoverColor,
-                boxShadow: "none",
-              },
-            }}
-          >
-            {actionText}
-          </Button>
-        </Stack>
-      </Stack>
+        <Button
+          fullWidth
+          onClick={onConfirm}
+          disabled={isArchiving}
+          startIcon={
+            isArchiving ? (
+              <CircularProgress size={16} sx={{ color: "white" }} />
+            ) : null
+          }
+          sx={{
+            height: 44,
+            backgroundColor: "#1F2937",
+            color: "white",
+            fontWeight: 500,
+            textTransform: "none",
+            borderRadius: "8px",
+            "&:hover": { backgroundColor: "#111827" },
+            "&:disabled": {
+              backgroundColor: "#9CA3AF",
+              color: "white",
+            },
+          }}
+        >
+          {isArchiving 
+            ? (isUnarchive ? "Restoring..." : "Archiving...") 
+            : actionText}
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 };
