@@ -38,8 +38,18 @@ import LockClockOutlinedIcon from "@mui/icons-material/LockClockOutlined";
 import CreateOutlinedIcon from "@mui/icons-material/CreateOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
-// ✅ Import delete actions and REFETCH from Redux
-import { deleteLeads, selectDeletingIds, fetchLeads } from "../../store/leadSlice";
+// Redux imports
+import {
+  deleteLeads,
+  selectDeletingIds,
+  fetchLeads,
+} from "../../store/leadSlice";
+
+// API imports
+import { LeadAPI } from "../../services/leads.api";
+
+// Dialog component
+import ArchiveLeadDialog from "./ArchiveLeadDialog";
 
 interface Props {
   selectedIds: string[];
@@ -98,14 +108,19 @@ const BulkActionBar: React.FC<Props> = ({
   const dispatch = useDispatch();
   const deletingIds = useSelector(selectDeletingIds);
 
+  // Dialog states
   const [openDelete, setOpenDelete] = useState(false);
   const [openArchive, setOpenArchive] = useState(false);
   const [openEmail, setOpenEmail] = useState(false);
   const [openComposer, setOpenComposer] = useState(false);
 
+  // Operation states
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
+  // Email composer states
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [toAddress, setToAddress] = useState("");
   const [subject, setSubject] = useState("");
@@ -113,42 +128,78 @@ const BulkActionBar: React.FC<Props> = ({
 
   if (selectedIds.length === 0) return null;
 
-  // ✅ Updated handleDelete with REFETCH
+  // Handle Delete
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
       setDeleteError(null);
 
-      console.log("🗑️ Deleting leads:", selectedIds);
-
-      // Dispatch bulk delete action
       const result = await dispatch(deleteLeads(selectedIds) as any);
 
       if (deleteLeads.fulfilled.match(result)) {
-        console.log("✅ All leads deleted successfully");
-        
-        // ✅ IMPORTANT: Refetch all leads from backend
         await dispatch(fetchLeads() as any);
-        
-        // Close dialog and call parent onDelete
         setOpenDelete(false);
-        onDelete(); // This clears selectedIds and updates local state
+        onDelete();
       } else {
         const errorMsg = result.payload as string || "Failed to delete leads";
-        console.error("❌ Failed to delete leads:", errorMsg);
         setDeleteError(errorMsg);
       }
     } catch (err: any) {
-      console.error("❌ Delete error:", err);
       setDeleteError(err.message || "Failed to delete leads");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleArchive = () => {
-    onArchive(tab === "active");
-    setOpenArchive(false);
+  // ✅ Handle Archive/Unarchive - Direct API calls
+  const handleArchiveConfirm = async () => {
+    try {
+      setIsArchiving(true);
+      setArchiveError(null);
+
+      const isArchiveAction = tab === "active";
+      
+      console.log(
+        isArchiveAction
+          ? `📦 Archiving ${selectedIds.length} leads (calling inactivate API)...`
+          : `📂 Unarchiving ${selectedIds.length} leads (calling activate API)...`
+      );
+
+      // ✅ Call the correct API based on tab
+      if (isArchiveAction) {
+        // Archive: Call inactivate API for each lead
+        await Promise.all(
+          selectedIds.map((id) => LeadAPI.inactivate(id))
+        );
+      } else {
+        // Unarchive: Call activate API for each lead
+        await Promise.all(
+          selectedIds.map((id) => LeadAPI.activate(id))
+        );
+      }
+
+      console.log(
+        isArchiveAction
+          ? "✅ All leads archived successfully"
+          : "✅ All leads unarchived successfully"
+      );
+
+      // Refetch leads to update UI
+      await dispatch(fetchLeads() as any);
+
+      // Close dialog and clear selection
+      setOpenArchive(false);
+      onArchive(isArchiveAction);
+    } catch (err: any) {
+      console.error("❌ Archive/Unarchive error:", err);
+      const errorMsg =
+        err?.response?.data?.detail ||
+        err?.message ||
+        `Failed to ${tab === "active" ? "archive" : "unarchive"} leads`;
+      setArchiveError(errorMsg);
+    } finally {
+      setIsArchiving(false);
+    }
   };
 
   const handleSend = () => {
@@ -169,6 +220,7 @@ const BulkActionBar: React.FC<Props> = ({
   };
 
   const someDeleting = selectedIds.some((id) => deletingIds.includes(id));
+  const anyProcessing = someDeleting || isDeleting || isArchiving;
 
   return (
     <Box
@@ -197,9 +249,9 @@ const BulkActionBar: React.FC<Props> = ({
             setOpenDelete(true);
             setDeleteError(null);
           }}
-          disabled={someDeleting || isDeleting}
-          sx={{ 
-            color: "black", 
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
             borderColor: "black",
             "&:disabled": {
               color: "#9CA3AF",
@@ -213,24 +265,49 @@ const BulkActionBar: React.FC<Props> = ({
         <Button
           variant="outlined"
           startIcon={
-            tab === "active" ? (
+            isArchiving ? (
+              <CircularProgress size={16} sx={{ color: "black" }} />
+            ) : tab === "active" ? (
               <ArchiveOutlinedIcon />
             ) : (
               <UnarchiveOutlinedIcon />
             )
           }
-          onClick={() => setOpenArchive(true)}
-          disabled={someDeleting || isDeleting}
-          sx={{ color: "black", borderColor: "black" }}
+          onClick={() => {
+            setOpenArchive(true);
+            setArchiveError(null);
+          }}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": {
+              color: "#9CA3AF",
+              borderColor: "#E5E7EB",
+            },
+          }}
         >
-          {tab === "active" ? "Archive" : "Restore"}
+          {isArchiving
+            ? tab === "active"
+              ? "Archiving..."
+              : "Restoring..."
+            : tab === "active"
+            ? "Archive"
+            : "Restore"}
         </Button>
 
         <Button
           variant="outlined"
           startIcon={<ChatBubbleOutlineIcon />}
-          disabled={someDeleting || isDeleting}
-          sx={{ color: "black", borderColor: "black" }}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": {
+              color: "#9CA3AF",
+              borderColor: "#E5E7EB",
+            },
+          }}
         >
           SMS
         </Button>
@@ -238,9 +315,16 @@ const BulkActionBar: React.FC<Props> = ({
         <Button
           variant="outlined"
           startIcon={<EmailOutlinedIcon />}
-          sx={{ color: "black", borderColor: "black" }}
           onClick={() => setOpenEmail(true)}
-          disabled={someDeleting || isDeleting}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": {
+              color: "#9CA3AF",
+              borderColor: "#E5E7EB",
+            },
+          }}
         >
           Email
         </Button>
@@ -373,65 +457,20 @@ const BulkActionBar: React.FC<Props> = ({
         </DialogActions>
       </Dialog>
 
-      {/* Archive Dialog */}
-      <Dialog
+      {/* Archive/Unarchive Dialog */}
+      <ArchiveLeadDialog
         open={openArchive}
-        onClose={() => setOpenArchive(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogContent sx={{ textAlign: "center", pt: 4 }}>
-          <DialogIcon
-            icon={
-              tab === "active" ? (
-                <ArchiveOutlinedIcon fontSize="large" />
-              ) : (
-                <UnarchiveOutlinedIcon fontSize="large" />
-              )
-            }
-            bg="#FEF3C7"
-            color="#D97706"
-          />
+        onClose={() => !isArchiving && setOpenArchive(false)}
+        leadName={
+          selectedIds.length === 1
+            ? selectedIds[0]
+            : `${selectedIds.length} leads`
+        }
+        onConfirm={handleArchiveConfirm}
+        isUnarchive={tab === "archived"}
+      />
 
-          <Typography variant="h6" fontWeight={600} mb={1}>
-            {tab === "active" ? "Archive Lead" : "Restore Lead"}
-          </Typography>
-
-          <Typography color="text.secondary">
-            {tab === "active"
-              ? "Are you sure you want to archive the selected lead? You can restore it anytime."
-              : "Are you sure you want to restore the selected lead?"}
-          </Typography>
-        </DialogContent>
-
-        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-          <Button
-            fullWidth
-            onClick={() => setOpenArchive(false)}
-            sx={{
-              backgroundColor: "#F3F4F6",
-              color: "black",
-              "&:hover": { backgroundColor: "#E5E7EB" },
-            }}
-          >
-            Cancel
-          </Button>
-
-          <Button
-            fullWidth
-            onClick={handleArchive}
-            sx={{
-              backgroundColor: "#111827",
-              color: "white",
-              "&:hover": { backgroundColor: "#000" },
-            }}
-          >
-            {tab === "active" ? "Archive" : "Restore"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Email Selector */}
+      {/* Email Selector Dialog */}
       <Dialog
         open={openEmail}
         onClose={() => setOpenEmail(false)}

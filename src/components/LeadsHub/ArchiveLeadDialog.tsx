@@ -16,7 +16,7 @@ interface Props {
   onClose: () => void;
   leadName?: string;
   onConfirm: () => void;
-  isUnarchive?: boolean; // ✅ NEW: Support both archive and unarchive
+  isUnarchive?: boolean; // ✅ Support both archive and unarchive
 }
 
 const ArchiveLeadDialog: React.FC<Props> = ({
@@ -24,7 +24,7 @@ const ArchiveLeadDialog: React.FC<Props> = ({
   onClose,
   leadName,
   onConfirm,
-  isUnarchive = false, // ✅ NEW: Default to archive action
+  isUnarchive = false, // ✅ Default to archive action
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
