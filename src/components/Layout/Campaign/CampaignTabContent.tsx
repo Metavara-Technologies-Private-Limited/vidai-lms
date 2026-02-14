@@ -1,6 +1,10 @@
 import React from "react";
 import "../../../../src/styles/Campaign/CampaignTabContent.css";
 import contentImage from "./Images/vidai.png";
+import instagramIcon from"./Icons/instagram.png";
+import facebookIcon from"./Icons/facebook.png";
+import linkedinIcon from"./Icons/linkedin.png";
+import { Sector } from "recharts";
 import {
   LineChart,
   Line,
@@ -13,12 +17,6 @@ import {
   Tooltip,
   ResponsiveContainer
 } from "recharts";
-
-
-import instagramIcon from "./Icons/instagram.png";
-import facebookIcon from "./Icons/facebook.png";
-import linkedinIcon from "./Icons/linkedin.png";
-
 
 interface Props {
   activeTab: string;
@@ -34,17 +32,18 @@ const performanceData = [
   { date: "6 Jan", facebook: 620, instagram: 580 },
   { date: "7 Jan", facebook: 160, instagram: 220 }
 ];
+
 const platformData = [
   { name: "Instagram", value: 30, color: "#A8AEBF" },
   { name: "Facebook", value: 20, color: "#C5CAD8" },
   { name: "LinkedIn", value: 50, color: "#8D95A8" }
 ];
 
-
-const CampaignTabContent: React.FC<Props> = ({
-  activeTab,
-  activeSubTab
-}) => {
+const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
+  const [selectedPlatform, setSelectedPlatform] =
+    React.useState<"facebook" | "instagram">("facebook");
+  const [activeIndex, setActiveIndex] =
+  React.useState<number | undefined>(undefined);
 
   /* ================= CONTENT ================= */
   if (activeTab === "Content") {
@@ -55,11 +54,22 @@ const CampaignTabContent: React.FC<Props> = ({
 
           <p>
             Struggling to conceive can feel overwhelming—but you’re not alone.
-            IVF has become a safe and proven path.
+            Millions of couples across the world face fertility challenges, and
+            IVF has become a proven, safe, and effective path toward parenthood.
+            With the right medical guidance, advanced technology, and
+            compassionate care, many families have successfully taken their
+            first step toward a brighter future.
+          </p>
+
+          <p>
+            Our fertility experts are here to support you at every stage of
+            your journey—helping you understand your options, address concerns,
+            and choose a treatment plan tailored to your needs.
           </p>
 
           <p className="cd-content-tags">
             #IVFAwareness #FertilityCare #ParenthoodJourney
+            #IVFSupport #HopeStartsHere
           </p>
         </div>
 
@@ -71,93 +81,263 @@ const CampaignTabContent: React.FC<Props> = ({
   }
 
   /* ================= PERFORMANCE ================= */
-  if (activeTab === "Performance") {
-    const dataKey =
-      activeSubTab === "Facebook" ? "facebook" : "instagram";
+ if (activeTab === "Performance") {
+  return (
+    <div className="cd-performance-card">
 
-    return (
-      <div className="cd-performance-card">
+      {/* TITLE */}
+      <h4 className="cd-perf-title">Impressions</h4>
 
-        <div className="cd-performance-header">
-          <h3>Impressions</h3>
-          <span className="cd-total">1500</span>
-          <p>Total Impressions</p>
+      {/* DIVIDER BELOW TITLE */}
+      <div className="cd-perf-divider"></div>
+
+      {/* ROW: NUMBER LEFT / TOGGLE RIGHT */}
+      <div className="cd-perf-row">
+
+        <div className="cd-perf-left">
+          <div className="cd-perf-number">1500</div>
+          <div className="cd-perf-sub">Total Impressions</div>
         </div>
 
-        <ResponsiveContainer width="100%" height={350}>
-          <LineChart data={performanceData}>
-            <CartesianGrid
-              strokeDasharray="4 4"
-              vertical={false}
-              stroke="#eee"
+        <div className="cd-platform-toggle">
+          <label>
+            <input
+              type="radio"
+              checked={selectedPlatform === "facebook"}
+              onChange={() => setSelectedPlatform("facebook")}
             />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip cursor={{ stroke: "#ccc", strokeWidth: 2 }} />
-            <Line
-              type="monotone"
-              dataKey={dataKey}
-              stroke="#6C7CF7"
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 8, stroke: "#fff", strokeWidth: 3 }}
+            Facebook
+          </label>
+
+          <label>
+            <input
+              type="radio"
+              checked={selectedPlatform === "instagram"}
+              onChange={() => setSelectedPlatform("instagram")}
             />
-          </LineChart>
-        </ResponsiveContainer>
+            Instagram
+          </label>
+        </div>
+
       </div>
-    );
-  }
+
+      {/* CHART */}
+     <ResponsiveContainer width="100%" height={210}>
+  <LineChart
+    data={performanceData}
+    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+  >
+     {/* Shadow Definition */}
+    <defs>
+      <filter id="lineShadow" height="200%">
+        <feDropShadow
+          dx="0"
+          dy="4"
+          stdDeviation="8"
+          floodColor="#5B6EF5"
+          floodOpacity="0.15"
+        />
+      </filter>
+    </defs>
+    <CartesianGrid
+      strokeDasharray="4 4"
+      vertical={false}
+      stroke="#F1F1F1"
+    />
+
+    <XAxis
+      dataKey="date"
+      axisLine={false}
+      tickLine={false}
+      stroke="#9E9E9E"
+    />
+
+    <YAxis
+      axisLine={false}
+      tickLine={false}
+      stroke="#9E9E9E"
+    />
+
+    <Tooltip content={<CustomTooltip />} />
+
+    <Line
+  type="natural"
+  dataKey={selectedPlatform}
+  stroke="#5B6EF5"
+  strokeWidth={2.5}
+  dot={false}
+  filter="url(#lineShadow)"
+  activeDot={{
+    r: 6,
+    stroke: "#ffffff",
+    strokeWidth: 3,
+    fill: "#5B6EF5"
+  }}
+/>
+  </LineChart>
+</ResponsiveContainer>
+
+    </div>
+  );
+}
 
   /* ================= PLATFORM BREAKDOWN ================= */
   if (activeTab === "Platform Breakdown") {
   return (
     <div className="cd-platform-wrapper">
 
+      {/* TITLE */}
       <h3 className="cd-platform-title">
         Platform Distribution & Performance
       </h3>
 
-      <div className="cd-platform-content">
+      {/* THIN DIVIDER BELOW TITLE */}
+      <div className="cd-platform-divider"></div>
 
-        {/* LEFT PIE CHART */}
-        <div className="cd-pie-section">
-          <ResponsiveContainer width={400} height={400}>
-            <PieChart>
-              <Pie
-                data={platformData}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={0}
-                outerRadius={160}
-              >
-                {platformData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+      <div className="cd-platform-main">
 
+        {/* LEFT SIDE - PIE */}
+        <div className="cd-pie-wrapper">
+
+  <ResponsiveContainer width="100%" height={320}>
+  <PieChart>
+
+   <Pie
+  data={platformData}
+  dataKey="value"
+  nameKey="name"
+  outerRadius={130}
+  activeShape={(props: any) => {
+    const {
+      cx,
+      cy,
+      midAngle,
+      innerRadius,
+      outerRadius,
+      startAngle,
+      endAngle,
+      fill,
+      payload
+    } = props;
+
+    const RADIAN = Math.PI / 180;
+
+    const midRadius =
+    innerRadius + (outerRadius - innerRadius) / 2;
+
+    const x =
+    cx + midRadius * Math.cos(-midAngle * RADIAN);
+
+    const y =
+    cy + midRadius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <>
+        {/* Slightly Expand Active Slice */}
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius + 6}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+        />
+
+        {/* Floating Popup Near Slice */}
+<foreignObject
+  x={x - 40}
+  y={y - 35}
+  width="90"
+  height="70"
+>
+  <div
+    style={{
+      position: "relative",
+      background: "#ffffff",
+      borderRadius: "14px",
+      padding: "8px 12px",
+      textAlign: "center",
+      boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center"
+    }}
+  >
+    <div
+      style={{
+        fontSize: "14px",
+        fontWeight: 600,
+        color: "#222"
+      }}
+    >
+      {payload.value} %
+    </div>
+
+    <div
+      style={{
+        fontSize: "12px",
+        color: "#8A8A8A",
+        marginTop: "2px"
+      }}
+    >
+      {payload.name}
+    </div>
+
+    {/* 🔽 Arrow */}
+    <div
+      style={{
+        position: "absolute",
+        bottom: "-4px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: 0,
+        height: 0,
+        borderLeft: "6px solid transparent",
+        borderRight: "6px solid transparent",
+        borderTop: "6px solid #ffffff",
+        filter: "drop-shadow(0 3px 3px rgba(0,0,0,0.06))"
+      }}
+    />
+  </div>
+</foreignObject>
+      </>
+    );
+  }}
+>
+  {platformData.map((entry, index) => (
+    <Cell key={`cell-${index}`} fill={entry.color} />
+  ))}
+</Pie>
+
+  </PieChart>
+</ResponsiveContainer>
+
+          {/* LEGEND BELOW PIE */}
           <div className="cd-platform-legend">
             <div>
               <span className="legend-dot dot1"></span>
-              <img src={instagramIcon} alt="" />
+              <img src={instagramIcon} alt="Instagram" />
               Instagram
             </div>
+
             <div>
               <span className="legend-dot dot2"></span>
-              <img src={facebookIcon} alt="" />
+              <img src={facebookIcon} alt="Facebook" />
               Facebook
             </div>
+
             <div>
               <span className="legend-dot dot3"></span>
-              <img src={linkedinIcon} alt="" />
+              <img src={linkedinIcon} alt="LinkedIn" />
               LinkedIn
             </div>
           </div>
+
         </div>
 
-        {/* RIGHT CARDS */}
+        {/* RIGHT SIDE - CARDS */}
         <div className="cd-platform-cards">
 
           <PlatformCard
@@ -182,22 +362,83 @@ const CampaignTabContent: React.FC<Props> = ({
           />
 
         </div>
+
       </div>
     </div>
   );
 }
-  /* ================= AI INSIGHTS ================= */
+
   if (activeTab === "AI Insights") {
-    return (
-      <div className="cd-placeholder-card">
-        <h3>AI Insights Coming Soon</h3>
+  return (
+    <div className="cd-ai-wrapper">
+
+      {/* TITLE */}
+      <h3 className="cd-ai-title">AI-Powered Insights</h3>
+
+      {/* THIN DIVIDER */}
+      <div className="cd-ai-divider"></div>
+
+      {/* INSIGHT CARDS */}
+      <div className="cd-ai-cards">
+
+        <div className="cd-ai-card green">
+          <div className="cd-ai-heading">High Performer</div>
+          <p>
+            Your LinkedIn ads are outperforming by 35%. The B2B audience is highly engaged.
+            Consider allocating 15–20% more budget to LinkedIn.
+          </p>
+        </div>
+
+        <div className="cd-ai-card blue">
+          <div className="cd-ai-heading">Optimization Opportunity</div>
+          <p>
+            Peak engagement occurs between 10 AM – 2 PM EST. Schedule posts during these
+            hours for 23% higher CTR.
+          </p>
+        </div>
+
+        <div className="cd-ai-card purple">
+          <div className="cd-ai-heading">Content Recommendation</div>
+          <p>
+            Video content generates 2.8x more engagement. Consider adding video creatives
+            to Instagram & Facebook.
+          </p>
+        </div>
+
+        <div className="cd-ai-card orange">
+          <div className="cd-ai-heading">Budget Efficiency</div>
+          <p>
+            Cost Per Conversion is 12% below target. Increase budget by $500 while
+            maintaining profitability.
+          </p>
+        </div>
+
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return null;
 };
-/* ================= PLATFORM CARD COMPONENT ================= */
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div
+        style={{
+          background: "#ffffff",
+          padding: "8px 14px",
+          borderRadius: "10px",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
+          fontSize: "13px",
+          fontWeight: 500
+        }}
+      >
+        {payload[0].value} Impressions
+      </div>
+    );
+  }
+  return null;
+};
 const PlatformCard = ({
   icon,
   title,
@@ -211,18 +452,15 @@ const PlatformCard = ({
 }) => (
   <div className="cd-platform-card">
     <div className="cd-platform-header">
-      <img src={icon} alt={title} />
+      <img className="cd-platform-icon" src={icon} alt={title} />
       <span>{title}</span>
     </div>
 
     <div className="cd-platform-metrics">
       <span className="spend">Spend: {spend}</span>
-      <span className="conversion">
-        Conversion: {conversion}
-      </span>
+      <span className="conversion">Conversion: {conversion}</span>
     </div>
   </div>
 );
-
 
 export default CampaignTabContent;

@@ -6,6 +6,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import dayjs from "dayjs";
 
 /* 🔹 LOCAL ICONS */
@@ -61,24 +62,25 @@ const [scheduleTime, setScheduleTime] = useState("");
     }
   };
 
-  // const handleSaveAndPost = () => {
-  // setSubmitted(true);
-  // if (!step1Valid || !step2Valid) return;
-
-  const handleSaveAndPost = async () => {
+const handleCreateCampaign = async (
+  type: "live" | "draft" | "scheduled"
+) => {
   setSubmitted(true);
-
-  if (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime)
-    return;
+  if (type !== "draft" && (!scheduleDate || !scheduleTime)) return;
+  if (type === "live" && (!step1Valid || !step2Valid)) return;
+  if (type === "scheduled" && (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime)) return;
 
   try {
-    const scheduledDateTime = dayjs(
-      `${scheduleDate} ${scheduleTime}`,
-      "YYYY-MM-DD HH:mm"
-    ).format("YYYY-MM-DDTHH:mm:ss");
+    const scheduledDateTime =
+      scheduleDate && scheduleTime
+        ? dayjs(
+            `${scheduleDate} ${scheduleTime}`,
+            "YYYY-MM-DD HH:mm"
+          ).format("YYYY-MM-DDTHH:mm:ss")
+        : null;
 
     const payload = {
-      clinic: 1, // replace dynamically if needed
+      clinic: 1,
 
       campaign_name: campaignName,
       campaign_description: "",
@@ -88,42 +90,48 @@ const [scheduleTime, setScheduleTime] = useState("");
       start_date: startDate,
       end_date: endDate,
 
-      campaign_mode: 1, // 🔥 1 = SOCIAL
+      campaign_mode: 1,
 
-      selected_start: scheduledDateTime,
-      selected_end: scheduledDateTime,
-      enter_time: scheduleTime,
+      selected_start: type === "scheduled" ? scheduledDateTime : null,
+      selected_end: type === "scheduled" ? scheduledDateTime : null,
+      enter_time: type === "scheduled" ? scheduleTime : null,
+
+      is_active: type === "live",
 
       social_media: accounts.map((platform) => ({
-        platform_name: platform, // instagram | facebook | linkedin
+        platform_name: platform,
         is_active: true,
       })),
     };
 
     const response = await CampaignAPI.create(payload);
-
     const apiData = response.data;
 
-    // 🔥 MAP BACKEND → UI MODEL
     const formattedCampaign = {
       id: apiData.id,
       name: apiData.campaign_name,
       type: "social",
-      status: apiData.is_active ? "Live" : "Draft",
+      status:
+        type === "live"
+          ? "Live"
+          : type === "draft"
+          ? "Draft"
+          : "Scheduled",
       start: apiData.start_date,
       end: apiData.end_date,
       platforms: accounts,
       leads: 0,
-      scheduledAt: apiData.selected_start,
+      scheduledAt:
+        type === "scheduled" ? scheduledDateTime : null,
     };
 
     onSave(formattedCampaign);
     onClose();
-
   } catch (error: any) {
     console.error(error.response?.data || error.message);
   }
 };
+
 
 const [instagramBudget, setInstagramBudget] = useState(350);
 const [facebookBudget, setFacebookBudget] = useState(250);
@@ -131,7 +139,6 @@ const [linkedinBudget, setLinkedinBudget] = useState(150);
 
 const totalBudget =
   instagramBudget + facebookBudget + linkedinBudget;
-
 
   return (
     <div className="campaign-modal-overlay">
@@ -354,14 +361,22 @@ const totalBudget =
 {/* ================= STEP 3 ================= */}
 {step === 3 && (
   <div className="step-content">
-  <h3>Schedule Campaign</h3>
+    <h3>Schedule Campaign</h3>
+
     <div className="section-card">
       {/* HEADER */}
       <div className="schedule-header">
         <div>
-          <h3>Schedule</h3>
+          <h3>
+            {mode === "paid"
+              ? "Schedule & Budget Allocation"
+              : "Schedule"}
+          </h3>
+
           <p className="section-subtitle">
-            Select a date and time for the campaign.
+            {mode === "paid"
+              ? "Establish your schedule and budget for every platform."
+              : "Select a date and time for the campaign."}
           </p>
         </div>
 
@@ -373,131 +388,168 @@ const totalBudget =
       {/* DATE + TIME */}
       <div className="schedule-row">
         <div className="form-group half">
-          <label>Select Date Range</label>
+          <label>Select Date</label>
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
-  format="DD/MM/YYYY"
-  value={scheduleDate ? dayjs(scheduleDate) : null}
-  onChange={(v) =>
-    setScheduleDate(v ? v.format("YYYY-MM-DD") : "")
-  }
-  slots={{ openPickerIcon: CalendarTodayIcon }}
-/>
-
+              format="DD/MM/YYYY"
+              value={scheduleDate ? dayjs(scheduleDate) : null}
+              onChange={(v) =>
+                setScheduleDate(v ? v.format("YYYY-MM-DD") : "")
+              }
+              slots={{ openPickerIcon: CalendarTodayIcon }}
+            />
           </LocalizationProvider>
         </div>
 
         <div className="form-group half">
-          <label>Enter Time</label>
-          <input
-  type="time"
-  value={scheduleTime}
-  onChange={(e) => setScheduleTime(e.target.value)}
-/>
-
-        </div>
+  <label>Enter Time</label>
+  <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <TimePicker
+      format="hh:mm A"       // 🔥 Enables AM/PM
+      value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null}
+      onChange={(v) => {
+        if (v) {
+          setScheduleTime(v.format("HH:mm"));  // store 24hr for backend
+        }
+      }}
+      ampm                    // 🔥 Show AM/PM selector
+      slotProps={{
+        textField: {
+          fullWidth: true,
+        }
+      }}
+    />
+  </LocalizationProvider>
+</div>
       </div>
-            {/* 🔥 THIN DIVIDER */}
-      <div className="budget-divider" />
 
-      {/* ===== BUDGET SECTION ===== */}
-      <div className="budget-section">
-        <h3>Budget Allocation</h3>
+      {/* 🔥 SHOW BUDGET ONLY IF PAID */}
+      {mode === "paid" && (
+        <>
+          <div className="budget-divider" />
 
-        <div className="budget-row">
+          <div className="budget-section">
+            <h3>Budget Allocation</h3>
 
-          {/* Instagram */}
-          <div className="budget-card">
-            <div className="budget-title">
-              <img src={instagramIcon} alt="Instagram" />
-              <span>Instagram (Estimate CPC : $3.5)</span>
+            <div className="budget-row">
+
+              {/* Instagram */}
+              <div className="budget-card">
+                <div className="budget-title">
+                  <img src={instagramIcon} alt="Instagram" />
+                  <span>Instagram (Estimate CPC : $3.5)</span>
+                </div>
+
+                <div className="budget-input-wrapper">
+                  <label>Enter Amount ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={instagramBudget}
+                    onChange={(e) =>
+                      setInstagramBudget(Number(e.target.value))
+                    }
+                    className="budget-input"
+                  />
+                </div>
+              </div>
+
+              {/* Facebook */}
+              <div className="budget-card">
+                <div className="budget-title">
+                  <img src={facebookIcon} alt="Facebook" />
+                  <span>Facebook (Estimate CPC : $2.5)</span>
+                </div>
+
+                <div className="budget-input-wrapper">
+                  <label>Enter Amount ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={facebookBudget}
+                    onChange={(e) =>
+                      setFacebookBudget(Number(e.target.value))
+                    }
+                    className="budget-input"
+                  />
+                </div>
+              </div>
+
+              {/* LinkedIn */}
+              <div className="budget-card">
+                <div className="budget-title">
+                  <img src={linkedinIcon} alt="LinkedIn" />
+                  <span>LinkedIn (Estimate CPC : $1.5)</span>
+                </div>
+
+                <div className="budget-input-wrapper">
+                  <label>Enter Amount ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={linkedinBudget}
+                    onChange={(e) =>
+                      setLinkedinBudget(Number(e.target.value))
+                    }
+                    className="budget-input"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="budget-input-wrapper">
-              <label>Enter Amount ($)</label>
-              <input
-                type="number"
-                min="0"
-                step="10"
-                value={instagramBudget}
-                onChange={(e) =>
-                  setInstagramBudget(Number(e.target.value))
-                }
-                className="budget-input"
-              />
+            <div className="total-budget">
+              <div>
+                <h4>Total Budget : ${totalBudget}</h4>
+                <p>
+                  Ad spend is charged directly by each connected
+                  social media platform. We don’t handle payments.
+                </p>
+              </div>
             </div>
           </div>
-
-          {/* Facebook */}
-          <div className="budget-card">
-            <div className="budget-title">
-              <img src={facebookIcon} alt="Facebook" />
-              <span>Facebook (Estimate CPC : $2.5)</span>
-            </div>
-
-            <div className="budget-input-wrapper">
-              <label>Enter Amount ($)</label>
-              <input
-                type="number"
-                min="0"
-                step="10"
-                value={facebookBudget}
-                onChange={(e) =>
-                  setFacebookBudget(Number(e.target.value))
-                }
-                className="budget-input"
-              />
-            </div>
-          </div>
-
-          {/* LinkedIn */}
-          <div className="budget-card">
-            <div className="budget-title">
-              <img src={linkedinIcon} alt="LinkedIn" />
-              <span>LinkedIn (Estimate CPC : $1.5)</span>
-            </div>
-
-            <div className="budget-input-wrapper">
-              <label>Enter Amount ($)</label>
-              <input
-                type="number"
-                min="0"
-                step="10"
-                value={linkedinBudget}
-                onChange={(e) =>
-                  setLinkedinBudget(Number(e.target.value))
-                }
-                className="budget-input"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* TOTAL */}
-        <div className="total-budget">
-          <div>
-            <h4>Total Budget : ${totalBudget}</h4>
-            <p>
-              Ad spend is charged directly by each connected
-              social media platform. We don’t handle payments.
-            </p>
-          </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   </div>
 )}
 
         {/* ================= FOOTER ================= */}
-        <div className="modal-actions">
+<div className="modal-actions">
   <button className="cancel-btn" onClick={onClose}>
     Cancel
   </button>
 
   {step === 3 ? (
-    <button className="next-btn" onClick={handleSaveAndPost}>
-      Save & Post
-    </button>
+    mode === "paid" ? (
+      <>
+        <button
+  className="cancel-btn"
+  onClick={() => handleCreateCampaign("draft")}
+>
+  Save as Draft
+</button>
+
+
+       <button
+  className="next-btn"
+  onClick={() => handleCreateCampaign("scheduled")}
+>
+  Schedule
+</button>
+
+      </>
+    ) : (
+      <button
+  className="next-btn"
+  onClick={() => handleCreateCampaign("live")}
+>
+  Save & Post
+</button>
+
+    )
   ) : (
     <button className="next-btn" onClick={handleNext}>
       Next

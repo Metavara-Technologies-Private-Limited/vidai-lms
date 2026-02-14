@@ -166,7 +166,7 @@ export default function CampaignsScreen() {
                   "Live",
                   "Stopped",
                   "Draft",
-                  "Schedule",
+                  "Scheduled",
                   "Completed",
                   "Failed",
                 ].map((item) => (
