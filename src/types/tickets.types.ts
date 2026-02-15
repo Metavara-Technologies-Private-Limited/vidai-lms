@@ -1,3 +1,5 @@
+import  dayjs, { Dayjs } from "dayjs";
+
 // Ticket Types based on Swagger API documentation
 
 export type TicketPriority = "low" | "medium" | "high";
@@ -9,6 +11,14 @@ export interface TicketDocument {
   file?: string;
   uploaded_at?: string;
 }
+
+export type FilterTicketsPayload = {
+  fromDate: Dayjs | null;
+  toDate: Dayjs | null;
+  priority: TicketPriority | null;
+  department_id: number | null;
+};
+
 
 // Ticket Timeline
 export interface TicketTimeline {
@@ -102,6 +112,7 @@ export interface TicketFilters {
   page?: number;
   page_size?: number;
 }
+
 
 // Assign Ticket Request
 export interface AssignTicketRequest {

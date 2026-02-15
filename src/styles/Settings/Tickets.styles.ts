@@ -109,18 +109,59 @@ export const paginationButtonSx = (active: boolean) => ({
 
 export const createTicketFocusedFieldSx = {
   "& .MuiOutlinedInput-root": {
-    height: 44,
+    height: 44, // normal inputs height
+
+    // ✅ Multiline should NOT inherit fixed height
+    "&.MuiInputBase-multiline": {
+      height: "auto",
+      padding: 0, // remove extra padding added earlier
+    },
+
     "&:hover fieldset": {
       borderColor: "#505050",
     },
+
     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
       borderColor: "#505050",
     },
   },
+
+  // ✅ Only control multiline text spacing lightly
+  "& .MuiInputBase-multiline textarea": {
+    padding: "10px 14px", // smaller = matches visual density
+    lineHeight: 1.4,
+  },
+
+  // ✅ Label color
+  "& .MuiInputLabel-root": {
+    color: "#232323",
+  },
+
   "& .MuiInputLabel-root.Mui-focused": {
-    color: "#505050",
+    color: "#232323",
+  },
+
+  // ✅ Placeholder style for normal inputs
+  "& input::placeholder": {
+    color: "#9E9E9E",
+    fontSize: "12px",
+    opacity: 1,
+  },
+
+  // ✅ Placeholder style for multiline only (without affecting height)
+  "& .MuiInputBase-multiline textarea::placeholder": {
+    color: "#9E9E9E",
+    fontSize: "12px",
+    opacity: 1,
+  },
+
+  // ✅ Select placeholder
+  "& .ticket-select-placeholder": {
+    color: "#9E9E9E",
+    fontSize: "12px",
   },
 };
+
 
 export const createTicketDialogPaperSx = {
   width: 700,
@@ -139,30 +180,72 @@ export const createTicketUploadButtonSx = {
   backgroundColor: "#9E9E9E",
   color: "#FFFFFF",
   textTransform: "none",
-  height: 25,
-  width: "50%",
+  fontWeight: 600,
   fontSize: "12px",
+  borderRadius: "4px",
+  height: 24,
+  px: 2,                 
   mr: 1,
-  "&:hover": { backgroundColor: "#505050" },
-};
 
-export const createTicketCancelButtonSx = {
-  color: "#505050",
-  borderColor: "#505050",
-  textTransform: "none",
+  display: "inline-flex", 
+  alignItems: "center",
+  justifyContent: "center",
+
+  whiteSpace: "nowrap",   
+  minWidth: "auto",       
+  lineHeight: 1,          
+
   "&:hover": {
-    color: "#232323",
+    backgroundColor: "#505050",
+  },
+
+  "&:disabled": {
+    backgroundColor: "#9E9E9E",
+    color: "#FFFFFF",
   },
 };
+
+
+
+export const createTicketCancelButtonSx = {
+  backgroundColor: "#FFFFFF", 
+  color: "#505050",
+  border: "1px solid #505050",
+  textTransform: "none",
+  fontWeight: 600,
+
+  "&:hover": {
+    backgroundColor: "#FFFFFF", 
+    color: "#232323",
+    border: "1px solid #232323",
+  },
+
+  "&:disabled": {
+    backgroundColor: "#FFFFFF",
+    color: "#505050",
+    border: "1px solid #505050",
+  },
+};
+
 
 export const createTicketSaveButtonSx = {
   backgroundColor: "#505050",
   color: "#FFFFFF",
   textTransform: "none",
+  minWidth: "100px",   
+  px: 2.5,             
+  borderRadius: "6px",
+
   "&:hover": {
     backgroundColor: "#232323",
   },
+
+  "&:disabled": {
+    backgroundColor: "#505050",
+    color: "#FFFFFF",
+  },
 };
+
 
 //#########################################################
 
