@@ -12,20 +12,20 @@ import FilterTickets from "./FilterTicket";
 import dayjs, { Dayjs } from "dayjs";
 
 // Types & Styles
-import type { TicketListItem } from "../../../types/tickets.types";
+import type { TicketListItem, TicketFilters, FilterTicketsPayload } from "../../../types/tickets.types";
 import {
   ticketsSearchBoxSx, createTicketButtonSx, ticketsTabsSx,
   ticketsTableHeaderSx, ticketsRowSx, priorityChipSx, paginationButtonSx,
 } from "../../../styles/Settings/Tickets.styles";
 
 // Redux & API
-import { 
-  fetchTickets, 
-  fetchTicketDashboard, 
-  selectAllTickets, 
-  selectTicketsLoading, 
-  selectTicketsError, 
-  selectTicketDashboard 
+import {
+  fetchTickets,
+  fetchTicketDashboard,
+  selectAllTickets,
+  selectTicketsLoading,
+  selectTicketsError,
+  selectTicketDashboard
 } from "../../../store/ticketSlice";
 import type { AppDispatch } from "../../../store";
 import type { Employee } from "../../../services/leads.api";
@@ -47,39 +47,39 @@ const Tickets = () => {
   const [openCreate, setOpenCreate] = useState(false);
   const [openFilter, setOpenFilter] = useState(false);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<any>(null);
+  const [filters, setFilters] = useState<TicketFilters | null>(null);
 
   console.log(employees);
-  
- useEffect(() => {
- 
-     
-const loadData = async () => {
-  
-  try {
-    const results = await Promise.allSettled([
-     
-      clinicsApi.getClinicEmployees(1),  
-    ]);
-    
-    
-    if (results[0].status === 'fulfilled') {
-      setEmployees(Array.isArray(results[0].value) ? results[0].value : (results[0].value as any).results || []);
-    }
 
-  } catch (err) { 
-     console.error("Error loading data:", err);
-  }  
-};
-      loadData();
-   
+  useEffect(() => {
+
+
+    const loadData = async () => {
+
+      try {
+        const results = await Promise.allSettled([
+
+          clinicsApi.getClinicEmployees(1),
+        ]);
+
+
+        if (results[0].status === 'fulfilled') {
+          setEmployees(Array.isArray(results[0].value) ? results[0].value : (results[0].value as any).results || []);
+        }
+
+      } catch (err) {
+        console.error("Error loading data:", err);
+      }
+    };
+    loadData();
+
   }, []);
 
 
   // 1. Initial Data Fetch from DB
   useEffect(() => {
     dispatch(fetchTickets());
-    dispatch(fetchTicketDashboard()); 
+    dispatch(fetchTicketDashboard());
   }, [dispatch]);
 
   // Normalize data: Ensure we are always working with an array
@@ -95,7 +95,7 @@ const loadData = async () => {
   const getCount = (status: string) => {
     const key = status.toLowerCase();
     if (dashboardCounts && typeof dashboardCounts === 'object' && key in dashboardCounts) {
-       return (dashboardCounts as any)[key] || 0;
+      return (dashboardCounts as any)[key] || 0;
     }
     // Fallback to local calculation if dashboard API hasn't loaded
     return ticketsFromDb.filter((t) => t.status?.toLowerCase() === key).length;
@@ -113,11 +113,11 @@ const loadData = async () => {
       // Advanced Filters from FilterTickets component
       if (filters) {
         if (filters.priority && t.priority?.toLowerCase() !== filters.priority.toLowerCase()) return false;
-        if (filters.department && String(t.department) !== String(filters.department)) return false;
-        
+        if (filters.department_id && Number(t.department) !== Number(filters.department_id)) return false;
+
         const ticketDate = dayjs(t.created_at);
-        if (filters.fromDate && ticketDate.isBefore(filters.fromDate, "day")) return false;
-        if (filters.toDate && ticketDate.isAfter(filters.toDate, "day")) return false;
+        if (filters.from_date && ticketDate.isBefore(filters.from_date, "day")) return false;
+        if (filters.to_date && ticketDate.isAfter(filters.to_date, "day")) return false;
       }
       return true;
     });
@@ -155,10 +155,10 @@ const loadData = async () => {
           <IconButton onClick={() => setOpenFilter(true)}>
             <Box component="img" src={Filter_Leads} />
           </IconButton>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />} 
-            sx={createTicketButtonSx} 
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            sx={createTicketButtonSx}
             onClick={() => setOpenCreate(true)}
           >
             Create New
@@ -203,7 +203,7 @@ const loadData = async () => {
               px={2}
               py={2}
               alignItems="center"
-              onClick={() => navigate(`/settings/tickets/${t.id}`)} 
+              onClick={() => navigate(`/settings/tickets/${t.id}`)}
               sx={{ ...ticketsRowSx, cursor: "pointer", borderBottom: '1px solid #f9f9f9' }}
             >
               <Box flex={1} color="#5a8aea" fontWeight="600" fontSize="0.9rem">{t.ticket_no}</Box>
@@ -240,16 +240,16 @@ const loadData = async () => {
         <Stack direction="row" alignItems="center" spacing={1}>
           <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)} sx={{ border: '1px solid #E0E0E0' }}>‹</IconButton>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Button 
-              key={p} 
-              onClick={() => setPage(p)} 
+            <Button
+              key={p}
+              onClick={() => setPage(p)}
               sx={paginationButtonSx(p === page)}
             >
               {p}
             </Button>
           ))}
-          <IconButton 
-            disabled={page === totalPages || totalPages === 0} 
+          <IconButton
+            disabled={page === totalPages || totalPages === 0}
             onClick={() => setPage((p) => p + 1)}
             sx={{ border: '1px solid #E0E0E0' }}
           >
@@ -259,14 +259,33 @@ const loadData = async () => {
       </Stack>
 
       <CreateTicket open={openCreate} onClose={() => setOpenCreate(false)} />
-      <FilterTickets 
-        open={openFilter} 
-        onClose={() => setOpenFilter(false)} 
-        onApply={(appliedFilters) => {
-          setFilters(appliedFilters);
+      <FilterTickets
+        open={openFilter}
+        onClose={() => setOpenFilter(false)}
+        onApply={(appliedFilters: FilterTicketsPayload | null) => {
+
+          if (!appliedFilters) {
+            setFilters(null);
+            setPage(1);
+            return;
+          }
+
+          const apiFilters: TicketFilters = {
+            priority: appliedFilters.priority || undefined,
+            department_id: appliedFilters.department_id || undefined,
+            from_date: appliedFilters.fromDate
+              ? appliedFilters.fromDate.format("YYYY-MM-DD")
+              : undefined,
+            to_date: appliedFilters.toDate
+              ? appliedFilters.toDate.format("YYYY-MM-DD")
+              : undefined,
+          };
+
+          setFilters(apiFilters);
           setPage(1);
-        }} 
+        }}
       />
+
     </Box>
   );
 };

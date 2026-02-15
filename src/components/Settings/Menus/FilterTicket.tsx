@@ -10,8 +10,12 @@ import {
   Typography,
   Divider,
 } from "@mui/material";
+
+import { useEffect, useState } from "react";
+import { clinicsApi } from "../../../services/tickets.api";
+import type { Department, TicketPriority, FilterTicketsPayload,TicketFilters  } from "../../../types/tickets.types";
+
 import CloseIcon from "@mui/icons-material/Close";
-import { useState } from "react";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -30,8 +34,12 @@ import {
 const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
   const [fromDate, setFromDate] = useState<Dayjs | null>(dayjs());
   const [toDate, setToDate] = useState<Dayjs | null>(dayjs().add(1, "day"));
-  const [priority, setPriority] = useState("Low");
-  const [department, setDepartment] = useState("Andrology");
+
+  const CLINIC_ID = "1";
+
+  const [priority, setPriority] = useState<string>("");
+  const [department, setDepartment] = useState<number | "">("");
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   const handleClear = () => {
     setFromDate(null);
@@ -43,9 +51,30 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
   };
 
   const handleApply = () => {
-    onApply?.({ fromDate, toDate, priority, department });
+    onApply?.({
+      fromDate,
+      toDate,
+      priority: (priority as TicketPriority) || null,
+      department_id: department || null,
+    });
     onClose();
   };
+
+  useEffect(() => {
+    if (open) {
+      const loadDepartments = async () => {
+        try {
+          const clinic = await clinicsApi.getClinicDetail(CLINIC_ID);
+          setDepartments(clinic?.department || []);
+        } catch (err) {
+          console.error("Failed to fetch departments", err);
+          setDepartments([]);
+        }
+      };
+
+      loadDepartments();
+    }
+  }, [open]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -104,9 +133,10 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
               onChange={(e) => setPriority(e.target.value)}
               sx={filterTicketsSelectFieldSx}
             >
-              <MenuItem value="Low">Low</MenuItem>
-              <MenuItem value="Medium">Medium</MenuItem>
-              <MenuItem value="High">High</MenuItem>
+              <MenuItem value="low">Low</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="high">High</MenuItem>
+
             </TextField>
 
             <TextField
@@ -114,15 +144,18 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
               label="Department"
               fullWidth
               value={department}
-              onChange={(e) => setDepartment(e.target.value)}
+              onChange={(e) =>
+                setDepartment(e.target.value === "" ? "" : Number(e.target.value))
+              }
               sx={filterTicketsSelectFieldSx}
             >
-              <MenuItem value="Andrology">Andrology</MenuItem>
-              <MenuItem value="Embryology">Embryology</MenuItem>
-              <MenuItem value="Cryopreservation">
-                Cryopreservation
-              </MenuItem>
+              {departments.map((d) => (
+                <MenuItem key={d.id} value={d.id}>
+                  {d.name}
+                </MenuItem>
+              ))}
             </TextField>
+
           </Stack>
 
           {/* Actions */}

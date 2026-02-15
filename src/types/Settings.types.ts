@@ -26,7 +26,7 @@ export interface Ticket {
   timeline: {
     type: "received" | "assigned" | "resolved" | "pending" | "closed";
     time: string;
-    user?: string; 
+    user?: string;
   }[];
 }
 
@@ -43,10 +43,12 @@ export interface TicketFilters {
   department: string;
 }
 
+import type { FilterTicketsPayload } from "./tickets.types";
+
 export interface FilterTicketsProps {
   open: boolean;
   onClose: () => void;
-  onApply?: (filters: TicketFilters | null) => void;
+  onApply?: (filters: FilterTicketsPayload | null) => void;
 }
 
 export type TicketTimelineItem = {

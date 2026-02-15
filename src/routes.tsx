@@ -4,6 +4,11 @@ import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
 
+// --- Added for Toast Notifications ---
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+// -------------------------------------
+
 type LoaderProps = { Comp: React.LazyExoticComponent<() => JSX.Element> };
 function LoadedComponent({ Comp }: LoaderProps) {
   return (
@@ -15,44 +20,58 @@ function LoadedComponent({ Comp }: LoaderProps) {
 
 export default function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-
-        {/* Sidebar routes */}
-        {SIDEBAR_TABS.flatMap((tab) =>
-          tab.menu.flatMap((item) => [
-            item.page && (
-              <Route
-                key={item.key}
-                path={item.path.replace(/^\//, "")}
-                element={<LoadedComponent Comp={item.page} />}
+    <>
+      {/* This container must exist for the toast.success() and toast.error() 
+          calls in your logic files to actually show up on the UI.
+      */}
+              <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                newestOnTop
+                closeOnClick
+                pauseOnHover
+                draggable
               />
-            ),
-            // {/* Sidebar sub menu routes */}
-            item.subMenu?.map((sub) =>
-              sub.page ? (
+
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+
+          {/* Sidebar routes */}
+          {SIDEBAR_TABS.flatMap((tab) =>
+            tab.menu.flatMap((item) => [
+              item.page && (
                 <Route
-                  key={sub.key}
-                  path={sub.path.replace(/^\//, "")}
-                  element={<LoadedComponent Comp={sub.page} />}
+                  key={item.key}
+                  path={item.path.replace(/^\//, "")}
+                  element={<LoadedComponent Comp={item.page} />}
                 />
-              ) : null,
-            ),
-          ]),
-        )}
+              ),
+              // {/* Sidebar sub menu routes */}
+              item.subMenu?.map((sub) =>
+                sub.page ? (
+                  <Route
+                    key={sub.key}
+                    path={sub.path.replace(/^\//, "")}
+                    element={<LoadedComponent Comp={sub.page} />}
+                  />
+                ) : null,
+              ),
+            ]),
+          )}
 
-        {/* Extra routes */}
-        {EXTRA_ROUTES.map((route) => (
-          <Route
-            key={route.key}
-            path={route.path}
-            element={<LoadedComponent Comp={route.page} />}
-          />
-        ))}
+          {/* Extra routes */}
+          {EXTRA_ROUTES.map((route) => (
+            <Route
+              key={route.key}
+              path={route.path}
+              element={<LoadedComponent Comp={route.page} />}
+            />
+          ))}
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Route>
-    </Routes>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Route>
+      </Routes>
+    </>
   );
 }
