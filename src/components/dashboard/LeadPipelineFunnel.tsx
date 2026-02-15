@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 // ✅ Integration Imports
 import { LeadAPI } from "../../services/leads.api";
 import type { Lead } from "../../types/leads.types";
-import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style";
 
 const LeadPipelineFunnel = () => {
   const [leads, setLeads] = useState<Lead[]>([]);

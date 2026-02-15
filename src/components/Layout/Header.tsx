@@ -84,7 +84,7 @@ const Header = () => {
             variant="body2"
             sx={{ display: { xs: "none", md: "block" } }}
           >
-            Clinic: {clinicName || "—"}
+            Clinic: <b>{clinicName || "—"}</b>
           </Typography>
 
           {iconMenus.map(({ icon, type }) => (

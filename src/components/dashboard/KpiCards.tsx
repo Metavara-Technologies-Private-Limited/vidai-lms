@@ -13,10 +13,10 @@ import FollowUpsIcon from "../../assets/icons/followUps.svg";
 import TotalConvertedIcon from "../../assets/icons/totalConverted.svg";
 import LostLeadsIcon from "../../assets/icons/lostLeads.svg";
 
-import { kpiCardsStyles } from "../../styles/dashboard/KpiCards.styles";
-// ✅ Integration: Import your API and Type
-import { LeadAPI } from "../../.././src/services/leads.api";
-import type { Lead } from "../../.././src/services/leads.api";
+import { kpiCardsStyles } from "../../styles/Dashboard/KpiCards.styles";
+import { LeadAPI } from "../../services/leads.api";
+import type { Lead } from "../../services/leads.api";
+import { LEAD_STATUS } from "../../utils/constants";
 
 /* KPI → ICON MAP */
 const KPI_ICONS: Record<string, string> = {
@@ -52,7 +52,6 @@ const KpiCards = () => {
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  // ✅ Integration State: Default values are 0
   const [counts, setCounts] = useState({
     totalLeads: 0,
     newLeads: 0,
@@ -61,11 +60,9 @@ const KpiCards = () => {
     totalConverted: 0,
     lostLeads: 0,
     registered: 0,
-    treatment: 0
+    treatment: 0,
   });
 
-  // ✅ Fetch Logic: Map API data to the counts state
- // ✅ Fetch Logic: Updated to match restapi_lead status values strictly
   const fetchKpiData = useCallback(async () => {
     try {
       const response = await LeadAPI.list();
@@ -73,26 +70,28 @@ const KpiCards = () => {
 
       setCounts({
         totalLeads: leads.length || 0,
-        
-        
-        newLeads: leads.filter(l => l.lead_status === "New").length || 0,
-        
-  
-        appointments: leads.filter(l => l.lead_status === "Appointment").length || 0,
-        
-    
-        followUps: leads.filter(l => l.lead_status === "Follow-Ups").length || 0,
-       
-        totalConverted: leads.filter(l => 
-          l.lead_status === "Converted" || l.lead_status === "Cycle Conversion"
-        ).length || 0,
-        
-       
-        lostLeads: leads.filter(l => l.lead_status === "Lost").length || 0,
-        
-    
-        registered: leads.filter(l => l.lead_status === "Converted").length || 0,
-        treatment: leads.filter(l => l.lead_status === "Cycle Conversion").length || 0
+        newLeads:
+          leads.filter((l) => l.lead_status === LEAD_STATUS.NEW).length || 0,
+        appointments:
+          leads.filter((l) => l.lead_status === LEAD_STATUS.APPOINTMENT)
+            .length || 0,
+        followUps:
+          leads.filter((l) => l.lead_status === LEAD_STATUS.FOLLOW_UPS)
+            .length || 0,
+        totalConverted:
+          leads.filter(
+            (l) =>
+              l.lead_status === LEAD_STATUS.CONVERTED ||
+              l.lead_status === LEAD_STATUS.CYCLE_CONVERSION,
+          ).length || 0,
+        lostLeads:
+          leads.filter((l) => l.lead_status === LEAD_STATUS.LOST).length || 0,
+        registered:
+          leads.filter((l) => l.lead_status === LEAD_STATUS.CONVERTED).length ||
+          0,
+        treatment:
+          leads.filter((l) => l.lead_status === LEAD_STATUS.CYCLE_CONVERSION)
+            .length || 0,
       });
     } catch (error) {
       console.error("Failed to fetch lead KPIs:", error);
@@ -107,7 +106,8 @@ const KpiCards = () => {
   // Check scroll position to show/hide arrows
   const checkScroll = () => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setShowLeftArrow(scrollLeft > 10);
       const isAtEnd = scrollLeft >= scrollWidth - clientWidth - 10;
       setShowRightArrow(!isAtEnd && scrollWidth > clientWidth);
@@ -115,10 +115,7 @@ const KpiCards = () => {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      checkScroll();
-    }, 100);
-    
+    const timer = setTimeout(() => checkScroll(), 100);
     window.addEventListener("resize", checkScroll);
     return () => {
       clearTimeout(timer);
@@ -144,33 +141,40 @@ const KpiCards = () => {
     }
   };
 
-  // ✅ Map the dynamic counts to your existing UI structure
   const dynamicKpis = [
     { id: "totalLeads", label: "Total Leads", value: counts.totalLeads },
     { id: "newLeads", label: "New Leads", value: counts.newLeads },
     { id: "appointments", label: "Appointments", value: counts.appointments },
     { id: "followUps", label: "Follow Ups", value: counts.followUps },
-    { 
-      id: "totalConverted", 
-      label: "Total Converted", 
+    {
+      id: "totalConverted",
+      label: "Total Converted",
       value: counts.totalConverted,
       breakdown: [
         { label: "Registered", value: counts.registered },
-        { label: "Treatment", value: counts.treatment }
-      ]
+        { label: "Treatment", value: counts.treatment },
+      ],
     },
     { id: "lostLeads", label: "Lost Leads", value: counts.lostLeads },
   ];
 
   return (
-    <Box sx={{ position: "relative", width: "100%", px: 3 }}>
+    <Box sx={{ position: "relative", width: "100%", px: 1 }}>
       {showLeftArrow && (
         <IconButton
           onClick={handleScrollLeft}
           sx={{
-            position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", zIndex: 10,
-            bgcolor: "white", boxShadow: "0px 2px 8px rgba(0,0,0,0.2)", width: 36, height: 36,
-            border: "1px solid #e0e0e0", "&:hover": { bgcolor: "#f5f5f5" },
+            position: "absolute",
+            left: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 10,
+            bgcolor: "white",
+            boxShadow: "0px 2px 8px rgba(0,0,0,0.2)",
+            width: 36,
+            height: 36,
+            border: "1px solid #e0e0e0",
+            "&:hover": { bgcolor: "#f5f5f5" },
           }}
         >
           <ChevronLeftIcon fontSize="medium" />
@@ -182,10 +186,18 @@ const KpiCards = () => {
         onScroll={checkScroll}
         sx={{
           ...kpiCardsStyles.grid,
-          display: "flex", gap: 1.5, overflowX: "auto", flexWrap: "nowrap", width: "100%", pb: 1,
+          display: "flex",
+          gap: 1.5,
+          overflowX: "auto",
+          flexWrap: "nowrap",
+          width: "100%",
+          pb: 1,
           scrollbarWidth: "thin",
           "&::-webkit-scrollbar": { height: "5px" },
-          "&::-webkit-scrollbar-thumb": { backgroundColor: "#daddf0", borderRadius: "10px" },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "#daddf0",
+            borderRadius: "10px",
+          },
         }}
       >
         {dynamicKpis.map((item) => (
@@ -195,25 +207,45 @@ const KpiCards = () => {
               ...kpiCardsStyles.cardBase,
               ...getCardStyle(item.id),
               flexShrink: 0,
-              width: item.id === "totalConverted" ? "calc(50% - 12px)" : "calc(25% - 12px)",
+              width: item.id === "totalConverted" ? "280px" : "160px",
               minWidth: item.id === "totalConverted" ? "20px" : "20px",
             }}
           >
             <Box sx={kpiCardsStyles.iconWrapper}>
-              <img src={KPI_ICONS[item.id]} alt={item.label} style={kpiCardsStyles.icon} />
+              <img
+                src={KPI_ICONS[item.id]}
+                alt={item.label}
+                style={kpiCardsStyles.icon}
+              />
             </Box>
 
             {item.id === "totalConverted" ? (
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", width: "100%", mt: 1 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-end",
+                  width: "100%",
+                  mt: 1,
+                }}
+              >
                 <Box>
-                  <Typography sx={kpiCardsStyles.label}>{item.label}</Typography>
-                  <Typography sx={kpiCardsStyles.value}>{item.value}</Typography>
+                  <Typography sx={kpiCardsStyles.label}>
+                    {item.label}
+                  </Typography>
+                  <Typography sx={kpiCardsStyles.value}>
+                    {item.value}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: "flex", gap: 3 }}>
                   {item.breakdown?.map((b) => (
                     <Box key={b.label}>
-                      <Typography sx={kpiCardsStyles.breakdownLabel}>{b.label}</Typography>
-                      <Typography sx={kpiCardsStyles.breakdownValue}>{b.value}</Typography>
+                      <Typography sx={kpiCardsStyles.breakdownLabel}>
+                        {b.label}
+                      </Typography>
+                      <Typography sx={kpiCardsStyles.breakdownValue}>
+                        {b.value}
+                      </Typography>
                     </Box>
                   ))}
                 </Box>
@@ -232,9 +264,17 @@ const KpiCards = () => {
         <IconButton
           onClick={handleScrollRight}
           sx={{
-            position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", zIndex: 10,
-            bgcolor: "white", boxShadow: "0px 2px 8px rgba(0,0,0,0.2)", width: 36, height: 36,
-            border: "1px solid #e0e0e0", "&:hover": { bgcolor: "#f5f5f5" },
+            position: "absolute",
+            right: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 10,
+            bgcolor: "white",
+            boxShadow: "0px 2px 8px rgba(0,0,0,0.2)",
+            width: 36,
+            height: 36,
+            border: "1px solid #e0e0e0",
+            "&:hover": { bgcolor: "#f5f5f5" },
           }}
         >
           <ChevronRightIcon fontSize="medium" />

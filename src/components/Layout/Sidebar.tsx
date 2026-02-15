@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Drawer,
@@ -20,33 +20,10 @@ import styles from "../../styles/sidebar.module.css";
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [openSettings, setOpenSettings] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const showSettingsMenu = location.pathname.startsWith("/settings");
 
   const tab = SIDEBAR_TABS[activeTab];
-  const isSettingsRoute = location.pathname.startsWith("/settings");
-  const showSettingsMenu = isSettingsRoute || openSettings;
- 
-  useEffect(() => {
-     
-    const currentTabIndex = SIDEBAR_TABS.findIndex((t) =>
-      t.menu.some(
-        (m) =>
-          location.pathname.startsWith(m.path) ||
-          (m.subMenu && m.subMenu.some((s) => location.pathname === s.path))
-      )
-    );
-
-    if (currentTabIndex !== -1) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setActiveTab(currentTabIndex);
-    }
-
-   
-    if (isSettingsRoute) {
-      setOpenSettings(true);
-    }
-  }, [location.pathname, isSettingsRoute]);
 
   return (
     <Drawer
@@ -62,7 +39,12 @@ export default function Sidebar() {
     >
       {/* LOGO */}
       <Box sx={{ pl: "24px", pt: "20px" }}>
-        <img src={ClinicLogoLMS} width={134} height={40} alt="Clinic Logo LMS" />
+        <img
+          src={ClinicLogoLMS}
+          width={134}
+          height={40}
+          alt="Clinic Logo LMS"
+        />
       </Box>
 
       {/* TOP ICON ROW */}
@@ -106,7 +88,7 @@ export default function Sidebar() {
       </Box>
 
       {/* MAIN CARD */}
-      <Box className={styles.cardWrapper}>
+      <Box className={styles.cardWrapper} sx={{ pb: 2 }}>
         <Box className={styles.card}>
           <Typography color="primary.main" sx={{ fontWeight: 700 }}>
             {tab.label}
@@ -116,24 +98,13 @@ export default function Sidebar() {
             {tab.menu.map((item) => {
               const isSettings = item.key === "settings";
               const isActive =
-                location.pathname === item.path ||
+                location.pathname.startsWith(item.path) ||
                 (item.subMenu &&
                   item.subMenu.some((sub) => sub.path === location.pathname));
 
               return (
                 <Box key={item.key}>
-                  <ListItemButton
-                    onClick={() => {
-                      if (isSettings) {
-                        setOpenSettings((prev) => !prev);
-                        // ✅ FIX: Navigate to Integration by default when clicking Settings
-                        navigate("/settings/integration");
-                      } else {
-                        setOpenSettings(false);
-                        navigate(item.path);
-                      }
-                    }}
-                  >
+                  <ListItemButton onClick={() => navigate(item.path)}>
                     <Typography
                       sx={{
                         color: isActive ? "#232323" : "#9e9e9e",

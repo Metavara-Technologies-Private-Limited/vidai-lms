@@ -38,21 +38,18 @@ export const DynamicBreadcrumbs = () => {
   );
 
   // Start with fixed "Admin > Referral MD"
-  const fixedCrumbs = [
-    { label: "VIDAI Leads", path: "/admin" },
- 
-  ];
+  const fixedCrumbs = [{ label: "VIDAI Leads", path: "/admin" }];
 
   // Map current path to menu label if exists
   const dynamicCrumbs = pathnames.map((_, idx) => {
     const path = `/${pathnames.slice(0, idx + 1).join("/")}`;
     const menuItem = allMenus.find((m) => m.path === path);
     return {
-label:
-  menuItem?.label ||
-  pathnames[idx]
-    .replace(/-/g, " ")
-    .replace(/^\w/, (c) => c.toUpperCase()),
+      label:
+        menuItem?.label ||
+        pathnames[idx]
+          .replace(/-/g, " ")
+          .replace(/^\w/, (c) => c.toUpperCase()),
       path,
     };
   });

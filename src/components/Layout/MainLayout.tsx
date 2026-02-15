@@ -27,15 +27,13 @@ const MainLayout = () => {
         <Header />
         <Box
           className={styles.cardWrapper}
-          m={0}
-          sx={{maxHeight: "calc(100vh - 80px)", overflowY: "auto" }}
+          sx={{m:0, pb:2}}
         >
           <Box
             className={styles.card}
             sx={{
               flexGrow: 1,
               overflowY: "auto",
-              height: "auto",
             }}
           >
             <Outlet />

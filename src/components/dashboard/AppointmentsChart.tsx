@@ -2,7 +2,7 @@ import { Box, } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useState } from "react";
 import { mockData } from "./mockData";
-import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style";
 //import type{TooltipProps} from "recharts";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
 

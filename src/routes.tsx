@@ -1,100 +1,56 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Suspense } from "react";
+import { Suspense, type JSX } from "react";
 import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
+import { EXTRA_ROUTES } from "./config/extra.routes";
 
-import Integration from "./components/Settings/Menus/Integration";
-import Tickets from "./components/Settings/Menus/Tickets";
-import TicketView from "./components/Settings/Menus/TicketView";
-
-import AddNewLead from "./components/LeadsHub/AddNewLead";
-import EditLead from "./components/LeadsHub/EditLead";
-import LeadView from "./components/LeadsHub/LeadView";
-import TemplatesPage from "./components/Settings/Templates/TemplatesPage";
+type LoaderProps = { Comp: React.LazyExoticComponent<() => JSX.Element> };
+function LoadedComponent({ Comp }: LoaderProps) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Comp />
+    </Suspense>
+  );
+}
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<MainLayout />}>
-        {/* default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
 
-        {/* Settings sub routes */}
-        <Route
-          path="settings/integration"
-          element={
-            <Suspense fallback={<div>Loading...</div>}>
-              <Integration />
-            </Suspense>
-          }
-        />
-
-        <Route
-          path="settings/templates"
-          element={
-            <Suspense fallback={<div>Loading...</div>}>
-              <TemplatesPage />
-            </Suspense>
-          }
-        />
-
-        <Route
-          path="settings/tickets"
-          element={
-            <Suspense fallback={<div>Loading...</div>}>
-              <Tickets />
-            </Suspense>
-          }
-        />
-
-        <Route path="/settings/tickets/:id" element={<TicketView />} />
-
-        {/* sidebar routes */}
+        {/* Sidebar routes */}
         {SIDEBAR_TABS.flatMap((tab) =>
-          tab.menu.map((item) => (
-            <Route
-              key={item.key}
-              path={item.path.replace("/", "")}
-              element={
-                <Suspense fallback={<div>Loading...</div>}>
-                  {item.page && <item.page />}
-                </Suspense>
-              }
-            />
-          )),
+          tab.menu.flatMap((item) => [
+            item.page && (
+              <Route
+                key={item.key}
+                path={item.path.replace(/^\//, "")}
+                element={<LoadedComponent Comp={item.page} />}
+              />
+            ),
+            // {/* Sidebar sub menu routes */}
+            item.subMenu?.map((sub) =>
+              sub.page ? (
+                <Route
+                  key={sub.key}
+                  path={sub.path.replace(/^\//, "")}
+                  element={<LoadedComponent Comp={sub.page} />}
+                />
+              ) : null,
+            ),
+          ]),
         )}
 
-        {/* Add New Lead */}
-        <Route
-          path="leads/add"
-          element={
-            <Suspense fallback={<div>Loading...</div>}>
-              <AddNewLead />
-            </Suspense>
-          }
-        />
+        {/* Extra routes */}
+        {EXTRA_ROUTES.map((route) => (
+          <Route
+            key={route.key}
+            path={route.path}
+            element={<LoadedComponent Comp={route.page} />}
+          />
+        ))}
 
-        {/* 🔥 Edit Lead Page */}
-        <Route
-          path="leads/edit/:id"
-          element={
-            <Suspense fallback={<div>Loading...</div>}>
-              <EditLead />
-            </Suspense>
-          }
-        />
-
-        {/* 🔥 Lead View Page */}
-        <Route
-          path="leads/:id"
-          element={
-            <Suspense fallback={<div>Loading...</div>}>
-              <LeadView />
-            </Suspense>
-          }
-        />
-
-        {/* fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
