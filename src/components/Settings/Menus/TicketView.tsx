@@ -136,7 +136,7 @@ const TicketView = () => {
               }
             }}
           />
-
+             
           <Stack direction="row" spacing={2} mb={4}>
             {ticket.documents?.map((doc) => (
               <Box key={doc.id} sx={{ p: 1.5, border: '1px solid #E0E0E0', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -147,7 +147,7 @@ const TicketView = () => {
           </Stack>
 
           <Button startIcon={<ReplyIcon />} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
-            Reply
+            Reply .
           </Button>
         </Box>
 
