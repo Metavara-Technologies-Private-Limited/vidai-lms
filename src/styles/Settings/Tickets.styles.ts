@@ -7,10 +7,10 @@ export const ticketsSearchBoxSx = {
   display: "flex",
   alignItems: "center",
   px: 1.2,
-  height: 34,              // 🔥 fixed smaller height
+  height: 34,              
   border: "1px solid #E0E0E0",
   borderRadius: "6px",
-  width: 220,              // slightly narrower
+  width: 220,             
 
   "& input": {
     fontSize: "13px",
@@ -153,121 +153,73 @@ export const paginationButtonSx = (active: boolean) => ({
   color: active ? "#FFFFFF" : "#BBBBBB",
 });
 
-//############################################################
-// ================================
-// Ticket View → Properties Panel Styles
-// ================================
-
-export const propertyContainerSx = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "14px",
+/* Page title */
+export const ticketsTitleSx = {
+  fontSize: "18px",
+  fontWeight: 600,
+  mb: 1,
+  mt: -3,
 };
 
-export const propertyFieldSx = {
-  backgroundColor: "#F7F7F7",
-  borderRadius: "10px",
-
-  "& .MuiOutlinedInput-root": {
-    borderRadius: "10px",
-    fontSize: "13px",
-    height: "44px",
-  },
-
-  "& .MuiOutlinedInput-notchedOutline": {
-    borderColor: "#E0E0E0",
-  },
-
-  "&:hover .MuiOutlinedInput-notchedOutline": {
-    borderColor: "#CFCFCF",
-  },
-
-  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-    borderColor: "#232323",
-  },
+/* Tabs + actions container */
+export const ticketsActionsRowSx = {
+  width: "100%",
 };
 
-export const floatingLabelSx = {
-  fontSize: "12px",
-  color: "#9E9E9E",
-};
-
-export const valuePillSx = {
-  borderRadius: "999px",
-  px: 1.2,
-  py: 0.3,
+/*  Column header text */
+export const ticketsColumnHeaderCellSx = {
   fontSize: "12px",
   fontWeight: 500,
-  display: "inline-flex",
-  alignItems: "center",
+  color: "#626262",
 };
 
-export const assigneeRenderSx = {
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
+/* Ellipsis cell (lab name / subject reusable) */
+export const ticketsEllipsisCellSx = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  fontSize: "13px",
 };
 
-export const propertyMenuProps = {
-  PaperProps: {
-    sx: {
-      mt: 1,
-      borderRadius: "12px",
-      padding: "6px",
-      backgroundColor: "#F6F6F6",
-      boxShadow: "none",
-    },
-  },
+/* Ticket number cell */
+export const ticketsNumberCellSx = {
+  color: "#5a8aea",
+  fontWeight: 600,
+  fontSize: "14px",
 };
 
-/* Status chip (same pattern as priority) */
-export const statusChipSx = (status: string) => {
-  const value = (status || "").trim().toLowerCase();
-
-  const isNew = value === "new";
-  const isPending = value === "pending";
-  const isResolved = value === "resolved";
-  const isClosed = value === "closed";
-
-  return {
-    borderRadius: "999px",
-    fontWeight: 500,
-    fontSize: "12px",
-    height: 22,
-    px: 1,
-    border: "1.5px solid",
-
-    borderColor: isNew
-      ? "#5B8FF9"        // 🔵 Blue
-      : isPending
-      ? "#FF4D4F"        // 🔴 Red (same as High)
-      : isResolved
-      ? "#52C41A"        // 🟢 Green
-      : "#FFC53D",       // 🟡 Yellow (same as Medium)
-
-    backgroundColor: isNew
-      ? "rgba(91,143,249,0.10)"
-      : isPending
-      ? "rgba(255,77,79,0.08)"
-      : isResolved
-      ? "rgba(82,196,26,0.10)"
-      : "rgba(255,197,61,0.10)",
-
-    color: isNew
-      ? "#5B8FF9"
-      : isPending
-      ? "#FF4D4F"
-      : isResolved
-      ? "#52C41A"
-      : "#FFC53D",
-
-    "& .MuiChip-label": {
-      color: "inherit",
-      px: 1,
-    },
-  };
+/* Assigned avatar */
+export const ticketsAvatarSx = {
+  width: 24,
+  height: 24,
+  fontSize: 10,
+  bgcolor: "#5a8aea",
 };
 
+/* Assigned name text */
+export const ticketsAssigneeTextSx = {
+  fontSize: "13px",
+  fontWeight: 500,
+  lineHeight: 1.2,
+  color: "#2b2b2b",
+};
+
+/* Pagination arrow buttons */
+export const ticketsPaginationArrowSx = {
+  padding: "4px",
+  fontWeight: "600",
+  minWidth: "32px",
+  height: "32px",
+};
+
+/* Pagination number overrides */
+export const ticketsPaginationNumberOverrideSx = {
+  minWidth: "32px",
+  height: "32px",
+  padding: "0px",
+  fontSize: "0.8rem",
+};
 
 //############################################################
 
@@ -279,7 +231,7 @@ export const createTicketFocusedFieldSx = {
   "& .MuiOutlinedInput-root": {
     height: 44, // normal inputs height
 
-    // ✅ Multiline should NOT inherit fixed height
+    //  Multiline should NOT inherit fixed height
     "&.MuiInputBase-multiline": {
       height: "auto",
       padding: 0, // remove extra padding added earlier
@@ -294,13 +246,13 @@ export const createTicketFocusedFieldSx = {
     },
   },
 
-  // ✅ Only control multiline text spacing lightly
+  //   Only control multiline text spacing lightly
   "& .MuiInputBase-multiline textarea": {
     padding: "10px 14px", // smaller = matches visual density
     lineHeight: 1.4,
   },
 
-  // ✅ Label color
+  //  Label color
   "& .MuiInputLabel-root": {
     color: "#232323",
   },
@@ -309,21 +261,21 @@ export const createTicketFocusedFieldSx = {
     color: "#232323",
   },
 
-  // ✅ Placeholder style for normal inputs
+  //  Placeholder style for normal inputs
   "& input::placeholder": {
     color: "#9E9E9E",
     fontSize: "12px",
     opacity: 1,
   },
 
-  // ✅ Placeholder style for multiline only (without affecting height)
+  //  Placeholder style for multiline only (without affecting height)
   "& .MuiInputBase-multiline textarea::placeholder": {
     color: "#9E9E9E",
     fontSize: "12px",
     opacity: 1,
   },
 
-  // ✅ Select placeholder
+  //  Select placeholder
   "& .ticket-select-placeholder": {
     color: "#9E9E9E",
     fontSize: "12px",
@@ -372,8 +324,6 @@ export const createTicketUploadButtonSx = {
     color: "#FFFFFF",
   },
 };
-
-
 
 export const createTicketCancelButtonSx = {
   backgroundColor: "#FFFFFF", 
@@ -504,13 +454,21 @@ export const ticketDetailsTabsSx = {
   bgcolor: "#e2e3e5",
   borderRadius: "10px",
   p: "4px",
+  display: "flex",
 
   "& .MuiTabs-indicator": {
-    display: "none", 
+    display: "none",
   },
 
+  /* Make tabs stretch full width */
   "& .MuiTabs-flexContainer": {
-    gap: "50px",
+    width: "100%",
+    display: "flex",
+  },
+
+  /* FIRST TAB → stick left */
+  "& .MuiTab-root:first-of-type": {
+    mr: "auto",
   },
 
   "& .MuiTab-root": {
@@ -521,6 +479,7 @@ export const ticketDetailsTabsSx = {
     color: "#232323",
     borderRadius: "8px",
     transition: "all 0.2s ease",
+    px: 3,
   },
 
   "& .MuiTab-root.Mui-selected": {
@@ -528,5 +487,148 @@ export const ticketDetailsTabsSx = {
     color: "#E17E61",
     fontWeight: 600,
     boxShadow: "0px 1px 3px rgba(0,0,0,0.08)",
+  },
+};
+
+
+export const propertyContainerSx = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "14px",
+};
+
+export const propertyFieldSx = {
+  backgroundColor: "#F7F7F7",
+  borderRadius: "10px",
+
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "10px",
+    fontSize: "13px",
+    height: "44px",
+  },
+
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: "#E0E0E0",
+  },
+
+  "&:hover .MuiOutlinedInput-notchedOutline": {
+    borderColor: "#CFCFCF",
+  },
+
+  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+    borderColor: "#232323",
+  },
+};
+
+export const floatingLabelSx = {
+  fontSize: "12px",
+  color: "#9E9E9E",
+};
+
+export const valuePillSx = {
+  borderRadius: "999px",
+  px: 1.2,
+  py: 0.3,
+  fontSize: "12px",
+  fontWeight: 500,
+  display: "inline-flex",
+  alignItems: "center",
+};
+
+export const assigneeRenderSx = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+
+export const propertyMenuProps = {
+  PaperProps: {
+    sx: {
+      mt: 1,
+      borderRadius: "12px",
+      padding: "6px",
+      backgroundColor: "#F6F6F6",
+      boxShadow: "none",
+    },
+  },
+};
+
+/* Status chip (same pattern as priority) */
+export const statusChipSx = (status: string) => {
+  const value = (status || "").trim().toLowerCase();
+
+  const isNew = value === "new";
+  const isPending = value === "pending";
+  const isResolved = value === "resolved";
+  const isClosed = value === "closed";
+
+  return {
+    borderRadius: "999px",
+    fontWeight: 500,
+    fontSize: "12px",
+    height: 22,
+    px: 1,
+    border: "1.5px solid",
+
+    borderColor: isNew
+      ? "#5B8FF9"        
+      : isPending
+      ? "#FF4D4F"        
+      : isResolved
+      ? "#52C41A"        
+      : "#FFC53D",       
+
+    backgroundColor: isNew
+      ? "rgba(91,143,249,0.10)"
+      : isPending
+      ? "rgba(255,77,79,0.08)"
+      : isResolved
+      ? "rgba(82,196,26,0.10)"
+      : "rgba(255,197,61,0.10)",
+
+    color: isNew
+      ? "#5B8FF9"
+      : isPending
+      ? "#FF4D4F"
+      : isResolved
+      ? "#52C41A"
+      : "#FFC53D",
+
+    "& .MuiChip-label": {
+      color: "inherit",
+      px: 1,
+    },
+  };
+};
+
+/* Main page wrapper */
+export const ticketViewWrapperSx = {
+  p: 0.5,
+  bgcolor: "#fff",
+};
+
+/* Header row (Back + Ticket No) */
+export const ticketViewHeaderSx = {
+  alignItems: "center",
+  mb: 1,
+  mt: -2,
+};
+
+/* Back button */
+export const ticketBackButtonSx = {
+  minWidth: "auto",
+  p: 0.2,
+  borderRadius: "2px",
+};
+
+
+/* Reply toolbar icon (used across reply editor) */
+export const replyToolbarIconSx = {
+  fontSize: 20,
+  color: "#6F6F6F",
+  cursor: "pointer",
+  transition: "0.2s",
+  "&:hover": {
+    color: "#232323",
   },
 };

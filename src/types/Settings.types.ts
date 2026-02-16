@@ -45,11 +45,7 @@ export interface TicketFilters {
 
 import type { FilterTicketsPayload } from "./tickets.types";
 
-export interface FilterTicketsProps {
-  open: boolean;
-  onClose: () => void;
-  onApply?: (filters: FilterTicketsPayload | null) => void;
-}
+
 
 export type TicketTimelineItem = {
   title: string;

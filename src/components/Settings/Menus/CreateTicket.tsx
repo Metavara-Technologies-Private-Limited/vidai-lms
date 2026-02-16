@@ -1,13 +1,13 @@
 import {
   Dialog, DialogContent, DialogTitle, IconButton, TextField, Box, Button,
-  MenuItem, Stack, Typography, Divider, CircularProgress, Alert,
+  MenuItem, Stack, Typography, Divider, CircularProgress, 
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useState, useEffect } from "react";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import dayjs, { Dayjs } from "dayjs";
+import { Dayjs } from "dayjs";
 import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import type { AppDispatch } from "../../../store";
@@ -18,7 +18,7 @@ import type { CreateTicketRequest, TicketPriority, Lab, Department, Employee } f
 
 import {
   createTicketFocusedFieldSx, createTicketDialogPaperSx, createTicketCloseButtonSx,
-  createTicketCancelButtonSx, createTicketSaveButtonSx,createTicketUploadButtonSx,
+  createTicketCancelButtonSx, createTicketSaveButtonSx, createTicketUploadButtonSx,
 } from "../../../styles/Settings/Tickets.styles";
 
 const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
@@ -44,15 +44,13 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   // --- UI States ---
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   // 1. Fetch live data for dropdowns matching Swagger definitions
   useEffect(() => {
     if (open) {
       const loadData = async () => {
         setLoadingData(true);
-        setError(null);
+        (null);
         try {
           const results = await Promise.allSettled([
             labsApi.getLabs(),
@@ -79,7 +77,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
         } catch (err) {
           const connError = "Connection error. Check backend server.";
-          setError(connError);
+          (connError);
           toast.error(connError);
         } finally {
           setLoadingData(false);
@@ -91,49 +89,49 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
   // 2. Submit Logic matching TicketWrite definition
   const handleSubmit = async () => {
-    setError(null);
-    
+    (null);
+
     // Check required fields
-   // --- Field Wise Validation (Old Project Style) ---
-if (!subject.trim()) {
-  toast.warn("Subject is required!");
-  return;
-}
+    // --- Field Wise Validation ---
+    if (!subject.trim()) {
+      toast.warn("Subject is required!");
+      return;
+    }
 
-if (!description.trim()) {
-  toast.warn("Description is required!");
-  return;
-}
+    if (!description.trim()) {
+      toast.warn("Description is required!");
+      return;
+    }
 
-if (!labId) {
-  toast.warn("Please select Lab!");
-  return;
-}
+    if (!labId) {
+      toast.warn("Please select Lab!");
+      return;
+    }
 
-if (!departmentId) {
-  toast.warn("Please select Department!");
-  return;
-}
+    if (!departmentId) {
+      toast.warn("Please select Department!");
+      return;
+    }
 
-if (!requestedBy.trim()) {
-  toast.warn("Please select Requested By!");
-  return;
-}
+    if (!requestedBy.trim()) {
+      toast.warn("Please select Requested By!");
+      return;
+    }
 
-if (!priority) {
-  toast.warn("Please select Priority!");
-  return;
-}
+    if (!priority) {
+      toast.warn("Please select Priority!");
+      return;
+    }
 
-if (!dueDate) {
-  toast.warn("Please select Due Date!");
-  return;
-}
+    if (!dueDate) {
+      toast.warn("Please select Due Date!");
+      return;
+    }
 
-if (!assigneeId) {
-  toast.warn("Please select Assignee!");
-  return;
-} 
+    if (!assigneeId) {
+      toast.warn("Please select Assignee!");
+      return;
+    }
 
 
     setLoading(true);
@@ -155,10 +153,7 @@ if (!assigneeId) {
       if (selectedFile && res.id) {
         await ticketsApi.uploadDocument(res.id, selectedFile);
       }
-
-      setSuccess(true);
-      // Logic from Snowflake Tech: Success notification
-toast.success("Ticket created successfully!");
+      toast.success("Ticket created successfully!");
 
       dispatch(fetchTickets());
       dispatch(fetchTicketDashboard());
@@ -176,9 +171,7 @@ toast.success("Ticket created successfully!");
           .map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`)
           .join(" | ");
       }
-
-      setError(finalError);
-toast.error(finalError);
+      toast.error(finalError);
     } finally {
       setLoading(false);
     }
@@ -187,7 +180,7 @@ toast.error(finalError);
   const reset = () => {
     setSubject(""); setDescription(""); setDueDate(null); setLabId("");
     setDepartmentId(""); setPriority(""); setAssigneeId(""); setRequestedBy("");
-    setSelectedFile(null); setError(null); setSuccess(false);
+    setSelectedFile(null);
   };
 
   const handleClose = () => {
@@ -212,170 +205,182 @@ toast.error(finalError);
           </Box>
         ) : (
           <Stack spacing={2.5} mt={2}>
-            <TextField label="Subject" placeholder="Enter subject" value={subject} onChange={(e) => setSubject(e.target.value)} fullWidth sx={createTicketFocusedFieldSx} InputLabelProps={{ shrink: true }} disabled={loading} />
+            <TextField 
+            label="Subject" 
+            placeholder="Enter subject" 
+            value={subject} onChange={(e) => setSubject(e.target.value)} 
+            fullWidth sx={createTicketFocusedFieldSx} 
+            InputLabelProps={{ shrink: true }} 
+            disabled={loading} />
 
-<TextField
-  label="Detailed Description"
-  placeholder="Enter description"
-  value={description}
-  onChange={(e) => setDescription(e.target.value)}
-  multiline
-  minRows={1}
-  maxRows={3} 
-  fullWidth
-  sx={createTicketFocusedFieldSx}
-  InputLabelProps={{
-    shrink: true,   // keeps label fixed on top
-  }}
-  disabled={loading}
-/>
+            <TextField
+              label="Detailed Description"
+              placeholder="Enter description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              multiline
+              minRows={1}
+              maxRows={3}
+              fullWidth
+              sx={createTicketFocusedFieldSx}
+              InputLabelProps={{
+                shrink: true,   
+              }}
+              disabled={loading}
+            />
 
 
             <Stack direction="row" spacing={2}>
-<TextField
-  select
-  label="Lab Name"
-  value={labId}
-  onChange={(e) => setLabId(e.target.value)}
-  fullWidth
-  sx={createTicketFocusedFieldSx}
-  InputLabelProps={{ shrink: true }}
-  disabled={loading}
-  SelectProps={{
-    displayEmpty: true,
-    renderValue: (selected) => {
-      if (!selected) {
-        return <span className="ticket-select-placeholder">Select lab name</span>;
-      }
-      const lab = labs.find((l) => String(l.id) === String(selected));
-      return lab ? lab.name : "";
-    },
-  }}
->
-  {labs.map((l) => (
-    <MenuItem key={l.id} value={l.id}>
-      {l.name}
-    </MenuItem>
-  ))}
-</TextField>
+              <TextField
+                select
+                label="Lab Name"
+                value={labId}
+                onChange={(e) => setLabId(e.target.value)}
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => {
+                    if (!selected) {
+                      return <span className="ticket-select-placeholder">Select lab name</span>;
+                    }
+                    const lab = labs.find((l) => String(l.id) === String(selected));
+                    return lab ? lab.name : "";
+                  },
+                }}
+              >
+                {labs.map((l) => (
+                  <MenuItem key={l.id} value={l.id}>
+                    {l.name}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-<TextField
-  select
-  label="Department"
-  value={departmentId}
-  onChange={(e) =>
-    setDepartmentId(e.target.value === "" ? "" : Number(e.target.value))
-  }
-  fullWidth
-  sx={createTicketFocusedFieldSx}
-  InputLabelProps={{ shrink: true }}
-  disabled={loading}
-  SelectProps={{
-    displayEmpty: true,
-    renderValue: (selected) => {
-      if (!selected) {
-        return (
-          <span className="ticket-select-placeholder">
-            Select department
-          </span>
-        );
-      }
+              <TextField
+                select
+                label="Department"
+                value={departmentId}
+                onChange={(e) =>
+                  setDepartmentId(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => {
+                    if (!selected) {
+                      return (
+                        <span className="ticket-select-placeholder">
+                          Select department
+                        </span>
+                      );
+                    }
 
-      const dept = departments.find(
-        (d) => String(d.id) === String(selected)
-      );
-      return dept ? dept.name : "";
-    },
-  }}
->
-  {departments.map((d) => (
-    <MenuItem key={d.id} value={d.id}>
-      {d.name}
-    </MenuItem>
-  ))}
-</TextField>
+                    const dept = departments.find(
+                      (d) => String(d.id) === String(selected)
+                    );
+                    return dept ? dept.name : "";
+                  },
+                }}
+              >
+                {departments.map((d) => (
+                  <MenuItem key={d.id} value={d.id}>
+                    {d.name}
+                  </MenuItem>
+                ))}
+              </TextField>
 
             </Stack>
 
             <Stack direction="row" spacing={2}>
-              <TextField label="Requested By" placeholder="Enter Name" value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} fullWidth sx={createTicketFocusedFieldSx} InputLabelProps={{ shrink: true }} disabled={loading} />
+              <TextField 
+              label="Requested By" 
+              placeholder="Enter Name" 
+              value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} 
+              fullWidth sx={createTicketFocusedFieldSx} 
+              InputLabelProps={{ shrink: true }} 
+              disabled={loading} />
 
-<TextField
-  select
-  label="Priority"
-  value={priority}
-  onChange={(e) => setPriority(e.target.value as TicketPriority)}
-  fullWidth
-  sx={createTicketFocusedFieldSx}
-  InputLabelProps={{ shrink: true }}
-  disabled={loading}
-  SelectProps={{
-    displayEmpty: true,
-    renderValue: (selected) => {
-      if (!selected) {
-        return (
-          <span className="ticket-select-placeholder">
-            Select priority
-          </span>
-        );
-      }
+              <TextField
+                select
+                label="Priority"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as TicketPriority)}
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => {
+                    if (!selected) {
+                      return (
+                        <span className="ticket-select-placeholder">
+                          Select priority
+                        </span>
+                      );
+                    }
 
-      const map: Record<string, string> = {
-        low: "Low",
-        medium: "Medium",
-        high: "High",
-      };
+                    const map: Record<string, string> = {
+                      low: "Low",
+                      medium: "Medium",
+                      high: "High",
+                    };
 
-      return map[selected as string];
-    },
-  }}
->
-  <MenuItem value="low">Low</MenuItem>
-  <MenuItem value="medium">Medium</MenuItem>
-  <MenuItem value="high">High</MenuItem>
-</TextField>
+                    return map[selected as string];
+                  },
+                }}
+              >
+                <MenuItem value="low">Low</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="high">High</MenuItem>
+              </TextField>
 
             </Stack>
 
             <Stack direction="row" spacing={2}>
-<TextField
-  select
-  label="Assign To"
-  value={assigneeId}
-  onChange={(e) =>
-    setAssigneeId(e.target.value === "" ? "" : Number(e.target.value))
-  }
-  fullWidth
-  sx={createTicketFocusedFieldSx}
-  InputLabelProps={{ shrink: true }}
-  disabled={loading}
-  SelectProps={{
-    displayEmpty: true,
-    renderValue: (selected) => {
-      if (!selected) {
-        return (
-          <span className="ticket-select-placeholder">
-            Select assignee
-          </span>
-        );
-      }
+              <TextField
+                select
+                label="Assign To"
+                value={assigneeId}
+                onChange={(e) =>
+                  setAssigneeId(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => {
+                    if (!selected) {
+                      return (
+                        <span className="ticket-select-placeholder">
+                          Select assignee
+                        </span>
+                      );
+                    }
 
-      const emp = employees.find(
-        (e) => String(e.id) === String(selected)
-      );
+                    const emp = employees.find(
+                      (e) => String(e.id) === String(selected)
+                    );
 
-      return emp
-        ? `${emp.emp_name} (${emp.department_name})`
-        : "";
-    },
-  }}
->
-  {employees.map((e) => (
-    <MenuItem key={e.id} value={e.id}>
-      {e.emp_name} ({e.department_name})
-    </MenuItem>
-  ))}
-</TextField>
+                    return emp
+                      ? `${emp.emp_name} (${emp.department_name})`
+                      : "";
+                  },
+                }}
+              >
+                {employees.map((e) => (
+                  <MenuItem key={e.id} value={e.id}>
+                    {e.emp_name} ({e.department_name})
+                  </MenuItem>
+                ))}
+              </TextField>
 
 
               <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -383,39 +388,39 @@ toast.error(finalError);
               </LocalizationProvider>
             </Stack>
 
-<Box
-  sx={{
-    width: { xs: "100%", sm: "70%", md: "50%" }, // responsive 50%
-  }}
->
-  <TextField
-    label="Upload Documents"
-    value={selectedFile?.name || ""}
-    placeholder="No file Choosen"
-    fullWidth
-    sx={createTicketFocusedFieldSx}
-    InputLabelProps={{ shrink: true }}
-    disabled={loading}
-    InputProps={{
-      startAdornment: (
-<Button
-  component="label"
-  disabled={loading}
-  sx={createTicketUploadButtonSx}
->
-  Choose File
-  <input
-    hidden
-    type="file"
-    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-  />
-</Button>
+            <Box
+              sx={{
+                width: { xs: "100%", sm: "70%", md: "50%" }, 
+              }}
+            >
+              <TextField
+                label="Upload Documents"
+                value={selectedFile?.name || ""}
+                placeholder="No file Choosen"
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <Button
+                      component="label"
+                      disabled={loading}
+                      sx={createTicketUploadButtonSx}
+                    >
+                      Choose File
+                      <input
+                        hidden
+                        type="file"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      />
+                    </Button>
 
-      ),
-      readOnly: true,
-    }}
-  />
-</Box>
+                  ),
+                  readOnly: true,
+                }}
+              />
+            </Box>
 
 
             <Stack direction="row" justifyContent="flex-end" spacing={2} pt={1}>

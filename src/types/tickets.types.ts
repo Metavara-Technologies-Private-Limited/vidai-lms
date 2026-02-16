@@ -19,6 +19,12 @@ export type FilterTicketsPayload = {
   department_id: number | null;
 };
 
+// Filter Tickets Props
+export interface FilterTicketsProps {
+  open: boolean;
+  onClose: () => void;
+  onApply?: (filters: FilterTicketsPayload | null) => void;
+}
 
 // Ticket Timeline
 export interface TicketTimeline {
