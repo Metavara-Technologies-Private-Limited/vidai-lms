@@ -456,19 +456,6 @@ export default function EditLead() {
 
   return (
     <Box sx={{ bgcolor: "#F8FAFC", minHeight: "100vh", p: 4 }}>
-      {/* Breadcrumb */}
-      <Stack direction="row" spacing={1} sx={{ mb: 3, alignItems: "center" }}>
-        <Typography variant="body2" color="text.secondary" sx={{ cursor: "pointer" }} onClick={() => navigate("/leads")}>
-          VIDAI Leads
-        </Typography>
-        <Typography variant="body2" color="text.secondary">›</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ cursor: "pointer" }} onClick={() => navigate("/leads")}>
-          Leads Hub
-        </Typography>
-        <Typography variant="body2" color="text.secondary">›</Typography>
-        <Typography variant="body2" fontWeight={600} color="#1E293B">{fullName}</Typography>
-      </Stack>
-
       {/* Error Alert */}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>

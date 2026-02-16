@@ -33,6 +33,7 @@ import {
 } from "../../store/leadSlice";
 import "../../styles/Leads/leads.css";
 import type { Lead } from "../../types/leads.types";
+import type { FilterValues } from "./FilterDialog";
 
 import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
@@ -40,15 +41,12 @@ import BulkActionBar from "./BulkActionBar";
 interface Props {
   search: string;
   tab: "active" | "archived";
+  filters?: FilterValues;
 }
 
 const rowsPerPage = 10;
 
 // ====================== Quality Derivation ======================
-// Rules (based on assignee + next action):
-//   Hot  → has assignee AND has next_action_description AND next_action_status = "pending"
-//   Warm → has assignee OR has next_action_description (but not all three above)
-//   Cold → no assignee AND no next_action_description
 const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
   const hasAssignee = Boolean(
     lead.assigned_to_id || lead.assigned_to_name
@@ -65,7 +63,7 @@ const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
   return "Cold";
 };
 
-const LeadsTable: React.FC<Props> = ({ search, tab }) => {
+const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -89,13 +87,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
     if (leads) {
       const leadsWithFix = leads.map((lead: any) => ({
         ...lead,
-        // Employee name from API
         assigned: lead.assigned_to_name || "Unassigned",
-
         status: lead.status || lead.lead_status || "New",
         name: lead.name || lead.full_name || "",
-
-        // ── Quality derived from assignee + next action ────────────
         quality: deriveQuality(lead),
       }));
 
@@ -112,28 +106,76 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
 
   const isSelected = (id: string) => selectedIds.includes(id);
 
-  // ====================== Filter Leads ======================
+  // ====================== Filter Leads with Search + Filters ======================
   const filteredLeads = React.useMemo(() => {
     return localLeads.filter((lead) => {
+      // Search filter
       const searchStr = `${lead.name || ""} ${lead.id || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
       
-      // ✅ FIXED: Filter by is_active status based on tab
-      // Active tab: show is_active !== false (true or undefined)
-      // Archived tab: show is_active === false
+      // Tab filter (active vs archived)
       const matchTab = tab === "archived" 
         ? lead.is_active === false 
         : lead.is_active !== false;
+
+      // Advanced filters
+      if (filters) {
+        // Department filter
+        if (filters.department && lead.department_id !== Number(filters.department)) {
+          return false;
+        }
+
+        // Assignee filter
+        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) {
+          return false;
+        }
+
+        // Status filter
+        if (filters.status) {
+          const leadStatus = (lead.lead_status || lead.status || "").toLowerCase();
+          if (leadStatus !== filters.status.toLowerCase()) {
+            return false;
+          }
+        }
+
+        // Quality filter
+        if (filters.quality && lead.quality !== filters.quality) {
+          return false;
+        }
+
+        // Source filter
+        if (filters.source && lead.source !== filters.source) {
+          return false;
+        }
+
+        // Date range filter
+        if (filters.dateFrom || filters.dateTo) {
+          const leadDate = lead.created_at ? new Date(lead.created_at) : null;
+          if (!leadDate) return false;
+
+          if (filters.dateFrom) {
+            const fromDate = new Date(filters.dateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            if (leadDate < fromDate) return false;
+          }
+
+          if (filters.dateTo) {
+            const toDate = new Date(filters.dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            if (leadDate > toDate) return false;
+          }
+        }
+      }
       
       return matchSearch && matchTab;
     });
-  }, [localLeads, search, tab]);
+  }, [localLeads, search, tab, filters]);
 
   // ====================== Reset Pagination on Filter Change ======================
   React.useEffect(() => {
     setPage(1);
     setSelectedIds([]);
-  }, [search, tab]);
+  }, [search, tab, filters]);
 
   // ====================== Pagination ======================
   const totalEntries = filteredLeads.length;
@@ -220,6 +262,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
           <Typography variant="body2" color="text.secondary">
             {search
               ? `No results for "${search}"`
+              : filters && Object.values(filters).some(v => v !== "" && v !== null)
+              ? "No leads match the selected filters"
               : tab === "archived"
               ? "No archived leads yet"
               : "No active leads"}
@@ -320,7 +364,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab }) => {
                   />
                 </TableCell>
 
-                {/* Quality chip — now always Hot / Warm / Cold, never N/A */}
                 <TableCell>
                   <Chip
                     label={lead.quality}
