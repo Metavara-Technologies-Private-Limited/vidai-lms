@@ -51,6 +51,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   const [location, setLocation] = React.useState("");
   const [subSource, setSubSource] = React.useState("");
 
+  // ✅ FIX: Fetch departments on mount
   React.useEffect(() => {
     if (!open) return;
     const fetchDepartments = async () => {
@@ -67,6 +68,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     fetchDepartments();
   }, [open, clinicId]);
 
+  // ✅ FIX: Fetch employees on mount
   React.useEffect(() => {
     if (!open) return;
     const fetchEmployees = async () => {
@@ -84,6 +86,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     fetchEmployees();
   }, [open, clinicId]);
 
+  // ✅ FIX: Filter employees by department
   React.useEffect(() => {
     if (!filters.department || employees.length === 0) {
       setFilteredEmployees(employees);
@@ -126,14 +129,16 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   };
 
   const handleApply = () => {
+    console.log("🔍 Applying filters:", filters);
     if (onApplyFilters) {
       onApplyFilters(filters);
     }
     onClose();
   };
 
+  // ✅ FIX: Clear All now properly resets filters AND notifies parent
   const handleClearAll = () => {
-    setFilters({
+    const emptyFilters: FilterValues = {
       department: "",
       assignee: "",
       status: "",
@@ -141,11 +146,21 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       source: "",
       dateFrom: null,
       dateTo: null,
-    });
+    };
+    
+    // Reset local state
+    setFilters(emptyFilters);
     setDateFrom(null);
     setDateTo(null);
     setLocation("");
     setSubSource("");
+    
+    // ✅ CRITICAL: Notify parent component to clear filters
+    if (onApplyFilters) {
+      onApplyFilters(emptyFilters);
+    }
+    
+    console.log("🧹 Filters cleared and applied:", emptyFilters);
   };
 
   const labelStyle = {
