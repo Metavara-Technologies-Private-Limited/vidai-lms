@@ -262,22 +262,23 @@ const Leads: React.FC = () => {
         className="leads-header"
         direction="row"
         justifyContent="space-between"
-        sx={{ mb: 2 }}
+        alignItems="center"
+        sx={{ mb: 3 }}
       >
         <Typography className="leads-title">Leads Hub</Typography>
 
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1.5} alignItems="center">
           {/* Search Input */}
           <TextField
             size="small"
-            placeholder="Search by Lead name / Lead No."
+            placeholder="Search by Lead name / Lead No"
             className="search-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
+                  <SearchIcon fontSize="small" sx={{ color: "#9CA3AF" }} />
                 </InputAdornment>
               ),
             }}
@@ -310,34 +311,18 @@ const Leads: React.FC = () => {
             </IconButton>
           </div>
 
-          {/* Filter Button - Now with Badge */}
+          {/* Filter Button - Standalone Icon (No Box) */}
           <Box sx={{ position: "relative" }}>
             <IconButton
-              sx={{ padding: "4px" }}
+              className="filter-icon-btn"
               onClick={() => setFilterOpen(true)}
               title="Open filters"
             >
-              <img src={Filter_Leads} height={36} width={36} alt="Filter" />
+              <img src={Filter_Leads} alt="Filter" />
             </IconButton>
             {/* Filter Badge */}
             {activeFilterCount > 0 && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  bgcolor: "#EF4444",
-                  color: "white",
-                  borderRadius: "50%",
-                  width: 18,
-                  height: 18,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "0.65rem",
-                  fontWeight: 700,
-                }}
-              >
+              <Box className="filter-badge">
                 {activeFilterCount}
               </Box>
             )}

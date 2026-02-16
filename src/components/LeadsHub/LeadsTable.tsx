@@ -63,6 +63,39 @@ const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
   return "Cold";
 };
 
+// ====================== Format Lead ID - Extract from API data ======================
+const formatLeadId = (id: string): string => {
+  // If ID already has format like "#LN-201" or "LN-201", use it
+  if (id.match(/^#?LN-\d+$/i)) {
+    return id.startsWith('#') ? id : `#${id}`;
+  }
+  
+  // If ID contains "LN-" somewhere, extract it
+  const lnMatch = id.match(/#?LN-(\d+)/i);
+  if (lnMatch) {
+    return `#LN-${lnMatch[1]}`;
+  }
+  
+  // Try to find any sequence of digits
+  const numMatch = id.match(/\d+/);
+  if (numMatch) {
+    return `#LN-${numMatch[0]}`;
+  }
+  
+  // Fallback: create from hash of ID
+  const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const num = (hash % 900) + 100; // Generate 3-digit number
+  return `#LN-${num}`;
+};
+
+// ====================== Capitalize First Letter Only ======================
+const formatStatus = (status: string): string => {
+  if (!status) return "New";
+  // Convert to lowercase, then capitalize first letter
+  const lower = status.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+};
+
 const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -85,12 +118,13 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   // ====================== Sync Redux leads → Local State ======================
   React.useEffect(() => {
     if (leads) {
-      const leadsWithFix = leads.map((lead: any) => ({
+      const leadsWithFix = leads.map((lead: any, index: number) => ({
         ...lead,
         assigned: lead.assigned_to_name || "Unassigned",
-        status: lead.status || lead.lead_status || "New",
-        name: lead.name || lead.full_name || "",
+        status: formatStatus(lead.status || lead.lead_status || "New"),
+        name: lead.full_name || lead.name || "",
         quality: deriveQuality(lead),
+        displayId: formatLeadId(lead.id),
       }));
 
       setLocalLeads(leadsWithFix);
@@ -110,7 +144,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const filteredLeads = React.useMemo(() => {
     return localLeads.filter((lead) => {
       // Search filter
-      const searchStr = `${lead.name || ""} ${lead.id || ""}`.toLowerCase();
+      const searchStr = `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
       
       // Tab filter (active vs archived)
@@ -279,7 +313,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         <Table stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox">
+              <TableCell padding="checkbox" className="checkbox-cell">
                 <Checkbox
                   indeterminate={
                     currentLeads.some((l) => selectedIds.includes(l.id)) &&
@@ -302,11 +336,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
               <TableCell>Status</TableCell>
               <TableCell>Quality</TableCell>
               <TableCell>AI Score</TableCell>
-              <TableCell>Assigned</TableCell>
+              <TableCell>Assigned To</TableCell>
               <TableCell>Task Type</TableCell>
               <TableCell>Task Status</TableCell>
               <TableCell>Activity</TableCell>
-              <TableCell align="center">Contact</TableCell>
+              <TableCell align="center">Contact Option</TableCell>
               <TableCell align="center" />
             </TableRow>
           </TableHead>
@@ -315,24 +349,24 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
             {currentLeads.map((lead: any) => (
               <TableRow
                 key={lead.id}
-                hover
                 sx={{ cursor: "pointer" }}
                 onClick={() =>
                   navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)
                 }
+                className={isSelected(lead.id) ? "row-selected" : ""}
               >
-                <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                <TableCell padding="checkbox" className="checkbox-cell" onClick={(e) => e.stopPropagation()}>
                   <Checkbox checked={isSelected(lead.id)} onChange={() => toggleSelect(lead.id)} />
                 </TableCell>
 
                 <TableCell>
-                  <Stack direction="row" spacing={2}>
+                  <Stack direction="row" spacing={2} alignItems="center">
                     <Avatar className="lead-avatar">
                       {lead.initials || lead.full_name?.charAt(0)?.toUpperCase()}
                     </Avatar>
                     <Box>
                       <Typography className="lead-name-text">{lead.full_name}</Typography>
-                      <Typography className="lead-id-text">{lead.id}</Typography>
+                      <Typography className="lead-id-text">{lead.displayId}</Typography>
                     </Box>
                   </Stack>
                 </TableCell>

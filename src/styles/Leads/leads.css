@@ -2,12 +2,12 @@
    GLOBAL TYPOGRAPHY
 ================================ */
 
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Montserrat:wght@700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Montserrat:wght@700&display=swap");
 
 .leads-page,
 .leads-page * {
   font-family: "Nunito", sans-serif !important;
-  font-weight: 600;
+  font-weight: 400;
   font-style: normal;
   font-size: 14px;
   line-height: 140%;
@@ -26,204 +26,363 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* prevent vertical scroll */
+  overflow: hidden;
 }
 
 /* ===============================
    HEADER
 ================================ */
 
+.leads-header {
+  margin-bottom: 20px !important;
+}
+
 .leads-title {
   font-family: "Montserrat", sans-serif !important;
-  font-weight: 700;
-  font-size: 20px;
+  font-weight: 700 !important;
+  font-size: 24px !important;
   line-height: 100%;
-  color: #111827;
+  color: #1F2937 !important;
+  margin: 0 !important;
 }
 
 .search-input {
-  width: 260px;
+  width: 300px;
+}
+
+.search-input .MuiOutlinedInput-root {
+  background: #FFFFFF;
+  border-radius: 10px;
+  height: 40px;
+}
+
+.search-input .MuiOutlinedInput-input {
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.search-input .MuiOutlinedInput-input::placeholder {
+  color: #9CA3AF;
+  opacity: 1;
 }
 
 .header-icon-container {
   display: flex;
   align-items: center;
-
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
   border-radius: 10px;
-  gap: 4px;            /* space between icons */
+  padding: 4px;
+  gap: 2px;
+  height: 40px;
 }
 
 .header-icon-btn {
-  width: 30px;
-  height: 36px;
-  padding: 0;
-
+  width: 32px !important;
+  height: 32px !important;
+  padding: 6px !important;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 6px;
+  transition: background-color 0.2s;
 }
 
+.header-icon-btn:hover {
+  background-color: #F3F4F6;
+}
+
+/* FILTER ICON - BIG */
+.filter-icon-btn {
+  width: 40px !important;
+  height: 40px !important;
+  padding: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 8px !important;
+  transition: all 0.2s;
+}
+
+.filter-icon-btn:hover {
+  background-color: #F9FAFB !important;
+}
+
+.filter-icon-btn img {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+/* Filter Badge */
+.filter-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: #EF4444;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border: 2px solid white;
+  z-index: 10;
+}
 
 .add-lead-btn {
-  background: #505050;
-  color: #fff;
-  text-transform: none;
-  border-radius: 8px;
-  padding: 6px 14px;
+  background: #1F2937 !important;
+  color: #FFFFFF !important;
+  text-transform: none !important;
+  border-radius: 10px !important;
+  padding: 10px 20px !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  height: 40px !important;
+  white-space: nowrap;
 }
 
 .add-lead-btn:hover {
-  background: #232323;
+  background: #111827 !important;
 }
-
 
 /* ===============================
    DATE & TIME
 ================================ */
 
 .lead-date {
-  font-size: 12px;
-  font-weight: 600;
-  color: #000;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  line-height: 1.2 !important;
 }
 
 .lead-time {
-  font-size: 11px;
-  font-weight: 600;
-  color: #6b7280;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #6B7280 !important;
+  line-height: 1.2 !important;
+  margin-top: 2px !important;
 }
 
 /* ===============================
-   TABS (MUI Tab Specific)
+   PILL TABS - ROUNDED BOXES (FIGMA STYLE)
 ================================ */
 
-.leads-tab {
-  min-width: auto !important;
-  padding: 4px 10px !important;
-  text-transform: none !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  border: 1px solid #e5e7eb !important;
-  border-radius: 10px !important;
-  color: #6b7280 !important;
+.pill-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px !important;
 }
 
-.leads-tab:hover {
-  background: transparent !important;
+.pill-tab {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #E5E7EB;
+  cursor: pointer;
+  font-size: 14px;
+  color: #6B7280;
+  background: #FFFFFF;
+  font-weight: 600;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
-.Mui-selected.leads-tab {
-  background: #fff7ed !important;
-  color: #ea580c !important;
-  border-color: #fdba74 !important;
+.pill-tab:hover {
+  background: #F9FAFB;
+  border-color: #D1D5DB;
 }
 
-.Mui-selected.leads-tab:hover {
-  background: #fff7ed !important;
+.pill-tab.active {
+  background: #FFF7ED !important;
+  border-color: #FB923C !important;
+  color: #EA580C !important;
 }
 
-.MuiTabs-flexContainer {
-  gap: 8px;
+.tab-count {
+  font-weight: 600;
+  font-size: 14px;
+  color: inherit;
 }
 
 /* ===============================
-   TABLE
+   TABLE - CLEAN
 ================================ */
 
 .leads-table {
   flex: 1;
-  overflow-x: auto;   /* horizontal scroll */
-  overflow-y: hidden; /* remove vertical scroll */
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #E5E7EB;
 }
 
 .leads-table table {
   border-collapse: separate;
-  border-spacing: 0 12px;
-  min-width: 1900px; /* adjust to your table width */
+  border-spacing: 0;
+  min-width: 1900px;
 }
 
+/* TABLE HEADER */
 .leads-table thead th {
-  font-size: 13px;
-  font-weight: 600;
-  color: #6b7280;
-  border-bottom: none;
-  background: #f9fafb;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #6B7280 !important;
+  border-bottom: 1px solid #E5E7EB !important;
+  border-right: none !important;
+  border-left: none !important;
+  background: #F9FAFB !important;
   position: sticky;
   top: 0;
   z-index: 4;
+  padding: 12px 16px !important;
+  white-space: nowrap;
 }
 
+/* REMOVE ALL VERTICAL LINES */
+.leads-table thead th,
+.leads-table tbody td {
+  border-right: none !important;
+  border-left: none !important;
+}
+
+/* NORMAL ROWS - WHITE BACKGROUND */
 .leads-table tbody tr {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  background: #FFFFFF;
+  transition: none;
+}
+
+.leads-table tbody tr:hover {
+  background: #FFFFFF !important;
+}
+
+/* SELECTED ROW - ONLY CHECKBOX CELL GREEN */
+.leads-table tbody tr.row-selected td {
+  background: #FFFFFF !important;
+}
+
+.leads-table tbody tr.row-selected td:first-child {
+  background: #ECFDF5 !important;
 }
 
 .leads-table tbody td {
-  border-bottom: none;
-  padding: 14px 12px;
-  font-size: 13px;
+  border-bottom: 1px solid #F3F4F6 !important;
+  padding: 14px 16px !important;
+  font-size: 13px !important;
+  color: #374151;
+  font-weight: 500 !important;
+  background: #FFFFFF;
 }
 
 /* ===============================
-   AVATAR & NAME (FIGMA BOLD)
+   AVATAR & NAME
 ================================ */
 
 .lead-avatar {
-  background: #eef2ff;
-  color: #4f46e5;
-  font-weight: 600;
-  width: 32px;
-  height: 32px;
-  font-size: 13px;
+  background: #EEF2FF !important;
+  color: #4F46E5 !important;
+  font-weight: 600 !important;
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 13px !important;
 }
 
-/* Figma Bold Name Style */
+/* LEAD NAME - INCREASED WEIGHT */
 .lead-name-text {
-  font-weight: 800 !important;
-  font-size: 14px;
-  color: #111827;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  color: #111827 !important;
+  line-height: 1.3 !important;
+}
+
+.lead-id-text {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #6B7280 !important;
+  line-height: 1.3 !important;
+  margin-top: 2px !important;
 }
 
 /* ===============================
-   CHIPS (BASE)
+   CHIPS - FIGMA STYLE
 ================================ */
 
 .lead-chip {
-  height: 24px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 999px;
+  height: 26px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  border-radius: 20px !important;
+  letter-spacing: 0px !important;
+  padding: 0 12px !important;
+  text-transform: capitalize !important;
 }
 
 /* ===============================
    STATUS CHIPS
 ================================ */
 
-.status-new { background: #f2e9ff; color: #7c3aed; }
-.status-appointment { background: #e8f1ff; color: #2563eb; }
-.status-follow-ups { background: #fff4e5; color: #f59e0b; }
-.status-converted { background: #e7f8ee; color: #16a34a; }
-.status-lost { background: #feecec; color: #ef4444; }
-.status-cycle-conversion { background: #ecfdf3; color: #22c55e; }
+.status-new { 
+  background: #F3E8FF !important; 
+  color: #7C3AED !important; 
+}
+
+.status-appointment { 
+  background: #DBEAFE !important; 
+  color: #2563EB !important; 
+}
+
+.status-follow-ups { 
+  background: #FEF3C7 !important; 
+  color: #D97706 !important; 
+}
+
+.status-converted { 
+  background: #D1FAE5 !important; 
+  color: #059669 !important; 
+}
+
+.status-lost { 
+  background: #FEE2E2 !important; 
+  color: #DC2626 !important; 
+}
+
+.status-cycle-conversion { 
+  background: #D1FAE5 !important; 
+  color: #059669 !important; 
+}
 
 /* ===============================
    QUALITY CHIPS
 ================================ */
 
-.quality-hot { background: #feecec; color: #ef4444; }
-.quality-warm { background: #fff7e6; color: #f59e0b; }
-.quality-cold { background: #eef4ff; color: #3b82f6; }
+.quality-hot { 
+  background: #FEE2E2 !important; 
+  color: #DC2626 !important; 
+}
+
+.quality-warm { 
+  background: #FEF3C7 !important; 
+  color: #D97706 !important; 
+}
+
+.quality-cold { 
+  background: #DBEAFE !important; 
+  color: #2563EB !important; 
+}
 
 /* ===============================
    SCORE
 ================================ */
 
 .score {
-  color: #ec4899;
-  font-weight: 700;
+  color: #EC4899 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
 }
 
 /* ===============================
@@ -231,12 +390,20 @@
 ================================ */
 
 .action-btn {
-  width: 28px;
-  height: 28px;
-  border: 1px solid #e5e7eb;
-  border-radius: 50%;
-  background: #fff;
-  color: #6b7280;
+  width: 32px !important;
+  height: 32px !important;
+  border: 1px solid #E5E7EB !important;
+  border-radius: 50% !important;
+  background: #FFFFFF !important;
+  color: #6B7280 !important;
+  padding: 6px !important;
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  background: #F3F4F6 !important;
+  border-color: #D1D5DB !important;
+  color: #374151 !important;
 }
 
 /* ===============================
@@ -245,15 +412,17 @@
 
 .three-dot-btn {
   cursor: pointer;
-  padding: 4px;
+  padding: 6px !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: #6B7280 !important;
+  border-radius: 4px;
+  transition: background-color 0.15s;
 }
 
 .three-dot-btn:hover {
-  background: transparent !important;
+  background: #F3F4F6 !important;
 }
 
 /* ===============================
@@ -261,45 +430,54 @@
 ================================ */
 
 .page-number {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6B7280;
+  transition: all 0.15s;
+}
+
+.page-number:hover {
+  background: #F3F4F6;
+  color: #374151;
 }
 
 .page-number.active {
-  background: #111827;
-  color: #fff;
+  background: #1F2937 !important;
+  color: #FFFFFF !important;
 }
 
 /* ===============================
-   PILL TABS (NON-MUI)
+   CHECKBOX
 ================================ */
 
-.pill-tabs {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
+.leads-table .MuiCheckbox-root {
+  padding: 6px !important;
+  color: #D1D5DB !important;
 }
 
-.pill-tab {
-  padding: 8px 16px;
-  border-radius: 12px;
-  border: 1px solid #eee;
-  cursor: pointer;
-  font-size: 13px;
-  color: #555;
-  background: #fff;
-  font-weight: 700;
+.leads-table .MuiCheckbox-root .MuiSvgIcon-root {
+  font-size: 20px !important;
 }
 
-.pill-tab.active {
-  background: #ffede6 !important;
-  border-color: #ff7849 !important;
-  color: #ff7849 !important;
+/* Green checkbox when selected */
+.leads-table .MuiCheckbox-root.Mui-checked {
+  color: #10B981 !important;
+}
+
+.leads-table .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root {
+  background-color: transparent;
+  border-radius: 4px;
+}
+
+.leads-table .MuiCheckbox-root.MuiCheckbox-indeterminate {
+  color: #10B981 !important;
 }
 
 /* ===============================
@@ -309,16 +487,26 @@
 .leads-table::-webkit-scrollbar {
   height: 8px;
 }
+
+.leads-table::-webkit-scrollbar-track {
+  background: #F3F4F6;
+  border-radius: 4px;
+}
+
 .leads-table::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 6px;
+  background: #D1D5DB;
+  border-radius: 4px;
+}
+
+.leads-table::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
 }
 
 .leads-table table th:first-child,
 .leads-table table td:first-child {
   position: sticky;
   left: 0;
-  background: #fff;
+  background: inherit;
   z-index: 5;
 }
 
@@ -326,7 +514,7 @@
 .leads-table table td:last-child {
   position: sticky;
   right: 0;
-  background: #fff;
+  background: inherit;
   z-index: 5;
 }
 
@@ -334,27 +522,8 @@
 .leads-table table td:nth-last-child(2) {
   position: sticky;
   right: 60px;
-  background: #fff;
+  background: inherit;
   z-index: 4;
-}
-
-/* ===============================
-   BIG ORANGE SQUARE CHECKBOX
-================================ */
-
-.leads-table .MuiCheckbox-root {
-  padding: 4px;
-  color: #D1D5DB !important;
-}
-
-.leads-table .MuiCheckbox-root .MuiSvgIcon-root {
-  font-size: "26px !important"; /* Makes the square big */
-}
-
-.leads-table .MuiCheckbox-root.Mui-checked {
-  color: #ff7849 !important; /* Orange Tick */
-  background-color: #fff7ed !important; /* Light Orange Bg */
-  border-radius: 4px;
 }
 
 /* ===============================
@@ -362,12 +531,14 @@
 ================================ */
 
 .bulk-action-btn {
-  color: black !important;
-  border-color: black !important;
-  text-transform: none;
+  color: #1F2937 !important;
+  border-color: #D1D5DB !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
 }
 
 .bulk-action-btn:hover {
-  background-color: #f5f5f5 !important;
-  border-color: black !important;
+  background-color: #F3F4F6 !important;
+  border-color: #9CA3AF !important;
 }
