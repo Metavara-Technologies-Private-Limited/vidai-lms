@@ -7,12 +7,9 @@ body {
 /* ================= PAGE ================= */
 
 .campaigns-page {
-  padding: 24px;
-  background: #fafafa;
   min-height: 100vh; 
   overflow-y: visible;
   box-sizing: border-box;
-  padding-bottom: 40px;
 }
 
 /* ================= FILTERS ================= */
@@ -72,7 +69,7 @@ body {
   border-color: #ff6b35;
 
   color: #ff6b35;
-  font-weight: 100;
+  font-weight: 700;
 
   box-shadow: none;
 }

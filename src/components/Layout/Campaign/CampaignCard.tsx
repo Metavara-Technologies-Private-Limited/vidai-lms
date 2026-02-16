@@ -13,6 +13,8 @@ import editIcon from "./Icons/edit.png";
 import duplicateIcon from "./Icons/duplicate.png";
 import stopIcon from "./Icons/stop.png";
 import playIcon from "./Icons/play-button.png";
+import socialCardIcon from "./Icons/social-media-card.png";
+import mailCardIcon from "./Icons/mail-card.png";
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 
@@ -36,6 +38,7 @@ interface Campaign {
   end: string;
   platforms: ("facebook" | "instagram" | "linkedin" | "gmail")[];
   leads: number;
+  lead_generated: number;
   scheduledAt?: string;
 }
 
@@ -45,19 +48,25 @@ interface CampaignCardProps {
   setOpenMenuId: (id: string | null) => void;
   onViewDetail: (campaign: Campaign) => void;
   onStatusChange: (id: string, status: CampaignStatus) => void; // already added in your file
+  onEdit?: (campaign: Campaign) => void;
 }
+
+const campaignTypeIconMap = {
+  social: socialCardIcon,
+  email: mailCardIcon,
+};
 
 export default function CampaignCard({
   campaign: c,
   openMenuId,
   setOpenMenuId,
   onViewDetail,
-  onStatusChange, // ✅ receive prop properly
+  onStatusChange,
+  onEdit,
 }: CampaignCardProps) {
   const isMenuOpen = openMenuId === c.id;
   const menuRef = useRef<HTMLDivElement>(null);
   const [showStopModal, setShowStopModal] = useState(false);
-
 
   const toggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -66,10 +75,7 @@ export default function CampaignCard({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setOpenMenuId(null);
       }
     };
@@ -88,17 +94,27 @@ export default function CampaignCard({
       style={{ cursor: "pointer" }}
     >
       <div className="card-header">
-        <div className="title">{c.name}</div>
-        <span className={`status ${c.status.toLowerCase()}`}>
-          {c.status}
-        </span>
+        <div className="title">
+          <div className={`title-icon-box ${c.type}`}>
+            <img
+              src={campaignTypeIconMap[c.type]}
+              alt={c.type}
+              className="title-icon"
+            />
+          </div>
+          <span className="title-text">{c.name}</span>
+        </div>
+
+        <span className={`status ${c.status.toLowerCase()}`}>{c.status}</span>
       </div>
 
       <div className="card-row">
         <div>
           <label>Campaign Duration:</label>
           <span>
-            {c.start} - {c.end}
+            {dayjs(c.start).format("DD/MM/YYYY")}
+            {" - "}
+            {dayjs(c.end).format("DD/MM/YYYY")}
           </span>
         </div>
 
@@ -106,13 +122,25 @@ export default function CampaignCard({
           <label>Platform:</label>
           <div className="platform-icons">
             {c.platforms.includes("facebook") && (
-              <img src={facebookIcon} className="platform-icon" alt="Facebook" />
+              <img
+                src={facebookIcon}
+                className="platform-icon"
+                alt="Facebook"
+              />
             )}
             {c.platforms.includes("instagram") && (
-              <img src={instagramIcon} className="platform-icon" alt="Instagram" />
+              <img
+                src={instagramIcon}
+                className="platform-icon"
+                alt="Instagram"
+              />
             )}
             {c.platforms.includes("linkedin") && (
-              <img src={linkedinIcon} className="platform-icon" alt="LinkedIn" />
+              <img
+                src={linkedinIcon}
+                className="platform-icon"
+                alt="LinkedIn"
+              />
             )}
             {c.platforms.includes("gmail") && (
               <img src={emailIcon} className="platform-icon" alt="Email" />
@@ -124,16 +152,16 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-       {c.status === "Scheduled" && c.scheduledAt ? (
-  <span>
-    <label>SCHEDULED:</label>{" "}
-    {dayjs(c.scheduledAt).format("DD MMM [at] hh:mm A")}
-  </span>
-) : (
-  <span>
-    Leads Generated: <b className="leads">{c.leads}</b>
-  </span>
-)}
+        {c.status === "Scheduled" && c.scheduledAt ? (
+          <span>
+            <label>SCHEDULED:</label>{" "}
+            {dayjs(c.scheduledAt).format("DD MMM [at] hh:mm A")}
+          </span>
+        ) : (
+          <span>
+            Leads Generated: <b className="leads">{c.lead_generated}</b>
+          </span>
+        )}
 
         <div className="action-buttons">
           <button
@@ -154,9 +182,9 @@ export default function CampaignCard({
               e.stopPropagation();
 
               if (c.status === "Stopped") {
-                onStatusChange(c.id, "Live"); // play
+                onStatusChange(c.id, "Live");
               } else {
-                setShowStopModal(true); // open stop modal
+                setShowStopModal(true);
               }
             }}
           >
@@ -174,13 +202,28 @@ export default function CampaignCard({
             </button>
 
             {isMenuOpen && (
-              <div className="context-menu">
-                <div className="menu-item">
+              <div
+                className="context-menu"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div
+                  className="menu-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuId(null);
+                    onEdit?.(c);
+                  }}
+                >
                   <img src={editIcon} alt="Edit" className="menu-icon" />
                   Edit
                 </div>
                 <div className="menu-item">
-                  <img src={duplicateIcon} alt="Duplicate" className="menu-icon" />
+                  <img
+                    src={duplicateIcon}
+                    alt="Duplicate"
+                    className="menu-icon"
+                  />
                   Duplicate
                 </div>
                 <div className="menu-item stop-item">

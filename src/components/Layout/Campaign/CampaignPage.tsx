@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import CampaignCard from "./CampaignCard";
 import SocialCampaignModal from "./SocialCampaignModal";
 import EmailCampaignModal from "./EmailCampaignModal";
 
 import "../../styles/Campaign/CampaignPage.css";
+import EditCampaignModal from "./EditCampaignModal";
 
 export type CampaignType = "social" | "email";
 
@@ -35,12 +37,34 @@ export default function CampaignPage() {
 
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false); // ADD
+  const [editingCampaign, setEditingCampaign] = useState<any>(null); // ADD
 
   /* ===== SAVE CAMPAIGN (USED BY BOTH MODALS) ===== */
   const handleSaveCampaign = (campaign: any) => {
     setCampaigns((prev) => [...prev, campaign]);
     setShowSocialModal(false);
     setShowEmailModal(false);
+  };
+
+  // ADD THIS
+  const handleEdit = (campaign: any) => {
+    setEditingCampaign(campaign);
+    setShowEditModal(true);
+  };
+
+  // ADD THIS
+  const handleUpdateCampaign = (updated: any) => {
+    setCampaigns((prev) =>
+      prev.map((c) => (c.id === updated.id ? updated : c)),
+    );
+    setShowEditModal(false);
+  };
+
+  const handleStatusChange = (id: string, status: CampaignStatus) => {
+    setCampaigns((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, status } : c)),
+    );
   };
 
   return (
@@ -77,6 +101,14 @@ export default function CampaignPage() {
         />
       )}
 
+      {showEditModal && editingCampaign && (
+        <EditCampaignModal
+          campaign={editingCampaign}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleUpdateCampaign}
+        />
+      )}
+
       {/* ================= CAMPAIGN CARDS ================= */}
       <div className="campaign-grid">
         {campaigns.map((c) => (
@@ -86,6 +118,8 @@ export default function CampaignPage() {
             openMenuId={openMenuId}
             setOpenMenuId={setOpenMenuId}
             onViewDetail={(campaign) => console.log(campaign)}
+            onEdit={handleEdit} // ADD THIS
+            onStatusChange={handleStatusChange} // ADD THIS
           />
         ))}
       </div>

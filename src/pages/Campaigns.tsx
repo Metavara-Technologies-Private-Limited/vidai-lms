@@ -19,6 +19,7 @@ import {
   updateCampaignStatus,
 } from "../store/campaignSlice";
 import type { AppDispatch } from "../store";
+import EditCampaignModal from "../components/Layout/Campaign/EditCampaignModal";
 
 /* ===== TYPES ===== */
 type CampaignStatus =
@@ -43,6 +44,7 @@ export default function CampaignsScreen() {
   const campaigns = (rawCampaigns || []).map((api: any) => ({
     id: api.id,
     name: api.campaign_name ?? "",
+    description: api.campaign_description ?? "",
     type: api.campaign_mode === 1 ? "social" : "email",
     status: api.is_active ? "Live" : "Stopped",
     start: api.start_date,
@@ -52,8 +54,12 @@ export default function CampaignsScreen() {
         ? api.social_media?.map((s: any) => s.platform_name) || []
         : ["gmail"],
     leads: 0,
+    lead_generated: api.lead_generated,
     scheduledAt: api.selected_start,
     objective: api.campaign_objective,
+    audience: api.target_audience,
+    subject: api.email[0]?.subject,
+    emailBody: api.email[0]?.email_body,
   }));
 
   /* ================= LOCAL UI STATE ================= */
@@ -68,6 +74,10 @@ export default function CampaignsScreen() {
   const [showEmailModal, setShowEmailModal] = useState(false);
 
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
+
+  // ADD these state variables after showEmailModal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<any>(null);
 
   /* ================= STATUS CHANGE ================= */
   const handleStatusChange = (id: string, newStatus: CampaignStatus) => {
@@ -84,12 +94,19 @@ export default function CampaignsScreen() {
     }, 3000);
   };
 
+  // ADD this handler after handleStatusChange
+  const handleEdit = (campaign: any) => {
+    setEditingCampaign(campaign);
+    setShowEditModal(true);
+  };
+
   /* ================= FILTERS ================= */
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
       const tabOk = tab === "all" || c.type === tab;
-      const searchOk =
-        (c.name ?? "").toLowerCase().includes(search.toLowerCase());
+      const searchOk = (c.name ?? "")
+        .toLowerCase()
+        .includes(search.toLowerCase());
       const statusOk = status === "all" || c.status === status;
       return tabOk && searchOk && statusOk;
     });
@@ -113,7 +130,6 @@ export default function CampaignsScreen() {
   return (
     <div className="campaigns-page">
       <CampaignHeader onAddNew={() => setShowAddCampaign(true)} />
-
       <div className="filters-row">
         {/* ================= TABS ================= */}
         <div className="tabs">
@@ -188,7 +204,6 @@ export default function CampaignsScreen() {
           </div>
         </div>
       </div>
-
       {/* ================= CARDS ================= */}
       <div className="campaign-grid">
         {filteredCampaigns.length === 0 ? (
@@ -202,11 +217,11 @@ export default function CampaignsScreen() {
               setOpenMenuId={setOpenMenuId}
               onViewDetail={setSelectedCampaign}
               onStatusChange={handleStatusChange}
+              onEdit={handleEdit} // ADD THIS
             />
           ))
         )}
       </div>
-
       {/* ================= MODALS ================= */}
       {showAddCampaign && (
         <AddNewCampaign
@@ -221,18 +236,26 @@ export default function CampaignsScreen() {
           }}
         />
       )}
-
       {showSocialModal && (
         <SocialCampaignModal
           onClose={() => setShowSocialModal(false)}
           onSave={() => setShowSocialModal(false)}
         />
       )}
-
       {showEmailModal && (
         <EmailCampaignModal
           onClose={() => setShowEmailModal(false)}
           onSave={() => setShowEmailModal(false)}
+        />
+      )}
+      {showEditModal && editingCampaign && (
+        <EditCampaignModal
+          campaign={editingCampaign}
+          onClose={() => setShowEditModal(false)}
+          onSave={() => {
+            setShowEditModal(false);
+            // Optionally refetch campaigns or update Redux
+          }}
         />
       )}
     </div>

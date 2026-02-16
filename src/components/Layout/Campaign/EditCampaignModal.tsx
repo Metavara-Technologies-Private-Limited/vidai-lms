@@ -1,34 +1,108 @@
-import { useState } from "react";
-import "../../../../src/styles/Campaign/SocialCampaignModal.css";
-import "../../../../src/styles/Campaign/EmailCampaignModal.css";
-
-import { CampaignAPI } from "../../../../src/services/campaign.api";
-import {FormControl,InputLabel,Select,MenuItem, Modal, Typography, IconButton} from "@mui/material";
+import { useEffect, useState } from "react";
+import {
+  Modal,
+  Box,
+  IconButton,
+  Typography,
+  FormControl,
+  Select,
+  MenuItem,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import dayjs from "dayjs";
+import viewIcon from "./Icons/view.png";
+import instagramIcon from "./Icons/instagram.png";
+import facebookIcon from "./Icons/facebook.png";
+import linkedinIcon from "./Icons/linkedin.png";
+import { CampaignAPI } from "../../../../src/services/campaign.api";
+import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 
-/* 🔹 LOCAL ICONS */
-import instagramIcon from "../../../components/Layout/Campaign/Icons/instagram.png";
-import facebookIcon from "../../../components/Layout/Campaign/Icons/facebook.png";
-import linkedinIcon from "../../../components/Layout/Campaign/Icons/linkedin.png";
-import { Box } from "@mui/system";
-import CloseIcon from "@mui/icons-material/Close";
+interface EditCampaignModalProps {
+  campaign: any;
+  onClose: () => void;
+  onSave: (updatedCampaign: any) => void;
+}
 
-export default function SocialCampaignModal({ onClose, onSave }: any) {
+export default function EditCampaignModal({
+  campaign,
+  onClose,
+  onSave,
+}: EditCampaignModalProps) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
+  const [fullCampaignData, setFullCampaignData] = useState<any>(null);
 
-  /* ================= STEP 1 ================= */
-  const [campaignName, setCampaignName] = useState("");
-  const [campaignDescription, setCampaignDescription] = useState("");
-  const [objective, setObjective] = useState("");
-  const [audience, setAudience] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  // Step 1 - Common
+  const [campaignName, setCampaignName] = useState(campaign.name);
+  const [campaignDescription, setCampaignDescription] = useState(
+    campaign.description || "",
+  );
+  const [objective, setObjective] = useState(campaign.objective || "");
+  const [audience, setAudience] = useState(campaign.audience || "");
+  const [startDate, setStartDate] = useState(campaign.start);
+  const [endDate, setEndDate] = useState(campaign.end);
+
+  // Step 2 - Email
+  const [subject, setSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+
+  // Step 2 - Social
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [mode, setMode] = useState<"organic" | "paid" | "">("");
+
+  // Step 3
+  const [scheduleDate, setScheduleDate] = useState(
+    campaign.scheduledAt
+      ? dayjs(campaign.scheduledAt).format("YYYY-MM-DD")
+      : "",
+  );
+  const [scheduleTime, setScheduleTime] = useState(
+    campaign.scheduledAt ? dayjs(campaign.scheduledAt).format("HH:mm") : "",
+  );
+  const [instagramBudget, setInstagramBudget] = useState(350);
+  const [facebookBudget, setFacebookBudget] = useState(250);
+  const [linkedinBudget, setLinkedinBudget] = useState(150);
+
+  const toggleAccount = (id: string) => {
+    setAccounts((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  useEffect(() => {
+    const fetchCampaign = async () => {
+      try {
+        const response = await CampaignAPI.get(campaign.id);
+        setFullCampaignData(response.data);
+
+        // Load email data
+        if (response.data.email && response.data.email.length > 0) {
+          setSubject(response.data.email[0].subject || "");
+          setEmailBody(response.data.email[0].email_body || "");
+        }
+
+        // Load social data
+        if (
+          response.data.social_media &&
+          response.data.social_media.length > 0
+        ) {
+          const platforms = response.data.social_media.map(
+            (sm: any) => sm.platform_name,
+          );
+          setAccounts(platforms);
+        }
+      } catch (error) {
+        console.error("Failed to fetch campaign:", error);
+      }
+    };
+
+    fetchCampaign();
+  }, [campaign.id]);
 
   const step1Valid =
     campaignName.trim() &&
@@ -38,24 +112,15 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     startDate &&
     endDate;
 
-  /* ================= STEP 2 ================= */
-  const [accounts, setAccounts] = useState<string[]>([]);
-  const [mode, setMode] = useState<"organic" | "paid" | "">("");
+  const step2Valid =
+    campaign.type === "email"
+      ? audience && subject.trim() && emailBody.trim()
+      : accounts.length > 0 && mode;
 
-  const step2Valid = accounts.length > 0 && mode;
+  const step3Valid = scheduleDate && scheduleTime;
 
-  const toggleAccount = (id: string) => {
-    setAccounts((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  };
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
-
-  /* ================= NAVIGATION ================= */
   const handleNext = () => {
     setSubmitted(true);
-
     if (step === 1 && step1Valid) {
       setStep(2);
       setSubmitted(false);
@@ -65,84 +130,73 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     }
   };
 
-  const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
+  const handleUpdate = async () => {
     setSubmitted(true);
-    if (type !== "draft" && (!scheduleDate || !scheduleTime)) return;
-    if (type === "live" && (!step1Valid || !step2Valid)) return;
-    if (
-      type === "scheduled" &&
-      (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime)
-    )
-      return;
+    if (!step3Valid || !fullCampaignData) return;
 
     try {
-      const scheduledDateTime =
-        scheduleDate && scheduleTime
-          ? dayjs(`${scheduleDate} ${scheduleTime}`, "YYYY-MM-DD HH:mm").format(
-              "YYYY-MM-DDTHH:mm:ss",
-            )
-          : null;
+      const scheduledDateTime = dayjs(
+        `${scheduleDate} ${scheduleTime}`,
+        "YYYY-MM-DD HH:mm",
+      ).format("YYYY-MM-DDTHH:mm:ss");
 
       const payload = {
         clinic: 1,
-
         campaign_name: campaignName,
         campaign_description: campaignDescription,
         campaign_objective: objective,
         target_audience: audience,
-
         start_date: startDate,
         end_date: endDate,
-
-        campaign_mode: 1,
-
-        selected_start: type === "scheduled" ? scheduledDateTime : null,
-        selected_end: type === "scheduled" ? scheduledDateTime : null,
-        enter_time: type === "scheduled" ? scheduleTime : null,
-
-        is_active: type === "live",
-
-        social_media: accounts.map((platform) => ({
-          platform_name: platform,
-          is_active: true,
-        })),
+        campaign_mode: campaign.type === "email" ? 2 : 1,
+        selected_start: scheduledDateTime,
+        selected_end: scheduledDateTime,
+        enter_time: scheduleTime,
+        email:
+          campaign.type === "email"
+            ? [
+                {
+                  id: fullCampaignData.email?.[0]?.id,
+                  audience_name: audience,
+                  subject: subject,
+                  email_body: emailBody,
+                  template_name: "EMAIL",
+                  sender_email: "noreply@clinic.com",
+                  scheduled_at: scheduledDateTime,
+                  is_active: true,
+                },
+              ]
+            : [],
+        social_media:
+          campaign.type === "social"
+            ? accounts.map((platform) => {
+                const existing = fullCampaignData.social_media?.find(
+                  (sm: any) => sm.platform_name === platform,
+                );
+                return {
+                  id: existing?.id,
+                  platform_name: platform,
+                  is_active: true,
+                };
+              })
+            : [],
       };
 
-      const response = await CampaignAPI.create(payload);
-      const apiData = response.data;
-
-      const formattedCampaign = {
-        id: apiData.id,
-        name: apiData.campaign_name,
-        type: "social",
-        status:
-          type === "live" ? "Live" : type === "draft" ? "Draft" : "Scheduled",
-        start: apiData.start_date,
-        end: apiData.end_date,
-        platforms: accounts,
-        leads: 0,
-        scheduledAt: type === "scheduled" ? scheduledDateTime : null,
-      };
-
-      onSave(formattedCampaign);
+      const response = await CampaignAPI.update(campaign.id, payload);
+      onSave(response.data);
       onClose();
-    } catch (error: any) {
-      console.error(error.response?.data || error.message);
+    } catch (error) {
+      console.error("Update error:", error);
     }
   };
-
-  const [instagramBudget, setInstagramBudget] = useState(350);
-  const [facebookBudget, setFacebookBudget] = useState(250);
-  const [linkedinBudget, setLinkedinBudget] = useState(150);
-
-  const totalBudget = instagramBudget + facebookBudget + linkedinBudget;
 
   return (
     <Modal open={true} onClose={onClose}>
       <Box className="email-campaign-modal">
-        {/* HEADER */}
         <div className="add-modal-header">
-          <Typography variant="h6">Add Social Media Campaign</Typography>
+          <Typography variant="h6">
+            Edit {campaign.type === "email" ? "Email" : "Social Media"} Campaign
+          </Typography>
           <IconButton onClick={onClose} className="close-btn">
             <CloseIcon fontSize="small" />
           </IconButton>
@@ -150,7 +204,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
         <div className="modal-divider" />
 
-        {/* ================= STEPPER ================= */}
+        {/* STEPPER */}
         <div className="stepper">
           <div
             className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
@@ -158,25 +212,27 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
             <div className="circle">{step > 1 ? "✓" : "1"}</div>
             <span>Campaign Details</span>
           </div>
-
           <div className="line" />
-
           <div
             className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}
           >
             <div className="circle">{step > 2 ? "✓" : "2"}</div>
-            <span>Content & Configuration</span>
+            <span>
+              {campaign.type === "email"
+                ? "Email Setup"
+                : "Content & Configuration"}
+            </span>
           </div>
-
           <div className="line" />
-
           <div className={`step ${step === 3 ? "active" : ""}`}>
             <div className="circle">3</div>
-            <span>Schedule Campaign</span>
+            <span>
+              Schedule {campaign.type === "email" ? "Email" : "Campaign"}
+            </span>
           </div>
         </div>
 
-        {/* ================= STEP 1 ================= */}
+        {/* STEP 1 - COMMON */}
         {step === 1 && (
           <div className="step-content">
             <Typography variant="h6" sx={{ mb: 3 }}>
@@ -201,7 +257,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
               <input
                 value={campaignDescription}
                 onChange={(e) => setCampaignDescription(e.target.value)}
-                placeholder="e.g. Contains records of routine checks and ongoing monitoring of laboratory equipment, including logs of temp..."
+                placeholder="Short description of campaign"
               />
             </div>
 
@@ -210,15 +266,15 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                 className={`form-group half ${submitted && !objective ? "error" : ""}`}
               >
                 <label>Campaign Objective *</label>
-                <FormControl fullWidth variant="outlined">
+                <FormControl fullWidth>
                   <Select
                     value={objective}
                     onChange={(e) => setObjective(e.target.value)}
                     displayEmpty
                   >
                     <MenuItem value="">Select Objective</MenuItem>
+                    <MenuItem value="awareness">Awareness</MenuItem>
                     <MenuItem value="leads">Lead Generation</MenuItem>
-                    <MenuItem value="awareness">Brand Awareness</MenuItem>
                   </Select>
                 </FormControl>
               </div>
@@ -227,14 +283,15 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                 className={`form-group half ${submitted && !audience ? "error" : ""}`}
               >
                 <label>Target Audience *</label>
-                <FormControl fullWidth variant="outlined">
+                <FormControl fullWidth>
                   <Select
                     value={audience}
                     onChange={(e) => setAudience(e.target.value)}
                     displayEmpty
                   >
                     <MenuItem value="">Select Audience</MenuItem>
-                    <MenuItem value="all">All Users</MenuItem>
+                    <MenuItem value="all">All Subscribers</MenuItem>
+                    <MenuItem value="active">Active Users</MenuItem>
                   </Select>
                 </FormControl>
               </div>
@@ -276,13 +333,90 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
           </div>
         )}
 
-        {/* ================= STEP 2 ================= */}
-        {step === 2 && (
+        {/* STEP 2 - EMAIL */}
+        {step === 2 && campaign.type === "email" && (
           <div className="step-content">
-            <Typography variant="h6" sx={{ mb: 3 }}>
-              Content & Configuration
-            </Typography>
-            {/* SELECT AD ACCOUNTS */}
+            <h2>Email Setup</h2>
+
+            <div
+              className={`section-card ${submitted && !audience ? "error" : ""}`}
+            >
+              <h3>Select Audience</h3>
+              <p className="section-subtitle">
+                Choose which audience list to send this email to
+              </p>
+
+              <div
+                className={`form-group ${submitted && !audience ? "error" : ""}`}
+              >
+                <label>Audience List *</label>
+                <FormControl fullWidth>
+                  <Select
+                    value={audience}
+                    onChange={(e) => setAudience(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="">Select Audience List</MenuItem>
+                    <MenuItem value="all">All Subscribers</MenuItem>
+                    <MenuItem value="active">Active Users</MenuItem>
+                  </Select>
+                </FormControl>
+              </div>
+            </div>
+
+            <div
+              className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}
+            >
+              <div className="email-content-header">
+                <div>
+                  <h3>Email Content</h3>
+                  <p className="section-subtitle">
+                    Design your email with AI assistance
+                  </p>
+                </div>
+
+                <div className="email-actions">
+                  <button className="outline-btn">
+                    <img src={viewIcon} alt="View" width={20} height={20} />
+                    Preview Email
+                  </button>
+                  <button className="light-btn">+ Email Template</button>
+                </div>
+              </div>
+
+              <div
+                className={`form-group ${submitted && !subject ? "error" : ""}`}
+              >
+                <label>Subject Line *</label>
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="New Product Launch"
+                />
+                <span className="ai-suggest">✨ AI Suggest</span>
+              </div>
+
+              <div
+                className={`form-group ${submitted && !emailBody ? "error" : ""}`}
+              >
+                <label>Email *</label>
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  placeholder="New Product Launch"
+                />
+                <span className="ai-suggest">✨ AI Suggest</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2 - SOCIAL */}
+        {step === 2 && campaign.type === "social" && (
+          <div className="step-content">
+            <h2>Content & Configuration</h2>
+
+            {/* Ad Accounts */}
             <div
               className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
             >
@@ -307,16 +441,14 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                       <span>{acc.label}</span>
                     </div>
                     <div
-                      className={`account-checkbox ${
-                        accounts.includes(acc.id) ? "checked" : ""
-                      }`}
+                      className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
                     />
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* CAMPAIGN MODE */}
+            {/* Campaign Mode */}
             <div
               className={`section-card ${submitted && !mode ? "error" : ""}`}
             >
@@ -326,7 +458,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
               </p>
 
               <div className="mode-row">
-                {/* ORGANIC */}
                 <div
                   className={`mode-card ${mode === "organic" ? "selected" : ""}`}
                   onClick={() => setMode("organic")}
@@ -345,7 +476,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                   <span className="badge">No Budget Required</span>
                 </div>
 
-                {/* PAID */}
                 <div
                   className={`mode-card ${mode === "paid" ? "selected" : ""}`}
                   onClick={() => setMode("paid")}
@@ -363,7 +493,8 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                 </div>
               </div>
             </div>
-            {/* ================= CAMPAIGN CONTENT ================= */}
+
+            {/* Campaign Content */}
             {mode && (
               <div className="section-card">
                 <h2>Campaign Content</h2>
@@ -371,7 +502,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                   Create your post content with AI assistance
                 </p>
 
-                {/* Instagram */}
                 <div className="content-row">
                   <img src={instagramIcon} alt="Instagram" />
                   <textarea
@@ -386,7 +516,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                   />
                 </div>
 
-                {/* Facebook */}
                 <div className="content-row">
                   <img src={facebookIcon} alt="Facebook" />
                   <input
@@ -401,7 +530,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                   />
                 </div>
 
-                {/* LinkedIn */}
                 <div className="content-row">
                   <img src={linkedinIcon} alt="LinkedIn" />
                   <input
@@ -420,15 +548,59 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
           </div>
         )}
 
-        {/* ================= STEP 3 ================= */}
-        {step === 3 && (
+        {/* STEP 3 - EMAIL */}
+        {step === 3 && campaign.type === "email" && (
           <div className="step-content">
-            <Typography variant="h6" sx={{ mb: 3 }}>
-              Schedule Campaign
-            </Typography>
+            <h2>Schedule Email</h2>
+            <div className="schedule-card">
+              <div className="schedule-header">
+                <div className="schedule-title">
+                  <h3>Schedule</h3>
+                  <p>Select date and time to send the email</p>
+                </div>
+                <button className="ai-opt-btn">
+                  ✨ AI-Optimization Timing
+                </button>
+              </div>
 
+              <div className="schedule-row">
+                <div
+                  className={`schedule-field ${submitted && !scheduleDate ? "error" : ""}`}
+                >
+                  <label>Select Date</label>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      format="DD/MM/YYYY"
+                      value={scheduleDate ? dayjs(scheduleDate) : null}
+                      onChange={(v) =>
+                        setScheduleDate(v ? v.format("YYYY-MM-DD") : "")
+                      }
+                      slots={{ openPickerIcon: CalendarTodayIcon }}
+                    />
+                  </LocalizationProvider>
+                </div>
+
+                <div
+                  className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}
+                >
+                  <label>Enter Time</label>
+                  <input
+                    className="schedule-input"
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3 - SOCIAL */}
+        {step === 3 && campaign.type === "social" && (
+          <div className="step-content">
+            <h3>Schedule Campaign</h3>
             <div className="section-card">
-              {/* HEADER */}
               <div className="schedule-header">
                 <div>
                   <h3>
@@ -436,18 +608,15 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                       ? "Schedule & Budget Allocation"
                       : "Schedule"}
                   </h3>
-
                   <p className="section-subtitle">
                     {mode === "paid"
                       ? "Establish your schedule and budget for every platform."
                       : "Select a date and time for the campaign."}
                   </p>
                 </div>
-
                 <button className="ai-btn">✨ AI-Optimization Timing</button>
               </div>
 
-              {/* DATE + TIME */}
               <div className="schedule-row">
                 <div className="form-group half">
                   <label>Select Date</label>
@@ -467,45 +636,34 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                   <label>Enter Time</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <TimePicker
-                      format="hh:mm A" // 🔥 Enables AM/PM
+                      format="hh:mm A"
                       value={
                         scheduleTime
                           ? dayjs(`2024-01-01 ${scheduleTime}`)
                           : null
                       }
                       onChange={(v) => {
-                        if (v) {
-                          setScheduleTime(v.format("HH:mm")); // store 24hr for backend
-                        }
+                        if (v) setScheduleTime(v.format("HH:mm"));
                       }}
-                      ampm // 🔥 Show AM/PM selector
-                      slotProps={{
-                        textField: {
-                          fullWidth: true,
-                        },
-                      }}
+                      ampm
                     />
                   </LocalizationProvider>
                 </div>
               </div>
 
-              {/* 🔥 SHOW BUDGET ONLY IF PAID */}
+              {/* Budget Section */}
               {mode === "paid" && (
                 <>
                   <div className="budget-divider" />
-
                   <div className="budget-section">
                     <h3>Budget Allocation</h3>
-
                     <div className="budget-row">
-                      {/* Instagram - Only show if selected */}
                       {accounts.includes("instagram") && (
                         <div className="budget-card">
                           <div className="budget-title">
                             <img src={instagramIcon} alt="Instagram" />
                             <span>Instagram (Estimate CPC : $3.5)</span>
                           </div>
-
                           <div className="budget-input-wrapper">
                             <label>Enter Amount ($)</label>
                             <input
@@ -522,14 +680,12 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                         </div>
                       )}
 
-                      {/* Facebook - Only show if selected */}
                       {accounts.includes("facebook") && (
                         <div className="budget-card">
                           <div className="budget-title">
                             <img src={facebookIcon} alt="Facebook" />
                             <span>Facebook (Estimate CPC : $2.5)</span>
                           </div>
-
                           <div className="budget-input-wrapper">
                             <label>Enter Amount ($)</label>
                             <input
@@ -546,14 +702,12 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                         </div>
                       )}
 
-                      {/* LinkedIn - Only show if selected */}
                       {accounts.includes("linkedin") && (
                         <div className="budget-card">
                           <div className="budget-title">
                             <img src={linkedinIcon} alt="LinkedIn" />
                             <span>LinkedIn (Estimate CPC : $1.5)</span>
                           </div>
-
                           <div className="budget-input-wrapper">
                             <label>Enter Amount ($)</label>
                             <input
@@ -574,7 +728,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                     <div className="total-budget">
                       <div>
                         <h4>
-                          Total Budget : $
+                          Total Budget: $
                           {(accounts.includes("instagram")
                             ? instagramBudget
                             : 0) +
@@ -598,37 +752,15 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
           </div>
         )}
 
-        {/* ================= FOOTER ================= */}
+        {/* FOOTER */}
         <div className="modal-actions">
           <button className="cancel-btn" onClick={onClose}>
             Cancel
           </button>
-
           {step === 3 ? (
-            mode === "paid" ? (
-              <>
-                <button
-                  className="cancel-btn"
-                  onClick={() => handleCreateCampaign("draft")}
-                >
-                  Save as Draft
-                </button>
-
-                <button
-                  className="next-btn"
-                  onClick={() => handleCreateCampaign("scheduled")}
-                >
-                  Schedule
-                </button>
-              </>
-            ) : (
-              <button
-                className="next-btn"
-                onClick={() => handleCreateCampaign("live")}
-              >
-                Save & Post
-              </button>
-            )
+            <button className="next-btn" onClick={handleUpdate}>
+              Update Campaign
+            </button>
           ) : (
             <button className="next-btn" onClick={handleNext}>
               Next
@@ -638,4 +770,4 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       </Box>
     </Modal>
   );
-}  
+}

@@ -6,8 +6,8 @@ body {
 
 /* ================= WRAPPER ================= */
 .cd-wrapper {
-  padding: 16px;
-  background: #fafafa;
+  /* padding: 16px; */
+  /* background: #fafafa; */
   min-height: 100vh;
 }
 
@@ -16,7 +16,7 @@ body {
    width: 100%;
   max-width: 1380px;
   min-height: 209px;
-  background: #ffffff;
+  background: #fafafa;
   border-radius: 16px;
   padding: 16px;
   display: flex;

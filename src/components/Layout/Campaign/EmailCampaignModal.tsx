@@ -6,13 +6,15 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import {FormControl,InputLabel,Select,MenuItem} from "@mui/material";
+import { FormControl, InputLabel, Select, MenuItem, Modal, Typography, IconButton } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
 import viewIcon from "./Icons/view.png"; // adjust path if needed
 
 import { CampaignAPI } from "../../../../src/services/campaign.api";
+import { Box } from "@mui/system";
 
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function EmailCampaignModal({ onClose, onSave }: any) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
@@ -55,104 +57,102 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
     } else if (step === 2 && step2Valid) {
       setStep(3);
       setSubmitted(false);
-      
     }
   };
 
   const handleSave = async (status: "Draft" | "Scheduled") => {
-  setSubmitted(true);
-  if (!step3Valid) return;
+    setSubmitted(true);
+    if (!step3Valid) return;
 
-  try {
-    const scheduledDateTime = dayjs(
-      `${scheduleDate} ${scheduleTime}`,
-      "YYYY-MM-DD HH:mm"
-    ).format("YYYY-MM-DDTHH:mm:ss");
+    try {
+      const scheduledDateTime = dayjs(
+        `${scheduleDate} ${scheduleTime}`,
+        "YYYY-MM-DD HH:mm",
+      ).format("YYYY-MM-DDTHH:mm:ss");
 
-    const payload = {
-      clinic: 1,
-      campaign_name: campaignName,
-      campaign_description: campaignDescription,
-      campaign_objective: objective,
-      target_audience: audience,
-      start_date: startDate,
-      end_date: endDate,
-      campaign_mode: 2,
+      const payload = {
+        clinic: 1,
+        campaign_name: campaignName,
+        campaign_description: campaignDescription,
+        campaign_objective: objective,
+        target_audience: audience,
+        start_date: startDate,
+        end_date: endDate,
+        campaign_mode: 2,
 
-      selected_start: scheduledDateTime,
-      selected_end: scheduledDateTime,
-      enter_time: scheduleTime,
+        selected_start: scheduledDateTime,
+        selected_end: scheduledDateTime,
+        enter_time: scheduleTime,
 
-      email: [
-        {
-          audience_name: audience,
-          subject: subject,
-          email_body: emailBody,
-          template_name: "EMAIL",
-          sender_email: "noreply@clinic.com", // ✅ REQUIRED
-          scheduled_at:
-            status === "Scheduled"
-              ? scheduledDateTime
-              : null,
-          is_active: status === "Scheduled",
-        },
-      ],
-    };
+        email: [
+          {
+            audience_name: audience,
+            subject: subject,
+            email_body: emailBody,
+            template_name: "EMAIL",
+            sender_email: "noreply@clinic.com", // ✅ REQUIRED
+            scheduled_at: status === "Scheduled" ? scheduledDateTime : null,
+            is_active: status === "Scheduled",
+          },
+        ],
+      };
 
-    console.log("PAYLOAD:", payload);
+      console.log("PAYLOAD:", payload);
 
-   const response = await CampaignAPI.create(payload);
+      const response = await CampaignAPI.create(payload);
 
-const apiData = response.data;
+      const apiData = response.data;
 
-const formattedCampaign = {
-  id: apiData.id,
-  name: apiData.campaign_name,
-  type: apiData.campaign_mode === 2 ? "email" : "social",
-  status: apiData.is_active ? "Live" : "Draft",
-  start: apiData.start_date,
-  end: apiData.end_date,
-  platforms:
-    apiData.campaign_mode === 2
-      ? ["gmail"]
-      : ["facebook", "instagram"],
-  leads: 0,
-  scheduledAt: apiData.selected_start,
-};
+      const formattedCampaign = {
+        id: apiData.id,
+        name: apiData.campaign_name,
+        type: apiData.campaign_mode === 2 ? "email" : "social",
+        status: apiData.is_active ? "Live" : "Draft",
+        start: apiData.start_date,
+        end: apiData.end_date,
+        platforms:
+          apiData.campaign_mode === 2 ? ["gmail"] : ["facebook", "instagram"],
+        leads: 0,
+        scheduledAt: apiData.selected_start,
+      };
 
-onSave(formattedCampaign); // 👈 pass new campaign
-onClose();
+      onSave(formattedCampaign); // 👈 pass new campaign
+      onClose();
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-  } catch (error: any) {
-    console.error(error.response?.data);
-  }
-};
-
-
-
-//     onSave(newCampaign);
-//   };
+  //     onSave(newCampaign);
+  //   };
 
   return (
-    <div className="campaign-modal-overlay">
-      <div className="campaign-modal">
-
-        {/* ================= HEADER ================= */}
-        <div className="modal-header">
-          <span className="modal-title">Add Email Campaigns</span>
-          <button className="modal-close" onClick={onClose}>×</button>
+    <Modal open={true} onClose={onClose}>
+      <Box className="email-campaign-modal">
+        {/* HEADER */}
+        <div className="add-modal-header">
+          <Typography variant="h6">Add Email Campaigns</Typography>
+          <IconButton onClick={onClose} className="close-btn">
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </div>
+
+        <div className="modal-divider" />
 
         {/* ================= STEPPER ================= */}
         <div className="stepper">
-          <div className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}>
+          <div
+            className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
+          >
             <div className="circle">{step > 1 ? "✓" : "1"}</div>
             <span>Campaign Details</span>
           </div>
 
           <div className="line" />
 
-          <div className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}>
+          <div
+            className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}
+          >
             <div className="circle">{step > 2 ? "✓" : "2"}</div>
             <span>Email Setup</span>
           </div>
@@ -168,9 +168,13 @@ onClose();
         {/* ================= STEP 1 ================= */}
         {step === 1 && (
           <div className="step-content">
-            <h2>Campaign Details</h2>
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Campaign Details
+            </Typography>
 
-            <div className={`form-group ${submitted && !campaignName ? "error" : ""}`}>
+            <div
+              className={`form-group ${submitted && !campaignName ? "error" : ""}`}
+            >
               <label>Campaign Name *</label>
               <input
                 value={campaignName}
@@ -179,7 +183,9 @@ onClose();
               />
             </div>
 
-            <div className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}>
+            <div
+              className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}
+            >
               <label>Campaign Description *</label>
               <input
                 value={campaignDescription}
@@ -189,43 +195,49 @@ onClose();
             </div>
 
             <div className="form-row">
-              <div className={`form-group half ${submitted && !objective ? "error" : ""}`}>
+              <div
+                className={`form-group half ${submitted && !objective ? "error" : ""}`}
+              >
                 <label>Campaign Objective *</label>
                 <FormControl fullWidth>
-  <InputLabel>Campaign Objective *</InputLabel>
-  <Select
-    value={objective}
-    label="Campaign Objective *"
-    onChange={(e) => setObjective(e.target.value)}
-  >
-    <MenuItem value="">Select Objective</MenuItem>
-    <MenuItem value="awareness">Awareness</MenuItem>
-    <MenuItem value="leads">Lead Generation</MenuItem>
-  </Select>
-</FormControl>
-
+                  {/* <InputLabel>Select Objective *</InputLabel> */}
+                  <Select
+                    value={objective}
+                    // label="Campaign Objective *"
+                    onChange={(e) => setObjective(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="">Select Objective</MenuItem>
+                    <MenuItem value="awareness">Awareness</MenuItem>
+                    <MenuItem value="leads">Lead Generation</MenuItem>
+                  </Select>
+                </FormControl>
               </div>
 
-              <div className={`form-group half ${submitted && !audience ? "error" : ""}`}>
+              <div
+                className={`form-group half ${submitted && !audience ? "error" : ""}`}
+              >
                 <label>Target Audience *</label>
                 <FormControl fullWidth>
-  <InputLabel>Target Audience *</InputLabel>
-  <Select
-    value={audience}
-    label="Target Audience *"
-    onChange={(e) => setAudience(e.target.value)}
-  >
-    <MenuItem value="">Select Audience</MenuItem>
-    <MenuItem value="all">All Subscribers</MenuItem>
-    <MenuItem value="active">Active Users</MenuItem>
-  </Select>
-</FormControl>
-
+                  {/* <InputLabel>Target Audience *</InputLabel> */}
+                  <Select
+                    value={audience}
+                    // label="Target Audience *"
+                    onChange={(e) => setAudience(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="">Select Audience</MenuItem>
+                    <MenuItem value="all">All Subscribers</MenuItem>
+                    <MenuItem value="active">Active Users</MenuItem>
+                  </Select>
+                </FormControl>
               </div>
             </div>
 
             <div className="form-row">
-              <div className={`form-group half ${submitted && !startDate ? "error" : ""}`}>
+              <div
+                className={`form-group half ${submitted && !startDate ? "error" : ""}`}
+              >
                 <label>Start Date *</label>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DatePicker
@@ -239,7 +251,9 @@ onClose();
                 </LocalizationProvider>
               </div>
 
-              <div className={`form-group half ${submitted && !endDate ? "error" : ""}`}>
+              <div
+                className={`form-group half ${submitted && !endDate ? "error" : ""}`}
+              >
                 <label>End Date *</label>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DatePicker
@@ -257,84 +271,89 @@ onClose();
         )}
 
         {/* ================= STEP 2 ================= */}
-{step === 2 && (
-        <div className="step-content">
-        <h2>Email Setup</h2>
+        {step === 2 && (
+          <div className="step-content">
+            <h2>Email Setup</h2>
 
-    {/* ===== SELECT AUDIENCE ===== */}
-    <div className={`section-card ${submitted && !audience ? "error" : ""}`}>
-      <h3>Select Audience</h3>
-      <p className="section-subtitle">
-        Choose which audience list to send this email to
-      </p>
+            {/* ===== SELECT AUDIENCE ===== */}
+            <div
+              className={`section-card ${submitted && !audience ? "error" : ""}`}
+            >
+              <h3>Select Audience</h3>
+              <p className="section-subtitle">
+                Choose which audience list to send this email to
+              </p>
 
-      <div className={`form-group ${submitted && !audience ? "error" : ""}`}>
-        <label>Audience List *</label>
-        <FormControl fullWidth>
-  <InputLabel>Audience List *</InputLabel>
-  <Select
-    value={audience}
-    label="Audience List *"
-    onChange={(e) => setAudience(e.target.value)}
-  >
-    <MenuItem value="">Select Audience List</MenuItem>
-    <MenuItem value="all">All Subscribers</MenuItem>
-    <MenuItem value="active">Active Users</MenuItem>
-  </Select>
-</FormControl>
+              <div
+                className={`form-group ${submitted && !audience ? "error" : ""}`}
+              >
+                <label>Audience List *</label>
+                <FormControl fullWidth>
+                  <InputLabel>Audience List *</InputLabel>
+                  <Select
+                    value={audience}
+                    label="Audience List *"
+                    onChange={(e) => setAudience(e.target.value)}
+                  >
+                    <MenuItem value="">Select Audience List</MenuItem>
+                    <MenuItem value="all">All Subscribers</MenuItem>
+                    <MenuItem value="active">Active Users</MenuItem>
+                  </Select>
+                </FormControl>
+              </div>
+            </div>
 
-      </div>
-    </div>
+            {/* ===== EMAIL CONTENT ===== */}
+            <div
+              className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}
+            >
+              {/* HEADER ROW */}
+              <div className="email-content-header">
+                <div>
+                  <h3>Email Content</h3>
+                  <p className="section-subtitle">
+                    Design your email with AI assistance
+                  </p>
+                </div>
 
-    {/* ===== EMAIL CONTENT ===== */}
-    <div className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}>
+                <div className="email-actions">
+                  <button className="outline-btn">
+                    <img src={viewIcon} alt="View" width={20} height={20} />
+                    Preview Email
+                  </button>
 
-      {/* HEADER ROW */}
-      <div className="email-content-header">
-        <div>
-          <h3>Email Content</h3>
-          <p className="section-subtitle">
-            Design your email with AI assistance
-          </p>
-        </div>
+                  <button className="light-btn">+ Email Template</button>
+                </div>
+              </div>
 
-        <div className="email-actions">
-          <button className="outline-btn">
-            <img src={viewIcon} alt="View" width={20} height={20} />
-            Preview Email
-          </button>
+              {/* SUBJECT */}
+              <div
+                className={`form-group ${submitted && !subject ? "error" : ""}`}
+              >
+                <label>Subject Line *</label>
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="New Product Launch"
+                />
+                <span className="ai-suggest">✨ AI Suggest</span>
+              </div>
 
-          <button className="light-btn">
-            + Email Template
-          </button>
-        </div>
-      </div>
-
-      {/* SUBJECT */}
-      <div className={`form-group ${submitted && !subject ? "error" : ""}`}>
-        <label>Subject Line *</label>
-        <input
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          placeholder="New Product Launch"
-        />
-        <span className="ai-suggest">✨ AI Suggest</span>
-      </div>
-
-      {/* EMAIL BODY */}
-      <div className={`form-group ${submitted && !emailBody ? "error" : ""}`}>
-        <label>Email *</label>
-        <textarea
-          value={emailBody}
-          onChange={(e) => setEmailBody(e.target.value)}
-          placeholder="New Product Launch"
-        />
-        <span className="ai-suggest">✨ AI Suggest</span>
-      </div>
-    </div>
-
-  </div>
-)}
+              {/* EMAIL BODY */}
+              <div
+                className={`form-group ${submitted && !emailBody ? "error" : ""}`}
+              >
+                <label>Email *</label>
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  placeholder="New Product Launch"
+                />
+                <span className="ai-suggest">✨ AI Suggest</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ================= STEP 3 ================= */}
         {step === 3 && (
@@ -353,7 +372,9 @@ onClose();
               </div>
 
               <div className="schedule-row">
-                <div className={`schedule-field ${submitted && !scheduleDate ? "error" : ""}`}>
+                <div
+                  className={`schedule-field ${submitted && !scheduleDate ? "error" : ""}`}
+                >
                   <label>Select Date</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
@@ -367,7 +388,9 @@ onClose();
                   </LocalizationProvider>
                 </div>
 
-                <div className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}>
+                <div
+                  className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}
+                >
                   <label>Enter Time</label>
                   <input
                     className="schedule-input"
@@ -409,8 +432,7 @@ onClose();
             </button>
           )}
         </div>
-
-      </div>
-    </div>
+      </Box>
+    </Modal>
   );
 }
