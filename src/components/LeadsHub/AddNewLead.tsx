@@ -11,8 +11,6 @@ import {
   RadioGroup,
   FormControlLabel,
   Chip,
-  Fade,
-  Alert,
   CircularProgress,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -20,7 +18,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { Dayjs } from "dayjs";
 import { useNavigate } from "react-router-dom";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import { toast } from "react-toastify";
 
 // ── Redux ──────────────────────────────────────────────────────────
 import { useSelector } from "react-redux";
@@ -52,7 +50,6 @@ export type LeadPayload = {
   source: string;
   sub_source?: string;
   lead_status?: "new" | "contacted";
-  // | "Lost" | "Converted" | "Cycle Conversion" | "Follow-Ups";
   next_action_status?: "pending" | "completed" | null;
   next_action_description?: string;
   treatment_interest: string;
@@ -100,13 +97,28 @@ const timeSlots = [
   "05:30 PM - 06:00 PM",
 ];
 
+// ====================== Sequential Toast Helper ======================
+const showSequentialToasts = async (messages: Array<{ type: 'error' | 'warning' | 'info'; text: string }>) => {
+  for (const msg of messages) {
+    await new Promise<void>((resolve) => {
+      const toastFn = msg.type === 'error' ? toast.error : msg.type === 'warning' ? toast.warning : toast.info;
+      toastFn(msg.text, {
+        position: "top-right",
+        autoClose: 1500,
+        theme: "colored",
+        onClose: () => resolve(),
+      });
+    });
+    // Small delay between toasts for better UX
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+};
+
 // ====================== Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
-  const [error, setError] = React.useState<string | null>(null);
-  const [showSuccess, setShowSuccess] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
 
@@ -117,7 +129,6 @@ export default function AddNewLead() {
   );
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
-  const [employeeError, setEmployeeError] = React.useState<string | null>(null);
   const [clinicId] = React.useState(1);
 
   // ── Pull campaigns directly from Redux (already fetched by CampaignsScreen) ──
@@ -185,7 +196,11 @@ export default function AddNewLead() {
           err?.response?.data?.detail ||
           err?.message ||
           "Failed to load departments";
-        setError(`Departments: ${msg}`);
+        toast.error(`Departments: ${msg}`, {
+          position: "top-right",
+          autoClose: 3000,
+          theme: "colored",
+        });
       } finally {
         setLoadingDepartments(false);
       }
@@ -198,7 +213,6 @@ export default function AddNewLead() {
     const fetchEmployees = async () => {
       try {
         setLoadingEmployees(true);
-        setEmployeeError(null);
         const emps = await EmployeeAPI.listByClinic(clinicId);
         setEmployees(Array.isArray(emps) ? emps : []);
       } catch (err: any) {
@@ -213,7 +227,11 @@ export default function AddNewLead() {
             : status === 404
               ? `Employees endpoint not found (clinic ${clinicId})`
               : msg;
-        setEmployeeError(displayMsg);
+        toast.warning(`Employees: ${displayMsg}`, {
+          position: "top-right",
+          autoClose: 3000,
+          theme: "colored",
+        });
         setEmployees([]);
       } finally {
         setLoadingEmployees(false);
@@ -223,9 +241,6 @@ export default function AddNewLead() {
   }, [clinicId]);
 
   // ====================== Auto-fill source & sub_source when campaign changes ======================
-  // Watches form.campaign (UUID). When set, copies source + subSource from the
-  // matching Redux campaign record into form state — making those fields read-only.
-  // When cleared, resets them so the user can fill them in manually.
   React.useEffect(() => {
     if (!form.campaign) {
       setForm((prev) => ({
@@ -310,13 +325,11 @@ export default function AddNewLead() {
   const handleChange =
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
-      setError(null);
     };
 
   // Selecting a campaign UUID — useEffect handles the downstream auto-fill
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
-    setError(null);
   };
 
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,67 +339,158 @@ export default function AddNewLead() {
       personnel: "",
       assignee: "",
     }));
-    setError(null);
   };
 
   // ====================== Validate ======================
-  const validateStep = (): boolean => {
+  const validateStep = async (): Promise<boolean> => {
+    const errors: Array<{ type: 'error' | 'warning' | 'info'; text: string }> = [];
+    const warnings: Array<{ type: 'error' | 'warning' | 'info'; text: string }> = [];
+
     if (currentStep === 1) {
+      // Required fields - collect all errors first
       if (!form.full_name.trim()) {
-        setError("Full name is required");
-        return false;
+        errors.push({ type: 'error', text: 'Full name is required!' });
       }
       if (!form.contact.trim()) {
-        setError("Contact number is required");
-        return false;
+        errors.push({ type: 'error', text: 'Contact number is required!' });
       }
       if (!form.email.trim()) {
-        setError("Email is required");
-        return false;
+        errors.push({ type: 'error', text: 'Email is required!' });
       }
       if (!form.gender) {
-        setError("Gender is required");
-        return false;
+        errors.push({ type: 'error', text: 'Gender is required!' });
       }
       if (!form.age) {
-        setError("Age is required");
-        return false;
+        errors.push({ type: 'error', text: 'Age is required!' });
       }
       if (!form.source) {
-        setError("Source is required");
+        errors.push({ type: 'error', text: 'Source is required!' });
+      }
+
+      // If there are errors, show them sequentially and return false
+      if (errors.length > 0) {
+        await showSequentialToasts(errors);
         return false;
       }
+
+      // Optional field warnings - only show if no errors
+      if (!form.location.trim()) {
+        warnings.push({ type: 'warning', text: 'Location is not provided!' });
+      }
+      if (!form.marital) {
+        warnings.push({ type: 'warning', text: 'Marital status is not selected!' });
+      }
+      if (!form.address.trim()) {
+        warnings.push({ type: 'warning', text: 'Address is not provided!' });
+      }
+      if (!form.language) {
+        warnings.push({ type: 'warning', text: 'Language preference is not selected!' });
+      }
+      
+      // Partner information warnings (if couple is selected)
+      if (isCouple === "yes") {
+        if (!form.partnerName.trim()) {
+          warnings.push({ type: 'warning', text: 'Partner name is not provided!' });
+        }
+        if (!form.partnerAge) {
+          warnings.push({ type: 'warning', text: 'Partner age is not provided!' });
+        }
+        if (!form.partnerGender) {
+          warnings.push({ type: 'warning', text: 'Partner gender is not selected!' });
+        }
+      }
+
+      // Source & Campaign warnings
+      if (!form.subSource && !form.campaign) {
+        warnings.push({ type: 'warning', text: 'Sub-source is not provided!' });
+      }
+
+      // Assignee & Next Action warnings
+      if (!form.assignee) {
+        warnings.push({ type: 'warning', text: 'Lead is not assigned to anyone!' });
+      }
+      if (!form.nextType) {
+        warnings.push({ type: 'warning', text: 'Next action type is not selected!' });
+      }
+      if (!form.nextStatus) {
+        warnings.push({ type: 'warning', text: 'Next action status is not selected!' });
+      }
+      if (!form.nextDesc.trim()) {
+        warnings.push({ type: 'warning', text: 'Next action description is not provided!' });
+      }
+
+      // Show warnings sequentially if any
+      if (warnings.length > 0) {
+        await showSequentialToasts(warnings);
+      }
     }
+    
     if (currentStep === 2) {
       if (form.treatments.length === 0) {
-        setError("Please select at least one treatment");
+        errors.push({ type: 'error', text: 'Please select at least one treatment!' });
+      }
+
+      // If there are errors, show them and return false
+      if (errors.length > 0) {
+        await showSequentialToasts(errors);
         return false;
       }
+      
+      // Optional document info
+      if (!form.documents) {
+        await showSequentialToasts([{ type: 'info', text: 'No documents uploaded' }]);
+      }
     }
+    
     if (currentStep === 3) {
       if (!form.department) {
-        setError("Department is required");
-        return false;
+        errors.push({ type: 'error', text: 'Department is required!' });
       }
       if (!form.appointmentDate) {
-        setError("Appointment date is required");
-        return false;
+        errors.push({ type: 'error', text: 'Appointment date is required!' });
       }
       if (!form.slot) {
-        setError("Time slot is required");
+        errors.push({ type: 'error', text: 'Time slot is required!' });
+      }
+
+      // If there are errors, show them and return false
+      if (errors.length > 0) {
+        await showSequentialToasts(errors);
         return false;
       }
+
+      // Optional warnings for step 3
+      if (!form.assignee) {
+        warnings.push({ type: 'warning', text: 'Lead is not assigned to any personnel!' });
+      }
+      if (!form.remark.trim()) {
+        warnings.push({ type: 'info', text: 'No remark added for appointment' });
+      }
+
+      // Show warnings if any
+      if (warnings.length > 0) {
+        await showSequentialToasts(warnings);
+      }
     }
+    
     return true;
   };
 
   const handleNext = async () => {
-    if (!validateStep()) return;
+    const isValid = await validateStep();
+    if (!isValid) return;
+    
     if (currentStep === 3) {
       await submitForm();
       return;
     }
+    
     setCurrentStep((prev) => prev + 1);
+    toast.success("Step completed!", {
+      position: "top-right",
+      autoClose: 1000,
+      theme: "colored",
+    });
   };
 
   const handleBack = () => {
@@ -443,17 +547,32 @@ export default function AddNewLead() {
 
   // ====================== Submit ======================
   const submitForm = async () => {
+    if (isSubmitting) return; // Prevent double-submit
+    
     try {
-      setError(null);
       setIsSubmitting(true);
       const payload = buildPayload();
+      
+      // Show immediate feedback
+      toast.info("Saving lead...", {
+        position: "top-right",
+        autoClose: 1000,
+        theme: "colored",
+      });
+
       const response = await LeadAPI.create(payload);
       console.log("✅ Lead created:", response);
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        navigate("/leads", { replace: true });
-      }, 1500);
+      
+      // Show success and navigate immediately
+      toast.success("Lead saved successfully!", {
+        position: "top-right",
+        autoClose: 1500,
+        theme: "colored",
+      });
+      
+      // Navigate immediately without delay
+      navigate("/leads", { replace: true });
+      
     } catch (err: any) {
       console.error(
         "❌ Lead create error:",
@@ -475,7 +594,12 @@ export default function AddNewLead() {
       } else {
         msg = err?.message || msg;
       }
-      setError(msg);
+      
+      toast.error(msg, {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -491,11 +615,9 @@ export default function AddNewLead() {
         bgcolor: "#F8FAFC",
         minHeight: "100vh",
         px: 4,
-        py: 2, // controlled spacing
+        py: 2,
       }}
     >
-      {/* Remove breadcrumb if empty */}
-
       <Paper
         sx={{
           borderRadius: "16px",
@@ -611,25 +733,6 @@ export default function AddNewLead() {
             },
           }}
         >
-          {error && (
-            <Alert
-              severity="error"
-              sx={{ mb: 3 }}
-              onClose={() => setError(null)}
-            >
-              {error}
-            </Alert>
-          )}
-          {employeeError && (
-            <Alert
-              severity="warning"
-              sx={{ mb: 3 }}
-              onClose={() => setEmployeeError(null)}
-            >
-              Could not load employees: <strong>{employeeError}</strong>
-            </Alert>
-          )}
-
           {/* ===== STEP 1 ===== */}
           {currentStep === 1 && (
             <Box>
@@ -1019,7 +1122,7 @@ export default function AddNewLead() {
                       </MenuItem>
                     ) : employees.length === 0 ? (
                       <MenuItem value="" disabled>
-                        {employeeError ? "Failed to load" : "No employees"}
+                        No employees
                       </MenuItem>
                     ) : (
                       employees.map((emp) => (
@@ -1300,9 +1403,7 @@ export default function AddNewLead() {
                       </MenuItem>
                     ) : filteredPersonnel.length === 0 ? (
                       <MenuItem value="" disabled>
-                        {employeeError
-                          ? "Failed to load"
-                          : "No employees in this department"}
+                        No employees in this department
                       </MenuItem>
                     ) : (
                       filteredPersonnel.map((emp) => (
@@ -1458,33 +1559,6 @@ export default function AddNewLead() {
           )}
         </Box>
       </Paper>
-
-      {/* Success Toast */}
-      <Fade in={showSuccess}>
-        <Box
-          sx={{
-            position: "fixed",
-            top: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            bgcolor: "#10B981",
-            color: "white",
-            px: 4,
-            py: 2,
-            borderRadius: "12px",
-            display: "flex",
-            alignItems: "center",
-            gap: 1.5,
-            zIndex: 10000,
-            boxShadow: "0px 10px 20px rgba(16, 185, 129, 0.3)",
-          }}
-        >
-          <CheckCircleIcon sx={{ fontSize: 24 }} />
-          <Typography variant="body1" fontWeight={700}>
-            Saved Successfully!
-          </Typography>
-        </Box>
-      </Fade>
     </Box>
   );
 }

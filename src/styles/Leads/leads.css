@@ -40,7 +40,7 @@
 .leads-title {
   font-family: "Montserrat", sans-serif !important;
   font-weight: 700 !important;
-  font-size: 24px !important;
+  font-size: 19px !important;
   line-height: 100%;
   color: #1F2937 !important;
   margin: 0 !important;
@@ -280,99 +280,109 @@
 }
 
 /* ===============================
-   AVATAR & NAME
+   AVATAR & NAME - SMALL CIRCLE LIKE FIGMA
 ================================ */
 
 .lead-avatar {
   background: #EEF2FF !important;
   color: #4F46E5 !important;
-  font-weight: 600 !important;
-  width: 32px !important;
-  height: 32px !important;
-  font-size: 13px !important;
+  font-weight: 700 !important;
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 12px !important;
+  border-radius: 50% !important; /* Perfect circle */
 }
 
-/* LEAD NAME - INCREASED WEIGHT */
+/* LEAD NAME - INCREASED WEIGHT & DARKER */
 .lead-name-text {
-  font-weight: 600 !important;
+  font-weight: 700 !important;
   font-size: 14px !important;
-  color: #111827 !important;
+  color: #0F172A !important;
   line-height: 1.3 !important;
 }
 
 .lead-id-text {
   font-size: 12px !important;
   font-weight: 500 !important;
-  color: #6B7280 !important;
+  color: #64748B !important;
   line-height: 1.3 !important;
   margin-top: 2px !important;
 }
 
 /* ===============================
-   CHIPS - FIGMA STYLE
+   CHIPS - FIGMA STYLE (SMALLER & ROUNDED WITH BORDERS)
 ================================ */
 
 .lead-chip {
-  height: 26px !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  border-radius: 20px !important;
+  height: 20px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
   letter-spacing: 0px !important;
-  padding: 0 12px !important;
+  padding: 0 8px !important;
   text-transform: capitalize !important;
 }
 
 /* ===============================
-   STATUS CHIPS
+   STATUS CHIPS - DARKER COLORS WITH BORDERS LIKE FIGMA
 ================================ */
 
 .status-new { 
-  background: #F3E8FF !important; 
-  color: #7C3AED !important; 
+  background: #E0E7FF !important; 
+  color: #4338CA !important; 
+  border: 1px solid #A5B4FC !important;
 }
 
 .status-appointment { 
   background: #DBEAFE !important; 
-  color: #2563EB !important; 
+  color: #1E40AF !important; 
+  border: 1px solid #93C5FD !important;
 }
 
 .status-follow-ups { 
   background: #FEF3C7 !important; 
-  color: #D97706 !important; 
+  color: #92400E !important; 
+  border: 1px solid #FCD34D !important;
 }
 
 .status-converted { 
   background: #D1FAE5 !important; 
-  color: #059669 !important; 
+  color: #065F46 !important; 
+  border: 1px solid #6EE7B7 !important;
 }
 
 .status-lost { 
   background: #FEE2E2 !important; 
-  color: #DC2626 !important; 
+  color: #991B1B !important; 
+  border: 1px solid #FCA5A5 !important;
 }
 
 .status-cycle-conversion { 
   background: #D1FAE5 !important; 
-  color: #059669 !important; 
+  color: #065F46 !important; 
+  border: 1px solid #6EE7B7 !important;
 }
 
 /* ===============================
-   QUALITY CHIPS
+   QUALITY CHIPS - DARKER WITH BORDERS LIKE FIGMA
 ================================ */
 
 .quality-hot { 
   background: #FEE2E2 !important; 
-  color: #DC2626 !important; 
+  color: #991B1B !important; 
+  border: 1px solid #FCA5A5 !important;
 }
 
 .quality-warm { 
   background: #FEF3C7 !important; 
-  color: #D97706 !important; 
+  color: #92400E !important; 
+  border: 1px solid #FCD34D !important;
 }
 
 .quality-cold { 
   background: #DBEAFE !important; 
-  color: #2563EB !important; 
+  color: #1E40AF !important; 
+  border: 1px solid #93C5FD !important;
 }
 
 /* ===============================
@@ -386,24 +396,29 @@
 }
 
 /* ===============================
-   ACTION BUTTONS
+   ACTION BUTTONS - FIGMA STYLE
 ================================ */
 
 .action-btn {
-  width: 32px !important;
-  height: 32px !important;
+  width: 28px !important;
+  height: 28px !important;
   border: 1px solid #E5E7EB !important;
   border-radius: 50% !important;
   background: #FFFFFF !important;
   color: #6B7280 !important;
-  padding: 6px !important;
+  padding: 4px !important;
   transition: all 0.15s;
+  min-width: unset !important;
 }
 
 .action-btn:hover {
   background: #F3F4F6 !important;
   border-color: #D1D5DB !important;
   color: #374151 !important;
+}
+
+.action-btn .MuiSvgIcon-root {
+  font-size: 16px !important;
 }
 
 /* ===============================
@@ -454,30 +469,99 @@
 }
 
 /* ===============================
-   CHECKBOX
+   CHECKBOX - FULLY CURVED ON ALL 4 SIDES LIKE FIGMA
 ================================ */
 
+/* GLOBAL CHECKBOX STYLES - APPLIES TO ALL CHECKBOXES */
+.MuiCheckbox-root {
+  border-radius: 4px !important;
+}
+
+.MuiCheckbox-root .MuiSvgIcon-root {
+  border-radius: 4px !important;
+}
+
+.MuiCheckbox-root svg {
+  border-radius: 4px !important;
+}
+
+.MuiCheckbox-root svg path {
+  rx: 4 !important;
+  ry: 4 !important;
+}
+
+.MuiCheckbox-root svg rect {
+  rx: 4 !important;
+  ry: 4 !important;
+  border-radius: 4px !important;
+}
+
+/* LEADS TABLE SPECIFIC */
 .leads-table .MuiCheckbox-root {
   padding: 6px !important;
   color: #D1D5DB !important;
 }
 
 .leads-table .MuiCheckbox-root .MuiSvgIcon-root {
-  font-size: 20px !important;
+  font-size: 18px !important;
+  border-radius: 4px !important;
 }
 
-/* Green checkbox when selected */
+/* Green checkbox when selected - with rounded border on all 4 sides */
 .leads-table .MuiCheckbox-root.Mui-checked {
   color: #10B981 !important;
 }
 
 .leads-table .MuiCheckbox-root.Mui-checked .MuiSvgIcon-root {
-  background-color: transparent;
-  border-radius: 4px;
+  background-color: transparent !important;
+  border-radius: 4px !important;
 }
 
 .leads-table .MuiCheckbox-root.MuiCheckbox-indeterminate {
   color: #10B981 !important;
+  border-radius: 4px !important;
+}
+
+/* Make checkbox icon curved - all 4 corners */
+.leads-table .MuiCheckbox-root svg {
+  border-radius: 4px !important;
+}
+
+/* Additional checkbox rounding fix */
+.leads-table .MuiSvgIcon-root {
+  border-radius: 4px !important;
+}
+
+/* Force rounded corners on checkbox - all 4 sides curved */
+.leads-table .MuiCheckbox-root svg path {
+  rx: 4 !important;
+  ry: 4 !important;
+}
+
+/* Override MUI default square checkbox - make curved on all sides */
+.leads-table .MuiCheckbox-root .MuiSvgIcon-root rect {
+  rx: 4 !important;
+  ry: 4 !important;
+  border-radius: 4px !important;
+}
+
+/* Ensure checkbox has proper curved border on all edges */
+.checkbox-cell .MuiCheckbox-root {
+  border-radius: 4px !important;
+}
+
+.checkbox-cell .MuiCheckbox-root svg {
+  border-radius: 4px !important;
+}
+
+/* Make the checkbox background curved when checked */
+.leads-table .MuiCheckbox-root.Mui-checked svg {
+  border-radius: 4px !important;
+}
+
+/* Additional override for checkbox icon */
+.leads-table .MuiCheckbox-root .MuiSvgIcon-fontSizeSmall {
+  border-radius: 4px !important;
 }
 
 /* ===============================
@@ -518,7 +602,6 @@
   z-index: 5;
 }
 
-.leads-table table th:nth-last-child(2),
 .leads-table table td:nth-last-child(2) {
   position: sticky;
   right: 60px;
@@ -541,4 +624,63 @@
 .bulk-action-btn:hover {
   background-color: #F3F4F6 !important;
   border-color: #9CA3AF !important;
+}
+
+/* BULK ACTION BAR CHECKBOX - CURVED ON ALL 4 SIDES */
+/* Using multiple selectors to ensure styles are applied */
+.MuiPaper-root .MuiCheckbox-root,
+.MuiToolbar-root .MuiCheckbox-root,
+div[class*="bulk"] .MuiCheckbox-root,
+div[class*="Bulk"] .MuiCheckbox-root,
+.bulk-action-bar .MuiCheckbox-root {
+  border-radius: 4px !important;
+}
+
+.MuiPaper-root .MuiCheckbox-root .MuiSvgIcon-root,
+.MuiToolbar-root .MuiCheckbox-root .MuiSvgIcon-root,
+div[class*="bulk"] .MuiCheckbox-root .MuiSvgIcon-root,
+div[class*="Bulk"] .MuiCheckbox-root .MuiSvgIcon-root,
+.bulk-action-bar .MuiCheckbox-root .MuiSvgIcon-root {
+  border-radius: 4px !important;
+}
+
+.MuiPaper-root .MuiCheckbox-root svg,
+.MuiToolbar-root .MuiCheckbox-root svg,
+div[class*="bulk"] .MuiCheckbox-root svg,
+div[class*="Bulk"] .MuiCheckbox-root svg,
+.bulk-action-bar .MuiCheckbox-root svg {
+  border-radius: 4px !important;
+}
+
+.MuiPaper-root .MuiCheckbox-root svg path,
+.MuiToolbar-root .MuiCheckbox-root svg path,
+div[class*="bulk"] .MuiCheckbox-root svg path,
+div[class*="Bulk"] .MuiCheckbox-root svg path,
+.bulk-action-bar .MuiCheckbox-root svg path {
+  rx: 4 !important;
+  ry: 4 !important;
+}
+
+.MuiPaper-root .MuiCheckbox-root svg rect,
+.MuiToolbar-root .MuiCheckbox-root svg rect,
+div[class*="bulk"] .MuiCheckbox-root svg rect,
+div[class*="Bulk"] .MuiCheckbox-root svg rect,
+.bulk-action-bar .MuiCheckbox-root svg rect {
+  rx: 4 !important;
+  ry: 4 !important;
+  border-radius: 4px !important;
+}
+
+/* Additional specific overrides for common bulk action patterns */
+[role="toolbar"] .MuiCheckbox-root svg,
+.MuiFade-root .MuiCheckbox-root svg,
+.MuiBox-root .MuiCheckbox-root svg {
+  border-radius: 4px !important;
+}
+
+[role="toolbar"] .MuiCheckbox-root svg rect,
+.MuiFade-root .MuiCheckbox-root svg rect,
+.MuiBox-root .MuiCheckbox-root svg rect {
+  rx: 4 !important;
+  ry: 4 !important;
 }
