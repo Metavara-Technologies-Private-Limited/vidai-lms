@@ -1,5 +1,4 @@
 import { useState } from "react";
-// import { v4 as uuid } from "uuid";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -10,12 +9,11 @@ import { FormControl, InputLabel, Select, MenuItem, Modal, Typography, IconButto
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
-import viewIcon from "./Icons/view.png"; // adjust path if needed
+import viewIcon from "./Icons/view.png"; 
 
 import { CampaignAPI } from "../../../../src/services/campaign.api";
 import { Box } from "@mui/system";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function EmailCampaignModal({ onClose, onSave }: any) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
@@ -117,16 +115,13 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
         scheduledAt: apiData.selected_start,
       };
 
-      onSave(formattedCampaign); // 👈 pass new campaign
+      onSave(formattedCampaign); 
       toast.success("Campaign created successfully");
       onClose();
     } catch (error) {
       toast.error("Failed to create campaign");
     }
   };
-
-  //     onSave(newCampaign);
-  //   };
 
   return (
     <Modal open={true} onClose={onClose}>
@@ -141,7 +136,7 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
 
         <div className="modal-divider" />
 
-        {/* ================= STEPPER ================= */}
+        {/*  STEPPER */}
         <div className="stepper">
           <div
             className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
@@ -202,10 +197,8 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
               >
                 <label>Campaign Objective *</label>
                 <FormControl fullWidth>
-                  {/* <InputLabel>Select Objective *</InputLabel> */}
                   <Select
                     value={objective}
-                    // label="Campaign Objective *"
                     onChange={(e) => setObjective(e.target.value)}
                     displayEmpty
                   >
@@ -221,10 +214,8 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
               >
                 <label>Target Audience *</label>
                 <FormControl fullWidth>
-                  {/* <InputLabel>Target Audience *</InputLabel> */}
                   <Select
                     value={audience}
-                    // label="Target Audience *"
                     onChange={(e) => setAudience(e.target.value)}
                     displayEmpty
                   >
@@ -276,8 +267,6 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
         {step === 2 && (
           <div className="step-content">
             <h2>Email Setup</h2>
-
-            {/* ===== SELECT AUDIENCE ===== */}
             <div
               className={`section-card ${submitted && !audience ? "error" : ""}`}
             >
@@ -309,7 +298,6 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
             <div
               className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}
             >
-              {/* HEADER ROW */}
               <div className="email-content-header">
                 <div>
                   <h3>Email Content</h3>
@@ -328,7 +316,6 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
                 </div>
               </div>
 
-              {/* SUBJECT */}
               <div
                 className={`form-group ${submitted && !subject ? "error" : ""}`}
               >
@@ -340,8 +327,6 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
                 />
                 <span className="ai-suggest">✨ AI Suggest</span>
               </div>
-
-              {/* EMAIL BODY */}
               <div
                 className={`form-group ${submitted && !emailBody ? "error" : ""}`}
               >

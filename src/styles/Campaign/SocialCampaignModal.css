@@ -1,5 +1,3 @@
-/* ================= MODAL OVERLAY ================= */
-
 .campaign-modal-overlay {
   position: fixed;
   inset: 0;
@@ -9,23 +7,18 @@
   justify-content: center;
 }
 
-/* ================= MODAL ================= */
-
 .campaign-modal {
   width: 1000px;
   max-width: 1000px;
   min-width: 1000px;
   background: #fff;
   border-radius: 16px;
-  overflow: hidden;              /* lock container */
+  overflow: hidden;              
   font-family: 'Montserrat', sans-serif;
   display: flex;
   flex-direction: column;
   max-height: 90vh;
 }
-
-
-/* ================= HEADER ================= */
 
 .modal-header {
   position: relative;
@@ -53,8 +46,6 @@
   cursor: pointer;
 }
 
-/* ================= STEPPER ================= */
-
 .stepper {
   width: 98%;
   margin: 24px auto 20px;
@@ -73,7 +64,6 @@
   gap: 8px;
 }
 
-/* Circle default */
 .step .circle {
   width: 24px;
   height: 24px;
@@ -92,7 +82,6 @@
   color: #9CA3AF;
 }
 
-/* Active */
 .step.active .circle {
   background: #FFEDE7;
   color: #F26A3E;
@@ -103,7 +92,6 @@
   font-weight: 600;
 }
 
-/* Completed */
 .step.completed .circle {
   background: #22C55E;
   color: #ffffff;
@@ -121,19 +109,16 @@
   margin: 0 12px;
 }
 
-/* ================= CONTENT ================= */
-
 .step-content {
-  flex: 1;               /* takes remaining space */
-  overflow-y: auto;      /* enables scrolling */
+  flex: 1;              
+  overflow-y: auto;      
   overflow-x: hidden; 
-  padding-bottom: 20px; /* space before footer */
+  padding-bottom: 20px; 
   
 }
 .step-content h2 {
   margin-top: 8px;
 }
-/* ================= FORM ================= */
 
 .form-group {
   position: relative;
@@ -146,10 +131,8 @@
 }
 
 .form-group.half {
-  flex: 0 0 calc(50% - 10px); /* 🔒 FIXED DATE WIDTH */
+  flex: 0 0 calc(50% - 10px); 
 }
-
-/* ================= NOTCHED LABEL ================= */
 
 .form-group > label {
   position: absolute;
@@ -162,8 +145,6 @@
   z-index: 2;
   pointer-events: none;
 }
-
-/* ================= INPUTS ================= */
 
 .form-group input {
   width: 100%;
@@ -183,8 +164,6 @@ select:invalid {
   outline: none;
 }
 
-/* ================= ERROR STATE ================= */
-
 .form-group.error input,
 .form-group.error select {
   border-color: #E11D48;
@@ -198,8 +177,6 @@ select:invalid {
   display: none;
 }
 
-/* ================= FOOTER ================= */
-
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -209,7 +186,6 @@ select:invalid {
   position: sticky;
   bottom: 0;
   background: #ffffff;
-  /* border-top: 1px solid #E5E7EB; */
   z-index: 10;
   align-items: center;
 }
@@ -250,16 +226,10 @@ select:invalid {
   background-color: #ffffff !important;
 }
 
-/* =========================================
-   MATCH MUI DATEPICKER TO NORMAL INPUT STYLE
-   ========================================= */
-
-/* Full width like other inputs */
 .MuiFormControl-root {
   width: 100% !important;
 }
 
-/* Same height + padding */
 .MuiOutlinedInput-root {
   height: 56px !important;
   border-radius: 8px !important;
@@ -267,46 +237,39 @@ select:invalid {
   box-sizing: border-box;
 }
 
-/* Make text vertically aligned like your inputs */
 .MuiOutlinedInput-input {
   padding: 0 !important;
   font-size: 14px !important;
 }
 
-/* Keep icon properly aligned */
 .MuiInputAdornment-root {
   margin-right: 4px !important;
 }
 
-/* Remove extra spacing */
 .MuiOutlinedInput-notchedOutline {
   border-width: 1.5px !important;
 }
 
-
-/* Normal */
 .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
 }
 
-/* Hover */
 .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
 }
 
-/* Focus — keep same */
 .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
   background-color: #ffffff !important;
 }
-/* 🔥 Prevent MUI from turning border red automatically */
+
 .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
 }
 .MuiOutlinedInput-root.Mui-focused.Mui-error .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
 }
-/* Error only when wrapper has .error */
+
 .form-group.error .MuiOutlinedInput-notchedOutline {
   border: 1px solid #6B6B6B !important;
 }
@@ -319,7 +282,6 @@ select:invalid {
   color: #E11D48 !important;
 }
 
-/* Calendar popup styling */
 .MuiPickersLayout-root {
   font-family: 'Montserrat', sans-serif !important;
 }
@@ -333,19 +295,14 @@ select:invalid {
   background-color: #F26A3E !important;
 }
 
-/* Dropdown menu items */
 .MuiMenuItem-root {
   font-family: 'Montserrat', sans-serif !important;
   font-size: 14px !important;
 }
-/* Remove italic look when no value selected */
+
 .MuiSelect-select.MuiSelect-select {
   font-style: normal !important;
 }
-
-/* =================================================
-   STEP 2 – CONTENT & CONFIGURATION (FIGMA MATCH)
-   ================================================= */
 
 .section-card {
   border: 1.5px solid #E5E7EB;
@@ -371,8 +328,6 @@ select:invalid {
   margin-top: 0;
   margin-bottom: 12px;
 }
-
-/* ---------- Ad Accounts ---------- */
 
 .account-row {
   display: flex;
@@ -409,7 +364,6 @@ select:invalid {
   height: 28px;
 }
 
-/* Checkbox */
 .account-checkbox {
   width: 22px;
   height: 22px;
@@ -418,12 +372,9 @@ select:invalid {
 }
 
 .account-checkbox.checked {
-
   background:#F26A3E;
   border-color:#F26A3E;
 }
-
-/* ================= CAMPAIGN MODE – FIGMA EXACT ================= */
 
 .mode-row {
   display: flex;
@@ -434,25 +385,22 @@ select:invalid {
 .mode-card {
   flex: 0 0 calc(50% - 10px);
   max-width: 430px;
-  height: 76px;                  /* Figma exact */
+  height: 76px;                 
   border: 1.5px solid #CBD5E1;
   border-radius: 12px;
-  padding: 14px 16px;            /* slightly tighter */
+  padding: 14px 16px;            
   display: flex;
-  align-items: flex-start;       /* 🔥 top aligned */
+  align-items: flex-start;      
   justify-content: space-between;
   background: #ffffff;
   cursor: pointer;
   box-sizing: border-box;
 }
 
-
-/* Selected */
 .mode-card.selected {
   border-color: #F26A3E;
 }
 
-/* LEFT CONTENT */
 .mode-left {
   display: flex;
   align-items: flex-start;
@@ -461,8 +409,6 @@ select:invalid {
   min-width: 0;
 }
 
-
-/* RADIO */
 .radio {
   width: 24px;
   height: 24px;
@@ -503,17 +449,11 @@ select:invalid {
   color: #9CA3AF;
   margin: 0;
   line-height: 18px;
-
-  white-space: nowrap;        /* ✅ force single line */
-  overflow: hidden;           /* ✅ prevent overflow */
-  text-overflow: ellipsis;    /* ✅ clean cut like Figma */
+  white-space: nowrap;       
+  overflow: hidden;           
+  text-overflow: ellipsis;    
 }
 
-
-
-/* BADGE */
-/* BADGE – compact height like Figma */
-/* BASE BADGE – used by BOTH */
 .mode-card .badge {
   align-self: flex-start;
   padding: 2px 10px;
@@ -523,26 +463,19 @@ select:invalid {
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-
   background: #F1F5F9;
   color: #111827;
-  border: 1px solid ;               /* ✅ ensure no border */
-
+  border: 1px solid ;               
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* 🔥 OVERRIDE outlined so it looks IDENTICAL */
 .mode-card .badge.outlined {
-  background: #F1F5F9;        /* same background */
-  color: #111827;             /* same text */
-  border: 1px solid ;               /* remove outline */
+  background: #F1F5F9;       
+  color: #111827;            
+  border: 1px solid ;               
 }
-
-/* =================================================
-   CAMPAIGN CONTENT (STEP 2)
-   ================================================= */
 
 .content-row {
   display: flex;
@@ -551,7 +484,6 @@ select:invalid {
   margin-bottom: 20px;
 }
 
-/* Social icons (Instagram / Facebook / LinkedIn) */
 .content-row img {
   width: 36px;
   height: 36px;
@@ -559,7 +491,6 @@ select:invalid {
   margin-top: 6px;
 }
 
-/* Textarea & input wrapper */
 .content-row textarea,
 .content-row input {
   flex: 1;
@@ -574,42 +505,31 @@ select:invalid {
   background: #ffffff;
 }
 
-/* Instagram textarea larger (like Figma) */
 .content-row textarea {
   min-height: 140px;
   resize: none;
 }
 
-/* Placeholder styling */
 .content-row textarea::placeholder,
 .content-row input::placeholder {
   color: #9CA3AF;
   font-size: 14px;
 }
 
-/* Focus state */
 .content-row textarea:focus,
 .content-row input:focus {
   border-color: #F26A3E;
 }
 
-/* Divider lines between rows (subtle like Figma) */
 .content-row:not(:last-child) {
   padding-bottom: 20px;
   border-bottom: 1px solid #F1F5F9;
 }
 
-
-/* ================= STEP 3 ================= */
-
 .schedule-row {
   display: flex;
   gap: 20px;
 }
-
-/* =================================================
-   STEP 3 – SCHEDULE CAMPAIGN
-   ================================================= */
 
 .schedule-card {
   border: 1.5px solid #E5E7EB;
@@ -618,8 +538,6 @@ select:invalid {
   margin-bottom: 28px;
   background: #ffffff;
 }
-
-/* ---------- Header ---------- */
 
 .schedule-header {
   display: flex;
@@ -647,8 +565,6 @@ select:invalid {
   margin: 0;
 }
 
-/* ---------- AI Optimization Button ---------- */
-
 .ai-opt-btn {
   display: flex;
   align-items: center;
@@ -664,22 +580,16 @@ select:invalid {
   white-space: nowrap;
 }
 
-/* ---------- Inputs Row ---------- */
-
 .schedule-row {
   display: flex;
   gap: 20px;
   align-items: flex-start;
 }
 
-/* ---------- Field Wrapper ---------- */
-
 .schedule-field {
   flex: 1;
   position: relative;
 }
-
-/* ---------- Floating Label ---------- */
 
 .schedule-field label {
   position: absolute;
@@ -692,8 +602,6 @@ select:invalid {
   z-index: 2;
   pointer-events: none;
 }
-
-/* ---------- Input Box (DATE & TIME SAME STYLE) ---------- */
 
 .schedule-input {
   width: 100%;
@@ -711,8 +619,6 @@ select:invalid {
   box-sizing: border-box;
 }
 
-/* ---------- Icons ---------- */
-
 .schedule-input svg,
 .schedule-input img {
   width: 22px;
@@ -721,14 +627,10 @@ select:invalid {
   flex-shrink: 0;
 }
 
-/* ---------- Hover / Focus ---------- */
-
 .schedule-input:hover,
 .schedule-input:focus-within {
   border-color: #D1D5DB;
 }
-
-/* ================= BUDGET SECTION ================= */
 
 .budget-divider {
   height: 1px;
@@ -778,8 +680,6 @@ select:invalid {
   margin-bottom: 6px;
 }
 
-/* ===== NUMBER INPUT ===== */
-
 .budget-input {
   width: 100%;
   height: 56px;
@@ -793,12 +693,10 @@ select:invalid {
   box-sizing: border-box;
 }
 
-/* Focus state */
 .budget-input:focus {
   border-color: #F26A3E;
 }
 
-/* Make arrows visible */
 .budget-input::-webkit-inner-spin-button,
 .budget-input::-webkit-outer-spin-button {
   opacity: 1;
@@ -807,12 +705,10 @@ select:invalid {
   height: 28px;
 }
 
-/* Firefox */
 .budget-input {
   -moz-appearance: number-input;
 }
 
-/* ================= TOTAL BUDGET ================= */
 
 .total-budget {
   border-radius: 16px;
@@ -837,36 +733,29 @@ select:invalid {
   font-weight: 600;
 }
 
-/* Draft */
 .status-draft {
   background: #E0ECFF;
   color: #2563EB;
   border: 1px solid #93C5FD;
 }
 
-/* Live */
 .status-live {
   background: #DCFCE7;
   color: #16A34A;
   border: 1px solid #86EFAC;
 }
 
-/* Scheduled */
 .status-scheduled {
   background: #F3E8FF;
   color: #7C3AED;
   border: 1px solid #D8B4FE;
 }
 
-/* Mobile responsive */
 @media (max-width: 900px) {
   .budget-row {
     flex-direction: column;
   }
 }
-
-
-/* ---------- Mobile ---------- */
 
 @media (max-width: 900px) {
   .schedule-row {

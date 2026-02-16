@@ -37,23 +37,18 @@ export default function CampaignPage() {
 
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false); // ADD
-  const [editingCampaign, setEditingCampaign] = useState<any>(null); // ADD
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<any>(null); 
 
-  /* ===== SAVE CAMPAIGN (USED BY BOTH MODALS) ===== */
   const handleSaveCampaign = (campaign: any) => {
     setCampaigns((prev) => [...prev, campaign]);
     setShowSocialModal(false);
     setShowEmailModal(false);
   };
-
-  // ADD THIS
   const handleEdit = (campaign: any) => {
     setEditingCampaign(campaign);
     setShowEditModal(true);
   };
-
-  // ADD THIS
   const handleUpdateCampaign = (updated: any) => {
     setCampaigns((prev) =>
       prev.map((c) => (c.id === updated.id ? updated : c)),

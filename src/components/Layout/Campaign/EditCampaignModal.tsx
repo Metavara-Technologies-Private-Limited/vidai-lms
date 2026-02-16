@@ -37,7 +37,6 @@ export default function EditCampaignModal({
   const [submitted, setSubmitted] = useState(false);
   const [fullCampaignData, setFullCampaignData] = useState<any>(null);
 
-  // Step 1 - Common
   const [campaignName, setCampaignName] = useState(campaign.name);
   const [campaignDescription, setCampaignDescription] = useState(
     campaign.description || "",
@@ -47,15 +46,12 @@ export default function EditCampaignModal({
   const [startDate, setStartDate] = useState(campaign.start);
   const [endDate, setEndDate] = useState(campaign.end);
 
-  // Step 2 - Email
   const [subject, setSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
 
-  // Step 2 - Social
   const [accounts, setAccounts] = useState<string[]>([]);
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
-  // Step 3
   const [scheduleDate, setScheduleDate] = useState(
     campaign.scheduledAt
       ? dayjs(campaign.scheduledAt).format("YYYY-MM-DD")
@@ -80,13 +76,11 @@ export default function EditCampaignModal({
         const response = await CampaignAPI.get(campaign.id);
         setFullCampaignData(response.data);
 
-        // Load email data
         if (response.data.email && response.data.email.length > 0) {
           setSubject(response.data.email[0].subject || "");
           setEmailBody(response.data.email[0].email_body || "");
         }
 
-        // Load social data
         if (
           response.data.social_media &&
           response.data.social_media.length > 0

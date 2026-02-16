@@ -202,22 +202,9 @@
   object-fit: contain;
 }
 
-/* .view-btn:hover {
-  background-color: #e3f2fd;
-} */
-
-/* .pause-btn:hover {
-  background-color: #fff3cd;
-} */
-
-/* More button & menu container */
 .more-container {
   position: relative;
 }
-
-/* .more-btn:hover {
-  background-color: #f0f0f0;
-} */
 
 /* ================= CONTEXT MENU (Dropdown) ================= */
 
@@ -256,7 +243,6 @@
   object-fit: contain;
 }
 
-/* Stop item styling */
 .stop-item {
   
   color: #e74c3c;

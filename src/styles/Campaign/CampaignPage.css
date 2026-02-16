@@ -8,14 +8,12 @@
 
 /* ================= PAGE ACTIONS ================= */
 
-/* Container for Add buttons */
 .campaign-actions {
   display: flex;
   gap: 16px;
   margin-bottom: 24px;
 }
 
-/* Add Campaign button (primary) */
 .add-campaign-btn {
   padding: 10px 18px;
   height: 44px;
@@ -31,13 +29,11 @@
   justify-content: center;
 }
 
-/* Secondary button (Email Campaign) */
 .add-campaign-btn.secondary {
   background: #E5E7EB;
   color: #232323;
 }
 
-/* Hover states */
 .add-campaign-btn:hover {
   opacity: 0.9;
 }

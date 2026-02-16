@@ -21,7 +21,6 @@ import cpaIcon from "./Icons/cpa.png";
 import CampaignTabContent from "./CampaignTabContent";
 import { IconButton } from "@mui/material";
 
-/* ================= TYPES ================= */
 interface Campaign {
   id: string;
   name: string;
@@ -35,7 +34,6 @@ interface Campaign {
   objective?: string;
 }
 
-/* ================= PLATFORM ICON MAP ================= */
 const platformIconMap: Record<string, string> = {
   facebook: facebookIcon,
   instagram: instagramIcon,
@@ -66,7 +64,6 @@ const CampaignDashboard = ({
 
   const platforms = campaign.platforms || [];
 
-  /* Mock metrics (replace with API later) */
   const metrics = [
     { title: "Total Impressions", value: "0", icon: impressionsIcon },
     { title: "Total Clicks", value: "0", icon: clicksIcon },

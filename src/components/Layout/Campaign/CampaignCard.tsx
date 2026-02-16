@@ -22,7 +22,7 @@ import { toast } from "react-toastify";
 type CampaignStatus =
   | "Live"
   | "Draft"
-  | "Scheduled"
+  | "Schedule"
   | "Paused"
   | "Stopped"
   | "Completed"
@@ -175,8 +175,6 @@ export default function CampaignCard({
           >
             <img src={viewIcon} alt="View" width={20} height={20} />
           </button>
-
-          {/* ✅ Pause / Play Toggle */}
           <button
             className="action-btn pause-btn"
             onClick={(e) => {

@@ -11,7 +11,7 @@ interface Props {
   campaignName: string;
   platforms: ("facebook" | "instagram" | "linkedin" | "gmail")[];
   onClose: () => void;
-  onStop: () => void; // ✅ parent status update
+  onStop: () => void; 
 }
 
 export default function StopCampaignModal({
@@ -52,7 +52,6 @@ export default function StopCampaignModal({
         className="stop-modal"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close Button */}
         <button className="stop-close" onClick={onClose}>
           ✕
         </button>
@@ -133,9 +132,9 @@ export default function StopCampaignModal({
               <button
                 className="stop-btn"
                 onClick={() => {
-                  onStop();  // ✅ update status in parent
+                  onStop(); 
                   toast.warn("Campaign stopped successfully");
-                  onClose(); // ✅ close modal
+                  onClose(); 
                 }}
               >
                 Yes
