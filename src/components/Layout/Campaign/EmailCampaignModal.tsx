@@ -9,6 +9,7 @@ import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { FormControl, InputLabel, Select, MenuItem, Modal, Typography, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
+import { toast } from "react-toastify";
 import viewIcon from "./Icons/view.png"; // adjust path if needed
 
 import { CampaignAPI } from "../../../../src/services/campaign.api";
@@ -117,9 +118,10 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
       };
 
       onSave(formattedCampaign); // 👈 pass new campaign
+      toast.success("Campaign created successfully");
       onClose();
     } catch (error) {
-      console.error(error);
+      toast.error("Failed to create campaign");
     }
   };
 
@@ -317,7 +319,7 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
                 </div>
 
                 <div className="email-actions">
-                  <button className="outline-btn">
+                  <button className="outline-btn" >
                     <img src={viewIcon} alt="View" width={20} height={20} />
                     Preview Email
                   </button>
