@@ -68,8 +68,12 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
   const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
     setSubmitted(true);
-    // if (type !== "draft" && (!scheduleDate || !scheduleTime)) return;
-    if (type === "live" && (!step1Valid || !step2Valid)) return;
+    if (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime) {
+  return;
+}
+    if (type === "live" && (!step1Valid || !step2Valid || !scheduleTime))
+  return;
+
     if (
       type === "scheduled" &&
       (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime)
@@ -97,10 +101,9 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
         campaign_mode: 1,
 
-        selected_start: type === "scheduled" ? scheduledDateTime : null,
-        selected_end: type === "scheduled" ? scheduledDateTime : null,
-        enter_time: type === "scheduled" ? scheduleTime : null,
-
+        selected_start: scheduledDateTime,
+        selected_end: scheduledDateTime,
+        enter_time: scheduleTime,
         is_active: type === "live",
 
         social_media: accounts.map((platform) => ({
