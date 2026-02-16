@@ -9,14 +9,29 @@ import Filter_Leads from "../../../assets/icons/Filter_Leads.svg";
 import AddIcon from "@mui/icons-material/Add";
 import CreateTicket from "./CreateTicket";
 import FilterTickets from "./FilterTicket";
-import dayjs, { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 
 // Types & Styles
 import type { TicketListItem, TicketFilters, FilterTicketsPayload } from "../../../types/tickets.types";
 import {
-  ticketsSearchBoxSx, createTicketButtonSx, ticketsTabsSx,
-  ticketsTableHeaderSx, ticketsRowSx, priorityChipSx, paginationButtonSx,
+  ticketsSearchBoxSx,
+  createTicketButtonSx,
+  ticketsTabsSx,
+  ticketsTableHeaderSx,
+  ticketsRowSx,
+  priorityChipSx,
+  paginationButtonSx,
+  ticketsTitleSx,
+  ticketsActionsRowSx,
+  ticketsColumnHeaderCellSx,
+  ticketsEllipsisCellSx,
+  ticketsNumberCellSx,
+  ticketsAvatarSx,
+  ticketsAssigneeTextSx,
+  ticketsPaginationArrowSx,
+  ticketsPaginationNumberOverrideSx,
 } from "../../../styles/Settings/Tickets.styles";
+
 
 // Redux & API
 import {
@@ -82,7 +97,6 @@ const Tickets = () => {
     dispatch(fetchTicketDashboard());
   }, [dispatch]);
 
-  // Normalize data: Ensure we are always working with an array
   const ticketsFromDb = useMemo(() => {
     if (Array.isArray(rawTickets)) return rawTickets;
     if (rawTickets && typeof rawTickets === 'object' && 'results' in rawTickets) {
@@ -91,13 +105,11 @@ const Tickets = () => {
     return [] as TicketListItem[];
   }, [rawTickets]);
 
-  // 2. Tab Count Logic (Prioritizes Dashboard API over local filtering)
   const getCount = (status: string) => {
     const key = status.toLowerCase();
     if (dashboardCounts && typeof dashboardCounts === 'object' && key in dashboardCounts) {
       return (dashboardCounts as any)[key] || 0;
     }
-    // Fallback to local calculation if dashboard API hasn't loaded
     return ticketsFromDb.filter((t) => t.status?.toLowerCase() === key).length;
   };
 
@@ -134,95 +146,77 @@ const Tickets = () => {
     return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
   }
 
-const columns = [
-  { key: "ticket_no", label: "Ticket No", flex: 1 },
-  { key: "lab_name", label: "Lab Name", flex: 1.4 },   
-  { key: "subject", label: "Subject", flex: 1 },       
-  { key: "created_at", label: "Created Date", flex: 1.1 }, 
-  { key: "due_date", label: "Due Date", flex: 1.1 },
-  { key: "requested_by", label: "Requested By", flex: 1.2 },
-  { key: "department", label: "Department", flex: 1.2 },
-  { key: "priority", label: "Priority", flex: 0.96},
-  { key: "assigned_to", label: "Assigned To", flex: 1.5 },
-];
+  const columns = [
+    { key: "ticket_no", label: "Ticket No", flex: 1 },
+    { key: "lab_name", label: "Lab Name", flex: 1.4 },
+    { key: "subject", label: "Subject", flex: 1 },
+    { key: "created_at", label: "Created Date", flex: 1.1 },
+    { key: "due_date", label: "Due Date", flex: 1.1 },
+    { key: "requested_by", label: "Requested By", flex: 1.2 },
+    { key: "department", label: "Department", flex: 1.2 },
+    { key: "priority", label: "Priority", flex: 0.96 },
+    { key: "assigned_to", label: "Assigned To", flex: 1.5 },
+  ];
 
-
-const cellSx = {
-  minWidth: 0,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-};
 
   return (
     <Box p={3}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-{/* Title Row */}
-<Typography fontSize="18px" fontWeight={600} mb={1} mt={-3}>
-  Tickets
-</Typography>
+      <Typography sx={ticketsTitleSx}>Tickets</Typography>
 
-{/* Tabs + Actions Row */}
-<Stack direction="row" alignItems="center" sx={{ width: "100%" }} mb={1.5}>
-  
-  {/* LEFT → Tabs */}
-  <Tabs
-    value={tab}
-    onChange={(_, v) => { setTab(v); setPage(1); }}
-    TabIndicatorProps={{ style: { display: "none" } }}
-    sx={ticketsTabsSx}
-  >
-    <Tab value="New" label={`New (${getCount("new")})`} />
-    <Tab value="Pending" label={`Pending (${getCount("pending")})`} />
-    <Tab value="Resolved" label={`Resolved (${getCount("resolved")})`} />
-    <Tab value="Closed" label={`Closed (${getCount("closed")})`} />
-  </Tabs>
+      <Stack direction="row" alignItems="center" sx={ticketsActionsRowSx} mb={1.5}>
 
-  {/* RIGHT → Actions */}
-  <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: "auto" }}>
-    <Box sx={ticketsSearchBoxSx}>
-      <SearchIcon fontSize="small" />
-      <InputBase
-        placeholder="Search by Ticket no."
-        sx={{ ml: 1, flex: 1 }}
-        value={search}
-        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-      />
-    </Box>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => { setTab(v); setPage(1); }}
+          TabIndicatorProps={{ style: { display: "none" } }}
+          sx={ticketsTabsSx}
+        >
+          <Tab value="New" label={`New (${getCount("new")})`} />
+          <Tab value="Pending" label={`Pending (${getCount("pending")})`} />
+          <Tab value="Resolved" label={`Resolved (${getCount("resolved")})`} />
+          <Tab value="Closed" label={`Closed (${getCount("closed")})`} />
+        </Tabs>
 
-    <IconButton onClick={() => setOpenFilter(true)} sx={{ width: 50, height: 50 }}>
-      <Box component="img" src={Filter_Leads} />
-    </IconButton>
+        {/* RIGHT → Actions */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: "auto" }}>
+          <Box sx={ticketsSearchBoxSx}>
+            <SearchIcon fontSize="small" />
+            <InputBase
+              placeholder="Search by Ticket no."
+              sx={{ ml: 1, flex: 1 }}
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+          </Box>
 
-    <Button
-      variant="contained"
-      startIcon={<AddIcon />}
-      sx={createTicketButtonSx}
-      onClick={() => setOpenCreate(true)}
-    >
-      Create New
-    </Button>
-  </Stack>
+          <IconButton onClick={() => setOpenFilter(true)} sx={{ width: 50, height: 50 }}>
+            <Box component="img" src={Filter_Leads} />
+          </IconButton>
 
-</Stack>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            sx={createTicketButtonSx}
+            onClick={() => setOpenCreate(true)}
+          >
+            Create New
+          </Button>
+        </Stack>
+
+      </Stack>
 
 
       {/* Table Section */}
-      <Box sx={{  overflowX: "auto" }}>
-<Stack direction="row" px={2} py={2} sx={ticketsTableHeaderSx}>
-  {columns.map((col) => (
-    <Box
-      key={col.key}
-      flex={col.flex}
-      fontSize="12px"
-      fontWeight={500}
-      color="#626262"
-    >
-      {col.label}
-    </Box>
-  ))}
-</Stack>
+      <Box sx={{ overflowX: "auto" }}>
+        <Stack direction="row" px={2} py={2} sx={ticketsTableHeaderSx}>
+          {columns.map((col) => (
+            <Box key={col.key} flex={col.flex} sx={ticketsColumnHeaderCellSx}>
+              {col.label}
+            </Box>
+          ))}
+        </Stack>
 
 
         {paginatedTickets.length === 0 ? (
@@ -231,78 +225,65 @@ const cellSx = {
           </Box>
         ) : (
           paginatedTickets.map((t: TicketListItem) => (
-<Stack
-  key={t.id}
-  direction="row"
-  px={2}
-  py={2}
-  alignItems="center"
-  onClick={() => navigate(`/settings/tickets/${t.id}`)}
-  sx={{ ...ticketsRowSx, cursor: "pointer", borderBottom: "1px solid #f1f1f1" }}
->
-  <Box flex={columns[0].flex} color="#5a8aea" fontWeight="600" fontSize="14px">
-    {t.ticket_no?.replace("TICKET-", "TN-")}
-  </Box>
+            <Stack
+              key={t.id}
+              direction="row"
+              px={2}
+              py={2}
+              alignItems="center"
+              onClick={() => navigate(`/settings/tickets/${t.id}`)}
+              sx={{ ...ticketsRowSx, cursor: "pointer", borderBottom: "1px solid #f1f1f1" }}
+            >
+              <Box flex={columns[0].flex} sx={ticketsNumberCellSx}>
+                {t.ticket_no?.replace("TICKET-", "TN-")}
+              </Box>
 
-<Box flex={columns[1].flex} sx={cellSx} fontSize="13px">
-  {t.lab_name}
-</Box>
+              <Box flex={columns[1].flex} sx={ticketsEllipsisCellSx}>
+                {t.lab_name}
+              </Box>
 
-<Box flex={columns[2].flex} sx={cellSx} fontSize="13px">
-    {t.subject}
-  </Box>
+              <Box flex={columns[2].flex} sx={ticketsEllipsisCellSx}>
+                {t.subject}
+              </Box>
 
-  <Box flex={columns[3].flex} fontSize="13px">
-    {dayjs(t.created_at).format("DD/MM/YYYY")}
-  </Box>
+              <Box flex={columns[3].flex} fontSize="13px">
+                {dayjs(t.created_at).format("DD/MM/YYYY")}
+              </Box>
 
-  <Box flex={columns[4].flex} fontSize="13px">
-    {t.due_date ? dayjs(t.due_date).format("DD/MM/YYYY") : "—"}
-  </Box>
+              <Box flex={columns[4].flex} fontSize="13px">
+                {t.due_date ? dayjs(t.due_date).format("DD/MM/YYYY") : "—"}
+              </Box>
 
-  <Box flex={columns[5].flex} fontSize="13px">
-    {t.requested_by || "nil"}
-  </Box>
+              <Box flex={columns[5].flex} fontSize="13px">
+                {t.requested_by || "nil"}
+              </Box>
 
-  <Box flex={columns[6].flex} fontSize="13px">
-    {t.department_name}
-  </Box>
+              <Box flex={columns[6].flex} fontSize="13px">
+                {t.department_name}
+              </Box>
 
-<Box flex={columns[7].flex} display="flex" justifyContent="flex-start">
-<Chip
-  label={t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1).toLowerCase() : ""}
-  sx={priorityChipSx(t.priority)}
-/>
-</Box>
+              <Box flex={columns[7].flex} display="flex" justifyContent="flex-start">
+                <Chip
+                  label={t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1).toLowerCase() : ""}
+                  sx={priorityChipSx(t.priority)}
+                />
+              </Box>
 
 
-<Box flex={columns[8].flex} display="flex" alignItems="center" gap={1}>
-  <Avatar
-    sx={{
-      width: 24,
-      height: 24,
-      fontSize: 10,
-      bgcolor: "#5a8aea",
-    }}
-  >
-    {t.assigned_to
-      ? employees.find(item => item.id === t.assigned_to)?.emp_name?.[0]
-      : "?"}
-  </Avatar>
+              <Box flex={columns[8].flex} display="flex" alignItems="center" gap={1}>
+                <Avatar sx={ticketsAvatarSx}>
+                  {t.assigned_to
+                    ? employees.find(item => item.id === t.assigned_to)?.emp_name?.[0]
+                    : "?"}
+                </Avatar>
 
-  <Typography
-    sx={{
-      fontSize: "13px",      // 👈 reduced font
-      fontWeight: 500,
-      lineHeight: 1.2,       // 👈 prevents row stretching
-      color: "#2b2b2b",
-    }}
-  >
-    {employees.find(item => item.id === t.assigned_to)?.emp_name || "Unassigned"}
-  </Typography>
-</Box>
+                <Typography sx={ticketsAssigneeTextSx}>
 
-</Stack>
+                  {employees.find(item => item.id === t.assigned_to)?.emp_name || "Unassigned"}
+                </Typography>
+              </Box>
+
+            </Stack>
 
           ))
         )}
@@ -314,49 +295,41 @@ const cellSx = {
           Showing {totalEntries === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + ROWS_PER_PAGE, totalEntries)} of {totalEntries} entries
         </Typography>
 
-<Stack direction="row" alignItems="center" spacing={1}>
-  <IconButton 
-    disabled={page === 1} 
-    onClick={() => setPage((p) => p - 1)} 
-    sx={{ 
-      padding: '4px', 
-      fontWeight:"600",
-      minWidth: '32px', 
-      height: '32px'    
-    }}
-  >
-    ‹
-  </IconButton>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <IconButton
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            sx={ticketsPaginationArrowSx}
+          >
+            ‹
+          </IconButton>
 
-  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-    <Button
-      key={p}
-      onClick={() => setPage(p)}
-      sx={{
-        ...paginationButtonSx(p === page),
-        minWidth: '32px',
-        height: '32px', 
-        padding: '0px',  
-        fontSize: '0.8rem' 
-      }}
-    >
-      {p}
-    </Button>
-  ))}
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <Button
+              key={p}
+              onClick={() => setPage(p)}
+              sx={{
+                ...paginationButtonSx(p === page),
+                ...ticketsPaginationNumberOverrideSx,
+              }}
+            >
+              {p}
+            </Button>
+          ))}
 
-  <IconButton
-    disabled={page === totalPages || totalPages === 0}
-    onClick={() => setPage((p) => p + 1)}
-    sx={{ 
-      padding: '4px', 
-      fontWeight:"600",
-      minWidth: '32px',
-      height: '32px'
-    }}
-  >
-    ›
-  </IconButton>
-</Stack>
+          <IconButton
+            disabled={page === totalPages || totalPages === 0}
+            onClick={() => setPage((p) => p + 1)}
+            sx={{
+              padding: '4px',
+              fontWeight: "600",
+              minWidth: '32px',
+              height: '32px'
+            }}
+          >
+            ›
+          </IconButton>
+        </Stack>
       </Stack>
 
       <CreateTicket open={openCreate} onClose={() => setOpenCreate(false)} />

@@ -13,15 +13,12 @@ import {
 
 import { useEffect, useState } from "react";
 import { clinicsApi } from "../../../services/tickets.api";
-import type { Department, TicketPriority, FilterTicketsPayload,TicketFilters  } from "../../../types/tickets.types";
-
 import CloseIcon from "@mui/icons-material/Close";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
-import type { FilterTicketsProps } from "../../../types/Settings.types";
-
+// Styles and Types
 import {
   filterTicketsFocusedFieldSx,
   filterTicketsTitleSx,
@@ -30,7 +27,8 @@ import {
   filterTicketsApplyButtonSx,
   filterTicketsSelectFieldSx,
 } from "../../../styles/Settings/Tickets.styles";
-
+import type { Department, TicketPriority, FilterTicketsProps } from "../../../types/tickets.types";
+// Component 
 const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
   const [fromDate, setFromDate] = useState<Dayjs | null>(dayjs());
   const [toDate, setToDate] = useState<Dayjs | null>(dayjs().add(1, "day"));
