@@ -22,9 +22,14 @@ import LeadsConversation from "../components/LeadsHub/LeadsConversation";
 import Activity from "../components/LeadsHub/Activity";
 import FilterDialog from "../components/LeadsHub/FilterDialog";
 import LeadsFollowUp from "../components/LeadsHub/LeadsFollowUp";
+import type { FilterValues } from "../types/leads.types";
 
 import { fetchLeads, selectLeads } from "../store/leadSlice";
 import "../styles/Leads/leads.css";
+
+const STORAGE_KEY_FILTERS = "leads_filters";
+const STORAGE_KEY_TAB = "leads_active_tab";
+const STORAGE_KEY_VIEW = "leads_view_mode";
 
 const Leads: React.FC = () => {
   const navigate = useNavigate();
@@ -33,38 +38,113 @@ const Leads: React.FC = () => {
   // ====================== Redux State ======================
   const leads = useSelector(selectLeads);
 
+  // ====================== Load Saved State from localStorage ======================
+  const loadSavedFilters = (): FilterValues => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_FILTERS);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error("Failed to load saved filters:", error);
+    }
+    return {
+      department: "",
+      assignee: "",
+      status: "",
+      quality: "",
+      source: "",
+      dateFrom: null,
+      dateTo: null,
+    };
+  };
+
+  const loadSavedTab = (): number => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_TAB);
+      if (saved) {
+        return parseInt(saved, 10);
+      }
+    } catch (error) {
+      console.error("Failed to load saved tab:", error);
+    }
+    return 0;
+  };
+
+  const loadSavedViewMode = (): "table" | "board" => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_VIEW);
+      if (saved === "board" || saved === "table") {
+        return saved;
+      }
+    } catch (error) {
+      console.error("Failed to load saved view mode:", error);
+    }
+    return "table";
+  };
+
   // ====================== Local State ======================
-  const [tab, setTab] = React.useState(0);
+  const [tab, setTab] = React.useState(loadSavedTab());
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
-  const [viewMode, setViewMode] = React.useState<"table" | "board">("table");
+  const [viewMode, setViewMode] = React.useState<"table" | "board">(loadSavedViewMode());
+  const [activeFilters, setActiveFilters] = React.useState<FilterValues>(loadSavedFilters());
   const [counts, setCounts] = React.useState({
     all: 0,
     followUps: 0,
     archived: 0,
   });
 
+  // ====================== Save to localStorage when filters change ======================
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(activeFilters));
+    } catch (error) {
+      console.error("Failed to save filters:", error);
+    }
+  }, [activeFilters]);
+
+  // ====================== Save tab to localStorage ======================
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_TAB, tab.toString());
+    } catch (error) {
+      console.error("Failed to save tab:", error);
+    }
+  }, [tab]);
+
+  // ====================== Save view mode to localStorage ======================
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_VIEW, viewMode);
+    } catch (error) {
+      console.error("Failed to save view mode:", error);
+    }
+  }, [viewMode]);
+
   // ====================== Fetch Leads on Mount ======================
   React.useEffect(() => {
     dispatch(fetchLeads() as any);
   }, [dispatch]);
 
-  // ====================== Calculate Counts ======================
+  // ====================== Calculate Counts (with Filters) ======================
   React.useEffect(() => {
     if (leads && leads.length > 0) {
       const followUpStatuses = ["new", "lost", "cycle conversion"];
 
-      // ✅ FIXED: Use is_active instead of archived
+      // Apply filters to leads before counting
+      const filteredLeads = applyFilters(leads);
+
       // Active leads: is_active !== false (true or undefined)
       // Archived leads: is_active === false
-      const allCount = leads.filter((l) => l.is_active !== false).length;
+      const allCount = filteredLeads.filter((l) => l.is_active !== false).length;
 
-      const followUpCount = leads.filter((l) => {
+      const followUpCount = filteredLeads.filter((l) => {
         const status = (l.lead_status || "").toLowerCase().trim();
         return l.is_active !== false && followUpStatuses.includes(status);
       }).length;
 
-      const archivedCount = leads.filter((l) => l.is_active === false).length;
+      const archivedCount = filteredLeads.filter((l) => l.is_active === false).length;
 
       setCounts({
         all: allCount,
@@ -76,7 +156,7 @@ const Leads: React.FC = () => {
         all: allCount,
         followUps: followUpCount,
         archived: archivedCount,
-        total: leads.length,
+        total: filteredLeads.length,
       });
     } else {
       setCounts({
@@ -85,7 +165,86 @@ const Leads: React.FC = () => {
         archived: 0,
       });
     }
-  }, [leads]);
+  }, [leads, activeFilters]);
+
+  // ====================== Apply Filters Function ======================
+  const applyFilters = (leadsToFilter: any[]) => {
+    return leadsToFilter.filter((lead) => {
+      // Department filter
+      if (activeFilters.department && lead.department_id !== Number(activeFilters.department)) {
+        return false;
+      }
+
+      // Assignee filter
+      if (activeFilters.assignee && lead.assigned_to_id !== Number(activeFilters.assignee)) {
+        return false;
+      }
+
+      // Status filter
+      if (activeFilters.status) {
+        const leadStatus = (lead.lead_status || lead.status || "").toLowerCase();
+        if (leadStatus !== activeFilters.status.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Quality filter (derived from lead data)
+      if (activeFilters.quality) {
+        const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
+        const hasNextAction = Boolean(
+          lead.next_action_description && lead.next_action_description.trim() !== ""
+        );
+        const nextActionPending = lead.next_action_status === "pending";
+
+        let leadQuality = "Cold";
+        if (hasAssignee && hasNextAction && nextActionPending) {
+          leadQuality = "Hot";
+        } else if (hasAssignee || hasNextAction) {
+          leadQuality = "Warm";
+        }
+
+        if (leadQuality !== activeFilters.quality) {
+          return false;
+        }
+      }
+
+      // Source filter
+      if (activeFilters.source && lead.source !== activeFilters.source) {
+        return false;
+      }
+
+      // Date range filter
+      if (activeFilters.dateFrom || activeFilters.dateTo) {
+        const leadDate = lead.created_at ? new Date(lead.created_at) : null;
+        if (!leadDate) return false;
+
+        if (activeFilters.dateFrom) {
+          const fromDate = new Date(activeFilters.dateFrom);
+          fromDate.setHours(0, 0, 0, 0);
+          if (leadDate < fromDate) return false;
+        }
+
+        if (activeFilters.dateTo) {
+          const toDate = new Date(activeFilters.dateTo);
+          toDate.setHours(23, 59, 59, 999);
+          if (leadDate > toDate) return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  // ====================== Handle Filter Apply ======================
+  const handleApplyFilters = (filters: FilterValues) => {
+    console.log("🔍 Applying filters to leads:", filters);
+    setActiveFilters(filters);
+  };
+
+  // ====================== Get Active Filter Count ======================
+  const activeFilterCount = React.useMemo(() => {
+    return Object.values(activeFilters).filter((v) => v !== "" && v !== null).length;
+  }, [activeFilters]);
 
   // ====================== Tab Configuration ======================
   const tabs = [
@@ -151,14 +310,38 @@ const Leads: React.FC = () => {
             </IconButton>
           </div>
 
-          {/* Filter Button */}
-          <IconButton
-            sx={{ padding: "4px" }}
-            onClick={() => setFilterOpen(true)}
-            title="Open filters"
-          >
-            <img src={Filter_Leads} height={36} width={36} alt="Filter" />
-          </IconButton>
+          {/* Filter Button - Now with Badge */}
+          <Box sx={{ position: "relative" }}>
+            <IconButton
+              sx={{ padding: "4px" }}
+              onClick={() => setFilterOpen(true)}
+              title="Open filters"
+            >
+              <img src={Filter_Leads} height={36} width={36} alt="Filter" />
+            </IconButton>
+            {/* Filter Badge */}
+            {activeFilterCount > 0 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  bgcolor: "#EF4444",
+                  color: "white",
+                  borderRadius: "50%",
+                  width: 18,
+                  height: 18,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                }}
+              >
+                {activeFilterCount}
+              </Box>
+            )}
+          </Box>
 
           {/* Add New Lead Button */}
           <Button
@@ -185,20 +368,31 @@ const Leads: React.FC = () => {
       </Stack>
 
       {/* ================= CONTENT SWITCH ================= */}
-      {tab === 1 && <LeadsFollowUp search={search} />}
+      {tab === 1 && <LeadsFollowUp search={search} filters={activeFilters} />}
       {tab === 3 && <LeadsConversation />}
       {tab === 4 && <Activity />}
 
       {tab !== 1 && tab !== 3 && tab !== 4 && (
         viewMode === "table" ? (
-          <LeadsTable search={search} tab={tab === 2 ? "archived" : "active"} />
+          <LeadsTable 
+            search={search} 
+            tab={tab === 2 ? "archived" : "active"} 
+            filters={activeFilters}
+          />
         ) : (
-          <LeadsBoard search={search} />
+          <LeadsBoard 
+            search={search} 
+            filters={activeFilters}
+          />
         )
       )}
 
-      {/* Filter Dialog */}
-      <FilterDialog open={filterOpen} onClose={() => setFilterOpen(false)} />
+      {/* Filter Dialog with API Integration */}
+      <FilterDialog 
+        open={filterOpen} 
+        onClose={() => setFilterOpen(false)}
+        onApplyFilters={handleApplyFilters}
+      />
     </Box>
   );
 };
