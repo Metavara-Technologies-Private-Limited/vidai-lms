@@ -59,13 +59,30 @@ import {
   selectLeadsError,
 } from "../../store/leadSlice";
 
-import type { Lead } from "../../types/leads.types";
+import type { Lead, FilterValues } from "../../types/leads.types";
 
 interface Props {
   search: string;
+  filters?: FilterValues;
 }
 
-const LeadsBoard: React.FC<Props> = ({ search }) => {
+// ====================== Quality Derivation ======================
+const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
+  const hasAssignee = Boolean(
+    lead.assigned_to_id || lead.assigned_to_name
+  );
+  const hasNextAction = Boolean(
+    lead.next_action_description &&
+    lead.next_action_description.trim() !== ""
+  );
+  const nextActionPending = lead.next_action_status === "pending";
+
+  if (hasAssignee && hasNextAction && nextActionPending) return "Hot";
+  if (hasAssignee || hasNextAction) return "Warm";
+  return "Cold";
+};
+
+const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
@@ -76,27 +93,113 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
   const error = useSelector(selectLeadsError);
 
   // ✅ INTEGRATION: Local state for managing leads
-  const [leads, setLeads] = React.useState<Lead[]>([]);
+  const [leads, setLeads] = React.useState<any[]>([]);
 
   // ✅ INTEGRATION: Fetch leads on mount
   React.useEffect(() => {
     dispatch(fetchLeads() as any);
   }, [dispatch]);
 
-  // ✅ INTEGRATION: Sync Redux leads to local state
+  // ✅ FIX: Complete field mapping from API - Sync Redux leads to local state
   React.useEffect(() => {
     if (reduxLeads && reduxLeads.length > 0) {
-      const leadsWithArchived = reduxLeads.map((lead) => ({
+      const mappedLeads = reduxLeads.map((lead: any) => ({
         ...lead,
-        archived: lead.archived ?? false,
+        // ==================== Core Identity ====================
+        id: lead.id || "",
+        full_name: lead.full_name || lead.name || "",
+        name: lead.full_name || lead.name || "",
+        initials: lead.initials || (lead.full_name || lead.name || "?").charAt(0).toUpperCase(),
+        
+        // ==================== Contact Information ====================
+        email: lead.email || lead.email_address || "",
+        phone: lead.phone || lead.mobile || lead.phone_number || "",
+        phone_number: lead.phone || lead.mobile || lead.phone_number || "",
+        
+        // ==================== Location ====================
+        location: lead.location || lead.city || lead.state || lead.address || "Not specified",
+        city: lead.city || "",
+        state: lead.state || "",
+        address: lead.address || "",
+        
+        // ==================== Source & Campaign ====================
+        source: lead.source || lead.lead_source || "Unknown",
+        lead_source: lead.source || lead.lead_source || "",
+        campaign: lead.campaign || "",
+        
+        // ==================== Status & Quality ====================
+        status: lead.lead_status || lead.status || "New",
+        lead_status: lead.lead_status || lead.status || "New",
+        quality: deriveQuality(lead),
+        
+        // ==================== Assignment ====================
+        assigned: lead.assigned_to_name || "Unassigned",
+        assigned_to_name: lead.assigned_to_name || "",
+        assigned_to_id: lead.assigned_to_id || null,
+        
+        // ==================== Score ====================
+        score: lead.score || lead.ai_score || lead.lead_score || 0,
+        ai_score: lead.score || lead.ai_score || 0,
+        
+        // ==================== Department ====================
+        department: lead.department || lead.department_name || "",
+        department_id: lead.department_id || null,
+        department_name: lead.department || lead.department_name || "",
+        
+        // ==================== Dates ====================
+        created_at: lead.created_at || lead.created_date || null,
+        updated_at: lead.updated_at || lead.modified_date || null,
+        last_contacted: lead.last_contacted || lead.last_contact_date || null,
+        
+        // ==================== Task/Next Action ====================
+        task: lead.next_action_type || lead.task_type || lead.task || "N/A",
+        task_type: lead.next_action_type || lead.task_type || "",
+        taskStatus: lead.next_action_status || lead.task_status || "Pending",
+        task_status: lead.next_action_status || lead.task_status || "",
+        next_action_description: lead.next_action_description || "",
+        next_action_due_date: lead.next_action_due_date || null,
+        
+        // ==================== Activity ====================
+        activity: lead.last_activity || lead.activity || "View Activity",
+        last_activity: lead.last_activity || lead.activity || "",
+        activity_count: lead.activity_count || 0,
+        
+        // ==================== Medical/IVF Specific ====================
+        medical_history: lead.medical_history || "",
+        treatment_type: lead.treatment_type || "",
+        consultation_date: lead.consultation_date || null,
+        
+        // ==================== Notes & Comments ====================
+        notes: lead.notes || lead.remarks || "",
+        remarks: lead.notes || lead.remarks || "",
+        
+        // ==================== Archived Status ====================
+        archived: lead.is_active === false,
+        is_active: lead.is_active !== false,
+        
+        // ==================== Tags ====================
+        tags: lead.tags || [],
+        
+        // ==================== Priority ====================
+        priority: lead.priority || "Medium",
+        
+        // ==================== Conversion ====================
+        converted: lead.converted || false,
+        conversion_date: lead.conversion_date || null,
+        
+        // ==================== Financial ====================
+        estimated_value: lead.estimated_value || 0,
+        actual_value: lead.actual_value || 0,
       }));
-      setLeads(leadsWithArchived);
       
-      // 🔍 Debug: Log lead statuses
-      console.log("📊 Total leads:", leadsWithArchived.length);
-      console.log("📊 Lead statuses:", leadsWithArchived.map(l => ({ id: l.id, status: l.status, archived: l.archived })));
+      setLeads(mappedLeads);
       
-      const statusCounts = leadsWithArchived.reduce((acc, lead) => {
+      // 🔍 Debug: Log comprehensive lead data
+      console.log("✅ LeadsBoard: Total leads mapped:", mappedLeads.length);
+      console.log("📊 Sample lead data:", mappedLeads[0]);
+      console.log("📊 All fields available:", Object.keys(mappedLeads[0] || {}));
+      
+      const statusCounts = mappedLeads.reduce((acc, lead) => {
         const status = (lead.status || "No Status").toLowerCase();
         acc[status] = (acc[status] || 0) + 1;
         return acc;
@@ -109,7 +212,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
   const [openBookModal, setOpenBookModal] = React.useState(false);
   const [openMailModal, setOpenMailModal] = React.useState(false);
   const [openSmsModal, setOpenSmsModal] = React.useState(false);
-  const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
+  const [selectedLead, setSelectedLead] = React.useState<any | null>(null);
 
   // --- MAIL FLOW STATES ---
   const [mailStep, setMailStep] = React.useState<1 | 2>(1);
@@ -127,35 +230,92 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
     { id: '5', title: 'Welcome Email – Patient Inquiry', desc: 'Introduces the clinic and builds trust after the first inquiry.' },
   ];
 
+  // ✅ Updated columns with proper status matching
   const columns = [
-    { label: "NEW LEADS", statusKey: ["New", "no status", ""], color: "#6366F1" }, // ✅ Handle "no status" as New
-    { label: "FOLLOW-UPS", statusKey: ["Follow-Ups", "Follow-up"], color: "#F59E0B" },
-    { label: "APPOINTMENT", statusKey: ["Appointment"], color: "#10B981" },
-    { label: "CONVERTED LEADS", statusKey: ["Converted"], color: "#8B5CF6" },
-    { label: "CYCLE CONVERSION", statusKey: ["Cycle Conversion"], color: "#EC4899" },
-    { label: "LOST LEADS", statusKey: ["Lost"], color: "#64748B" },
+    { label: "NEW LEADS", statusKey: ["New", "new", "no status", ""], color: "#6366F1" },
+    { label: "FOLLOW-UPS", statusKey: ["Follow-Ups", "Follow-up", "follow-ups", "follow-up", "Lost", "lost", "Cycle Conversion", "cycle conversion"], color: "#F59E0B" },
+    { label: "APPOINTMENT", statusKey: ["Appointment", "appointment", "Scheduled", "scheduled"], color: "#10B981" },
+    { label: "CONVERTED LEADS", statusKey: ["Converted", "converted", "Won", "won"], color: "#8B5CF6" },
+    { label: "CYCLE CONVERSION", statusKey: ["Cycle Conversion", "cycle conversion"], color: "#EC4899" },
+    { label: "LOST LEADS", statusKey: ["Lost", "lost", "Disqualified", "disqualified"], color: "#64748B" },
   ];
 
-  // ✅ INTEGRATION: Filter from Redux state (not mock) and exclude archived
-  const filteredLeads = leads.filter((l) => {
-    const matchSearch = `${l.full_name || l.name} ${l.id}`.toLowerCase().includes(search.toLowerCase());
-    const isActive = !l.archived; // Don't show archived leads on board
-    return matchSearch && isActive;
-  });
+  // ✅ Enhanced filtering with all filter options
+  const filteredLeads = React.useMemo(() => {
+    return leads.filter((lead) => {
+      // Search filter
+      const searchStr = `${lead.full_name || lead.name || ""} ${lead.id || ""}`.toLowerCase();
+      const matchSearch = searchStr.includes(search.toLowerCase());
+      
+      // Active filter - exclude archived
+      const isActive = lead.is_active !== false;
+      
+      // Advanced filters
+      if (filters) {
+        // Department filter
+        if (filters.department && lead.department_id !== Number(filters.department)) {
+          return false;
+        }
+
+        // Assignee filter
+        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) {
+          return false;
+        }
+
+        // Status filter
+        if (filters.status) {
+          const leadStatus = (lead.lead_status || lead.status || "").toLowerCase();
+          if (leadStatus !== filters.status.toLowerCase()) {
+            return false;
+          }
+        }
+
+        // Quality filter
+        if (filters.quality && lead.quality !== filters.quality) {
+          return false;
+        }
+
+        // Source filter
+        if (filters.source && lead.source !== filters.source) {
+          return false;
+        }
+
+        // Date range filter
+        if (filters.dateFrom || filters.dateTo) {
+          const leadDate = lead.created_at ? new Date(lead.created_at) : null;
+          if (!leadDate) return false;
+
+          if (filters.dateFrom) {
+            const fromDate = new Date(filters.dateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            if (leadDate < fromDate) return false;
+          }
+
+          if (filters.dateTo) {
+            const toDate = new Date(filters.dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            if (leadDate > toDate) return false;
+          }
+        }
+      }
+      
+      return matchSearch && isActive;
+    });
+  }, [leads, search, filters]);
 
   // Handlers
-  const handleOpenBookModal = (lead: Lead) => {
+  const handleOpenBookModal = (lead: any) => {
     setSelectedLead(lead);
     setOpenBookModal(true);
   };
 
-  const handleOpenMail = (lead: Lead) => {
+  const handleOpenMail = (lead: any) => {
     setSelectedLead(lead);
     setMailStep(1); 
     setOpenMailModal(true);
   };
 
-  const handleOpenSms = (lead: Lead) => {
+  const handleOpenSms = (lead: any) => {
     setSelectedLead(lead);
     setSmsMessage("");
     setOpenSmsModal(true);
@@ -204,7 +364,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
     sx: { mb: 0.5, display: "block", color: "#475569", fontSize: '0.75rem' },
   };
 
-  const renderCardContent = (lead: Lead, columnLabel: string, isHovered: boolean) => {
+  const renderCardContent = (lead: any, columnLabel: string, isHovered: boolean) => {
     const iconBtnStyle = { 
       border: "1px solid #E2E8F0", 
       p: 0.5, 
@@ -242,7 +402,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
           <Stack direction="row" spacing={1} alignItems="center">
             <LocationOnIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-              {lead.location || "Not specified"}
+              {lead.location}
             </Typography>
           </Stack>
           <Stack direction="row" spacing={1} alignItems="center">
@@ -261,7 +421,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
               ASSIGNED TO
             </Typography>
             <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: '0.75rem' }}>
-              {lead.assigned || "Unassigned"}
+              {lead.assigned}
             </Typography>
           </Box>
           <Box sx={{ textAlign: "right" }}>
@@ -269,7 +429,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
               LEAD SOURCE
             </Typography>
             <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: '0.75rem' }}>
-              {lead.source || "Unknown"}
+              {lead.source}
             </Typography>
           </Box>
         </Stack>
@@ -392,11 +552,12 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
       {columns.map((col) => {
         // ✅ Case-insensitive status matching with null/undefined handling
         const leadsInCol = filteredLeads.filter((l) => {
-          const leadStatus = (l.status || "no status").toLowerCase().trim();
+          const leadStatus = (l.status || l.lead_status || "no status").toLowerCase().trim();
           return col.statusKey.some((key) => 
             leadStatus === (key || "no status").toLowerCase().trim()
           );
         });
+        
         return (
           <Box 
             key={col.label} 
@@ -454,7 +615,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Avatar sx={{ width: 36, height: 36, fontSize: "0.8rem", bgcolor: '#EEF2FF', color: '#6366F1', fontWeight: 700 }}>
-                        {lead.initials || (lead.full_name || lead.name)?.charAt(0).toUpperCase()}
+                        {lead.initials}
                       </Avatar>
                       <Box>
                         <Typography variant="subtitle2" fontWeight={700} sx={{ fontSize: '0.9rem', color: '#1E293B' }}>
@@ -467,7 +628,7 @@ const LeadsBoard: React.FC<Props> = ({ search }) => {
                     </Stack>
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <Chip 
-                        label={lead.quality || "N/A"} 
+                        label={lead.quality} 
                         size="small" 
                         sx={{ 
                           height: 20, fontSize: "0.65rem", fontWeight: 700,
