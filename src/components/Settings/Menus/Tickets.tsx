@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import {
-  Box, Button, Chip, IconButton, InputBase, Stack, Tab, Tabs, Typography, Avatar, CircularProgress, Alert, Divider
+  Box, Button, Chip, IconButton, InputBase, Stack, Tab, Tabs, Typography, Avatar, CircularProgress, Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -134,62 +134,96 @@ const Tickets = () => {
     return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
   }
 
+const columns = [
+  { key: "ticket_no", label: "Ticket No", flex: 1 },
+  { key: "lab_name", label: "Lab Name", flex: 1.4 },   
+  { key: "subject", label: "Subject", flex: 1 },       
+  { key: "created_at", label: "Created Date", flex: 1.1 }, 
+  { key: "due_date", label: "Due Date", flex: 1.1 },
+  { key: "requested_by", label: "Requested By", flex: 1.2 },
+  { key: "department", label: "Department", flex: 1.2 },
+  { key: "priority", label: "Priority", flex: 0.96},
+  { key: "assigned_to", label: "Assigned To", flex: 1.5 },
+];
+
+
+const cellSx = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
   return (
     <Box p={3}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* Header Section */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h6" fontWeight={700}>Tickets</Typography>
+{/* Title Row */}
+<Typography fontSize="18px" fontWeight={600} mb={1} mt={-3}>
+  Tickets
+</Typography>
 
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Box sx={ticketsSearchBoxSx}>
-            <SearchIcon fontSize="small" />
-            <InputBase
-              placeholder="Search by Ticket no."
-              sx={{ ml: 1, flex: 1 }}
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            />
-          </Box>
-          <IconButton onClick={() => setOpenFilter(true)}>
-            <Box component="img" src={Filter_Leads} />
-          </IconButton>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            sx={createTicketButtonSx}
-            onClick={() => setOpenCreate(true)}
-          >
-            Create New
-          </Button>
-        </Stack>
-      </Stack>
+{/* Tabs + Actions Row */}
+<Stack direction="row" alignItems="center" sx={{ width: "100%" }} mb={1.5}>
+  
+  {/* LEFT → Tabs */}
+  <Tabs
+    value={tab}
+    onChange={(_, v) => { setTab(v); setPage(1); }}
+    TabIndicatorProps={{ style: { display: "none" } }}
+    sx={ticketsTabsSx}
+  >
+    <Tab value="New" label={`New (${getCount("new")})`} />
+    <Tab value="Pending" label={`Pending (${getCount("pending")})`} />
+    <Tab value="Resolved" label={`Resolved (${getCount("resolved")})`} />
+    <Tab value="Closed" label={`Closed (${getCount("closed")})`} />
+  </Tabs>
 
-      {/* Status Tabs Section */}
-      <Tabs
-        value={tab}
-        onChange={(_, v) => { setTab(v); setPage(1); }}
-        TabIndicatorProps={{ style: { display: "none" } }}
-        sx={ticketsTabsSx}
-      >
-        <Tab value="New" label={`New (${getCount("new")})`} />
-        <Tab value="Pending" label={`Pending (${getCount("pending")})`} />
-        <Tab value="Resolved" label={`Resolved (${getCount("resolved")})`} />
-        <Tab value="Closed" label={`Closed (${getCount("closed")})`} />
-      </Tabs>
+  {/* RIGHT → Actions */}
+  <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: "auto" }}>
+    <Box sx={ticketsSearchBoxSx}>
+      <SearchIcon fontSize="small" />
+      <InputBase
+        placeholder="Search by Ticket no."
+        sx={{ ml: 1, flex: 1 }}
+        value={search}
+        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+      />
+    </Box>
+
+    <IconButton onClick={() => setOpenFilter(true)} sx={{ width: 50, height: 50 }}>
+      <Box component="img" src={Filter_Leads} />
+    </IconButton>
+
+    <Button
+      variant="contained"
+      startIcon={<AddIcon />}
+      sx={createTicketButtonSx}
+      onClick={() => setOpenCreate(true)}
+    >
+      Create New
+    </Button>
+  </Stack>
+
+</Stack>
+
 
       {/* Table Section */}
-      <Box sx={{ background: "#fff", borderRadius: 2, overflowX: "auto", boxShadow: "0px 2px 8px rgba(0,0,0,0.05)" }}>
-        <Stack direction="row" px={2} py={2} sx={ticketsTableHeaderSx}>
-          {["Ticket No", "Lab Name", "Subject", "Created Date", "Due Date", "Requested By", "Department", "Priority", "Assigned To"].map((h) => (
-            <Box key={h} flex={h === "Subject" ? 1.5 : 1} fontWeight={600} fontSize="0.85rem" color="text.secondary">
-              {h}
-            </Box>
-          ))}
-        </Stack>
+      <Box sx={{  overflowX: "auto" }}>
+<Stack direction="row" px={2} py={2} sx={ticketsTableHeaderSx}>
+  {columns.map((col) => (
+    <Box
+      key={col.key}
+      flex={col.flex}
+      fontSize="12px"
+      fontWeight={500}
+      color="#626262"
+    >
+      {col.label}
+    </Box>
+  ))}
+</Stack>
 
-        <Divider />
 
         {paginatedTickets.length === 0 ? (
           <Box p={6} textAlign="center">
@@ -197,65 +231,132 @@ const Tickets = () => {
           </Box>
         ) : (
           paginatedTickets.map((t: TicketListItem) => (
-            <Stack
-              key={t.id}
-              direction="row"
-              px={2}
-              py={2}
-              alignItems="center"
-              onClick={() => navigate(`/settings/tickets/${t.id}`)}
-              sx={{ ...ticketsRowSx, cursor: "pointer", borderBottom: '1px solid #f9f9f9' }}
-            >
-              <Box flex={1} color="#5a8aea" fontWeight="600" fontSize="0.9rem">{t.ticket_no}</Box>
-              <Box flex={1} fontSize="0.9rem">{t.lab_name}</Box>
-              <Box flex={1.5} sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pr: 2 }}>
-                {t.subject}
-              </Box>
-              <Box flex={1} fontSize="0.85rem">{dayjs(t.created_at).format("DD/MM/YYYY")}</Box>
-              <Box flex={1} fontSize="0.85rem">{t.due_date ? dayjs(t.due_date).format("DD/MM/YYYY") : "—"}</Box>
-              <Box flex={1} fontSize="0.9rem">{t.requested_by}</Box>
-              <Box flex={1} fontSize="0.9rem">{t.department_name}</Box>
-              <Box flex={1}>
-                <Chip label={t.priority} size="small" sx={priorityChipSx(t.priority)} />
-              </Box>
-              <Box flex={1} display="flex" alignItems="center" gap={1.5}>
-                <Avatar sx={{ width: 28, height: 28, fontSize: 11, bgcolor: '#5a8aea' }}>
-                  {t.assigned_to ? employees.find(item => item.id === t.assigned_to)?.emp_name[0] : "?"}
-                </Avatar>
-                <Typography variant="body2" fontWeight={500}>
-                  {employees.find(item => item.id === t.assigned_to)?.emp_name || "Unassigned"}
-                </Typography>
-              </Box>
-            </Stack>
+<Stack
+  key={t.id}
+  direction="row"
+  px={2}
+  py={2}
+  alignItems="center"
+  onClick={() => navigate(`/settings/tickets/${t.id}`)}
+  sx={{ ...ticketsRowSx, cursor: "pointer", borderBottom: "1px solid #f1f1f1" }}
+>
+  <Box flex={columns[0].flex} color="#5a8aea" fontWeight="600" fontSize="14px">
+    {t.ticket_no?.replace("TICKET-", "TN-")}
+  </Box>
+
+<Box flex={columns[1].flex} sx={cellSx} fontSize="13px">
+  {t.lab_name}
+</Box>
+
+<Box flex={columns[2].flex} sx={cellSx} fontSize="13px">
+    {t.subject}
+  </Box>
+
+  <Box flex={columns[3].flex} fontSize="13px">
+    {dayjs(t.created_at).format("DD/MM/YYYY")}
+  </Box>
+
+  <Box flex={columns[4].flex} fontSize="13px">
+    {t.due_date ? dayjs(t.due_date).format("DD/MM/YYYY") : "—"}
+  </Box>
+
+  <Box flex={columns[5].flex} fontSize="13px">
+    {t.requested_by || "nil"}
+  </Box>
+
+  <Box flex={columns[6].flex} fontSize="13px">
+    {t.department_name}
+  </Box>
+
+<Box flex={columns[7].flex} display="flex" justifyContent="flex-start">
+<Chip
+  label={t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1).toLowerCase() : ""}
+  sx={priorityChipSx(t.priority)}
+/>
+</Box>
+
+
+<Box flex={columns[8].flex} display="flex" alignItems="center" gap={1}>
+  <Avatar
+    sx={{
+      width: 24,
+      height: 24,
+      fontSize: 10,
+      bgcolor: "#5a8aea",
+    }}
+  >
+    {t.assigned_to
+      ? employees.find(item => item.id === t.assigned_to)?.emp_name?.[0]
+      : "?"}
+  </Avatar>
+
+  <Typography
+    sx={{
+      fontSize: "13px",      // 👈 reduced font
+      fontWeight: 500,
+      lineHeight: 1.2,       // 👈 prevents row stretching
+      color: "#2b2b2b",
+    }}
+  >
+    {employees.find(item => item.id === t.assigned_to)?.emp_name || "Unassigned"}
+  </Typography>
+</Box>
+
+</Stack>
+
           ))
         )}
       </Box>
 
       {/* Pagination View */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mt={3} px={1}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mt={3} px={0.5}>
         <Typography fontSize={13} color="text.secondary">
           Showing {totalEntries === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + ROWS_PER_PAGE, totalEntries)} of {totalEntries} entries
         </Typography>
 
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)} sx={{ border: '1px solid #E0E0E0' }}>‹</IconButton>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Button
-              key={p}
-              onClick={() => setPage(p)}
-              sx={paginationButtonSx(p === page)}
-            >
-              {p}
-            </Button>
-          ))}
-          <IconButton
-            disabled={page === totalPages || totalPages === 0}
-            onClick={() => setPage((p) => p + 1)}
-            sx={{ border: '1px solid #E0E0E0' }}
-          >
-            ›
-          </IconButton>
-        </Stack>
+<Stack direction="row" alignItems="center" spacing={1}>
+  <IconButton 
+    disabled={page === 1} 
+    onClick={() => setPage((p) => p - 1)} 
+    sx={{ 
+      padding: '4px', 
+      fontWeight:"600",
+      minWidth: '32px', 
+      height: '32px'    
+    }}
+  >
+    ‹
+  </IconButton>
+
+  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+    <Button
+      key={p}
+      onClick={() => setPage(p)}
+      sx={{
+        ...paginationButtonSx(p === page),
+        minWidth: '32px',
+        height: '32px', 
+        padding: '0px',  
+        fontSize: '0.8rem' 
+      }}
+    >
+      {p}
+    </Button>
+  ))}
+
+  <IconButton
+    disabled={page === totalPages || totalPages === 0}
+    onClick={() => setPage((p) => p + 1)}
+    sx={{ 
+      padding: '4px', 
+      fontWeight:"600",
+      minWidth: '32px',
+      height: '32px'
+    }}
+  >
+    ›
+  </IconButton>
+</Stack>
       </Stack>
 
       <CreateTicket open={openCreate} onClose={() => setOpenCreate(false)} />

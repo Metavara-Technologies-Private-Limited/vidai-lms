@@ -1,4 +1,4 @@
-import  dayjs, { Dayjs } from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 
 // Ticket Types based on Swagger API documentation
 
@@ -111,6 +111,7 @@ export interface TicketFilters {
   to_date?: string;
   page?: number;
   page_size?: number;
+  ordering?: string;
 }
 
 

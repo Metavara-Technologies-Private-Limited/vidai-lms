@@ -6,11 +6,17 @@
 export const ticketsSearchBoxSx = {
   display: "flex",
   alignItems: "center",
-  px: 1.5,
-  py: 0.5,
+  px: 1.2,
+  height: 34,              // 🔥 fixed smaller height
   border: "1px solid #E0E0E0",
-  borderRadius: 1,
-  width: 260,
+  borderRadius: "6px",
+  width: 220,              // slightly narrower
+
+  "& input": {
+    fontSize: "13px",
+    padding: 0,
+  },
+
   "&:has(.Mui-focused)": {
     border: "1px solid #232323",
   },
@@ -18,24 +24,53 @@ export const ticketsSearchBoxSx = {
 
 /* Create button */
 export const createTicketButtonSx = {
-  borderRadius: 1,
-  color: "FFFFFF",
+  height: 34,                 
+  px: 2,
+  fontSize: "12px",
+  fontWeight: 600,
+  borderRadius: "6px",
+  textTransform: "none",
+  color: "#FFFFFF",
   backgroundColor: "#505050",
-  "&:hover": { backgroundColor: "#232323" },
+
+  "& .MuiButton-startIcon": {
+    marginRight: "4px",
+  },
+
+  "&:hover": {
+    backgroundColor: "#232323",
+  },
 };
+
 
 /* Tabs */
 export const ticketsTabsSx = {
-  mb: 2,
+  mb: 0,
+  minHeight: 36,
+  height: 36,
+
+  width: "fit-content",        // ✅ KEY: stop Tabs from stretching
+  flexShrink: 0,               // ✅ prevent flex expanding
+
+  "& .MuiTabs-flexContainer": {
+    height: 36,
+    alignItems: "center",
+    gap: "10px",               // ✅ controls spacing BETWEEN tabs
+  },
 
   "& .MuiTab-root": {
     textTransform: "none",
-    borderRadius: "12px",
+    borderRadius: "8px",
     border: "1px solid #E0E0E0",
     color: "#9E9E9E",
-    minHeight: 44,
-    px: 4,
-    mr: 2,
+
+    minHeight: 30,
+    height: 30,
+    padding: "0 14px",
+    marginRight: 0,            // ❌ remove margin (we now use gap)
+
+    fontSize: "13px",
+    fontWeight: 500,
     backgroundColor: "#FAFAFA",
     transition: "all 0.2s ease",
   },
@@ -44,10 +79,10 @@ export const ticketsTabsSx = {
     color: "#E97B5A",
     borderColor: "#E97B5A",
     backgroundColor: "rgba(233,123,90,0.08)",
-    boxShadow: "0px 2px 6px rgba(0,0,0,0.08)",
-    fontWeight: 700,
+    fontWeight: 600,
   },
 };
+
 
 /* Table header */
 export const ticketsTableHeaderSx = {
@@ -56,40 +91,57 @@ export const ticketsTableHeaderSx = {
   backgroundColor: "#F8F8F9",
   borderBottom: "1px solid #EEE",
   borderRadius: 1.5,
-  fontSize: "14px",
+  fontSize: "10px",
 };
 
 /* Table row */
 export const ticketsRowSx = {
-  borderTop: "1px solid #EEE",
   "&:hover": { background: "#FAFAFA" },
 };
 
 /* Priority chip */
-export const priorityChipSx = (priority: string) => ({
-  borderRadius: "999px",
-  fontWeight: 500,
-  px: 1.5,
-  border: "2px solid",
-  borderColor:
-    priority === "High"
+export const priorityChipSx = (priority: string) => {
+  // ✅ Clean the incoming value from API
+  const value = (priority || "").trim().toLowerCase();
+
+  const isHigh = value === "high";
+  const isMedium = value === "medium";
+  const isLow = value === "low";
+
+  return {
+    borderRadius: "999px",
+    fontWeight: 500,
+    fontSize: "12px",
+    height: 22,
+    px: 1,
+    border: "1.5px solid",
+
+    // ✅ Force styles so MUI default color doesn't override
+    borderColor: isHigh
       ? "#FF4D4F"
-      : priority === "Medium"
+      : isMedium
       ? "#FFC53D"
       : "#5B8FF9",
-  backgroundColor:
-    priority === "High"
-      ? "rgba(255, 77, 79, 0.08)"
-      : priority === "Medium"
-      ? "rgba(255, 197, 61, 0.10)"
-      : "rgba(91, 143, 249, 0.10)",
-  color:
-    priority === "High"
+
+    backgroundColor: isHigh
+      ? "rgba(255,77,79,0.08)"
+      : isMedium
+      ? "rgba(255,197,61,0.10)"
+      : "rgba(91,143,249,0.10)",
+
+    color: isHigh
       ? "#FF4D4F"
-      : priority === "Medium"
+      : isMedium
       ? "#FFC53D"
       : "#5B8FF9",
-});
+
+    // 👇 ensures text uses our color, not MUI default
+    "& .MuiChip-label": {
+      color: "inherit",
+      px: 1,
+    },
+  };
+};
 
 /* Pagination button */
 export const paginationButtonSx = (active: boolean) => ({
@@ -100,6 +152,122 @@ export const paginationButtonSx = (active: boolean) => ({
   backgroundColor: active ? "#232323" : "transparent",
   color: active ? "#FFFFFF" : "#BBBBBB",
 });
+
+//############################################################
+// ================================
+// Ticket View → Properties Panel Styles
+// ================================
+
+export const propertyContainerSx = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "14px",
+};
+
+export const propertyFieldSx = {
+  backgroundColor: "#F7F7F7",
+  borderRadius: "10px",
+
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "10px",
+    fontSize: "13px",
+    height: "44px",
+  },
+
+  "& .MuiOutlinedInput-notchedOutline": {
+    borderColor: "#E0E0E0",
+  },
+
+  "&:hover .MuiOutlinedInput-notchedOutline": {
+    borderColor: "#CFCFCF",
+  },
+
+  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+    borderColor: "#232323",
+  },
+};
+
+export const floatingLabelSx = {
+  fontSize: "12px",
+  color: "#9E9E9E",
+};
+
+export const valuePillSx = {
+  borderRadius: "999px",
+  px: 1.2,
+  py: 0.3,
+  fontSize: "12px",
+  fontWeight: 500,
+  display: "inline-flex",
+  alignItems: "center",
+};
+
+export const assigneeRenderSx = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+
+export const propertyMenuProps = {
+  PaperProps: {
+    sx: {
+      mt: 1,
+      borderRadius: "12px",
+      padding: "6px",
+      backgroundColor: "#F6F6F6",
+      boxShadow: "none",
+    },
+  },
+};
+
+/* Status chip (same pattern as priority) */
+export const statusChipSx = (status: string) => {
+  const value = (status || "").trim().toLowerCase();
+
+  const isNew = value === "new";
+  const isPending = value === "pending";
+  const isResolved = value === "resolved";
+  const isClosed = value === "closed";
+
+  return {
+    borderRadius: "999px",
+    fontWeight: 500,
+    fontSize: "12px",
+    height: 22,
+    px: 1,
+    border: "1.5px solid",
+
+    borderColor: isNew
+      ? "#5B8FF9"        // 🔵 Blue
+      : isPending
+      ? "#FF4D4F"        // 🔴 Red (same as High)
+      : isResolved
+      ? "#52C41A"        // 🟢 Green
+      : "#FFC53D",       // 🟡 Yellow (same as Medium)
+
+    backgroundColor: isNew
+      ? "rgba(91,143,249,0.10)"
+      : isPending
+      ? "rgba(255,77,79,0.08)"
+      : isResolved
+      ? "rgba(82,196,26,0.10)"
+      : "rgba(255,197,61,0.10)",
+
+    color: isNew
+      ? "#5B8FF9"
+      : isPending
+      ? "#FF4D4F"
+      : isResolved
+      ? "#52C41A"
+      : "#FFC53D",
+
+    "& .MuiChip-label": {
+      color: "inherit",
+      px: 1,
+    },
+  };
+};
+
 
 //############################################################
 
@@ -324,5 +492,41 @@ export const filterTicketsSelectFieldSx = {
   },
   "& .MuiInputLabel-root.Mui-focused": {
     color: "#505050",
+  },
+};
+//#########################################################
+
+// ================================
+// TicketView file styles
+// ================================
+export const ticketDetailsTabsSx = {
+  minHeight: 40,
+  bgcolor: "#e2e3e5",
+  borderRadius: "10px",
+  p: "4px",
+
+  "& .MuiTabs-indicator": {
+    display: "none", 
+  },
+
+  "& .MuiTabs-flexContainer": {
+    gap: "50px",
+  },
+
+  "& .MuiTab-root": {
+    textTransform: "none",
+    minHeight: 32,
+    fontSize: "14px",
+    fontWeight: 500,
+    color: "#232323",
+    borderRadius: "8px",
+    transition: "all 0.2s ease",
+  },
+
+  "& .MuiTab-root.Mui-selected": {
+    bgcolor: "#FFFFFF",
+    color: "#E17E61",
+    fontWeight: 600,
+    boxShadow: "0px 1px 3px rgba(0,0,0,0.08)",
   },
 };
