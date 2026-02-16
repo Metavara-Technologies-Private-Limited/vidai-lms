@@ -17,6 +17,7 @@ import socialCardIcon from "./Icons/social-media-card.png";
 import mailCardIcon from "./Icons/mail-card.png";
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
+import { toast } from "react-toastify";
 
 type CampaignStatus =
   | "Live"
@@ -183,6 +184,7 @@ export default function CampaignCard({
 
               if (c.status === "Stopped") {
                 onStatusChange(c.id, "Live");
+                toast.success("Campaign is Live now");
               } else {
                 setShowStopModal(true);
               }

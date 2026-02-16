@@ -82,16 +82,7 @@ export default function CampaignsScreen() {
   /* ================= STATUS CHANGE ================= */
   const handleStatusChange = (id: string, newStatus: CampaignStatus) => {
     dispatch(updateCampaignStatus({ id, status: newStatus }));
-
-    // Toast
-    const toast = document.createElement("div");
-    toast.className = "success-toast";
-    toast.innerText = `Campaign ${newStatus}`;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      toast.remove();
-    }, 3000);
+    
   };
 
   // ADD this handler after handleStatusChange

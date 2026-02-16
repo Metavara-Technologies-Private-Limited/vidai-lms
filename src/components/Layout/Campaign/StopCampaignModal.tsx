@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "../../../../src/styles/Campaign/StopCampaignModal.css";
+import { toast } from "react-toastify";
 
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
@@ -133,6 +134,7 @@ export default function StopCampaignModal({
                 className="stop-btn"
                 onClick={() => {
                   onStop();  // ✅ update status in parent
+                  toast.warn("Campaign stopped successfully");
                   onClose(); // ✅ close modal
                 }}
               >

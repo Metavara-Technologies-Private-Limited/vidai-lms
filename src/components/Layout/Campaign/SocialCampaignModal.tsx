@@ -10,6 +10,7 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import dayjs from "dayjs";
+import { toast } from "react-toastify";
 
 /* 🔹 LOCAL ICONS */
 import instagramIcon from "../../../components/Layout/Campaign/Icons/instagram.png";
@@ -67,7 +68,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
   const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
     setSubmitted(true);
-    if (type !== "draft" && (!scheduleDate || !scheduleTime)) return;
+    // if (type !== "draft" && (!scheduleDate || !scheduleTime)) return;
     if (type === "live" && (!step1Valid || !step2Valid)) return;
     if (
       type === "scheduled" &&
@@ -116,18 +117,19 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
         name: apiData.campaign_name,
         type: "social",
         status:
-          type === "live" ? "Live" : type === "draft" ? "Draft" : "Scheduled",
+          type === "live" ? "Live" : type === "draft" ? "Draft" : "scheduled",
         start: apiData.start_date,
         end: apiData.end_date,
         platforms: accounts,
         leads: 0,
         scheduledAt: type === "scheduled" ? scheduledDateTime : null,
       };
-
+      
       onSave(formattedCampaign);
+      toast.success("Campaign created successfully");
       onClose();
     } catch (error: any) {
-      console.error(error.response?.data || error.message);
+      toast.error("Failed to create campaign");
     }
   };
 
