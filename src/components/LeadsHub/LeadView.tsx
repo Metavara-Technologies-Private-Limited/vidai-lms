@@ -55,6 +55,31 @@ type NoteData = {
   time: string;
 };
 
+// ====================== Format Lead ID - Same as Table ======================
+const formatLeadId = (id: string): string => {
+  // If ID already has format like "#LN-201" or "LN-201", use it
+  if (id.match(/^#?LN-\d+$/i)) {
+    return id.startsWith('#') ? id : `#${id}`;
+  }
+  
+  // If ID contains "LN-" somewhere, extract it
+  const lnMatch = id.match(/#?LN-(\d+)/i);
+  if (lnMatch) {
+    return `#LN-${lnMatch[1]}`;
+  }
+  
+  // Try to find any sequence of digits
+  const numMatch = id.match(/\d+/);
+  if (numMatch) {
+    return `#LN-${numMatch[0]}`;
+  }
+  
+  // Fallback: create from hash of ID
+  const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const num = (hash % 900) + 100; // Generate 3-digit number
+  return `#LN-${num}`;
+};
+
 export default function LeadDetailView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -373,6 +398,9 @@ export default function LeadDetailView() {
   const leadCampaignName = lead.campaign_name || "N/A";
   const leadCampaignDuration = lead.campaign_duration || "N/A";
   
+  // FORMAT LEAD ID - Use the same function as the table
+  const leadDisplayId = formatLeadId(lead.id);
+  
   // Partner Information
   const partnerName = lead.partner_name || lead.partner_full_name || "N/A";
   const partnerAge = lead.partner_age || "N/A";
@@ -426,7 +454,7 @@ export default function LeadDetailView() {
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Lead ID</Typography>
-              <Typography fontWeight={600} variant="body1">{lead.id}</Typography>
+              <Typography fontWeight={600} variant="body1">{leadDisplayId}</Typography>
             </Stack>
             <Stack spacing={0.5}>
               <Typography variant="caption" color="text.secondary">Source</Typography>
