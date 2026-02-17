@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import "../../../../src/styles/Campaign/SocialCampaignModal.css";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
-
 import { CampaignAPI } from "../../../../src/services/campaign.api";
 import {FormControl,InputLabel,Select,MenuItem, Modal, Typography, IconButton} from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";

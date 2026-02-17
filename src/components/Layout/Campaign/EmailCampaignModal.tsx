@@ -1,6 +1,5 @@
 import { useState } from "react";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
-
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";

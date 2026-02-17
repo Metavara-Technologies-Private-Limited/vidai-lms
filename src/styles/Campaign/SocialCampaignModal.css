@@ -706,7 +706,7 @@ select:invalid {
 }
 
 .budget-input {
-  -moz-appearance: number-input;
+  appearance: textfield;
 }
 
 

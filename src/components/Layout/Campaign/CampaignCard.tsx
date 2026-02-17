@@ -1,7 +1,5 @@
 import "../../../../src/styles/Campaign/CampaignCard.css";
 import StopCampaignModal from "../../../components/Layout/Campaign/StopCampaignModal";
-
-/* ===== ICON IMPORTS ===== */
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
@@ -153,7 +151,7 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-        {c.status === "Scheduled" && c.scheduledAt ? (
+        {c.status === "Schedule" && c.scheduledAt ? (
           <span>
             <label>SCHEDULED:</label>{" "}
             {dayjs(c.scheduledAt).format("DD MMM [at] hh:mm A")}
