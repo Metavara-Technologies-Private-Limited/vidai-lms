@@ -2,11 +2,17 @@ import { Box, Typography, Divider, Avatar, Stack, TextField, Button } from "@mui
 import ReplyMail from "../../../assets/icons/Reply_Ticket_Mail.svg";
 import dayjs from "dayjs";
 import TicketReplyEditor from "./TicketReplyEditor";
+import type { TicketReplyEditorProps } from "./TicketReplyEditor";
+import type {
+  TicketDetail,
+  TicketDocument,
+} from "../../../types/tickets.types";
+
 
 interface Props {
-  ticket: any;
+  ticket: TicketDetail | null;
   description: string;
-  replyProps?: any;
+  replyProps?: TicketReplyEditorProps | null;
 
   setDescription: (v: string) => void;
 
@@ -85,7 +91,7 @@ const TicketContentPanel = ({
 
         {/* Attachments */}
         <Stack direction="row" spacing={2}>
-          {ticket.documents?.map((doc: any) => (
+          {ticket.documents?.map((doc: TicketDocument) => (
             <Box
               key={doc.id}
               sx={{
@@ -115,21 +121,21 @@ const TicketContentPanel = ({
         </Stack>
       </Box>
 
-{/* Reply Button */}
-{!openReply && (
-  <Button onClick={() => setOpenReply(true)} sx={{ textTransform: "none", mt: 2 }}>
-    <img src={ReplyMail} alt="Reply" />
-  </Button>
-)}
+      {/* Reply Button */}
+      {!openReply && (
+        <Button onClick={() => setOpenReply(true)} sx={{ textTransform: "none", mt: 2 }}>
+          <img src={ReplyMail} alt="Reply" />
+        </Button>
+      )}
 
-{/* Reply Editor shows BELOW */}
-{openReply && replyProps && (
-  <TicketReplyEditor
-    openReply={openReply}
-    setOpenReply={setOpenReply}
-    {...replyProps}
-  />
-)}
+      {/* Reply Editor shows BELOW */}
+      {openReply && replyProps ? (
+        <TicketReplyEditor
+          {...replyProps}
+          openReply={openReply}
+          setOpenReply={setOpenReply}
+        />
+      ) : null}
 
     </Box>
   );

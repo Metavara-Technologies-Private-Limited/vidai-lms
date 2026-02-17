@@ -13,6 +13,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import dayjs from "dayjs";
+import type { TicketDetail, Employee, TicketPriority, TicketStatus, TicketTimeline } from "../../../types/tickets.types";
 
 import {
   propertyContainerSx,
@@ -25,8 +26,8 @@ import {
 } from "../../../styles/Settings/Tickets.styles";
 
 interface Props {
-  ticket: any;
-  employees: any[];
+  ticket: TicketDetail | null;
+  employees: Employee[];
 
   tab: number;
   setTab: (v: number) => void;
@@ -34,11 +35,11 @@ interface Props {
   type: string;
   setType: (v: string) => void;
 
-  status: string;
-  setStatus: (v: any) => void;
+  status: TicketStatus;
+  setStatus: (v: TicketStatus) => void;
 
-  priority: string;
-  setPriority: (v: any) => void;
+  priority: TicketPriority;
+  setPriority: (v: TicketPriority) => void;
 
   assignTo: number | "";
   setAssignTo: (v: number | "") => void;
@@ -48,6 +49,7 @@ interface Props {
 
   ticketTypes: string[];
 }
+
 
 const TicketPropertiesSidebar = ({
   ticket,
@@ -124,12 +126,13 @@ const TicketPropertiesSidebar = ({
                 select
                 label="Status"
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(e) => setStatus(e.target.value as TicketStatus)}
                 fullWidth
                 size="small"
                 sx={propertyFieldSx}
                 InputLabelProps={{ sx: floatingLabelSx }}
               >
+
                 {["new", "pending", "resolved", "closed"].map((s) => (
                   <MenuItem key={s} value={s}>
                     <Chip label={s.toUpperCase()} sx={statusChipSx(s)} />
@@ -142,12 +145,13 @@ const TicketPropertiesSidebar = ({
                 select
                 label="Priority"
                 value={priority}
-                onChange={(e) => setPriority(e.target.value)}
+                onChange={(e) => setPriority(e.target.value as TicketPriority)}
                 fullWidth
                 size="small"
                 sx={propertyFieldSx}
                 InputLabelProps={{ sx: floatingLabelSx }}
               >
+
                 {["low", "medium", "high"].map((p) => (
                   <MenuItem key={p} value={p}>
                     <Chip label={p.toUpperCase()} sx={priorityChipSx(p)} />
@@ -195,9 +199,9 @@ const TicketPropertiesSidebar = ({
       ) : (
         <Box>
           {(() => {
-            const timeline = ticket.timeline ? [...ticket.timeline] : [];
+            const timeline = (ticket.timeline || []) as TicketTimeline[];
 
-            let displayItems = [...timeline];
+            const displayItems: (TicketTimeline & { is_injected?: boolean })[] = [...timeline];
             const hasAssignment = displayItems.some(t => t.action?.toLowerCase().includes("assign"));
 
             if (!hasAssignment && ticket.assigned_to) {
@@ -214,7 +218,7 @@ const TicketPropertiesSidebar = ({
               }
             }
 
-            return displayItems.map((item: any, index: number) => {
+            return displayItems.map((item, index) => {
               const isAssigned = item.action?.toLowerCase().includes("assign") || item.is_injected;
               const isLast = index === displayItems.length - 1;
 
@@ -228,7 +232,7 @@ const TicketPropertiesSidebar = ({
                         left: 15,
                         top: 34,
                         width: 2,
-                        height: "calc(100% - 10px)", 
+                        height: "calc(100% - 10px)",
                         bgcolor: "#E0E0E0",
                         zIndex: 0,
                       }}
@@ -248,7 +252,7 @@ const TicketPropertiesSidebar = ({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      zIndex: 1, 
+                      zIndex: 1,
                     }}
                   >
                     {isAssigned ? (
