@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import "../../../../src/styles/Campaign/StopCampaignModal.css";
 import { toast } from "react-toastify";
-
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
