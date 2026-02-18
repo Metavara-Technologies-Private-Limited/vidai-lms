@@ -4,7 +4,7 @@
   justify-content: space-between;
   align-items: flex-start;
   background: #fff;
-  padding: 18px 22px;   /* reduced padding */
+  padding: 18px 22px;   
   border-radius: 16px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
   gap: 24px;
@@ -35,15 +35,15 @@
 }
 
 .cd-content-image {
-  width: 340px;          /* adjust width */
+  width: 340px;         
   display: flex;
-  align-items: stretch;  /* important */
+  align-items: stretch;  
 }
 
 .cd-content-image img {
   width: 100%;
-  height: 100%;          /* match container height */
-  object-fit: cover;     /* fill container */
+  height: 100%;          
+  object-fit: cover;    
   object-position: center;
   border-radius: 16px;
 }
@@ -59,14 +59,13 @@
   border: 1px solid #f1f1f1;
 }
 
-/* Title */
 .cd-perf-title {
   font-size: 16px;
   font-weight: 500;
   margin-bottom: 6px;
 }
 
-/* Divider */
+
 .cd-perf-divider {
   width: 100%;
   height: 1px;
@@ -74,7 +73,7 @@
   margin-bottom: 10px;
 }
 
-/* Row with number + toggle */
+
 .cd-perf-row {
   display: flex;
   justify-content: space-between;
@@ -135,16 +134,14 @@
   margin: 10px 0 20px 0;
 }
 
-/* Main Layout */
 .cd-platform-main {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-/* LEFT PIE AREA */
 .cd-pie-wrapper {
-  width: 340px;   /* controls chart width */
+  width: 340px;   
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -170,7 +167,6 @@
 .dot2 { background: #C5CAD8; }
 .dot3 { background: #8D95A8; }
 
-/* RIGHT CARDS */
 .cd-platform-cards {
   display: flex;
   gap: 20px;
@@ -246,7 +242,6 @@
   margin-bottom: 10px;
 }
 
-/* Thin divider */
 .cd-ai-divider {
   width: 100%;
   height: 0.5px;
@@ -254,14 +249,12 @@
   margin: 6px 0 14px 0; 
 }
 
-/* Cards layout */
 .cd-ai-cards {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* Individual card */
 .cd-ai-card {
   padding: 10px 14px;
   border-radius: 12px;
@@ -274,7 +267,6 @@
   margin-bottom: 6px;
 }
 
-/* Color variations */
 .green {
   background: #f4fff6;
   border-color: #c6f0d6;

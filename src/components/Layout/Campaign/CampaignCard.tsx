@@ -1,7 +1,5 @@
 import "../../../../src/styles/Campaign/CampaignCard.css";
 import StopCampaignModal from "../../../components/Layout/Campaign/StopCampaignModal";
-
-/* ===== ICON IMPORTS ===== */
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
@@ -22,7 +20,7 @@ import { toast } from "react-toastify";
 type CampaignStatus =
   | "Live"
   | "Draft"
-  | "Scheduled"
+  | "Schedule"
   | "Paused"
   | "Stopped"
   | "Completed"
@@ -153,7 +151,7 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-        {c.status === "Scheduled" && c.scheduledAt ? (
+        {c.status === "Schedule" && c.scheduledAt ? (
           <span>
             <label>SCHEDULED:</label>{" "}
             {dayjs(c.scheduledAt).format("DD MMM [at] hh:mm A")}
@@ -175,8 +173,6 @@ export default function CampaignCard({
           >
             <img src={viewIcon} alt="View" width={20} height={20} />
           </button>
-
-          {/* ✅ Pause / Play Toggle */}
           <button
             className="action-btn pause-btn"
             onClick={(e) => {

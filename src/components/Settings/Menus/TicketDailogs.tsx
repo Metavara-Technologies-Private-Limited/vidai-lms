@@ -11,6 +11,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import Visibility from "@mui/icons-material/Visibility";
 import { NewTemplateModal } from "../Templates/NewTemplateModal";
 import TemplateService from "../../../services/templates.api";
+import type { EmailTemplate } from "../../../types/tickets.types";
 
 interface TicketDailogProps {
   /* File Preview */
@@ -20,20 +21,21 @@ interface TicketDailogProps {
 
   /* Template Dialog */
   openTemplateDialog: boolean;
-  templates: any[];
-  selectedTemplate: any;
-  setSelectedTemplate: (t: any) => void;
+  templates: EmailTemplate[];
+  selectedTemplate: EmailTemplate | null;
+  setSelectedTemplate: (t: EmailTemplate) => void;
   setOpenTemplateDialog: (v: boolean) => void;
 
   /* Template Insert */
-  onInsertTemplate: (tpl: any) => void;
+  onInsertTemplate: (tpl: EmailTemplate) => void;
 
   /* View Template */
   viewTemplateOpen: boolean;
-  viewTemplateData: any;
+  viewTemplateData: EmailTemplate | null;
   setViewTemplateOpen: (v: boolean) => void;
-  setViewTemplateData: (d: any) => void;
+  setViewTemplateData: (d: EmailTemplate) => void;
 }
+
 
 const TicketDailog = ({
   previewOpen,
@@ -93,7 +95,7 @@ const TicketDailog = ({
           </Typography>
 
           <Stack spacing={1.5}>
-            {templates.map((tpl: any) => {
+{templates.map((tpl) => {
               const isSelected = selectedTemplate?.id === tpl.id;
 
               return (
@@ -171,19 +173,21 @@ const TicketDailog = ({
               Cancel
             </Button>
 
-            <Button
-              variant="contained"
-              disabled={!selectedTemplate}
-              sx={{
-                bgcolor: "#505050",
-                "&:hover": {
-                  bgcolor: "#232323",
-                }
-              }}
-              onClick={() => onInsertTemplate(selectedTemplate)}
-            >
-              Insert
-            </Button>
+<Button
+  variant="contained"
+  disabled={!selectedTemplate}
+  sx={{
+    bgcolor: "#505050",
+    "&:hover": { bgcolor: "#232323" }
+  }}
+  onClick={() => {
+    if (!selectedTemplate) return;
+    onInsertTemplate(selectedTemplate);
+  }}
+>
+  Insert
+</Button>
+
           </Stack>
         </DialogContent>
       </Dialog>

@@ -7,10 +7,10 @@ export const ticketsSearchBoxSx = {
   display: "flex",
   alignItems: "center",
   px: 1.2,
-  height: 34,              
+  height: 34,
   border: "1px solid #E0E0E0",
   borderRadius: "6px",
-  width: 220,             
+  width: 220,
 
   "& input": {
     fontSize: "13px",
@@ -24,7 +24,7 @@ export const ticketsSearchBoxSx = {
 
 /* Create button */
 export const createTicketButtonSx = {
-  height: 34,                 
+  height: 34,
   px: 2,
   fontSize: "12px",
   fontWeight: 600,
@@ -67,7 +67,7 @@ export const ticketsTabsSx = {
     minHeight: 30,
     height: 30,
     padding: "0 14px",
-    marginRight: 0,            // ❌ remove margin (we now use gap)
+    marginRight: 0,
 
     fontSize: "13px",
     fontWeight: 500,
@@ -106,7 +106,7 @@ export const priorityChipSx = (priority: string) => {
 
   const isHigh = value === "high";
   const isMedium = value === "medium";
-  const isLow = value === "low";
+
 
   return {
     borderRadius: "999px",
@@ -120,20 +120,20 @@ export const priorityChipSx = (priority: string) => {
     borderColor: isHigh
       ? "#FF4D4F"
       : isMedium
-      ? "#FFC53D"
-      : "#5B8FF9",
+        ? "#FFC53D"
+        : "#5B8FF9",
 
     backgroundColor: isHigh
       ? "rgba(255,77,79,0.08)"
       : isMedium
-      ? "rgba(255,197,61,0.10)"
-      : "rgba(91,143,249,0.10)",
+        ? "rgba(255,197,61,0.10)"
+        : "rgba(91,143,249,0.10)",
 
     color: isHigh
       ? "#FF4D4F"
       : isMedium
-      ? "#FFC53D"
-      : "#5B8FF9",
+        ? "#FFC53D"
+        : "#5B8FF9",
 
     // 👇 ensures text uses our color, not MUI default
     "& .MuiChip-label": {
@@ -304,16 +304,16 @@ export const createTicketUploadButtonSx = {
   fontSize: "12px",
   borderRadius: "4px",
   height: 24,
-  px: 2,                 
+  px: 2,
   mr: 1,
 
-  display: "inline-flex", 
+  display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
 
-  whiteSpace: "nowrap",   
-  minWidth: "auto",       
-  lineHeight: 1,          
+  whiteSpace: "nowrap",
+  minWidth: "auto",
+  lineHeight: 1,
 
   "&:hover": {
     backgroundColor: "#505050",
@@ -326,14 +326,14 @@ export const createTicketUploadButtonSx = {
 };
 
 export const createTicketCancelButtonSx = {
-  backgroundColor: "#FFFFFF", 
+  backgroundColor: "#FFFFFF",
   color: "#505050",
   border: "1px solid #505050",
   textTransform: "none",
   fontWeight: 600,
 
   "&:hover": {
-    backgroundColor: "#FFFFFF", 
+    backgroundColor: "#FFFFFF",
     color: "#232323",
     border: "1px solid #232323",
   },
@@ -350,8 +350,8 @@ export const createTicketSaveButtonSx = {
   backgroundColor: "#505050",
   color: "#FFFFFF",
   textTransform: "none",
-  minWidth: "100px",   
-  px: 2.5,             
+  minWidth: "100px",
+  px: 2.5,
   borderRadius: "6px",
 
   "&:hover": {
@@ -560,7 +560,7 @@ export const statusChipSx = (status: string) => {
   const isNew = value === "new";
   const isPending = value === "pending";
   const isResolved = value === "resolved";
-  const isClosed = value === "closed";
+
 
   return {
     borderRadius: "999px",
@@ -571,28 +571,28 @@ export const statusChipSx = (status: string) => {
     border: "1.5px solid",
 
     borderColor: isNew
-      ? "#5B8FF9"        
+      ? "#5B8FF9"
       : isPending
-      ? "#FF4D4F"        
-      : isResolved
-      ? "#52C41A"        
-      : "#FFC53D",       
+        ? "#FF4D4F"
+        : isResolved
+          ? "#52C41A"
+          : "#FFC53D",
 
     backgroundColor: isNew
       ? "rgba(91,143,249,0.10)"
       : isPending
-      ? "rgba(255,77,79,0.08)"
-      : isResolved
-      ? "rgba(82,196,26,0.10)"
-      : "rgba(255,197,61,0.10)",
+        ? "rgba(255,77,79,0.08)"
+        : isResolved
+          ? "rgba(82,196,26,0.10)"
+          : "rgba(255,197,61,0.10)",
 
     color: isNew
       ? "#5B8FF9"
       : isPending
-      ? "#FF4D4F"
-      : isResolved
-      ? "#52C41A"
-      : "#FFC53D",
+        ? "#FF4D4F"
+        : isResolved
+          ? "#52C41A"
+          : "#FFC53D",
 
     "& .MuiChip-label": {
       color: "inherit",
