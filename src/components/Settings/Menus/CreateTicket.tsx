@@ -7,14 +7,14 @@ import { useState, useEffect } from "react";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import type { AppDispatch } from "../../../store";
 import { fetchTickets, fetchTicketDashboard } from "../../../store/ticketSlice";
 import { ticketsApi, labsApi, clinicsApi } from "../../../services/tickets.api";
 import type { CreateTicketProps } from "../../../types/Settings.types";
-import type { CreateTicketRequest, TicketPriority, Lab, Department, Employee } from "../../../types/tickets.types";
+import type { CreateTicketRequest, TicketPriority, Lab, Department, Employee, PaginatedResponse } from "../../../types/tickets.types";
 
 import {
   createTicketFocusedFieldSx, createTicketDialogPaperSx, createTicketCloseButtonSx,
@@ -50,7 +50,6 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
     if (open) {
       const loadData = async () => {
         setLoadingData(true);
-        (null);
         try {
           const results = await Promise.allSettled([
             labsApi.getLabs(),
@@ -59,9 +58,10 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
           ]);
 
           if (results[0].status === 'fulfilled') {
-            const labsData = results[0].value;
-            const labList = Array.isArray(labsData) ? labsData : (labsData as any).results || [];
-            setLabs(labList.filter((l: Lab) => l.is_active));
+const labsData = results[0].value as Lab[] | PaginatedResponse<Lab>;
+const labList = Array.isArray(labsData) ? labsData : labsData.results;
+setLabs(labList.filter((l) => l.is_active));
+
           } else {
             console.error("Labs API failed. Using empty list.");
             setLabs([]);
@@ -72,14 +72,15 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
           }
 
           if (results[2].status === 'fulfilled') {
-            setEmployees(Array.isArray(results[2].value) ? results[2].value : (results[2].value as any).results || []);
+const empData = results[2].value as Employee[] | PaginatedResponse<Employee>;
+setEmployees(Array.isArray(empData) ? empData : empData.results);
           }
 
-        } catch (err) {
-          const connError = "Connection error. Check backend server.";
-          (connError);
-          toast.error(connError);
-        } finally {
+} catch {
+  const connError = "Connection error. Check backend server.";
+  toast.error(connError);
+}
+ finally {
           setLoadingData(false);
         }
       };
@@ -89,8 +90,6 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
   // 2. Submit Logic matching TicketWrite definition
   const handleSubmit = async () => {
-    (null);
-
     // Check required fields
     // --- Field Wise Validation ---
     if (!subject.trim()) {
@@ -162,19 +161,24 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
         handleClose();
       }, 1500);
 
-    } catch (err: any) {
-      const serverData = err.response?.data;
-      let finalError = "Submission failed. Ensure Lab and Department IDs are valid.";
+} catch (err: unknown) {
+  let finalError = "Submission failed. Ensure Lab and Department IDs are valid.";
 
-      if (serverData && typeof serverData === 'object') {
-        finalError = Object.entries(serverData)
-          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`)
-          .join(" | ");
-      }
-      toast.error(finalError);
-    } finally {
-      setLoading(false);
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const serverData = (err as { response?: { data?: unknown } }).response?.data;
+
+    if (serverData && typeof serverData === "object") {
+      finalError = Object.entries(serverData as Record<string, unknown>)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`)
+        .join(" | ");
     }
+  }
+
+  toast.error(finalError);
+} finally {
+  setLoading(false);
+}
+
   };
 
   const reset = () => {
@@ -383,9 +387,22 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
               </TextField>
 
 
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker label="Due Date" value={dueDate} onChange={(v) => setDueDate(v)} disabled={loading} slotProps={{ textField: { fullWidth: true, sx: createTicketFocusedFieldSx, InputLabelProps: { shrink: true } } }} />
-              </LocalizationProvider>
+<LocalizationProvider dateAdapter={AdapterDayjs}>
+  <DatePicker
+    label="Due Date"
+    value={dueDate}
+    onChange={(v: Dayjs | null) => setDueDate(v)}
+    disabled={loading}
+    slotProps={{
+      textField: {
+        fullWidth: true,
+        sx: createTicketFocusedFieldSx,
+        InputLabelProps: { shrink: true }
+      }
+    }}
+  />
+</LocalizationProvider>
+
             </Stack>
 
             <Box

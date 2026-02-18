@@ -1,4 +1,4 @@
-import dayjs, { Dayjs } from "dayjs";
+import { Dayjs } from "dayjs";
 
 // Ticket Types based on Swagger API documentation
 
@@ -181,4 +181,13 @@ export interface PaginatedResponse<T> {
   next: string | null;
   previous: string | null;
   results: T[];
+}
+
+// Email Template used inside Tickets
+export interface EmailTemplate {
+  id: string | number;
+  audience_name: string;
+  subject: string;
+  body?: string;
+  type?: string;
 }

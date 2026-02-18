@@ -19,10 +19,11 @@ import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import FormatSizeIcon from "@mui/icons-material/FormatSize";
-
+import type { Employee } from "../../../services/leads.api";
+import type { SxProps, Theme } from "@mui/material/styles";
 import DeleteMail from "../../../assets/icons/Delete_Icon.svg";
 
-interface Props {
+export interface TicketReplyEditorProps {
     openReply: boolean;
     setOpenReply: (v: boolean) => void;
 
@@ -35,7 +36,7 @@ interface Props {
     replyMessage: string;
     setReplyMessage: (v: string) => void;
 
-    employees: any[];
+    employees: Employee[];   // ✅ FIXED
 
     anchorEl: HTMLElement | null;
     setAnchorEl: (v: HTMLElement | null) => void;
@@ -54,8 +55,9 @@ interface Props {
 
     setOpenTemplateDialog: (v: boolean) => void;
 
-    iconSx: any;
+    iconSx: SxProps<Theme>;  // ✅ FIXED (MUI style type)
 }
+
 
 const TicketReplyEditor = ({
     openReply,
@@ -79,7 +81,7 @@ const TicketReplyEditor = ({
     handleEmojiInsert,
     setOpenTemplateDialog,
     iconSx,
-}: Props) => {
+}: TicketReplyEditorProps) => {
     if (!openReply) return null;
 
     const openPicker = Boolean(anchorEl);
