@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import "../../../../src/styles/Campaign/SocialCampaignModal.css";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
-
 import { CampaignAPI } from "../../../../src/services/campaign.api";
 import {FormControl,InputLabel,Select,MenuItem, Modal, Typography, IconButton} from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -11,8 +11,6 @@ import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
-
-/* 🔹 LOCAL ICONS */
 import instagramIcon from "../../../components/Layout/Campaign/Icons/instagram.png";
 import facebookIcon from "../../../components/Layout/Campaign/Icons/facebook.png";
 import linkedinIcon from "../../../components/Layout/Campaign/Icons/linkedin.png";
@@ -287,7 +285,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
             <Typography variant="h6" sx={{ mb: 3 }}>
               Content & Configuration
             </Typography>
-            {/* SELECT AD ACCOUNTS */}
             <div
               className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
             >
@@ -472,7 +469,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                   <label>Enter Time</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <TimePicker
-                      format="hh:mm A" // 🔥 Enables AM/PM
+                      format="hh:mm A" 
                       value={
                         scheduleTime
                           ? dayjs(`2024-01-01 ${scheduleTime}`)
@@ -480,10 +477,10 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                       }
                       onChange={(v) => {
                         if (v) {
-                          setScheduleTime(v.format("HH:mm")); // store 24hr for backend
+                          setScheduleTime(v.format("HH:mm")); 
                         }
                       }}
-                      ampm // 🔥 Show AM/PM selector
+                      ampm 
                       slotProps={{
                         textField: {
                           fullWidth: true,
@@ -494,16 +491,13 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                 </div>
               </div>
 
-              {/* 🔥 SHOW BUDGET ONLY IF PAID */}
               {mode === "paid" && (
                 <>
                   <div className="budget-divider" />
 
                   <div className="budget-section">
                     <h3>Budget Allocation</h3>
-
                     <div className="budget-row">
-                      {/* Instagram - Only show if selected */}
                       {accounts.includes("instagram") && (
                         <div className="budget-card">
                           <div className="budget-title">
@@ -526,8 +520,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                           </div>
                         </div>
                       )}
-
-                      {/* Facebook - Only show if selected */}
                       {accounts.includes("facebook") && (
                         <div className="budget-card">
                           <div className="budget-title">
@@ -550,8 +542,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                           </div>
                         </div>
                       )}
-
-                      {/* LinkedIn - Only show if selected */}
                       {accounts.includes("linkedin") && (
                         <div className="budget-card">
                           <div className="budget-title">

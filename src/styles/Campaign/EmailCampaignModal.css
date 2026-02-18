@@ -1,13 +1,9 @@
-
-/* ================= MODAL ================= */
-
 .email-campaign-modal {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: 1000px;
-  /* max-width: 90vw; */
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0px 20px 40px rgba(0, 0, 0, 0.12);
@@ -15,8 +11,6 @@
   max-height: 90vh;
   overflow-y: auto;
 }
-
-/* ================= HEADER ================= */
 
 .modal-header {
   position: relative;
@@ -44,8 +38,6 @@
   cursor: pointer;
 }
 
-/* ================= STEPPER ================= */
-
 .stepper {
   width: 98%;
   margin: 24px auto 18px;
@@ -65,7 +57,6 @@
   gap: 8px;
 }
 
-/* Circle default */
 .step .circle {
   width: 24px;
   height: 24px;
@@ -84,7 +75,6 @@
   color: #9CA3AF;
 }
 
-/* Active */
 .step.active .circle {
   background: #FFEDE7;
   color: #F26A3E;
@@ -95,7 +85,6 @@
   font-weight: 600;
 }
 
-/* Completed */
 .step.completed .circle {
   background: #22C55E;
   color: #ffffff;
@@ -116,17 +105,10 @@
 /* ================= CONTENT ================= */
 
 .step-content {
-  flex: 1;               /* takes remaining space */
-  overflow-y: auto;      /* enables scrolling */
-  padding-bottom: 20px; /* space before footer */
+  flex: 1;              
+  overflow-y: auto;      
+  padding-bottom: 20px; 
 }
-/* .step-content h2 {
-  margin-top: 8px;
-} */
-
-
-
-/* ================= FORM ================= */
 
 .form-group {
   position: relative;
@@ -139,10 +121,8 @@
 }
 
 .form-group.half {
-  flex: 0 0 calc(50% - 10px); /* 🔒 FIXED DATE WIDTH */
+  flex: 0 0 calc(50% - 10px); 
 }
-
-/* ================= NOTCHED LABEL ================= */
 
 .form-group > label {
   position: absolute;
@@ -152,11 +132,8 @@
   padding: 2px 8px;
   font-size: 13px;
   color: #6B6B6B;
-  /* z-index: 2; */
   pointer-events: none;
 }
-
-/* ================= INPUTS ================= */
 
 .form-group input {
   width: 100%;
@@ -176,8 +153,6 @@ select:invalid {
   outline: none;
 }
 
-/* ================= ERROR STATE ================= */
-
 .form-group.error input,
 .form-group.error select {
   border-color: #E11D48;
@@ -191,8 +166,6 @@ select:invalid {
   display: none;
 }
 
-/* ================= FOOTER ================= */
-
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -202,7 +175,6 @@ select:invalid {
   position: sticky;
   bottom: 0;
   background: #ffffff;
-  /* border-top: 1px solid #E5E7EB; */
   z-index: 10;
   align-items: center;
 }
@@ -239,10 +211,6 @@ select:invalid {
   cursor: not-allowed;
 }
 
-/* =================================================
-   STEP 2 – CONTENT & CONFIGURATION (FIGMA MATCH)
-   ================================================= */
-
 .section-card {
   border: 1.5px solid #E5E7EB;
   border-radius: 20px;
@@ -267,8 +235,6 @@ select:invalid {
   margin-top: 0;
   margin-bottom: 8px;
 }
-
-/* ---------- Ad Accounts ---------- */
 
 .account-row {
   display: flex;
@@ -305,7 +271,6 @@ select:invalid {
   height: 28px;
 }
 
-/* Checkbox */
 .account-checkbox {
   width: 22px;
   height: 22px;
@@ -330,12 +295,12 @@ select:invalid {
 .mode-card {
   flex: 0 0 calc(50% - 10px);
   max-width: 430px;
-  height: 76px;                  /* Figma exact */
+  height: 76px;                  
   border: 1.5px solid #CBD5E1;
   border-radius: 12px;
-  padding: 14px 16px;            /* slightly tighter */
+  padding: 14px 16px;           
   display: flex;
-  align-items: flex-start;       /* 🔥 top aligned */
+  align-items: flex-start;       
   justify-content: space-between;
   background: #ffffff;
   cursor: pointer;
@@ -400,16 +365,11 @@ select:invalid {
   margin: 0;
   line-height: 18px;
 
-  white-space: nowrap;        /* ✅ force single line */
-  overflow: hidden;           /* ✅ prevent overflow */
-  text-overflow: ellipsis;    /* ✅ clean cut like Figma */
+  white-space: nowrap;       
+  overflow: hidden;          
+  text-overflow: ellipsis;    
 }
 
-
-
-/* BADGE */
-/* BADGE – compact height like Figma */
-/* BASE BADGE – used by BOTH */
 .mode-card .badge {
   align-self: flex-start;
   padding: 2px 10px;
@@ -422,23 +382,18 @@ select:invalid {
 
   background: #F1F5F9;
   color: #111827;
-  border: 1px solid ;               /* ✅ ensure no border */
+  border: 1px solid ;               
 
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* 🔥 OVERRIDE outlined so it looks IDENTICAL */
 .mode-card .badge.outlined {
-  background: #F1F5F9;        /* same background */
-  color: #111827;             /* same text */
-  border: 1px solid ;               /* remove outline */
+  background: #F1F5F9;       
+  color: #111827;            
+  border: 1px solid ;              
 }
-
-/* =================================================
-   CAMPAIGN CONTENT (STEP 2)
-   ================================================= */
 
 .content-row {
   display: flex;
@@ -447,7 +402,6 @@ select:invalid {
   margin-bottom: 20px;
 }
 
-/* Social icons (Instagram / Facebook / LinkedIn) */
 .content-row img {
   width: 36px;
   height: 36px;
@@ -455,7 +409,6 @@ select:invalid {
   margin-top: 6px;
 }
 
-/* Textarea & input wrapper */
 .content-row textarea,
 .content-row input {
   flex: 1;
@@ -470,51 +423,42 @@ select:invalid {
   background: #ffffff;
 }
 
-/* Instagram textarea larger (like Figma) */
 .content-row textarea {
   min-height: 140px;
   resize: none;
 }
 
-/* Placeholder styling */
 .content-row textarea::placeholder,
 .content-row input::placeholder {
   color: #9CA3AF;
   font-size: 14px;
 }
 
-/* Focus state */
 .content-row textarea:focus,
 .content-row input:focus {
   border-color: #F26A3E;
 }
 
-/* Divider lines between rows (subtle like Figma) */
 .content-row:not(:last-child) {
   padding-bottom: 20px;
   border-bottom: 1px solid #F1F5F9;
 }
-/* Normal state */
 .MuiOutlinedInput-notchedOutline {
   border: 1px solid #E2E3E5 !important;
 }
 
-/* Hover state */
 .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
   border: 1px solid #E2E3E5 !important;
 }
 
-/* Focus state — remove thick border */
 .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
   border:0.5px solid #E2E3E5 !important;
 }
 
-/* Error state */
 .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
   border: 1px solid #E11D48 !important;
 }
 
-/* Rounded corners */
 .MuiOutlinedInput-root {
   border-radius: 16px !important;
   height: 56px !important;
@@ -529,15 +473,10 @@ select:invalid {
   font-size: 10px !important;
 }
 
-
-/* ================= STEP 3 ================= */
-
 .schedule-row {
   display: flex;
   gap: 20px;
 }
-
-/* ================= MUI DATE PICKER OVERRIDES ================= */
 
 .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
 .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
@@ -555,9 +494,6 @@ select:invalid {
 .form-group.error .MuiFormLabel-root {
   color: #E11D48 !important;
 }
-/* =================================================
-   STEP 3 – SCHEDULE CAMPAIGN
-   ================================================= */
 
 .schedule-card {
   border: 1.5px solid #E5E7EB;
@@ -566,8 +502,6 @@ select:invalid {
   margin-bottom: 28px;
   background: #ffffff;
 }
-
-/* ---------- Header ---------- */
 
 .schedule-header {
   display: flex;
@@ -595,8 +529,6 @@ select:invalid {
   margin: 0;
 }
 
-/* ---------- AI Optimization Button ---------- */
-
 .ai-opt-btn {
   display: flex;
   align-items: center;
@@ -612,15 +544,11 @@ select:invalid {
   white-space: nowrap;
 }
 
-/* ---------- Inputs Row ---------- */
-
 .schedule-row {
   display: flex;
   gap: 20px;
   align-items: flex-start;
 }
-
-/* ---------- Field Wrapper ---------- */
 
 .schedule-field {
   flex: 1;
@@ -630,8 +558,6 @@ select:invalid {
   height: 56px;
   border-radius: 16px;
 }
-
-/* ---------- Floating Label ---------- */
 
 .schedule-field label {
   position: absolute;
@@ -644,8 +570,6 @@ select:invalid {
   z-index: 2;
   pointer-events: none;
 }
-
-/* ---------- Input Box (DATE & TIME SAME STYLE) ---------- */
 
 .schedule-input {
   width: 100%;
@@ -663,8 +587,6 @@ select:invalid {
   box-sizing: border-box;
 }
 
-/* ---------- Icons ---------- */
-
 .schedule-input svg,
 .schedule-input img {
   width: 22px;
@@ -672,8 +594,6 @@ select:invalid {
   color: #232323;
   flex-shrink: 0;
 }
-
-/* ---------- Hover / Focus ---------- */
 
 .schedule-input:hover,
 .schedule-input:focus-within {
@@ -688,12 +608,10 @@ select:invalid {
   }
 }
 
-/* Email specific subtitle spacing */
 .section-subtitle {
   margin-bottom: 16px;
 }
 
-/* Schedule input alignment (same as social) */
 .schedule-field input[type="time"] {
   border: 1.5px solid #E2E3E5;
   border-radius: 16px;
@@ -702,10 +620,6 @@ select:invalid {
   font-size: 16px;
 }
  
-/* =================================================
-   EMAIL CAMPAIGN – TEXTAREA (FIGMA MATCH)
-   ================================================= */
-
 .form-group textarea {
   width: 100%;
   min-height: 40px;
@@ -784,7 +698,6 @@ select:invalid {
   cursor: pointer;
 }
 
-/* Hover effects */
 .outline-btn:hover {
   background: #F9FAFB;
 }
@@ -809,13 +722,11 @@ select:invalid {
   white-space: nowrap;
 }
 
-/* For textarea — align near top instead of center */
 .form-group textarea + .ai-suggest {
   top: 20px;
   transform: none;
 }
 
-/* Hover effect */
 .ai-suggest:hover {
   color: #F26A3E;
 }

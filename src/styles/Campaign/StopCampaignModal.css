@@ -1,37 +1,28 @@
-/* OVERLAY */
 .stop-overlay {
   position: fixed;
   inset: 0;
-
-  background: rgba(255, 255, 255, 0.5); /* no black */
+  background: rgba(255, 255, 255, 0.5); 
   backdrop-filter: blur(2px);
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   z-index: 9999;
 }
 
-/* MODAL */
 .stop-modal {
   width: 480px;
   max-width: 95%;
-
   background: #ffffff;
   border-radius: 18px;
   padding: 30px;
   position: relative;
-
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
 }
 
-/* CLOSE BUTTON */
 .stop-close {
   position: absolute;
   top: 15px;
   right: 15px;
-
   background: #f1f1f1;
   border: none;
   border-radius: 50%;
@@ -40,7 +31,6 @@
   cursor: pointer;
 }
 
-/* TITLES */
 .stop-title {
   font-size: 20px;
   font-weight: 600;
@@ -52,7 +42,6 @@
   margin-bottom: 20px;
 }
 
-/* PLATFORM ITEMS */
 .platform-list {
   display: flex;
   flex-direction: column;
@@ -64,7 +53,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   padding: 14px;
   border: 1px solid #ddd;
   border-radius: 12px;
@@ -97,7 +85,6 @@
   border-color: #ff6b3d;
 }
 
-/* ACTION BUTTONS */
 .stop-actions {
   display: flex;
   gap: 15px;
@@ -127,18 +114,15 @@
   cursor: not-allowed;
 }
 
-/* CONFIRM SECTION */
 .confirm-icon {
   width: 60px;
   height: 60px;
   background: #ffe8dc;
   border-radius: 50%;
   margin: 0 auto 15px auto;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   font-size: 24px;
 }
 
@@ -160,11 +144,9 @@
   background: #e8f8ef;
   border-radius: 50%;
   margin: 0 auto 15px auto;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   font-size: 24px;
   color: #2ecc71;
 }

@@ -84,16 +84,9 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
  if (activeTab === "Performance") {
   return (
     <div className="cd-performance-card">
-
-      {/* TITLE */}
       <h4 className="cd-perf-title">Impressions</h4>
-
-      {/* DIVIDER BELOW TITLE */}
       <div className="cd-perf-divider"></div>
-
-      {/* ROW: NUMBER LEFT / TOGGLE RIGHT */}
       <div className="cd-perf-row">
-
         <div className="cd-perf-left">
           <div className="cd-perf-number">1500</div>
           <div className="cd-perf-sub">Total Impressions</div>
@@ -120,14 +113,11 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
         </div>
 
       </div>
-
-      {/* CHART */}
      <ResponsiveContainer width="100%" height={210}>
   <LineChart
     data={performanceData}
     margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
   >
-     {/* Shadow Definition */}
     <defs>
       <filter id="lineShadow" height="200%">
         <feDropShadow
@@ -185,18 +175,11 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
   if (activeTab === "Platform Breakdown") {
   return (
     <div className="cd-platform-wrapper">
-
-      {/* TITLE */}
       <h3 className="cd-platform-title">
         Platform Distribution & Performance
       </h3>
-
-      {/* THIN DIVIDER BELOW TITLE */}
       <div className="cd-platform-divider"></div>
-
       <div className="cd-platform-main">
-
-        {/* LEFT SIDE - PIE */}
         <div className="cd-pie-wrapper">
 
   <ResponsiveContainer width="100%" height={320}>
@@ -233,7 +216,6 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
 
     return (
       <>
-        {/* Slightly Expand Active Slice */}
         <Sector
           cx={cx}
           cy={cy}
@@ -243,8 +225,6 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
           endAngle={endAngle}
           fill={fill}
         />
-
-        {/* Floating Popup Near Slice */}
 <foreignObject
   x={x - 40}
   y={y - 35}
@@ -285,7 +265,6 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
       {payload.name}
     </div>
 
-    {/* 🔽 Arrow */}
     <div
       style={{
         position: "absolute",
@@ -313,8 +292,6 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
 
   </PieChart>
 </ResponsiveContainer>
-
-          {/* LEGEND BELOW PIE */}
           <div className="cd-platform-legend">
             <div>
               <span className="legend-dot dot1"></span>
@@ -336,8 +313,6 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
           </div>
 
         </div>
-
-        {/* RIGHT SIDE - CARDS */}
         <div className="cd-platform-cards">
 
           <PlatformCard
@@ -371,16 +346,9 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
   if (activeTab === "AI Insights") {
   return (
     <div className="cd-ai-wrapper">
-
-      {/* TITLE */}
       <h3 className="cd-ai-title">AI-Powered Insights</h3>
-
-      {/* THIN DIVIDER */}
       <div className="cd-ai-divider"></div>
-
-      {/* INSIGHT CARDS */}
       <div className="cd-ai-cards">
-
         <div className="cd-ai-card green">
           <div className="cd-ai-heading">High Performer</div>
           <p>

@@ -130,7 +130,6 @@
   color: #666666;
   margin-bottom: 12px;
 }
-/* ================= GREEN CHECK LIST ================= */
 
 .campaign-type-card ul {
   list-style: none;
@@ -142,7 +141,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* space between icon & text */
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 10px;

@@ -11,6 +11,7 @@ import AddNewCampaign from "../components/Layout/Campaign/AddNewCampaign";
 import SocialCampaignModal from "../components/Layout/Campaign/SocialCampaignModal";
 import CampaignDashboard from "../components/Layout/Campaign/CampaignDashboard";
 import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
+import dayjs from "dayjs";
 
 /* ===== REDUX ===== */
 import { useSelector, useDispatch } from "react-redux";
@@ -41,12 +42,29 @@ export default function CampaignsScreen() {
   const rawCampaigns = useSelector(selectCampaign);
 
   /* ================= MAP API → UI MODEL ================= */
-  const campaigns = (rawCampaigns || []).map((api: any) => ({
+  const campaigns = (rawCampaigns || []).map((api: any) => {
+  let status: CampaignStatus;
+
+  if (api.is_active) {
+    status = "Live";
+  } else if (
+    api.selected_start &&
+    dayjs(api.selected_start).isAfter(dayjs())
+  ) {
+    status = "Schedule";
+  } 
+  else if (api.is_active === false && !api.selected_start) {
+  status = "Draft";
+}
+  else if (!api.is_active) {
+    status = "Stopped";
+  }
+
+  return {
     id: api.id,
     name: api.campaign_name ?? "",
-    description: api.campaign_description ?? "",
     type: api.campaign_mode === 1 ? "social" : "email",
-    status: api.is_active ? "Live" : "Stopped",
+    status,
     start: api.start_date,
     end: api.end_date,
     platforms:
@@ -54,13 +72,11 @@ export default function CampaignsScreen() {
         ? api.social_media?.map((s: any) => s.platform_name) || []
         : ["gmail"],
     leads: 0,
-    lead_generated: api.lead_generated,
     scheduledAt: api.selected_start,
     objective: api.campaign_objective,
-    audience: api.target_audience,
-    subject: api.email[0]?.subject,
-    emailBody: api.email[0]?.email_body,
-  }));
+  };
+});
+
 
   /* ================= LOCAL UI STATE ================= */
   const [tab, setTab] = useState<Tab>("all");
@@ -68,30 +84,21 @@ export default function CampaignsScreen() {
   const [status, setStatus] = useState<CampaignStatus | "all">("all");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [openStatus, setOpenStatus] = useState(false);
-
   const [showAddCampaign, setShowAddCampaign] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
-
-  // ADD these state variables after showEmailModal
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
-
-  /* ================= STATUS CHANGE ================= */
   const handleStatusChange = (id: string, newStatus: CampaignStatus) => {
-    dispatch(updateCampaignStatus({ id, status: newStatus }));
-    
+    dispatch(updateCampaignStatus({ id, status: newStatus }));   
   };
 
-  // ADD this handler after handleStatusChange
   const handleEdit = (campaign: any) => {
     setEditingCampaign(campaign);
     setShowEditModal(true);
   };
 
-  /* ================= FILTERS ================= */
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
       const tabOk = tab === "all" || c.type === tab;
@@ -107,7 +114,6 @@ export default function CampaignsScreen() {
   const socialCount = campaigns.filter((c) => c.type === "social").length;
   const emailCount = campaigns.filter((c) => c.type === "email").length;
 
-  /* ================= DASHBOARD ================= */
   if (selectedCampaign) {
     return (
       <CampaignDashboard
@@ -117,12 +123,10 @@ export default function CampaignsScreen() {
     );
   }
 
-  /* ================= LIST VIEW ================= */
   return (
     <div className="campaigns-page">
       <CampaignHeader onAddNew={() => setShowAddCampaign(true)} />
       <div className="filters-row">
-        {/* ================= TABS ================= */}
         <div className="tabs">
           <button
             className={`tab-btn ${tab === "all" ? "active" : ""}`}
@@ -146,7 +150,6 @@ export default function CampaignsScreen() {
           </button>
         </div>
 
-        {/* ================= SEARCH + STATUS ================= */}
         <div className="right-filters">
           <div className="search-input">
             <img src={searchIcon} alt="Search" className="search-icon" />
@@ -157,7 +160,6 @@ export default function CampaignsScreen() {
             />
           </div>
 
-          {/* ===== STATUS DROPDOWN ===== */}
           <div className="status-dropdown">
             <div
               className={`status-btn ${openStatus ? "active" : ""}`}
@@ -173,7 +175,7 @@ export default function CampaignsScreen() {
                   "Live",
                   "Stopped",
                   "Draft",
-                  "Scheduled",
+                  "Schedule",
                   "Completed",
                   "Failed",
                 ].map((item) => (
@@ -195,7 +197,6 @@ export default function CampaignsScreen() {
           </div>
         </div>
       </div>
-      {/* ================= CARDS ================= */}
       <div className="campaign-grid">
         {filteredCampaigns.length === 0 ? (
           <div className="empty-state">No campaigns found</div>
@@ -245,7 +246,6 @@ export default function CampaignsScreen() {
           onClose={() => setShowEditModal(false)}
           onSave={() => {
             setShowEditModal(false);
-            // Optionally refetch campaigns or update Redux
           }}
         />
       )}
