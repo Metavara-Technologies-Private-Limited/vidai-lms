@@ -1,19 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from "react";
 import "../styles/Campaign/campaigns.css";
-
-/* ===== ICONS ===== */
 import searchIcon from "../components/Layout/Campaign/Icons/search.png";
-
-/* ===== COMPONENTS ===== */
 import CampaignHeader from "../components/Layout/Campaign/CampaignHeader";
 import CampaignCard from "../components/Layout/Campaign/CampaignCard";
 import AddNewCampaign from "../components/Layout/Campaign/AddNewCampaign";
 import SocialCampaignModal from "../components/Layout/Campaign/SocialCampaignModal";
 import CampaignDashboard from "../components/Layout/Campaign/CampaignDashboard";
 import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
-import dayjs from "dayjs";
-
-/* ===== REDUX ===== */
 import { useSelector, useDispatch } from "react-redux";
 import {
   selectCampaign,
@@ -21,8 +15,6 @@ import {
 } from "../store/campaignSlice";
 import type { AppDispatch } from "../store";
 import EditCampaignModal from "../components/Layout/Campaign/EditCampaignModal";
-
-/* ===== TYPES ===== */
 type CampaignStatus =
   | "Live"
   | "Draft"
@@ -37,28 +29,20 @@ type Tab = "all" | "social" | "email";
 
 export default function CampaignsScreen() {
   const dispatch = useDispatch<AppDispatch>();
-
-  /* ================= GET CAMPAIGNS FROM REDUX ================= */
   const rawCampaigns = useSelector(selectCampaign);
 
-  /* ================= MAP API → UI MODEL ================= */
-  const campaigns = (rawCampaigns || []).map((api: any) => {
+const campaigns = (rawCampaigns || []).map((api: any) => {
   let status: CampaignStatus;
 
-  if (api.is_active) {
-    status = "Live";
-  } else if (
-    api.selected_start &&
-    dayjs(api.selected_start).isAfter(dayjs())
-  ) {
-    status = "Schedule";
-  } 
-  else if (api.is_active === false && !api.selected_start) {
+if (api.status === "live" || api.is_active === true) {
+  status = "Live";
+} else if (api.status === "scheduled") {
+  status = "Schedule";
+} else if (api.status === "draft") {
   status = "Draft";
+} else {
+  status = "Stopped";
 }
-  else if (!api.is_active) {
-    status = "Stopped";
-  }
 
   return {
     id: api.id,
@@ -76,7 +60,6 @@ export default function CampaignsScreen() {
     objective: api.campaign_objective,
   };
 });
-
 
   /* ================= LOCAL UI STATE ================= */
   const [tab, setTab] = useState<Tab>("all");

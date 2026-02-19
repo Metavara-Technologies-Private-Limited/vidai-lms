@@ -88,22 +88,17 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
       const payload = {
         clinic: 1,
-
         campaign_name: campaignName,
         campaign_description: campaignDescription,
         campaign_objective: objective,
         target_audience: audience,
-
         start_date: startDate,
         end_date: endDate,
-
         campaign_mode: 1,
-
         selected_start: scheduledDateTime,
         selected_end: scheduledDateTime,
         enter_time: scheduleTime,
         is_active: type === "live",
-
         social_media: accounts.map((platform) => ({
           platform_name: platform,
           is_active: true,
@@ -112,7 +107,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
       const response = await CampaignAPI.create(payload);
       const apiData = response.data;
-
       const formattedCampaign = {
         id: apiData.id,
         name: apiData.campaign_name,

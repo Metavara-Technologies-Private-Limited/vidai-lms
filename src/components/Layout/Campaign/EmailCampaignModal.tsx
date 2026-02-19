@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -9,14 +10,12 @@ import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import viewIcon from "./Icons/view.png"; 
-
 import { CampaignAPI } from "../../../../src/services/campaign.api";
 import { Box } from "@mui/system";
 
 export default function EmailCampaignModal({ onClose, onSave }: any) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
-
   /* ================= STEP 1 – DETAILS ================= */
   const [campaignName, setCampaignName] = useState("");
   const [campaignDescription, setCampaignDescription] = useState("");
