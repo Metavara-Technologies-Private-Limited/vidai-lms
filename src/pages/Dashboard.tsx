@@ -1,5 +1,19 @@
+import Box from "@mui/material/Box";
+import DashboardLayout from "../components/Dashboard/DashboardLayout";
+
 const Dashboard = () => {
-  return <h1>Dashboard</h1>;
+  return (
+    <Box
+      sx={{
+        width: "auto",
+        height: "100%",
+        overflowY: "auto",
+        paddingBottom: 4,
+      }}
+    >
+      <DashboardLayout />
+    </Box>
+  );
 };
 
 export default Dashboard;

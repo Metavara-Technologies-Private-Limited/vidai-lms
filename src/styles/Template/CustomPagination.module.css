@@ -1,0 +1,40 @@
+.paginationContainer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 24px;
+  background-color: white;
+  border-top: 1px solid #F3F4F6;
+}
+
+.pageNumber {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #9CA3AF; /* Gray for inactive */
+  transition: all 0.2s ease;
+  border-radius: 8px;
+}
+
+.activePage {
+  background-color: #1F2937 !important; /* Dark black/gray active state */
+  color: white !important;
+  border-radius: 12px;
+}
+
+.arrowBtn {
+  color: #9CA3AF !important;
+}
+
+.arrowBtn:disabled {
+  color: #E5E7EB !important;
+}
+
+.pageNumber:hover:not(.activePage) {
+  background-color: #F9FAFB;
+  color: #374151;
+}

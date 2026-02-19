@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -15,16 +15,28 @@ import NotificationIcon from "@/assets/icons/notification.svg";
 import MessageQuestionIcon from "@/assets/icons/message-question.svg";
 import UserAvatarIcon from "@/assets/icons/ellipse_12.svg";
 import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
-// import { RootState } from "@/store";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchClinic, selectClinic } from "../../store/clinicSlice";
+import type { AppDispatch } from "../../store";
+import { fetchCampaign } from "../../store/campaignSlice";
+
 
 const Header = () => {
-  //   const clinicName = useSelector((state: RootState) => state.clinic.data?.name);
+  const dispatch = useDispatch<AppDispatch>();
+
+  const clinic = useSelector(selectClinic);
+  const clinicName = clinic?.name || "";
 
   /* ================= ICON MENU STATE ================= */
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [activeMenu, setActiveMenu] = useState<
     "calendar" | "notification" | "help" | null
   >(null);
+
+  useEffect(() => {
+    dispatch(fetchClinic(1));
+    dispatch(fetchCampaign());
+  }, [dispatch]);
 
   const handleIconClick = (
     event: React.MouseEvent<HTMLElement>,
@@ -72,8 +84,7 @@ const Header = () => {
             variant="body2"
             sx={{ display: { xs: "none", md: "block" } }}
           >
-            Clinic:
-            {/* {clinicName || "—"} */}
+            Clinic: <b>{clinicName || "—"}</b>
           </Typography>
 
           {iconMenus.map(({ icon, type }) => (

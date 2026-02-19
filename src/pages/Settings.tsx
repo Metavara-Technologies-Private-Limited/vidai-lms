@@ -1,5 +1,11 @@
-const Settings = () => {
-  return <h1>Settings</h1>;
-};
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 
-export default Settings;
+export default function Settings() {
+  const location = useLocation();
+
+  if (location.pathname === "/settings") {
+    return <Navigate to="integration" replace />;
+  }
+
+  return <Outlet />;
+}

@@ -1,4 +1,21 @@
+import { IconButton, Modal, Typography } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import socialCardIcon from "./Icons/social-media-card.png";
+import mailCardIcon from "./Icons/mail-card.png";
 import "../../../../src/styles/Campaign/AddNewCampaign.css";
+import { Box } from "@mui/system";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+
+const FeatureList = ({ features }: { features: string[] }) => (
+  <ul>
+    {features.map((feature, index) => (
+      <li key={index}>
+        <CheckCircleIcon sx={{ fontSize: 18, color: "#2ecc71" }} />
+        {feature}
+      </li>
+    ))}
+  </ul>
+);
 
 interface AddNewCampaignProps {
   onClose: () => void;
@@ -12,59 +29,75 @@ export default function AddNewCampaign({
   onEmailSelect,
 }: AddNewCampaignProps) {
   return (
-    <div className="campaign-modal-overlay">
-      <div className="campaign-modal">
-        <div className="modal-header">
-          <h3>Add Campaigns</h3>
-          <button className="close-btn" onClick={onClose}>
-            ×
-          </button>
+    <Modal open={true} onClose={onClose}>
+      <Box className="add-campaign-modal">
+        <div className="add-modal-header">
+          <Typography variant="h6">Add Campaign</Typography>
+          <IconButton onClick={onClose} className="close-btn">
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </div>
-
-        <h4 className="modal-subtitle">Choose Campaign Type</h4>
-
+        <div className="modal-divider" />
+        <div className="add-modal-subtitle">Choose Campaign Type</div>
         {/* SOCIAL MEDIA CARD */}
-        <div className="campaign-type-card" onClick={onSocialSelect}>
+        <div
+          className="campaign-type-card campaign-type-card-social"
+          onClick={onSocialSelect}
+        >
           <div className="card-top">
-            <div className="card-icon social">🌐</div>
+            <div className="card-icon social">
+              <img
+                src={socialCardIcon}
+                alt="Social"
+                className="add-title-icon"
+              />
+            </div>
             <span className="badge paid">Paid & Organic</span>
           </div>
 
-          <h5>Social Media Campaign</h5>
+          <div className="add-modal-head">Social Media Campaign</div>
           <p>
             Create campaigns for LinkedIn, Facebook and Instagram with budget
             management and AI-powered content creation.
           </p>
 
-          <ul>
-            <li>Multi-platform posting</li>
-            <li>Budget allocation & CPC estimates</li>
-            <li>Scheduling & Automation</li>
-            <li>Platform specific previews</li>
-          </ul>
+          <FeatureList
+            features={[
+              "Multi-platform posting",
+              "Budget allocation & CPC estimates",
+              "Scheduling & Automation",
+              "Platform specific previews",
+            ]}
+          />
         </div>
-
         {/* EMAIL CARD */}
-        <div className="campaign-type-card" onClick={onEmailSelect}>
+        <div
+          className="campaign-type-card campaign-type-card-mail"
+          onClick={onEmailSelect}
+        >
           <div className="card-top">
-            <div className="card-icon email">✉️</div>
+            <div className="card-icon email">
+              <img src={mailCardIcon} alt="Email" className="add-title-icon" />
+            </div>
             <span className="badge free">Free</span>
           </div>
 
-          <h5>Email Campaign</h5>
+          <div className="add-modal-head">Email Campaign</div>
           <p>
             Design and schedule email campaigns with AI-assisted copy, subject
             line, and audience targeting.
           </p>
 
-          <ul>
-            <li>Generate email & subject line with AI</li>
-            <li>Email preview</li>
-            <li>Scheduling & automation</li>
-            <li>AI-optimized timing</li>
-          </ul>
+          <FeatureList
+            features={[
+              "Generate email & subject line with AI",
+              "Email preview",
+              "Scheduling & automation",
+              "AI-optimized timing",
+            ]}
+          />
         </div>
-      </div>
-    </div>
+      </Box>
+    </Modal>
   );
 }

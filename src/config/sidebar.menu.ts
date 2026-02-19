@@ -1,11 +1,11 @@
-// src/config/sidebar.menu.ts
 import { lazy, type JSX } from "react";
 
 export type MenuItem = {
   key: string;
   label: string;
   path: string;
-  page: React.LazyExoticComponent<() => JSX.Element>;
+  page?: React.LazyExoticComponent<() => JSX.Element>;
+  subMenu?: MenuItem[];
 };
 
 export const LEADS_MENU: MenuItem[] = [
@@ -44,6 +44,28 @@ export const LEADS_MENU: MenuItem[] = [
     label: "Settings",
     path: "/settings",
     page: lazy(() => import("../pages/Settings")),
+    subMenu: [
+      {
+        key: "integration",
+        label: "Integration",
+        path: "/settings/integration",
+        page: lazy(() => import("../components/Settings/Menus/Integration")),
+      },
+      {
+        key: "tickets",
+        label: "Tickets",
+        path: "/settings/tickets",
+        page: lazy(() => import("../components/Settings/Menus/Tickets")),
+      },
+      {
+        key: "templates",
+        label: "Templates",
+        path: "/settings/templates",
+        page: lazy(
+          () => import("../components/Settings/Templates/TemplatesPage"),
+        ),
+      },
+    ],
   },
 ];
 

@@ -1,0 +1,75 @@
+.modalContainer {
+  background: white;
+  border-radius: 12px;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+}
+
+.modalTitle {
+  font-weight: 700 !important;
+}
+
+.previewContent {
+  flex-grow: 1;
+  padding: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.whatsappBubble {
+  background: #F5F3FF; /* Light lavender bubble */
+  padding: 24px;
+  border-radius: 16px;
+  max-width: 80%;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #374151;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.placeholder {
+  color: #8B5CF6; /* Purple for placeholders */
+  font-weight: 600;
+}
+
+.timestamp {
+  display: block;
+  text-align: right;
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-top: 10px;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 24px;
+  border-top: 1px solid #F3F4F6;
+}
+
+.backBtn {
+  border: 1px solid #374151 !important;
+  color: #374151 !important;
+  border-radius: 8px !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+}
+
+.saveBtn {
+  background-color: #4B4B4B !important;
+  color: white !important;
+  border-radius: 8px !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+}

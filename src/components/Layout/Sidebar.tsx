@@ -7,10 +7,11 @@ import {
   List,
   ListItemButton,
   IconButton,
+  Collapse,
 } from "@mui/material";
 
 import { SHOW_ICONS, SIDEBAR_TABS } from "../../config/sidebar.tabs";
-import ClinicLogo from "../../assets/icons/Clinic-Logo.svg";
+import ClinicLogoLMS from "../../assets/icons/Clinic-Logo-LMS.svg";
 import VidaiLogo from "../../assets/icons/Vidai-logo.svg";
 import DashboardCardBg from "../../assets/icons/dashboard_card_bg.svg";
 
@@ -19,8 +20,9 @@ import styles from "../../styles/sidebar.module.css";
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-
   const [activeTab, setActiveTab] = useState(0);
+  const showSettingsMenu = location.pathname.startsWith("/settings");
+
   const tab = SIDEBAR_TABS[activeTab];
 
   return (
@@ -37,7 +39,12 @@ export default function Sidebar() {
     >
       {/* LOGO */}
       <Box sx={{ pl: "24px", pt: "20px" }}>
-        <img src={ClinicLogo} width={134} height={40} alt="Clinic Logo" />
+        <img
+          src={ClinicLogoLMS}
+          width={134}
+          height={40}
+          alt="Clinic Logo LMS"
+        />
       </Box>
 
       {/* TOP ICON ROW */}
@@ -49,7 +56,6 @@ export default function Sidebar() {
           display: SHOW_ICONS ? "flex" : "none",
         }}
       >
-        {/* SUBTRACT BACKGROUND */}
         <Box
           component="img"
           src={tab.bg}
@@ -61,11 +67,9 @@ export default function Sidebar() {
           }}
         />
 
-        {/* ICONS */}
         <Box className={styles.iconrowbox}>
           {SIDEBAR_TABS.map((t, idx) => {
             const size = 35 * t.icon.baseScale;
-
             return (
               <Box key={t.key}>
                 <IconButton
@@ -75,12 +79,7 @@ export default function Sidebar() {
                   }}
                   sx={{ width: 40, height: 40 }}
                 >
-                  <img
-                    src={t.icon.src}
-                    alt={t.label}
-                    width={size}
-                    height={size}
-                  />
+                  <img src={t.icon.src} alt={t.label} width={size} />
                 </IconButton>
               </Box>
             );
@@ -89,51 +88,96 @@ export default function Sidebar() {
       </Box>
 
       {/* MAIN CARD */}
-      <Box className={styles.cardWrapper}>
+      <Box className={styles.cardWrapper} sx={{ pb: 2 }}>
         <Box className={styles.card}>
-          {/* CARD HEADER */}
           <Typography color="primary.main" sx={{ fontWeight: 700 }}>
             {tab.label}
           </Typography>
 
-          {/* MENU */}
           <List>
             {tab.menu.map((item) => {
-              const active = location.pathname === item.path;
+              const isSettings = item.key === "settings";
+              const isActive =
+                location.pathname.startsWith(item.path) ||
+                (item.subMenu &&
+                  item.subMenu.some((sub) => sub.path === location.pathname));
 
               return (
-                <ListItemButton
-                  key={item.key}
-                  onClick={() => navigate(item.path)}
-                >
-                  <Typography
-                    variant="inherit"
-                    sx={{
-                      fontWeight: active ? 600 : 500,
-                      color: active ? "#232323" : "#9e9e9e",
-                    }}
-                  >
-                    {item.label}
-                  </Typography>
-                </ListItemButton>
+                <Box key={item.key}>
+                  <ListItemButton onClick={() => navigate(item.path)}>
+                    <Typography
+                      sx={{
+                        color: isActive ? "#232323" : "#9e9e9e",
+                        fontWeight: isActive ? 600 : 500,
+                      }}
+                    >
+                      {item.label}
+                    </Typography>
+                  </ListItemButton>
+
+                  {isSettings && item.subMenu && (
+                    <Collapse in={showSettingsMenu}>
+                      {item.subMenu.map((sub) => {
+                        const isSubActive = location.pathname === sub.path;
+
+                        return (
+                          <ListItemButton
+                            key={sub.key}
+                            onClick={() => navigate(sub.path)}
+                            sx={{
+                              pl: 4,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.5,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: "50%",
+                                backgroundColor: "#FFFFFF",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: "50%",
+                                  backgroundColor: isSubActive
+                                    ? "#E17E61"
+                                    : "#CFD1D4",
+                                }}
+                              />
+                            </Box>
+
+                            <Typography
+                              sx={{
+                                fontSize: "0.95rem",
+                                fontWeight: 600,
+                                color: isSubActive ? "#232323" : "#9e9e9e",
+                              }}
+                            >
+                              {sub.label}
+                            </Typography>
+                          </ListItemButton>
+                        );
+                      })}
+                    </Collapse>
+                  )}
+                </Box>
               );
             })}
           </List>
 
-          {/* BACKGROUND DECOR */}
           <img src={DashboardCardBg} className={styles.cardBg} alt="" />
 
-          {/* FOOTER */}
           <Box className={styles.footer}>
             <img src={VidaiLogo} width="70%" alt="Vidai Logo" />
-            <Typography
-              sx={{
-                fontSize: 10,
-                color: "grey.400",
-                fontWeight: 400,
-                py: "5px",
-              }}
-            >
+            <Typography fontSize={10} color="grey.400">
               Updated Version 2.0
             </Typography>
           </Box>
