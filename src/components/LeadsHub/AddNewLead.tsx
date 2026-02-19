@@ -16,7 +16,7 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { Dayjs } from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -1441,16 +1441,22 @@ export default function AddNewLead() {
               >
                 <Box>
                   <Typography sx={labelStyle}>Date *</Typography>
+                  {/* ✅ FIX: wrap value in dayjs() to guarantee Dayjs type,
+                      avoiding the PickerValue (Date | Dayjs | null) mismatch */}
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
                       value={selectedDate}
                       onChange={(newDate) => {
-                        setSelectedDate(newDate);
-                        if (newDate)
+                        // ✅ FIX: convert any incoming value to Dayjs via dayjs()
+                        // PickerValue can be Date | Dayjs | null — dayjs() handles all cases
+                        const asDayjs = newDate ? dayjs(newDate as Dayjs | Date) : null;
+                        setSelectedDate(asDayjs);
+                        if (asDayjs && asDayjs.isValid()) {
                           setForm((prev) => ({
                             ...prev,
-                            appointmentDate: newDate.format("YYYY-MM-DD"),
+                            appointmentDate: asDayjs.format("YYYY-MM-DD"),
                           }));
+                        }
                       }}
                       slotProps={{
                         textField: {

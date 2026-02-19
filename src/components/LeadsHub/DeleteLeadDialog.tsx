@@ -86,7 +86,11 @@ const DeleteLeadDialog: React.FC<Props> = ({
           color="text.secondary" 
           sx={{ fontSize: "14px", lineHeight: 1.6, px: 1, mb: leadId ? 1 : 0 }}
         >
-          This action cannot be undone. Are you sure you want to Delete selected Lead permanently ?
+          This action cannot be undone. Are you sure you want to delete{" "}
+          <Typography component="span" fontWeight={600} color="text.primary" fontSize="14px">
+            {leadName}
+          </Typography>{" "}
+          permanently?
         </Typography>
 
         {/* ✅ Lead ID Display (optional) */}
