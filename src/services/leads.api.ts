@@ -51,6 +51,38 @@ export type Lead = {
   modified_at: string;
 };
 
+// Type for creating/updating leads
+export type LeadPayload = {
+  clinic_id: number;
+  department_id: number;
+  campaign_id?: string | null;
+  assigned_to_id?: number | null;
+  personal_id?: number | null;
+  full_name: string;
+  contact_no: string;
+  age?: number | null;
+  marital_status?: "single" | "married" | null;
+  email?: string | null;
+  language_preference?: string;
+  location?: string;
+  address?: string;
+  partner_inquiry: boolean;
+  partner_full_name?: string;
+  partner_age?: number | null;
+  partner_gender?: "male" | "female" | null;
+  source: string;
+  sub_source?: string;
+  lead_status?: "new" | "contacted";
+  next_action_status?: "pending" | "completed" | null;
+  next_action_description?: string;
+  treatment_interest: string;
+  book_appointment: boolean;
+  appointment_date: string;
+  slot: string;
+  remark?: string;
+  is_active: boolean;
+};
+
 // ====================== Axios Instance ======================
 const api = axios.create({
   baseURL: 'http://127.0.0.1:8000/api',
@@ -81,7 +113,7 @@ export const LeadAPI = {
     return response.data;
   },
 
-  create: async (data: any): Promise<Lead> => {
+  create: async (data: LeadPayload): Promise<Lead> => {
     const response = await api.post<Lead>('/leads/', data);
     console.log("✅ Lead created:", response.data);
     return response.data;
@@ -92,7 +124,7 @@ export const LeadAPI = {
     return response.data;
   },
 
-  update: async (leadId: string, data: any): Promise<Lead> => {
+  update: async (leadId: string, data: Partial<LeadPayload>): Promise<Lead> => {
     const response = await api.put<Lead>(`/leads/${leadId}/update/`, data);
     return response.data;
   },
@@ -135,12 +167,12 @@ export const ClinicAPI = {
   },
 
   getEmployees: async (clinicId: number): Promise<Employee[]> => {
-    const response = await api.get<Employee[]>(`/clinics/${clinicId}/employees/`);
+    const response = await api.get<Employee[] | { results: Employee[] }>(`/clinics/${clinicId}/employees/`);
     const data = response.data;
 
     if (!Array.isArray(data)) {
-      if (data && typeof data === 'object' && Array.isArray((data as any).results)) {
-        return (data as any).results as Employee[];
+      if (data && typeof data === 'object' && 'results' in data && Array.isArray(data.results)) {
+        return data.results;
       }
       return [];
     }
