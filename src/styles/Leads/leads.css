@@ -21,7 +21,7 @@
 
 .leads-page {
   padding: 24px;
-  background: #f9fafb;
+  background: #ffffff; /* CHANGED: was #f9fafb */
   min-height: 100vh;
   height: 100vh;
   display: flex;
@@ -40,8 +40,8 @@
 .leads-title {
   font-family: "Montserrat", sans-serif !important;
   font-weight: 700 !important;
-  font-size: 19px !important;
-  line-height: 100%;
+  font-size: 20px !important; /* CHANGED: was 19px, now matches MUI h6 */
+  line-height: 1.6 !important; /* CHANGED: matches MUI h6 */
   color: #1F2937 !important;
   margin: 0 !important;
 }
