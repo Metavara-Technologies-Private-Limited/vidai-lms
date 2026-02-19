@@ -60,6 +60,30 @@ export type LeadPayload = {
   is_active: boolean;
 };
 
+// ====================== Campaign Type ======================
+type CampaignData = {
+  id: string;
+  campaign_name?: string;
+  campaign_mode?: number;
+  social_media?: Array<{ platform_name?: string }>;
+  is_active?: boolean;
+};
+
+// ====================== API Error Type ======================
+type ApiError = {
+  response?: {
+    status?: number;
+    data?: {
+      detail?: string;
+      message?: string;
+      error?: string;
+      request_id?: string;
+      [key: string]: unknown;
+    };
+  };
+  message?: string;
+};
+
 // ====================== Helpers ======================
 const strOrNull = (val: string | undefined | null): string | null =>
   val && val.trim() !== "" ? val.trim() : null;
@@ -124,9 +148,7 @@ export default function AddNewLead() {
 
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>(
-    [],
-  );
+  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>([]);
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
   const [clinicId] = React.useState(1);
@@ -137,8 +159,8 @@ export default function AddNewLead() {
   // Map raw Redux shape → simple UI model with source + subSource derived
   const campaigns = React.useMemo(
     () =>
-      (rawCampaigns || []).map((api: any) => ({
-        id: api.id as string, // UUID
+      (rawCampaigns || []).map((api: CampaignData) => ({
+        id: api.id,
         name: api.campaign_name ?? "",
         // campaign_mode === 1 → Social Media, else → Email
         source: api.campaign_mode === 1 ? "Social Media" : "Email",
@@ -147,7 +169,7 @@ export default function AddNewLead() {
           api.campaign_mode === 1
             ? (api.social_media?.[0]?.platform_name ?? "")
             : "gmail",
-        isActive: api.is_active as boolean,
+        isActive: Boolean(api.is_active),
       })),
     [rawCampaigns],
   );
@@ -191,10 +213,11 @@ export default function AddNewLead() {
         setLoadingDepartments(true);
         const depts = await DepartmentAPI.listActiveByClinic(clinicId);
         setDepartments(depts);
-      } catch (err: any) {
+      } catch (err) {
+        const error = err as ApiError;
         const msg =
-          err?.response?.data?.detail ||
-          err?.message ||
+          error?.response?.data?.detail ||
+          error?.message ||
           "Failed to load departments";
         toast.error(`Departments: ${msg}`, {
           position: "top-right",
@@ -215,11 +238,12 @@ export default function AddNewLead() {
         setLoadingEmployees(true);
         const emps = await EmployeeAPI.listByClinic(clinicId);
         setEmployees(Array.isArray(emps) ? emps : []);
-      } catch (err: any) {
-        const status = err?.response?.status;
+      } catch (err) {
+        const error = err as ApiError;
+        const status = error?.response?.status;
         const msg =
-          err?.response?.data?.detail ||
-          err?.message ||
+          error?.response?.data?.detail ||
+          error?.message ||
           "Failed to load employees";
         const displayMsg =
           status === 401
@@ -509,7 +533,6 @@ export default function AddNewLead() {
       treatment_interest: form.treatments.join(","),
       appointment_date: form.appointmentDate,
       slot: form.slot,
-      // campaign_id is the UUID stored in form.campaign, or null
       campaign_id: strOrNull(form.campaign),
       email: strOrNull(form.email),
       language_preference: form.language || "",
@@ -573,12 +596,13 @@ export default function AddNewLead() {
       // Navigate immediately without delay
       navigate("/leads", { replace: true });
       
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as ApiError;
       console.error(
         "❌ Lead create error:",
-        err?.response?.data || err?.message,
+        error?.response?.data || error?.message,
       );
-      const data = err?.response?.data;
+      const data = error?.response?.data;
       let msg = "Failed to save lead";
       if (data) {
         if (typeof data === "string") msg = data;
@@ -592,7 +616,7 @@ export default function AddNewLead() {
           msg = `${firstKey}: ${Array.isArray(firstVal) ? firstVal[0] : firstVal}`;
         }
       } else {
-        msg = err?.message || msg;
+        msg = error?.message || msg;
       }
       
       toast.error(msg, {
@@ -610,27 +634,17 @@ export default function AddNewLead() {
 
   // ====================== Render ======================
   return (
-    <Box
+    <Paper
       sx={{
-        bgcolor: "#F8FAFC",
+        overflow: "hidden",
         minHeight: "100vh",
-        px: 4,
-        py: 2,
       }}
     >
-      <Paper
-        sx={{
-          borderRadius: "16px",
-          overflow: "hidden",
-          mt: 0,
-        }}
-      >
         <Box
           sx={{
             bgcolor: "white",
             px: 3,
             py: 2,
-            borderBottom: "1px solid #F1F5F9",
           }}
         >
           <Typography
@@ -650,7 +664,6 @@ export default function AddNewLead() {
             px: 6,
             pt: 3,
             pb: 2,
-            borderBottom: "1px solid #F1F5F9",
           }}
         >
           <Box
@@ -1206,7 +1219,9 @@ export default function AddNewLead() {
                     }
                   }}
                   sx={{ ...inputStyle, maxWidth: "50%" }}
-                  displayEmpty
+                  SelectProps={{
+                    displayEmpty: true,
+                  }}
                 >
                   <MenuItem value="" disabled>
                     Select
@@ -1488,7 +1503,6 @@ export default function AddNewLead() {
           sx={{
             bgcolor: "white",
             p: 3,
-            borderTop: "1px solid #F1F5F9",
             display: "flex",
             justifyContent: "flex-end",
             gap: 2,
@@ -1559,6 +1573,5 @@ export default function AddNewLead() {
           )}
         </Box>
       </Paper>
-    </Box>
   );
 }

@@ -1,6 +1,17 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { LeadAPI } from "../services/leads.api";
-import type { Lead } from "../types/leads.types";
+import { LeadAPI, type Lead } from "../services/leads.api";
+
+// ====================== API Error Type ======================
+type ApiError = {
+  response?: {
+    data?: {
+      detail?: string;
+      message?: string;
+      [key: string]: unknown;
+    };
+  };
+  message?: string;
+};
 
 // ====================== Type Definitions ======================
 interface LeadState {
@@ -31,11 +42,12 @@ export const fetchLeads = createAsyncThunk<
     const leads = await LeadAPI.list();
     console.log("📊 Fetched leads from API:", leads.length);
     return leads;
-  } catch (err: any) {
+  } catch (err) {
+    const error = err as ApiError;
     const message =
-      err?.response?.data?.detail ||
-      err?.response?.data?.message ||
-      err?.message ||
+      error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      error?.message ||
       "Failed to fetch leads";
     return rejectWithValue(message);
   }
@@ -55,12 +67,13 @@ export const deleteLead = createAsyncThunk<
     await LeadAPI.delete(leadId);
     console.log("✅ Lead deleted successfully:", leadId);
     return leadId;
-  } catch (err: any) {
-    console.error("❌ Failed to delete lead:", err);
+  } catch (err) {
+    const error = err as ApiError;
+    console.error("❌ Failed to delete lead:", error);
     const message =
-      err?.response?.data?.detail ||
-      err?.response?.data?.message ||
-      err?.message ||
+      error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      error?.message ||
       "Failed to delete lead";
     return rejectWithValue(message);
   }
@@ -79,12 +92,13 @@ export const deleteLeads = createAsyncThunk<
     await Promise.all(leadIds.map((id) => LeadAPI.delete(id)));
     console.log("✅ All leads deleted successfully");
     return leadIds;
-  } catch (err: any) {
-    console.error("❌ Failed to delete leads:", err);
+  } catch (err) {
+    const error = err as ApiError;
+    console.error("❌ Failed to delete leads:", error);
     const message =
-      err?.response?.data?.detail ||
-      err?.response?.data?.message ||
-      err?.message ||
+      error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      error?.message ||
       "Failed to delete leads";
     return rejectWithValue(message);
   }
