@@ -13,7 +13,6 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import type { DateValidationError, PickerChangeHandlerContext } from "@mui/x-date-pickers";
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs, { Dayjs } from "dayjs";
 
@@ -33,7 +32,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
-
+  
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
 
@@ -52,7 +51,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   const [location, setLocation] = React.useState("");
   const [subSource, setSubSource] = React.useState("");
 
-  // Fetch departments on mount
+  // ✅ FIX: Fetch departments on mount
   React.useEffect(() => {
     if (!open) return;
     const fetchDepartments = async () => {
@@ -66,10 +65,10 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
         setLoadingDepartments(false);
       }
     };
-    void fetchDepartments();
+    fetchDepartments();
   }, [open, clinicId]);
 
-  // Fetch employees on mount
+  // ✅ FIX: Fetch employees on mount
   React.useEffect(() => {
     if (!open) return;
     const fetchEmployees = async () => {
@@ -84,10 +83,10 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
         setLoadingEmployees(false);
       }
     };
-    void fetchEmployees();
+    fetchEmployees();
   }, [open, clinicId]);
 
-  // Filter employees by department
+  // ✅ FIX: Filter employees by department
   React.useEffect(() => {
     if (!filters.department || employees.length === 0) {
       setFilteredEmployees(employees);
@@ -113,34 +112,23 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     }));
   };
 
-  // ✅ FIX: Accept unknown value and convert to Dayjs safely
-  const handleDateFromChange = (
-    value: unknown,
-    _context: PickerChangeHandlerContext<DateValidationError>
-  ): void => {
-    const dayjsValue = value ? dayjs(value as Parameters<typeof dayjs>[0]) : null;
-    const validValue = dayjsValue && dayjsValue.isValid() ? dayjsValue : null;
-    setDateFrom(validValue);
+  const handleDateFromChange = (newValue: Dayjs | null) => {
+    setDateFrom(newValue);
     setFilters((prev) => ({
       ...prev,
-      dateFrom: validValue ? validValue.format("YYYY-MM-DD") : null,
+      dateFrom: newValue ? newValue.format("YYYY-MM-DD") : null,
     }));
   };
 
-  const handleDateToChange = (
-    value: unknown,
-    _context: PickerChangeHandlerContext<DateValidationError>
-  ): void => {
-    const dayjsValue = value ? dayjs(value as Parameters<typeof dayjs>[0]) : null;
-    const validValue = dayjsValue && dayjsValue.isValid() ? dayjsValue : null;
-    setDateTo(validValue);
+  const handleDateToChange = (newValue: Dayjs | null) => {
+    setDateTo(newValue);
     setFilters((prev) => ({
       ...prev,
-      dateTo: validValue ? validValue.format("YYYY-MM-DD") : null,
+      dateTo: newValue ? newValue.format("YYYY-MM-DD") : null,
     }));
   };
 
-  const handleApply = (): void => {
+  const handleApply = () => {
     console.log("🔍 Applying filters:", filters);
     if (onApplyFilters) {
       onApplyFilters(filters);
@@ -148,7 +136,8 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     onClose();
   };
 
-  const handleClearAll = (): void => {
+  // ✅ FIX: Clear All now properly resets filters AND notifies parent
+  const handleClearAll = () => {
     const emptyFilters: FilterValues = {
       department: "",
       assignee: "",
@@ -158,14 +147,19 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       dateFrom: null,
       dateTo: null,
     };
+    
+    // Reset local state
     setFilters(emptyFilters);
     setDateFrom(null);
     setDateTo(null);
     setLocation("");
     setSubSource("");
+    
+    // ✅ CRITICAL: Notify parent component to clear filters
     if (onApplyFilters) {
       onApplyFilters(emptyFilters);
     }
+    
     console.log("🧹 Filters cleared and applied:", emptyFilters);
   };
 
@@ -183,9 +177,16 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       fontSize: "13px",
       backgroundColor: "#FFFFFF",
       height: "40px",
-      "& fieldset": { borderColor: "#E5E7EB" },
-      "&:hover fieldset": { borderColor: "#D1D5DB" },
-      "&.Mui-focused fieldset": { borderColor: "#9CA3AF", borderWidth: "1px" },
+      "& fieldset": {
+        borderColor: "#E5E7EB",
+      },
+      "&:hover fieldset": {
+        borderColor: "#D1D5DB",
+      },
+      "&.Mui-focused fieldset": {
+        borderColor: "#9CA3AF",
+        borderWidth: "1px",
+      },
     },
     "& .MuiInputBase-input": {
       padding: "9px 12px",
@@ -217,7 +218,15 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       }}
     >
       {/* Header */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", px: 3, py: 2 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          px: 3,
+          py: 2,
+        }}
+      >
         <Typography variant="h6" fontWeight={600} sx={{ fontSize: "16px", color: "#111827" }}>
           Filter By
         </Typography>
@@ -230,14 +239,13 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       <DialogContent sx={{ px: 3, py: 0, pb: 2 }}>
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-
             {/* Row 1: From Date & To Date */}
             <Box sx={{ display: "flex", gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>From Date</Typography>
                 <DatePicker
                   value={dateFrom}
-                  onChange={handleDateFromChange as never}
+                  onChange={handleDateFromChange}
                   format="DD/MM/YYYY"
                   slotProps={{
                     textField: {
@@ -253,8 +261,8 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                 <Typography sx={labelStyle}>To Date</Typography>
                 <DatePicker
                   value={dateTo}
-                  onChange={handleDateToChange as never}
-                  minDate={dateFrom ?? undefined}
+                  onChange={handleDateToChange}
+                  minDate={dateFrom || undefined}
                   format="DD/MM/YYYY"
                   slotProps={{
                     textField: {
@@ -272,9 +280,17 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
             <Box sx={{ display: "flex", gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Lead Quality</Typography>
-                <TextField select fullWidth size="small" value={filters.quality}
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={filters.quality}
                   onChange={(e) => handleFilterChange("quality", e.target.value)}
-                  sx={inputStyle} SelectProps={{ displayEmpty: true }}>
+                  sx={inputStyle}
+                  SelectProps={{
+                    displayEmpty: true,
+                  }}
+                >
                   <MenuItem value="">Select Quality</MenuItem>
                   <MenuItem value="Hot">Hot</MenuItem>
                   <MenuItem value="Warm">Warm</MenuItem>
@@ -283,9 +299,17 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Status</Typography>
-                <TextField select fullWidth size="small" value={filters.status}
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={filters.status}
                   onChange={(e) => handleFilterChange("status", e.target.value)}
-                  sx={inputStyle} SelectProps={{ displayEmpty: true }}>
+                  sx={inputStyle}
+                  SelectProps={{
+                    displayEmpty: true,
+                  }}
+                >
                   <MenuItem value="">Select Status</MenuItem>
                   <MenuItem value="new">New</MenuItem>
                   <MenuItem value="contacted">Contacted</MenuItem>
@@ -302,9 +326,17 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
             <Box sx={{ display: "flex", gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Location</Typography>
-                <TextField select fullWidth size="small" value={location}
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  sx={inputStyle} SelectProps={{ displayEmpty: true }}>
+                  sx={inputStyle}
+                  SelectProps={{
+                    displayEmpty: true,
+                  }}
+                >
                   <MenuItem value="">Select Location</MenuItem>
                   <MenuItem value="LA Jolla, California">LA Jolla, California</MenuItem>
                   <MenuItem value="Oceanview, California">Oceanview, California</MenuItem>
@@ -314,10 +346,18 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Assignee</Typography>
-                <TextField select fullWidth size="small" value={filters.assignee}
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={filters.assignee}
                   onChange={(e) => handleFilterChange("assignee", e.target.value)}
                   disabled={loadingEmployees}
-                  sx={inputStyle} SelectProps={{ displayEmpty: true }}>
+                  sx={inputStyle}
+                  SelectProps={{
+                    displayEmpty: true,
+                  }}
+                >
                   <MenuItem value="">Select Assignee</MenuItem>
                   {filteredEmployees.map((emp) => (
                     <MenuItem key={emp.id} value={emp.id.toString()}>
@@ -332,9 +372,17 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
             <Box sx={{ display: "flex", gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Source</Typography>
-                <TextField select fullWidth size="small" value={filters.source}
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={filters.source}
                   onChange={(e) => handleFilterChange("source", e.target.value)}
-                  sx={inputStyle} SelectProps={{ displayEmpty: true }}>
+                  sx={inputStyle}
+                  SelectProps={{
+                    displayEmpty: true,
+                  }}
+                >
                   <MenuItem value="">Select Source</MenuItem>
                   <MenuItem value="Social Media">Social Media</MenuItem>
                   <MenuItem value="Website">Website</MenuItem>
@@ -346,9 +394,17 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Sub-Source</Typography>
-                <TextField select fullWidth size="small" value={subSource}
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={subSource}
                   onChange={(e) => setSubSource(e.target.value)}
-                  sx={inputStyle} SelectProps={{ displayEmpty: true }}>
+                  sx={inputStyle}
+                  SelectProps={{
+                    displayEmpty: true,
+                  }}
+                >
                   <MenuItem value="">Select Sub-Source</MenuItem>
                   <MenuItem value="Facebook">Facebook</MenuItem>
                   <MenuItem value="Instagram">Instagram</MenuItem>
@@ -358,19 +414,50 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                 </TextField>
               </Box>
             </Box>
-
           </Box>
         </LocalizationProvider>
       </DialogContent>
 
       {/* Actions */}
       <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 2 }}>
-        <Button onClick={handleClearAll} fullWidth variant="outlined"
-          sx={{ height: 40, borderRadius: "6px", textTransform: "none", fontWeight: 500, fontSize: "14px", color: "#374151", borderColor: "#E5E7EB", "&:hover": { borderColor: "#D1D5DB", bgcolor: "#F9FAFB" } }}>
+        <Button
+          onClick={handleClearAll}
+          fullWidth
+          variant="outlined"
+          sx={{
+            height: 40,
+            borderRadius: "6px",
+            textTransform: "none",
+            fontWeight: 500,
+            fontSize: "14px",
+            color: "#374151",
+            borderColor: "#E5E7EB",
+            "&:hover": {
+              borderColor: "#D1D5DB",
+              bgcolor: "#F9FAFB",
+            },
+          }}
+        >
           Clear All
         </Button>
-        <Button onClick={handleApply} fullWidth variant="contained"
-          sx={{ height: 40, bgcolor: "#2C2C2C", borderRadius: "6px", textTransform: "none", fontWeight: 500, fontSize: "14px", boxShadow: "none", "&:hover": { bgcolor: "#1A1A1A", boxShadow: "none" } }}>
+        <Button
+          onClick={handleApply}
+          fullWidth
+          variant="contained"
+          sx={{
+            height: 40,
+            bgcolor: "#2C2C2C",
+            borderRadius: "6px",
+            textTransform: "none",
+            fontWeight: 500,
+            fontSize: "14px",
+            boxShadow: "none",
+            "&:hover": {
+              bgcolor: "#1A1A1A",
+              boxShadow: "none",
+            },
+          }}
+        >
           Apply
         </Button>
       </DialogActions>

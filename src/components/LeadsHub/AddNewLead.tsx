@@ -121,7 +121,8 @@ const timeSlots = [
   "05:30 PM - 06:00 PM",
 ];
 
-// ====================== Sequential Toast Helper ======================
+// ====================== Toast Helpers ======================
+// Errors block — shown one by one (user must fix these)
 const showSequentialToasts = async (messages: Array<{ type: 'error' | 'warning' | 'info'; text: string }>) => {
   for (const msg of messages) {
     await new Promise<void>((resolve) => {
@@ -133,9 +134,22 @@ const showSequentialToasts = async (messages: Array<{ type: 'error' | 'warning' 
         onClose: () => resolve(),
       });
     });
-    // Small delay between toasts for better UX
     await new Promise(resolve => setTimeout(resolve, 200));
   }
+};
+
+// Warnings are non-blocking — fire and forget, don't await
+const showWarningsNonBlocking = (messages: Array<{ type: 'error' | 'warning' | 'info'; text: string }>) => {
+  messages.forEach((msg, i) => {
+    setTimeout(() => {
+      const toastFn = msg.type === 'error' ? toast.error : msg.type === 'warning' ? toast.warning : toast.info;
+      toastFn(msg.text, {
+        position: "top-right",
+        autoClose: 2000,
+        theme: "colored",
+      });
+    }, i * 300); // stagger slightly so they don't stack instantly
+  });
 };
 
 // ====================== Component ======================
@@ -153,18 +167,14 @@ export default function AddNewLead() {
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
   const [clinicId] = React.useState(1);
 
-  // ── Pull campaigns directly from Redux (already fetched by CampaignsScreen) ──
   const rawCampaigns = useSelector(selectCampaign);
 
-  // Map raw Redux shape → simple UI model with source + subSource derived
   const campaigns = React.useMemo(
     () =>
       (rawCampaigns || []).map((api: CampaignData) => ({
         id: api.id,
         name: api.campaign_name ?? "",
-        // campaign_mode === 1 → Social Media, else → Email
         source: api.campaign_mode === 1 ? "Social Media" : "Email",
-        // first platform name for social, "gmail" for email
         subSource:
           api.campaign_mode === 1
             ? (api.social_media?.[0]?.platform_name ?? "")
@@ -189,8 +199,8 @@ export default function AddNewLead() {
     partnerGender: "",
     source: "",
     subSource: "",
-    campaign: "", // stores the campaign UUID
-    campaignName: "", // read-only display label
+    campaign: "",
+    campaignName: "",
     assignee: "",
     nextType: "",
     nextStatus: "",
@@ -325,7 +335,6 @@ export default function AddNewLead() {
     },
   };
 
-  // Greyed-out read-only style for auto-filled fields
   const readOnlyStyle = {
     "& .MuiOutlinedInput-root": {
       borderRadius: "8px",
@@ -351,7 +360,6 @@ export default function AddNewLead() {
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
-  // Selecting a campaign UUID — useEffect handles the downstream auto-fill
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
   };
@@ -366,149 +374,88 @@ export default function AddNewLead() {
   };
 
   // ====================== Validate ======================
+  // Returns { valid: boolean } immediately.
+  // Errors are awaited (blocking). Warnings fire non-blocking so we don't delay.
   const validateStep = async (): Promise<boolean> => {
     const errors: Array<{ type: 'error' | 'warning' | 'info'; text: string }> = [];
     const warnings: Array<{ type: 'error' | 'warning' | 'info'; text: string }> = [];
 
     if (currentStep === 1) {
-      // Required fields - collect all errors first
-      if (!form.full_name.trim()) {
-        errors.push({ type: 'error', text: 'Full name is required!' });
-      }
-      if (!form.contact.trim()) {
-        errors.push({ type: 'error', text: 'Contact number is required!' });
-      }
-      if (!form.email.trim()) {
-        errors.push({ type: 'error', text: 'Email is required!' });
-      }
-      if (!form.gender) {
-        errors.push({ type: 'error', text: 'Gender is required!' });
-      }
-      if (!form.age) {
-        errors.push({ type: 'error', text: 'Age is required!' });
-      }
-      if (!form.source) {
-        errors.push({ type: 'error', text: 'Source is required!' });
-      }
+      if (!form.full_name.trim()) errors.push({ type: 'error', text: 'Full name is required!' });
+      if (!form.contact.trim())   errors.push({ type: 'error', text: 'Contact number is required!' });
+      if (!form.email.trim())     errors.push({ type: 'error', text: 'Email is required!' });
+      if (!form.gender)           errors.push({ type: 'error', text: 'Gender is required!' });
+      if (!form.age)              errors.push({ type: 'error', text: 'Age is required!' });
+      if (!form.source)           errors.push({ type: 'error', text: 'Source is required!' });
 
-      // If there are errors, show them sequentially and return false
       if (errors.length > 0) {
         await showSequentialToasts(errors);
         return false;
       }
 
-      // Optional field warnings - only show if no errors
-      if (!form.location.trim()) {
-        warnings.push({ type: 'warning', text: 'Location is not provided!' });
-      }
-      if (!form.marital) {
-        warnings.push({ type: 'warning', text: 'Marital status is not selected!' });
-      }
-      if (!form.address.trim()) {
-        warnings.push({ type: 'warning', text: 'Address is not provided!' });
-      }
-      if (!form.language) {
-        warnings.push({ type: 'warning', text: 'Language preference is not selected!' });
-      }
-      
-      // Partner information warnings (if couple is selected)
+      // Warnings — non-blocking
+      if (!form.location.trim())  warnings.push({ type: 'warning', text: 'Location is not provided!' });
+      if (!form.marital)          warnings.push({ type: 'warning', text: 'Marital status is not selected!' });
+      if (!form.address.trim())   warnings.push({ type: 'warning', text: 'Address is not provided!' });
+      if (!form.language)         warnings.push({ type: 'warning', text: 'Language preference is not selected!' });
+
       if (isCouple === "yes") {
-        if (!form.partnerName.trim()) {
-          warnings.push({ type: 'warning', text: 'Partner name is not provided!' });
-        }
-        if (!form.partnerAge) {
-          warnings.push({ type: 'warning', text: 'Partner age is not provided!' });
-        }
-        if (!form.partnerGender) {
-          warnings.push({ type: 'warning', text: 'Partner gender is not selected!' });
-        }
+        if (!form.partnerName.trim()) warnings.push({ type: 'warning', text: 'Partner name is not provided!' });
+        if (!form.partnerAge)         warnings.push({ type: 'warning', text: 'Partner age is not provided!' });
+        if (!form.partnerGender)      warnings.push({ type: 'warning', text: 'Partner gender is not selected!' });
       }
 
-      // Source & Campaign warnings
-      if (!form.subSource && !form.campaign) {
-        warnings.push({ type: 'warning', text: 'Sub-source is not provided!' });
-      }
+      if (!form.subSource && !form.campaign) warnings.push({ type: 'warning', text: 'Sub-source is not provided!' });
+      if (!form.assignee)   warnings.push({ type: 'warning', text: 'Lead is not assigned to anyone!' });
+      if (!form.nextType)   warnings.push({ type: 'warning', text: 'Next action type is not selected!' });
+      if (!form.nextStatus) warnings.push({ type: 'warning', text: 'Next action status is not selected!' });
+      if (!form.nextDesc.trim()) warnings.push({ type: 'warning', text: 'Next action description is not provided!' });
 
-      // Assignee & Next Action warnings
-      if (!form.assignee) {
-        warnings.push({ type: 'warning', text: 'Lead is not assigned to anyone!' });
-      }
-      if (!form.nextType) {
-        warnings.push({ type: 'warning', text: 'Next action type is not selected!' });
-      }
-      if (!form.nextStatus) {
-        warnings.push({ type: 'warning', text: 'Next action status is not selected!' });
-      }
-      if (!form.nextDesc.trim()) {
-        warnings.push({ type: 'warning', text: 'Next action description is not provided!' });
-      }
-
-      // Show warnings sequentially if any
-      if (warnings.length > 0) {
-        await showSequentialToasts(warnings);
-      }
+      if (warnings.length > 0) showWarningsNonBlocking(warnings); // ← non-blocking
     }
-    
+
     if (currentStep === 2) {
       if (form.treatments.length === 0) {
         errors.push({ type: 'error', text: 'Please select at least one treatment!' });
       }
 
-      // If there are errors, show them and return false
       if (errors.length > 0) {
         await showSequentialToasts(errors);
         return false;
       }
-      
-      // Optional document info
-      if (!form.documents) {
-        await showSequentialToasts([{ type: 'info', text: 'No documents uploaded' }]);
-      }
+
+      if (!form.documents) showWarningsNonBlocking([{ type: 'info', text: 'No documents uploaded' }]);
     }
-    
+
     if (currentStep === 3) {
-      if (!form.department) {
-        errors.push({ type: 'error', text: 'Department is required!' });
-      }
-      if (!form.appointmentDate) {
-        errors.push({ type: 'error', text: 'Appointment date is required!' });
-      }
-      if (!form.slot) {
-        errors.push({ type: 'error', text: 'Time slot is required!' });
-      }
+      if (!form.department)      errors.push({ type: 'error', text: 'Department is required!' });
+      if (!form.appointmentDate) errors.push({ type: 'error', text: 'Appointment date is required!' });
+      if (!form.slot)            errors.push({ type: 'error', text: 'Time slot is required!' });
 
-      // If there are errors, show them and return false
       if (errors.length > 0) {
         await showSequentialToasts(errors);
         return false;
       }
 
-      // Optional warnings for step 3
-      if (!form.assignee) {
-        warnings.push({ type: 'warning', text: 'Lead is not assigned to any personnel!' });
-      }
-      if (!form.remark.trim()) {
-        warnings.push({ type: 'info', text: 'No remark added for appointment' });
-      }
+      // Warnings — non-blocking so Save fires immediately
+      if (!form.assignee)        warnings.push({ type: 'warning', text: 'Lead is not assigned to any personnel!' });
+      if (!form.remark.trim())   warnings.push({ type: 'info', text: 'No remark added for appointment' });
 
-      // Show warnings if any
-      if (warnings.length > 0) {
-        await showSequentialToasts(warnings);
-      }
+      if (warnings.length > 0) showWarningsNonBlocking(warnings); // ← non-blocking
     }
-    
+
     return true;
   };
 
   const handleNext = async () => {
     const isValid = await validateStep();
     if (!isValid) return;
-    
+
     if (currentStep === 3) {
       await submitForm();
       return;
     }
-    
+
     setCurrentStep((prev) => prev + 1);
     toast.success("Step completed!", {
       position: "top-right",
@@ -570,32 +517,23 @@ export default function AddNewLead() {
 
   // ====================== Submit ======================
   const submitForm = async () => {
-    if (isSubmitting) return; // Prevent double-submit
-    
+    if (isSubmitting) return;
+
     try {
       setIsSubmitting(true);
       const payload = buildPayload();
-      
-      // Show immediate feedback
-      toast.info("Saving lead...", {
-        position: "top-right",
-        autoClose: 1000,
-        theme: "colored",
-      });
 
       const response = await LeadAPI.create(payload);
       console.log("✅ Lead created:", response);
-      
-      // Show success and navigate immediately
+
       toast.success("Lead saved successfully!", {
         position: "top-right",
         autoClose: 1500,
         theme: "colored",
       });
-      
-      // Navigate immediately without delay
+
       navigate("/leads", { replace: true });
-      
+
     } catch (err) {
       const error = err as ApiError;
       console.error(
@@ -618,7 +556,7 @@ export default function AddNewLead() {
       } else {
         msg = error?.message || msg;
       }
-      
+
       toast.error(msg, {
         position: "top-right",
         autoClose: 3000,
@@ -629,955 +567,535 @@ export default function AddNewLead() {
     }
   };
 
-  // Derived: is a campaign currently selected?
   const campaignSelected = Boolean(form.campaign);
 
   // ====================== Render ======================
   return (
-    <Paper
-      sx={{
-        overflow: "hidden",
-        minHeight: "100vh",
-      }}
-    >
+    <Paper sx={{ overflow: "hidden", minHeight: "100vh" }}>
+      <Box sx={{ bgcolor: "white", px: 3, py: 2 }}>
+        <Typography variant="h6" fontWeight={700} color="#1E293B" sx={{ m: 0 }}>
+          Add New Lead
+        </Typography>
+      </Box>
+
+      {/* Step Indicator */}
+      <Box sx={{ bgcolor: "white", px: 6, pt: 3, pb: 2 }}>
         <Box
           sx={{
-            bgcolor: "white",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 3,
+            bgcolor: "#F8FAFC",
             px: 3,
-            py: 2,
+            py: 1.5,
+            borderRadius: "12px",
+            border: "1px solid #E2E8F0",
           }}
         >
-          <Typography
-            variant="h6"
-            fontWeight={700}
-            color="#1E293B"
-            sx={{ m: 0 }}
-          >
-            Add New Lead
-          </Typography>
-        </Box>
-
-        {/* Step Indicator */}
-        <Box
-          sx={{
-            bgcolor: "white",
-            px: 6,
-            pt: 3,
-            pb: 2,
-          }}
-        >
-          <Box
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-              bgcolor: "#F8FAFC",
-              px: 3,
-              py: 1.5,
-              borderRadius: "12px",
-              border: "1px solid #E2E8F0",
-            }}
-          >
-            {[
-              { label: "Patient Details", step: 1 },
-              { label: "Medical Details", step: 2 },
-              { label: "Book Appointment", step: 3 },
-            ].map(({ label, step }) => (
+          {[
+            { label: "Patient Details", step: 1 },
+            { label: "Medical Details", step: 2 },
+            { label: "Book Appointment", step: 3 },
+          ].map(({ label, step }) => (
+            <Box key={step} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Box
-                key={step}
-                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  bgcolor:
+                    currentStep > step
+                      ? "#10B981"
+                      : currentStep === step
+                        ? step === 3
+                          ? "#3B82F6"
+                          : "#F97316"
+                        : "#E2E8F0",
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                }}
               >
-                <Box
-                  sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
-                    bgcolor:
-                      currentStep > step
-                        ? "#10B981"
-                        : currentStep === step
-                          ? step === 3
-                            ? "#3B82F6"
-                            : "#F97316"
-                          : "#E2E8F0",
-                    color: "white",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 700,
-                    fontSize: "0.75rem",
-                  }}
-                >
-                  {currentStep > step ? "✓" : step}
-                </Box>
-                <Typography
-                  variant="body2"
-                  fontWeight={600}
-                  sx={{
-                    fontSize: "0.875rem",
-                    color:
-                      currentStep > step
-                        ? "#10B981"
-                        : currentStep === step
-                          ? step === 3
-                            ? "#3B82F6"
-                            : "#F97316"
-                          : "#94A3B8",
-                  }}
-                >
-                  {label}
-                </Typography>
+                {currentStep > step ? "✓" : step}
               </Box>
-            ))}
-          </Box>
-        </Box>
-
-        {/* Form Body */}
-        <Box
-          sx={{
-            bgcolor: "white",
-            p: 3,
-            maxHeight: "calc(100vh - 400px)",
-            overflowY: "auto",
-            "&::-webkit-scrollbar": { width: "8px" },
-            "&::-webkit-scrollbar-thumb": {
-              backgroundColor: "#CBD5E1",
-              borderRadius: "4px",
-            },
-          }}
-        >
-          {/* ===== STEP 1 ===== */}
-          {currentStep === 1 && (
-            <Box>
               <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                color="#1E293B"
-                sx={{ mb: 2 }}
+                variant="body2"
+                fontWeight={600}
+                sx={{
+                  fontSize: "0.875rem",
+                  color:
+                    currentStep > step
+                      ? "#10B981"
+                      : currentStep === step
+                        ? step === 3
+                          ? "#3B82F6"
+                          : "#F97316"
+                        : "#94A3B8",
+                }}
               >
-                LEAD INFORMATION
+                {label}
               </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
 
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 2,
-                  mb: 3,
-                }}
-              >
-                <Box>
-                  <Typography sx={labelStyle}>Full Name *</Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={form.full_name}
-                    onChange={handleChange("full_name")}
-                    sx={inputStyle}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Contact No. *</Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={form.contact}
-                    onChange={handleChange("contact")}
-                    sx={inputStyle}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Email *</Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={form.email}
-                    onChange={handleChange("email")}
-                    sx={inputStyle}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Location</Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={form.location}
-                    onChange={handleChange("location")}
-                    sx={inputStyle}
-                  />
-                </Box>
+      {/* Form Body */}
+      <Box
+        sx={{
+          bgcolor: "white",
+          p: 3,
+          maxHeight: "calc(100vh - 400px)",
+          overflowY: "auto",
+          "&::-webkit-scrollbar": { width: "8px" },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "#CBD5E1",
+            borderRadius: "4px",
+          },
+        }}
+      >
+        {/* ===== STEP 1 ===== */}
+        {currentStep === 1 && (
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+              LEAD INFORMATION
+            </Typography>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
+              <Box>
+                <Typography sx={labelStyle}>Full Name *</Typography>
+                <TextField fullWidth size="small" value={form.full_name} onChange={handleChange("full_name")} sx={inputStyle} />
               </Box>
+              <Box>
+                <Typography sx={labelStyle}>Contact No. *</Typography>
+                <TextField fullWidth size="small" value={form.contact} onChange={handleChange("contact")} sx={inputStyle} />
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Email *</Typography>
+                <TextField fullWidth size="small" value={form.email} onChange={handleChange("email")} sx={inputStyle} />
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Location</Typography>
+                <TextField fullWidth size="small" value={form.location} onChange={handleChange("location")} sx={inputStyle} />
+              </Box>
+            </Box>
 
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 2,
-                  mb: 4,
-                }}
-              >
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 4 }}>
+              <Box>
+                <Typography sx={labelStyle}>Gender *</Typography>
+                <TextField select fullWidth size="small" value={form.gender} onChange={handleChange("gender")} sx={inputStyle}>
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </TextField>
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Age *</Typography>
+                <TextField fullWidth size="small" type="number" value={form.age} onChange={handleChange("age")} sx={inputStyle} />
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Marital Status</Typography>
+                <TextField select fullWidth size="small" value={form.marital} onChange={handleChange("marital")} sx={inputStyle}>
+                  <MenuItem value="">-- Select --</MenuItem>
+                  <MenuItem value="Married">Married</MenuItem>
+                  <MenuItem value="Single">Single</MenuItem>
+                </TextField>
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Address</Typography>
+                <TextField fullWidth size="small" value={form.address} onChange={handleChange("address")} sx={inputStyle} />
+              </Box>
+            </Box>
+
+            <Box sx={{ mb: 4 }}>
+              <Typography sx={labelStyle}>Language Preference</Typography>
+              <TextField select fullWidth size="small" value={form.language} onChange={handleChange("language")} sx={{ ...inputStyle, maxWidth: "25%" }}>
+                <MenuItem value="">-- Select --</MenuItem>
+                <MenuItem value="English">English</MenuItem>
+                <MenuItem value="Hindi">Hindi</MenuItem>
+                <MenuItem value="Kannada">Kannada</MenuItem>
+              </TextField>
+            </Box>
+
+            <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+              PARTNER INFORMATION
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <Typography sx={{ ...labelStyle, mb: 1 }}>Is This Inquiry For A Couple?</Typography>
+              <RadioGroup row value={isCouple} onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}>
+                <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
+                <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+              </RadioGroup>
+            </Box>
+
+            {isCouple === "yes" && (
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
                 <Box>
-                  <Typography sx={labelStyle}>Gender *</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.gender}
-                    onChange={handleChange("gender")}
-                    sx={inputStyle}
-                  >
+                  <Typography sx={labelStyle}>Full Name</Typography>
+                  <TextField fullWidth size="small" value={form.partnerName} onChange={handleChange("partnerName")} sx={inputStyle} />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Age</Typography>
+                  <TextField fullWidth size="small" type="number" value={form.partnerAge} onChange={handleChange("partnerAge")} sx={inputStyle} />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Gender</Typography>
+                  <TextField select fullWidth size="small" value={form.partnerGender} onChange={handleChange("partnerGender")} sx={inputStyle}>
+                    <MenuItem value="">-- Select --</MenuItem>
                     <MenuItem value="Male">Male</MenuItem>
                     <MenuItem value="Female">Female</MenuItem>
-                    <MenuItem value="Other">Other</MenuItem>
                   </TextField>
                 </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Age *</Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="number"
-                    value={form.age}
-                    onChange={handleChange("age")}
-                    sx={inputStyle}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Marital Status</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.marital}
-                    onChange={handleChange("marital")}
-                    sx={inputStyle}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Married">Married</MenuItem>
-                    <MenuItem value="Single">Single</MenuItem>
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Address</Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={form.address}
-                    onChange={handleChange("address")}
-                    sx={inputStyle}
-                  />
-                </Box>
               </Box>
+            )}
 
-              <Box sx={{ mb: 4 }}>
-                <Typography sx={labelStyle}>Language Preference</Typography>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  value={form.language}
-                  onChange={handleChange("language")}
-                  sx={{ ...inputStyle, maxWidth: "25%" }}
-                >
-                  <MenuItem value="">-- Select --</MenuItem>
-                  <MenuItem value="English">English</MenuItem>
-                  <MenuItem value="Hindi">Hindi</MenuItem>
-                  <MenuItem value="Kannada">Kannada</MenuItem>
-                </TextField>
-              </Box>
+            <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+              SOURCE & CAMPAIGN DETAILS
+            </Typography>
 
-              <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                color="#1E293B"
-                sx={{ mb: 2 }}
-              >
-                PARTNER INFORMATION
-              </Typography>
-              <Box sx={{ mb: 2 }}>
-                <Typography sx={{ ...labelStyle, mb: 1 }}>
-                  Is This Inquiry For A Couple?
-                </Typography>
-                <RadioGroup
-                  row
-                  value={isCouple}
-                  onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}
-                >
-                  <FormControlLabel
-                    value="yes"
-                    control={<Radio size="small" />}
-                    label="Yes"
-                  />
-                  <FormControlLabel
-                    value="no"
-                    control={<Radio size="small" />}
-                    label="No"
-                  />
-                </RadioGroup>
-              </Box>
-
-              {isCouple === "yes" && (
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: 2,
-                    mb: 4,
-                  }}
-                >
-                  <Box>
-                    <Typography sx={labelStyle}>Full Name</Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={form.partnerName}
-                      onChange={handleChange("partnerName")}
-                      sx={inputStyle}
-                    />
-                  </Box>
-                  <Box>
-                    <Typography sx={labelStyle}>Age</Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      type="number"
-                      value={form.partnerAge}
-                      onChange={handleChange("partnerAge")}
-                      sx={inputStyle}
-                    />
-                  </Box>
-                  <Box>
-                    <Typography sx={labelStyle}>Gender</Typography>
-                    <TextField
-                      select
-                      fullWidth
-                      size="small"
-                      value={form.partnerGender}
-                      onChange={handleChange("partnerGender")}
-                      sx={inputStyle}
-                    >
-                      <MenuItem value="">-- Select --</MenuItem>
-                      <MenuItem value="Male">Male</MenuItem>
-                      <MenuItem value="Female">Female</MenuItem>
-                    </TextField>
-                  </Box>
-                </Box>
-              )}
-
-              {/* ===== SOURCE & CAMPAIGN DETAILS ===== */}
-              <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                color="#1E293B"
-                sx={{ mb: 2 }}
-              >
-                SOURCE & CAMPAIGN DETAILS
-              </Typography>
-
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 2,
-                  mb: 4,
-                }}
-              >
-                {/* 1. Campaign dropdown — pick a campaign to auto-fill source & sub-source */}
-                <Box>
-                  <Typography sx={labelStyle}>Campaign Name</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.campaign}
-                    onChange={handleCampaignChange}
-                    sx={inputStyle}
-                  >
-                    <MenuItem value="">-- None --</MenuItem>
-                    {campaigns.length === 0 ? (
-                      <MenuItem value="" disabled>
-                        No campaigns available
-                      </MenuItem>
-                    ) : (
-                      campaigns.map((c) => (
-                        <MenuItem key={c.id} value={c.id}>
-                          {c.name}
-                        </MenuItem>
-                      ))
-                    )}
-                  </TextField>
-                </Box>
-
-                {/* 2. Source — read-only (grey) when campaign selected, editable dropdown otherwise */}
-                <Box>
-                  <Typography sx={labelStyle}>
-                    Source *
-                    {campaignSelected && (
-                      <Typography
-                        component="span"
-                        sx={{
-                          fontSize: "0.65rem",
-                          color: "#6366F1",
-                          ml: 1,
-                          fontWeight: 500,
-                        }}
-                      >
-                        auto-filled from campaign
-                      </Typography>
-                    )}
-                  </Typography>
-                  {campaignSelected ? (
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={form.source}
-                      InputProps={{ readOnly: true }}
-                      sx={readOnlyStyle}
-                    />
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
+              <Box>
+                <Typography sx={labelStyle}>Campaign Name</Typography>
+                <TextField select fullWidth size="small" value={form.campaign} onChange={handleCampaignChange} sx={inputStyle}>
+                  <MenuItem value="">-- None --</MenuItem>
+                  {campaigns.length === 0 ? (
+                    <MenuItem value="" disabled>No campaigns available</MenuItem>
                   ) : (
-                    <TextField
-                      select
-                      fullWidth
-                      size="small"
-                      value={form.source}
-                      onChange={handleChange("source")}
-                      sx={inputStyle}
-                    >
-                      <MenuItem value="">-- Select --</MenuItem>
-                      <MenuItem value="Social Media">Social Media</MenuItem>
-                      <MenuItem value="Website">Website</MenuItem>
-                      <MenuItem value="Referral">Referral</MenuItem>
-                      <MenuItem value="Direct">Direct</MenuItem>
-                    </TextField>
+                    campaigns.map((c) => (
+                      <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                    ))
                   )}
-                </Box>
-
-                {/* 3. Sub-Source — read-only when campaign selected, editable otherwise */}
-                <Box>
-                  <Typography sx={labelStyle}>
-                    Sub-Source
-                    {campaignSelected && (
-                      <Typography
-                        component="span"
-                        sx={{
-                          fontSize: "0.65rem",
-                          color: "#6366F1",
-                          ml: 1,
-                          fontWeight: 500,
-                        }}
-                      >
-                        auto-filled from campaign
-                      </Typography>
-                    )}
-                  </Typography>
-                  {campaignSelected ? (
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={form.subSource}
-                      InputProps={{ readOnly: true }}
-                      sx={readOnlyStyle}
-                    />
-                  ) : (
-                    <TextField
-                      select
-                      fullWidth
-                      size="small"
-                      value={form.subSource}
-                      onChange={handleChange("subSource")}
-                      sx={inputStyle}
-                    >
-                      <MenuItem value="">-- Select --</MenuItem>
-                      <MenuItem value="Facebook">Facebook</MenuItem>
-                      <MenuItem value="Instagram">Instagram</MenuItem>
-                      <MenuItem value="Google">Google</MenuItem>
-                      <MenuItem value="LinkedIn">LinkedIn</MenuItem>
-                    </TextField>
-                  )}
-                </Box>
-              </Box>
-
-              <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                color="#1E293B"
-                sx={{ mb: 2 }}
-              >
-                ASSIGNEE & NEXT ACTION DETAILS
-              </Typography>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 2,
-                  mb: 2,
-                }}
-              >
-                <Box>
-                  <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.assignee}
-                    onChange={handleChange("assignee")}
-                    sx={inputStyle}
-                    disabled={loadingEmployees}
-                    InputProps={{
-                      endAdornment: loadingEmployees ? (
-                        <CircularProgress size={20} sx={{ mr: 1 }} />
-                      ) : null,
-                    }}
-                  >
-                    {loadingEmployees ? (
-                      <MenuItem value="" disabled>
-                        Loading...
-                      </MenuItem>
-                    ) : employees.length === 0 ? (
-                      <MenuItem value="" disabled>
-                        No employees
-                      </MenuItem>
-                    ) : (
-                      employees.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id.toString()}>
-                          {emp.emp_name} ({emp.emp_type})
-                        </MenuItem>
-                      ))
-                    )}
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Next Action Type</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.nextType}
-                    onChange={handleChange("nextType")}
-                    sx={inputStyle}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Follow Up">Follow Up</MenuItem>
-                    <MenuItem value="Call">Call</MenuItem>
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Next Action Status</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.nextStatus}
-                    onChange={handleChange("nextStatus")}
-                    sx={inputStyle}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="pending">Pending</MenuItem>
-                    <MenuItem value="completed">Completed</MenuItem>
-                  </TextField>
-                </Box>
-              </Box>
-              <Box sx={{ mb: 2 }}>
-                <Typography sx={labelStyle}>Next Action Description</Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={form.nextDesc}
-                  onChange={handleChange("nextDesc")}
-                  sx={inputStyle}
-                />
-              </Box>
-            </Box>
-          )}
-
-          {/* ===== STEP 2 ===== */}
-          {currentStep === 2 && (
-            <Box>
-              <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                color="#1E293B"
-                sx={{ mb: 2 }}
-              >
-                TREATMENT INFORMATION
-              </Typography>
-              <Box sx={{ mb: 3 }}>
-                <Typography sx={labelStyle}>Treatment Interest *</Typography>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  value={form.treatmentInterest}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setForm((prev) => ({ ...prev, treatmentInterest: value }));
-                    if (value && !form.treatments.includes(value)) {
-                      setForm((prev) => ({
-                        ...prev,
-                        treatments: [...prev.treatments, value],
-                      }));
-                    }
-                  }}
-                  sx={{ ...inputStyle, maxWidth: "50%" }}
-                  SelectProps={{
-                    displayEmpty: true,
-                  }}
-                >
-                  <MenuItem value="" disabled>
-                    Select
-                  </MenuItem>
-                  <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
-                  <MenuItem value="IVF">IVF</MenuItem>
-                  <MenuItem value="IUI">IUI</MenuItem>
-                  <MenuItem value="Consultation">Consultation</MenuItem>
                 </TextField>
-              </Box>
-
-              {form.treatments.length > 0 && (
-                <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-                  {form.treatments.map((t) => (
-                    <Chip
-                      key={t}
-                      label={t}
-                      onDelete={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          treatments: prev.treatments.filter((x) => x !== t),
-                        }))
-                      }
-                      sx={{
-                        bgcolor: "#FEE2E2",
-                        color: "#B91C1C",
-                        fontWeight: 600,
-                        border: "1px solid #FCA5A5",
-                        "& .MuiChip-deleteIcon": {
-                          color: "#B91C1C",
-                          "&:hover": { color: "#991B1B" },
-                        },
-                      }}
-                    />
-                  ))}
-                </Stack>
-              )}
-
-              <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                color="#1E293B"
-                sx={{ mb: 2 }}
-              >
-                DOCUMENTS & REPORTS
-              </Typography>
-              <Box sx={{ mb: 2 }}>
-                <Typography sx={labelStyle}>Upload Documents</Typography>
-                <Box
-                  sx={{
-                    border: "2px dashed #E2E8F0",
-                    borderRadius: "12px",
-                    p: 3,
-                    display: "inline-block",
-                    textAlign: "center",
-                    bgcolor: "#F8FAFC",
-                    minWidth: "400px",
-                  }}
-                >
-                  <Button
-                    variant="contained"
-                    component="label"
-                    sx={{
-                      bgcolor: "#64748B",
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      fontWeight: 600,
-                      px: 3,
-                      py: 1,
-                      "&:hover": { bgcolor: "#475569" },
-                    }}
-                  >
-                    Choose File
-                    <input
-                      type="file"
-                      hidden
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          documents: e.target.files ? e.target.files[0] : null,
-                        }))
-                      }
-                    />
-                  </Button>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mt: 1 }}
-                  >
-                    {form.documents ? form.documents.name : "No File Chosen"}
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-          )}
-
-          {/* ===== STEP 3 ===== */}
-          {currentStep === 3 && (
-            <Box>
-              <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                color="#1E293B"
-                sx={{ mb: 2 }}
-              >
-                APPOINTMENT DETAILS
-              </Typography>
-              <Box sx={{ mb: 3 }}>
-                <Typography sx={{ ...labelStyle, mb: 1 }}>
-                  Want to Book an Appointment?
-                </Typography>
-                <RadioGroup
-                  row
-                  value={form.wantAppointment}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      wantAppointment: e.target.value as "yes" | "no",
-                    }))
-                  }
-                >
-                  <FormControlLabel
-                    value="yes"
-                    control={<Radio size="small" />}
-                    label="Yes"
-                  />
-                  <FormControlLabel
-                    value="no"
-                    control={<Radio size="small" />}
-                    label="No"
-                  />
-                </RadioGroup>
-              </Box>
-
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: 2,
-                  mb: 2,
-                }}
-              >
-                <Box>
-                  <Typography sx={labelStyle}>Department *</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.department}
-                    onChange={handleDepartmentChange}
-                    sx={inputStyle}
-                    disabled={loadingDepartments}
-                    InputProps={{
-                      endAdornment: loadingDepartments ? (
-                        <CircularProgress size={20} sx={{ mr: 1 }} />
-                      ) : null,
-                    }}
-                  >
-                    {loadingDepartments ? (
-                      <MenuItem value="" disabled>
-                        Loading...
-                      </MenuItem>
-                    ) : departments.length === 0 ? (
-                      <MenuItem value="" disabled>
-                        No departments available
-                      </MenuItem>
-                    ) : (
-                      departments.map((dept) => (
-                        <MenuItem key={dept.id} value={dept.id.toString()}>
-                          {dept.name}
-                        </MenuItem>
-                      ))
-                    )}
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.assignee}
-                    onChange={handleChange("assignee")}
-                    sx={inputStyle}
-                    disabled={loadingEmployees || !form.department}
-                  >
-                    {!form.department ? (
-                      <MenuItem value="" disabled>
-                        Select department first
-                      </MenuItem>
-                    ) : loadingEmployees ? (
-                      <MenuItem value="" disabled>
-                        Loading...
-                      </MenuItem>
-                    ) : filteredPersonnel.length === 0 ? (
-                      <MenuItem value="" disabled>
-                        No employees in this department
-                      </MenuItem>
-                    ) : (
-                      filteredPersonnel.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id.toString()}>
-                          {emp.emp_name} ({emp.emp_type})
-                        </MenuItem>
-                      ))
-                    )}
-                  </TextField>
-                </Box>
-              </Box>
-
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: 2,
-                  mb: 3,
-                }}
-              >
-                <Box>
-                  <Typography sx={labelStyle}>Date *</Typography>
-                  {/* ✅ FIX: wrap value in dayjs() to guarantee Dayjs type,
-                      avoiding the PickerValue (Date | Dayjs | null) mismatch */}
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker
-                      value={selectedDate}
-                      onChange={(newDate) => {
-                        // ✅ FIX: convert any incoming value to Dayjs via dayjs()
-                        // PickerValue can be Date | Dayjs | null — dayjs() handles all cases
-                        const asDayjs = newDate ? dayjs(newDate as Dayjs | Date) : null;
-                        setSelectedDate(asDayjs);
-                        if (asDayjs && asDayjs.isValid()) {
-                          setForm((prev) => ({
-                            ...prev,
-                            appointmentDate: asDayjs.format("YYYY-MM-DD"),
-                          }));
-                        }
-                      }}
-                      slotProps={{
-                        textField: {
-                          size: "small",
-                          fullWidth: true,
-                          sx: inputStyle,
-                        },
-                      }}
-                    />
-                  </LocalizationProvider>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Select Slot *</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={form.slot}
-                    onChange={handleChange("slot")}
-                    sx={inputStyle}
-                  >
-                    {timeSlots.map((slot, i) => (
-                      <MenuItem key={i} value={slot}>
-                        {slot}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
               </Box>
 
               <Box>
-                <Typography sx={labelStyle}>Remark</Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  multiline
-                  rows={2}
-                  placeholder="Type Here..."
-                  value={form.remark}
-                  onChange={handleChange("remark")}
-                  sx={inputStyle}
-                />
+                <Typography sx={labelStyle}>
+                  Source *
+                  {campaignSelected && (
+                    <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+                      auto-filled from campaign
+                    </Typography>
+                  )}
+                </Typography>
+                {campaignSelected ? (
+                  <TextField fullWidth size="small" value={form.source} InputProps={{ readOnly: true }} sx={readOnlyStyle} />
+                ) : (
+                  <TextField select fullWidth size="small" value={form.source} onChange={handleChange("source")} sx={inputStyle}>
+                    <MenuItem value="">-- Select --</MenuItem>
+                    <MenuItem value="Social Media">Social Media</MenuItem>
+                    <MenuItem value="Website">Website</MenuItem>
+                    <MenuItem value="Referral">Referral</MenuItem>
+                    <MenuItem value="Direct">Direct</MenuItem>
+                  </TextField>
+                )}
+              </Box>
+
+              <Box>
+                <Typography sx={labelStyle}>
+                  Sub-Source
+                  {campaignSelected && (
+                    <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+                      auto-filled from campaign
+                    </Typography>
+                  )}
+                </Typography>
+                {campaignSelected ? (
+                  <TextField fullWidth size="small" value={form.subSource} InputProps={{ readOnly: true }} sx={readOnlyStyle} />
+                ) : (
+                  <TextField select fullWidth size="small" value={form.subSource} onChange={handleChange("subSource")} sx={inputStyle}>
+                    <MenuItem value="">-- Select --</MenuItem>
+                    <MenuItem value="Facebook">Facebook</MenuItem>
+                    <MenuItem value="Instagram">Instagram</MenuItem>
+                    <MenuItem value="Google">Google</MenuItem>
+                    <MenuItem value="LinkedIn">LinkedIn</MenuItem>
+                  </TextField>
+                )}
               </Box>
             </Box>
-          )}
-        </Box>
 
-        {/* Footer */}
-        <Box
-          sx={{
-            bgcolor: "white",
-            p: 3,
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 2,
-          }}
+            <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+              ASSIGNEE & NEXT ACTION DETAILS
+            </Typography>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 2 }}>
+              <Box>
+                <Typography sx={labelStyle}>Assigned To</Typography>
+                <TextField
+                  select fullWidth size="small" value={form.assignee} onChange={handleChange("assignee")}
+                  sx={inputStyle} disabled={loadingEmployees}
+                  InputProps={{ endAdornment: loadingEmployees ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null }}
+                >
+                  {loadingEmployees ? (
+                    <MenuItem value="" disabled>Loading...</MenuItem>
+                  ) : employees.length === 0 ? (
+                    <MenuItem value="" disabled>No employees</MenuItem>
+                  ) : (
+                    employees.map((emp) => (
+                      <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
+                    ))
+                  )}
+                </TextField>
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Next Action Type</Typography>
+                <TextField select fullWidth size="small" value={form.nextType} onChange={handleChange("nextType")} sx={inputStyle}>
+                  <MenuItem value="">-- Select --</MenuItem>
+                  <MenuItem value="Follow Up">Follow Up</MenuItem>
+                  <MenuItem value="Call">Call</MenuItem>
+                </TextField>
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Next Action Status</Typography>
+                <TextField select fullWidth size="small" value={form.nextStatus} onChange={handleChange("nextStatus")} sx={inputStyle}>
+                  <MenuItem value="">-- Select --</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                </TextField>
+              </Box>
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography sx={labelStyle}>Next Action Description</Typography>
+              <TextField fullWidth size="small" value={form.nextDesc} onChange={handleChange("nextDesc")} sx={inputStyle} />
+            </Box>
+          </Box>
+        )}
+
+        {/* ===== STEP 2 ===== */}
+        {currentStep === 2 && (
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+              TREATMENT INFORMATION
+            </Typography>
+            <Box sx={{ mb: 3 }}>
+              <Typography sx={labelStyle}>Treatment Interest *</Typography>
+              <TextField
+                select fullWidth size="small" value={form.treatmentInterest}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setForm((prev) => ({ ...prev, treatmentInterest: value }));
+                  if (value && !form.treatments.includes(value)) {
+                    setForm((prev) => ({ ...prev, treatments: [...prev.treatments, value] }));
+                  }
+                }}
+                sx={{ ...inputStyle, maxWidth: "50%" }}
+                SelectProps={{ displayEmpty: true }}
+              >
+                <MenuItem value="" disabled>Select</MenuItem>
+                <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
+                <MenuItem value="IVF">IVF</MenuItem>
+                <MenuItem value="IUI">IUI</MenuItem>
+                <MenuItem value="Consultation">Consultation</MenuItem>
+              </TextField>
+            </Box>
+
+            {form.treatments.length > 0 && (
+              <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
+                {form.treatments.map((t) => (
+                  <Chip
+                    key={t}
+                    label={t}
+                    onDelete={() =>
+                      setForm((prev) => ({ ...prev, treatments: prev.treatments.filter((x) => x !== t) }))
+                    }
+                    sx={{
+                      bgcolor: "#FEE2E2",
+                      color: "#B91C1C",
+                      fontWeight: 600,
+                      border: "1px solid #FCA5A5",
+                      "& .MuiChip-deleteIcon": { color: "#B91C1C", "&:hover": { color: "#991B1B" } },
+                    }}
+                  />
+                ))}
+              </Stack>
+            )}
+
+            <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+              DOCUMENTS & REPORTS
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <Typography sx={labelStyle}>Upload Documents</Typography>
+              <Box
+                sx={{
+                  border: "2px dashed #E2E8F0",
+                  borderRadius: "12px",
+                  p: 3,
+                  display: "inline-block",
+                  textAlign: "center",
+                  bgcolor: "#F8FAFC",
+                  minWidth: "400px",
+                }}
+              >
+                <Button
+                  variant="contained"
+                  component="label"
+                  sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, px: 3, py: 1, "&:hover": { bgcolor: "#475569" } }}
+                >
+                  Choose File
+                  <input
+                    type="file"
+                    hidden
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, documents: e.target.files ? e.target.files[0] : null }))
+                    }
+                  />
+                </Button>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                  {form.documents ? form.documents.name : "No File Chosen"}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        )}
+
+        {/* ===== STEP 3 ===== */}
+        {currentStep === 3 && (
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+              APPOINTMENT DETAILS
+            </Typography>
+            <Box sx={{ mb: 3 }}>
+              <Typography sx={{ ...labelStyle, mb: 1 }}>Want to Book an Appointment?</Typography>
+              <RadioGroup
+                row
+                value={form.wantAppointment}
+                onChange={(e) => setForm((prev) => ({ ...prev, wantAppointment: e.target.value as "yes" | "no" }))}
+              >
+                <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
+                <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+              </RadioGroup>
+            </Box>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
+              <Box>
+                <Typography sx={labelStyle}>Department *</Typography>
+                <TextField
+                  select fullWidth size="small" value={form.department} onChange={handleDepartmentChange}
+                  sx={inputStyle} disabled={loadingDepartments}
+                  InputProps={{ endAdornment: loadingDepartments ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null }}
+                >
+                  {loadingDepartments ? (
+                    <MenuItem value="" disabled>Loading...</MenuItem>
+                  ) : departments.length === 0 ? (
+                    <MenuItem value="" disabled>No departments available</MenuItem>
+                  ) : (
+                    departments.map((dept) => (
+                      <MenuItem key={dept.id} value={dept.id.toString()}>{dept.name}</MenuItem>
+                    ))
+                  )}
+                </TextField>
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Assigned To</Typography>
+                <TextField
+                  select fullWidth size="small" value={form.assignee} onChange={handleChange("assignee")}
+                  sx={inputStyle} disabled={loadingEmployees || !form.department}
+                >
+                  {!form.department ? (
+                    <MenuItem value="" disabled>Select department first</MenuItem>
+                  ) : loadingEmployees ? (
+                    <MenuItem value="" disabled>Loading...</MenuItem>
+                  ) : filteredPersonnel.length === 0 ? (
+                    <MenuItem value="" disabled>No employees in this department</MenuItem>
+                  ) : (
+                    filteredPersonnel.map((emp) => (
+                      <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
+                    ))
+                  )}
+                </TextField>
+              </Box>
+            </Box>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 3 }}>
+              <Box>
+                <Typography sx={labelStyle}>Date *</Typography>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    value={selectedDate}
+                    onChange={(newDate) => {
+                      const asDayjs = newDate ? dayjs(newDate as Dayjs | Date) : null;
+                      setSelectedDate(asDayjs);
+                      if (asDayjs && asDayjs.isValid()) {
+                        setForm((prev) => ({ ...prev, appointmentDate: asDayjs.format("YYYY-MM-DD") }));
+                      }
+                    }}
+                    slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
+                  />
+                </LocalizationProvider>
+              </Box>
+              <Box>
+                <Typography sx={labelStyle}>Select Slot *</Typography>
+                <TextField select fullWidth size="small" value={form.slot} onChange={handleChange("slot")} sx={inputStyle}>
+                  {timeSlots.map((slot, i) => (
+                    <MenuItem key={i} value={slot}>{slot}</MenuItem>
+                  ))}
+                </TextField>
+              </Box>
+            </Box>
+
+            <Box>
+              <Typography sx={labelStyle}>Remark</Typography>
+              <TextField
+                fullWidth size="small" multiline rows={2} placeholder="Type Here..."
+                value={form.remark} onChange={handleChange("remark")} sx={inputStyle}
+              />
+            </Box>
+          </Box>
+        )}
+      </Box>
+
+      {/* Footer */}
+      <Box sx={{ bgcolor: "white", p: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}>
+        <Button
+          onClick={() => navigate("/leads")}
+          sx={{ textTransform: "none", color: "#64748B", fontWeight: 700, px: 3 }}
         >
+          Cancel
+        </Button>
+        {currentStep > 1 && (
           <Button
-            onClick={() => navigate("/leads")}
+            onClick={handleBack}
+            variant="outlined"
+            disabled={isSubmitting}
             sx={{
               textTransform: "none",
-              color: "#64748B",
+              borderColor: "#E2E8F0",
+              color: "#1E293B",
               fontWeight: 700,
               px: 3,
+              "&:hover": { borderColor: "#CBD5E1" },
             }}
           >
-            Cancel
+            Back
           </Button>
-          {currentStep > 1 && (
-            <Button
-              onClick={handleBack}
-              variant="outlined"
-              disabled={isSubmitting}
-              sx={{
-                textTransform: "none",
-                borderColor: "#E2E8F0",
-                color: "#1E293B",
-                fontWeight: 700,
-                px: 3,
-                "&:hover": { borderColor: "#CBD5E1" },
-              }}
-            >
-              Back
-            </Button>
-          )}
-          {currentStep < 3 ? (
-            <Button
-              onClick={handleNext}
-              variant="contained"
-              sx={{
-                bgcolor: "#334155",
-                textTransform: "none",
-                fontWeight: 700,
-                px: 4,
-                "&:hover": { bgcolor: "#1E293B" },
-              }}
-            >
-              Next
-            </Button>
-          ) : (
-            <Button
-              onClick={handleNext}
-              variant="contained"
-              disabled={isSubmitting}
-              sx={{
-                bgcolor: "#334155",
-                textTransform: "none",
-                fontWeight: 700,
-                px: 4,
-                minWidth: "100px",
-                "&:hover": { bgcolor: "#1E293B" },
-              }}
-            >
-              {isSubmitting ? (
-                <CircularProgress size={20} sx={{ color: "white" }} />
-              ) : (
-                "Save"
-              )}
-            </Button>
-          )}
-        </Box>
-      </Paper>
+        )}
+        {currentStep < 3 ? (
+          <Button
+            onClick={handleNext}
+            variant="contained"
+            sx={{ bgcolor: "#334155", textTransform: "none", fontWeight: 700, px: 4, "&:hover": { bgcolor: "#1E293B" } }}
+          >
+            Next
+          </Button>
+        ) : (
+          <Button
+            onClick={handleNext}
+            variant="contained"
+            disabled={isSubmitting}
+            sx={{
+              bgcolor: "#334155",
+              textTransform: "none",
+              fontWeight: 700,
+              px: 4,
+              minWidth: "100px",
+              "&:hover": { bgcolor: "#1E293B" },
+            }}
+          >
+            {isSubmitting ? <CircularProgress size={20} sx={{ color: "white" }} /> : "Save"}
+          </Button>
+        )}
+      </Box>
+    </Paper>
   );
 }
