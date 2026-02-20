@@ -56,29 +56,15 @@ const intOrFallback = (val: string | undefined | null, fallback: number): number
 const isNextActionStatus = (v: string): v is NextActionStatus =>
   v === "pending" || v === "completed";
 
-// ====================== Format Lead ID - FIXED ======================
+// ====================== Format Lead ID ======================
 const formatLeadId = (id: string): string => {
-  // If ID already has format like "#LN-201" or "LN-201", use it
-  if (id.match(/^#?LN-\d+$/i)) {
-    return id.startsWith('#') ? id : `#${id}`;
-  }
-  
-  // If ID contains "LN-" somewhere, extract it
+  if (id.match(/^#?LN-\d+$/i)) return id.startsWith('#') ? id : `#${id}`;
   const lnMatch = id.match(/#?LN-(\d+)/i);
-  if (lnMatch) {
-    return `#LN-${lnMatch[1]}`;
-  }
-  
-  // Try to find any sequence of digits
+  if (lnMatch) return `#LN-${lnMatch[1]}`;
   const numMatch = id.match(/\d+/);
-  if (numMatch) {
-    return `#LN-${numMatch[0]}`;
-  }
-  
-  // Fallback: create from hash of ID
+  if (numMatch) return `#LN-${numMatch[0]}`;
   const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const num = (hash % 900) + 100; // Generate 3-digit number
-  return `#LN-${num}`;
+  return `#LN-${(hash % 900) + 100}`;
 };
 
 // ====================== Stepper ======================
@@ -259,47 +245,50 @@ export default function EditLead() {
     mb: 1.5,
   };
 
-  // ====================== Save ======================
+  // ====================== Save — optimistic: show success + navigate immediately ======================
   const handleSave = async () => {
-    if (!leadData || !id) return;
-    try {
-      setSaving(true);
-      setError(null);
-      const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
-      const updateData: Partial<Lead> = {
-        clinic_id: clinicId,
-        department_id: intOrFallback(department, 1),
-        full_name: fullName.trim(),
-        contact_no: contactNo.trim(),
-        email: strOrNull(email),
-        age: intOrNull(age),
-        marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
-        language_preference: language || "",
-        location: location || "",
-        address: address || "",
-        partner_inquiry: isCouple === "yes",
-        partner_full_name: partnerName || "",
-        partner_age: intOrNull(partnerAge),
-        partner_gender: partnerGender ? (partnerGender.toLowerCase() as "male" | "female") : null,
-        source,
-        sub_source: subSource || "",
-        assigned_to_id: intOrNull(assignee),
-        next_action_status: resolvedStatus,
-        next_action_description: nextDesc || "",
-        treatment_interest: treatments.join(",") || treatmentInterest,
-        book_appointment: wantAppointment === "yes",
-        appointment_date: appointmentDate,
-        slot,
-        remark: remark || "",
-      };
-      await LeadAPI.update(id, updateData);
-      dispatch(fetchLeads());
-      setShowSuccess(true);
-      setTimeout(() => { setShowSuccess(false); navigate("/leads"); }, 2000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save lead");
-      setSaving(false);
-    }
+    if (!leadData || !id || saving) return;
+
+    const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
+    const updateData: Partial<Lead> = {
+      clinic_id: clinicId,
+      department_id: intOrFallback(department, 1),
+      full_name: fullName.trim(),
+      contact_no: contactNo.trim(),
+      email: strOrNull(email),
+      age: intOrNull(age),
+      marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
+      language_preference: language || "",
+      location: location || "",
+      address: address || "",
+      partner_inquiry: isCouple === "yes",
+      partner_full_name: partnerName || "",
+      partner_age: intOrNull(partnerAge),
+      partner_gender: partnerGender ? (partnerGender.toLowerCase() as "male" | "female") : null,
+      source,
+      sub_source: subSource || "",
+      assigned_to_id: intOrNull(assignee),
+      next_action_status: resolvedStatus,
+      next_action_description: nextDesc || "",
+      treatment_interest: treatments.join(",") || treatmentInterest,
+      book_appointment: wantAppointment === "yes",
+      appointment_date: appointmentDate,
+      slot,
+      remark: remark || "",
+    };
+
+    // ── Optimistic: show success & navigate immediately ──
+    setSaving(true);
+    setShowSuccess(true);
+    setTimeout(() => navigate("/leads", { replace: true }), 800);
+
+    // ── Fire API in background — user is already gone ──
+    LeadAPI.update(id, updateData)
+      .then(() => dispatch(fetchLeads()))
+      .catch((err: unknown) => {
+        // API failed silently in background — log it
+        console.error("❌ Lead update failed:", err instanceof Error ? err.message : err);
+      });
   };
 
   // ====================== Loading / Error ======================
@@ -335,7 +324,6 @@ export default function EditLead() {
     );
   }
 
-  // ====================== FIXED: Format Lead ID to show only #LN-XXX ======================
   const leadLabel = leadData.id ? formatLeadId(leadData.id.toString()) : "";
 
   return (
@@ -359,7 +347,7 @@ export default function EditLead() {
           </Typography>
         </Box>
 
-        {/* ---- Stepper — matches Figma tab-pill style ---- */}
+        {/* ---- Stepper ---- */}
         <Box sx={{ px: 4, py: 1.5, bgcolor: "#FFFFFF" }}>
           <Box sx={{
             display: "inline-flex", alignItems: "center",
@@ -373,22 +361,15 @@ export default function EditLead() {
               const stepColor = completed ? "#10B981" : active ? "#F97316" : "transparent";
               const textColor = completed ? "#10B981" : active ? "#F97316" : "#94A3B8";
               const bgColor = active || completed ? "#FFFFFF" : "transparent";
-
               return (
-                <Box
-                  key={step}
-                  sx={{
-                    display: "flex", alignItems: "center", gap: 1,
-                    px: 2, py: 0.75,
-                    borderRadius: "8px",
-                    bgcolor: bgColor,
-                    boxShadow: active || completed ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                    transition: "all 0.2s",
-                  }}
-                >
+                <Box key={step} sx={{
+                  display: "flex", alignItems: "center", gap: 1,
+                  px: 2, py: 0.75, borderRadius: "8px", bgcolor: bgColor,
+                  boxShadow: active || completed ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  transition: "all 0.2s",
+                }}>
                   <Box sx={{
-                    width: 20, height: 20, borderRadius: "50%",
-                    bgcolor: stepColor,
+                    width: 20, height: 20, borderRadius: "50%", bgcolor: stepColor,
                     border: completed || active ? "none" : "1.5px solid #CBD5E1",
                     color: completed || active ? "#FFF" : "#94A3B8",
                     display: "flex", alignItems: "center", justifyContent: "center",
@@ -396,9 +377,7 @@ export default function EditLead() {
                   }}>
                     {completed ? "✓" : step}
                   </Box>
-                  <Typography fontSize="13px" fontWeight={600} color={textColor} noWrap>
-                    {label}
-                  </Typography>
+                  <Typography fontSize="13px" fontWeight={600} color={textColor} noWrap>{label}</Typography>
                 </Box>
               );
             })}
@@ -407,8 +386,7 @@ export default function EditLead() {
 
         {/* ---- Scrollable Form ---- */}
         <Box sx={{
-          bgcolor: "white", px: 4, pt: 3, pb: 2,
-          overflowY: "auto",
+          bgcolor: "white", px: 4, pt: 3, pb: 2, overflowY: "auto",
           "&::-webkit-scrollbar": { width: "6px" },
           "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
         }}>
@@ -423,7 +401,6 @@ export default function EditLead() {
                 <Box><Typography sx={labelStyle}>Email *</Typography><TextField fullWidth size="small" value={email} onChange={(e) => setEmail(e.target.value)} sx={inputStyle} /></Box>
                 <Box><Typography sx={labelStyle}>Location/ Address</Typography><TextField fullWidth size="small" value={location} onChange={(e) => setLocation(e.target.value)} sx={inputStyle} /></Box>
               </Box>
-
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
                 <Box>
                   <Typography sx={labelStyle}>Gender *</Typography>
@@ -445,7 +422,6 @@ export default function EditLead() {
                 </Box>
                 <Box><Typography sx={labelStyle}>Address</Typography><TextField fullWidth size="small" value={address} onChange={(e) => setAddress(e.target.value)} sx={inputStyle} /></Box>
               </Box>
-
               <Box sx={{ mb: 3 }}>
                 <Typography sx={labelStyle}>Language Preference</Typography>
                 <TextField select fullWidth size="small" value={language} onChange={(e) => setLanguage(e.target.value)} sx={{ ...inputStyle, maxWidth: "25%" }}>
@@ -464,7 +440,6 @@ export default function EditLead() {
                   <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
                 </RadioGroup>
               </Box>
-
               {isCouple === "yes" && (
                 <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 3 }}>
                   <Box><Typography sx={labelStyle}>Full Name</Typography><TextField fullWidth size="small" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} sx={inputStyle} /></Box>
@@ -651,10 +626,7 @@ export default function EditLead() {
         </Box>
 
         {/* ---- Footer ---- */}
-        <Box sx={{
-          bgcolor: "white", px: 4, py: 2,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
+        <Box sx={{ bgcolor: "white", px: 4, py: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Typography variant="caption" color="text.secondary">Step {currentStep} of 3</Typography>
           <Box sx={{ display: "flex", gap: 1.5 }}>
             <Button onClick={() => navigate("/leads")} disabled={saving}
@@ -663,25 +635,23 @@ export default function EditLead() {
               Cancel
             </Button>
             {currentStep > 1 && (
-              <Button onClick={() => setCurrentStep((s) => s - 1)} disabled={saving}
-                variant="outlined"
+              <Button onClick={() => setCurrentStep((s) => s - 1)} disabled={saving} variant="outlined"
                 sx={{ textTransform: "none", borderColor: "#E2E8F0", color: "#1E293B", fontWeight: 600,
                   px: 3, borderRadius: "8px", "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" } }}>
                 Back
               </Button>
             )}
             {currentStep < 3 ? (
-              <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={saving}
-                variant="contained"
-                sx={{ bgcolor: "#1E293B", textTransform: "none", fontWeight: 600, px: 4,
-                  borderRadius: "8px", "&:hover": { bgcolor: "#0F172A" } }}>
+              <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={saving} variant="contained"
+                sx={{ bgcolor: "#1E293B", textTransform: "none", fontWeight: 600, px: 4, borderRadius: "8px", "&:hover": { bgcolor: "#0F172A" } }}>
                 Next
               </Button>
             ) : (
               <Button onClick={handleSave} disabled={saving} variant="contained"
-                sx={{ bgcolor: "#10B981", textTransform: "none", fontWeight: 600, px: 4,
-                  minWidth: 100, borderRadius: "8px", "&:hover": { bgcolor: "#059669" } }}>
-                {saving ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Save Lead"}
+                sx={{ bgcolor: "#1E293B", textTransform: "none", fontWeight: 600, px: 4,
+                  minWidth: 100, borderRadius: "8px", boxShadow: "none",
+                  "&:hover": { bgcolor: "#0F172A", boxShadow: "none" } }}>
+                {saving ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Save"}
               </Button>
             )}
           </Box>

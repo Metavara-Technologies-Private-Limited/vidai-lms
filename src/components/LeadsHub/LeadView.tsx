@@ -579,7 +579,7 @@ export default function LeadDetailView() {
                 fontSize: "30px",
                 fontWeight: 700,
                 transform: "translateY(-35px)",
-                ml: 2.8,
+                ml: -2,
                 flexShrink: 0,
               }}
             >
