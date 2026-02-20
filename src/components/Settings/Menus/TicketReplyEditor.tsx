@@ -19,6 +19,7 @@ import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import FormatSizeIcon from "@mui/icons-material/FormatSize";
+
 import type { Employee } from "../../../services/leads.api";
 import type { SxProps, Theme } from "@mui/material/styles";
 import DeleteMail from "../../../assets/icons/Delete_Icon.svg";
