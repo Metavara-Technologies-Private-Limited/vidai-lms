@@ -29,6 +29,37 @@ import type { Lead, Department, Employee } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import type { NextActionStatus } from "../../types/leads.types";
 
+// ====================== Task Type Config ======================
+// Single source of truth — same as AddNewLead.tsx
+export const TASK_TYPES = [
+  "Follow Up",
+  "Call Patient",
+  "Book Appointment",
+  "Send Message",
+  "Send Email",
+  "Review Details",
+  "No Action",
+] as const;
+
+export type TaskType = typeof TASK_TYPES[number];
+
+// Rules: "Book Appointment" → only "Done/completed", all others → only "To Do/pending"
+export const TASK_STATUS_FOR_TYPE: Record<string, { label: string; value: string }[]> = {
+  "Follow Up":        [{ label: "To Do", value: "pending"   }],
+  "Call Patient":     [{ label: "To Do", value: "pending"   }],
+  "Book Appointment": [{ label: "Done",  value: "completed" }],
+  "Send Message":     [{ label: "To Do", value: "pending"   }],
+  "Send Email":       [{ label: "To Do", value: "pending"   }],
+  "Review Details":   [{ label: "To Do", value: "pending"   }],
+  "No Action":        [{ label: "To Do", value: "pending"   }],
+};
+
+// Auto-derive status when task type is picked
+export const getAutoNextActionStatus = (taskType: string): "pending" | "completed" | "" => {
+  if (!taskType) return "";
+  return taskType === "Book Appointment" ? "completed" : "pending";
+};
+
 // ====================== Time Slots ======================
 const timeSlots = [
   "09:00 AM - 09:30 AM", "09:30 AM - 10:00 AM", "10:00 AM - 10:30 AM",
@@ -126,6 +157,28 @@ export default function EditLead() {
   const [slot, setSlot] = React.useState("");
   const [remark, setRemark] = React.useState("");
 
+  // ====================== Computed: available task statuses for selected type ======================
+  const availableTaskStatuses = React.useMemo<{ label: string; value: string }[]>(() => {
+    if (!nextType) {
+      return [
+        { label: "To Do", value: "pending"   },
+        { label: "Done", value: "completed" },
+      ];
+    }
+    return TASK_STATUS_FOR_TYPE[nextType] ?? [
+      { label: "To Do", value: "pending"   },
+      { label: "Done", value: "completed" },
+    ];
+  }, [nextType]);
+
+  // ====================== Handle task type change — auto-set status ======================
+  const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newType = e.target.value;
+    const autoStatus = getAutoNextActionStatus(newType);
+    setNextType(newType);
+    setNextStatus(autoStatus);
+  };
+
   // ====================== Fetch Lead ======================
   React.useEffect(() => {
     if (!id) { setError("No lead ID provided"); setLoading(false); return; }
@@ -151,6 +204,8 @@ export default function EditLead() {
         setSource(lead.source ?? "");
         setSubSource(lead.sub_source ?? "");
         setAssignee(lead.assigned_to_id?.toString() ?? "");
+        // ✅ Load next_action_type from backend
+        setNextType((lead as any).next_action_type ?? "");
         setNextStatus(lead.next_action_status ?? "");
         setNextDesc(lead.next_action_description ?? "");
         setTreatmentInterest(lead.treatment_interest ?? "");
@@ -229,6 +284,17 @@ export default function EditLead() {
     },
   };
 
+  const readOnlyStyle = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px",
+      fontSize: "0.875rem",
+      bgcolor: "#F1F5F9",
+      "& fieldset": { borderColor: "#E2E8F0" },
+      "&:hover fieldset": { borderColor: "#E2E8F0" },
+      "&.Mui-focused fieldset": { borderColor: "#E2E8F0" },
+    },
+  };
+
   const labelStyle = {
     fontSize: "0.75rem",
     fontWeight: 600,
@@ -245,7 +311,7 @@ export default function EditLead() {
     mb: 1.5,
   };
 
-  // ====================== Save — optimistic: show success + navigate immediately ======================
+  // ====================== Save ======================
   const handleSave = async () => {
     if (!leadData || !id || saving) return;
 
@@ -268,6 +334,7 @@ export default function EditLead() {
       source,
       sub_source: subSource || "",
       assigned_to_id: intOrNull(assignee),
+      next_action_type: nextType || undefined,   // ✅ ADDED — send task type to backend
       next_action_status: resolvedStatus,
       next_action_description: nextDesc || "",
       treatment_interest: treatments.join(",") || treatmentInterest,
@@ -275,18 +342,17 @@ export default function EditLead() {
       appointment_date: appointmentDate,
       slot,
       remark: remark || "",
-    };
+    } as any;
 
     // ── Optimistic: show success & navigate immediately ──
     setSaving(true);
     setShowSuccess(true);
     setTimeout(() => navigate("/leads", { replace: true }), 800);
 
-    // ── Fire API in background — user is already gone ──
+    // ── Fire API in background ──
     LeadAPI.update(id, updateData)
       .then(() => dispatch(fetchLeads()))
       .catch((err: unknown) => {
-        // API failed silently in background — log it
         console.error("❌ Lead update failed:", err instanceof Error ? err.message : err);
       });
   };
@@ -391,7 +457,7 @@ export default function EditLead() {
           "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
         }}>
 
-          {/* STEP 1 */}
+          {/* ===== STEP 1 ===== */}
           {currentStep === 1 && (
             <Box>
               <Typography sx={sectionLabel}>LEAD INFORMATION</Typography>
@@ -477,14 +543,20 @@ export default function EditLead() {
                     <MenuItem value="LinkedIn">LinkedIn</MenuItem>
                   </TextField>
                 </Box>
-                <Box><Typography sx={labelStyle}>Campaign Name</Typography><TextField fullWidth size="small" value={campaign} onChange={(e) => setCampaign(e.target.value)} sx={inputStyle} /></Box>
+                <Box>
+                  <Typography sx={labelStyle}>Campaign Name</Typography>
+                  <TextField fullWidth size="small" value={campaign} onChange={(e) => setCampaign(e.target.value)} sx={inputStyle} />
+                </Box>
               </Box>
 
               <Typography sx={sectionLabel}>ASSIGNEE & NEXT ACTION DETAILS</Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
+
+                {/* Assigned To */}
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField select fullWidth size="small" value={assignee} onChange={(e) => setAssignee(e.target.value)} sx={inputStyle}
+                  <TextField select fullWidth size="small" value={assignee}
+                    onChange={(e) => setAssignee(e.target.value)} sx={inputStyle}
                     disabled={loadingEmployees}
                     InputProps={{ endAdornment: loadingEmployees ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null }}>
                     <MenuItem value=""><em>-- Select Employee --</em></MenuItem>
@@ -495,22 +567,49 @@ export default function EditLead() {
                     ))}
                   </TextField>
                 </Box>
+
+                {/* ✅ Next Action Type — full list matching AddNewLead */}
                 <Box>
                   <Typography sx={labelStyle}>Next Action Type</Typography>
-                  <TextField select fullWidth size="small" value={nextType} onChange={(e) => setNextType(e.target.value)} sx={inputStyle}>
+                  <TextField
+                    select fullWidth size="small"
+                    value={nextType}
+                    onChange={handleNextTypeChange}
+                    sx={inputStyle}
+                  >
                     <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Follow Up">Follow Up</MenuItem>
-                    <MenuItem value="Call">Call</MenuItem>
+                    {TASK_TYPES.map((t) => (
+                      <MenuItem key={t} value={t}>{t}</MenuItem>
+                    ))}
                   </TextField>
                 </Box>
+
+                {/* ✅ Next Action Status — auto-set based on task type, read-only when type selected */}
                 <Box>
-                  <Typography sx={labelStyle}>Next Action Status</Typography>
-                  <TextField select fullWidth size="small" value={nextStatus} onChange={(e) => setNextStatus(e.target.value)} sx={inputStyle}>
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="pending">Pending</MenuItem>
-                    <MenuItem value="completed">Completed</MenuItem>
+                  <Typography sx={labelStyle}>
+                    Next Action Status
+                    {nextType && (
+                      <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+                        auto-set for {nextType}
+                      </Typography>
+                    )}
+                  </Typography>
+                  <TextField
+                    select fullWidth size="small"
+                    value={nextStatus}
+                    onChange={(e) => setNextStatus(e.target.value)}
+                    sx={nextType ? readOnlyStyle : inputStyle}
+                    InputProps={{ readOnly: Boolean(nextType) }}
+                  >
+                    {availableTaskStatuses.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 </Box>
+
+                {/* Next Action Description */}
                 <Box>
                   <Typography sx={labelStyle}>Next Action Description</Typography>
                   <TextField fullWidth size="small" value={nextDesc} onChange={(e) => setNextDesc(e.target.value)} sx={inputStyle} />
@@ -519,7 +618,7 @@ export default function EditLead() {
             </Box>
           )}
 
-          {/* STEP 2 */}
+          {/* ===== STEP 2 ===== */}
           {currentStep === 2 && (
             <Box>
               <Typography sx={sectionLabel}>TREATMENT INFORMATION</Typography>
@@ -560,7 +659,7 @@ export default function EditLead() {
             </Box>
           )}
 
-          {/* STEP 3 */}
+          {/* ===== STEP 3 ===== */}
           {currentStep === 3 && (
             <Box>
               <Typography sx={sectionLabel}>APPOINTMENT DETAILS</Typography>
@@ -586,7 +685,8 @@ export default function EditLead() {
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField select fullWidth size="small" value={assignee} onChange={(e) => setAssignee(e.target.value)}
+                  <TextField select fullWidth size="small" value={assignee}
+                    onChange={(e) => setAssignee(e.target.value)}
                     sx={inputStyle} disabled={loadingEmployees || !department}>
                     {!department ? (
                       <MenuItem value="" disabled>Select department first</MenuItem>
@@ -619,7 +719,8 @@ export default function EditLead() {
               </Box>
               <Box>
                 <Typography sx={labelStyle}>Remark</Typography>
-                <TextField fullWidth size="small" multiline rows={2} placeholder="Type Here..." value={remark} onChange={(e) => setRemark(e.target.value)} sx={inputStyle} />
+                <TextField fullWidth size="small" multiline rows={2} placeholder="Type Here..."
+                  value={remark} onChange={(e) => setRemark(e.target.value)} sx={inputStyle} />
               </Box>
             </Box>
           )}

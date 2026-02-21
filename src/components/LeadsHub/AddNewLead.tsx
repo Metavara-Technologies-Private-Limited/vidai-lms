@@ -28,6 +28,39 @@ import type { FormState } from "../../types/leads.types";
 import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import type { Department, Employee } from "../../services/leads.api";
 
+// ====================== Task Type Config ======================
+// Single source of truth — same rules used in LeadsTable
+export const TASK_TYPES = [
+  "Follow Up",
+  "Call Patient",
+  "Book Appointment",
+  "Send Message",
+  "Send Email",
+  "Review Details",
+  "No Action",
+] as const;
+
+export type TaskType = typeof TASK_TYPES[number];
+
+// Rules:
+//   "Book Appointment" → only "Done" is allowed
+//   All others        → only "To Do" is allowed
+export const TASK_STATUS_FOR_TYPE: Record<string, { label: string; value: string }[]> = {
+  "Follow Up":        [{ label: "To Do",    value: "pending"   }],
+  "Call Patient":     [{ label: "To Do",    value: "pending"   }],
+  "Book Appointment": [{ label: "Done",     value: "completed" }],
+  "Send Message":     [{ label: "To Do",    value: "pending"   }],
+  "Send Email":       [{ label: "To Do",    value: "pending"   }],
+  "Review Details":   [{ label: "To Do",    value: "pending"   }],
+  "No Action":        [{ label: "To Do",    value: "pending"   }],
+};
+
+// Auto-derive the backend value when a task type is picked
+export const getAutoNextActionStatus = (taskType: string): "pending" | "completed" | "" => {
+  if (!taskType) return "";
+  return taskType === "Book Appointment" ? "completed" : "pending";
+};
+
 // ====================== Backend Payload Type ======================
 export type LeadPayload = {
   clinic_id: number;
@@ -52,6 +85,7 @@ export type LeadPayload = {
   lead_status?: "new" | "contacted";
   next_action_status?: "pending" | "completed" | null;
   next_action_description?: string;
+  next_action_type?: string;
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;
@@ -93,10 +127,7 @@ const intOrNull = (val: string | undefined | null): number | null => {
   return val && val.trim() !== "" && !isNaN(n) ? n : null;
 };
 
-const intOrFallback = (
-  val: string | undefined | null,
-  fallback: number,
-): number => {
+const intOrFallback = (val: string | undefined | null, fallback: number): number => {
   const n = Number(val);
   return val && val.trim() !== "" && !isNaN(n) && n > 0 ? n : fallback;
 };
@@ -122,33 +153,41 @@ const timeSlots = [
 ];
 
 // ====================== Toast Helpers ======================
-// Errors block — shown one by one (user must fix these)
-const showSequentialToasts = async (messages: Array<{ type: 'error' | 'warning' | 'info'; text: string }>) => {
+const showSequentialToasts = async (
+  messages: Array<{ type: "error" | "warning" | "info"; text: string }>
+) => {
   for (const msg of messages) {
     await new Promise<void>((resolve) => {
-      const toastFn = msg.type === 'error' ? toast.error : msg.type === 'warning' ? toast.warning : toast.info;
-      toastFn(msg.text, {
+      const fn =
+        msg.type === "error"
+          ? toast.error
+          : msg.type === "warning"
+          ? toast.warning
+          : toast.info;
+      fn(msg.text, {
         position: "top-right",
         autoClose: 1500,
         theme: "colored",
         onClose: () => resolve(),
       });
     });
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise((r) => setTimeout(r, 200));
   }
 };
 
-// Warnings are non-blocking — fire and forget, don't await
-const showWarningsNonBlocking = (messages: Array<{ type: 'error' | 'warning' | 'info'; text: string }>) => {
+const showWarningsNonBlocking = (
+  messages: Array<{ type: "error" | "warning" | "info"; text: string }>
+) => {
   messages.forEach((msg, i) => {
     setTimeout(() => {
-      const toastFn = msg.type === 'error' ? toast.error : msg.type === 'warning' ? toast.warning : toast.info;
-      toastFn(msg.text, {
-        position: "top-right",
-        autoClose: 2000,
-        theme: "colored",
-      });
-    }, i * 300); // stagger slightly so they don't stack instantly
+      const fn =
+        msg.type === "error"
+          ? toast.error
+          : msg.type === "warning"
+          ? toast.warning
+          : toast.info;
+      fn(msg.text, { position: "top-right", autoClose: 2000, theme: "colored" });
+    }, i * 300);
   });
 };
 
@@ -176,12 +215,10 @@ export default function AddNewLead() {
         name: api.campaign_name ?? "",
         source: api.campaign_mode === 1 ? "Social Media" : "Email",
         subSource:
-          api.campaign_mode === 1
-            ? (api.social_media?.[0]?.platform_name ?? "")
-            : "gmail",
+          api.campaign_mode === 1 ? (api.social_media?.[0]?.platform_name ?? "") : "gmail",
         isActive: Boolean(api.is_active),
       })),
-    [rawCampaigns],
+    [rawCampaigns]
   );
 
   const [form, setForm] = React.useState<FormState>({
@@ -216,20 +253,32 @@ export default function AddNewLead() {
     remark: "",
   });
 
+  // ====================== Computed: available task statuses ======================
+  // Only show statuses valid for the selected task type.
+  // If no task type selected → show all options.
+  const availableTaskStatuses = React.useMemo<{ label: string; value: string }[]>(() => {
+    if (!form.nextType) {
+      return [
+        { label: "To Do",    value: "pending"   },
+        { label: "Done",     value: "completed" },
+      ];
+    }
+    return TASK_STATUS_FOR_TYPE[form.nextType] ?? [
+      { label: "To Do",    value: "pending"   },
+      { label: "Done",     value: "completed" },
+    ];
+  }, [form.nextType]);
+
   // ====================== Fetch Departments ======================
   React.useEffect(() => {
-    const fetchDepartments = async () => {
+    const fetchDepts = async () => {
       try {
         setLoadingDepartments(true);
         const depts = await DepartmentAPI.listActiveByClinic(clinicId);
         setDepartments(depts);
       } catch (err) {
         const error = err as ApiError;
-        const msg =
-          error?.response?.data?.detail ||
-          error?.message ||
-          "Failed to load departments";
-        toast.error(`Departments: ${msg}`, {
+        toast.error(`Departments: ${error?.response?.data?.detail || error?.message || "Failed"}`, {
           position: "top-right",
           autoClose: 3000,
           theme: "colored",
@@ -238,12 +287,12 @@ export default function AddNewLead() {
         setLoadingDepartments(false);
       }
     };
-    fetchDepartments();
+    fetchDepts();
   }, [clinicId]);
 
   // ====================== Fetch Employees ======================
   React.useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchEmps = async () => {
       try {
         setLoadingEmployees(true);
         const emps = await EmployeeAPI.listByClinic(clinicId);
@@ -252,57 +301,32 @@ export default function AddNewLead() {
         const error = err as ApiError;
         const status = error?.response?.status;
         const msg =
-          error?.response?.data?.detail ||
-          error?.message ||
-          "Failed to load employees";
-        const displayMsg =
           status === 401
             ? "Unauthorized — please log in again"
             : status === 404
-              ? `Employees endpoint not found (clinic ${clinicId})`
-              : msg;
-        toast.warning(`Employees: ${displayMsg}`, {
-          position: "top-right",
-          autoClose: 3000,
-          theme: "colored",
-        });
+            ? `Employees endpoint not found (clinic ${clinicId})`
+            : error?.response?.data?.detail || error?.message || "Failed to load employees";
+        toast.warning(`Employees: ${msg}`, { position: "top-right", autoClose: 3000, theme: "colored" });
         setEmployees([]);
       } finally {
         setLoadingEmployees(false);
       }
     };
-    fetchEmployees();
+    fetchEmps();
   }, [clinicId]);
 
-  // ====================== Auto-fill source & sub_source when campaign changes ======================
+  // ====================== Auto-fill source from campaign ======================
   React.useEffect(() => {
     if (!form.campaign) {
-      setForm((prev) => ({
-        ...prev,
-        campaignName: "",
-        source: "",
-        subSource: "",
-      }));
+      setForm((prev) => ({ ...prev, campaignName: "", source: "", subSource: "" }));
       return;
     }
-
     const matched = campaigns.find((c) => c.id === form.campaign);
     if (!matched) return;
-
-    setForm((prev) => ({
-      ...prev,
-      campaignName: matched.name,
-      source: matched.source,
-      subSource: matched.subSource,
-    }));
-
-    console.log(`=== Campaign selected: "${matched.name}" ===`);
-    console.log(
-      `  source="${matched.source}" | subSource="${matched.subSource}"`,
-    );
+    setForm((prev) => ({ ...prev, campaignName: matched.name, source: matched.source, subSource: matched.subSource }));
   }, [form.campaign, campaigns]);
 
-  // ====================== Filter Personnel by Department ======================
+  // ====================== Filter personnel by department ======================
   React.useEffect(() => {
     if (!form.department || employees.length === 0) {
       setFilteredPersonnel([]);
@@ -310,19 +334,18 @@ export default function AddNewLead() {
     }
     const selectedDeptId = Number(form.department);
     const selectedDept = departments.find((d) => d.id === selectedDeptId);
-    if (!selectedDept) {
-      setFilteredPersonnel([]);
-      return;
-    }
-
-    const normalize = (s: string) =>
-      (s ?? "").trim().toLowerCase().normalize("NFC");
+    if (!selectedDept) { setFilteredPersonnel([]); return; }
+    const normalize = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
     const selectedName = normalize(selectedDept.name);
-    const filtered = employees.filter(
-      (emp) => normalize(emp.department_name) === selectedName,
-    );
-    setFilteredPersonnel(filtered);
+    setFilteredPersonnel(employees.filter((emp) => normalize(emp.department_name) === selectedName));
   }, [form.department, employees, departments]);
+
+  // ====================== When task type changes → auto-set status ======================
+  const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newType = e.target.value;
+    const autoStatus = getAutoNextActionStatus(newType);
+    setForm((prev) => ({ ...prev, nextType: newType, nextStatus: autoStatus }));
+  };
 
   // ====================== Styles ======================
   const inputStyle = {
@@ -360,88 +383,59 @@ export default function AddNewLead() {
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
-  const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
-  };
 
-  const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({
-      ...prev,
-      department: e.target.value,
-      personnel: "",
-      assignee: "",
-    }));
-  };
+  const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, department: e.target.value, personnel: "", assignee: "" }));
 
-  // ====================== Validate ======================
-  // Returns { valid: boolean } immediately.
-  // Errors are awaited (blocking). Warnings fire non-blocking so we don't delay.
+  // ====================== Validation ======================
   const validateStep = async (): Promise<boolean> => {
-    const errors: Array<{ type: 'error' | 'warning' | 'info'; text: string }> = [];
-    const warnings: Array<{ type: 'error' | 'warning' | 'info'; text: string }> = [];
+    const errors: Array<{ type: "error" | "warning" | "info"; text: string }> = [];
+    const warnings: Array<{ type: "error" | "warning" | "info"; text: string }> = [];
 
     if (currentStep === 1) {
-      if (!form.full_name.trim()) errors.push({ type: 'error', text: 'Full name is required!' });
-      if (!form.contact.trim())   errors.push({ type: 'error', text: 'Contact number is required!' });
-      if (!form.email.trim())     errors.push({ type: 'error', text: 'Email is required!' });
-      if (!form.gender)           errors.push({ type: 'error', text: 'Gender is required!' });
-      if (!form.age)              errors.push({ type: 'error', text: 'Age is required!' });
-      if (!form.source)           errors.push({ type: 'error', text: 'Source is required!' });
+      if (!form.full_name.trim()) errors.push({ type: "error", text: "Full name is required!" });
+      if (!form.contact.trim())   errors.push({ type: "error", text: "Contact number is required!" });
+      if (!form.email.trim())     errors.push({ type: "error", text: "Email is required!" });
+      if (!form.gender)           errors.push({ type: "error", text: "Gender is required!" });
+      if (!form.age)              errors.push({ type: "error", text: "Age is required!" });
+      if (!form.source)           errors.push({ type: "error", text: "Source is required!" });
+      if (errors.length > 0) { await showSequentialToasts(errors); return false; }
 
-      if (errors.length > 0) {
-        await showSequentialToasts(errors);
-        return false;
-      }
-
-      // Warnings — non-blocking
-      if (!form.location.trim())  warnings.push({ type: 'warning', text: 'Location is not provided!' });
-      if (!form.marital)          warnings.push({ type: 'warning', text: 'Marital status is not selected!' });
-      if (!form.address.trim())   warnings.push({ type: 'warning', text: 'Address is not provided!' });
-      if (!form.language)         warnings.push({ type: 'warning', text: 'Language preference is not selected!' });
-
+      if (!form.location.trim())  warnings.push({ type: "warning", text: "Location is not provided!" });
+      if (!form.marital)          warnings.push({ type: "warning", text: "Marital status is not selected!" });
+      if (!form.address.trim())   warnings.push({ type: "warning", text: "Address is not provided!" });
+      if (!form.language)         warnings.push({ type: "warning", text: "Language preference is not selected!" });
       if (isCouple === "yes") {
-        if (!form.partnerName.trim()) warnings.push({ type: 'warning', text: 'Partner name is not provided!' });
-        if (!form.partnerAge)         warnings.push({ type: 'warning', text: 'Partner age is not provided!' });
-        if (!form.partnerGender)      warnings.push({ type: 'warning', text: 'Partner gender is not selected!' });
+        if (!form.partnerName.trim()) warnings.push({ type: "warning", text: "Partner name is not provided!" });
+        if (!form.partnerAge)         warnings.push({ type: "warning", text: "Partner age is not provided!" });
+        if (!form.partnerGender)      warnings.push({ type: "warning", text: "Partner gender is not selected!" });
       }
-
-      if (!form.subSource && !form.campaign) warnings.push({ type: 'warning', text: 'Sub-source is not provided!' });
-      if (!form.assignee)   warnings.push({ type: 'warning', text: 'Lead is not assigned to anyone!' });
-      if (!form.nextType)   warnings.push({ type: 'warning', text: 'Next action type is not selected!' });
-      if (!form.nextStatus) warnings.push({ type: 'warning', text: 'Next action status is not selected!' });
-      if (!form.nextDesc.trim()) warnings.push({ type: 'warning', text: 'Next action description is not provided!' });
-
-      if (warnings.length > 0) showWarningsNonBlocking(warnings); // ← non-blocking
+      if (!form.subSource && !form.campaign) warnings.push({ type: "warning", text: "Sub-source is not provided!" });
+      if (!form.assignee)   warnings.push({ type: "warning", text: "Lead is not assigned to anyone!" });
+      if (!form.nextType)   warnings.push({ type: "warning", text: "Next action type is not selected!" });
+      if (!form.nextStatus) warnings.push({ type: "warning", text: "Next action status is not selected!" });
+      if (!form.nextDesc.trim()) warnings.push({ type: "warning", text: "Next action description is not provided!" });
+      if (warnings.length > 0) showWarningsNonBlocking(warnings);
     }
 
     if (currentStep === 2) {
       if (form.treatments.length === 0) {
-        errors.push({ type: 'error', text: 'Please select at least one treatment!' });
+        errors.push({ type: "error", text: "Please select at least one treatment!" });
       }
-
-      if (errors.length > 0) {
-        await showSequentialToasts(errors);
-        return false;
-      }
-
-      if (!form.documents) showWarningsNonBlocking([{ type: 'info', text: 'No documents uploaded' }]);
+      if (errors.length > 0) { await showSequentialToasts(errors); return false; }
+      if (!form.documents) showWarningsNonBlocking([{ type: "info", text: "No documents uploaded" }]);
     }
 
     if (currentStep === 3) {
-      if (!form.department)      errors.push({ type: 'error', text: 'Department is required!' });
-      if (!form.appointmentDate) errors.push({ type: 'error', text: 'Appointment date is required!' });
-      if (!form.slot)            errors.push({ type: 'error', text: 'Time slot is required!' });
-
-      if (errors.length > 0) {
-        await showSequentialToasts(errors);
-        return false;
-      }
-
-      // Warnings — non-blocking so Save fires immediately
-      if (!form.assignee)        warnings.push({ type: 'warning', text: 'Lead is not assigned to any personnel!' });
-      if (!form.remark.trim())   warnings.push({ type: 'info', text: 'No remark added for appointment' });
-
-      if (warnings.length > 0) showWarningsNonBlocking(warnings); // ← non-blocking
+      if (!form.department)      errors.push({ type: "error", text: "Department is required!" });
+      if (!form.appointmentDate) errors.push({ type: "error", text: "Appointment date is required!" });
+      if (!form.slot)            errors.push({ type: "error", text: "Time slot is required!" });
+      if (errors.length > 0) { await showSequentialToasts(errors); return false; }
+      if (!form.assignee)      warnings.push({ type: "warning", text: "Lead is not assigned to any personnel!" });
+      if (!form.remark.trim()) warnings.push({ type: "info",    text: "No remark added for appointment" });
+      if (warnings.length > 0) showWarningsNonBlocking(warnings);
     }
 
     return true;
@@ -450,18 +444,9 @@ export default function AddNewLead() {
   const handleNext = async () => {
     const isValid = await validateStep();
     if (!isValid) return;
-
-    if (currentStep === 3) {
-      await submitForm();
-      return;
-    }
-
+    if (currentStep === 3) { await submitForm(); return; }
     setCurrentStep((prev) => prev + 1);
-    toast.success("Step completed!", {
-      position: "top-right",
-      autoClose: 1000,
-      theme: "colored",
-    });
+    toast.success("Step completed!", { position: "top-right", autoClose: 1000, theme: "colored" });
   };
 
   const handleBack = () => {
@@ -488,6 +473,7 @@ export default function AddNewLead() {
       remark: form.remark || "",
       partner_full_name: form.partnerName || "",
       next_action_description: form.nextDesc || "",
+      next_action_type: form.nextType || undefined,
       marital_status: form.marital
         ? (form.marital.toLowerCase() as "single" | "married")
         : null,
@@ -507,47 +493,29 @@ export default function AddNewLead() {
       is_active: true,
       lead_status: "new",
     };
-
-    console.log("=== PAYLOAD BEING SENT TO /leads/ ===");
-    console.log(JSON.stringify(payload, null, 2));
-    console.log("=====================================");
-
+    console.log("=== PAYLOAD ===", JSON.stringify(payload, null, 2));
     return payload;
   };
 
   // ====================== Submit ======================
   const submitForm = async () => {
     if (isSubmitting) return;
-
     try {
       setIsSubmitting(true);
       const payload = buildPayload();
-
       const response = await LeadAPI.create(payload);
       console.log("✅ Lead created:", response);
-
-      toast.success("Lead saved successfully!", {
-        position: "top-right",
-        autoClose: 1500,
-        theme: "colored",
-      });
-
+      toast.success("Lead saved successfully!", { position: "top-right", autoClose: 1500, theme: "colored" });
       navigate("/leads", { replace: true });
-
     } catch (err) {
       const error = err as ApiError;
-      console.error(
-        "❌ Lead create error:",
-        error?.response?.data || error?.message,
-      );
       const data = error?.response?.data;
       let msg = "Failed to save lead";
       if (data) {
         if (typeof data === "string") msg = data;
         else if (data.detail) msg = data.detail;
         else if (data.message) msg = data.message;
-        else if (data.error)
-          msg = `${data.error}${data.request_id ? ` (request_id: ${data.request_id})` : ""}`;
+        else if (data.error) msg = `${data.error}${data.request_id ? ` (${data.request_id})` : ""}`;
         else {
           const firstKey = Object.keys(data)[0];
           const firstVal = data[firstKey];
@@ -556,12 +524,7 @@ export default function AddNewLead() {
       } else {
         msg = error?.message || msg;
       }
-
-      toast.error(msg, {
-        position: "top-right",
-        autoClose: 3000,
-        theme: "colored",
-      });
+      toast.error(msg, { position: "top-right", autoClose: 3000, theme: "colored" });
     } finally {
       setIsSubmitting(false);
     }
@@ -573,7 +536,7 @@ export default function AddNewLead() {
   return (
     <Paper sx={{ overflow: "hidden", minHeight: "100vh" }}>
       <Box sx={{ bgcolor: "white", px: 3, py: 2 }}>
-        <Typography variant="h6" fontWeight={700} color="#1E293B" sx={{ m: 0 }}>
+        <Typography variant="h6" fontWeight={700} color="#1E293B">
           Add New Lead
         </Typography>
       </Box>
@@ -607,10 +570,10 @@ export default function AddNewLead() {
                     currentStep > step
                       ? "#10B981"
                       : currentStep === step
-                        ? step === 3
-                          ? "#3B82F6"
-                          : "#F97316"
-                        : "#E2E8F0",
+                      ? step === 3
+                        ? "#3B82F6"
+                        : "#F97316"
+                      : "#E2E8F0",
                   color: "white",
                   display: "flex",
                   alignItems: "center",
@@ -630,10 +593,10 @@ export default function AddNewLead() {
                     currentStep > step
                       ? "#10B981"
                       : currentStep === step
-                        ? step === 3
-                          ? "#3B82F6"
-                          : "#F97316"
-                        : "#94A3B8",
+                      ? step === 3
+                        ? "#3B82F6"
+                        : "#F97316"
+                      : "#94A3B8",
                 }}
               >
                 {label}
@@ -651,10 +614,7 @@ export default function AddNewLead() {
           maxHeight: "calc(100vh - 400px)",
           overflowY: "auto",
           "&::-webkit-scrollbar": { width: "8px" },
-          "&::-webkit-scrollbar-thumb": {
-            backgroundColor: "#CBD5E1",
-            borderRadius: "4px",
-          },
+          "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
         }}
       >
         {/* ===== STEP 1 ===== */}
@@ -755,7 +715,6 @@ export default function AddNewLead() {
             <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
               SOURCE & CAMPAIGN DETAILS
             </Typography>
-
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
               <Box>
                 <Typography sx={labelStyle}>Campaign Name</Typography>
@@ -770,7 +729,6 @@ export default function AddNewLead() {
                   )}
                 </TextField>
               </Box>
-
               <Box>
                 <Typography sx={labelStyle}>
                   Source *
@@ -792,7 +750,6 @@ export default function AddNewLead() {
                   </TextField>
                 )}
               </Box>
-
               <Box>
                 <Typography sx={labelStyle}>
                   Sub-Source
@@ -819,12 +776,15 @@ export default function AddNewLead() {
             <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
               ASSIGNEE & NEXT ACTION DETAILS
             </Typography>
+
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 2 }}>
+              {/* Assigned To */}
               <Box>
                 <Typography sx={labelStyle}>Assigned To</Typography>
                 <TextField
-                  select fullWidth size="small" value={form.assignee} onChange={handleChange("assignee")}
-                  sx={inputStyle} disabled={loadingEmployees}
+                  select fullWidth size="small" value={form.assignee}
+                  onChange={handleChange("assignee")} sx={inputStyle}
+                  disabled={loadingEmployees}
                   InputProps={{ endAdornment: loadingEmployees ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null }}
                 >
                   {loadingEmployees ? (
@@ -833,28 +793,57 @@ export default function AddNewLead() {
                     <MenuItem value="" disabled>No employees</MenuItem>
                   ) : (
                     employees.map((emp) => (
-                      <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
+                      <MenuItem key={emp.id} value={emp.id.toString()}>
+                        {emp.emp_name} ({emp.emp_type})
+                      </MenuItem>
                     ))
                   )}
                 </TextField>
               </Box>
+
+              {/* Next Action Type — full task type list */}
               <Box>
                 <Typography sx={labelStyle}>Next Action Type</Typography>
-                <TextField select fullWidth size="small" value={form.nextType} onChange={handleChange("nextType")} sx={inputStyle}>
+                <TextField
+                  select fullWidth size="small"
+                  value={form.nextType}
+                  onChange={handleNextTypeChange}
+                  sx={inputStyle}
+                >
                   <MenuItem value="">-- Select --</MenuItem>
-                  <MenuItem value="Follow Up">Follow Up</MenuItem>
-                  <MenuItem value="Call">Call</MenuItem>
+                  {TASK_TYPES.map((t) => (
+                    <MenuItem key={t} value={t}>{t}</MenuItem>
+                  ))}
                 </TextField>
               </Box>
+
+              {/* Next Action Status — filtered by task type selection */}
               <Box>
-                <Typography sx={labelStyle}>Next Action Status</Typography>
-                <TextField select fullWidth size="small" value={form.nextStatus} onChange={handleChange("nextStatus")} sx={inputStyle}>
-                  <MenuItem value="">-- Select --</MenuItem>
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="completed">Completed</MenuItem>
+                <Typography sx={labelStyle}>
+                  Next Action Status
+                  {form.nextType && (
+                    <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+                      auto-set for {form.nextType}
+                    </Typography>
+                  )}
+                </Typography>
+                <TextField
+                  select fullWidth size="small"
+                  value={form.nextStatus}
+                  onChange={handleChange("nextStatus")}
+                  sx={form.nextType ? readOnlyStyle : inputStyle}
+                  // Make it read-only when task type is selected (status auto-set)
+                  InputProps={{ readOnly: Boolean(form.nextType) }}
+                >
+                  {availableTaskStatuses.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
                 </TextField>
               </Box>
             </Box>
+
             <Box sx={{ mb: 2 }}>
               <Typography sx={labelStyle}>Next Action Description</Typography>
               <TextField fullWidth size="small" value={form.nextDesc} onChange={handleChange("nextDesc")} sx={inputStyle} />
@@ -871,7 +860,8 @@ export default function AddNewLead() {
             <Box sx={{ mb: 3 }}>
               <Typography sx={labelStyle}>Treatment Interest *</Typography>
               <TextField
-                select fullWidth size="small" value={form.treatmentInterest}
+                select fullWidth size="small"
+                value={form.treatmentInterest}
                 onChange={(e) => {
                   const value = e.target.value;
                   setForm((prev) => ({ ...prev, treatmentInterest: value }));
@@ -971,8 +961,9 @@ export default function AddNewLead() {
               <Box>
                 <Typography sx={labelStyle}>Department *</Typography>
                 <TextField
-                  select fullWidth size="small" value={form.department} onChange={handleDepartmentChange}
-                  sx={inputStyle} disabled={loadingDepartments}
+                  select fullWidth size="small" value={form.department}
+                  onChange={handleDepartmentChange} sx={inputStyle}
+                  disabled={loadingDepartments}
                   InputProps={{ endAdornment: loadingDepartments ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null }}
                 >
                   {loadingDepartments ? (
@@ -989,8 +980,9 @@ export default function AddNewLead() {
               <Box>
                 <Typography sx={labelStyle}>Assigned To</Typography>
                 <TextField
-                  select fullWidth size="small" value={form.assignee} onChange={handleChange("assignee")}
-                  sx={inputStyle} disabled={loadingEmployees || !form.department}
+                  select fullWidth size="small" value={form.assignee}
+                  onChange={handleChange("assignee")} sx={inputStyle}
+                  disabled={loadingEmployees || !form.department}
                 >
                   {!form.department ? (
                     <MenuItem value="" disabled>Select department first</MenuItem>
@@ -1000,7 +992,9 @@ export default function AddNewLead() {
                     <MenuItem value="" disabled>No employees in this department</MenuItem>
                   ) : (
                     filteredPersonnel.map((emp) => (
-                      <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
+                      <MenuItem key={emp.id} value={emp.id.toString()}>
+                        {emp.emp_name} ({emp.emp_type})
+                      </MenuItem>
                     ))
                   )}
                 </TextField>
@@ -1058,14 +1052,7 @@ export default function AddNewLead() {
             onClick={handleBack}
             variant="outlined"
             disabled={isSubmitting}
-            sx={{
-              textTransform: "none",
-              borderColor: "#E2E8F0",
-              color: "#1E293B",
-              fontWeight: 700,
-              px: 3,
-              "&:hover": { borderColor: "#CBD5E1" },
-            }}
+            sx={{ textTransform: "none", borderColor: "#E2E8F0", color: "#1E293B", fontWeight: 700, px: 3, "&:hover": { borderColor: "#CBD5E1" } }}
           >
             Back
           </Button>
@@ -1083,14 +1070,7 @@ export default function AddNewLead() {
             onClick={handleNext}
             variant="contained"
             disabled={isSubmitting}
-            sx={{
-              bgcolor: "#334155",
-              textTransform: "none",
-              fontWeight: 700,
-              px: 4,
-              minWidth: "100px",
-              "&:hover": { bgcolor: "#1E293B" },
-            }}
+            sx={{ bgcolor: "#334155", textTransform: "none", fontWeight: 700, px: 4, minWidth: "100px", "&:hover": { bgcolor: "#1E293B" } }}
           >
             {isSubmitting ? <CircularProgress size={20} sx={{ color: "white" }} /> : "Save"}
           </Button>
