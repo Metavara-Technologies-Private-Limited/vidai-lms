@@ -28,6 +28,8 @@ interface Props {
 
 const rowsPerPage = 10;
 
+// ====================== Helpers ======================
+
 const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
   const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
   const hasNextAction = Boolean(lead.next_action_description?.trim());
@@ -57,9 +59,11 @@ const formatStatus = (status: string): string => {
     "follow up": "Follow Up",
     "follow-up": "Follow Up",
     "follow-ups": "Follow Up",
+    follow_up: "Follow Up",
     appointment: "Appointment",
     lost: "Lost",
     "cycle conversion": "Cycle Conversion",
+    cycle_conversion: "Cycle Conversion",
   };
   return map[lower] ?? (lower.charAt(0).toUpperCase() + lower.slice(1));
 };
@@ -67,13 +71,13 @@ const formatStatus = (status: string): string => {
 const getStatusChipSx = (status: string) => {
   const lower = (status || "").toLowerCase();
   const map: Record<string, { bg: string; color: string }> = {
-    converted:          { bg: "rgba(22,163,74,0.10)",  color: "#16A34A" },
-    appointment:        { bg: "rgba(16,185,129,0.10)", color: "#10B981" },
-    "follow up":        { bg: "rgba(245,158,11,0.10)", color: "#F59E0B" },
-    new:                { bg: "rgba(59,130,246,0.10)", color: "#3B82F6" },
-    contacted:          { bg: "rgba(99,102,241,0.10)", color: "#6366F1" },
-    lost:               { bg: "rgba(239,68,68,0.10)",  color: "#EF4444" },
-    "cycle conversion": { bg: "rgba(139,92,246,0.10)", color: "#8B5CF6" },
+    converted:           { bg: "rgba(22,163,74,0.10)",   color: "#16A34A" },
+    appointment:         { bg: "rgba(16,185,129,0.10)",  color: "#10B981" },
+    "follow up":         { bg: "rgba(245,158,11,0.10)",  color: "#F59E0B" },
+    new:                 { bg: "rgba(59,130,246,0.10)",  color: "#3B82F6" },
+    contacted:           { bg: "rgba(99,102,241,0.10)",  color: "#6366F1" },
+    lost:                { bg: "rgba(239,68,68,0.10)",   color: "#EF4444" },
+    "cycle conversion":  { bg: "rgba(139,92,246,0.10)",  color: "#8B5CF6" },
   };
   const s = map[lower] ?? { bg: "rgba(100,116,139,0.10)", color: "#64748B" };
   return {
@@ -89,6 +93,67 @@ const getStatusChipSx = (status: string) => {
   };
 };
 
+const getTaskStatusChipSx = (status: string) => {
+  const lower = (status || "").toLowerCase();
+  if (lower === "done" || lower === "completed") {
+    return {
+      borderRadius: "6px", fontWeight: 700, fontSize: "11px", height: 26,
+      border: "2px solid #10B981", backgroundColor: "transparent", color: "#10B981",
+      "& .MuiChip-label": { px: 1.5 },
+    };
+  }
+  if (lower === "to do" || lower === "todo" || lower === "pending") {
+    return {
+      borderRadius: "6px", fontWeight: 700, fontSize: "11px", height: 26,
+      border: "2px solid #3B82F6", backgroundColor: "transparent", color: "#3B82F6",
+      "& .MuiChip-label": { px: 1.5 },
+    };
+  }
+  if (lower === "overdue") {
+    return {
+      borderRadius: "6px", fontWeight: 700, fontSize: "11px", height: 26,
+      border: "2px solid #EF4444", backgroundColor: "transparent", color: "#EF4444",
+      "& .MuiChip-label": { px: 1.5 },
+    };
+  }
+  return {
+    borderRadius: "6px", fontWeight: 600, fontSize: "11px", height: 26,
+    border: "2px solid #94A3B8", backgroundColor: "transparent", color: "#64748B",
+    "& .MuiChip-label": { px: 1.5 },
+  };
+};
+
+const formatTaskStatus = (
+  nextActionStatus: string | null | undefined,
+  taskType: string | null | undefined
+): string => {
+  if (taskType === "Book Appointment") return "Done";
+  const s = (nextActionStatus || "").toLowerCase();
+  if (s === "completed") return "Done";
+  if (s === "pending") return "To Do";
+  return "";
+};
+
+// Valid task type labels — must match what AddNewLead sends
+const VALID_TASK_TYPES = [
+  "Follow Up",
+  "Call Patient",
+  "Book Appointment",
+  "Send Message",
+  "Send Email",
+  "Review Details",
+  "No Action",
+];
+
+const formatTaskType = (raw: string | null | undefined): string => {
+  if (!raw || raw.trim() === "") return "";
+  const trimmed = raw.trim();
+  if (VALID_TASK_TYPES.includes(trimmed)) return trimmed;
+  const found = VALID_TASK_TYPES.find((p) => p.toLowerCase() === trimmed.toLowerCase());
+  return found ?? trimmed;
+};
+
+// ====================== Component ======================
 const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -108,14 +173,32 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   React.useEffect(() => {
     if (leads) {
       setLocalLeads(
-        leads.map((lead: any) => ({
-          ...lead,
-          assigned: lead.assigned_to_name || "Unassigned",
-          status: formatStatus(lead.status || lead.lead_status || "New"),
-          name: lead.full_name || lead.name || "",
-          quality: deriveQuality(lead),
-          displayId: formatLeadId(lead.id),
-        }))
+        leads.map((lead: any) => {
+          // Primary source: next_action_type (the correct field)
+          // This will be null for leads created before the field was added to the model.
+          // Those old leads must be re-created or updated via the edit form to populate it.
+          const rawTaskType =
+            lead.next_action_type ||
+            lead.task_type ||
+            lead.nextActionType ||
+            lead.taskType ||
+            lead.action_type ||
+            "";
+
+          const taskType = formatTaskType(rawTaskType);
+          const taskStatus = formatTaskStatus(lead.next_action_status, taskType);
+
+          return {
+            ...lead,
+            assigned: lead.assigned_to_name || "Unassigned",
+            status: formatStatus(lead.status || lead.lead_status || "New"),
+            name: lead.full_name || lead.name || "",
+            quality: deriveQuality(lead),
+            displayId: formatLeadId(lead.id),
+            taskType,
+            taskStatus,
+          };
+        })
       );
     }
   }, [leads]);
@@ -131,9 +214,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       const searchStr = `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
       const matchTab =
-        tab === "archived"
-          ? lead.is_active === false
-          : lead.is_active !== false;
+        tab === "archived" ? lead.is_active === false : lead.is_active !== false;
 
       if (filters) {
         if (filters.department && lead.department_id !== Number(filters.department)) return false;
@@ -175,10 +256,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
     if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [totalPages, page]);
 
-  const currentLeads = filteredLeads.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage
-  );
+  const currentLeads = filteredLeads.slice((page - 1) * rowsPerPage, page * rowsPerPage);
   const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
@@ -189,14 +267,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
 
   const handleBulkArchive = (archive: boolean) => {
     setLocalLeads((p) =>
-      p.map((l) =>
-        selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l
-      )
+      p.map((l) => selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l)
     );
     setSelectedIds([]);
   };
 
-  // ── Loading ──
   if (loading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
@@ -207,7 +282,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       </Box>
     );
 
-  // ── Error ──
   if (error)
     return (
       <Alert severity="error" sx={{ mb: 3 }}>
@@ -223,7 +297,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       </Alert>
     );
 
-  // ── No leads at all ──
   if (localLeads.length === 0)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
@@ -236,7 +309,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       </Box>
     );
 
-  // ── No filtered leads ──
   if (filteredLeads.length === 0)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
@@ -249,9 +321,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
               ? `No results for "${search}"`
               : filters && Object.values(filters).some((v) => v !== "" && v !== null)
               ? "No leads match the selected filters"
-              : tab === "archived"
-              ? "No archived leads yet"
-              : "No active leads"}
+              : tab === "archived" ? "No archived leads yet" : "No active leads"}
           </Typography>
         </Stack>
       </Box>
@@ -283,7 +353,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
               <TableCell>Date | Time</TableCell>
               <TableCell>Location</TableCell>
               <TableCell>Source</TableCell>
-              <TableCell>Status</TableCell>
+              <TableCell>Lead Status</TableCell>
               <TableCell>Quality</TableCell>
               <TableCell>AI Score</TableCell>
               <TableCell>Assigned To</TableCell>
@@ -305,19 +375,14 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                 }
                 className={isSelected(lead.id) ? "row-selected" : ""}
               >
-                {/* Checkbox */}
                 <TableCell
                   padding="checkbox"
                   className="checkbox-cell"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Checkbox
-                    checked={isSelected(lead.id)}
-                    onChange={() => toggleSelect(lead.id)}
-                  />
+                  <Checkbox checked={isSelected(lead.id)} onChange={() => toggleSelect(lead.id)} />
                 </TableCell>
 
-                {/* Lead Name | No */}
                 <TableCell>
                   <Stack direction="row" spacing={2} alignItems="center">
                     <Avatar className="lead-avatar">
@@ -330,39 +395,24 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Stack>
                 </TableCell>
 
-                {/* Date | Time */}
                 <TableCell>
                   <Typography className="lead-date">
-                    {lead.created_at
-                      ? new Date(lead.created_at).toLocaleDateString("en-GB")
-                      : "N/A"}
+                    {lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-GB") : "N/A"}
                   </Typography>
                   <Typography className="lead-time">
                     {lead.created_at
-                      ? new Date(lead.created_at).toLocaleTimeString("en-IN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                      ? new Date(lead.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
                       : "N/A"}
                   </Typography>
                 </TableCell>
 
-                {/* Location */}
                 <TableCell>{lead.location || "N/A"}</TableCell>
-
-                {/* Source */}
                 <TableCell>{lead.source || "N/A"}</TableCell>
 
-                {/* Status — chip only, no button */}
                 <TableCell>
-                  <Chip
-                    label={lead.status}
-                    size="small"
-                    sx={getStatusChipSx(lead.status)}
-                  />
+                  <Chip label={lead.status} size="small" sx={getStatusChipSx(lead.status)} />
                 </TableCell>
 
-                {/* Quality */}
                 <TableCell>
                   <Chip
                     label={lead.quality}
@@ -371,29 +421,34 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   />
                 </TableCell>
 
-                {/* AI Score */}
                 <TableCell className="score">
-                  {String(lead.score || 0).includes("%")
-                    ? lead.score
-                    : `${lead.score || 0}%`}
+                  {String(lead.score || 0).includes("%") ? lead.score : `${lead.score || 0}%`}
                 </TableCell>
 
-                {/* Assigned To */}
                 <TableCell>{lead.assigned}</TableCell>
 
                 {/* Task Type */}
-                <TableCell>{lead.task || "N/A"}</TableCell>
-
-                {/* Task Status */}
                 <TableCell>
-                  <Chip
-                    label={lead.taskStatus || "Pending"}
-                    size="small"
-                    className="lead-chip"
-                  />
+                  <Typography
+                    sx={{
+                      fontSize: "13px",
+                      color: lead.taskType ? "#1E293B" : "#94A3B8",
+                      fontWeight: lead.taskType ? 500 : 400,
+                    }}
+                  >
+                    {lead.taskType || "—"}
+                  </Typography>
                 </TableCell>
 
-                {/* Activity */}
+                {/* Task Status chip */}
+                <TableCell>
+                  {lead.taskStatus ? (
+                    <Chip label={lead.taskStatus} size="small" sx={getTaskStatusChipSx(lead.taskStatus)} />
+                  ) : (
+                    <Typography sx={{ fontSize: "13px", color: "#94A3B8" }}>—</Typography>
+                  )}
+                </TableCell>
+
                 <TableCell
                   sx={{ color: "primary.main", fontWeight: 700 }}
                   onClick={(e) => {
@@ -404,14 +459,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   {lead.activity || "View Activity"}
                 </TableCell>
 
-                {/* Contact Option */}
                 <TableCell align="center">
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    justifyContent="center"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
                     <CallButton lead={lead} />
                     <IconButton className="action-btn">
                       <ChatBubbleOutlineIcon fontSize="small" />
@@ -422,7 +471,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Stack>
                 </TableCell>
 
-                {/* Menu */}
                 <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                   <MenuButton lead={lead} setLeads={setLocalLeads} tab={tab} />
                 </TableCell>
@@ -432,7 +480,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         </Table>
       </TableContainer>
 
-      {/* Pagination */}
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
         <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries}
@@ -450,10 +497,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
               {p}
             </Box>
           ))}
-          <IconButton
-            disabled={page === totalPages || totalPages === 0}
-            onClick={() => setPage((p) => p + 1)}
-          >
+          <IconButton disabled={page === totalPages || totalPages === 0} onClick={() => setPage((p) => p + 1)}>
             <ChevronRightIcon />
           </IconButton>
         </Stack>
