@@ -1,25 +1,11 @@
 import * as React from "react";
 import {
-  Box,
-  Checkbox,
-  Chip,
-  IconButton,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-  Avatar,
-  Paper,
-  CircularProgress,
-  Alert,
+  Box, Checkbox, Chip, IconButton, Stack, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Typography, Avatar, Paper,
+  CircularProgress, Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -27,14 +13,10 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 import {
   fetchLeads,
-  selectLeads,
-  selectLeadsLoading,
-  selectLeadsError,
+  selectLeads, selectLeadsLoading, selectLeadsError,
 } from "../../store/leadSlice";
 import "../../styles/Leads/leads.css";
-import type { Lead } from "../../types/leads.types";
 import type { FilterValues } from "./FilterDialog";
-
 import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
 
@@ -46,172 +28,146 @@ interface Props {
 
 const rowsPerPage = 10;
 
-// ====================== Quality Derivation ======================
 const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
-  const hasAssignee = Boolean(
-    lead.assigned_to_id || lead.assigned_to_name
-  );
-  const hasNextAction = Boolean(
-    lead.next_action_description &&
-    lead.next_action_description.trim() !== ""
-  );
-  const nextActionPending =
-    lead.next_action_status === "pending";
-
+  const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
+  const hasNextAction = Boolean(lead.next_action_description?.trim());
+  const nextActionPending = lead.next_action_status === "pending";
   if (hasAssignee && hasNextAction && nextActionPending) return "Hot";
   if (hasAssignee || hasNextAction) return "Warm";
   return "Cold";
 };
 
-// ====================== Format Lead ID - Extract from API data ======================
 const formatLeadId = (id: string): string => {
-  // If ID already has format like "#LN-201" or "LN-201", use it
-  if (id.match(/^#?LN-\d+$/i)) {
-    return id.startsWith('#') ? id : `#${id}`;
-  }
-  
-  // If ID contains "LN-" somewhere, extract it
+  if (id.match(/^#?LN-\d+$/i)) return id.startsWith("#") ? id : `#${id}`;
   const lnMatch = id.match(/#?LN-(\d+)/i);
-  if (lnMatch) {
-    return `#LN-${lnMatch[1]}`;
-  }
-  
-  // Try to find any sequence of digits
+  if (lnMatch) return `#LN-${lnMatch[1]}`;
   const numMatch = id.match(/\d+/);
-  if (numMatch) {
-    return `#LN-${numMatch[0]}`;
-  }
-  
-  // Fallback: create from hash of ID
-  const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const num = (hash % 900) + 100; // Generate 3-digit number
-  return `#LN-${num}`;
+  if (numMatch) return `#LN-${numMatch[0]}`;
+  const hash = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return `#LN-${(hash % 900) + 100}`;
 };
 
-// ====================== Capitalize First Letter Only ======================
 const formatStatus = (status: string): string => {
   if (!status) return "New";
-  // Convert to lowercase, then capitalize first letter
-  const lower = status.toLowerCase();
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
+  const lower = status.toLowerCase().trim();
+  const map: Record<string, string> = {
+    new: "New",
+    contacted: "Contacted",
+    converted: "Converted",
+    "follow up": "Follow Up",
+    "follow-up": "Follow Up",
+    "follow-ups": "Follow Up",
+    appointment: "Appointment",
+    lost: "Lost",
+    "cycle conversion": "Cycle Conversion",
+  };
+  return map[lower] ?? (lower.charAt(0).toUpperCase() + lower.slice(1));
+};
+
+const getStatusChipSx = (status: string) => {
+  const lower = (status || "").toLowerCase();
+  const map: Record<string, { bg: string; color: string }> = {
+    converted:          { bg: "rgba(22,163,74,0.10)",  color: "#16A34A" },
+    appointment:        { bg: "rgba(16,185,129,0.10)", color: "#10B981" },
+    "follow up":        { bg: "rgba(245,158,11,0.10)", color: "#F59E0B" },
+    new:                { bg: "rgba(59,130,246,0.10)", color: "#3B82F6" },
+    contacted:          { bg: "rgba(99,102,241,0.10)", color: "#6366F1" },
+    lost:               { bg: "rgba(239,68,68,0.10)",  color: "#EF4444" },
+    "cycle conversion": { bg: "rgba(139,92,246,0.10)", color: "#8B5CF6" },
+  };
+  const s = map[lower] ?? { bg: "rgba(100,116,139,0.10)", color: "#64748B" };
+  return {
+    borderRadius: "999px",
+    fontWeight: 500,
+    fontSize: "11px",
+    height: 22,
+    border: "1.5px solid",
+    borderColor: s.color,
+    backgroundColor: s.bg,
+    color: s.color,
+    "& .MuiChip-label": { px: 1 },
+  };
 };
 
 const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  // ====================== Redux State ======================
   const leads = useSelector(selectLeads);
   const loading = useSelector(selectLeadsLoading);
   const error = useSelector(selectLeadsError);
 
-  // ====================== Local State ======================
   const [localLeads, setLocalLeads] = React.useState<any[]>([]);
   const [page, setPage] = React.useState(1);
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
-  // ====================== Fetch Leads ======================
   React.useEffect(() => {
     dispatch(fetchLeads() as any);
   }, [dispatch]);
 
-  // ====================== Sync Redux leads → Local State ======================
   React.useEffect(() => {
     if (leads) {
-      const leadsWithFix = leads.map((lead: any, index: number) => ({
-        ...lead,
-        assigned: lead.assigned_to_name || "Unassigned",
-        status: formatStatus(lead.status || lead.lead_status || "New"),
-        name: lead.full_name || lead.name || "",
-        quality: deriveQuality(lead),
-        displayId: formatLeadId(lead.id),
-      }));
-
-      setLocalLeads(leadsWithFix);
+      setLocalLeads(
+        leads.map((lead: any) => ({
+          ...lead,
+          assigned: lead.assigned_to_name || "Unassigned",
+          status: formatStatus(lead.status || lead.lead_status || "New"),
+          name: lead.full_name || lead.name || "",
+          quality: deriveQuality(lead),
+          displayId: formatLeadId(lead.id),
+        }))
+      );
     }
   }, [leads]);
 
-  // ====================== Toggle Selection ======================
-  const toggleSelect = (id: string) => {
+  const toggleSelect = (id: string) =>
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
-  };
-
   const isSelected = (id: string) => selectedIds.includes(id);
 
-  // ====================== Filter Leads with Search + Filters ======================
   const filteredLeads = React.useMemo(() => {
     return localLeads.filter((lead) => {
-      // Search filter
       const searchStr = `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
-      
-      // Tab filter (active vs archived)
-      const matchTab = tab === "archived" 
-        ? lead.is_active === false 
-        : lead.is_active !== false;
+      const matchTab =
+        tab === "archived"
+          ? lead.is_active === false
+          : lead.is_active !== false;
 
-      // Advanced filters
       if (filters) {
-        // Department filter
-        if (filters.department && lead.department_id !== Number(filters.department)) {
-          return false;
-        }
-
-        // Assignee filter
-        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) {
-          return false;
-        }
-
-        // Status filter
+        if (filters.department && lead.department_id !== Number(filters.department)) return false;
+        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) return false;
         if (filters.status) {
-          const leadStatus = (lead.lead_status || lead.status || "").toLowerCase();
-          if (leadStatus !== filters.status.toLowerCase()) {
-            return false;
-          }
+          const ls = (lead.lead_status || lead.status || "").toLowerCase();
+          if (ls !== filters.status.toLowerCase()) return false;
         }
-
-        // Quality filter
-        if (filters.quality && lead.quality !== filters.quality) {
-          return false;
-        }
-
-        // Source filter
-        if (filters.source && lead.source !== filters.source) {
-          return false;
-        }
-
-        // Date range filter
+        if (filters.quality && lead.quality !== filters.quality) return false;
+        if (filters.source && lead.source !== filters.source) return false;
         if (filters.dateFrom || filters.dateTo) {
           const leadDate = lead.created_at ? new Date(lead.created_at) : null;
           if (!leadDate) return false;
-
           if (filters.dateFrom) {
-            const fromDate = new Date(filters.dateFrom);
-            fromDate.setHours(0, 0, 0, 0);
-            if (leadDate < fromDate) return false;
+            const f = new Date(filters.dateFrom);
+            f.setHours(0, 0, 0, 0);
+            if (leadDate < f) return false;
           }
-
           if (filters.dateTo) {
-            const toDate = new Date(filters.dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            if (leadDate > toDate) return false;
+            const t = new Date(filters.dateTo);
+            t.setHours(23, 59, 59, 999);
+            if (leadDate > t) return false;
           }
         }
       }
-      
       return matchSearch && matchTab;
     });
   }, [localLeads, search, tab, filters]);
 
-  // ====================== Reset Pagination on Filter Change ======================
   React.useEffect(() => {
     setPage(1);
     setSelectedIds([]);
   }, [search, tab, filters]);
 
-  // ====================== Pagination ======================
   const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
 
@@ -223,27 +179,25 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
     (page - 1) * rowsPerPage,
     page * rowsPerPage
   );
-
   const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
-  // ====================== Bulk Actions ======================
   const handleBulkDelete = () => {
-    setLocalLeads((prev) => prev.filter((l) => !selectedIds.includes(l.id)));
+    setLocalLeads((p) => p.filter((l) => !selectedIds.includes(l.id)));
     setSelectedIds([]);
   };
 
   const handleBulkArchive = (archive: boolean) => {
-    setLocalLeads((prev) =>
-      prev.map((l) =>
+    setLocalLeads((p) =>
+      p.map((l) =>
         selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l
       )
     );
     setSelectedIds([]);
   };
 
-  // ====================== Loading ======================
-  if (loading) {
+  // ── Loading ──
+  if (loading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
@@ -252,10 +206,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         </Stack>
       </Box>
     );
-  }
 
-  // ====================== Error ======================
-  if (error) {
+  // ── Error ──
+  if (error)
     return (
       <Alert severity="error" sx={{ mb: 3 }}>
         <Typography fontWeight={600}>Failed to load leads</Typography>
@@ -269,10 +222,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         </Typography>
       </Alert>
     );
-  }
 
-  // ====================== Empty ======================
-  if (localLeads.length === 0) {
+  // ── No leads at all ──
+  if (localLeads.length === 0)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
@@ -283,10 +235,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         </Stack>
       </Box>
     );
-  }
 
-  // ====================== Empty Filtered State ======================
-  if (filteredLeads.length === 0) {
+  // ── No filtered leads ──
+  if (filteredLeads.length === 0)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
@@ -296,7 +247,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
           <Typography variant="body2" color="text.secondary">
             {search
               ? `No results for "${search}"`
-              : filters && Object.values(filters).some(v => v !== "" && v !== null)
+              : filters && Object.values(filters).some((v) => v !== "" && v !== null)
               ? "No leads match the selected filters"
               : tab === "archived"
               ? "No archived leads yet"
@@ -305,7 +256,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         </Stack>
       </Box>
     );
-  }
 
   return (
     <>
@@ -355,10 +305,19 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                 }
                 className={isSelected(lead.id) ? "row-selected" : ""}
               >
-                <TableCell padding="checkbox" className="checkbox-cell" onClick={(e) => e.stopPropagation()}>
-                  <Checkbox checked={isSelected(lead.id)} onChange={() => toggleSelect(lead.id)} />
+                {/* Checkbox */}
+                <TableCell
+                  padding="checkbox"
+                  className="checkbox-cell"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={isSelected(lead.id)}
+                    onChange={() => toggleSelect(lead.id)}
+                  />
                 </TableCell>
 
+                {/* Lead Name | No */}
                 <TableCell>
                   <Stack direction="row" spacing={2} alignItems="center">
                     <Avatar className="lead-avatar">
@@ -371,6 +330,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Stack>
                 </TableCell>
 
+                {/* Date | Time */}
                 <TableCell>
                   <Typography className="lead-date">
                     {lead.created_at
@@ -387,17 +347,22 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Typography>
                 </TableCell>
 
+                {/* Location */}
                 <TableCell>{lead.location || "N/A"}</TableCell>
+
+                {/* Source */}
                 <TableCell>{lead.source || "N/A"}</TableCell>
 
+                {/* Status — chip only, no button */}
                 <TableCell>
                   <Chip
                     label={lead.status}
                     size="small"
-                    className={`lead-chip status-${lead.status?.toLowerCase()?.replace(/\s+/g, "-")}`}
+                    sx={getStatusChipSx(lead.status)}
                   />
                 </TableCell>
 
+                {/* Quality */}
                 <TableCell>
                   <Chip
                     label={lead.quality}
@@ -406,15 +371,20 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   />
                 </TableCell>
 
+                {/* AI Score */}
                 <TableCell className="score">
                   {String(lead.score || 0).includes("%")
                     ? lead.score
                     : `${lead.score || 0}%`}
                 </TableCell>
 
+                {/* Assigned To */}
                 <TableCell>{lead.assigned}</TableCell>
+
+                {/* Task Type */}
                 <TableCell>{lead.task || "N/A"}</TableCell>
 
+                {/* Task Status */}
                 <TableCell>
                   <Chip
                     label={lead.taskStatus || "Pending"}
@@ -423,6 +393,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   />
                 </TableCell>
 
+                {/* Activity */}
                 <TableCell
                   sx={{ color: "primary.main", fontWeight: 700 }}
                   onClick={(e) => {
@@ -433,6 +404,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   {lead.activity || "View Activity"}
                 </TableCell>
 
+                {/* Contact Option */}
                 <TableCell align="center">
                   <Stack
                     direction="row"
@@ -450,6 +422,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Stack>
                 </TableCell>
 
+                {/* Menu */}
                 <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                   <MenuButton lead={lead} setLeads={setLocalLeads} tab={tab} />
                 </TableCell>
@@ -459,6 +432,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         </Table>
       </TableContainer>
 
+      {/* Pagination */}
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
         <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries}
@@ -491,7 +465,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         onDelete={handleBulkDelete}
         onArchive={handleBulkArchive}
       />
-
       <Dialogs />
     </>
   );

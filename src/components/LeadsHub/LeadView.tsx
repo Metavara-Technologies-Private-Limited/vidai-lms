@@ -47,6 +47,7 @@ import { CallButton, Dialogs } from "./LeadsMenuDialogs";
 
 import {
   fetchLeads,
+  convertLead,
   selectLeads,
   selectLeadsLoading,
   selectLeadsError,
@@ -94,6 +95,8 @@ export default function LeadDetailView() {
 
   const [activeTab, setActiveTab] = React.useState("Patient Info");
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
+  const [convertLoading, setConvertLoading] = React.useState(false);
+  const [convertError, setConvertError] = React.useState<string | null>(null);
   const [historyView, setHistoryView] = React.useState<
     "chatbot" | "call" | "email"
   >("chatbot");
@@ -321,7 +324,7 @@ export default function LeadDetailView() {
     }
   };
 
-  // ====================== Next Action Handler (from file 1 - fully working) ======================
+  // ====================== Next Action Handler ======================
   const handleAddNextAction = async () => {
     if (!actionType.trim() || !actionDescription.trim()) return;
     if (!lead) return;
@@ -370,8 +373,43 @@ export default function LeadDetailView() {
   };
 
   // ====================== Handlers ======================
-  const handleOpenPopup = () => setOpenConvertPopup(true);
-  const handleClosePopup = () => setOpenConvertPopup(false);
+  const handleOpenPopup = () => {
+    setConvertError(null);
+    setOpenConvertPopup(true);
+  };
+  const handleClosePopup = () => {
+    setOpenConvertPopup(false);
+    setConvertError(null);
+  };
+
+  // ====================== Convert Lead Handler ======================
+  const handleConvertLead = async () => {
+    if (!lead) return;
+    try {
+      setConvertLoading(true);
+      setConvertError(null);
+
+      const leadUuid = decodeURIComponent(id || "");
+
+      // Dispatch convertLead thunk — calls PUT API then patches Redux state
+      // directly with status: "Converted" so table shows green chip instantly
+      const result = await dispatch(convertLead(leadUuid) as any);
+
+      if (result?.error || convertLead.rejected.match(result)) {
+        const msg = result?.payload || result?.error?.message || "Failed to convert lead.";
+        setConvertError(String(msg));
+        return;
+      }
+
+      console.log("✅ Lead converted successfully");
+      setOpenConvertPopup(false);
+    } catch (err: any) {
+      console.error("❌ Failed to convert lead:", err);
+      setConvertError("Failed to convert lead. Please try again.");
+    } finally {
+      setConvertLoading(false);
+    }
+  };
 
   const getCleanLeadId = (leadId: string) =>
     leadId.replace("#", "").replace("LN-", "").replace("LD-", "");
@@ -509,6 +547,18 @@ export default function LeadDetailView() {
     currentStatus === "follow-up" ||
     currentStatus === "follow-ups";
 
+  // ── Check if already converted ──
+  // Backend lead_status only allows "new"|"contacted",
+  // so we track converted state via localStorage using the lead UUID
+  const convertedLeadIds: string[] = JSON.parse(
+    localStorage.getItem("converted_lead_ids") || "[]"
+  );
+  const leadUuidRaw = decodeURIComponent(id || "");
+  const isConverted =
+    convertedLeadIds.includes(leadUuidRaw) ||
+    currentStatus === "converted" ||
+    (lead?.lead_status || "").toLowerCase() === "converted";
+
   const availableActions: { value: string; label: string }[] = isFollowUp
     ? [{ value: "Appointment", label: "Appointment" }]
     : [
@@ -618,9 +668,13 @@ export default function LeadDetailView() {
                 Lead Status
               </Typography>
               <Chip
-                label={leadStatus}
+                label={isConverted ? "Converted" : leadStatus}
                 size="small"
-                sx={pillChipSx("#5B8FF9", "rgba(91,143,249,0.10)")}
+                sx={
+                  isConverted
+                    ? pillChipSx("#16A34A", "rgba(22,163,74,0.10)")
+                    : pillChipSx("#5B8FF9", "rgba(91,143,249,0.10)")
+                }
               />
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
@@ -723,21 +777,26 @@ export default function LeadDetailView() {
             variant="contained"
             onClick={handleOpenPopup}
             startIcon={<SwapHorizIcon />}
+            disabled={isConverted}
             sx={{
               borderRadius: "8px",
               textTransform: "none",
-              bgcolor: "#505050",
-              color: "#FFFFFF",
+              bgcolor: isConverted ? "#E2E8F0" : "#505050",
+              color: isConverted ? "#94A3B8" : "#FFFFFF",
               px: 2,
               boxShadow: "none",
               "&:hover": {
-                bgcolor: "#232323",
-                color: "#FFFFFF",
+                bgcolor: isConverted ? "#E2E8F0" : "#232323",
+                color: isConverted ? "#94A3B8" : "#FFFFFF",
                 boxShadow: "none",
+              },
+              "&:disabled": {
+                bgcolor: "#E2E8F0",
+                color: "#94A3B8",
               },
             }}
           >
-            Convert Lead
+            {isConverted ? "Converted" : "Convert Lead"}
           </Button>
         </Stack>
       </Stack>
@@ -1541,7 +1600,7 @@ export default function LeadDetailView() {
       {/* ══ CONVERT POPUP ══ */}
       <Dialog
         open={openConvertPopup}
-        onClose={handleClosePopup}
+        onClose={convertLoading ? undefined : handleClosePopup}
         PaperProps={{
           sx: {
             borderRadius: "24px",
@@ -1575,11 +1634,20 @@ export default function LeadDetailView() {
                 Are you sure you want to Convert <b>"{leadName}"</b> lead into a patient & register it?
               </Typography>
             </Box>
+
+            {/* Error message inside dialog */}
+            {convertError && (
+              <Alert severity="error" sx={{ width: "100%", borderRadius: "10px", textAlign: "left" }}>
+                {convertError}
+              </Alert>
+            )}
+
             <Stack direction="row" spacing={2} sx={{ width: "100%", mt: 2 }}>
               <Button
                 fullWidth
                 onClick={handleClosePopup}
                 variant="outlined"
+                disabled={convertLoading}
                 sx={{
                   borderRadius: "12px",
                   textTransform: "none",
@@ -1594,7 +1662,8 @@ export default function LeadDetailView() {
               <Button
                 fullWidth
                 variant="contained"
-                onClick={handleClosePopup}
+                onClick={handleConvertLead}
+                disabled={convertLoading}
                 sx={{
                   bgcolor: "#505050",
                   borderRadius: "12px",
@@ -1603,16 +1672,21 @@ export default function LeadDetailView() {
                   py: 1.2,
                   boxShadow: "none",
                   "&:hover": { bgcolor: "#232323" },
+                  "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
                 }}
               >
-                Convert
+                {convertLoading ? (
+                  <CircularProgress size={20} sx={{ color: "white" }} />
+                ) : (
+                  "Convert"
+                )}
               </Button>
             </Stack>
           </Stack>
         </DialogContent>
       </Dialog>
 
-      {/* ══ ADD NEXT ACTION DIALOG (fully working from file 1) ══ */}
+      {/* ══ ADD NEXT ACTION DIALOG ══ */}
       <Dialog
         open={openAddActionDialog}
         onClose={closeActionDialog}

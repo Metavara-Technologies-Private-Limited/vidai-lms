@@ -25,7 +25,6 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import CloseIcon from "@mui/icons-material/Close";
-import PhoneEnabledIcon from "@mui/icons-material/PhoneEnabled";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
@@ -40,8 +39,6 @@ import InsertPhotoIcon from "@mui/icons-material/InsertPhoto";
 import HistoryIcon from "@mui/icons-material/History";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-
-// Mail Icons
 import SendIcon from "@mui/icons-material/Send";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 
@@ -52,14 +49,15 @@ import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
 
 import {
   fetchLeads,
+  bookAppointment,
   selectLeads,
   selectLeadsLoading,
   selectLeadsError,
 } from "../../store/leadSlice";
 
-import { DepartmentAPI, EmployeeAPI, LeadAPI } from "../../services/leads.api";
+import { DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import type { Department, Employee } from "../../services/leads.api";
-import type { Lead, FilterValues } from "../../types/leads.types";
+import type { FilterValues } from "../../types/leads.types";
 
 interface Props {
   search: string;
@@ -95,7 +93,6 @@ const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
     lead.next_action_description && lead.next_action_description.trim() !== ""
   );
   const nextActionPending = lead.next_action_status === "pending";
-
   if (hasAssignee && hasNextAction && nextActionPending) return "Hot";
   if (hasAssignee || hasNextAction) return "Warm";
   return "Cold";
@@ -116,6 +113,7 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     dispatch(fetchLeads() as any);
   }, [dispatch]);
 
+  // ── Sync Redux → local board state ──
   React.useEffect(() => {
     if (reduxLeads && reduxLeads.length > 0) {
       const mappedLeads = reduxLeads.map((lead: any) => ({
@@ -134,8 +132,9 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         source: lead.source || lead.lead_source || "Unknown",
         lead_source: lead.source || lead.lead_source || "",
         campaign: lead.campaign || "",
-        status: lead.lead_status || lead.status || "New",
-        lead_status: lead.lead_status || lead.status || "New",
+        // ✅ Read status from Redux — slice patches "Appointment"/"Converted" directly
+        status: lead.status || lead.lead_status || "New",
+        lead_status: lead.status || lead.lead_status || "New",
         quality: deriveQuality(lead),
         assigned: lead.assigned_to_name || "Unassigned",
         assigned_to_name: lead.assigned_to_name || "",
@@ -170,7 +169,6 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         conversion_date: lead.conversion_date || null,
         estimated_value: lead.estimated_value || 0,
         actual_value: lead.actual_value || 0,
-        // appointment fields
         appointment_date: lead.appointment_date || null,
         slot: lead.slot || "",
         remark: lead.remark || "",
@@ -181,19 +179,17 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         clinic_id: lead.clinic_id || null,
         campaign_id: lead.campaign_id || null,
       }));
-
       setLeads(mappedLeads);
-      console.log("✅ LeadsBoard: Total leads mapped:", mappedLeads.length);
     }
   }, [reduxLeads]);
 
-  // --- Modal States ---
+  // ── Modal States ──
   const [openBookModal, setOpenBookModal] = React.useState(false);
   const [openMailModal, setOpenMailModal] = React.useState(false);
   const [openSmsModal, setOpenSmsModal] = React.useState(false);
   const [selectedLead, setSelectedLead] = React.useState<any | null>(null);
 
-  // --- BOOK APPOINTMENT API STATES ---
+  // ── Appointment Modal States ──
   const [apptDepartments, setApptDepartments] = React.useState<Department[]>([]);
   const [apptEmployees, setApptEmployees] = React.useState<Employee[]>([]);
   const [apptFilteredEmployees, setApptFilteredEmployees] = React.useState<Employee[]>([]);
@@ -208,12 +204,10 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
   const [apptError, setApptError] = React.useState<string | null>(null);
   const [apptSuccess, setApptSuccess] = React.useState(false);
 
-  // --- MAIL FLOW STATES ---
+  // ── Mail/SMS States ──
   const [mailStep, setMailStep] = React.useState<1 | 2>(1);
   const [selectedTemplate, setSelectedTemplate] = React.useState("");
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
-
-  // --- SMS STATES ---
   const [smsMessage, setSmsMessage] = React.useState("");
 
   const templates = [
@@ -225,12 +219,12 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
   ];
 
   const columns = [
-    { label: "NEW LEADS", statusKey: ["New", "new", "no status", ""], color: "#6366F1" },
-    { label: "FOLLOW-UPS", statusKey: ["Follow-Ups", "Follow-up", "follow-ups", "follow-up", "Lost", "lost", "Cycle Conversion", "cycle conversion"], color: "#F59E0B" },
-    { label: "APPOINTMENT", statusKey: ["Appointment", "appointment", "Scheduled", "scheduled"], color: "#10B981" },
-    { label: "CONVERTED LEADS", statusKey: ["Converted", "converted", "Won", "won"], color: "#8B5CF6" },
-    { label: "CYCLE CONVERSION", statusKey: ["Cycle Conversion", "cycle conversion"], color: "#EC4899" },
-    { label: "LOST LEADS", statusKey: ["Lost", "lost", "Disqualified", "disqualified"], color: "#64748B" },
+    { label: "NEW LEADS",        statusKey: ["New", "new", "no status", ""],                                                             color: "#6366F1" },
+    { label: "FOLLOW-UPS",       statusKey: ["Follow-Ups", "Follow-up", "follow-ups", "follow-up", "Contacted", "contacted"],            color: "#F59E0B" },
+    { label: "APPOINTMENT",      statusKey: ["Appointment", "appointment", "Scheduled", "scheduled"],                                   color: "#10B981" },
+    { label: "CONVERTED LEADS",  statusKey: ["Converted", "converted", "Won", "won"],                                                   color: "#8B5CF6" },
+    { label: "CYCLE CONVERSION", statusKey: ["Cycle Conversion", "cycle conversion"],                                                   color: "#EC4899" },
+    { label: "LOST LEADS",       statusKey: ["Lost", "lost", "Disqualified", "disqualified"],                                           color: "#64748B" },
   ];
 
   const filteredLeads = React.useMemo(() => {
@@ -243,8 +237,8 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         if (filters.department && lead.department_id !== Number(filters.department)) return false;
         if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) return false;
         if (filters.status) {
-          const leadStatus = (lead.lead_status || lead.status || "").toLowerCase();
-          if (leadStatus !== filters.status.toLowerCase()) return false;
+          const ls = (lead.lead_status || lead.status || "").toLowerCase();
+          if (ls !== filters.status.toLowerCase()) return false;
         }
         if (filters.quality && lead.quality !== filters.quality) return false;
         if (filters.source && lead.source !== filters.source) return false;
@@ -252,52 +246,46 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
           const leadDate = lead.created_at ? new Date(lead.created_at) : null;
           if (!leadDate) return false;
           if (filters.dateFrom) {
-            const fromDate = new Date(filters.dateFrom);
-            fromDate.setHours(0, 0, 0, 0);
-            if (leadDate < fromDate) return false;
+            const f = new Date(filters.dateFrom);
+            f.setHours(0, 0, 0, 0);
+            if (leadDate < f) return false;
           }
           if (filters.dateTo) {
-            const toDate = new Date(filters.dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            if (leadDate > toDate) return false;
+            const t = new Date(filters.dateTo);
+            t.setHours(23, 59, 59, 999);
+            if (leadDate > t) return false;
           }
         }
       }
-
       return matchSearch && isActive;
     });
   }, [leads, search, filters]);
 
-  // ====================== Book Appointment: Fetch Departments + Employees IN PARALLEL ======================
+  // ── Fetch depts + employees when modal opens ──
   React.useEffect(() => {
     if (!openBookModal || !selectedLead?.clinic_id) return;
-
     const fetchAll = async () => {
-      // Both spinners on simultaneously
       setApptLoadingDepts(true);
       setApptLoadingEmps(true);
       setApptError(null);
       try {
-        // Single round-trip: fire both requests at the same time
         const [depts, emps] = await Promise.all([
           DepartmentAPI.listActiveByClinic(selectedLead.clinic_id),
           EmployeeAPI.listByClinic(selectedLead.clinic_id),
         ]);
         setApptDepartments(depts);
         setApptEmployees(emps);
-      } catch (err) {
-        console.error("Failed to fetch appointment data:", err);
+      } catch {
         setApptError("Failed to load departments/personnel. Please try again.");
       } finally {
         setApptLoadingDepts(false);
         setApptLoadingEmps(false);
       }
     };
-
     fetchAll();
   }, [openBookModal, selectedLead]);
 
-  // ====================== Book Appointment: Filter Employees by Department ======================
+  // ── Filter employees by dept ──
   React.useEffect(() => {
     if (!apptSelectedDeptId) {
       setApptFilteredEmployees(apptEmployees);
@@ -313,90 +301,51 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     }
   }, [apptSelectedDeptId, apptEmployees, apptDepartments]);
 
-  // ====================== Book Appointment: Submit (Optimistic) ======================
-  const handleBookAppointmentSubmit = () => {
+  // ====================== Book Appointment Submit ======================
+  // ✅ Dispatches Redux bookAppointment thunk — optimistically patches status
+  // to "Appointment" in Redux immediately (pending handler in slice), so BOTH
+  // LeadsBoard AND LeadsTable reflect the change at the same time.
+  const handleBookAppointmentSubmit = async () => {
     if (!selectedLead?.id) { setApptError("Lead ID is missing."); return; }
     if (!apptSelectedDeptId) { setApptError("Please select a department."); return; }
     if (!apptDate) { setApptError("Please select an appointment date."); return; }
     if (!apptSlot) { setApptError("Please select a time slot."); return; }
 
-    const formattedDate = apptDate.toISOString().split("T")[0];
-    const optimisticUpdate = {
-      appointment_date: formattedDate,
-      slot: apptSlot,
-      remark: apptRemark,
-      book_appointment: true,
-      department_id: Number(apptSelectedDeptId),
-      ...(apptSelectedEmpId && { assigned_to_id: Number(apptSelectedEmpId) }),
-    };
-
-    // ✅ OPTIMISTIC: update UI & show success immediately — don't wait for API
-    setLeads((prev) =>
-      prev.map((l) => (l.id === selectedLead.id ? { ...l, ...optimisticUpdate } : l))
-    );
-    setApptSuccess(true);
-    handleCloseAll();
-
-    // Hide success toast after 2s
-    setTimeout(() => setApptSuccess(false), 2000);
-
-    // Fire API in background — revert on failure
-    const payload: any = {
-      clinic_id: selectedLead.clinic_id,
-      department_id: Number(apptSelectedDeptId),
-      full_name: selectedLead.full_name || selectedLead.name,
-      contact_no: selectedLead.contact_no || selectedLead.phone || selectedLead.phone_number || "",
-      source: selectedLead.source || "Unknown",
-      treatment_interest: selectedLead.treatment_interest || "N/A",
-      book_appointment: true,
-      appointment_date: formattedDate,
-      slot: apptSlot,
-      is_active: selectedLead.is_active !== false,
-      partner_inquiry: selectedLead.partner_inquiry || false,
-      ...(apptSelectedEmpId && { assigned_to_id: Number(apptSelectedEmpId) }),
-      ...(apptRemark && { remark: apptRemark }),
-      ...(selectedLead.email && { email: selectedLead.email }),
-      ...(selectedLead.location && { location: selectedLead.location }),
-      ...(selectedLead.address && { address: selectedLead.address }),
-      ...(selectedLead.age && { age: selectedLead.age }),
-      ...(selectedLead.marital_status && { marital_status: selectedLead.marital_status }),
-      ...(selectedLead.lead_status && { lead_status: selectedLead.lead_status }),
-      ...(selectedLead.next_action_status && { next_action_status: selectedLead.next_action_status }),
-      ...(selectedLead.next_action_description && { next_action_description: selectedLead.next_action_description }),
-      ...(selectedLead.campaign_id && { campaign_id: selectedLead.campaign_id }),
-    };
+    setApptSubmitting(true);
+    setApptError(null);
 
     const leadId = selectedLead.id.replace(/^#/, "");
-    LeadAPI.update(leadId, payload)
-      .then((updated) => console.log("✅ Appointment saved to server:", updated))
-      .catch((err) => {
-        console.error("❌ Background save failed — reverting:", err);
-        // Revert the optimistic update
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === selectedLead.id
-              ? {
-                  ...l,
-                  appointment_date: selectedLead.appointment_date,
-                  slot: selectedLead.slot,
-                  remark: selectedLead.remark,
-                  book_appointment: selectedLead.book_appointment,
-                  department_id: selectedLead.department_id,
-                  assigned_to_id: selectedLead.assigned_to_id,
-                }
-              : l
-          )
-        );
-        // Show error in a brief toast (can't reopen modal easily, so just log prominently)
-        const detail =
-          err?.response?.data?.detail ||
-          err?.response?.data?.non_field_errors?.[0] ||
-          "Appointment save failed. Please try again.";
-        console.error("Revert reason:", detail);
-      });
+    const formattedDate = apptDate.toISOString().split("T")[0];
+
+    // Dispatch thunk — Redux pending handler patches status to "Appointment" instantly
+    const result = await dispatch(
+      bookAppointment({
+        leadId,
+        payload: {
+          department_id: Number(apptSelectedDeptId),
+          appointment_date: formattedDate,
+          slot: apptSlot,
+          remark: apptRemark,
+          ...(apptSelectedEmpId && { assigned_to_id: Number(apptSelectedEmpId) }),
+        },
+      }) as any
+    );
+
+    setApptSubmitting(false);
+
+    if (bookAppointment.rejected.match(result)) {
+      // Redux already reverted — show error in modal
+      setApptError(result.payload || "Failed to book appointment. Please try again.");
+      return;
+    }
+
+    // Success — Redux state now has status: "Appointment", board re-renders via useEffect
+    setApptSuccess(true);
+    handleCloseAll();
+    setTimeout(() => setApptSuccess(false), 2000);
   };
 
-  // ====================== Handlers ======================
+  // ── Handlers ──
   const handleOpenBookModal = (lead: any) => {
     setSelectedLead(lead);
     setApptDepartments([]);
@@ -413,33 +362,14 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     setOpenBookModal(true);
   };
 
-  const handleOpenMail = (lead: any) => {
-    setSelectedLead(lead);
-    setMailStep(1);
-    setOpenMailModal(true);
-  };
-
-  const handleOpenSms = (lead: any) => {
-    setSelectedLead(lead);
-    setSmsMessage("");
-    setOpenSmsModal(true);
-  };
-
-  const handleNextToCompose = () => { setMailStep(2); };
-
+  const handleOpenMail = (lead: any) => { setSelectedLead(lead); setMailStep(1); setOpenMailModal(true); };
+  const handleOpenSms  = (lead: any) => { setSelectedLead(lead); setSmsMessage(""); setOpenSmsModal(true); };
+  const handleNextToCompose = () => setMailStep(2);
   const handleSaveAsTemplate = () => {
     setShowSaveSuccess(true);
-    setTimeout(() => {
-      setShowSaveSuccess(false);
-      handleCloseAll();
-    }, 2500);
+    setTimeout(() => { setShowSaveSuccess(false); handleCloseAll(); }, 2500);
   };
-
-  const handleSendSms = () => {
-    console.log("Sending SMS to:", selectedLead?.full_name || selectedLead?.name, "Message:", smsMessage);
-    handleCloseAll();
-  };
-
+  const handleSendSms = () => { handleCloseAll(); };
   const handleCloseAll = () => {
     setOpenBookModal(false);
     setOpenMailModal(false);
@@ -452,7 +382,7 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     setApptSubmitting(false);
   };
 
-  // ====================== Styles ======================
+  // ── Styles ──
   const modalFieldStyle = {
     "& .MuiOutlinedInput-root": {
       borderRadius: "8px",
@@ -484,6 +414,7 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
       "&:hover": { bgcolor: "#F8FAFC", color: "#6366F1" },
     };
 
+    // Show "Book an Appointment" button only on NEW LEADS and FOLLOW-UPS columns
     const showButton = (columnLabel === "NEW LEADS" || columnLabel === "FOLLOW-UPS") && isHovered;
 
     if (!isHovered) {
@@ -579,8 +510,8 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     );
   };
 
-  // ====================== Loading ======================
-  if (loading) {
+  // ── Loading ──
+  if (loading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
@@ -589,10 +520,9 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         </Stack>
       </Box>
     );
-  }
 
-  // ====================== Error ======================
-  if (error) {
+  // ── Error ──
+  if (error)
     return (
       <Alert severity="error" sx={{ mb: 3 }}>
         <Typography fontWeight={600}>Failed to load leads</Typography>
@@ -606,10 +536,9 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         </Typography>
       </Alert>
     );
-  }
 
-  // ====================== Empty ======================
-  if (leads.length === 0) {
+  // ── Empty ──
+  if (leads.length === 0)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
@@ -618,7 +547,6 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         </Stack>
       </Box>
     );
-  }
 
   // ====================== Render ======================
   return (
@@ -639,7 +567,9 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         {columns.map((col) => {
           const leadsInCol = filteredLeads.filter((l) => {
             const leadStatus = (l.status || l.lead_status || "no status").toLowerCase().trim();
-            return col.statusKey.some((key) => leadStatus === (key || "no status").toLowerCase().trim());
+            return col.statusKey.some(
+              (key) => leadStatus === (key || "no status").toLowerCase().trim()
+            );
           });
 
           return (
@@ -742,47 +672,37 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
           );
         })}
 
-        {/* ✅ Dialogs (CallDialog) */}
         <Dialogs />
 
-        {/* ====================== SUCCESS TOAST ====================== */}
+        {/* Save template toast */}
         <Fade in={showSaveSuccess}>
-          <Box
-            sx={{
-              position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-              bgcolor: "#10B981", color: "white", px: 3, py: 1.5, borderRadius: "12px",
-              display: "flex", alignItems: "center", gap: 1.5, zIndex: 10000,
-              boxShadow: "0px 10px 20px rgba(16, 185, 129, 0.2)",
-            }}
-          >
+          <Box sx={{
+            position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
+            bgcolor: "#10B981", color: "white", px: 3, py: 1.5, borderRadius: "12px",
+            display: "flex", alignItems: "center", gap: 1.5, zIndex: 10000,
+            boxShadow: "0px 10px 20px rgba(16,185,129,0.2)",
+          }}>
             <CheckCircleOutlineIcon sx={{ fontSize: 20 }} />
             <Typography variant="body2" fontWeight={600}>Saved as A Template successfully!</Typography>
           </Box>
         </Fade>
 
-        {/* ====================== APPOINTMENT SUCCESS TOAST ====================== */}
+        {/* Appointment success toast */}
         <Fade in={apptSuccess}>
-          <Box
-            sx={{
-              position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-              bgcolor: "#10B981", color: "white", px: 3, py: 1.5, borderRadius: "12px",
-              display: "flex", alignItems: "center", gap: 1.5, zIndex: 10000,
-              boxShadow: "0px 10px 20px rgba(16, 185, 129, 0.25)",
-            }}
-          >
+          <Box sx={{
+            position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
+            bgcolor: "#10B981", color: "white", px: 3, py: 1.5, borderRadius: "12px",
+            display: "flex", alignItems: "center", gap: 1.5, zIndex: 10000,
+            boxShadow: "0px 10px 20px rgba(16,185,129,0.25)",
+          }}>
             <CheckCircleOutlineIcon sx={{ fontSize: 20 }} />
             <Typography variant="body2" fontWeight={600}>Appointment booked successfully!</Typography>
           </Box>
         </Fade>
 
         {/* ====================== SMS MODAL ====================== */}
-        <Dialog
-          open={openSmsModal}
-          onClose={handleCloseAll}
-          fullWidth
-          maxWidth="sm"
-          PaperProps={{ sx: { borderRadius: "24px", overflow: "hidden" } }}
-        >
+        <Dialog open={openSmsModal} onClose={handleCloseAll} fullWidth maxWidth="sm"
+          PaperProps={{ sx: { borderRadius: "24px", overflow: "hidden" } }}>
           <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 3 }}>
             <Typography variant="h6" fontWeight={800} color="#1E293B">Send SMS</Typography>
             <IconButton onClick={handleCloseAll} size="small"><CloseIcon /></IconButton>
@@ -806,7 +726,7 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     borderRadius: "12px",
-                    "& fieldset": { borderColor: "#E2E8F0", borderWidth: "1px" },
+                    "& fieldset": { borderColor: "#E2E8F0" },
                     "&:hover fieldset": { borderColor: "#CBD5E1" },
                     "&.Mui-focused fieldset": { borderColor: "#6366F1", borderWidth: "2px" },
                   },
@@ -821,24 +741,17 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
             <Button onClick={handleCloseAll} sx={{ flex: 1, color: "#64748B", textTransform: "none", fontWeight: 700, borderRadius: "12px", border: "1px solid #E2E8F0", py: 1.2 }}>
               Cancel
             </Button>
-            <Button
-              variant="contained" onClick={handleSendSms} disabled={!smsMessage.trim()}
+            <Button variant="contained" onClick={handleSendSms} disabled={!smsMessage.trim()}
               endIcon={<SendIcon sx={{ fontSize: 16 }} />}
-              sx={{ flex: 1, bgcolor: "#334155", borderRadius: "12px", textTransform: "none", fontWeight: 700, py: 1.2, "&:hover": { bgcolor: "#1e293b" }, "&:disabled": { bgcolor: "#CBD5E1" } }}
-            >
+              sx={{ flex: 1, bgcolor: "#334155", borderRadius: "12px", textTransform: "none", fontWeight: 700, py: 1.2, "&:hover": { bgcolor: "#1e293b" }, "&:disabled": { bgcolor: "#CBD5E1" } }}>
               Send
             </Button>
           </DialogActions>
         </Dialog>
 
         {/* ====================== MAIL MODAL ====================== */}
-        <Dialog
-          open={openMailModal}
-          onClose={handleCloseAll}
-          fullWidth
-          maxWidth={mailStep === 1 ? "sm" : "md"}
-          PaperProps={{ sx: { borderRadius: "24px", overflow: "hidden" } }}
-        >
+        <Dialog open={openMailModal} onClose={handleCloseAll} fullWidth maxWidth={mailStep === 1 ? "sm" : "md"}
+          PaperProps={{ sx: { borderRadius: "24px", overflow: "hidden" } }}>
           {mailStep === 1 ? (
             <>
               <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 3 }}>
@@ -846,10 +759,8 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                 <IconButton onClick={handleCloseAll} size="small"><CloseIcon /></IconButton>
               </DialogTitle>
               <DialogContent sx={{ p: 0 }}>
-                <Box
-                  onClick={handleNextToCompose}
-                  sx={{ p: 3, textAlign: "center", borderBottom: "1px solid #F1F5F9", cursor: "pointer", transition: "0.2s", "&:hover": { bgcolor: "#F8FAFC" } }}
-                >
+                <Box onClick={handleNextToCompose}
+                  sx={{ p: 3, textAlign: "center", borderBottom: "1px solid #F1F5F9", cursor: "pointer", "&:hover": { bgcolor: "#F8FAFC" } }}>
                   <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
                     <BorderColorIcon sx={{ fontSize: 20, color: "#64748B" }} />
                     <Typography fontWeight={600} color="#64748B">Compose New Email</Typography>
@@ -861,15 +772,12 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                   </Typography>
                   <RadioGroup value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
                     {templates.map((tmp) => (
-                      <Box
-                        key={tmp.id}
-                        onClick={() => setSelectedTemplate(tmp.title)}
+                      <Box key={tmp.id} onClick={() => setSelectedTemplate(tmp.title)}
                         sx={{
                           display: "flex", alignItems: "flex-start", p: 2, mb: 1.5,
                           border: "1px solid", borderColor: selectedTemplate === tmp.title ? "#6366F1" : "#E2E8F0",
                           borderRadius: "12px", cursor: "pointer", bgcolor: selectedTemplate === tmp.title ? "#F5F7FF" : "transparent",
-                        }}
-                      >
+                        }}>
                         <Radio size="small" value={tmp.title} sx={{ mt: -0.5 }} />
                         <Box sx={{ flex: 1 }}>
                           <Typography variant="body2" fontWeight={700} color="#1E293B">{tmp.title}</Typography>
@@ -883,7 +791,8 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
               </DialogContent>
               <DialogActions sx={{ p: 3, borderTop: "1px solid #F1F5F9" }}>
                 <Button onClick={handleCloseAll} sx={{ color: "#64748B", textTransform: "none", fontWeight: 700 }}>Cancel</Button>
-                <Button variant="contained" onClick={handleNextToCompose} sx={{ bgcolor: "#334155", borderRadius: "10px", px: 4, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#1e293b" } }}>
+                <Button variant="contained" onClick={handleNextToCompose}
+                  sx={{ bgcolor: "#334155", borderRadius: "10px", px: 4, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#1e293b" } }}>
                   Next
                 </Button>
               </DialogActions>
@@ -898,11 +807,13 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                 <Stack spacing={0.5}>
                   <Box sx={{ display: "flex", alignItems: "center", borderBottom: "1px solid #F1F5F9", py: 1.5 }}>
                     <Typography variant="body2" sx={{ width: 40, color: "#94A3B8", fontWeight: 500 }}>To :</Typography>
-                    <Chip label={selectedLead?.full_name || selectedLead?.name} size="small" onDelete={() => {}} sx={{ bgcolor: "#EEF2FF", color: "#6366F1", fontWeight: 600, borderRadius: "6px" }} />
+                    <Chip label={selectedLead?.full_name || selectedLead?.name} size="small" onDelete={() => {}}
+                      sx={{ bgcolor: "#EEF2FF", color: "#6366F1", fontWeight: 600, borderRadius: "6px" }} />
                   </Box>
                   <Box sx={{ display: "flex", alignItems: "center", borderBottom: "1px solid #F1F5F9", py: 1.5 }}>
                     <Typography variant="body2" sx={{ width: 70, color: "#94A3B8", fontWeight: 500 }}>Subject :</Typography>
-                    <TextField fullWidth variant="standard" defaultValue="Thank You for Your IVF Inquiry - Next Steps" InputProps={{ disableUnderline: true, sx: { fontSize: "0.85rem", fontWeight: 600 } }} />
+                    <TextField fullWidth variant="standard" defaultValue="Thank You for Your IVF Inquiry - Next Steps"
+                      InputProps={{ disableUnderline: true, sx: { fontSize: "0.85rem", fontWeight: 600 } }} />
                   </Box>
                   <Box sx={{ py: 3, minHeight: 320, overflowY: "auto" }}>
                     <Typography variant="body2" sx={{ mb: 2 }}>Hi {selectedLead?.full_name || selectedLead?.name},</Typography>
@@ -913,8 +824,7 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                       To ensure we provide the most accurate guidance tailored to your medical history, please complete our secure intake form:
                     </Typography>
                     <Typography variant="body2" sx={{ color: "#6366F1", textDecoration: "underline", mb: 2, display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}>
-                      👉 Fill the IVF Inquiry Form <br />
-                      https://example.com/ivf-inquiry-form
+                      👉 Fill the IVF Inquiry Form<br />https://example.com/ivf-inquiry-form
                     </Typography>
                     <Typography variant="body2" fontWeight={700} sx={{ mt: 2, color: "#1E293B" }}>
                       What happens next? After you submit the form, our specialist team will:
@@ -938,10 +848,12 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                 </Stack>
                 <Stack direction="row" spacing={1.5}>
                   <Button onClick={() => setMailStep(1)} sx={{ color: "#64748B", textTransform: "none", fontWeight: 700 }}>Cancel</Button>
-                  <Button variant="outlined" onClick={handleSaveAsTemplate} sx={{ borderColor: "#E2E8F0", color: "#1E293B", textTransform: "none", borderRadius: "10px", fontWeight: 700 }}>
+                  <Button variant="outlined" onClick={handleSaveAsTemplate}
+                    sx={{ borderColor: "#E2E8F0", color: "#1E293B", textTransform: "none", borderRadius: "10px", fontWeight: 700 }}>
                     Save as Template
                   </Button>
-                  <Button variant="contained" onClick={handleCloseAll} endIcon={<SendIcon sx={{ fontSize: 16 }} />} sx={{ bgcolor: "#334155", borderRadius: "10px", px: 3, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#1e293b" } }}>
+                  <Button variant="contained" onClick={handleCloseAll} endIcon={<SendIcon sx={{ fontSize: 16 }} />}
+                    sx={{ bgcolor: "#334155", borderRadius: "10px", px: 3, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#1e293b" } }}>
                     Send
                   </Button>
                 </Stack>
@@ -950,20 +862,12 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
           )}
         </Dialog>
 
-        {/* ====================== BOOK APPOINTMENT MODAL (API-POWERED) ====================== */}
-        <Dialog
-          open={openBookModal}
-          onClose={!apptSubmitting ? handleCloseAll : undefined}
-          fullWidth
-          maxWidth="xs"
-          PaperProps={{
-            sx: { borderRadius: "20px", boxShadow: "0px 24px 48px rgba(0,0,0,0.12)", overflow: "visible" },
-          }}
-        >
-          {/* Header */}
-          <DialogTitle
-            sx={{ p: 2.5, pb: 1.5, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}
-          >
+        {/* ====================== BOOK APPOINTMENT MODAL ====================== */}
+        <Dialog open={openBookModal} onClose={!apptSubmitting ? handleCloseAll : undefined}
+          fullWidth maxWidth="xs"
+          PaperProps={{ sx: { borderRadius: "20px", boxShadow: "0px 24px 48px rgba(0,0,0,0.12)", overflow: "visible" } }}>
+
+          <DialogTitle sx={{ p: 2.5, pb: 1.5, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <Box>
               <Typography variant="h6" fontWeight={800} sx={{ fontSize: "1.05rem", color: "#1E293B" }}>
                 Book an Appointment
@@ -978,24 +882,17 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                 </Stack>
               )}
             </Box>
-            <IconButton
-              onClick={handleCloseAll}
-              disabled={apptSubmitting}
-              size="small"
-              sx={{ color: "#94A3B8", mt: 0.3 }}
-            >
+            <IconButton onClick={handleCloseAll} disabled={apptSubmitting} size="small" sx={{ color: "#94A3B8", mt: 0.3 }}>
               <CloseIcon fontSize="small" />
             </IconButton>
           </DialogTitle>
 
           <DialogContent sx={{ px: 2.5, pt: 1.5, pb: 1 }}>
-            {/* Error */}
             {apptError && (
               <Alert severity="error" sx={{ mb: 2, borderRadius: "10px", fontSize: "0.8rem" }} onClose={() => setApptError(null)}>
                 {apptError}
               </Alert>
             )}
-
             <Stack spacing={2}>
               {/* Department */}
               <Box>
@@ -1006,24 +903,16 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                     <Typography variant="caption" color="text.secondary">Loading departments...</Typography>
                   </Box>
                 ) : (
-                  <TextField
-                    select fullWidth size="small"
-                    value={apptSelectedDeptId}
-                    onChange={(e) => setApptSelectedDeptId(Number(e.target.value))}
-                    sx={modalFieldStyle}
-                  >
+                  <TextField select fullWidth size="small" value={apptSelectedDeptId}
+                    onChange={(e) => setApptSelectedDeptId(Number(e.target.value))} sx={modalFieldStyle}>
                     <MenuItem value="" disabled>
                       <Typography color="text.secondary" sx={{ fontSize: "0.85rem" }}>Select Department</Typography>
                     </MenuItem>
-                    {apptDepartments.map((dept) => (
-                      <MenuItem key={dept.id} value={dept.id} sx={{ fontSize: "0.85rem" }}>
-                        {dept.name}
-                      </MenuItem>
+                    {apptDepartments.map((d) => (
+                      <MenuItem key={d.id} value={d.id} sx={{ fontSize: "0.85rem" }}>{d.name}</MenuItem>
                     ))}
                     {apptDepartments.length === 0 && !apptLoadingDepts && (
-                      <MenuItem disabled sx={{ fontSize: "0.85rem", color: "#94A3B8" }}>
-                        No departments found
-                      </MenuItem>
+                      <MenuItem disabled sx={{ fontSize: "0.85rem", color: "#94A3B8" }}>No departments found</MenuItem>
                     )}
                   </TextField>
                 )}
@@ -1045,13 +934,9 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                     <Typography variant="caption" color="text.secondary">Loading personnel...</Typography>
                   </Box>
                 ) : (
-                  <TextField
-                    select fullWidth size="small"
-                    value={apptSelectedEmpId}
-                    onChange={(e) => setApptSelectedEmpId(Number(e.target.value))}
-                    sx={modalFieldStyle}
-                    disabled={!apptSelectedDeptId}
-                  >
+                  <TextField select fullWidth size="small" value={apptSelectedEmpId}
+                    onChange={(e) => setApptSelectedEmpId(Number(e.target.value))} sx={modalFieldStyle}
+                    disabled={!apptSelectedDeptId}>
                     <MenuItem value="">
                       <Typography color="text.secondary" sx={{ fontSize: "0.85rem" }}>Select Personnel (Optional)</Typography>
                     </MenuItem>
@@ -1061,16 +946,12 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                           <Typography sx={{ fontSize: "0.85rem", fontWeight: 600, color: "#1E293B", lineHeight: 1.3 }}>
                             {emp.emp_name}
                           </Typography>
-                          <Typography sx={{ fontSize: "0.72rem", color: "#94A3B8" }}>
-                            {emp.emp_type}
-                          </Typography>
+                          <Typography sx={{ fontSize: "0.72rem", color: "#94A3B8" }}>{emp.emp_type}</Typography>
                         </Box>
                       </MenuItem>
                     ))}
                     {apptSelectedDeptId && apptFilteredEmployees.length === 0 && !apptLoadingEmps && (
-                      <MenuItem disabled sx={{ fontSize: "0.85rem", color: "#94A3B8" }}>
-                        No personnel in this department
-                      </MenuItem>
+                      <MenuItem disabled sx={{ fontSize: "0.85rem", color: "#94A3B8" }}>No personnel in this department</MenuItem>
                     )}
                   </TextField>
                 )}
@@ -1078,22 +959,14 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
 
               {/* Date + Slot */}
               <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-                {/* MUI DatePicker */}
                 <Box>
                   <Typography sx={apptLabelStyle}>Date *</Typography>
-                  <DatePicker
-                    value={apptDate}
-                    onChange={(newVal) => setApptDate(newVal)}
-                    minDate={new Date()}
+                  <DatePicker value={apptDate} onChange={(v) => setApptDate(v)} minDate={new Date()}
                     slots={{ openPickerIcon: CalendarMonthIcon }}
                     slotProps={{
                       textField: {
-                        size: "small",
-                        fullWidth: true,
-                        sx: {
-                          ...modalFieldStyle,
-                          "& .MuiInputAdornment-root .MuiIconButton-root": { color: "#94A3B8", p: 0.5 },
-                        },
+                        size: "small", fullWidth: true,
+                        sx: { ...modalFieldStyle, "& .MuiInputAdornment-root .MuiIconButton-root": { color: "#94A3B8", p: 0.5 } },
                       },
                       popper: {
                         sx: {
@@ -1101,44 +974,33 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
                           "& .MuiPickersDay-root.Mui-selected": { bgcolor: "#6366F1" },
                           "& .MuiPickersDay-root.Mui-selected:hover": { bgcolor: "#4F46E5" },
                           "& .MuiPickersDay-root:hover": { bgcolor: "#EEF2FF" },
-                          "& .MuiPickersCalendarHeader-label": { fontWeight: 700, color: "#1E293B" },
                         },
                       },
                     }}
                   />
                 </Box>
-
-                {/* Time Slot */}
                 <Box>
                   <Typography sx={apptLabelStyle}>Time Slot *</Typography>
-                  <TextField
-                    select fullWidth size="small"
-                    value={apptSlot}
-                    onChange={(e) => setApptSlot(e.target.value)}
-                    sx={modalFieldStyle}
-                    disabled={!apptDate}
-                  >
+                  <TextField select fullWidth size="small" value={apptSlot}
+                    onChange={(e) => setApptSlot(e.target.value)} sx={modalFieldStyle} disabled={!apptDate}>
                     <MenuItem value="" disabled>
                       <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>Select Slot</Typography>
                     </MenuItem>
-                    {TIME_SLOTS.map((slot) => (
-                      <MenuItem key={slot} value={slot} sx={{ fontSize: "0.8rem" }}>
-                        {slot}
-                      </MenuItem>
+                    {TIME_SLOTS.map((s) => (
+                      <MenuItem key={s} value={s} sx={{ fontSize: "0.8rem" }}>{s}</MenuItem>
                     ))}
                   </TextField>
                 </Box>
               </Box>
 
-              {/* Appointment Summary */}
+              {/* Summary */}
               {apptDate && apptSlot && (
                 <Box sx={{ bgcolor: "#EEF2FF", borderRadius: "10px", p: 1.5, border: "1px solid #C7D2FE" }}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <CalendarMonthIcon sx={{ fontSize: 15, color: "#6366F1" }} />
                     <Typography variant="caption" fontWeight={600} color="#4338CA" sx={{ fontSize: "0.78rem" }}>
                       {apptDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
-                      {" · "}
-                      {apptSlot}
+                      {" · "}{apptSlot}
                     </Typography>
                   </Stack>
                 </Box>
@@ -1147,45 +1009,25 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
               {/* Remark */}
               <Box>
                 <Typography sx={apptLabelStyle}>Remark</Typography>
-                <TextField
-                  fullWidth multiline rows={2} size="small"
+                <TextField fullWidth multiline rows={2} size="small"
                   placeholder="Add any notes or special instructions..."
                   value={apptRemark}
                   onChange={(e) => setApptRemark(e.target.value)}
-                  sx={{
-                    ...modalFieldStyle,
-                    "& .MuiInputBase-input": { fontSize: "0.85rem", py: 0 },
-                  }}
+                  sx={{ ...modalFieldStyle, "& .MuiInputBase-input": { fontSize: "0.85rem", py: 0 } }}
                 />
               </Box>
             </Stack>
           </DialogContent>
 
           <DialogActions sx={{ p: 2.5, pt: 1.5, gap: 1.5 }}>
-            <Button
-              onClick={handleCloseAll}
-              disabled={apptSubmitting}
-              variant="outlined"
-              sx={{
-                flex: 1, textTransform: "none", borderRadius: "12px",
-                color: "#64748B", borderColor: "#E2E8F0", fontWeight: 700, py: 1.2,
-                "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" },
-              }}
-            >
+            <Button onClick={handleCloseAll} disabled={apptSubmitting} variant="outlined"
+              sx={{ flex: 1, textTransform: "none", borderRadius: "12px", color: "#64748B", borderColor: "#E2E8F0", fontWeight: 700, py: 1.2, "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" } }}>
               Cancel
             </Button>
-            <Button
-              variant="contained"
-              onClick={handleBookAppointmentSubmit}
-              disabled={!apptSelectedDeptId || !apptDate || !apptSlot}
-              sx={{
-                flex: 1, textTransform: "none", borderRadius: "12px",
-                bgcolor: "#334155", fontWeight: 700, py: 1.2,
-                "&:hover": { bgcolor: "#1E293B" },
-                "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
-              }}
-            >
-              Book Appointment
+            <Button variant="contained" onClick={handleBookAppointmentSubmit}
+              disabled={!apptSelectedDeptId || !apptDate || !apptSlot || apptSubmitting}
+              sx={{ flex: 1, textTransform: "none", borderRadius: "12px", bgcolor: "#334155", fontWeight: 700, py: 1.2, "&:hover": { bgcolor: "#1E293B" }, "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" } }}>
+              {apptSubmitting ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Book Appointment"}
             </Button>
           </DialogActions>
         </Dialog>
