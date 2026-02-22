@@ -16,9 +16,44 @@ import {
   selectLeads, selectLeadsLoading, selectLeadsError,
 } from "../../store/leadSlice";
 import "../../styles/Leads/leads.css";
-import type { FilterValues } from "./FilterDialog";
+import type { FilterValues } from "../../types/leads.types";
 import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
+
+// ====================== Types ======================
+
+interface RawLead {
+  id: string;
+  full_name?: string;
+  name?: string;
+  assigned_to_id?: number;
+  assigned_to_name?: string;
+  next_action_description?: string;
+  next_action_status?: string;
+  next_action_type?: string;
+  task_type?: string;
+  nextActionType?: string;
+  taskType?: string;
+  action_type?: string;
+  status?: string;
+  lead_status?: string;
+  is_active?: boolean;
+  created_at?: string;
+  location?: string;
+  source?: string;
+  score?: number | string;
+  activity?: string;
+  initials?: string;
+  department_id?: number;
+}
+
+interface ProcessedLead extends RawLead {
+  assigned: string;
+  quality: "Hot" | "Warm" | "Cold";
+  displayId: string;
+  taskType: string;
+  taskStatus: string;
+}
 
 interface Props {
   search: string;
@@ -28,9 +63,38 @@ interface Props {
 
 const rowsPerPage = 10;
 
+// ====================== Sticky column styles ======================
+const stickyContactStyle = {
+  position: "sticky" as const,
+  right: 48,
+  zIndex: 2,
+  bgcolor: "#FFFFFF",
+};
+
+const stickyMenuStyle = {
+  position: "sticky" as const,
+  right: 0,
+  zIndex: 2,
+  bgcolor: "#FFFFFF",
+};
+
+const stickyHeaderContactStyle = {
+  position: "sticky" as const,
+  right: 48,
+  zIndex: 3,
+  bgcolor: "#F8FAFC",
+};
+
+const stickyHeaderMenuStyle = {
+  position: "sticky" as const,
+  right: 0,
+  zIndex: 3,
+  bgcolor: "#F8FAFC",
+};
+
 // ====================== Helpers ======================
 
-const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
+const deriveQuality = (lead: RawLead): "Hot" | "Warm" | "Cold" => {
   const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
   const hasNextAction = Boolean(lead.next_action_description?.trim());
   const nextActionPending = lead.next_action_status === "pending";
@@ -134,7 +198,6 @@ const formatTaskStatus = (
   return "";
 };
 
-// Valid task type labels — must match what AddNewLead sends
 const VALID_TASK_TYPES = [
   "Follow Up",
   "Call Patient",
@@ -158,25 +221,22 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const leads = useSelector(selectLeads);
-  const loading = useSelector(selectLeadsLoading);
-  const error = useSelector(selectLeadsError);
+  const leads = useSelector(selectLeads) as RawLead[] | null;
+  const loading = useSelector(selectLeadsLoading) as boolean;
+  const error = useSelector(selectLeadsError) as string | null;
 
-  const [localLeads, setLocalLeads] = React.useState<any[]>([]);
+  const [localLeads, setLocalLeads] = React.useState<ProcessedLead[]>([]);
   const [page, setPage] = React.useState(1);
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   React.useEffect(() => {
-    dispatch(fetchLeads() as any);
+    dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
   }, [dispatch]);
 
   React.useEffect(() => {
     if (leads) {
       setLocalLeads(
-        leads.map((lead: any) => {
-          // Primary source: next_action_type (the correct field)
-          // This will be null for leads created before the field was added to the model.
-          // Those old leads must be re-created or updated via the edit form to populate it.
+        leads.map((lead: RawLead): ProcessedLead => {
           const rawTaskType =
             lead.next_action_type ||
             lead.task_type ||
@@ -210,7 +270,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const isSelected = (id: string) => selectedIds.includes(id);
 
   const filteredLeads = React.useMemo(() => {
-    return localLeads.filter((lead) => {
+    return localLeads.filter((lead: ProcessedLead) => {
       const searchStr = `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
       const matchTab =
@@ -290,7 +350,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         <Typography
           variant="body2"
           sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
-          onClick={() => dispatch(fetchLeads() as any)}
+          onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}
         >
           Try again
         </Typography>
@@ -329,8 +389,13 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
 
   return (
     <>
-      <TableContainer component={Paper} elevation={0} className="leads-table">
-        <Table stickyHeader>
+      <TableContainer
+        component={Paper}
+        elevation={0}
+        className="leads-table"
+        sx={{ overflowX: "auto" }}
+      >
+        <Table stickyHeader sx={{ minWidth: 1200 }}>
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox" className="checkbox-cell">
@@ -360,13 +425,15 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
               <TableCell>Task Type</TableCell>
               <TableCell>Task Status</TableCell>
               <TableCell>Activity</TableCell>
-              <TableCell align="center">Contact Option</TableCell>
-              <TableCell align="center" />
+              <TableCell align="center" sx={stickyHeaderContactStyle}>
+                Contact Option
+              </TableCell>
+              <TableCell align="center" sx={stickyHeaderMenuStyle} />
             </TableRow>
           </TableHead>
 
           <TableBody>
-            {currentLeads.map((lead: any) => (
+            {currentLeads.map((lead: ProcessedLead) => (
               <TableRow
                 key={lead.id}
                 sx={{ cursor: "pointer" }}
@@ -410,7 +477,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                 <TableCell>{lead.source || "N/A"}</TableCell>
 
                 <TableCell>
-                  <Chip label={lead.status} size="small" sx={getStatusChipSx(lead.status)} />
+                  <Chip label={lead.status} size="small" sx={getStatusChipSx(lead.status ?? "")} />
                 </TableCell>
 
                 <TableCell>
@@ -427,7 +494,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
 
                 <TableCell>{lead.assigned}</TableCell>
 
-                {/* Task Type */}
                 <TableCell>
                   <Typography
                     sx={{
@@ -440,7 +506,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Typography>
                 </TableCell>
 
-                {/* Task Status chip */}
                 <TableCell>
                   {lead.taskStatus ? (
                     <Chip label={lead.taskStatus} size="small" sx={getTaskStatusChipSx(lead.taskStatus)} />
@@ -459,8 +524,12 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   {lead.activity || "View Activity"}
                 </TableCell>
 
-                <TableCell align="center">
-                  <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
+                <TableCell
+                  align="center"
+                  sx={stickyContactStyle}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Stack direction="row" spacing={1} justifyContent="center">
                     <CallButton lead={lead} />
                     <IconButton className="action-btn">
                       <ChatBubbleOutlineIcon fontSize="small" />
@@ -471,7 +540,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Stack>
                 </TableCell>
 
-                <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                <TableCell
+                  align="center"
+                  sx={stickyMenuStyle}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <MenuButton lead={lead} setLeads={setLocalLeads} tab={tab} />
                 </TableCell>
               </TableRow>
