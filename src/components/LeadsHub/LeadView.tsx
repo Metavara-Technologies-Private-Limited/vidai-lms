@@ -55,30 +55,120 @@ import {
 import { api } from "../../services/leads.api";
 
 // ====================== Types ======================
-type NoteData = {
+interface NoteData {
   id: string;
   uuid?: string;
   title: string;
   content: string;
   time: string;
-};
+}
 
-// ====================== Format Lead ID - Same as Table ======================
+interface RawNote {
+  id: string;
+  title?: string;
+  note?: string;
+  created_at?: string;
+  is_deleted?: boolean;
+}
+
+interface LeadRecord {
+  id: string;
+  full_name?: string;
+  name?: string;
+  assigned_to_name?: string;
+  assigned?: string;
+  status?: string;
+  lead_status?: string;
+  quality?: string;
+  score?: number | string;
+  source?: string;
+  sub_source?: string;
+  campaign_name?: string;
+  campaign_duration?: string;
+  phone?: string;
+  contact_number?: string;
+  contact_no?: string;
+  email?: string;
+  location?: string;
+  gender?: string;
+  age?: number | string;
+  marital_status?: string;
+  address?: string;
+  language_preference?: string;
+  created_at?: string;
+  initials?: string;
+  department?: string;
+  department_name?: string;
+  department_id?: number;
+  clinic_id?: number;
+  personnel?: string;
+  appointment_date?: string;
+  slot?: string;
+  appointment_slot?: string;
+  remark?: string;
+  appointment_remark?: string;
+  treatment_interest?: string;
+  partner_name?: string;
+  partner_full_name?: string;
+  partner_age?: number | string;
+  partner_gender?: string;
+  next_action_type?: string;
+  next_action_status?: string;
+  next_action_description?: string;
+  task?: string;
+  taskStatus?: string;
+  is_active?: boolean;
+  book_appointment?: boolean;
+  partner_inquiry?: boolean;
+  phone_number?: string;
+}
+
+interface CallMessageProps {
+  speaker: string;
+  time: string;
+  text: string;
+}
+
+interface TimelineItemProps {
+  icon?: React.ReactNode;
+  title: string;
+  time: string;
+  isAvatar?: boolean;
+  avatarInitial?: string;
+  isLast?: boolean;
+  onClick?: () => void;
+  isClickable?: boolean;
+}
+
+interface ChatBubbleProps {
+  side: "left" | "right";
+  text: string;
+  time: string;
+}
+
+interface InfoProps {
+  label: string;
+  value: string;
+  isAvatar?: boolean;
+}
+
+interface DocumentRowProps {
+  name: string;
+  size: string;
+  sx?: object;
+}
+
+// ====================== Format Lead ID ======================
 const formatLeadId = (id: string): string => {
   if (id.match(/^#?LN-\d+$/i)) {
     return id.startsWith("#") ? id : `#${id}`;
   }
   const lnMatch = id.match(/#?LN-(\d+)/i);
-  if (lnMatch) {
-    return `#LN-${lnMatch[1]}`;
-  }
+  if (lnMatch) return `#LN-${lnMatch[1]}`;
   const numMatch = id.match(/\d+/);
-  if (numMatch) {
-    return `#LN-${numMatch[0]}`;
-  }
+  if (numMatch) return `#LN-${numMatch[0]}`;
   const hash = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const num = (hash % 900) + 100;
-  return `#LN-${num}`;
+  return `#LN-${(hash % 900) + 100}`;
 };
 
 export default function LeadDetailView() {
@@ -89,19 +179,16 @@ export default function LeadDetailView() {
     (state: RootState) => state.emailTemplate.selectedTemplate,
   );
 
-  const leads = useSelector(selectLeads);
-  const loading = useSelector(selectLeadsLoading);
-  const error = useSelector(selectLeadsError);
+  const leads = useSelector(selectLeads) as LeadRecord[] | null;
+  const loading = useSelector(selectLeadsLoading) as boolean;
+  const error = useSelector(selectLeadsError) as string | null;
 
   const [activeTab, setActiveTab] = React.useState("Patient Info");
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
   const [convertLoading, setConvertLoading] = React.useState(false);
   const [convertError, setConvertError] = React.useState<string | null>(null);
-  const [historyView, setHistoryView] = React.useState<
-    "chatbot" | "call" | "email"
-  >("chatbot");
+  const [historyView, setHistoryView] = React.useState<"chatbot" | "call" | "email">("chatbot");
 
-  // ── Notes state ──────────────────────────────────────────
   const [notes, setNotes] = React.useState<NoteData[]>([]);
   const [notesLoading, setNotesLoading] = React.useState(false);
   const [notesError, setNotesError] = React.useState<string | null>(null);
@@ -109,13 +196,11 @@ export default function LeadDetailView() {
   const [newNoteContent, setNewNoteContent] = React.useState("");
   const [noteSubmitting, setNoteSubmitting] = React.useState(false);
 
-  // ── Edit state ────────────────────────────────────────────
   const [editingNoteId, setEditingNoteId] = React.useState<string | null>(null);
   const [editTitle, setEditTitle] = React.useState("");
   const [editContent, setEditContent] = React.useState("");
   const [editSubmitting, setEditSubmitting] = React.useState(false);
 
-  // ── Add Next Action state ────────────────────────────────
   const [openAddActionDialog, setOpenAddActionDialog] = React.useState(false);
   const [actionType, setActionType] = React.useState("");
   const [actionStatus, setActionStatus] = React.useState("pending");
@@ -123,11 +208,7 @@ export default function LeadDetailView() {
   const [actionSubmitting, setActionSubmitting] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
 
-  // ── Delete dialogs state ──────────────────────────────────
-  const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(
-    null,
-  );
-  const [deleteActionDialog, setDeleteActionDialog] = React.useState(false);
+  const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(null);
 
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px",
@@ -142,12 +223,9 @@ export default function LeadDetailView() {
     borderColor: color,
     backgroundColor: bg,
     color: color,
-    "& .MuiChip-label": {
-      px: 1,
-    },
+    "& .MuiChip-label": { px: 1 },
   });
 
-  // ====================== Helpers ======================
   const formatNoteTime = (iso: string) =>
     new Date(iso)
       .toLocaleString("en-US", {
@@ -163,8 +241,9 @@ export default function LeadDetailView() {
     try {
       const token = localStorage.getItem("auth_token");
       if (!token) return null;
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return payload.user_id ?? payload.id ?? payload.sub ?? null;
+      const payload = JSON.parse(atob(token.split(".")[1])) as Record<string, unknown>;
+      const uid = payload.user_id ?? payload.id ?? payload.sub ?? null;
+      return typeof uid === "number" ? uid : null;
     } catch {
       return null;
     }
@@ -172,12 +251,12 @@ export default function LeadDetailView() {
 
   React.useEffect(() => {
     if (!leads || leads.length === 0) {
-      dispatch(fetchLeads() as any);
+      dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
     }
   }, [dispatch, leads]);
 
-  const lead = React.useMemo(() => {
-    if (!leads || leads.length === 0) return null;
+  const lead = React.useMemo((): LeadRecord | undefined => {
+    if (!leads || leads.length === 0) return undefined;
     const cleanId = decodeURIComponent(id || "")
       .replace("#", "")
       .replace("LN-", "")
@@ -196,11 +275,11 @@ export default function LeadDetailView() {
       setNotesLoading(true);
       setNotesError(null);
       const { data } = await api.get(`/leads/${leadUuid}/notes/`);
-      const results = Array.isArray(data) ? data : (data.results ?? []);
+      const results: RawNote[] = Array.isArray(data) ? data : (data.results ?? []);
       setNotes(
         results
-          .filter((n: any) => !n.is_deleted)
-          .map((n: any) => ({
+          .filter((n) => !n.is_deleted)
+          .map((n) => ({
             id: n.id,
             uuid: n.id,
             title: n.title ?? "",
@@ -208,10 +287,12 @@ export default function LeadDetailView() {
             time: n.created_at ? formatNoteTime(n.created_at) : "",
           })),
       );
-    } catch (err: any) {
-      setNotesError(
-        err?.response?.data?.detail || err?.message || "Failed to load notes",
-      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to load notes";
+      setNotesError(message);
     } finally {
       setNotesLoading(false);
     }
@@ -240,22 +321,25 @@ export default function LeadDetailView() {
         is_deleted: false,
         ...(userId !== null && { created_by: userId }),
       });
+      const createdNote = created as RawNote;
       setNotes((prev) => [
         ...prev,
         {
-          id: created.id,
-          uuid: created.id,
-          title: created.title ?? newNoteTitle,
-          content: created.note ?? newNoteContent,
-          time: created.created_at ? formatNoteTime(created.created_at) : "",
+          id: createdNote.id,
+          uuid: createdNote.id,
+          title: createdNote.title ?? newNoteTitle,
+          content: createdNote.note ?? newNoteContent,
+          time: createdNote.created_at ? formatNoteTime(createdNote.created_at) : "",
         },
       ]);
       setNewNoteTitle("");
       setNewNoteContent("");
-    } catch (err: any) {
-      setNotesError(
-        err?.response?.data?.detail || err?.message || "Failed to save note",
-      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to save note";
+      setNotesError(message);
     } finally {
       setNoteSubmitting(false);
     }
@@ -280,33 +364,29 @@ export default function LeadDetailView() {
       setEditSubmitting(true);
       setNotesError(null);
       const userId = getCurrentUserId();
-      const { data: updated } = await api.put(
-        `/leads/notes/${noteId}/update/`,
-        {
-          title: editTitle.trim(),
-          note: editContent.trim(),
-          lead: decodeURIComponent(id || ""),
-          ...(userId !== null && { created_by: userId }),
-        },
-      );
+      const { data: updated } = await api.put(`/leads/notes/${noteId}/update/`, {
+        title: editTitle.trim(),
+        note: editContent.trim(),
+        lead: decodeURIComponent(id || ""),
+        ...(userId !== null && { created_by: userId }),
+      });
+      const updatedNote = updated as RawNote;
       setNotes((prev) =>
         prev.map((n) =>
           n.id === noteId
-            ? {
-                ...n,
-                title: updated.title ?? editTitle,
-                content: updated.note ?? editContent,
-              }
+            ? { ...n, title: updatedNote.title ?? editTitle, content: updatedNote.note ?? editContent }
             : n,
         ),
       );
       setEditingNoteId(null);
       setEditTitle("");
       setEditContent("");
-    } catch (err: any) {
-      setNotesError(
-        err?.response?.data?.detail || err?.message || "Failed to update note",
-      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to update note";
+      setNotesError(message);
     } finally {
       setEditSubmitting(false);
     }
@@ -317,10 +397,12 @@ export default function LeadDetailView() {
       await api.delete(`/leads/notes/${noteId}/delete/`);
       setNotes((prev) => prev.filter((n) => n.id !== noteId));
       setDeleteNoteDialog(null);
-    } catch (err: any) {
-      setNotesError(
-        err?.response?.data?.detail || err?.message || "Failed to delete note",
-      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to delete note";
+      setNotesError(message);
     }
   };
 
@@ -328,10 +410,8 @@ export default function LeadDetailView() {
   const handleAddNextAction = async () => {
     if (!actionType.trim() || !actionDescription.trim()) return;
     if (!lead) return;
-
     try {
       setActionSubmitting(true);
-
       const leadUuid = decodeURIComponent(id || "");
       await api.put(`/leads/${leadUuid}/update/`, {
         clinic_id: lead.clinic_id,
@@ -349,22 +429,18 @@ export default function LeadDetailView() {
         next_action_status: actionStatus,
         next_action_description: actionDescription.trim(),
       });
-
-      console.log("✅ Next action saved:", actionType, actionStatus);
-
       setOpenAddActionDialog(false);
       setActionType("");
       setActionStatus("pending");
       setActionDescription("");
       setActionError(null);
-
-      dispatch(fetchLeads() as any);
-    } catch (err: any) {
-      console.error("❌ Failed to add action:", err);
+      dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string; non_field_errors?: string[] } }; message?: string };
       const detail =
-        err?.response?.data?.detail ||
-        err?.response?.data?.non_field_errors?.[0] ||
-        JSON.stringify(err?.response?.data) ||
+        axiosErr?.response?.data?.detail ||
+        axiosErr?.response?.data?.non_field_errors?.[0] ||
+        axiosErr?.message ||
         "Failed to save action. Please try again.";
       setActionError(String(detail));
     } finally {
@@ -372,11 +448,11 @@ export default function LeadDetailView() {
     }
   };
 
-  // ====================== Handlers ======================
   const handleOpenPopup = () => {
     setConvertError(null);
     setOpenConvertPopup(true);
   };
+
   const handleClosePopup = () => {
     setOpenConvertPopup(false);
     setConvertError(null);
@@ -388,24 +464,23 @@ export default function LeadDetailView() {
     try {
       setConvertLoading(true);
       setConvertError(null);
-
       const leadUuid = decodeURIComponent(id || "");
+      const result = await dispatch(
+        convertLead(leadUuid) as unknown as Parameters<typeof dispatch>[0],
+      ) as { error?: unknown; payload?: unknown };
 
-      // Dispatch convertLead thunk — calls PUT API then patches Redux state
-      // directly with status: "Converted" so table shows green chip instantly
-      const result = await dispatch(convertLead(leadUuid) as any);
-
-      if (result?.error || convertLead.rejected.match(result)) {
-        const msg = result?.payload || result?.error?.message || "Failed to convert lead.";
+      if (convertLead.rejected.match(result as Parameters<typeof convertLead.rejected.match>[0])) {
+        const msg =
+          (result as { payload?: string; error?: { message?: string } })?.payload ||
+          (result as { error?: { message?: string } })?.error?.message ||
+          "Failed to convert lead.";
         setConvertError(String(msg));
         return;
       }
-
-      console.log("✅ Lead converted successfully");
       setOpenConvertPopup(false);
-    } catch (err: any) {
-      console.error("❌ Failed to convert lead:", err);
-      setConvertError("Failed to convert lead. Please try again.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to convert lead. Please try again.";
+      setConvertError(message);
     } finally {
       setConvertLoading(false);
     }
@@ -419,22 +494,21 @@ export default function LeadDetailView() {
     navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, { state: { lead } });
   };
 
-  // ====================== Loading State ======================
+  const closeActionDialog = () => {
+    setOpenAddActionDialog(false);
+    setActionType("");
+    setActionStatus("pending");
+    setActionDescription("");
+    setActionError(null);
+  };
+
+  // ====================== Loading / Error / Not Found ======================
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
-          <Typography color="text.secondary">
-            Loading lead details...
-          </Typography>
+          <Typography color="text.secondary">Loading lead details...</Typography>
         </Stack>
       </Box>
     );
@@ -448,13 +522,8 @@ export default function LeadDetailView() {
           <Typography variant="body2">{error}</Typography>
           <Typography
             variant="body2"
-            sx={{
-              mt: 1,
-              color: "primary.main",
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
-            onClick={() => dispatch(fetchLeads() as any)}
+            sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
+            onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}
           >
             Try again
           </Typography>
@@ -468,17 +537,10 @@ export default function LeadDetailView() {
       <Box p={3}>
         <Alert severity="warning">
           <Typography fontWeight={600}>Lead not found</Typography>
-          <Typography variant="body2">
-            The lead you're looking for doesn't exist or may have been deleted.
-          </Typography>
+          <Typography variant="body2">The lead you're looking for doesn't exist or may have been deleted.</Typography>
           <Typography
             variant="body2"
-            sx={{
-              mt: 1,
-              color: "primary.main",
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
+            sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
             onClick={() => navigate("/leads")}
           >
             Go back to Leads Hub
@@ -488,11 +550,10 @@ export default function LeadDetailView() {
     );
   }
 
-  // ====================== Extract ALL Data from Redux Lead Object ======================
+  // ====================== Extract Data ======================
   const leadName = lead.full_name || lead.name || "Unknown";
   const leadInitials = lead.initials || leadName.charAt(0).toUpperCase();
-  const leadPhone =
-    lead.phone || lead.contact_number || lead.contact_no || "N/A";
+  const leadPhone = lead.phone || lead.contact_number || lead.contact_no || "N/A";
   const leadEmail = lead.email || "N/A";
   const leadLocation = lead.location || "N/A";
   const leadGender = lead.gender || "N/A";
@@ -503,9 +564,7 @@ export default function LeadDetailView() {
   const leadAssigned = lead.assigned_to_name || lead.assigned || "Unassigned";
   const leadStatus = lead.status || lead.lead_status || "New";
   const leadQuality = lead.quality || "N/A";
-  const leadScore = String(lead.score || 0).includes("%")
-    ? lead.score
-    : `${lead.score || 0}%`;
+  const leadScore = String(lead.score || 0).includes("%") ? lead.score : `${lead.score || 0}%`;
   const leadSource = lead.source || "Unknown";
   const leadSubSource = lead.sub_source || "N/A";
   const leadCampaignName = lead.campaign_name || "N/A";
@@ -514,8 +573,7 @@ export default function LeadDetailView() {
   const partnerName = lead.partner_name || lead.partner_full_name || "N/A";
   const partnerAge = lead.partner_age || "N/A";
   const partnerGender = lead.partner_gender || "N/A";
-  const appointmentDepartment =
-    lead.department || lead.department_name || "N/A";
+  const appointmentDepartment = lead.department || lead.department_name || "N/A";
   const appointmentPersonnel = lead.personnel || lead.assigned_to_name || "N/A";
   const appointmentDate = lead.appointment_date
     ? new Date(lead.appointment_date).toLocaleDateString("en-GB")
@@ -523,23 +581,18 @@ export default function LeadDetailView() {
   const appointmentSlot = lead.slot || lead.appointment_slot || "N/A";
   const appointmentRemark = lead.remark || lead.appointment_remark || "N/A";
   const treatmentInterest = lead.treatment_interest
-    ? lead.treatment_interest.split(",").map((t: string) => t.trim())
+    ? lead.treatment_interest.split(",").map((t) => t.trim())
     : [];
   const leadCreatedAt = lead.created_at
     ? new Date(lead.created_at).toLocaleString("en-IN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
       })
     : "N/A";
   const nextActionType = lead.next_action_type || lead.task || "N/A";
-  const nextActionStatus =
-    lead.next_action_status || lead.taskStatus || "Pending";
+  const nextActionStatus = lead.next_action_status || lead.taskStatus || "Pending";
   const nextActionDescription = lead.next_action_description || "N/A";
 
-  // ── Derive status for dialog logic ──
   const currentStatus = (lead?.status || lead?.lead_status || "new").toLowerCase();
   const isAppointment = currentStatus === "appointment";
   const isFollowUp =
@@ -547,12 +600,7 @@ export default function LeadDetailView() {
     currentStatus === "follow-up" ||
     currentStatus === "follow-ups";
 
-  // ── Check if already converted ──
-  // Backend lead_status only allows "new"|"contacted",
-  // so we track converted state via localStorage using the lead UUID
-  const convertedLeadIds: string[] = JSON.parse(
-    localStorage.getItem("converted_lead_ids") || "[]"
-  );
+  const convertedLeadIds: string[] = JSON.parse(localStorage.getItem("converted_lead_ids") || "[]");
   const leadUuidRaw = decodeURIComponent(id || "");
   const isConverted =
     convertedLeadIds.includes(leadUuidRaw) ||
@@ -566,121 +614,48 @@ export default function LeadDetailView() {
         { value: "Appointment", label: "Appointment" },
       ];
 
-  const closeActionDialog = () => {
-    setOpenAddActionDialog(false);
-    setActionType("");
-    setActionStatus("pending");
-    setActionDescription("");
-    setActionError(null);
-  };
-
   return (
     <Box p={1} minHeight="100vh">
-      {/* BREADCRUMBS */}
       <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }} />
 
       {/* TOP SUMMARY CARD */}
-      <Card
-        elevation={0}
-        sx={{
-          position: "relative",
-          p: 5,
-          mb: 3,
-          borderRadius: "16px",
-          backgroundColor: "#FAFAFA",
-          overflow: "hidden",
-          boxShadow: "none",
-        }}
-      >
+      <Card elevation={0} sx={{ position: "relative", p: 5, mb: 3, borderRadius: "16px", backgroundColor: "#FAFAFA", overflow: "hidden", boxShadow: "none" }}>
         <Box
           component="img"
           src={Lead_Subtract}
           alt=""
-          sx={{
-            position: "absolute",
-            top: "6px",
-            left: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "fill",
-            zIndex: 0,
-            pointerEvents: "none",
-          }}
+          sx={{ position: "absolute", top: "6px", left: 0, width: "100%", height: "100%", objectFit: "fill", zIndex: 0, pointerEvents: "none" }}
         />
-
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ position: "relative", width: "100%", zIndex: 1 }}
-        >
-          <Stack
-            direction="row"
-            alignItems="flex-end"
-            justifyContent="space-between"
-            sx={{ width: "100%", pl: 2, pr: 1 }}
-          >
-            <Avatar
-              sx={{
-                bgcolor: "#EEF2FF",
-                color: "#6366F1",
-                width: 45,
-                height: 45,
-                fontSize: "30px",
-                fontWeight: 700,
-                transform: "translateY(-35px)",
-                ml: -2,
-                flexShrink: 0,
-              }}
-            >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ position: "relative", width: "100%", zIndex: 1 }}>
+          <Stack direction="row" alignItems="flex-end" justifyContent="space-between" sx={{ width: "100%", pl: 2, pr: 1 }}>
+            <Avatar sx={{ bgcolor: "#EEF2FF", color: "#6366F1", width: 45, height: 45, fontSize: "30px", fontWeight: 700, transform: "translateY(-35px)", ml: -2, flexShrink: 0 }}>
               {leadInitials}
             </Avatar>
-
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Lead Name
-              </Typography>
-              <Typography fontWeight={700} variant="body1" fontSize="12px">
-                {leadName}
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Lead Name</Typography>
+              <Typography fontWeight={700} variant="body1" fontSize="12px">{leadName}</Typography>
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Lead ID
-              </Typography>
-              <Typography fontWeight={600} variant="body1" fontSize="12px">
-                {leadDisplayId}
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Lead ID</Typography>
+              <Typography fontWeight={600} variant="body1" fontSize="12px">{leadDisplayId}</Typography>
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Source
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Source</Typography>
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 <Box sx={{ width: 16, height: 16, bgcolor: "#FFB800", borderRadius: "50%" }} />
-                <Typography fontWeight={600} variant="body1" fontSize="12px">
-                  {leadSource}
-                </Typography>
+                <Typography fontWeight={600} variant="body1" fontSize="12px">{leadSource}</Typography>
               </Stack>
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Lead Status
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Lead Status</Typography>
               <Chip
                 label={isConverted ? "Converted" : leadStatus}
                 size="small"
-                sx={
-                  isConverted
-                    ? pillChipSx("#16A34A", "rgba(22,163,74,0.10)")
-                    : pillChipSx("#5B8FF9", "rgba(91,143,249,0.10)")
-                }
+                sx={isConverted ? pillChipSx("#16A34A", "rgba(22,163,74,0.10)") : pillChipSx("#5B8FF9", "rgba(91,143,249,0.10)")}
               />
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Lead Quality
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Lead Quality</Typography>
               <Chip
                 label={leadQuality}
                 size="small"
@@ -688,40 +663,22 @@ export default function LeadDetailView() {
                   leadQuality === "Hot"
                     ? pillChipSx("#FF4D4F", "rgba(255,77,79,0.10)")
                     : leadQuality === "Warm"
-                      ? pillChipSx("#FFC53D", "rgba(255,197,61,0.10)")
-                      : pillChipSx("#52C41A", "rgba(82,196,26,0.10)")
+                    ? pillChipSx("#FFC53D", "rgba(255,197,61,0.10)")
+                    : pillChipSx("#52C41A", "rgba(82,196,26,0.10)")
                 }
               />
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                AI Lead Score
-              </Typography>
-              <Typography fontWeight={700} color="#EC4899" fontSize="12px">
-                {leadScore}
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">AI Lead Score</Typography>
+              <Typography fontWeight={700} color="#EC4899" fontSize="12px">{leadScore}</Typography>
             </Stack>
           </Stack>
         </Stack>
       </Card>
 
       {/* TABS & ACTION BUTTONS */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      >
-        <Box
-          sx={{
-            bgcolor: "#FAFAFA",
-            borderRadius: "10px",
-            p: 0.8,
-            width: "fit-content",
-            display: "inline-flex",
-            alignItems: "center",
-          }}
-        >
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box sx={{ bgcolor: "#FAFAFA", borderRadius: "10px", p: 0.8, width: "fit-content", display: "inline-flex", alignItems: "center" }}>
           <Stack direction="row" spacing={1}>
             {["Patient Info", "History", "Next Action"].map((tab) => {
               const selected = activeTab === tab;
@@ -730,46 +687,25 @@ export default function LeadDetailView() {
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   sx={{
-                    cursor: "pointer",
-                    px: 2.5,
-                    py: 1,
-                    borderRadius: "8px",
+                    cursor: "pointer", px: 2.5, py: 1, borderRadius: "8px",
                     bgcolor: selected ? "#FFFFFF" : "transparent",
                     color: selected ? "#E17E61" : "#232323",
                     boxShadow: selected ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
+                    transition: "all 0.2s ease", display: "flex", alignItems: "center",
                   }}
                 >
-                  <Typography fontWeight={600} fontSize="14px" color="inherit">
-                    {tab}
-                  </Typography>
+                  <Typography fontWeight={600} fontSize="14px" color="inherit">{tab}</Typography>
                 </Box>
               );
             })}
           </Stack>
         </Box>
-
         <Stack direction="row" spacing={2}>
           <Button
             variant="outlined"
             startIcon={<EditOutlinedIcon />}
             onClick={handleEdit}
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              bgcolor: "#f3f3f3",
-              color: "#505050",
-              border: "none",
-              boxShadow: "none",
-              "&:hover": {
-                bgcolor: "#f3f3f3",
-                color: "#232323",
-                border: "none",
-                boxShadow: "none",
-              },
-            }}
+            sx={{ borderRadius: "8px", textTransform: "none", bgcolor: "#f3f3f3", color: "#505050", border: "none", boxShadow: "none", "&:hover": { bgcolor: "#f3f3f3", color: "#232323", border: "none", boxShadow: "none" } }}
           >
             Edit
           </Button>
@@ -779,21 +715,12 @@ export default function LeadDetailView() {
             startIcon={<SwapHorizIcon />}
             disabled={isConverted}
             sx={{
-              borderRadius: "8px",
-              textTransform: "none",
+              borderRadius: "8px", textTransform: "none",
               bgcolor: isConverted ? "#E2E8F0" : "#505050",
               color: isConverted ? "#94A3B8" : "#FFFFFF",
-              px: 2,
-              boxShadow: "none",
-              "&:hover": {
-                bgcolor: isConverted ? "#E2E8F0" : "#232323",
-                color: isConverted ? "#94A3B8" : "#FFFFFF",
-                boxShadow: "none",
-              },
-              "&:disabled": {
-                bgcolor: "#E2E8F0",
-                color: "#94A3B8",
-              },
+              px: 2, boxShadow: "none",
+              "&:hover": { bgcolor: isConverted ? "#E2E8F0" : "#232323", color: isConverted ? "#94A3B8" : "#FFFFFF", boxShadow: "none" },
+              "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
             }}
           >
             {isConverted ? "Converted" : "Convert Lead"}
@@ -805,29 +732,10 @@ export default function LeadDetailView() {
       {activeTab === "Patient Info" && (
         <Stack direction="row" spacing={3}>
           <Box sx={{ flex: 2 }}>
-            <Card
-              sx={{
-                p: 3,
-                borderRadius: "16px",
-                mb: 1,
-                bgcolor: "#fcfcfc",
-                boxShadow: "none",
-                border: "none",
-                mt: -1,
-              }}
-            >
-              <Typography variant="subtitle1" fontWeight={600} mb={3}>
-                Basic Information
-              </Typography>
+            <Card sx={{ p: 3, borderRadius: "16px", mb: 1, bgcolor: "#fcfcfc", boxShadow: "none", border: "none", mt: -1 }}>
+              <Typography variant="subtitle1" fontWeight={600} mb={3}>Basic Information</Typography>
               <Divider sx={{ mb: 1, mt: -2, mx: -3 }} />
-              <Typography
-                variant="caption"
-                fontWeight={500}
-                color="#232323"
-                display="block"
-                mb={2}
-                sx={{ textTransform: "uppercase", letterSpacing: "1px" }}
-              >
+              <Typography variant="caption" fontWeight={500} color="#232323" display="block" mb={2} sx={{ textTransform: "uppercase", letterSpacing: "1px" }}>
                 Lead Information
               </Typography>
               <Stack spacing={3}>
@@ -849,14 +757,7 @@ export default function LeadDetailView() {
                 <Info label="CREATED DATE & TIME" value={leadCreatedAt} />
               </Stack>
               <Divider sx={{ mb: 2, mt: 2, mx: -3 }} />
-              <Typography
-                variant="caption"
-                fontWeight={500}
-                color="#232323"
-                display="block"
-                mb={2}
-                sx={{ textTransform: "uppercase", letterSpacing: "1px" }}
-              >
+              <Typography variant="caption" fontWeight={500} color="#232323" display="block" mb={2} sx={{ textTransform: "uppercase", letterSpacing: "1px" }}>
                 Partner Information
               </Typography>
               <Stack direction="row" spacing={6}>
@@ -865,14 +766,7 @@ export default function LeadDetailView() {
                 <Info label="GENDER" value={partnerGender} />
               </Stack>
               <Divider sx={{ mb: 2, mt: 2, mx: -3 }} />
-              <Typography
-                variant="caption"
-                fontWeight={500}
-                color="#232323"
-                display="block"
-                mb={2}
-                sx={{ textTransform: "uppercase", letterSpacing: "1px" }}
-              >
+              <Typography variant="caption" fontWeight={500} color="#232323" display="block" mb={2} sx={{ textTransform: "uppercase", letterSpacing: "1px" }}>
                 Source & Campaign Details
               </Typography>
               <Stack direction="row" spacing={6}>
@@ -883,124 +777,53 @@ export default function LeadDetailView() {
             </Card>
           </Box>
           <Stack spacing={3} sx={{ flex: 1 }}>
-            <Card
-              sx={{
-                p: 3,
-                bgcolor: "#fcfffa",
-                borderRadius: "10px",
-                border: "none",
-                mt: -1,
-              }}
-            >
-              <Typography color="#16A34A" fontWeight={700} variant="subtitle2" mb={2}>
-                Appointment
-              </Typography>
+            <Card sx={{ p: 3, bgcolor: "#fcfffa", borderRadius: "10px", border: "none", mt: -1 }}>
+              <Typography color="#16A34A" fontWeight={700} variant="subtitle2" mb={2}>Appointment</Typography>
               <Divider sx={{ mb: 1, mt: 1, mx: -3 }} />
               <Stack direction="row" mb={2}>
                 <Box sx={{ flex: 1 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    DEPARTMENT
-                  </Typography>
-                  <Typography fontWeight={600} variant="body2">
-                    {appointmentDepartment}
-                  </Typography>
+                  <Typography variant="caption" color="text.secondary">DEPARTMENT</Typography>
+                  <Typography fontWeight={600} variant="body2">{appointmentDepartment}</Typography>
                 </Box>
                 <Box sx={{ flex: 1 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    PERSONNEL
-                  </Typography>
-                  <Typography fontWeight={600} variant="body2">
-                    {appointmentPersonnel}
-                  </Typography>
+                  <Typography variant="caption" color="text.secondary">PERSONNEL</Typography>
+                  <Typography fontWeight={600} variant="body2">{appointmentPersonnel}</Typography>
                 </Box>
               </Stack>
               <Stack direction="row" mb={2}>
                 <Box sx={{ flex: 1 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    DATE
-                  </Typography>
-                  <Typography fontWeight={600} variant="body2">
-                    {appointmentDate}
-                  </Typography>
+                  <Typography variant="caption" color="text.secondary">DATE</Typography>
+                  <Typography fontWeight={600} variant="body2">{appointmentDate}</Typography>
                 </Box>
                 <Box sx={{ flex: 1 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    SLOT
-                  </Typography>
-                  <Typography fontWeight={600} variant="body2">
-                    {appointmentSlot}
-                  </Typography>
+                  <Typography variant="caption" color="text.secondary">SLOT</Typography>
+                  <Typography fontWeight={600} variant="body2">{appointmentSlot}</Typography>
                 </Box>
               </Stack>
-              <Typography variant="caption" color="text.secondary">
-                REMARK
-              </Typography>
-              <Typography fontWeight={600} variant="body2">
-                {appointmentRemark}
-              </Typography>
+              <Typography variant="caption" color="text.secondary">REMARK</Typography>
+              <Typography fontWeight={600} variant="body2">{appointmentRemark}</Typography>
             </Card>
 
-            <Card
-              sx={{
-                p: 3,
-                borderRadius: "10px",
-                backgroundColor: "#fcfcfc",
-                border: "none",
-                boxShadow: "none",
-              }}
-            >
-              <Typography fontWeight={700} variant="subtitle2" mb={2}>
-                Treatment Interest
-              </Typography>
+            <Card sx={{ p: 3, borderRadius: "10px", backgroundColor: "#fcfcfc", border: "none", boxShadow: "none" }}>
+              <Typography fontWeight={700} variant="subtitle2" mb={2}>Treatment Interest</Typography>
               <Divider sx={{ mb: 2, mx: -3 }} />
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 {treatmentInterest.length > 0 ? (
-                  treatmentInterest.map((treatment: string, idx: number) => (
-                    <Chip
-                      key={idx}
-                      label={treatment}
-                      size="small"
-                      sx={{
-                        bgcolor: "#F5F3FF",
-                        color: "#7C3AED",
-                        fontWeight: 500,
-                        mb: 1,
-                      }}
-                    />
+                  treatmentInterest.map((treatment, idx) => (
+                    <Chip key={idx} label={treatment} size="small" sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", fontWeight: 500, mb: 1 }} />
                   ))
                 ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    No treatments selected
-                  </Typography>
+                  <Typography variant="body2" color="text.secondary">No treatments selected</Typography>
                 )}
               </Stack>
             </Card>
 
-            <Card
-              sx={{
-                p: 2,
-                borderRadius: "10px",
-                mb: 2,
-                backgroundColor: "#fcfcfc",
-                border: "none",
-                boxShadow: "none",
-              }}
-            >
-              <Typography fontWeight={700} variant="subtitle2" mb={2}>
-                Documents
-              </Typography>
+            <Card sx={{ p: 2, borderRadius: "10px", mb: 2, backgroundColor: "#fcfcfc", border: "none", boxShadow: "none" }}>
+              <Typography fontWeight={700} variant="subtitle2" mb={2}>Documents</Typography>
               <Divider sx={{ mb: 2, mx: -3 }} />
               <Stack spacing={2}>
-                <DocumentRow
-                  sx={{ backgroundColor: "#FFFFFF", borderRadius: "10px", p: 2 }}
-                  name="ivf_report_2024.pdf"
-                  size="1.24 MB"
-                />
-                <DocumentRow
-                  sx={{ backgroundColor: "#FFFFFF", borderRadius: "10px", p: 2 }}
-                  name="body_checkup_2024.doc"
-                  size="2.03 MB"
-                />
+                <DocumentRow sx={{ backgroundColor: "#FFFFFF", borderRadius: "10px", p: 2 }} name="ivf_report_2024.pdf" size="1.24 MB" />
+                <DocumentRow sx={{ backgroundColor: "#FFFFFF", borderRadius: "10px", p: 2 }} name="body_checkup_2024.doc" size="2.03 MB" />
               </Stack>
             </Card>
           </Stack>
@@ -1011,75 +834,27 @@ export default function LeadDetailView() {
       {activeTab === "History" && (
         <Stack direction="row" spacing={3}>
           <Card sx={{ flex: 1, p: 3, borderRadius: "16px" }}>
-            <Typography variant="subtitle1" fontWeight={700} mb={3}>
-              Activity Timeline
-            </Typography>
+            <Typography variant="subtitle1" fontWeight={700} mb={3}>Activity Timeline</Typography>
             <Stack spacing={0}>
-              <TimelineItem
-                icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: "#6366F1" }} />}
-                title="Appointment Booked - Confirmation sent (SMS)"
-                time={leadCreatedAt}
-              />
-              <TimelineItem
-                icon={<CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />}
-                title="Outgoing call attempted - Connected"
-                time={leadCreatedAt}
-                onClick={() => setHistoryView("call")}
-                isClickable
-              />
-              <TimelineItem
-                icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />}
-                title="Patient shared contact number and email"
-                time={leadCreatedAt}
-                onClick={() => setHistoryView("email")}
-                isClickable
-              />
-              <TimelineItem
-                icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: "#3B82F6" }} />}
-                title="Sent an Welcome Email"
-                time={leadCreatedAt}
-                onClick={() => setHistoryView("email")}
-                isClickable
-              />
-              <TimelineItem
-                isAvatar
-                avatarInitial={leadAssigned.charAt(0)}
-                title={`Assigned to ${leadAssigned}`}
-                time={leadCreatedAt}
-              />
-              <TimelineItem
-                icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />}
-                title="Lead arrived from Website Chatbot"
-                time={leadCreatedAt}
-                onClick={() => setHistoryView("chatbot")}
-                isClickable
-                isLast
-              />
+              <TimelineItem icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: "#6366F1" }} />} title="Appointment Booked - Confirmation sent (SMS)" time={leadCreatedAt} />
+              <TimelineItem icon={<CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />} title="Outgoing call attempted - Connected" time={leadCreatedAt} onClick={() => setHistoryView("call")} isClickable />
+              <TimelineItem icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />} title="Patient shared contact number and email" time={leadCreatedAt} onClick={() => setHistoryView("email")} isClickable />
+              <TimelineItem icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: "#3B82F6" }} />} title="Sent an Welcome Email" time={leadCreatedAt} onClick={() => setHistoryView("email")} isClickable />
+              <TimelineItem isAvatar avatarInitial={leadAssigned.charAt(0)} title={`Assigned to ${leadAssigned}`} time={leadCreatedAt} />
+              <TimelineItem icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />} title="Lead arrived from Website Chatbot" time={leadCreatedAt} onClick={() => setHistoryView("chatbot")} isClickable isLast />
             </Stack>
           </Card>
-          <Card
-            sx={{
-              flex: 2,
-              borderRadius: "16px",
-              display: "flex",
-              flexDirection: "column",
-              maxHeight: "600px",
-            }}
-          >
+          <Card sx={{ flex: 2, borderRadius: "16px", display: "flex", flexDirection: "column", maxHeight: "600px" }}>
             {historyView === "chatbot" && (
               <>
                 <Box p={2} borderBottom="1px solid #E2E8F0">
-                  <Typography variant="subtitle1" fontWeight={700}>
-                    Chatbot
-                  </Typography>
+                  <Typography variant="subtitle1" fontWeight={700}>Chatbot</Typography>
                 </Box>
                 <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "#F8FAFC" }}>
                   <Stack spacing={3}>
                     <Typography variant="caption" align="center" color="text.secondary" display="block">
                       {lead.created_at
-                        ? new Date(lead.created_at)
-                            .toLocaleDateString("en-US", { weekday: "short", day: "2-digit", month: "short" })
-                            .toUpperCase()
+                        ? new Date(lead.created_at).toLocaleDateString("en-US", { weekday: "short", day: "2-digit", month: "short" }).toUpperCase()
                         : "TODAY"}
                     </Typography>
                     <ChatBubble side="left" text="Hello! How can I help you today?" time="9:41 AM" />
@@ -1097,9 +872,7 @@ export default function LeadDetailView() {
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
-                          <IconButton color="primary">
-                            <SendIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
+                          <IconButton color="primary"><SendIcon sx={{ fontSize: 18 }} /></IconButton>
                         </InputAdornment>
                       ),
                     }}
@@ -1111,9 +884,7 @@ export default function LeadDetailView() {
               <>
                 <Box p={2} borderBottom="1px solid #E2E8F0">
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      Call Transcript
-                    </Typography>
+                    <Typography variant="subtitle1" fontWeight={700}>Call Transcript</Typography>
                     <CallButton lead={lead} />
                   </Stack>
                 </Box>
@@ -1122,9 +893,7 @@ export default function LeadDetailView() {
                     <Typography variant="caption" align="center" color="text.secondary" display="block">
                       CALL -{" "}
                       {lead.created_at
-                        ? new Date(lead.created_at)
-                            .toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
-                            .toUpperCase()
+                        ? new Date(lead.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase()
                         : "TODAY"}
                     </Typography>
                     <CallMessage speaker="Mike" time="0:03" text="Good morning! You've reached Bloom Fertility Center. This is Mike. How can I help you today?" />
@@ -1139,13 +908,8 @@ export default function LeadDetailView() {
               <>
                 <Box p={2} borderBottom="1px solid #E2E8F0">
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      Email History
-                    </Typography>
-                    <IconButton
-                      onClick={() => (window.location.href = `mailto:${leadEmail}`)}
-                      sx={{ bgcolor: "#EFF6FF", "&:hover": { bgcolor: "#DBEAFE" } }}
-                    >
+                    <Typography variant="subtitle1" fontWeight={700}>Email History</Typography>
+                    <IconButton onClick={() => (window.location.href = `mailto:${leadEmail}`)} sx={{ bgcolor: "#EFF6FF", "&:hover": { bgcolor: "#DBEAFE" } }}>
                       <EmailOutlinedIcon sx={{ color: "#3B82F6" }} />
                     </IconButton>
                   </Stack>
@@ -1155,9 +919,7 @@ export default function LeadDetailView() {
                     <Card sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                       <Stack direction="row" justifyContent="space-between" mb={2}>
                         <Stack direction="row" spacing={1.5} alignItems="center">
-                          <Avatar sx={{ width: 40, height: 40, bgcolor: "#EEF2FF", color: "#6366F1" }}>
-                            {leadInitials}
-                          </Avatar>
+                          <Avatar sx={{ width: 40, height: 40, bgcolor: "#EEF2FF", color: "#6366F1" }}>{leadInitials}</Avatar>
                           <Box>
                             <Typography variant="body2" fontWeight={700}>{leadName}</Typography>
                             <Typography variant="caption" color="text.secondary">{leadEmail}</Typography>
@@ -1166,14 +928,10 @@ export default function LeadDetailView() {
                         <Stack direction="row" spacing={1} alignItems="center">
                           <Typography variant="caption" color="text.secondary">
                             {lead.created_at
-                              ? new Date(lead.created_at).toLocaleDateString("en-US", {
-                                  weekday: "short", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit",
-                                })
+                              ? new Date(lead.created_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" })
                               : "Today"}
                           </Typography>
-                          <IconButton size="small">
-                            <ShortcutIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
+                          <IconButton size="small"><ShortcutIcon sx={{ fontSize: 16 }} /></IconButton>
                         </Stack>
                       </Stack>
                       <Typography variant="body2" color="text.primary" mb={1}>Hello,</Typography>
@@ -1183,9 +941,7 @@ export default function LeadDetailView() {
                       <Typography variant="body2" color="text.secondary" mb={1}>
                         Could you please let me know the consultation process and available appointment slots this week?
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" mb={2}>
-                        Looking forward to your response.
-                      </Typography>
+                      <Typography variant="body2" color="text.secondary" mb={2}>Looking forward to your response.</Typography>
                       <Typography variant="body2" color="text.secondary">Regards,</Typography>
                       <Typography variant="body2" color="text.secondary">{leadName}</Typography>
                       <Typography variant="body2" color="text.secondary">{leadPhone}</Typography>
@@ -1218,42 +974,19 @@ export default function LeadDetailView() {
       {/* ── NEXT ACTION TAB ── */}
       {activeTab === "Next Action" && (
         <Stack direction="row" spacing={3} alignItems="flex-start">
-          {/* LEFT: Actions Panel */}
           <Box sx={{ width: 320, flexShrink: 0 }}>
             <Card sx={{ borderRadius: "16px", overflow: "hidden" }}>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-                sx={{ px: 2.5, py: 2, borderBottom: "1px solid #F1F5F9" }}
-              >
-                <Typography variant="subtitle2" fontWeight={700}>
-                  Next Action
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => setOpenAddActionDialog(true)}
-                >
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 2.5, py: 2, borderBottom: "1px solid #F1F5F9" }}>
+                <Typography variant="subtitle2" fontWeight={700}>Next Action</Typography>
+                <IconButton size="small" onClick={() => setOpenAddActionDialog(true)}>
                   <AddCircleOutlineIcon fontSize="small" />
                 </IconButton>
               </Stack>
-
               <Box sx={{ p: 2 }}>
-                {/* AI Suggestion */}
-                <Box
-                  sx={{
-                    p: 2,
-                    bgcolor: "#EEF2FF",
-                    borderRadius: "12px",
-                    mb: 2,
-                    border: "1px solid #E0E7FF",
-                  }}
-                >
+                <Box sx={{ p: 2, bgcolor: "#EEF2FF", borderRadius: "12px", mb: 2, border: "1px solid #E0E7FF" }}>
                   <Stack direction="row" spacing={1} alignItems="center" mb={1}>
                     <AutoFixHighIcon sx={{ color: "#6366F1", fontSize: 16 }} />
-                    <Typography variant="caption" fontWeight={700} color="#6366F1">
-                      AI Suggestion
-                    </Typography>
+                    <Typography variant="caption" fontWeight={700} color="#6366F1">AI Suggestion</Typography>
                   </Stack>
                   <Typography variant="body2" fontWeight={600} mb={0.5}>
                     Book Appointment{" "}
@@ -1261,88 +994,38 @@ export default function LeadDetailView() {
                       | Lead confirmed interest via WhatsApp
                     </Typography>
                   </Typography>
-                  <Typography variant="caption" color="#6366F1" sx={{ cursor: "pointer", fontWeight: 600 }}>
-                    Apply suggestion
-                  </Typography>
+                  <Typography variant="caption" color="#6366F1" sx={{ cursor: "pointer", fontWeight: 600 }}>Apply suggestion</Typography>
                 </Box>
 
-                <Typography
-                  variant="caption"
-                  fontWeight={700}
-                  color="text.secondary"
-                  sx={{ textTransform: "uppercase", letterSpacing: "0.8px", display: "block", mb: 1.5 }}
-                >
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.8px", display: "block", mb: 1.5 }}>
                   Next Action
                 </Typography>
 
-                {/* Active action card */}
-                <Card
-                  variant="outlined"
-                  sx={{ p: 2, borderRadius: "12px", mb: 3, border: "1px solid #E2E8F0" }}
-                >
+                <Card variant="outlined" sx={{ p: 2, borderRadius: "12px", mb: 3, border: "1px solid #E2E8F0" }}>
                   <Stack direction="row" spacing={1.5} alignItems="flex-start">
                     <Box sx={{ p: 1, bgcolor: "#EFF6FF", borderRadius: "8px", mt: 0.25 }}>
                       <CallOutlinedIcon sx={{ color: "#3B82F6", fontSize: 20 }} />
                     </Box>
                     <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="body2" fontWeight={700} mb={1.5}>
-                        {nextActionType}
-                      </Typography>
+                      <Typography variant="body2" fontWeight={700} mb={1.5}>{nextActionType}</Typography>
                       <Stack direction="row" spacing={4} mb={1}>
                         <Box>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            fontWeight={600}
-                            sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}
-                          >
-                            DUE
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>DUE</Typography>
                           <Typography variant="body2" fontWeight={600}>Today</Typography>
                         </Box>
                         <Box>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            fontWeight={600}
-                            sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}
-                          >
-                            STATUS
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>STATUS</Typography>
                           <Box mt={0.25}>
-                            <Chip
-                              label={nextActionStatus}
-                              size="small"
-                              sx={{ bgcolor: "#EFF6FF", color: "#3B82F6", fontWeight: 600, borderRadius: "6px", height: 22, fontSize: "0.7rem" }}
-                            />
+                            <Chip label={nextActionStatus} size="small" sx={{ bgcolor: "#EFF6FF", color: "#3B82F6", fontWeight: 600, borderRadius: "6px", height: 22, fontSize: "0.7rem" }} />
                           </Box>
                         </Box>
                       </Stack>
                       <Box mb={2}>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          fontWeight={600}
-                          sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}
-                        >
-                          DESCRIPTION
-                        </Typography>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>DESCRIPTION</Typography>
                         <Typography variant="body2">{nextActionDescription}</Typography>
                       </Box>
                       <Stack direction="row" spacing={1}>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 14 }} />}
-                          sx={{
-                            textTransform: "none",
-                            borderRadius: "8px",
-                            borderColor: "#E2E8F0",
-                            color: "#475569",
-                            fontSize: "0.75rem",
-                            py: 0.5,
-                          }}
-                        >
+                        <Button variant="outlined" size="small" startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 14 }} />} sx={{ textTransform: "none", borderRadius: "8px", borderColor: "#E2E8F0", color: "#475569", fontSize: "0.75rem", py: 0.5 }}>
                           Mark Done
                         </Button>
                         <CallButton lead={lead} />
@@ -1351,54 +1034,26 @@ export default function LeadDetailView() {
                   </Stack>
                 </Card>
 
-                <Typography
-                  variant="caption"
-                  fontWeight={700}
-                  color="text.secondary"
-                  sx={{ textTransform: "uppercase", letterSpacing: "0.8px", display: "block", mb: 1.5 }}
-                >
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.8px", display: "block", mb: 1.5 }}>
                   Previous Actions
                 </Typography>
 
-                <Card
-                  variant="outlined"
-                  sx={{ p: 2, borderRadius: "12px", border: "1px solid #E2E8F0" }}
-                >
+                <Card variant="outlined" sx={{ p: 2, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                   <Stack direction="row" spacing={1.5} alignItems="flex-start">
                     <Box sx={{ p: 1, bgcolor: "#F0FDF4", borderRadius: "8px", mt: 0.25 }}>
                       <CallOutlinedIcon sx={{ color: "#10B981", fontSize: 20 }} />
                     </Box>
                     <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="body2" fontWeight={700} mb={1.5}>
-                        Follow-Up Call
-                      </Typography>
+                      <Typography variant="body2" fontWeight={700} mb={1.5}>Follow-Up Call</Typography>
                       <Stack direction="row" spacing={4} mb={1}>
                         <Box>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            fontWeight={600}
-                            sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}
-                          >
-                            DUE
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>DUE</Typography>
                           <Typography variant="body2" fontWeight={600}>16/01/2026</Typography>
                         </Box>
                         <Box>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            fontWeight={600}
-                            sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}
-                          >
-                            STATUS
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>STATUS</Typography>
                           <Box mt={0.25}>
-                            <Chip
-                              label="Completed"
-                              size="small"
-                              sx={{ bgcolor: "#F0FDF4", color: "#16A34A", fontWeight: 600, borderRadius: "6px", height: 22, fontSize: "0.7rem" }}
-                            />
+                            <Chip label="Completed" size="small" sx={{ bgcolor: "#F0FDF4", color: "#16A34A", fontWeight: 600, borderRadius: "6px", height: 22, fontSize: "0.7rem" }} />
                           </Box>
                         </Box>
                       </Stack>
@@ -1413,114 +1068,54 @@ export default function LeadDetailView() {
           <Box sx={{ flexGrow: 1 }}>
             <Card sx={{ borderRadius: "16px", overflow: "hidden" }}>
               <Box sx={{ px: 2.5, py: 2, borderBottom: "1px solid #F1F5F9" }}>
-                <Typography variant="subtitle2" fontWeight={700}>
-                  Notes
-                </Typography>
+                <Typography variant="subtitle2" fontWeight={700}>Notes</Typography>
               </Box>
-
               <Box sx={{ p: 2.5 }}>
                 {notesError && (
-                  <Alert severity="error" onClose={() => setNotesError(null)} sx={{ mb: 2, borderRadius: "10px" }}>
-                    {notesError}
-                  </Alert>
+                  <Alert severity="error" onClose={() => setNotesError(null)} sx={{ mb: 2, borderRadius: "10px" }}>{notesError}</Alert>
                 )}
-
                 {notesLoading ? (
                   <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                     <Stack alignItems="center" spacing={1}>
                       <CircularProgress size={24} />
-                      <Typography variant="caption" color="text.secondary">
-                        Loading notes...
-                      </Typography>
+                      <Typography variant="caption" color="text.secondary">Loading notes...</Typography>
                     </Stack>
                   </Box>
                 ) : (
                   <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mb: 3 }}>
                     {notes.map((note) =>
                       editingNoteId === note.id ? (
-                        <Card
-                          key={note.id}
-                          variant="outlined"
-                          sx={{ p: 2, borderRadius: "12px", border: "2px solid #6366F1", bgcolor: "#FAFAFE" }}
-                        >
+                        <Card key={note.id} variant="outlined" sx={{ p: 2, borderRadius: "12px", border: "2px solid #6366F1", bgcolor: "#FAFAFE" }}>
                           <TextField
-                            fullWidth
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            variant="standard"
-                            placeholder="Title"
+                            fullWidth value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                            variant="standard" placeholder="Title"
                             inputProps={{ style: { fontWeight: 700, fontSize: "0.875rem" } }}
-                            sx={{
-                              mb: 1,
-                              "& .MuiInput-underline:before": { borderBottomColor: "#E2E8F0" },
-                              "& .MuiInput-underline:after": { borderBottomColor: "#6366F1" },
-                            }}
+                            sx={{ mb: 1, "& .MuiInput-underline:before": { borderBottomColor: "#E2E8F0" }, "& .MuiInput-underline:after": { borderBottomColor: "#6366F1" } }}
                           />
                           <TextField
-                            fullWidth
-                            multiline
-                            minRows={3}
-                            value={editContent}
-                            onChange={(e) => setEditContent(e.target.value)}
-                            variant="standard"
-                            placeholder="Note content..."
+                            fullWidth multiline minRows={3} value={editContent} onChange={(e) => setEditContent(e.target.value)}
+                            variant="standard" placeholder="Note content..."
                             inputProps={{ style: { fontSize: "0.875rem", color: "#475569", lineHeight: 1.6 } }}
-                            sx={{
-                              mb: 2,
-                              "& .MuiInput-underline:before": { borderBottom: "none" },
-                              "& .MuiInput-underline:after": { borderBottom: "none" },
-                              "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" },
-                            }}
+                            sx={{ mb: 2, "& .MuiInput-underline:before": { borderBottom: "none" }, "& .MuiInput-underline:after": { borderBottom: "none" }, "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" } }}
                           />
                           <Stack direction="row" spacing={1} justifyContent="flex-end">
-                            <Button
-                              size="small"
-                              onClick={handleCancelEdit}
-                              disabled={editSubmitting}
-                              sx={{ textTransform: "none", fontSize: "0.75rem", color: "#64748B", borderRadius: "8px", "&:hover": { bgcolor: "#F1F5F9" } }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              onClick={() => handleSaveEdit(note.id)}
-                              disabled={editSubmitting}
-                              sx={{ textTransform: "none", fontSize: "0.75rem", bgcolor: "#334155", borderRadius: "8px", boxShadow: "none", minWidth: 64, "&:hover": { bgcolor: "#1E293B", boxShadow: "none" } }}
-                            >
+                            <Button size="small" onClick={handleCancelEdit} disabled={editSubmitting} sx={{ textTransform: "none", fontSize: "0.75rem", color: "#64748B", borderRadius: "8px", "&:hover": { bgcolor: "#F1F5F9" } }}>Cancel</Button>
+                            <Button size="small" variant="contained" onClick={() => handleSaveEdit(note.id)} disabled={editSubmitting} sx={{ textTransform: "none", fontSize: "0.75rem", bgcolor: "#334155", borderRadius: "8px", boxShadow: "none", minWidth: 64, "&:hover": { bgcolor: "#1E293B", boxShadow: "none" } }}>
                               {editSubmitting ? <CircularProgress size={14} sx={{ color: "white" }} /> : "Save"}
                             </Button>
                           </Stack>
                         </Card>
                       ) : (
-                        <Card
-                          key={note.id}
-                          variant="outlined"
-                          sx={{ p: 2, borderRadius: "12px", border: "1px solid #E2E8F0", position: "relative" }}
-                        >
-                          <Typography variant="body2" fontWeight={700} mb={0.5}>
-                            {note.title}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-line", mb: 1.5, lineHeight: 1.6 }}>
-                            {note.content}
-                          </Typography>
+                        <Card key={note.id} variant="outlined" sx={{ p: 2, borderRadius: "12px", border: "1px solid #E2E8F0", position: "relative" }}>
+                          <Typography variant="body2" fontWeight={700} mb={0.5}>{note.title}</Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-line", mb: 1.5, lineHeight: 1.6 }}>{note.content}</Typography>
                           <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Typography variant="caption" color="text.secondary">
-                              {note.time}
-                            </Typography>
+                            <Typography variant="caption" color="text.secondary">{note.time}</Typography>
                             <Stack direction="row" spacing={0.5}>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleStartEdit(note)}
-                                sx={{ color: "#3B82F6", "&:hover": { bgcolor: "#EFF6FF" } }}
-                              >
+                              <IconButton size="small" onClick={() => handleStartEdit(note)} sx={{ color: "#3B82F6", "&:hover": { bgcolor: "#EFF6FF" } }}>
                                 <EditIcon sx={{ fontSize: 14 }} />
                               </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => setDeleteNoteDialog(note.id)}
-                                sx={{ color: "#EF4444", "&:hover": { bgcolor: "#FEF2F2" } }}
-                              >
+                              <IconButton size="small" onClick={() => setDeleteNoteDialog(note.id)} sx={{ color: "#EF4444", "&:hover": { bgcolor: "#FEF2F2" } }}>
                                 <DeleteOutlineIcon sx={{ fontSize: 14 }} />
                               </IconButton>
                             </Stack>
@@ -1531,41 +1126,18 @@ export default function LeadDetailView() {
                   </Box>
                 )}
 
-                {/* Add note input area */}
                 <Card variant="outlined" sx={{ borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden" }}>
                   <TextField
-                    fullWidth
-                    placeholder="Title"
-                    value={newNoteTitle}
-                    onChange={(e) => setNewNoteTitle(e.target.value)}
+                    fullWidth placeholder="Title" value={newNoteTitle} onChange={(e) => setNewNoteTitle(e.target.value)}
                     variant="standard"
-                    sx={{
-                      px: 2,
-                      pt: 1.5,
-                      "& .MuiInputBase-root": { fontSize: "0.875rem", fontWeight: 600 },
-                      "& .MuiInput-underline:before": { borderBottom: "none" },
-                      "& .MuiInput-underline:after": { borderBottom: "none" },
-                      "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" },
-                    }}
+                    sx={{ px: 2, pt: 1.5, "& .MuiInputBase-root": { fontSize: "0.875rem", fontWeight: 600 }, "& .MuiInput-underline:before": { borderBottom: "none" }, "& .MuiInput-underline:after": { borderBottom: "none" }, "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" } }}
                   />
                   <Divider sx={{ mx: 2, borderColor: "#F1F5F9" }} />
                   <Stack direction="row" alignItems="flex-end">
                     <TextField
-                      fullWidth
-                      multiline
-                      minRows={2}
-                      placeholder="Write note here..."
-                      value={newNoteContent}
-                      onChange={(e) => setNewNoteContent(e.target.value)}
-                      variant="standard"
-                      sx={{
-                        px: 2,
-                        py: 1,
-                        "& .MuiInputBase-root": { fontSize: "0.875rem", color: "#64748B" },
-                        "& .MuiInput-underline:before": { borderBottom: "none" },
-                        "& .MuiInput-underline:after": { borderBottom: "none" },
-                        "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" },
-                      }}
+                      fullWidth multiline minRows={2} placeholder="Write note here..." value={newNoteContent}
+                      onChange={(e) => setNewNoteContent(e.target.value)} variant="standard"
+                      sx={{ px: 2, py: 1, "& .MuiInputBase-root": { fontSize: "0.875rem", color: "#64748B" }, "& .MuiInput-underline:before": { borderBottom: "none" }, "& .MuiInput-underline:after": { borderBottom: "none" }, "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" } }}
                     />
                     <Box sx={{ p: 1.5, flexShrink: 0 }}>
                       <IconButton
@@ -1574,19 +1146,11 @@ export default function LeadDetailView() {
                         sx={{
                           bgcolor: (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting ? "#334155" : "#F1F5F9",
                           color: (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting ? "white" : "#94A3B8",
-                          width: 36,
-                          height: 36,
-                          transition: "all 0.2s",
-                          "&:hover": {
-                            bgcolor: (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting ? "#1E293B" : "#E2E8F0",
-                          },
+                          width: 36, height: 36, transition: "all 0.2s",
+                          "&:hover": { bgcolor: (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting ? "#1E293B" : "#E2E8F0" },
                         }}
                       >
-                        {noteSubmitting ? (
-                          <CircularProgress size={16} sx={{ color: "#94A3B8" }} />
-                        ) : (
-                          <SendIcon sx={{ fontSize: 16 }} />
-                        )}
+                        {noteSubmitting ? <CircularProgress size={16} sx={{ color: "#94A3B8" }} /> : <SendIcon sx={{ fontSize: 16 }} />}
                       </IconButton>
                     </Box>
                   </Stack>
@@ -1601,85 +1165,26 @@ export default function LeadDetailView() {
       <Dialog
         open={openConvertPopup}
         onClose={convertLoading ? undefined : handleClosePopup}
-        PaperProps={{
-          sx: {
-            borderRadius: "24px",
-            p: 4,
-            textAlign: "center",
-            maxWidth: "420px",
-            boxShadow: "0px 20px 25px -5px rgba(0,0,0,0.1)",
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: "24px", p: 4, textAlign: "center", maxWidth: "420px", boxShadow: "0px 20px 25px -5px rgba(0,0,0,0.1)" } }}
       >
         <DialogContent sx={{ p: 0 }}>
           <Stack alignItems="center" spacing={2.5}>
-            <Box
-              sx={{
-                width: 64,
-                height: 64,
-                borderRadius: "50%",
-                bgcolor: "#FFF7ED",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: "#FFF7ED", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <SwapHorizIcon sx={{ fontSize: 32, color: "#F97316" }} />
             </Box>
             <Box>
-              <Typography variant="h6" fontWeight={700} gutterBottom>
-                Convert Lead
-              </Typography>
+              <Typography variant="h6" fontWeight={700} gutterBottom>Convert Lead</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ px: 2, lineHeight: 1.6 }}>
                 Are you sure you want to Convert <b>"{leadName}"</b> lead into a patient & register it?
               </Typography>
             </Box>
-
-            {/* Error message inside dialog */}
             {convertError && (
-              <Alert severity="error" sx={{ width: "100%", borderRadius: "10px", textAlign: "left" }}>
-                {convertError}
-              </Alert>
+              <Alert severity="error" sx={{ width: "100%", borderRadius: "10px", textAlign: "left" }}>{convertError}</Alert>
             )}
-
             <Stack direction="row" spacing={2} sx={{ width: "100%", mt: 2 }}>
-              <Button
-                fullWidth
-                onClick={handleClosePopup}
-                variant="outlined"
-                disabled={convertLoading}
-                sx={{
-                  borderRadius: "12px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  color: "#232323",
-                  borderColor: "#232323",
-                  py: 1.2,
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={handleConvertLead}
-                disabled={convertLoading}
-                sx={{
-                  bgcolor: "#505050",
-                  borderRadius: "12px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  py: 1.2,
-                  boxShadow: "none",
-                  "&:hover": { bgcolor: "#232323" },
-                  "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
-                }}
-              >
-                {convertLoading ? (
-                  <CircularProgress size={20} sx={{ color: "white" }} />
-                ) : (
-                  "Convert"
-                )}
+              <Button fullWidth onClick={handleClosePopup} variant="outlined" disabled={convertLoading} sx={{ borderRadius: "12px", textTransform: "none", fontWeight: 600, color: "#232323", borderColor: "#232323", py: 1.2 }}>Cancel</Button>
+              <Button fullWidth variant="contained" onClick={handleConvertLead} disabled={convertLoading} sx={{ bgcolor: "#505050", borderRadius: "12px", textTransform: "none", fontWeight: 600, py: 1.2, boxShadow: "none", "&:hover": { bgcolor: "#232323" }, "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" } }}>
+                {convertLoading ? <CircularProgress size={20} sx={{ color: "white" }} /> : "Convert"}
               </Button>
             </Stack>
           </Stack>
@@ -1687,16 +1192,9 @@ export default function LeadDetailView() {
       </Dialog>
 
       {/* ══ ADD NEXT ACTION DIALOG ══ */}
-      <Dialog
-        open={openAddActionDialog}
-        onClose={closeActionDialog}
-        PaperProps={{
-          sx: { borderRadius: "16px", p: 3, maxWidth: "500px", width: "100%" },
-        }}
-      >
+      <Dialog open={openAddActionDialog} onClose={closeActionDialog} PaperProps={{ sx: { borderRadius: "16px", p: 3, maxWidth: "500px", width: "100%" } }}>
         <DialogContent sx={{ p: 0 }}>
           <Stack spacing={3}>
-            {/* Header */}
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
               <Box>
                 <Typography variant="h6" fontWeight={700}>Add Next Action</Typography>
@@ -1705,133 +1203,59 @@ export default function LeadDetailView() {
                   <Chip
                     label={lead?.status || lead?.lead_status || "New"}
                     size="small"
-                    sx={{
-                      height: 18,
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      bgcolor: isAppointment ? "#EFF6FF" : isFollowUp ? "#FEF3C7" : "#F0FDF4",
-                      color: isAppointment ? "#3B82F6" : isFollowUp ? "#F59E0B" : "#16A34A",
-                    }}
+                    sx={{ height: 18, fontSize: "11px", fontWeight: 600, bgcolor: isAppointment ? "#EFF6FF" : isFollowUp ? "#FEF3C7" : "#F0FDF4", color: isAppointment ? "#3B82F6" : isFollowUp ? "#F59E0B" : "#16A34A" }}
                   />
                 </Typography>
               </Box>
             </Stack>
-
-            {/* Appointment-status info banner */}
             {isAppointment && (
               <Alert severity="info" sx={{ borderRadius: "10px", fontSize: "13px" }}>
                 This lead already has an <strong>Appointment</strong> status. Fields are disabled.
               </Alert>
             )}
-
-            {/* Error */}
             {actionError && (
-              <Alert severity="error" onClose={() => setActionError(null)} sx={{ borderRadius: "10px", fontSize: "13px" }}>
-                {actionError}
-              </Alert>
+              <Alert severity="error" onClose={() => setActionError(null)} sx={{ borderRadius: "10px", fontSize: "13px" }}>{actionError}</Alert>
             )}
-
-            {/* Action Type */}
             <Box>
               <Typography fontSize="13px" fontWeight={600} mb={1}>
                 Action Type *
                 {!isAppointment && (
                   <Typography component="span" fontSize="11px" color="#94A3B8" fontWeight={400} ml={1}>
-                    {isFollowUp
-                      ? "(Follow Up leads can only move to Appointment)"
-                      : "(New leads can move to Follow Up or Appointment)"}
+                    {isFollowUp ? "(Follow Up leads can only move to Appointment)" : "(New leads can move to Follow Up or Appointment)"}
                   </Typography>
                 )}
               </Typography>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                value={actionType}
-                onChange={(e) => setActionType(e.target.value)}
-                disabled={isAppointment}
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
-              >
+              <TextField select fullWidth size="small" value={actionType} onChange={(e) => setActionType(e.target.value)} disabled={isAppointment} sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}>
                 <MenuItem value="">-- Select --</MenuItem>
                 {availableActions.map((a) => (
                   <MenuItem key={a.value} value={a.value}>{a.label}</MenuItem>
                 ))}
               </TextField>
             </Box>
-
-            {/* Status */}
             <Box>
               <Typography fontSize="13px" fontWeight={600} mb={1}>Status *</Typography>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                value={actionStatus}
-                onChange={(e) => setActionStatus(e.target.value)}
-                disabled={isAppointment}
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
-              >
+              <TextField select fullWidth size="small" value={actionStatus} onChange={(e) => setActionStatus(e.target.value)} disabled={isAppointment} sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}>
                 <MenuItem value="pending">Pending</MenuItem>
                 <MenuItem value="completed">Completed</MenuItem>
               </TextField>
             </Box>
-
-            {/* Description */}
             <Box>
               <Typography fontSize="13px" fontWeight={600} mb={1}>Description *</Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                size="small"
-                value={actionDescription}
-                onChange={(e) => setActionDescription(e.target.value)}
-                placeholder="Enter action description..."
-                disabled={isAppointment}
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
-              />
+              <TextField fullWidth multiline rows={3} size="small" value={actionDescription} onChange={(e) => setActionDescription(e.target.value)} placeholder="Enter action description..." disabled={isAppointment} sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
             </Box>
-
-            {/* Payload preview */}
             {!isAppointment && actionType && (
               <Box sx={{ bgcolor: "#F8FAFC", borderRadius: "8px", px: 2, py: 1.25, border: "1px solid #E2E8F0" }}>
                 <Typography fontSize="11px" color="#64748B">
                   Next action type will be set to{" "}
-                  <Typography component="span" fontWeight={700} color="#0F172A" fontSize="11px">
-                    {actionType}
-                  </Typography>{" "}
-                  with status{" "}
-                  <Typography component="span" fontWeight={700} color="#0F172A" fontSize="11px">
-                    {actionStatus}
-                  </Typography>
+                  <Typography component="span" fontWeight={700} color="#0F172A" fontSize="11px">{actionType}</Typography>
+                  {" "}with status{" "}
+                  <Typography component="span" fontWeight={700} color="#0F172A" fontSize="11px">{actionStatus}</Typography>
                 </Typography>
               </Box>
             )}
-
-            {/* Buttons */}
             <Stack direction="row" spacing={2} justifyContent="flex-end">
-              <Button
-                onClick={closeActionDialog}
-                variant="outlined"
-                disabled={actionSubmitting}
-                sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 600, color: "#475569", borderColor: "#E2E8F0" }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAddNextAction}
-                variant="contained"
-                disabled={isAppointment || !actionType || !actionDescription || actionSubmitting}
-                sx={{
-                  bgcolor: "#334155",
-                  borderRadius: "8px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  boxShadow: "none",
-                  "&:hover": { bgcolor: "#1E293B" },
-                  "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
-                }}
-              >
+              <Button onClick={closeActionDialog} variant="outlined" disabled={actionSubmitting} sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 600, color: "#475569", borderColor: "#E2E8F0" }}>Cancel</Button>
+              <Button onClick={handleAddNextAction} variant="contained" disabled={isAppointment || !actionType || !actionDescription || actionSubmitting} sx={{ bgcolor: "#334155", borderRadius: "8px", textTransform: "none", fontWeight: 600, boxShadow: "none", "&:hover": { bgcolor: "#1E293B" }, "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" } }}>
                 {actionSubmitting ? <CircularProgress size={20} sx={{ color: "white" }} /> : "Save"}
               </Button>
             </Stack>
@@ -1840,72 +1264,21 @@ export default function LeadDetailView() {
       </Dialog>
 
       {/* ══ DELETE NOTE DIALOG ══ */}
-      <Dialog
-        open={deleteNoteDialog !== null}
-        onClose={() => setDeleteNoteDialog(null)}
-        PaperProps={{
-          sx: {
-            borderRadius: "24px",
-            p: 4,
-            textAlign: "center",
-            maxWidth: "420px",
-            boxShadow: "0px 20px 25px -5px rgba(0,0,0,0.1)",
-          },
-        }}
-      >
+      <Dialog open={deleteNoteDialog !== null} onClose={() => setDeleteNoteDialog(null)} PaperProps={{ sx: { borderRadius: "24px", p: 4, textAlign: "center", maxWidth: "420px", boxShadow: "0px 20px 25px -5px rgba(0,0,0,0.1)" } }}>
         <DialogContent sx={{ p: 0 }}>
           <Stack alignItems="center" spacing={2.5}>
-            <Box
-              sx={{
-                width: 64,
-                height: 64,
-                borderRadius: "50%",
-                bgcolor: "#FEF2F2",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <DeleteOutlineIcon sx={{ fontSize: 32, color: "#EF4444" }} />
             </Box>
             <Box>
-              <Typography variant="h6" fontWeight={700} gutterBottom>
-                Delete Note
-              </Typography>
+              <Typography variant="h6" fontWeight={700} gutterBottom>Delete Note</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ px: 2, lineHeight: 1.6 }}>
                 This action cannot be undone. Are you sure you want to delete this note permanently?
               </Typography>
             </Box>
             <Stack direction="row" spacing={2} sx={{ width: "100%", mt: 2 }}>
-              <Button
-                fullWidth
-                onClick={() => setDeleteNoteDialog(null)}
-                variant="outlined"
-                sx={{
-                  borderRadius: "12px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  color: "#475569",
-                  borderColor: "#E2E8F0",
-                  py: 1.2,
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={() => deleteNoteDialog && handleDeleteNote(deleteNoteDialog)}
-                sx={{
-                  bgcolor: "#EF4444",
-                  borderRadius: "12px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  py: 1.2,
-                  boxShadow: "none",
-                  "&:hover": { bgcolor: "#DC2626" },
-                }}
-              >
+              <Button fullWidth onClick={() => setDeleteNoteDialog(null)} variant="outlined" sx={{ borderRadius: "12px", textTransform: "none", fontWeight: 600, color: "#475569", borderColor: "#E2E8F0", py: 1.2 }}>Cancel</Button>
+              <Button fullWidth variant="contained" onClick={() => deleteNoteDialog && handleDeleteNote(deleteNoteDialog)} sx={{ bgcolor: "#EF4444", borderRadius: "12px", textTransform: "none", fontWeight: 600, py: 1.2, boxShadow: "none", "&:hover": { bgcolor: "#DC2626" } }}>
                 Delete
               </Button>
             </Stack>
@@ -1920,99 +1293,55 @@ export default function LeadDetailView() {
 
 // ====================== Sub-components ======================
 
-const CallMessage = ({ speaker, time, text }: any) => (
+const CallMessage: React.FC<CallMessageProps> = ({ speaker, time, text }) => (
   <Box>
     <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
-      <Typography variant="caption" fontWeight={700} color="text.primary">
-        {speaker}
-      </Typography>
-      <Typography variant="caption" color="text.secondary">
-        {time}
-      </Typography>
+      <Typography variant="caption" fontWeight={700} color="text.primary">{speaker}</Typography>
+      <Typography variant="caption" color="text.secondary">{time}</Typography>
     </Stack>
-    <Typography variant="body2" color="text.secondary">
-      {text}
-    </Typography>
+    <Typography variant="body2" color="text.secondary">{text}</Typography>
   </Box>
 );
 
-const TimelineItem = ({ icon, title, time, isAvatar, avatarInitial, isLast, onClick, isClickable }: any) => (
+const TimelineItem: React.FC<TimelineItemProps> = ({ icon, title, time, isAvatar, avatarInitial, isLast, onClick, isClickable }) => (
   <Stack direction="row" spacing={2}>
     <Stack alignItems="center">
-      <Box
-        sx={{
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
-          bgcolor: "#F1F5F9",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {isAvatar ? (
-          <Avatar sx={{ width: 20, height: 20, fontSize: "10px" }}>{avatarInitial}</Avatar>
-        ) : (
-          icon
-        )}
+      <Box sx={{ width: 32, height: 32, borderRadius: "50%", bgcolor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {isAvatar ? <Avatar sx={{ width: 20, height: 20, fontSize: "10px" }}>{avatarInitial}</Avatar> : icon}
       </Box>
-      {!isLast && (
-        <Box sx={{ width: "2px", flexGrow: 1, bgcolor: "#E2E8F0", my: 0.5 }} />
-      )}
+      {!isLast && <Box sx={{ width: "2px", flexGrow: 1, bgcolor: "#E2E8F0", my: 0.5 }} />}
     </Stack>
-    <Box
-      pb={3}
-      onClick={onClick}
-      sx={{ cursor: isClickable ? "pointer" : "default", "&:hover": isClickable ? { opacity: 0.7 } : {} }}
-    >
+    <Box pb={3} onClick={onClick} sx={{ cursor: isClickable ? "pointer" : "default", "&:hover": isClickable ? { opacity: 0.7 } : {} }}>
       <Typography variant="body2" fontWeight={600}>{title}</Typography>
       <Typography variant="caption" color="text.secondary">{time}</Typography>
     </Box>
   </Stack>
 );
 
-const ChatBubble = ({ side, text, time }: any) => (
+const ChatBubble: React.FC<ChatBubbleProps> = ({ side, text, time }) => (
   <Box sx={{ alignSelf: side === "left" ? "flex-start" : "flex-end", maxWidth: "70%" }}>
-    <Box
-      sx={{
-        p: 1.5,
-        borderRadius: side === "left" ? "0 12px 12px 12px" : "12px 0 12px 12px",
-        bgcolor: side === "left" ? "#FFF" : "#1E293B",
-        color: side === "left" ? "text.primary" : "#FFF",
-        boxShadow: "0px 1px 2px rgba(0,0,0,0.05)",
-      }}
-    >
+    <Box sx={{ p: 1.5, borderRadius: side === "left" ? "0 12px 12px 12px" : "12px 0 12px 12px", bgcolor: side === "left" ? "#FFF" : "#1E293B", color: side === "left" ? "text.primary" : "#FFF", boxShadow: "0px 1px 2px rgba(0,0,0,0.05)" }}>
       <Typography variant="body2">{text}</Typography>
     </Box>
-    <Typography
-      variant="caption"
-      color="text.secondary"
-      sx={{ mt: 0.5, display: "block", textAlign: side === "right" ? "right" : "left" }}
-    >
-      {time}
-    </Typography>
+    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block", textAlign: side === "right" ? "right" : "left" }}>{time}</Typography>
   </Box>
 );
 
-const getSubSourceIcon = (source?: string) => {
+const getSubSourceIcon = (source?: string): string | null => {
   const key = (source || "").toLowerCase();
-  if (key.includes("facebook")) return Facebook;
-  if (key.includes("instagram")) return Instagram;
-  if (key.includes("linkedin")) return Linkedin;
-  if (key.includes("google ads")) return GoogleAds;
-  if (key.includes("google")) return GoogleCalender;
+  if (key.includes("facebook")) return Facebook as string;
+  if (key.includes("instagram")) return Instagram as string;
+  if (key.includes("linkedin")) return Linkedin as string;
+  if (key.includes("google ads")) return GoogleAds as string;
+  if (key.includes("google")) return GoogleCalender as string;
   return null;
 };
 
-const Info = ({ label, value, isAvatar }: any) => (
+const Info: React.FC<InfoProps> = ({ label, value, isAvatar }) => (
   <Box sx={{ flex: 1, minWidth: 0 }}>
-    <Typography
-      variant="caption"
-      sx={{ color: "#9E9E9E", fontSize: "12px", fontWeight: 500, display: "block", mb: 0.5 }}
-    >
+    <Typography variant="caption" sx={{ color: "#9E9E9E", fontSize: "12px", fontWeight: 500, display: "block", mb: 0.5 }}>
       {label}
     </Typography>
-
     {label === "SUB-SOURCE" ? (
       <Stack direction="row" spacing={1} alignItems="center">
         {getSubSourceIcon(value) && (
@@ -2031,7 +1360,7 @@ const Info = ({ label, value, isAvatar }: any) => (
   </Box>
 );
 
-const DocumentRow = ({ name, size, sx = {} }: any) => (
+const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, sx = {} }) => (
   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={sx}>
     <Stack direction="row" spacing={1.5} alignItems="center">
       <DescriptionOutlinedIcon sx={{ color: "#3B82F6" }} fontSize="small" />
@@ -2041,12 +1370,8 @@ const DocumentRow = ({ name, size, sx = {} }: any) => (
       </Box>
     </Stack>
     <Stack direction="row" spacing={0.5}>
-      <IconButton size="small">
-        <FileDownloadOutlinedIcon fontSize="inherit" />
-      </IconButton>
-      <IconButton size="small">
-        <ShortcutIcon sx={{ transform: "rotate(90deg)", fontSize: "14px" }} />
-      </IconButton>
+      <IconButton size="small"><FileDownloadOutlinedIcon fontSize="inherit" /></IconButton>
+      <IconButton size="small"><ShortcutIcon sx={{ transform: "rotate(90deg)", fontSize: "14px" }} /></IconButton>
     </Stack>
   </Stack>
 );
