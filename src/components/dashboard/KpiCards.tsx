@@ -6,6 +6,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useRef, useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch } from "../../store/index";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
 import NewLeadsIcon from "../../assets/icons/newLeads.svg";
@@ -17,6 +18,8 @@ import LostLeadsIcon from "../../assets/icons/lostLeads.svg";
 import { kpiCardsStyles } from "../../styles/Dashboard/KpiCards.styles";
 import { fetchLeads, selectLeads } from "../../store/leadSlice";
 import { LEAD_STATUS } from "../../utils/constants";
+import type { KpiCardData, LiveKpiCounts } from "../../types/dashboard.types";
+import type { Lead } from "../../services/leads.api";
 
 /* KPI → ICON MAP */
 const KPI_ICONS: Record<string, string> = {
@@ -41,7 +44,7 @@ const getCardStyle = (id: string) => {
 };
 
 const KpiCards = () => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const leads = useSelector(selectLeads);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -50,13 +53,13 @@ const KpiCards = () => {
 
   // ── Fetch leads on mount if not already loaded ──
   useEffect(() => {
-    dispatch(fetchLeads() as any);
+    dispatch(fetchLeads());
   }, [dispatch]);
 
   // ── Live counts derived from Redux store ──
   // Updates automatically whenever leads change in Redux
   // (e.g. appointment booked, lead converted, new lead added)
-  const counts = (() => {
+  const counts: LiveKpiCounts = (() => {
     if (!leads || leads.length === 0) {
       return {
         totalLeads: 0,
@@ -71,10 +74,10 @@ const KpiCards = () => {
     }
 
     // Only count active (non-archived) leads
-    const activeLeads = leads.filter((l: any) => l.is_active !== false);
+    const activeLeads = leads.filter((l: Lead) => l.is_active !== false);
 
     const byStatus = (...statuses: string[]) =>
-      activeLeads.filter((l: any) => {
+      activeLeads.filter((l: Lead) => {
         const s = (l.lead_status || l.status || "").toLowerCase().trim();
         return statuses.some((t) => s === t.toLowerCase());
       }).length;
@@ -118,7 +121,7 @@ const KpiCards = () => {
     scrollContainerRef.current?.scrollBy({ left: 300, behavior: "smooth" });
   };
 
-  const dynamicKpis = [
+  const dynamicKpis: KpiCardData[] = [
     { id: "totalLeads",     label: "Total Leads",     value: counts.totalLeads },
     { id: "newLeads",       label: "New Leads",       value: counts.newLeads },
     { id: "appointments",   label: "Appointments",    value: counts.appointments },
