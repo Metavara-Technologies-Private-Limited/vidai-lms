@@ -87,6 +87,20 @@ export interface AppointmentStatus {
   color?: string;
 }
 
+/* Appointment Chart Data */
+export interface AppointmentChartData {
+  status: string;
+  value: number;
+  color: string;
+}
+
+export interface AppointmentCounts {
+  appointmentsBooked: number;
+  completed: number;
+  noShows: number;
+  cancelled: number;
+}
+
 /* =======================
    TEAM PERFORMANCE
 ======================= */

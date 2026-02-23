@@ -5,7 +5,7 @@ import { LeadAPI, type Lead } from "../../services/leads.api";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style";
 //import type{TooltipProps} from "recharts";
-import type{CustomTooltipProps} from "../../types/dashboard.types";
+import type { CustomTooltipProps, AppointmentChartData } from "../../types/dashboard.types";
 
 
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
@@ -52,15 +52,16 @@ const AppointmentsChart = () => {
     fetchLeads();
   }, []);
 
-  const data = useMemo(() => {
+  const data = useMemo((): AppointmentChartData[] => {
     let appointmentsBooked = 0;
     let completed = 0;
 
-    leads.forEach((lead) => {
+    leads.forEach((lead: Lead) => {
+      const leadData = lead as Lead & Record<string, unknown>;
       const rawStatus = (
-        (lead as any).next_action_status ||
-        (lead as any).task_status ||
-        (lead as any).taskStatus ||
+        leadData.next_action_status ||
+        leadData.task_status ||
+        leadData.taskStatus ||
         ""
       ).toString().trim().toLowerCase();
 
