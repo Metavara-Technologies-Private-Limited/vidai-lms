@@ -78,7 +78,7 @@ const KpiCards = () => {
 
     const byStatus = (...statuses: string[]) =>
       activeLeads.filter((l: Lead) => {
-        const s = (l.lead_status || l.status || "").toLowerCase().trim();
+        const s = (l.lead_status || "").toLowerCase().trim();
         return statuses.some((t) => s === t.toLowerCase());
       }).length;
 

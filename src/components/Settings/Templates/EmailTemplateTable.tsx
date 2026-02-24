@@ -28,8 +28,10 @@ const HighlightText = ({ text, highlight }: { text: string | undefined; highligh
 };
 
 interface Props {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any[]; 
   searchQuery: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: any) => void;
 }
 
@@ -41,6 +43,7 @@ export const EmailTemplateTable: React.FC<Props> = ({ data = [], searchQuery, on
 
   useEffect(() => {
     if (page > 0 && totalPages > 0 && page > totalPages - 1) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPage(Math.max(0, totalPages - 1));
     } else if (totalPages === 0) {
       setPage(0);

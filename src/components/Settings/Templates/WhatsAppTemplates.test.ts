@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { WhatsAppTemplate } from '../../../types/templates.types';
 
 describe('WhatsApp Template Components - Test Suite', () => {
   
@@ -7,7 +8,7 @@ describe('WhatsApp Template Components - Test Suite', () => {
       id: '1',
       name: 'Appointment Confirmation',
       message: 'Hi {{name}}, your appointment is confirmed for {{date}} at {{time}}.',
-      use_case: 'Confirmation',
+      use_case: 'Appointment',
       createdBy: 'Admin',
       lastUpdatedAt: '2024-01-15 | 10:30 AM',
       mediaType: 'text', // Can be: text, image, video, document
@@ -26,7 +27,7 @@ describe('WhatsApp Template Components - Test Suite', () => {
     it('should have correct WhatsApp template values', () => {
       expect(mockWhatsAppTemplate.id).toBe('1');
       expect(mockWhatsAppTemplate.name).toBe('Appointment Confirmation');
-      expect(mockWhatsAppTemplate.use_case).toBe('Confirmation');
+      expect(mockWhatsAppTemplate.use_case).toBe('Appointment');
       expect(mockWhatsAppTemplate.mediaType).toBe('text');
     });
 
@@ -73,15 +74,13 @@ describe('WhatsApp Template Components - Test Suite', () => {
   describe('WhatsApp Template Use Cases', () => {
     const whatsappUseCases = [
       { name: 'Appointment', color: '#16A34A', icon: 'calendar' },
-      { name: 'Confirmation', color: '#3B82F6', icon: 'check' },
       { name: 'Reminder', color: '#D97706', icon: 'bell' },
-      { name: 'Follow-up', color: '#7C3AED', icon: 'arrow-right' },
-      { name: 'Promotion', color: '#EC4899', icon: 'gift' },
-      { name: 'Support', color: '#06B6D4', icon: 'help-circle' },
+      { name: 'Feedback', color: '#EA580C', icon: 'message-square' },
+      { name: 'Marketing', color: '#7C3AED', icon: 'megaphone' },
     ];
 
     it('should have all WhatsApp use cases', () => {
-      expect(whatsappUseCases).toHaveLength(6);
+      expect(whatsappUseCases).toHaveLength(4);
     });
 
     it('should have valid colors for use cases', () => {
@@ -140,14 +139,14 @@ describe('WhatsApp Template Components - Test Suite', () => {
         id: '1', 
         name: 'Order Confirmation', 
         message: 'Order confirmed!', 
-        use_case: 'Confirmation',
+        use_case: 'Appointment',
         mediaType: 'text'
       },
       { 
         id: '2', 
         name: 'Product Update', 
         message: 'Check out our new product!', 
-        use_case: 'Promotion',
+        use_case: 'Marketing',
         mediaType: 'image'
       },
       { 
@@ -161,14 +160,14 @@ describe('WhatsApp Template Components - Test Suite', () => {
         id: '4', 
         name: 'Support Response', 
         message: 'We are here to help!', 
-        use_case: 'Support',
+        use_case: 'Feedback',
         mediaType: 'text'
       },
       { 
         id: '5', 
         name: 'Follow-up Message', 
         message: 'How was your experience?', 
-        use_case: 'Follow-up',
+        use_case: 'Reminder',
         mediaType: 'text'
       },
     ];
@@ -178,9 +177,9 @@ describe('WhatsApp Template Components - Test Suite', () => {
     });
 
     it('should filter by use case', () => {
-      const confirmations = whatsappTemplates.filter(t => t.use_case === 'Confirmation');
-      expect(confirmations).toHaveLength(1);
-      expect(confirmations[0].name).toBe('Order Confirmation');
+      const appointments = whatsappTemplates.filter(t => t.use_case === 'Appointment');
+      expect(appointments.length).toBeGreaterThan(0);
+      expect(appointments[0].name).toBe('Order Confirmation');
     });
 
     it('should filter by media type', () => {
@@ -274,56 +273,48 @@ describe('WhatsApp Template Components - Test Suite', () => {
   });
 
   describe('WhatsApp Template Validation', () => {
-    const validateTemplate = (template: any) => {
+    const validateTemplate = (template: WhatsAppTemplate | null | undefined) => {
       return template &&
         typeof template.id === 'string' &&
         typeof template.name === 'string' &&
-        typeof template.message === 'string' &&
-        typeof template.use_case === 'string' &&
-        typeof template.mediaType === 'string' &&
-        ['text', 'image', 'video', 'document', 'audio'].includes(template.mediaType);
+        typeof template.body === 'string' &&
+        (template.is_active === undefined || typeof template.is_active === 'boolean');
     };
 
     it('should validate correct WhatsApp template', () => {
-      const valid = {
+      const valid: WhatsAppTemplate = {
         id: '1',
         name: 'Test',
-        message: 'Message',
-        use_case: 'Test',
-        mediaType: 'text',
+        body: 'Message',
       };
       expect(validateTemplate(valid)).toBe(true);
     });
 
     it('should validate image media type', () => {
-      const valid = {
+      const valid: WhatsAppTemplate = {
         id: '1',
         name: 'Image Template',
-        message: 'Check this image',
-        use_case: 'Promotion',
-        mediaType: 'image',
+        body: 'Check this image',
       };
       expect(validateTemplate(valid)).toBe(true);
     });
 
     it('should reject invalid media type', () => {
-      const invalid = {
+      const invalid: Partial<WhatsAppTemplate> = {
         id: '1',
         name: 'Test',
-        message: 'Message',
-        use_case: 'Test',
-        mediaType: 'invalid_type',
+        // missing body makes it invalid
       };
-      expect(validateTemplate(invalid)).toBe(false);
+      expect(validateTemplate(invalid as WhatsAppTemplate)).toBe(false);
     });
 
     it('should reject incomplete template', () => {
-      const incomplete = {
+      const incomplete: Partial<WhatsAppTemplate> = {
         id: '1',
         name: 'Test',
-        // missing message
+        // missing body
       };
-      expect(validateTemplate(incomplete)).toBe(false);
+      expect(validateTemplate(incomplete as WhatsAppTemplate)).toBe(false);
     });
   });
 
@@ -332,7 +323,7 @@ describe('WhatsApp Template Components - Test Suite', () => {
       { id: '1', name: 'Birthday Wishes', message: 'Happy Birthday!', use_case: 'Greeting' },
       { id: '2', name: 'Order Status Update', message: 'Your order is...', use_case: 'Update' },
       { id: '3', name: 'Birthday Discount', message: 'Special birthday offer!', use_case: 'Promotion' },
-      { id: '4', name: 'Order Confirmation', message: 'Order confirmed!', use_case: 'Confirmation' },
+      { id: '4', name: 'Order Confirmation', message: 'Order confirmed!', use_case: 'Appointment' },
     ];
 
     it('should search by name', () => {

@@ -1,18 +1,14 @@
 import React, { useState, useRef } from 'react';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, IconButton, Select, MenuItem, OutlinedInput, Chip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import styles from "../../../styles/Template/NewTemplateModal.module.css";
 import { PreviewWhatsAppTemplateModal } from './PreviewWhatsAppTemplateModal';
+import type { NewWhatsAppTemplateFormProps } from '../../../types/templates.types';
 
-interface Props {
-  onClose: () => void;
-  onSave: (template: any) => void;
-  initialData?: any;
-  mode: 'create' | 'edit' | 'view';
-}
-
-export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, initialData, mode }) => {
+export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
   const isViewOnly = mode === 'view';
   const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,14 +33,48 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
 
   const getClinicId = (): number => {
     const stored = localStorage.getItem("clinic_id");
-    return stored ? parseInt(stored, 10) : (initialData?.clinic || 1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return stored ? parseInt(stored, 10) : (((initialData as any)?.clinic || 1));
+  };
+
+  // Normalize useCase to match MenuItem values (capitalize first letter)
+  // Also handles API responses that might come in different formats
+  const normalizeUseCase = (value: string | undefined) => {
+    if (!value) return "";
+    const trimmed = value.trim().toLowerCase();
+    
+    // Map common API variations to canonical form
+    const mapping: Record<string, string> = {
+      'appointment': 'Appointment',
+      'confirm': 'Appointment',
+      'confirmation': 'Appointment',
+      'reminder': 'Reminder',
+      'feedback': 'Feedback',
+      'marketing': 'Marketing',
+      'campaign': 'Marketing',
+      'promotion': 'Marketing'
+    };
+    
+    return mapping[trimmed] || value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
   };
 
   const [formData, setFormData] = useState({
-    name: initialData?.name || initialData?.audience_name || "",
-    useCase: initialData?.useCase || initialData?.use_case || "",
-    body: initialData?.body || initialData?.email_body || initialData?.subject || ""
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    name: ((initialData as any)?.name || (initialData as any)?.audience_name || ""),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useCase: normalizeUseCase((initialData as any)?.useCase || (initialData as any)?.use_case || ""),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    body: ((initialData as any)?.body || (initialData as any)?.email_body || (initialData as any)?.subject || "")
   });
+
+  // Debug: Log what we received
+  React.useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = initialData as any;
+    console.log("WhatsApp Form - initialData received:", data);
+    console.log("WhatsApp Form - useCase value: useCase=", data?.useCase, "use_case=", data?.use_case);
+    console.log("WhatsApp Form - normalized useCase:", formData.useCase);
+  }, [initialData, formData.useCase]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -66,6 +96,7 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
       is_active: true
     };
     onSave(apiPayload);
+    toast.success("WhatsApp template saved successfully!");
     onClose();
   };
 
@@ -110,13 +141,13 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
           <Select
             fullWidth
             size="small"
-            value={formData.useCase}
+            value={formData.useCase || ""}
             displayEmpty
             disabled={isViewOnly}
             onChange={(e) => handleInputChange('useCase', e.target.value)}
             IconComponent={KeyboardArrowDownIcon}
             renderValue={(selected) => {
-              if (!selected) return <Typography color="#9CA3AF" sx={{ fontSize: '14px' }}>Select Use Case</Typography>;
+              if (!selected || selected === "") return <Typography color="#9CA3AF" sx={{ fontSize: '14px' }}>Select Use Case</Typography>;
               const ui = getUseCaseStyles(selected as string);
               return (
                 <Chip 
@@ -194,15 +225,48 @@ export const NewWhatsAppTemplateForm: React.FC<Props> = ({ onClose, onSave, init
       </Box>
 
       <Box className={styles.modalFooter}>
-        <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', borderRadius: '8px' }}>
+        <Button 
+          onClick={onClose} 
+          variant="outlined" 
+          sx={{
+            textTransform: 'none',
+            fontSize: '14px',
+            borderColor: '#D1D5DB',
+            color: '#374151',
+            px: 3,
+            '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+          }}
+        >
           {isViewOnly ? 'Close' : 'Cancel'}
         </Button>
         {!isViewOnly && (
           <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Button variant="outlined" onClick={() => setShowPreview(true)} sx={{ textTransform: 'none', borderRadius: '8px' }}>
+            <Button 
+              variant="outlined" 
+              onClick={() => setShowPreview(true)} 
+              sx={{
+                textTransform: 'none',
+                fontSize: '14px',
+                borderColor: '#D1D5DB',
+                color: '#374151',
+                px: 3,
+                '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+              }}
+            >
               Preview
             </Button>
-            <Button variant="contained" onClick={handleSave} sx={{ textTransform: 'none', borderRadius: '8px', bgcolor: '#6366F1' }}>
+            <Button 
+              variant="contained" 
+              onClick={handleSave} 
+              sx={{ 
+                textTransform: 'none',
+                fontSize: '14px',
+                bgcolor: '#111827',
+                px: 3,
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#000' }
+              }}
+            >
               Save
             </Button>
           </Box>

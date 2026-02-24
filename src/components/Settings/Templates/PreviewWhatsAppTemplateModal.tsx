@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Button, IconButton } from '@mui/material';
+import { Box, Button, IconButton, Dialog } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import styles from '../../../styles/Template/PreviewWhatsAppTemplateModal.module.css';
 
@@ -30,48 +30,44 @@ export const PreviewWhatsAppTemplateModal: React.FC<PreviewProps> = ({
   };
 
   return (
-    <Box className={styles.modalContainer}>
+    <Dialog open={true} onClose={onClose} maxWidth="sm" fullWidth>
+      {/* Header */}
       <Box className={styles.modalHeader}>
-        <Typography className={styles.modalTitle}>Preview Template</Typography>
-        <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
+        <span className={styles.modalTitle}>
+          Preview Template
+        </span>
+        <IconButton onClick={onClose} size="small">
+          <CloseIcon fontSize="small" />
+        </IconButton>
       </Box>
 
-      <Box className={styles.previewContent} sx={{ 
-        m: 2,
-        border: '1px solid #E5E7EB',
-        borderRadius: '12px',
-        backgroundColor: '#FFFFFF',
-        overflow: 'hidden',
-        display: 'flex', 
-        justifyContent: 'flex-end', 
-        alignItems: 'flex-end', 
-        minHeight: '300px', 
-        p: 3 
-      }}>
-        <Box sx={{ 
-          backgroundColor: '#E3F2FD',
-          borderRadius: '12px',
-          padding: '12px 16px',
-          maxWidth: '60%',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-        }}>
-          <Box sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', mb: 1, color: '#000000', fontSize: '14px', lineHeight: 1.5 }}>
-            {renderBody(templateData.body)}
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-            <span className={styles.timestamp} style={{ fontSize: '12px', color: '#999999', marginTop: '4px' }}>5:47 AM</span>
+      {/* Preview Content - Chat Bubble Style */}
+      <Box className={styles.previewContent}>
+        <Box className={styles.whatsappBubble}>
+          {renderBody(templateData.body)}
+          <Box className={styles.timestamp}>
+            5:47 AM
           </Box>
         </Box>
       </Box>
 
+      {/* Footer with Actions */}
       <Box className={styles.modalFooter}>
-        <Button variant="outlined" onClick={onBackToEdit} className={styles.backBtn}>
+        <Button 
+          variant="outlined" 
+          onClick={onBackToEdit}
+          className={styles.backBtn}
+        >
           Back to Edit
         </Button>
-        <Button variant="contained" onClick={onSave} className={styles.saveBtn}>
+        <Button 
+          variant="contained" 
+          onClick={onSave}
+          className={styles.saveBtn}
+        >
           Save
         </Button>
       </Box>
-    </Box>
+    </Dialog>
   );
 };
