@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { SMSTemplate } from '../../../types/templates.types';
 
 describe('SMS Template Components - Test Suite', () => {
   
@@ -281,33 +282,30 @@ describe('SMS Template Components - Test Suite', () => {
   });
 
   describe('SMS Template Validation Rules', () => {
-    const validateTemplate = (template: any) => {
+    const validateTemplate = (template: SMSTemplate | null | undefined) => {
       return template &&
         typeof template.id === 'string' &&
         typeof template.name === 'string' &&
-        typeof template.message === 'string' &&
-        typeof template.use_case === 'string' &&
-        typeof template.createdBy === 'string';
+        typeof template.body === 'string' &&
+        (template.is_active === undefined || typeof template.is_active === 'boolean');
     };
 
     it('should validate correct SMS template', () => {
-      const valid = {
+      const valid: SMSTemplate = {
         id: '1',
         name: 'Test',
-        message: 'Message',
-        use_case: 'Test',
-        createdBy: 'Admin',
+        body: 'Message',
       };
       expect(validateTemplate(valid)).toBe(true);
     });
 
     it('should reject invalid SMS template', () => {
-      const invalid = {
+      const invalid: Partial<SMSTemplate> = {
         id: '1',
         name: 'Test',
-        // missing message
+        // missing body
       };
-      expect(validateTemplate(invalid)).toBe(false);
+      expect(validateTemplate(invalid as SMSTemplate)).toBe(false);
     });
 
     it('should reject null values', () => {

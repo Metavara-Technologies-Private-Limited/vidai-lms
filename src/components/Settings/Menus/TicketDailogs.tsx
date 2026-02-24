@@ -193,11 +193,12 @@ const TicketDailog = ({
       </Dialog>
 
       {/* ================= VIEW TEMPLATE ================= */}
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <NewTemplateModal
         open={viewTemplateOpen}
         onClose={() => setViewTemplateOpen(false)}
         onSave={() => {}}
-        initialData={viewTemplateData}
+        initialData={viewTemplateData as any || undefined}
         mode="view"
       />
     </>

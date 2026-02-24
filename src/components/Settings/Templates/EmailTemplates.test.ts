@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { EmailTemplate } from '../../../types/templates.types';
 
 describe('Vitest Configuration - Email Templates Test Suite', () => {
   
@@ -177,50 +178,41 @@ describe('Vitest Configuration - Email Templates Test Suite', () => {
   });
 
   describe('Template Validation', () => {
-    const validateTemplate = (template: any) => {
+    const validateTemplate = (template: EmailTemplate | null | undefined) => {
       return template &&
         typeof template.id === 'string' &&
-        typeof template.name === 'string' &&
+        typeof template.audience_name === 'string' &&
         typeof template.subject === 'string' &&
-        typeof template.body === 'string' &&
-        typeof template.use_case === 'string' &&
-        typeof template.createdBy === 'string' &&
-        typeof template.lastUpdatedAt === 'string';
+        typeof template.email_body === 'string';
     };
 
     it('should validate valid template', () => {
-      const validTemplate = {
+      const validTemplate: EmailTemplate = {
         id: '1',
-        name: 'Test',
+        audience_name: 'Test Audience',
         subject: 'Subject',
-        body: '<p>Body</p>',
-        use_case: 'Test',
-        createdBy: 'Admin',
-        lastUpdatedAt: '2024-01-15 | 10:30 AM',
+        email_body: '<p>Body</p>',
       };
 
       expect(validateTemplate(validTemplate)).toBe(true);
     });
 
     it('should reject invalid template', () => {
-      const invalidTemplate = {
+      const invalidTemplate: Partial<EmailTemplate> = {
         id: '1',
-        name: 'Test',
+        audience_name: 'Test',
         // missing required fields
       };
 
-      expect(validateTemplate(invalidTemplate)).toBe(false);
+      expect(validateTemplate(invalidTemplate as EmailTemplate)).toBe(false);
     });
 
     it('should handle edge case - empty strings', () => {
-      const edgeCaseTemplate = {
+      const edgeCaseTemplate: EmailTemplate = {
         id: '',
-        name: '',
+        audience_name: '',
         subject: '',
-        body: '',
-        use_case: '',
-        createdBy: '',
-        lastUpdatedAt: '',
+        email_body: '',
       };
 
       expect(validateTemplate(edgeCaseTemplate)).toBe(true);
