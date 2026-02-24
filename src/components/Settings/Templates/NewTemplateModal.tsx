@@ -40,8 +40,18 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 
   useEffect(() => {
     if (open) {
-      // Detect template type from initialData based on which fields are present
-      if (initialData) {
+      // First, check if initialData has a 'type' field (from edit action)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dataType = (initialData as any)?.type;
+      
+      if (dataType === 'whatsapp') {
+        setView('whatsapp');
+      } else if (dataType === 'sms') {
+        setView('sms');
+      } else if (dataType === 'email') {
+        setView('email');
+      } else if (initialData) {
+        // Fallback to field-based detection for templates without explicit type
         if ('audience_name' in initialData || 'subject' in initialData) {
           setView('email');
         } else if ('body' in initialData && !('audience_name' in initialData) && !('subject' in initialData)) {

@@ -67,14 +67,23 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
     body: ((initialData as any)?.body || (initialData as any)?.email_body || (initialData as any)?.subject || "")
   });
 
-  // Debug: Log what we received
+  // Sync formData when initialData changes (for edit/view mode)
   React.useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = initialData as any;
-    console.log("WhatsApp Form - initialData received:", data);
-    console.log("WhatsApp Form - useCase value: useCase=", data?.useCase, "use_case=", data?.use_case);
-    console.log("WhatsApp Form - normalized useCase:", formData.useCase);
-  }, [initialData, formData.useCase]);
+    if (initialData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = initialData as any;
+      setFormData({
+        name: data?.name || data?.audience_name || "",
+        useCase: normalizeUseCase(data?.useCase || data?.use_case || ""),
+        body: data?.body || data?.email_body || data?.subject || ""
+      });
+      console.log("WhatsApp Form - Updated formData from initialData:", {
+        name: data?.name || data?.audience_name,
+        useCase: normalizeUseCase(data?.useCase || data?.use_case),
+        body: data?.body || data?.email_body || data?.subject
+      });
+    }
+  }, [initialData?.id]); // Re-sync when initialData id changes (new template selected)
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -96,13 +105,15 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
       is_active: true
     };
     onSave(apiPayload);
-    toast.success("WhatsApp template saved successfully!");
+    const message = mode === 'edit' ? "WhatsApp template updated successfully!" : "WhatsApp template saved successfully!";
+    toast.success(message);
     onClose();
   };
 
   if (showPreview) {
     return (
       <PreviewWhatsAppTemplateModal
+        open={showPreview}
         onClose={onClose}
         onBackToEdit={() => setShowPreview(false)}
         onSave={handleSave}

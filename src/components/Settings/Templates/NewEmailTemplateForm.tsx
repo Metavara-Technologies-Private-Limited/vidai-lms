@@ -97,6 +97,20 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     subject: ((initialData as EmailTemplate)?.subject || 'Your Consultation is Confirmed - {appointment_date}'),
   });
 
+  // Sync formData when initialData changes (for edit/view mode)
+  React.useEffect(() => {
+    if (initialData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = initialData as any;
+      setFormData(prev => ({
+        ...prev,
+        name: data?.name || prev.name,
+        useCase: normalizeUseCase(data?.use_case || data?.useCase || prev.useCase),
+        subject: data?.subject || prev.subject
+      }));
+    }
+  }, [initialData?.id]); // Re-sync when initialData id changes
+
   const [showPreview, setShowPreview] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [colorAnchor, setColorAnchor] = useState<HTMLButtonElement | null>(null);
@@ -260,7 +274,8 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     console.log("📧 Email Template Payload:", JSON.stringify(apiPayload, null, 2));
 
     onSave(apiPayload);
-    toast.success("Email template saved successfully!");
+    const message = mode === 'edit' ? "Email template updated successfully!" : "Email template saved successfully!";
+    toast.success(message);
     onClose();
   };
 

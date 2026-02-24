@@ -60,6 +60,19 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
     body: ((initialData as any)?.body || (initialData as any)?.email_body || (initialData as any)?.subject || "")
   });
 
+  // Sync formData when initialData changes (for edit/view mode)
+  React.useEffect(() => {
+    if (initialData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = initialData as any;
+      setFormData({
+        name: data?.name || data?.audience_name || "",
+        useCase: normalizeUseCase(data?.useCase || data?.use_case || ""),
+        body: data?.body || data?.email_body || data?.subject || ""
+      });
+    }
+  }, [initialData?.id]); // Re-sync when initialData id changes
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -94,7 +107,8 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
     console.log("🚀 Saving SMS with File:", selectedFile?.name || "No file");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onSave(apiPayload as any);
-    toast.success("SMS template saved successfully!");
+    const message = mode === 'edit' ? "SMS template updated successfully!" : "SMS template saved successfully!";
+    toast.success(message);
     onClose();
   };
 
@@ -102,7 +116,6 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
     return (
       <PreviewSMSTemplateModal
         open={showPreview}
-        onClose={onClose}
         onBackToEdit={() => setShowPreview(false)}
         onSave={handleSave} 
         templateData={formData}

@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import styles from '../../../styles/Template/PreviewWhatsAppTemplateModal.module.css';
 
 interface PreviewProps {
+  open: boolean;
   onClose: () => void;
   onBackToEdit: () => void;
   onSave: () => void;
@@ -11,7 +12,7 @@ interface PreviewProps {
 }
 
 export const PreviewWhatsAppTemplateModal: React.FC<PreviewProps> = ({ 
-  onClose, onBackToEdit, onSave, templateData 
+  open, onBackToEdit, onSave, templateData 
 }) => {
   // Regex for WhatsApp {{variable}} syntax
   const renderBody = (text: string) => {
@@ -30,13 +31,13 @@ export const PreviewWhatsAppTemplateModal: React.FC<PreviewProps> = ({
   };
 
   return (
-    <Dialog open={true} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onBackToEdit} maxWidth="sm" fullWidth>
       {/* Header */}
       <Box className={styles.modalHeader}>
         <span className={styles.modalTitle}>
           Preview Template
         </span>
-        <IconButton onClick={onClose} size="small">
+        <IconButton onClick={onBackToEdit} size="small">
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>

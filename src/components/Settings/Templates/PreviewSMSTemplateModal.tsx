@@ -5,15 +5,16 @@ import styles from '../../../styles/Template/PreviewSMSTemplateModal.module.css'
 
 interface PreviewProps {
   open: boolean;
-  onClose: () => void;
   onBackToEdit: () => void;
   onSave: () => void;
   templateData: { name?: string; useCase?: string; body: string };
 }
 
 export const PreviewSMSTemplateModal: React.FC<PreviewProps> = ({ 
-  onClose, onBackToEdit, onSave, templateData 
+  open, onBackToEdit, onSave, templateData 
 }) => {
+  if (!open) return null;
+
   const renderBody = (text: string) => {
     const parts = text.split(/(\{[^}]+\})/g);
     return parts.map((part, index) => (
@@ -27,7 +28,7 @@ export const PreviewSMSTemplateModal: React.FC<PreviewProps> = ({
     <Box className={styles.modalContainer}>
       <Box className={styles.modalHeader}>
         <Typography className={styles.modalTitle}>Preview Template</Typography>
-        <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
+        <IconButton onClick={onBackToEdit} size="small"><CloseIcon /></IconButton>
       </Box>
 
       <Box className={styles.previewContent} sx={{ 

@@ -1,8 +1,6 @@
 import React from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, Stack } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import type { Template } from '../../../types/templates.types';
 
 interface Props {
@@ -31,7 +29,6 @@ Created By: ${createdBy}
 
   const handleCopy = () => {
     navigator.clipboard.writeText(copyText);
-    toast.success("Template details copied to clipboard!");
     onCopySuccess();
     onClose();
   };

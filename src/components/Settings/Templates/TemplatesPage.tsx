@@ -165,7 +165,7 @@ const TemplatesPage: React.FC = () => {
       <NewTemplateModal 
         open={isModalOpen} 
         onClose={() => setModalOpen(false)} 
-        onSave={() => { loadTemplates(); toast.success(`Template ${viewMode === 'edit' ? 'updated' : 'saved'} successfully!`); }} 
+        onSave={() => { loadTemplates(); }} 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         initialData={activeTemplate as any || undefined} 
         mode={viewMode} 
