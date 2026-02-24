@@ -12,7 +12,7 @@ import FilterTickets from "./FilterTicket";
 import dayjs from "dayjs";
 
 // Types & Styles
-import type { TicketListItem, TicketFilters, FilterTicketsPayload, PaginatedResponse } from "../../../types/tickets.types";
+import type { TicketListItem, TicketFilters, FilterTicketsPayload } from "../../../types/tickets.types";
 import {
   ticketsSearchBoxSx,
   createTicketButtonSx,
@@ -78,10 +78,8 @@ const Tickets = () => {
         ]);
 
 
-        if (results[0].status === "fulfilled") {
-          const data = results[0].value as Employee[] | PaginatedResponse<Employee>;
-
-          setEmployees(Array.isArray(data) ? data : data.results);
+        if (results[0].status === 'fulfilled') {
+          setEmployees(Array.isArray(results[0].value) ? results[0].value : (results[0].value as any).results || []);
         }
 
       } catch (err) {
@@ -101,17 +99,16 @@ const Tickets = () => {
 
   const ticketsFromDb = useMemo(() => {
     if (Array.isArray(rawTickets)) return rawTickets;
-    if (rawTickets && typeof rawTickets === "object" && "results" in rawTickets) {
-      return (rawTickets as PaginatedResponse<TicketListItem>).results;
+    if (rawTickets && typeof rawTickets === 'object' && 'results' in rawTickets) {
+      return (rawTickets as any).results as TicketListItem[];
     }
-
     return [] as TicketListItem[];
   }, [rawTickets]);
 
   const getCount = (status: string) => {
     const key = status.toLowerCase();
     if (dashboardCounts && typeof dashboardCounts === 'object' && key in dashboardCounts) {
-      return dashboardCounts[key as keyof typeof dashboardCounts] || 0;
+      return (dashboardCounts as any)[key] || 0;
     }
     return ticketsFromDb.filter((t) => t.status?.toLowerCase() === key).length;
   };
