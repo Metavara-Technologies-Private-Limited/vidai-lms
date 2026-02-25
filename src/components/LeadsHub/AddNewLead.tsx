@@ -12,6 +12,8 @@ import {
   FormControlLabel,
   Chip,
   CircularProgress,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -19,6 +21,9 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 // ── Redux ──────────────────────────────────────────────────────────
 import { useSelector } from "react-redux";
@@ -118,6 +123,26 @@ type ApiError = {
   message?: string;
 };
 
+// ====================== Document Config ======================
+const ALLOWED_DOC_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+const MAX_DOC_SIZE_MB = 10;
+
+const getDocColor = (name: string): string => {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    pdf: "#EF4444", doc: "#3B82F6", docx: "#3B82F6",
+    jpg: "#10B981", jpeg: "#10B981", png: "#10B981", webp: "#10B981",
+  };
+  return map[ext] ?? "#6366F1";
+};
+
 // ====================== Helpers ======================
 const strOrNull = (val: string | undefined | null): string | null =>
   val && val.trim() !== "" ? val.trim() : null;
@@ -206,6 +231,11 @@ export default function AddNewLead() {
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
   const [clinicId] = React.useState(1);
 
+  // ✅ NEW — document state (added, nothing else changed)
+  const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
+  const [docDragOver, setDocDragOver] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const rawCampaigns = useSelector(selectCampaign);
 
   const campaigns = React.useMemo(
@@ -254,8 +284,6 @@ export default function AddNewLead() {
   });
 
   // ====================== Computed: available task statuses ======================
-  // Only show statuses valid for the selected task type.
-  // If no task type selected → show all options.
   const availableTaskStatuses = React.useMemo<{ label: string; value: string }[]>(() => {
     if (!form.nextType) {
       return [
@@ -347,6 +375,35 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, nextType: newType, nextStatus: autoStatus }));
   };
 
+  // ====================== ✅ Document handlers (NEW) ======================
+  const addFiles = (files: File[]) => {
+    files.forEach((file) => {
+      if (!ALLOWED_DOC_TYPES.includes(file.type)) {
+        toast.error(`"${file.name}" — unsupported type. Use PDF, Word, JPG or PNG.`, {
+          position: "top-right", autoClose: 3000, theme: "colored",
+        });
+        return;
+      }
+      if (file.size > MAX_DOC_SIZE_MB * 1024 * 1024) {
+        toast.error(`"${file.name}" — exceeds ${MAX_DOC_SIZE_MB}MB limit.`, {
+          position: "top-right", autoClose: 3000, theme: "colored",
+        });
+        return;
+      }
+      setPendingFiles((prev) =>
+        prev.find((f) => f.name === file.name && f.size === file.size) ? prev : [...prev, file]
+      );
+    });
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(e.target.files ?? []));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeFile = (index: number) =>
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+
   // ====================== Styles ======================
   const inputStyle = {
     "& .MuiOutlinedInput-root": {
@@ -425,7 +482,7 @@ export default function AddNewLead() {
         errors.push({ type: "error", text: "Please select at least one treatment!" });
       }
       if (errors.length > 0) { await showSequentialToasts(errors); return false; }
-      if (!form.documents) showWarningsNonBlocking([{ type: "info", text: "No documents uploaded" }]);
+      if (!form.documents && pendingFiles.length === 0) showWarningsNonBlocking([{ type: "info", text: "No documents uploaded" }]);
     }
 
     if (currentStep === 3) {
@@ -503,7 +560,15 @@ export default function AddNewLead() {
     try {
       setIsSubmitting(true);
       const payload = buildPayload();
-      const response = await LeadAPI.create(payload);
+
+      // ✅ If files selected → send as multipart in one request, else plain JSON
+      let response;
+      if (pendingFiles.length > 0) {
+        response = await LeadAPI.createWithDocuments(payload, pendingFiles);
+      } else {
+        response = await LeadAPI.create(payload);
+      }
+
       console.log("✅ Lead created:", response);
       toast.success("Lead saved successfully!", { position: "top-right", autoClose: 1500, theme: "colored" });
       navigate("/leads", { replace: true });
@@ -778,7 +843,6 @@ export default function AddNewLead() {
             </Typography>
 
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 2 }}>
-              {/* Assigned To */}
               <Box>
                 <Typography sx={labelStyle}>Assigned To</Typography>
                 <TextField
@@ -801,7 +865,6 @@ export default function AddNewLead() {
                 </TextField>
               </Box>
 
-              {/* Next Action Type — full task type list */}
               <Box>
                 <Typography sx={labelStyle}>Next Action Type</Typography>
                 <TextField
@@ -817,7 +880,6 @@ export default function AddNewLead() {
                 </TextField>
               </Box>
 
-              {/* Next Action Status — filtered by task type selection */}
               <Box>
                 <Typography sx={labelStyle}>
                   Next Action Status
@@ -832,7 +894,6 @@ export default function AddNewLead() {
                   value={form.nextStatus}
                   onChange={handleChange("nextStatus")}
                   sx={form.nextType ? readOnlyStyle : inputStyle}
-                  // Make it read-only when task type is selected (status auto-set)
                   InputProps={{ readOnly: Boolean(form.nextType) }}
                 >
                   {availableTaskStatuses.map((opt) => (
@@ -904,38 +965,110 @@ export default function AddNewLead() {
             <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
               DOCUMENTS & REPORTS
             </Typography>
-            <Box sx={{ mb: 2 }}>
-              <Typography sx={labelStyle}>Upload Documents</Typography>
-              <Box
+
+            {/* ✅ NEW — Drop Zone replaces old single "Choose File" button */}
+            <Box
+              onDrop={(e) => { e.preventDefault(); setDocDragOver(false); addFiles(Array.from(e.dataTransfer.files)); }}
+              onDragOver={(e) => { e.preventDefault(); setDocDragOver(true); }}
+              onDragLeave={() => setDocDragOver(false)}
+              onClick={() => fileInputRef.current?.click()}
+              sx={{
+                border: docDragOver ? "2px dashed #6366F1" : "2px dashed #E2E8F0",
+                borderRadius: "12px",
+                p: 3,
+                display: "inline-flex",
+                flexDirection: "column",
+                alignItems: "center",
+                textAlign: "center",
+                bgcolor: docDragOver ? "rgba(99,102,241,0.04)" : "#F8FAFC",
+                minWidth: "400px",
+                transition: "all 0.2s",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                hidden
+                multiple
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                onChange={handleFileInputChange}
+              />
+              <UploadFileIcon sx={{ fontSize: 28, color: "#94A3B8", mb: 1 }} />
+              <Button
+                variant="contained"
+                component="span"
+                onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                 sx={{
-                  border: "2px dashed #E2E8F0",
-                  borderRadius: "12px",
-                  p: 3,
-                  display: "inline-block",
-                  textAlign: "center",
-                  bgcolor: "#F8FAFC",
-                  minWidth: "400px",
+                  bgcolor: "#64748B",
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  fontWeight: 600,
+                  px: 3,
+                  py: 1,
+                  "&:hover": { bgcolor: "#475569" },
                 }}
               >
-                <Button
-                  variant="contained"
-                  component="label"
-                  sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, px: 3, py: 1, "&:hover": { bgcolor: "#475569" } }}
-                >
-                  Choose File
-                  <input
-                    type="file"
-                    hidden
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, documents: e.target.files ? e.target.files[0] : null }))
-                    }
-                  />
-                </Button>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                  {form.documents ? form.documents.name : "No File Chosen"}
-                </Typography>
-              </Box>
+                Choose File
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                {pendingFiles.length > 0
+                  ? `${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""} selected`
+                  : "No File Chosen · PDF, Word, JPG, PNG up to 10MB"}
+              </Typography>
             </Box>
+
+            {/* ✅ NEW — Selected files list with remove button */}
+            {pendingFiles.length > 0 && (
+              <Stack spacing={1} sx={{ mt: 2, maxWidth: "500px" }}>
+                {pendingFiles.map((file, index) => {
+                  const color = getDocColor(file.name);
+                  const ext = file.name.split(".").pop()?.toUpperCase() ?? "FILE";
+                  return (
+                    <Stack
+                      key={`${file.name}-${index}`}
+                      direction="row"
+                      alignItems="center"
+                      spacing={2}
+                      sx={{
+                        px: 2, py: 1, borderRadius: "8px",
+                        border: "1px solid #E2E8F0", bgcolor: "#F8FAFC",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 32, height: 32, borderRadius: "6px",
+                          bgcolor: `${color}18`, display: "flex",
+                          alignItems: "center", justifyContent: "center", flexShrink: 0,
+                        }}
+                      >
+                        <InsertDriveFileOutlinedIcon sx={{ fontSize: 16, color }} />
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="body2" fontWeight={600} color="#1E293B"
+                          sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        >
+                          {file.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {ext} · {(file.size / 1024).toFixed(0)} KB
+                        </Typography>
+                      </Box>
+                      <Tooltip title="Remove">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => { e.stopPropagation(); removeFile(index); }}
+                          sx={{ color: "#94A3B8", "&:hover": { color: "#EF4444" } }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  );
+                })}
+              </Stack>
+            )}
           </Box>
         )}
 
