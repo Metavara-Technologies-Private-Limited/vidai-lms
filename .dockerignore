@@ -1,9 +1,12 @@
+# ignore everything in devops except what we need
+devops/*
+!devops/Dockerfile
+!devops/nginx.conf
 node_modules
 dist
 .git
 .gitignore
 .github
-devops
 .vscode
 .DS_Store
 .env
