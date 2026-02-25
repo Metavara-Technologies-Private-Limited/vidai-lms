@@ -19,6 +19,9 @@ interface LeadState {
   loading: boolean;
   error: string | null;
   deletingIds: string[];
+  // ✅ Document state
+  documentsUploading: boolean;
+  documentsError: string | null;
 }
 
 const initialState: LeadState = {
@@ -26,10 +29,11 @@ const initialState: LeadState = {
   loading: false,
   error: null,
   deletingIds: [],
+  documentsUploading: false,
+  documentsError: null,
 };
 
 // ====================== Status Normalizer ======================
-// Maps whatever the backend returns → consistent display string
 const normalizeStatus = (raw: string): string => {
   const map: Record<string, string> = {
     new:              "New",
@@ -45,9 +49,7 @@ const normalizeStatus = (raw: string): string => {
 
 // ====================== Async Thunks ======================
 
-/**
- * Fetch all leads
- */
+/** Fetch all leads */
 export const fetchLeads = createAsyncThunk<
   Lead[],
   void,
@@ -68,10 +70,7 @@ export const fetchLeads = createAsyncThunk<
   }
 });
 
-/**
- * Book Appointment
- * Sends lead_status: "appointment" — backend now accepts this value.
- */
+/** Book Appointment */
 export const bookAppointment = createAsyncThunk<
   { leadId: string; appointmentData: any },
   { leadId: string; payload: any },
@@ -92,7 +91,6 @@ export const bookAppointment = createAsyncThunk<
     slot: payload.slot,
     is_active: lead.is_active !== false,
     partner_inquiry: lead.partner_inquiry || false,
-    // ✅ Backend now accepts "appointment" — status will persist on refresh
     lead_status: "appointment",
     ...(payload.assigned_to_id && { assigned_to_id: payload.assigned_to_id }),
     ...(payload.remark && { remark: payload.remark }),
@@ -114,9 +112,7 @@ export const bookAppointment = createAsyncThunk<
   return { leadId, appointmentData: payload };
 });
 
-/**
- * Convert a lead — sends lead_status: "converted" to backend.
- */
+/** Convert Lead */
 export const convertLead = createAsyncThunk<
   string,
   string,
@@ -138,7 +134,6 @@ export const convertLead = createAsyncThunk<
       slot: lead.slot || "",
       is_active: lead.is_active !== false,
       partner_inquiry: lead.partner_inquiry || false,
-      // ✅ Backend now accepts "converted"
       lead_status: "converted",
       next_action_status: "completed",
       next_action_description: "Lead converted to patient",
@@ -157,9 +152,7 @@ export const convertLead = createAsyncThunk<
   }
 });
 
-/**
- * Delete a lead (soft delete)
- */
+/** Delete a lead (soft delete) */
 export const deleteLead = createAsyncThunk<
   string,
   string,
@@ -179,9 +172,7 @@ export const deleteLead = createAsyncThunk<
   }
 });
 
-/**
- * Delete multiple leads at once
- */
+/** Delete multiple leads */
 export const deleteLeads = createAsyncThunk<
   string[],
   string[],
@@ -201,6 +192,71 @@ export const deleteLeads = createAsyncThunk<
   }
 });
 
+// ====================== Document Thunks ======================
+
+/**
+ * Upload a single document file to a lead.
+ * PUT /leads/{lead_id}/update/ with multipart/form-data
+ * Updates the lead's documents array in the store on success.
+ */
+export const uploadLeadDocument = createAsyncThunk<
+  { leadId: string; updatedLead: Lead },
+  { leadId: string; file: File },
+  { rejectValue: string }
+>("leads/uploadDocument", async ({ leadId, file }, { rejectWithValue }) => {
+  try {
+    const updatedLead = await LeadAPI.uploadDocument(leadId, file);
+    return { leadId, updatedLead };
+  } catch (err) {
+    const error = err as ApiError;
+    return rejectWithValue(
+      error?.response?.data?.detail || error?.message || "Failed to upload document"
+    );
+  }
+});
+
+/**
+ * Upload multiple document files to a lead sequentially.
+ * Each file calls PUT /leads/{lead_id}/update/ with multipart/form-data.
+ * Updates the lead's documents array in the store on success.
+ */
+export const uploadLeadDocuments = createAsyncThunk<
+  { leadId: string; updatedLead: Lead },
+  { leadId: string; files: File[] },
+  { rejectValue: string }
+>("leads/uploadDocuments", async ({ leadId, files }, { rejectWithValue }) => {
+  try {
+    const updatedLead = await LeadAPI.uploadDocuments(leadId, files);
+    return { leadId, updatedLead };
+  } catch (err) {
+    const error = err as ApiError;
+    return rejectWithValue(
+      error?.response?.data?.detail || error?.message || "Failed to upload documents"
+    );
+  }
+});
+
+/**
+ * Fetch the documents list for a specific lead from the API.
+ * GET /leads/{lead_id}/ → returns lead.documents[]
+ * Refreshes the lead's documents in the store.
+ */
+export const fetchLeadDocuments = createAsyncThunk<
+  { leadId: string; documents: string[] },
+  string,
+  { rejectValue: string }
+>("leads/fetchDocuments", async (leadId, { rejectWithValue }) => {
+  try {
+    const documents = await LeadAPI.getDocuments(leadId);
+    return { leadId, documents };
+  } catch (err) {
+    const error = err as ApiError;
+    return rejectWithValue(
+      error?.response?.data?.detail || error?.message || "Failed to fetch documents"
+    );
+  }
+});
+
 // ====================== Slice ======================
 const leadSlice = createSlice({
   name: "leads",
@@ -212,19 +268,19 @@ const leadSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    clearDocumentsError: (state) => {
+      state.documentsError = null;
+    },
   },
   extraReducers: (builder) => {
     builder
-      // ========== Fetch Leads ==========
+      // ── Fetch Leads ────────────────────────────────────────────
       .addCase(fetchLeads.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchLeads.fulfilled, (state, action) => {
         state.loading = false;
-        // ✅ Normalize status from backend into consistent display strings
-        // Backend now stores "appointment", "converted" etc. correctly
-        // so no localStorage tricks needed — just map the values cleanly
         state.leads = action.payload.map((lead) => ({
           ...lead,
           status: normalizeStatus(
@@ -237,8 +293,7 @@ const leadSlice = createSlice({
         state.error = action.payload ?? "Failed to fetch leads";
       })
 
-      // ========== Book Appointment ==========
-      // Optimistic: patch status immediately on PENDING
+      // ── Book Appointment ───────────────────────────────────────
       .addCase(bookAppointment.pending, (state, action) => {
         const { leadId, payload } = action.meta.arg;
         state.leads = state.leads.map((lead) =>
@@ -258,25 +313,19 @@ const leadSlice = createSlice({
         );
       })
       .addCase(bookAppointment.fulfilled, (_state, _action) => {
-        // Already patched in pending — nothing extra needed
+        // already patched optimistically
       })
       .addCase(bookAppointment.rejected, (state, action) => {
-        // API failed — revert optimistic update
         const { leadId } = action.meta.arg;
         state.leads = state.leads.map((lead) =>
           lead.id === leadId
-            ? {
-                ...lead,
-                status: "New" as any,
-                lead_status: "new" as any,
-                book_appointment: false,
-              }
+            ? { ...lead, status: "New" as any, lead_status: "new" as any, book_appointment: false }
             : lead
         );
         state.error = action.payload ?? "Failed to book appointment";
       })
 
-      // ========== Convert Lead ==========
+      // ── Convert Lead ───────────────────────────────────────────
       .addCase(convertLead.fulfilled, (state, action) => {
         state.leads = state.leads.map((lead) =>
           lead.id === action.payload
@@ -288,7 +337,7 @@ const leadSlice = createSlice({
         state.error = action.payload ?? "Failed to convert lead";
       })
 
-      // ========== Delete Single Lead ==========
+      // ── Delete Single Lead ─────────────────────────────────────
       .addCase(deleteLead.pending, (state, action) => {
         state.deletingIds.push(action.meta.arg);
         state.error = null;
@@ -302,7 +351,7 @@ const leadSlice = createSlice({
         state.error = action.payload ?? "Failed to delete lead";
       })
 
-      // ========== Delete Multiple Leads ==========
+      // ── Delete Multiple Leads ──────────────────────────────────
       .addCase(deleteLeads.pending, (state, action) => {
         state.deletingIds.push(...action.meta.arg);
         state.error = null;
@@ -314,11 +363,58 @@ const leadSlice = createSlice({
       .addCase(deleteLeads.rejected, (state, action) => {
         state.deletingIds = state.deletingIds.filter((id) => !action.meta.arg.includes(id));
         state.error = action.payload ?? "Failed to delete leads";
+      })
+
+      // ── Upload Single Document ─────────────────────────────────
+      .addCase(uploadLeadDocument.pending, (state) => {
+        state.documentsUploading = true;
+        state.documentsError = null;
+      })
+      .addCase(uploadLeadDocument.fulfilled, (state, action) => {
+        state.documentsUploading = false;
+        const { leadId, updatedLead } = action.payload;
+        // Patch the lead's documents array with the fresh server response
+        state.leads = state.leads.map((lead) =>
+          lead.id === leadId
+            ? { ...lead, documents: updatedLead.documents ?? lead.documents }
+            : lead
+        );
+      })
+      .addCase(uploadLeadDocument.rejected, (state, action) => {
+        state.documentsUploading = false;
+        state.documentsError = action.payload ?? "Failed to upload document";
+      })
+
+      // ── Upload Multiple Documents ──────────────────────────────
+      .addCase(uploadLeadDocuments.pending, (state) => {
+        state.documentsUploading = true;
+        state.documentsError = null;
+      })
+      .addCase(uploadLeadDocuments.fulfilled, (state, action) => {
+        state.documentsUploading = false;
+        const { leadId, updatedLead } = action.payload;
+        state.leads = state.leads.map((lead) =>
+          lead.id === leadId
+            ? { ...lead, documents: updatedLead.documents ?? lead.documents }
+            : lead
+        );
+      })
+      .addCase(uploadLeadDocuments.rejected, (state, action) => {
+        state.documentsUploading = false;
+        state.documentsError = action.payload ?? "Failed to upload documents";
+      })
+
+      // ── Fetch Documents ────────────────────────────────────────
+      .addCase(fetchLeadDocuments.fulfilled, (state, action) => {
+        const { leadId, documents } = action.payload;
+        state.leads = state.leads.map((lead) =>
+          lead.id === leadId ? { ...lead, documents } : lead
+        );
       });
   },
 });
 
-export const { clearLeads, clearError } = leadSlice.actions;
+export const { clearLeads, clearError, clearDocumentsError } = leadSlice.actions;
 export default leadSlice.reducer;
 
 // ====================== Selectors ======================
@@ -327,6 +423,14 @@ export const selectLeadsLoading = (state: { leads: LeadState }) => state.leads.l
 export const selectLeadsError = (state: { leads: LeadState }) => state.leads.error;
 export const selectDeletingIds = (state: { leads: LeadState }) => state.leads.deletingIds;
 export const selectIsLeadDeleting =
-  (leadId: string) =>
-  (state: { leads: LeadState }) =>
+  (leadId: string) => (state: { leads: LeadState }) =>
     state.leads.deletingIds.includes(leadId);
+
+// ✅ Document selectors
+export const selectDocumentsUploading = (state: { leads: LeadState }) =>
+  state.leads.documentsUploading;
+export const selectDocumentsError = (state: { leads: LeadState }) =>
+  state.leads.documentsError;
+export const selectLeadDocuments =
+  (leadId: string) => (state: { leads: LeadState }) =>
+    state.leads.leads.find((l) => l.id === leadId)?.documents ?? [];

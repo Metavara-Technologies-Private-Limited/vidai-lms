@@ -41,11 +41,17 @@ export type Lead = {
   source: string;
   sub_source?: string;
   lead_status?: "New" | "Contacted" | "Follow-Ups" | "Converted" | "Lost" | "Cycle Conversion" | "Appointment";
+  next_action_type?: string;
+  next_action_status?: string;
+  next_action_description?: string;
+  assigned_to_id?: number;
+  assigned_to_name?: string;
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;
   slot: string;
   remark?: string;
+  documents?: string[];
   is_active: boolean;
   created_at: string;
   modified_at: string;
@@ -75,6 +81,7 @@ export type LeadPayload = {
   lead_status?: "new" | "contacted";
   next_action_status?: "pending" | "completed" | null;
   next_action_description?: string;
+  next_action_type?: string;
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;
@@ -113,9 +120,35 @@ export const LeadAPI = {
     return response.data;
   },
 
+  // Original create — plain JSON, no files
   create: async (data: LeadPayload): Promise<Lead> => {
     const response = await api.post<Lead>('/leads/', data);
     console.log("✅ Lead created:", response.data);
+    return response.data;
+  },
+
+  // ✅ NEW — create lead + upload documents in ONE multipart POST /leads/
+  // documents field is read-only after creation, so files must go with the create request
+  createWithDocuments: async (data: LeadPayload, files: File[]): Promise<Lead> => {
+    const formData = new FormData();
+
+    // Append every lead field as a form field
+    (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
+      const value = data[key];
+      if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    });
+
+    // Append each file under the `documents` key
+    files.forEach((file) => {
+      formData.append('documents', file);
+    });
+
+    const response = await api.post<Lead>('/leads/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    console.log("✅ Lead + documents created:", response.data);
     return response.data;
   },
 
@@ -129,10 +162,6 @@ export const LeadAPI = {
     return response.data;
   },
 
-  delete: async (leadId: string): Promise<void> => {
-    await api.patch(`/leads/${leadId}/delete/`);
-  },
-
   // ✅ ARCHIVE: POST /leads/{lead_id}/activate/
   activate: async (leadId: string): Promise<void> => {
     await api.post(`/leads/${leadId}/activate/`);
@@ -141,6 +170,10 @@ export const LeadAPI = {
   // ✅ UNARCHIVE: PATCH /leads/{lead_id}/inactivate/
   inactivate: async (leadId: string): Promise<void> => {
     await api.patch(`/leads/${leadId}/inactivate/`);
+  },
+
+  delete: async (leadId: string): Promise<void> => {
+    await api.patch(`/leads/${leadId}/delete/`);
   },
 };
 
