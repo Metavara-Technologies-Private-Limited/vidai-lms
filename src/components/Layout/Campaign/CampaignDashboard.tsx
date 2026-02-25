@@ -30,6 +30,8 @@ interface Campaign {
   lead_generated?: number;
   scheduledAt?: string;
   objective?: string;
+  total_spend?: number;
+  cpc?: number;
 }
 
 const platformIconMap: Record<string, string> = {
@@ -70,10 +72,10 @@ const CampaignDashboard = ({
       value: campaign.lead_generated || "0",
       icon: conversionsIcon,
     },
-    { title: "Total Spend", value: "$0", icon: spendIcon },
+    {title: "Total Spend",value: `$${campaign.total_spend ?? 0}`,icon: spendIcon,},
     { title: "CTR", value: "0%", icon: ctrIcon },
     { title: "Conversion Rate", value: "0%", icon: conversionRateIcon },
-    { title: "CPC", value: "$0", icon: cpcIcon },
+    {title: "CPC",value: `$${campaign.cpc?.toFixed(2) ?? 0}`,icon: cpcIcon,},
     { title: "CPA", value: "$0", icon: cpaIcon },
   ];
 

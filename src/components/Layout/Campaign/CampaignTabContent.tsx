@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import "../../../../src/styles/Campaign/CampaignTabContent.css";
 import contentImage from "./Images/vidai.png";

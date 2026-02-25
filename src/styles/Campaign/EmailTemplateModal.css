@@ -1,0 +1,261 @@
+.email-template-modal {
+  width: 720px;
+  background: #fff;
+  margin: 80px auto;
+  border-radius: 16px;
+  padding: 24px;
+  outline: none;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.template-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.compose-box {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px dashed #e5e7eb;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.compose-box img {
+  width: 30px;
+  height: 30px;
+  opacity: 0.7;
+}
+
+.compose-box:hover {
+  background: #f9fafb;
+  border-color: #e88f7a;
+}
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.or-divider .line {
+  flex: 1;
+  height: 1px;
+  background: #eee;
+}
+
+.select-label {
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.template-item {
+  border: 1px solid #e5e7eb;
+  padding: 16px 18px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #fff;
+}
+
+.template-item:hover {
+  border-color: #f5b7a3;
+}
+
+/* ✅ ACTIVE STATE */
+.template-item.active {
+  border: 1px solid #e88f7a;
+}
+
+.template-text h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.template-text p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #666;
+}
+.view-icon {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.view-icon img {
+  width: 20px;
+  height: 20px;
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.view-icon img:hover {
+  opacity: 1;
+}
+
+.custom-radio {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  position: relative;
+  cursor: pointer;
+  background: white;
+}
+.custom-radio:checked {
+  border: 2px solid black; /* RED BORDER */
+}
+
+/* INNER DOT */
+.custom-radio:checked::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #c2412d; /* darker inner dot */
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.view-icon {
+  margin-left: auto;
+  font-size: 16px;
+}
+
+.template-actions {
+  display: flex;
+  justify-content: center; /* center the button */
+  margin-top: 24px;
+}
+
+.cancel-btn {
+  padding: 10px 26px;
+  border-radius: 14px;
+  border: 1px solid #cfcfcf;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  width: auto;              /* 🔥 IMPORTANT */
+  display: inline-flex;     /* 🔥 IMPORTANT */
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background: #f3f4f6;
+}
+
+.compose-modal {
+  width: 900px;
+  height: 600px;
+  background: #fff;
+  margin: 60px auto;
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.compose-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.compose-field {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 0;
+  position: relative;
+}
+
+.compose-field input {
+  width: 100%;
+  border: none;
+  outline: none;
+}
+
+.cc-bcc {
+  position: absolute;
+  right: 0;
+  font-size: 13px;
+  color: #888;
+}
+
+.compose-body {
+  flex: 1;
+}
+
+.compose-body textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+}
+
+.compose-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.compose-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.template-btn {
+  padding: 10px 26px;
+  border-radius: 14px;
+  background: #e5e7eb;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.template-btn:hover {
+  background: #d1d5db;   /* Slight darker grey */
+}  
+
+.send-btn {
+  padding: 10px 28px;
+  border-radius: 14px;
+  background: #4b5563;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.send-btn:hover {
+  background: grey;   /* darker on hover */
+}

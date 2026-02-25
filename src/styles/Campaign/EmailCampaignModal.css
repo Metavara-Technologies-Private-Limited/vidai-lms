@@ -691,7 +691,7 @@ select:invalid {
   gap: 8px;
   padding: 8px 14px;
   border-radius: 12px;
-  border: none;
+  border: 1.5px solid #6B6B6B;;
   background: #F3F4F6;
   font-size: 14px;
   font-weight: 600;
@@ -699,7 +699,7 @@ select:invalid {
 }
 
 .outline-btn:hover {
-  background: #F9FAFB;
+  background: #E5E7EB;
 }
 
 .light-btn:hover {
@@ -729,4 +729,105 @@ select:invalid {
 
 .ai-suggest:hover {
   color: #F26A3E;
+}
+  
+/* Overlay */
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 1200;
+}
+
+/* Slide Panel */
+.preview-container {
+  width: 420px;
+  height: 100%;
+  background: #fff;
+  box-shadow: -5px 0 20px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+  animation: slideIn 0.35s ease forwards;
+  display: flex;
+  flex-direction: column;
+}
+
+.email-body-row {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+  margin-top: 20px;
+}
+
+.email-left {
+  flex: 1;
+}
+
+.email-preview {
+  width: 300px;
+  min-height: 320px;   /* 👈 increased height */
+  background: #fff;
+  border: 1px  grey;
+  border-radius: 16px;
+  box-shadow: 0 6px 25px rgba(0,0,0,0.08);
+  padding: 20px;
+  animation: slideInside 0.3s ease;
+}
+
+@keyframes slideInside {
+  from {
+    opacity: 0;
+    transform: translateX(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.chip {
+  background: #f3f4f6;
+  padding: 5px 12px;
+  border-radius: 20px;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preview-header button {
+  background: #f3f4f6;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.preview-body p {
+  margin: 8px 0;
+}
+
+.label {
+  color: #6b7280;  /* grey */
+  font-weight: 400;
+}
+
+.preview-to,
+.preview-subject {
+  border-bottom: 0.5px  #f1f3f5;  /* lighter + thinner */
+  padding-bottom: 6px;
+}
+
+.preview-email-content {
+  margin-top: 15px;
+  line-height: 1.6;
+}
+.preview-divider {
+  height: 1px;
+  background-color: #eceff1;  /* very light grey */
+  margin: 14px 0;
+  width: 100%;
 }

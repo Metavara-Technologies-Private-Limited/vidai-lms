@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -9,14 +10,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import viewIcon from "./Icons/view.png"; 
-
 import { CampaignAPI } from "../../../../src/services/campaign.api";
 import { Box } from "@mui/system";
+import EmailTemplateModal from "../../../components/Layout/Campaign/EmailTemplateModal";
 
 export default function EmailCampaignModal({ onClose, onSave }: any) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
-
   /* ================= STEP 1 – DETAILS ================= */
   const [campaignName, setCampaignName] = useState("");
   const [campaignDescription, setCampaignDescription] = useState("");
@@ -36,6 +36,8 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
   /* ================= STEP 2 – EMAIL SETUP ================= */
   const [subject, setSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const step2Valid = audience && subject.trim() && emailBody.trim();
 
@@ -122,7 +124,15 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
     }
   };
 
+  const audienceLabel =
+  audience === "all"
+    ? "All Subscribers"
+    : audience === "active"
+    ? "Active Users"
+    : "";
+
   return (
+     <>
     <Modal open={true} onClose={onClose}>
       <Box className="email-campaign-modal">
         {/* HEADER */}
@@ -294,50 +304,104 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
             </div>
 
             {/* ===== EMAIL CONTENT ===== */}
-            <div
-              className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}
-            >
-              <div className="email-content-header">
-                <div>
-                  <h3>Email Content</h3>
-                  <p className="section-subtitle">
-                    Design your email with AI assistance
-                  </p>
-                </div>
+<div
+  className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}
+>
 
-                <div className="email-actions">
-                  <button className="outline-btn" >
-                    <img src={viewIcon} alt="View" width={20} height={20} />
-                    Preview Email
-                  </button>
+  {/* HEADER FULL WIDTH */}
+  <div className="email-content-header">
+    <div>
+      <h3>Email Content</h3>
+      <p className="section-subtitle">
+        Design your email with AI assistance
+      </p>
+    </div>
 
-                  <button className="light-btn">+ Email Template</button>
-                </div>
-              </div>
+    <div className="email-actions">
+      <button
+        className="outline-btn"
+        onClick={() => setPreviewOpen(!previewOpen)}
+      >
+        <img src={viewIcon} alt="View" width={20} height={20} />
+        Preview Email
+      </button>
 
-              <div
-                className={`form-group ${submitted && !subject ? "error" : ""}`}
-              >
-                <label>Subject Line *</label>
-                <input
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="New Product Launch"
-                />
-                <span className="ai-suggest">✨ AI Suggest</span>
-              </div>
-              <div
-                className={`form-group ${submitted && !emailBody ? "error" : ""}`}
-              >
-                <label>Email *</label>
-                <textarea
-                  value={emailBody}
-                  onChange={(e) => setEmailBody(e.target.value)}
-                  placeholder="New Product Launch"
-                />
-                <span className="ai-suggest">✨ AI Suggest</span>
-              </div>
-            </div>
+      <button
+        className="light-btn"
+        onClick={() => setTemplateOpen(true)}
+      >
+        + Email Template
+      </button>
+    </div>
+  </div>
+
+  {/* FLEX ROW STARTS HERE */}
+  <div className="email-body-row">
+
+    {/* LEFT SIDE */}
+    <div className="email-left">
+
+      <div
+        className={`form-group ${submitted && !subject ? "error" : ""}`}
+      >
+        <label>Subject Line *</label>
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="New Product Launch"
+        />
+        <span className="ai-suggest">✨ AI Suggest</span>
+      </div>
+
+      <div
+        className={`form-group ${submitted && !emailBody ? "error" : ""}`}
+      >
+        <label>Email *</label>
+        <textarea
+          value={emailBody}
+          onChange={(e) => setEmailBody(e.target.value)}
+          placeholder="Enter email content"
+          rows={8}
+        />
+        <span className="ai-suggest">✨ AI Suggest</span>
+      </div>
+
+    </div>
+
+    {/* RIGHT SIDE PREVIEW */}
+    {previewOpen && (
+      <div className="email-preview">
+        
+        <div className="preview-header">
+          <h3>Preview Email</h3>
+          <button onClick={() => setPreviewOpen(false)}>✕</button>
+        </div>
+
+        <div className="preview-body">
+
+          <p>
+            To: <span className="chip">{audienceLabel}</span>
+          </p>
+
+         <div className="preview-divider"></div>
+
+          <p className="preview-subject">
+            <span className="label">Subject:</span> {subject}
+          </p>
+
+          <div className="preview-divider"></div>
+
+          <div className="preview-email-content">
+            <p>{emailBody}</p>
+          </div>
+
+        </div>
+
+      </div>
+    )}
+
+  </div>
+</div>
           </div>
         )}
 
@@ -420,5 +484,16 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
         </div>
       </Box>
     </Modal>
+    <EmailTemplateModal
+      open={templateOpen}
+      onClose={() => setTemplateOpen(false)}
+      onSelect={(template: any) => {
+        setSubject(template.title);
+        setEmailBody(template.subtitle);
+      }}
+    />
+ </>
+    
   );
+ 
 }

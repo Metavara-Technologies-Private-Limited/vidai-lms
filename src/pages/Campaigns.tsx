@@ -1,19 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from "react";
 import "../styles/Campaign/campaigns.css";
-
-/* ===== ICONS ===== */
 import searchIcon from "../components/Layout/Campaign/Icons/search.png";
-
-/* ===== COMPONENTS ===== */
 import CampaignHeader from "../components/Layout/Campaign/CampaignHeader";
 import CampaignCard from "../components/Layout/Campaign/CampaignCard";
 import AddNewCampaign from "../components/Layout/Campaign/AddNewCampaign";
 import SocialCampaignModal from "../components/Layout/Campaign/SocialCampaignModal";
 import CampaignDashboard from "../components/Layout/Campaign/CampaignDashboard";
 import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
-import dayjs from "dayjs";
-
-/* ===== REDUX ===== */
 import { useSelector, useDispatch } from "react-redux";
 import {
   selectCampaign,
@@ -21,8 +15,6 @@ import {
 } from "../store/campaignSlice";
 import type { AppDispatch } from "../store";
 import EditCampaignModal from "../components/Layout/Campaign/EditCampaignModal";
-
-/* ===== TYPES ===== */
 type CampaignStatus =
   | "Live"
   | "Draft"
@@ -37,28 +29,20 @@ type Tab = "all" | "social" | "email";
 
 export default function CampaignsScreen() {
   const dispatch = useDispatch<AppDispatch>();
-
-  /* ================= GET CAMPAIGNS FROM REDUX ================= */
   const rawCampaigns = useSelector(selectCampaign);
 
-  /* ================= MAP API → UI MODEL ================= */
-  const campaigns = (rawCampaigns || []).map((api: any) => {
+const campaigns = (rawCampaigns || []).map((api: any) => {
   let status: CampaignStatus;
 
-  if (api.is_active) {
-    status = "Live";
-  } else if (
-    api.selected_start &&
-    dayjs(api.selected_start).isAfter(dayjs())
-  ) {
-    status = "Schedule";
-  } 
-  else if (api.is_active === false && !api.selected_start) {
+if (api.status === "live" || api.is_active === true) {
+  status = "Live";
+} else if (api.status === "scheduled") {
+  status = "Schedule";
+} else if (api.status === "draft") {
   status = "Draft";
+} else {
+  status = "Stopped";
 }
-  else if (!api.is_active) {
-    status = "Stopped";
-  }
 
   return {
     id: api.id,
@@ -77,7 +61,6 @@ export default function CampaignsScreen() {
   };
 });
 
-
   /* ================= LOCAL UI STATE ================= */
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
@@ -90,6 +73,7 @@ export default function CampaignsScreen() {
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [duplicatingCampaign, setDuplicatingCampaign] = useState<any>(null);
   const handleStatusChange = (id: string, newStatus: CampaignStatus) => {
     dispatch(updateCampaignStatus({ id, status: newStatus }));   
   };
@@ -98,6 +82,15 @@ export default function CampaignsScreen() {
     setEditingCampaign(campaign);
     setShowEditModal(true);
   };
+  const handleDuplicate = (campaign: any) => {
+  setDuplicatingCampaign(campaign);
+
+  if (campaign.type === "social") {
+    setShowSocialModal(true);
+  } else {
+    setShowEmailModal(true);
+  }
+};
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
@@ -210,6 +203,7 @@ export default function CampaignsScreen() {
               onViewDetail={setSelectedCampaign}
               onStatusChange={handleStatusChange}
               onEdit={handleEdit} // ADD THIS
+              onDuplicate={handleDuplicate}
             />
           ))
         )}
@@ -230,14 +224,30 @@ export default function CampaignsScreen() {
       )}
       {showSocialModal && (
         <SocialCampaignModal
-          onClose={() => setShowSocialModal(false)}
-          onSave={() => setShowSocialModal(false)}
+          campaign={duplicatingCampaign}
+          isDuplicate={true}
+          onClose={() => {
+            setShowSocialModal(false);
+            setDuplicatingCampaign(null);
+          }}
+          onSave={() => {
+            setShowSocialModal(false);
+            setDuplicatingCampaign(null);
+          }}
         />
       )}
       {showEmailModal && (
         <EmailCampaignModal
-          onClose={() => setShowEmailModal(false)}
-          onSave={() => setShowEmailModal(false)}
+          campaign={duplicatingCampaign}
+          isDuplicate={true}
+          onClose={() => {
+            setShowEmailModal(false);
+            setDuplicatingCampaign(null);
+          }}
+          onSave={() => {
+            setShowEmailModal(false);
+            setDuplicatingCampaign(null);
+          }}
         />
       )}
       {showEditModal && editingCampaign && (
