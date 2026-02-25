@@ -73,6 +73,7 @@ if (api.status === "live" || api.is_active === true) {
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [duplicatingCampaign, setDuplicatingCampaign] = useState<any>(null);
   const handleStatusChange = (id: string, newStatus: CampaignStatus) => {
     dispatch(updateCampaignStatus({ id, status: newStatus }));   
   };
@@ -81,6 +82,15 @@ if (api.status === "live" || api.is_active === true) {
     setEditingCampaign(campaign);
     setShowEditModal(true);
   };
+  const handleDuplicate = (campaign: any) => {
+  setDuplicatingCampaign(campaign);
+
+  if (campaign.type === "social") {
+    setShowSocialModal(true);
+  } else {
+    setShowEmailModal(true);
+  }
+};
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
@@ -193,6 +203,7 @@ if (api.status === "live" || api.is_active === true) {
               onViewDetail={setSelectedCampaign}
               onStatusChange={handleStatusChange}
               onEdit={handleEdit} // ADD THIS
+              onDuplicate={handleDuplicate}
             />
           ))
         )}
@@ -213,14 +224,30 @@ if (api.status === "live" || api.is_active === true) {
       )}
       {showSocialModal && (
         <SocialCampaignModal
-          onClose={() => setShowSocialModal(false)}
-          onSave={() => setShowSocialModal(false)}
+          campaign={duplicatingCampaign}
+          isDuplicate={true}
+          onClose={() => {
+            setShowSocialModal(false);
+            setDuplicatingCampaign(null);
+          }}
+          onSave={() => {
+            setShowSocialModal(false);
+            setDuplicatingCampaign(null);
+          }}
         />
       )}
       {showEmailModal && (
         <EmailCampaignModal
-          onClose={() => setShowEmailModal(false)}
-          onSave={() => setShowEmailModal(false)}
+          campaign={duplicatingCampaign}
+          isDuplicate={true}
+          onClose={() => {
+            setShowEmailModal(false);
+            setDuplicatingCampaign(null);
+          }}
+          onSave={() => {
+            setShowEmailModal(false);
+            setDuplicatingCampaign(null);
+          }}
         />
       )}
       {showEditModal && editingCampaign && (

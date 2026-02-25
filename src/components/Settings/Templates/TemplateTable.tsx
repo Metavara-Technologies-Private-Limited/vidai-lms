@@ -7,6 +7,7 @@ import { WhatsAppTemplateTable } from './WhatsAppTemplate'; // New Import
 import { NewTemplateModal } from './NewTemplateModal';
 import { TEMPLATES_MOCK_DATA } from '../templateMockData';
 import styles from '../../../styles/Templates/TemplatesPage.module.css';
+import type { Filters } from './TemplateFilterPopover';
 
 const TemplatesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('Email');
@@ -22,11 +23,13 @@ const TemplatesPage: React.FC = () => {
   return (
     <Box className={styles.pageContainer}>
       <TemplateHeader 
-              onTabChange={(tab) => setActiveTab(tab)}
-              onNewTemplate={() => setModalOpen(true)}
-              counts={counts} onSearch={function (): void {
-                  throw new Error('Function not implemented.');
-              } }      />
+        onTabChange={(tab) => setActiveTab(tab)}
+        onNewTemplate={() => setModalOpen(true)}
+        counts={counts} onSearch={function (): void {
+          throw new Error('Function not implemented.');
+        } } onApplyFilters={function (_filters: Filters | null): void { // eslint-disable-line @typescript-eslint/no-unused-vars
+          throw new Error('Function not implemented.');
+        } }      />
 
       <Box className={styles.tableWrapper}>
         {/* Render the correct table for the active tab */}

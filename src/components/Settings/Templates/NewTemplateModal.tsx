@@ -17,12 +17,13 @@ import { NewEmailTemplateForm } from "./NewEmailTemplateForm";
 import { NewSMSTemplateForm } from "./NewSMSTemplateForm";
 import { NewWhatsAppTemplateForm } from "./NewWhatsAppTemplateForm";
 import TemplateService, { type APITemplateType } from "../../../services/templates.api";
+import type { EmailTemplate, SMSTemplate, WhatsAppTemplate } from '../../../types/templates.types';
 
 interface ModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (template: unknown) => void;
-  initialData?: any;
+  initialData?: EmailTemplate | SMSTemplate | WhatsAppTemplate | undefined;
   mode: "create" | "edit" | "view";
 }
 
@@ -39,9 +40,24 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 
   useEffect(() => {
     if (open) {
-      if (initialData?.type) {
-        const viewType = initialData.type === 'mail' ? 'email' : initialData.type;
-        setView(viewType);
+      // First, check if initialData has a 'type' field (from edit action)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dataType = (initialData as any)?.type;
+      
+      if (dataType === 'whatsapp') {
+        setView('whatsapp');
+      } else if (dataType === 'sms') {
+        setView('sms');
+      } else if (dataType === 'email') {
+        setView('email');
+      } else if (initialData) {
+        // Fallback to field-based detection for templates without explicit type
+        if ('audience_name' in initialData || 'subject' in initialData) {
+          setView('email');
+        } else if ('body' in initialData && !('audience_name' in initialData) && !('subject' in initialData)) {
+          // Could be SMS or WhatsApp - default to SMS
+          setView('sms');
+        }
       } else {
         setView("select");
       }
@@ -58,6 +74,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     }, 300);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleFormSave = async (formData: any) => {
     setLoading(true);
     setError(null);
@@ -75,19 +92,21 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 
       onSave(response);
       handleClose();
-    } catch (err: any) {
+    } catch (err) {
       // ✅ IMPROVED ERROR LOGGING: This will help you see the exact field validation error
-      console.error("❌ API Error Details:", err.response?.data);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const error = err as any;
+      console.error("❌ API Error Details:", error?.response?.data);
       
       let errorMessage = "Failed to save. ";
-      if (err.response?.data) {
+      if (error?.response?.data) {
         // If the error is an object (Django validation errors), format it nicely
-        if (typeof err.response.data === 'object') {
-          errorMessage += Object.entries(err.response.data)
+        if (typeof error.response.data === 'object') {
+          errorMessage += Object.entries(error.response.data)
             .map(([field, msg]) => `${field}: ${msg}`)
             .join(", ");
         } else {
-          errorMessage += err.response.data;
+          errorMessage += error.response.data;
         }
       }
       
@@ -115,7 +134,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay} {ErrorDisplay}
-        <NewEmailTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData} mode={mode} />
+        <NewEmailTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as EmailTemplate | undefined} mode={mode} />
       </Dialog>
     );
   }
@@ -124,7 +143,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay} {ErrorDisplay}
-        <NewSMSTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData} mode={mode} />
+        <NewSMSTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as SMSTemplate | undefined} mode={mode} />
       </Dialog>
     );
   }
@@ -133,7 +152,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay} {ErrorDisplay}
-        <NewWhatsAppTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData} mode={mode} />
+        <NewWhatsAppTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as WhatsAppTemplate | undefined} mode={mode} />
       </Dialog>
     );
   }
@@ -156,7 +175,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 };
 
 // Helper component for cleaner selection view
-const SelectionCard = ({ icon, title, sub, onClick, bgClass }: any) => (
+const SelectionCard: React.FC<{icon: React.ReactNode; title: string; sub: string; onClick: () => void; bgClass: string}> = ({ icon, title, sub, onClick, bgClass }) => (
   <Box className={styles.categoryCard} onClick={onClick} sx={{ width: '140px', cursor: 'pointer' }}>
     <Box className={`${styles.iconWrapper} ${bgClass}`}>{icon}</Box>
     <Typography className={styles.cardTitle}>{title}</Typography>

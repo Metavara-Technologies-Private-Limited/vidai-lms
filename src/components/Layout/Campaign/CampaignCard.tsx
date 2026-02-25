@@ -48,6 +48,7 @@ interface CampaignCardProps {
   onViewDetail: (campaign: Campaign) => void;
   onStatusChange: (id: string, status: CampaignStatus) => void; // already added in your file
   onEdit?: (campaign: Campaign) => void;
+  onDuplicate?: (campaign: Campaign) => void;
 }
 
 const campaignTypeIconMap = {
@@ -62,6 +63,7 @@ export default function CampaignCard({
   onViewDetail,
   onStatusChange,
   onEdit,
+  onDuplicate,
 }: CampaignCardProps) {
   const isMenuOpen = openMenuId === c.id;
   const menuRef = useRef<HTMLDivElement>(null);
@@ -216,7 +218,14 @@ export default function CampaignCard({
                   <img src={editIcon} alt="Edit" className="menu-icon" />
                   Edit
                 </div>
-                <div className="menu-item">
+                <div
+                  className="menu-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuId(null);
+                    onDuplicate?.(c);
+                  }}
+                >
                   <img
                     src={duplicateIcon}
                     alt="Duplicate"

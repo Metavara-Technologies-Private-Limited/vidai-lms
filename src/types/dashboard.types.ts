@@ -7,14 +7,37 @@ export type Severity = "high" | "medium";
 export interface KpiBreakdown {
   id: string;
   label: string;
-  value: number;
+  value: string | number;
 }
 
 export interface KpiItem {
   id: string;
   label: string;
-  value: number;
+  value: string | number;
   breakdown?: KpiBreakdown[];
+}
+
+/* KpiCard for Dashboard - Live Data Structure */
+export interface KpiCardData {
+  id: string;
+  label: string;
+  value: number | string;
+  breakdown?: Array<{
+    label: string;
+    value: number | string;
+  }>;
+}
+
+/* Live KPI Counts from Leads */
+export interface LiveKpiCounts {
+  totalLeads: number;
+  newLeads: number;
+  appointments: number;
+  followUps: number;
+  totalConverted: number;
+  lostLeads: number;
+  registered: number;
+  treatment: number;
 }
 
 export interface SlaAlert {
@@ -62,6 +85,20 @@ export interface AppointmentStatus {
   status: string;
   value: number;
   color?: string;
+}
+
+/* Appointment Chart Data */
+export interface AppointmentChartData {
+  status: string;
+  value: number;
+  color: string;
+}
+
+export interface AppointmentCounts {
+  appointmentsBooked: number;
+  completed: number;
+  noShows: number;
+  cancelled: number;
 }
 
 /* =======================

@@ -41,11 +41,17 @@ export type Lead = {
   source: string;
   sub_source?: string;
   lead_status?: "New" | "Contacted" | "Follow-Ups" | "Converted" | "Lost" | "Cycle Conversion" | "Appointment";
+  next_action_type?: string;
+  next_action_status?: string;
+  next_action_description?: string;
+  assigned_to_id?: number;
+  assigned_to_name?: string;
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;
   slot: string;
   remark?: string;
+  documents?: string[];
   is_active: boolean;
   created_at: string;
   modified_at: string;
@@ -75,6 +81,7 @@ export type LeadPayload = {
   lead_status?: "new" | "contacted";
   next_action_status?: "pending" | "completed" | null;
   next_action_description?: string;
+  next_action_type?: string;
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;
@@ -113,9 +120,29 @@ export const LeadAPI = {
     return response.data;
   },
 
+  // Original create — plain JSON, no files
   create: async (data: LeadPayload): Promise<Lead> => {
     const response = await api.post<Lead>('/leads/', data);
     console.log("✅ Lead created:", response.data);
+    return response.data;
+  },
+
+  // ✅ NEW — create lead + upload documents in ONE multipart POST /leads/
+  createWithDocuments: async (data: LeadPayload, files: File[]): Promise<Lead> => {
+    const formData = new FormData();
+    (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
+      const value = data[key];
+      if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    });
+    files.forEach((file) => {
+      formData.append('documents', file);
+    });
+    const response = await api.post<Lead>('/leads/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    console.log("✅ Lead + documents created:", response.data);
     return response.data;
   },
 
@@ -129,18 +156,63 @@ export const LeadAPI = {
     return response.data;
   },
 
-  delete: async (leadId: string): Promise<void> => {
-    await api.patch(`/leads/${leadId}/delete/`);
-  },
-
-  // ✅ ARCHIVE: POST /leads/{lead_id}/activate/
   activate: async (leadId: string): Promise<void> => {
     await api.post(`/leads/${leadId}/activate/`);
   },
 
-  // ✅ UNARCHIVE: PATCH /leads/{lead_id}/inactivate/
   inactivate: async (leadId: string): Promise<void> => {
     await api.patch(`/leads/${leadId}/inactivate/`);
+  },
+
+  delete: async (leadId: string): Promise<void> => {
+    await api.patch(`/leads/${leadId}/delete/`);
+  },
+
+  getDocuments: async (leadId: string): Promise<string[]> => {
+    const lead = await LeadAPI.getById(leadId);
+    return lead.documents ?? [];
+  },
+
+  uploadDocument: async (leadId: string, file: File): Promise<Lead> => {
+    const formData = new FormData();
+    formData.append('documents', file);
+    const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  uploadDocuments: async (leadId: string, files: File[]): Promise<Lead> => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('documents', file));
+    const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+};
+
+// ====================== Twilio API ======================
+// Connects the Call and SMS buttons in the LeadsTable Contact Option column
+export const TwilioAPI = {
+  /**
+   * Initiate an outbound call to the lead's contact number.
+   * POST /twilio/make-call/  →  { to: "+91XXXXXXXXXX" }
+   */
+  makeCall: async (payload: { to: string }): Promise<unknown> => {
+    const response = await api.post('/twilio/make-call/', payload);
+    console.log("📞 Call initiated:", response.data);
+    return response.data;
+  },
+
+  /**
+   * Send an SMS to the lead's contact number.
+   * POST /twilio/send-sms/  →  { to: "+91XXXXXXXXXX", message: "..." }
+   */
+  sendSMS: async (payload: { to: string; message: string }): Promise<unknown> => {
+    const response = await api.post('/twilio/send-sms/', payload);
+    console.log("💬 SMS sent:", response.data);
+    return response.data;
   },
 };
 
@@ -169,19 +241,16 @@ export const ClinicAPI = {
   getEmployees: async (clinicId: number): Promise<Employee[]> => {
     const response = await api.get<Employee[] | { results: Employee[] }>(`/clinics/${clinicId}/employees/`);
     const data = response.data;
-
     if (!Array.isArray(data)) {
       if (data && typeof data === 'object' && 'results' in data && Array.isArray(data.results)) {
         return data.results;
       }
       return [];
     }
-
     console.log("=== EMPLOYEES FROM API ===");
     data.forEach(e =>
       console.log(`  id=${e.id} | emp_name="${e.emp_name}" | department_name="${e.department_name}"`)
     );
-
     return data;
   },
 };
@@ -190,12 +259,10 @@ export const ClinicAPI = {
 export const DepartmentAPI = {
   listByClinic: async (clinicId: number): Promise<Department[]> => {
     const clinic = await ClinicAPI.getById(clinicId);
-
     console.log("=== DEPARTMENTS FROM API ===");
     (clinic.department || []).forEach(d =>
       console.log(`  id=${d.id} | name="${d.name}" | is_active=${d.is_active}`)
     );
-
     return clinic.department || [];
   },
 

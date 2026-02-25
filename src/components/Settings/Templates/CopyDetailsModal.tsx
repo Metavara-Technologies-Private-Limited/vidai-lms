@@ -1,10 +1,11 @@
 import React from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, Stack } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import type { Template } from '../../../types/templates.types';
 
 interface Props {
   open: boolean;
-  template: any; // Using any to handle the mapped object from TemplatesPage
+  template: Template;
   onClose: () => void;
   onCopySuccess: () => void;
 }
@@ -14,9 +15,9 @@ export const CopyDetailsModal: React.FC<Props> = ({ open, template, onClose, onC
 
   // Formatting values for the clipboard string
   const templateName = template.name || "Untitled";
-  const useCase = template.useCase || template.use_case || "General";
-  const createdBy = template.createdBy || template.created_by_name || "Admin";
-  const lastUpdated = template.lastUpdatedAt || (template.modified_at ? new Date(template.modified_at).toLocaleDateString() : "N/A");
+  const useCase = template.useCase || "General";
+  const createdBy = template.createdBy || "Admin";
+  const lastUpdated = template.lastUpdatedAt || "N/A";
 
   const copyText = `
 Template Name: ${templateName}
@@ -90,7 +91,7 @@ Created By: ${createdBy}
           variant="contained" 
           fullWidth 
           startIcon={<ContentCopyIcon />} 
-          sx={{ borderRadius: '8px', textTransform: 'none', bgcolor: '#6366F1', '&:hover': { bgcolor: '#4F46E5' } }}
+          sx={{ borderRadius: '8px', textTransform: 'none', bgcolor: '#111827', '&:hover': { bgcolor: '#000' } }}
         >
           Copy to Clipboard
         </Button>
