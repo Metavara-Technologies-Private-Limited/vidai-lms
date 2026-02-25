@@ -1,18 +1,14 @@
 import React, { useState, useRef } from 'react';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, IconButton, Select, MenuItem, OutlinedInput } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import styles from "../../../styles/Template/NewTemplateModal.module.css";
 import { PreviewSMSTemplateModal } from './PreviewSMSTemplateModal';
+import type { NewSMSTemplateFormProps } from '../../../types/templates.types';
 
-interface Props {
-  onClose: () => void;
-  onSave: (template: any) => void; 
-  initialData?: any;
-  mode: 'create' | 'edit' | 'view';
-}
-
-export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialData, mode }) => {
+export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
   const isViewOnly = mode === 'view'; 
   const [showPreview, setShowPreview] = useState(false);
   
@@ -28,18 +24,54 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
       try {
         const user = JSON.parse(userData);
         if (user.clinic_id) return user.clinic_id;
-      } catch (e) {
-        console.error("Failed to parse user data");
+      } catch (err) {
+        console.error("Failed to parse user data", err);
       }
     }
-    return initialData?.clinic || 1; 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ((initialData as any)?.clinic || 1); 
+  };
+
+  // Normalize useCase to match MenuItem values (capitalize first letter)
+  // Also handles API responses that might come in different formats
+  const normalizeUseCase = (value: string | undefined) => {
+    if (!value) return "";
+    const trimmed = value.trim().toLowerCase();
+    
+    // Map common API variations to canonical form
+    const mapping: Record<string, string> = {
+      'appointment': 'Appointment',
+      'confirm': 'Appointment',
+      'confirmation': 'Appointment',
+      'reminder': 'Reminder',
+      'follow-up': 'Follow-up',
+      'followup': 'Follow-up'
+    };
+    
+    return mapping[trimmed] || value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
   };
 
   const [formData, setFormData] = useState({
-    name: initialData?.name || initialData?.audience_name || "",
-    useCase: initialData?.useCase || initialData?.use_case || "",
-    body: initialData?.body || initialData?.email_body || initialData?.subject || ""
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    name: ((initialData as any)?.name || (initialData as any)?.audience_name || ""),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useCase: normalizeUseCase((initialData as any)?.useCase || (initialData as any)?.use_case || ""),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    body: ((initialData as any)?.body || (initialData as any)?.email_body || (initialData as any)?.subject || "")
   });
+
+  // Sync formData when initialData changes (for edit/view mode)
+  React.useEffect(() => {
+    if (initialData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = initialData as any;
+      setFormData({
+        name: data?.name || data?.audience_name || "",
+        useCase: normalizeUseCase(data?.useCase || data?.use_case || ""),
+        body: data?.body || data?.email_body || data?.subject || ""
+      });
+    }
+  }, [initialData?.id]); // Re-sync when initialData id changes
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -73,7 +105,10 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
     }
 
     console.log("🚀 Saving SMS with File:", selectedFile?.name || "No file");
-    onSave(apiPayload); 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onSave(apiPayload as any);
+    const message = mode === 'edit' ? "SMS template updated successfully!" : "SMS template saved successfully!";
+    toast.success(message);
     onClose();
   };
 
@@ -81,7 +116,6 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
     return (
       <PreviewSMSTemplateModal
         open={showPreview}
-        onClose={onClose}
         onBackToEdit={() => setShowPreview(false)}
         onSave={handleSave} 
         templateData={formData}
@@ -198,15 +232,48 @@ export const NewSMSTemplateForm: React.FC<Props> = ({ onClose, onSave, initialDa
       </Box>
 
       <Box className={styles.modalFooter}>
-        <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', borderRadius: '8px' }}>
+        <Button 
+          onClick={onClose} 
+          variant="outlined" 
+          sx={{
+            textTransform: 'none',
+            fontSize: '14px',
+            borderColor: '#D1D5DB',
+            color: '#374151',
+            px: 3,
+            '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+          }}
+        >
           {isViewOnly ? 'Close' : 'Cancel'}
         </Button>
         {!isViewOnly && (
           <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Button variant="outlined" onClick={() => setShowPreview(true)} sx={{ textTransform: 'none', borderRadius: '8px' }}>
+            <Button 
+              variant="outlined" 
+              onClick={() => setShowPreview(true)} 
+              sx={{
+                textTransform: 'none',
+                fontSize: '14px',
+                borderColor: '#D1D5DB',
+                color: '#374151',
+                px: 3,
+                '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+              }}
+            >
               Preview
             </Button>
-            <Button variant="contained" onClick={handleSave} sx={{ textTransform: 'none', borderRadius: '8px', bgcolor: '#6366F1' }}>
+            <Button 
+              variant="contained" 
+              onClick={handleSave} 
+              sx={{ 
+                textTransform: 'none',
+                fontSize: '14px',
+                bgcolor: '#111827',
+                px: 3,
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#000' }
+              }}
+            >
               Save
             </Button>
           </Box>

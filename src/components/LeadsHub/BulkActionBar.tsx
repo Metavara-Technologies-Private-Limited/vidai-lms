@@ -13,9 +13,9 @@ import {
   Radio,
   Divider,
   CircularProgress,
-  Alert,
 } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch } from "../../store";
 
 // Main Action Icons
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
@@ -36,7 +36,6 @@ import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import ChangeHistoryIcon from "@mui/icons-material/ChangeHistory";
 import LockClockOutlinedIcon from "@mui/icons-material/LockClockOutlined";
 import CreateOutlinedIcon from "@mui/icons-material/CreateOutlined";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 // Redux imports
 import {
@@ -51,6 +50,21 @@ import { LeadAPI } from "../../services/leads.api";
 // Dialog components
 import ArchiveLeadDialog from "./ArchiveLeadDialog";
 import DeleteLeadDialog from "./DeleteLeadDialog";
+
+// ── Typed error helper ──────────────────────────────────────────────
+type ApiError = {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+  message?: string;
+};
+
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  const e = err as ApiError;
+  return e?.response?.data?.detail ?? e?.message ?? fallback;
+};
 
 interface Props {
   selectedIds: string[];
@@ -80,7 +94,8 @@ const BulkActionBar: React.FC<Props> = ({
   onArchive,
   onSendEmail,
 }) => {
-  const dispatch = useDispatch();
+  // ✅ Typed dispatch — no more `as any` needed on dispatch calls
+  const dispatch = useDispatch<AppDispatch>();
   const deletingIds = useSelector(selectDeletingIds);
 
   // Dialog states
@@ -103,54 +118,53 @@ const BulkActionBar: React.FC<Props> = ({
 
   if (selectedIds.length === 0) return null;
 
-  // Handle Delete
+  // ── Handle Delete ───────────────────────────────────────────────
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
       setDeleteError(null);
 
-      const result = await dispatch(deleteLeads(selectedIds) as any);
+      // ✅ No `as any` — AppDispatch knows the thunk return type
+      const result = await dispatch(deleteLeads(selectedIds));
 
       if (deleteLeads.fulfilled.match(result)) {
-        await dispatch(fetchLeads() as any);
+        await dispatch(fetchLeads());
         setOpenDelete(false);
         onDelete();
       } else {
-        const errorMsg = result.payload as string || "Failed to delete leads";
+        const errorMsg =
+          typeof result.payload === "string"
+            ? result.payload
+            : "Failed to delete leads";
         setDeleteError(errorMsg);
       }
-    } catch (err: any) {
-      setDeleteError(err.message || "Failed to delete leads");
+    } catch (err: unknown) {
+      // ✅ `err: unknown` instead of `err: any`
+      setDeleteError(getErrorMessage(err, "Failed to delete leads"));
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // ✅ Handle Archive/Unarchive - Direct API calls
+  // ── Handle Archive / Unarchive ──────────────────────────────────
   const handleArchiveConfirm = async () => {
     try {
       setIsArchiving(true);
       setArchiveError(null);
 
       const isArchiveAction = tab === "active";
-      
+
       console.log(
         isArchiveAction
           ? `📦 Archiving ${selectedIds.length} leads (calling inactivate API)...`
           : `📂 Unarchiving ${selectedIds.length} leads (calling activate API)...`
       );
 
-      // ✅ Call the correct API based on tab
+      // ✅ No `as any` — AppDispatch handles thunks correctly
       if (isArchiveAction) {
-        // Archive: Call inactivate API for each lead
-        await Promise.all(
-          selectedIds.map((id) => LeadAPI.inactivate(id))
-        );
+        await Promise.all(selectedIds.map((id) => LeadAPI.inactivate(id)));
       } else {
-        // Unarchive: Call activate API for each lead
-        await Promise.all(
-          selectedIds.map((id) => LeadAPI.activate(id))
-        );
+        await Promise.all(selectedIds.map((id) => LeadAPI.activate(id)));
       }
 
       console.log(
@@ -159,19 +173,19 @@ const BulkActionBar: React.FC<Props> = ({
           : "✅ All leads unarchived successfully"
       );
 
-      // Refetch leads to update UI
-      await dispatch(fetchLeads() as any);
+      await dispatch(fetchLeads());
 
-      // Close dialog and clear selection
       setOpenArchive(false);
       onArchive(isArchiveAction);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // ✅ `err: unknown` instead of `err: any`
       console.error("❌ Archive/Unarchive error:", err);
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.message ||
-        `Failed to ${tab === "active" ? "archive" : "unarchive"} leads`;
-      setArchiveError(errorMsg);
+      setArchiveError(
+        getErrorMessage(
+          err,
+          `Failed to ${tab === "active" ? "archive" : "unarchive"} leads`
+        )
+      );
     } finally {
       setIsArchiving(false);
     }
@@ -228,10 +242,7 @@ const BulkActionBar: React.FC<Props> = ({
           sx={{
             color: "black",
             borderColor: "black",
-            "&:disabled": {
-              color: "#9CA3AF",
-              borderColor: "#E5E7EB",
-            },
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
           }}
         >
           {someDeleting || isDeleting ? "Deleting..." : "Delete"}
@@ -256,10 +267,7 @@ const BulkActionBar: React.FC<Props> = ({
           sx={{
             color: "black",
             borderColor: "black",
-            "&:disabled": {
-              color: "#9CA3AF",
-              borderColor: "#E5E7EB",
-            },
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
           }}
         >
           {isArchiving
@@ -278,10 +286,7 @@ const BulkActionBar: React.FC<Props> = ({
           sx={{
             color: "black",
             borderColor: "black",
-            "&:disabled": {
-              color: "#9CA3AF",
-              borderColor: "#E5E7EB",
-            },
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
           }}
         >
           SMS
@@ -295,17 +300,14 @@ const BulkActionBar: React.FC<Props> = ({
           sx={{
             color: "black",
             borderColor: "black",
-            "&:disabled": {
-              color: "#9CA3AF",
-              borderColor: "#E5E7EB",
-            },
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
           }}
         >
           Email
         </Button>
       </Stack>
 
-      {/* ✅ Delete Dialog - Using new component */}
+      {/* Delete Dialog */}
       <DeleteLeadDialog
         open={openDelete}
         leadName={
@@ -322,7 +324,7 @@ const BulkActionBar: React.FC<Props> = ({
         onConfirm={handleDelete}
       />
 
-      {/* ✅ Archive/Unarchive Dialog - Using new component */}
+      {/* Archive / Unarchive Dialog */}
       <ArchiveLeadDialog
         open={openArchive}
         onClose={() => !isArchiving && setOpenArchive(false)}
@@ -415,10 +417,7 @@ const BulkActionBar: React.FC<Props> = ({
             sx={{
               borderColor: "#D1D5DB",
               color: "#374151",
-              "&:hover": {
-                borderColor: "#9CA3AF",
-                backgroundColor: "#F9FAFB",
-              },
+              "&:hover": { borderColor: "#9CA3AF", backgroundColor: "#F9FAFB" },
             }}
           >
             Cancel
@@ -539,10 +538,7 @@ const BulkActionBar: React.FC<Props> = ({
               sx={{
                 borderColor: "#D1D5DB",
                 color: "#374151",
-                "&:hover": {
-                  borderColor: "#9CA3AF",
-                  backgroundColor: "#F9FAFB",
-                },
+                "&:hover": { borderColor: "#9CA3AF", backgroundColor: "#F9FAFB" },
               }}
             >
               Back

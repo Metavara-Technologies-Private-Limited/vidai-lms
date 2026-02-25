@@ -69,6 +69,7 @@ export type FormState = {
   source: string;
   subSource: string;
   campaign: string;
+  campaignName: string; // Read-only display label for selected campaign
 
   assignee: string;
   nextType: string;

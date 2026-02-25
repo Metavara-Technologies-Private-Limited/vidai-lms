@@ -112,6 +112,115 @@ export interface WhatsAppTemplate {
   updated_at?: string;
 }
 
+// ===== Form & Component Types =====
+
+/**
+ * Unified form template interface for handling all template types
+ * Combines fields from Email, SMS, and WhatsApp templates for flexibility
+ */
+export interface FormTemplate {
+  id?: string;
+  // Email fields
+  audience_name?: string;
+  subject?: string;
+  email_body?: string;
+  // SMS/WhatsApp fields
+  name?: string;
+  body?: string;
+  // Common fields
+  use_case?: string;
+  useCase?: string;
+  phone_number?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  clinic?: number;
+  lastUpdatedAt?: string;
+  createdBy?: string;
+  created_by_name?: string;
+  modified_at?: string;
+}
+
+/**
+ * New Email Template Form Props
+ */
+export interface NewEmailTemplateFormProps {
+  onClose: () => void;
+  onSave: (template: FormTemplate | EmailTemplate) => void;
+  initialData?: FormTemplate | EmailTemplate;
+  mode: 'create' | 'edit' | 'view';
+}
+
+/**
+ * New SMS Template Form Props
+ */
+export interface NewSMSTemplateFormProps {
+  onClose: () => void;
+  onSave: (template: FormTemplate | SMSTemplate) => void;
+  initialData?: FormTemplate | SMSTemplate;
+  mode: 'create' | 'edit' | 'view';
+}
+
+/**
+ * New WhatsApp Template Form Props
+ */
+export interface NewWhatsAppTemplateFormProps {
+  onClose: () => void;
+  onSave: (template: FormTemplate | WhatsAppTemplate) => void;
+  initialData?: FormTemplate | WhatsAppTemplate;
+  mode: 'create' | 'edit' | 'view';
+}
+
+/**
+ * Copy Details Modal Props
+ */
+export interface CopyDetailsModalProps {
+  open: boolean;
+  onClose: () => void;
+  template: Template;
+}
+
+/**
+ * Selection Card Props for New Template Modal
+ */
+export interface SelectionCardProps {
+  icon: React.ReactNode;
+  title: string;
+  sub: string;
+  onClick: () => void;
+  bgClass: string;
+}
+
+/**
+ * New Template Modal Props
+ */
+export interface NewTemplateModalProps {
+  open: boolean;
+  onClose: () => void;
+  initialData?: EmailTemplate | SMSTemplate | WhatsAppTemplate;
+  onSave?: (template: EmailTemplate | SMSTemplate | WhatsAppTemplate) => void;
+}
+
+/**
+ * Template Filters - can be extended based on actual filtering needs
+ */
+export interface TemplateFilters {
+  searchText?: string;
+  templateType?: TemplateType;
+  dateFrom?: Dayjs | null;
+  dateTo?: Dayjs | null;
+  useCase?: string;
+}
+
+/**
+ * Template State Structure
+ */
+export interface TemplatesState {
+  mail: EmailTemplate[];
+  sms: SMSTemplate[];
+  whatsapp: WhatsAppTemplate[];
+}
+
 /**
  * Helper functions to convert API templates to UI format
  */
