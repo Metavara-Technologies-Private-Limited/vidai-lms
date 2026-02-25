@@ -40,6 +40,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import Lead_Subtract from "../../assets/icons/Lead_Subtract.svg";
 import type { RootState } from "../../store";
 
@@ -52,7 +53,7 @@ import {
   selectLeadsLoading,
   selectLeadsError,
 } from "../../store/leadSlice";
-import { api } from "../../services/leads.api";
+import { api, LeadAPI } from "../../services/leads.api";
 
 // ====================== Types ======================
 interface NoteData {
@@ -121,6 +122,7 @@ interface LeadRecord {
   book_appointment?: boolean;
   partner_inquiry?: boolean;
   phone_number?: string;
+  documents?: string[];
 }
 
 interface CallMessageProps {
@@ -154,7 +156,8 @@ interface InfoProps {
 
 interface DocumentRowProps {
   name: string;
-  size: string;
+  size?: string;
+  url?: string;
   sx?: object;
 }
 
@@ -169,6 +172,31 @@ const formatLeadId = (id: string): string => {
   if (numMatch) return `#LN-${numMatch[0]}`;
   const hash = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return `#LN-${(hash % 900) + 100}`;
+};
+
+// ====================== Document helpers ======================
+const getDocColor = (name: string): string => {
+  const ext = (name.split(".").pop() ?? "").toLowerCase();
+  const map: Record<string, string> = {
+    pdf: "#EF4444",
+    doc: "#3B82F6",
+    docx: "#3B82F6",
+    jpg: "#10B981",
+    jpeg: "#10B981",
+    png: "#10B981",
+    webp: "#10B981",
+  };
+  return map[ext] ?? "#6366F1";
+};
+
+const getFileNameFromUrl = (url: string): string => {
+  try {
+    const decoded = decodeURIComponent(url);
+    const parts = decoded.split("/");
+    return parts[parts.length - 1].split("?")[0];
+  } catch {
+    return url;
+  }
 };
 
 export default function LeadDetailView() {
@@ -209,6 +237,11 @@ export default function LeadDetailView() {
   const [actionError, setActionError] = React.useState<string | null>(null);
 
   const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(null);
+
+  // ====================== Document state ======================
+  const [documents, setDocuments] = React.useState<string[]>([]);
+  const [docsLoading, setDocsLoading] = React.useState(false);
+  const [docsError, setDocsError] = React.useState<string | null>(null);
 
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px",
@@ -298,12 +331,36 @@ export default function LeadDetailView() {
     }
   }, []);
 
+  // ====================== Fetch Documents ======================
+  const fetchDocuments = React.useCallback(async (leadUuid: string) => {
+    try {
+      setDocsLoading(true);
+      setDocsError(null);
+      // First try documents from lead object itself, fallback to API call
+      if (lead?.documents && lead.documents.length > 0) {
+        setDocuments(lead.documents);
+      } else {
+        const docs = await LeadAPI.getDocuments(leadUuid);
+        setDocuments(docs);
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to load documents";
+      setDocsError(message);
+    } finally {
+      setDocsLoading(false);
+    }
+  }, [lead]);
+
   React.useEffect(() => {
     if (lead) {
       const rawId = decodeURIComponent(id || "");
       fetchNotes(rawId);
+      fetchDocuments(rawId);
     }
-  }, [lead, fetchNotes, id]);
+  }, [lead, fetchNotes, fetchDocuments, id]);
 
   // ====================== Note Operations ======================
   const handleAddNote = async () => {
@@ -818,13 +875,48 @@ export default function LeadDetailView() {
               </Stack>
             </Card>
 
+            {/* ── DOCUMENTS CARD (API-connected) ── */}
             <Card sx={{ p: 2, borderRadius: "10px", mb: 2, backgroundColor: "#fcfcfc", border: "none", boxShadow: "none" }}>
               <Typography fontWeight={700} variant="subtitle2" mb={2}>Documents</Typography>
               <Divider sx={{ mb: 2, mx: -3 }} />
-              <Stack spacing={2}>
-                <DocumentRow sx={{ backgroundColor: "#FFFFFF", borderRadius: "10px", p: 2 }} name="ivf_report_2024.pdf" size="1.24 MB" />
-                <DocumentRow sx={{ backgroundColor: "#FFFFFF", borderRadius: "10px", p: 2 }} name="body_checkup_2024.doc" size="2.03 MB" />
-              </Stack>
+
+              {docsLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+                  <Stack alignItems="center" spacing={1}>
+                    <CircularProgress size={20} />
+                    <Typography variant="caption" color="text.secondary">Loading documents...</Typography>
+                  </Stack>
+                </Box>
+              ) : docsError ? (
+                <Alert
+                  severity="error"
+                  onClose={() => setDocsError(null)}
+                  sx={{ borderRadius: "8px", fontSize: "12px" }}
+                >
+                  {docsError}
+                </Alert>
+              ) : documents.length === 0 ? (
+                <Box sx={{ textAlign: "center", py: 2 }}>
+                  <InsertDriveFileOutlinedIcon sx={{ fontSize: 32, color: "#CBD5E1", mb: 0.5 }} />
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    No documents uploaded
+                  </Typography>
+                </Box>
+              ) : (
+                <Stack spacing={2}>
+                  {documents.map((docUrl, idx) => {
+                    const fileName = getFileNameFromUrl(docUrl);
+                    return (
+                      <DocumentRow
+                        key={idx}
+                        sx={{ backgroundColor: "#FFFFFF", borderRadius: "10px", p: 2 }}
+                        name={fileName}
+                        url={docUrl}
+                      />
+                    );
+                  })}
+                </Stack>
+              )}
             </Card>
           </Stack>
         </Stack>
@@ -1360,18 +1452,74 @@ const Info: React.FC<InfoProps> = ({ label, value, isAvatar }) => (
   </Box>
 );
 
-const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, sx = {} }) => (
-  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={sx}>
-    <Stack direction="row" spacing={1.5} alignItems="center">
-      <DescriptionOutlinedIcon sx={{ color: "#3B82F6" }} fontSize="small" />
-      <Box>
-        <Typography variant="body2" fontWeight={600}>{name}</Typography>
-        <Typography variant="caption" color="text.secondary">{size}</Typography>
-      </Box>
+// ── Updated DocumentRow — supports real URLs with download & open ──
+const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, url, sx = {} }) => {
+  const color = getDocColor(name);
+  const ext = (name.split(".").pop() ?? "").toUpperCase();
+
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={sx}>
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box
+          sx={{
+            width: 36,
+            height: 36,
+            borderRadius: "8px",
+            bgcolor: `${color}18`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <DescriptionOutlinedIcon sx={{ color, fontSize: 18 }} />
+        </Box>
+        <Box>
+          <Typography
+            variant="body2"
+            fontWeight={600}
+            sx={{
+              maxWidth: 160,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={name}
+          >
+            {name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {ext}{size ? ` · ${size}` : ""}
+          </Typography>
+        </Box>
+      </Stack>
+      <Stack direction="row" spacing={0.5}>
+        <IconButton size="small" onClick={handleDownload} disabled={!url} title="Download">
+          <FileDownloadOutlinedIcon fontSize="inherit" />
+        </IconButton>
+        <IconButton size="small" onClick={handleOpen} disabled={!url} title="Open in new tab">
+          <ShortcutIcon sx={{ transform: "rotate(90deg)", fontSize: "14px" }} />
+        </IconButton>
+      </Stack>
     </Stack>
-    <Stack direction="row" spacing={0.5}>
-      <IconButton size="small"><FileDownloadOutlinedIcon fontSize="inherit" /></IconButton>
-      <IconButton size="small"><ShortcutIcon sx={{ transform: "rotate(90deg)", fontSize: "14px" }} /></IconButton>
-    </Stack>
-  </Stack>
-);
+  );
+};
