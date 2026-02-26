@@ -1,5 +1,9 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Suspense, type JSX } from "react";
+import {
+  Suspense,
+  type ComponentType,
+  type LazyExoticComponent,
+} from "react";
 import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
@@ -9,7 +13,7 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 // -------------------------------------
 
-type LoaderProps = { Comp: React.LazyExoticComponent<() => JSX.Element> };
+type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
   return (
     <Suspense fallback={<div>Loading...</div>}>

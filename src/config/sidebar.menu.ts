@@ -1,10 +1,10 @@
-import { lazy, type JSX } from "react";
+import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
 export type MenuItem = {
   key: string;
   label: string;
   path: string;
-  page?: React.LazyExoticComponent<() => JSX.Element>;
+  page?: LazyExoticComponent<ComponentType<object>>;
   subMenu?: MenuItem[];
 };
 
