@@ -391,8 +391,7 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
   <DatePicker
     label="Due Date"
     value={dueDate}
-    onChange={(v: Dayjs | null) => setDueDate(v)}
-    disabled={loading}
+onChange={(v) => setDueDate(v as Dayjs | null)}    disabled={loading}
     slotProps={{
       textField: {
         fullWidth: true,
