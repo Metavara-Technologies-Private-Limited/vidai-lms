@@ -78,10 +78,15 @@ const Tickets = () => {
         ]);
 
 
-        if (results[0].status === 'fulfilled') {
-          setEmployees(Array.isArray(results[0].value) ? results[0].value : (results[0].value as any).results || []);
-        }
+if (results[0].status === "fulfilled") {
+  const value = results[0].value as
+    | Employee[]
+    | { results: Employee[] };
 
+  setEmployees(
+    Array.isArray(value) ? value : value.results ?? []
+  );
+}
       } catch (err) {
         console.error("Error loading data:", err);
       }
@@ -97,21 +102,32 @@ const Tickets = () => {
     dispatch(fetchTicketDashboard());
   }, [dispatch]);
 
-  const ticketsFromDb = useMemo(() => {
-    if (Array.isArray(rawTickets)) return rawTickets;
-    if (rawTickets && typeof rawTickets === 'object' && 'results' in rawTickets) {
-      return (rawTickets as any).results as TicketListItem[];
-    }
-    return [] as TicketListItem[];
-  }, [rawTickets]);
+const ticketsFromDb = useMemo((): TicketListItem[] => {
+  if (Array.isArray(rawTickets)) return rawTickets;
 
-  const getCount = (status: string) => {
-    const key = status.toLowerCase();
-    if (dashboardCounts && typeof dashboardCounts === 'object' && key in dashboardCounts) {
-      return (dashboardCounts as any)[key] || 0;
-    }
-    return ticketsFromDb.filter((t) => t.status?.toLowerCase() === key).length;
-  };
+  if (
+    rawTickets &&
+    typeof rawTickets === "object" &&
+    "results" in rawTickets
+  ) {
+    const data = rawTickets as { results: TicketListItem[] };
+    return data.results ?? [];
+  }
+
+  return [];
+}, [rawTickets]);
+
+const getCount = (status: string): number => {
+  const key = status.toLowerCase() as keyof typeof dashboardCounts;
+
+  if (dashboardCounts && key in dashboardCounts) {
+    return dashboardCounts[key] ?? 0;
+  }
+
+  return ticketsFromDb.filter(
+    (t) => t.status?.toLowerCase() === key
+  ).length;
+};
 
   // 3. Filtering and Search Logic
   const filteredTickets = useMemo(() => {

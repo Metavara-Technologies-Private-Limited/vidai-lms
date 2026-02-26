@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef,useCallback  } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -18,7 +18,8 @@ import {
 } from "@mui/material";
 import BackwardIcon from "../../../assets/icons/Backward_Icon.svg";
 import { ticketsApi, clinicsApi } from "../../../services/tickets.api";
-import type { TicketDetail, Employee, TicketStatus, TicketPriority } from "../../../types/tickets.types";
+import type { TicketDetail, TicketStatus, TicketPriority,EmailTemplate, } from "../../../types/tickets.types";
+import type { Employee } from "../../../services/leads.api";
 import { toast } from "react-toastify";
 import TicketPropertiesSidebar from "../Menus/TicketPropertiesSidebar";
 
@@ -60,14 +61,19 @@ const TicketView = () => {
   const [showEmoji, setShowEmoji] = useState(false);
   const [type, setType] = useState<string>("Question");
   const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const [viewTemplateOpen, setViewTemplateOpen] = useState(false);
-  const [viewTemplateData, setViewTemplateData] = useState<any>(null);
+  const [viewTemplateData, setViewTemplateData] = useState<EmailTemplate | null>(null);
 
+type TicketEmployeeApi = {
+  id: number;
+  emp_name: string;
+  emp_type: string;
+  department_name?: string;
+};
 
-  const loadData = async () => {
-    if (!id) return;
+const loadData = useCallback(async () => {    if (!id) return;
     try {
       setLoading(true);
       const [ticketData, empData] = await Promise.all([
@@ -75,51 +81,69 @@ const TicketView = () => {
         clinicsApi.getClinicEmployees("1")
       ]);
 
-      setTicket(ticketData);
-      setEmployees(empData);
+setTicket(ticketData);
+
+// ✅ Normalize employee type
+const normalizedEmployees: Employee[] = (empData as TicketEmployeeApi[]).map((emp) => ({
+  id: emp.id,
+  emp_name: emp.emp_name,
+  emp_type: emp.emp_type,
+  department_name: emp.department_name ?? "",
+}));
+
+setEmployees(normalizedEmployees);
 
       // Sync local states with DB response
       setStatus(ticketData.status);
       setPriority(ticketData.priority);
       setAssignTo(ticketData.assigned_to || "");
       setDescription(ticketData.description);
-    } catch (err) {
+    } catch  {
       setError("Failed to load ticket details from server.");
     } finally {
       setLoading(false);
     }
+}, [id]);
+
+useEffect(() => {
+  loadData();
+}, [loadData]);
+
+useEffect(() => {
+  if (!openTemplateDialog) return;
+
+  const loadTemplates = async () => {
+    try {
+      const response = await TemplateService.getTemplates("mail");
+
+      // ✅ Define API response shape (instead of using any)
+      type TemplateApiItem = {
+        id: string | number;
+        name: string;
+        subject: string;
+        body?: string;
+      };
+
+      const templateList: TemplateApiItem[] = Array.isArray(response)
+        ? response
+        : response?.results ?? [];
+
+      // ✅ Normalize into Ticket EmailTemplate type
+      const normalized: EmailTemplate[] = templateList.map((t) => ({
+        id: t.id,
+        audience_name: t.name,
+        subject: t.subject,
+        body: t.body,
+      }));
+
+      setTemplates(normalized);
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+    }
   };
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
-
-  useEffect(() => {
-    if (!openTemplateDialog) return;
-
-    const loadTemplates = async () => {
-      try {
-        const response = await TemplateService.getTemplates("mail");
-
-        // Handles both paginated and non-paginated API responses
-        const templateList = Array.isArray(response)
-          ? response
-          : response?.results || [];
-
-        setTemplates(
-          templateList.map((t: any) => ({
-            ...t,
-            audience_name: t.name,
-            email_body: t.body,   // normalize once
-          }))
-        );
-      } catch (error) {
-        console.error("Error fetching templates:", error);
-      }
-    };
-
-    loadTemplates();
-  }, [openTemplateDialog]);
+  loadTemplates();
+}, [openTemplateDialog]);
 
 
   useEffect(() => {
@@ -198,7 +222,7 @@ const TicketView = () => {
 
       await loadData();
       toast.success("Ticket updated successfully!");
-    } catch (err) {
+    } catch {
       const msg = "Failed to update ticket.";
       setError(msg);
       toast.error(msg);
@@ -227,7 +251,7 @@ const TicketView = () => {
       // Reset UI
       setReplyMessage("");
       setOpenReply(false);
-    } catch (error) {
+    } catch  {
       toast.error("Failed to send reply.");
     }
   };
@@ -405,37 +429,39 @@ const TicketView = () => {
 
       <Box display="flex" gap={4}>
         {/*#####    Ticket Content comes here ################ */}
-        <TicketContentPanel
-          ticket={ticket}
-          description={description}
-          setDescription={setDescription}
-          handlePreviewOpen={handlePreviewOpen}
-          openReply={openReply}
-          setOpenReply={setOpenReply}
+<TicketContentPanel
+  ticket={ticket}
+  description={description}
+  setDescription={setDescription}
+  handlePreviewOpen={handlePreviewOpen}
+  openReply={openReply}
+  setOpenReply={setOpenReply}
 
-          replyProps={{
-            replyTo,
-            setReplyTo,
-            replySubject,
-            setReplySubject,
-            replyMessage,
-            setReplyMessage,
-            employees,
-            anchorEl,
-            setAnchorEl,
-            showEmoji,
-            setShowEmoji,
-            handleSendReply,
-            handleCancelReply,
-            handleAttachClick,
-            handleInsertLink,
-            handleInsertDriveLink,
-            handleImageClick,
-            handleEmojiInsert,
-            setOpenTemplateDialog,
-            iconSx: replyToolbarIconSx,
-          }}
-        />
+  replyProps={{
+    openReply,
+    setOpenReply,
+    replyTo,
+    setReplyTo,
+    replySubject,
+    setReplySubject,
+    replyMessage,
+    setReplyMessage,
+    employees,
+    anchorEl,
+    setAnchorEl,
+    showEmoji,
+    setShowEmoji,
+    handleSendReply,
+    handleCancelReply,
+    handleAttachClick,
+    handleInsertLink,
+    handleInsertDriveLink,
+    handleImageClick,
+    handleEmojiInsert,
+    setOpenTemplateDialog,
+    iconSx: replyToolbarIconSx,
+  }}
+/>
 
 
 

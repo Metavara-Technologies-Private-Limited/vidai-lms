@@ -96,7 +96,7 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
               <DatePicker
                 label="From Date"
                 value={fromDate}
-                onChange={(v) => setFromDate(v)}
+                onChange={(v) => setFromDate(v as Dayjs | null)}
                 slotProps={{
                   textField: {
                     fullWidth: true,
@@ -110,7 +110,7 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
               <DatePicker
                 label="To Date"
                 value={toDate}
-                onChange={(v) => setToDate(v)}
+                onChange={(v) => setToDate(v as Dayjs | null)}
                 slotProps={{
                   textField: {
                     fullWidth: true,
