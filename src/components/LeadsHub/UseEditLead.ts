@@ -183,12 +183,13 @@ export function useEditLead() {
   };
 
   const handleDateChange = (
-    d: Dayjs | null,
+    d: Date | Dayjs | null,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _context: PickerChangeHandlerContext<DateValidationError>
   ) => {
-    setSelectedDate(d);
-    if (d) setAppointmentDate(d.format("YYYY-MM-DD"));
+    const nextDate = d ? dayjs(d) : null;
+    setSelectedDate(nextDate);
+    if (nextDate) setAppointmentDate(nextDate.format("YYYY-MM-DD"));
   };
 
   // ====================== Fetch Lead ======================
