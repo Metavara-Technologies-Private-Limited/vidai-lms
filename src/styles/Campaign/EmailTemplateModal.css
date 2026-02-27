@@ -259,3 +259,28 @@
 .send-btn:hover {
   background: grey;   /* darker on hover */
 }
+
+
+.social-toolbar-container {
+  padding: 12px 16px;
+}
+
+.social-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  background: #f3f4f6;
+  border-radius: 14px;
+  padding: 10px 18px;
+}
+
+.social-toolbar svg {
+  font-size: 20px;
+  color: #111;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.social-toolbar svg:hover {
+  transform: scale(1.1);
+}

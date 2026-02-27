@@ -32,6 +32,10 @@ interface Campaign {
   objective?: string;
   total_spend?: number;
   cpc?: number;
+  budget?: number;
+  start_date?: string;
+  end_date?: string;
+  created_at?: string;
 }
 
 const platformIconMap: Record<string, string> = {
@@ -184,7 +188,7 @@ const CampaignDashboard = ({
 
       {/* ================= TAB CONTENT ================= */}
       <CampaignTabContent
-        campaign={campaign}
+        campaign={campaign as any}
         activeTab={activeTab}
         activeSubTab={activeSubTab}
       />

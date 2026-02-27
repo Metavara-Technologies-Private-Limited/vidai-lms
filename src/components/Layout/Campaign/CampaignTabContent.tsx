@@ -6,6 +6,7 @@ import instagramIcon from"./Icons/instagram.png";
 import facebookIcon from"./Icons/facebook.png";
 import linkedinIcon from"./Icons/linkedin.png";
 import { Sector } from "recharts";
+import type { Campaign } from "../../../types/campaigns.types";
 import {
   LineChart,
   Line,
@@ -20,6 +21,7 @@ import {
 } from "recharts";
 
 interface Props {
+  campaign: Campaign;   
   activeTab: string;
   activeSubTab: string;
 }
@@ -43,8 +45,8 @@ const platformData = [
 const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
   const [selectedPlatform, setSelectedPlatform] =
     React.useState<"facebook" | "instagram">("facebook");
-  const [activeIndex, setActiveIndex] =
-  React.useState<number | undefined>(undefined);
+  // const [activeIndex, setActiveIndex] =
+  // React.useState<number | undefined>(undefined);
 
   /* ================= CONTENT ================= */
   if (activeTab === "Content") {
