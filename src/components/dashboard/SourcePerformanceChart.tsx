@@ -18,7 +18,7 @@ import {
 } from "recharts";
 import { useState } from "react";
 import { mockData } from "./mockData";
-import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style";
+import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 
 type Metric = "volume" | "rate" | "revenue" | "cost";
 import type{CustomTooltipProps} from "../../types/dashboard.types";

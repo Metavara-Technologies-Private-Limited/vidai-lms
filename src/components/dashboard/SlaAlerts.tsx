@@ -4,7 +4,7 @@ import Avatar from "@mui/material/Avatar";
 
 import { mockData } from "./mockData";
 import type { SlaAlert } from "../../types/dashboard.types";
-import { slaAlertsStyles } from "../../styles/Dashboard/SlaAlerts.styles";
+import { slaAlertsStyles } from "../../styles/dashboard/SlaAlerts.styles";
 
 const AlertItem = ({ alert }: { alert: SlaAlert }) => {
   return (
