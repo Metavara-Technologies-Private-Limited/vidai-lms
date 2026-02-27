@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import {
   Dialog,
   Box,
@@ -22,7 +23,7 @@ import type { EmailTemplate, SMSTemplate, WhatsAppTemplate } from '../../../type
 interface ModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (template: unknown) => void;
+  onSave: (template: unknown) => void | Promise<void>;
   initialData?: EmailTemplate | SMSTemplate | WhatsAppTemplate | undefined;
   mode: "create" | "edit" | "view";
 }
@@ -90,7 +91,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
         response = await TemplateService.createTemplate(apiType, formData);
       }
 
-      onSave(response);
+      await onSave(response);
       handleClose();
     } catch (err) {
       // ✅ IMPROVED ERROR LOGGING: This will help you see the exact field validation error
@@ -111,7 +112,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
       }
       
       setError(errorMessage);
-      alert(`Backend Error: ${errorMessage}`);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -36,7 +36,8 @@ export interface TicketReplyEditorProps {
     replyMessage: string;
     setReplyMessage: (v: string) => void;
 
-recipients: LeadRecipient[];
+recipients?: LeadRecipient[];
+    employees?: unknown[];
     anchorEl: HTMLElement | null;
     setAnchorEl: (v: HTMLElement | null) => void;
 
@@ -71,7 +72,7 @@ const TicketReplyEditor = ({
     setReplySubject,
     replyMessage,
     setReplyMessage,
-    recipients,
+    recipients = [],
     anchorEl,
     setAnchorEl,
     showEmoji,

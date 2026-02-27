@@ -133,6 +133,7 @@ useEffect(() => {
         id: t.id,
         audience_name: t.name,
         subject: t.subject,
+        email_body: t.body ?? "",
         body: t.body,
       }));
 

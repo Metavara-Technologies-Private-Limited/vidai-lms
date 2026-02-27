@@ -14,7 +14,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CloseIcon from "@mui/icons-material/Close";
-import { Dayjs } from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 
 import { DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import type { Department, Employee } from "../../services/leads.api";
@@ -109,19 +109,21 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     }));
   };
 
-  const handleDateFromChange = (newValue: Dayjs | null) => {
-    setDateFrom(newValue);
+  const handleDateFromChange = (newValue: Date | Dayjs | null) => {
+    const parsed = newValue ? dayjs(newValue) : null;
+    setDateFrom(parsed);
     setFilters((prev) => ({
       ...prev,
-      dateFrom: newValue ? newValue.format("YYYY-MM-DD") : null,
+      dateFrom: parsed ? parsed.format("YYYY-MM-DD") : null,
     }));
   };
 
-  const handleDateToChange = (newValue: Dayjs | null) => {
-    setDateTo(newValue);
+  const handleDateToChange = (newValue: Date | Dayjs | null) => {
+    const parsed = newValue ? dayjs(newValue) : null;
+    setDateTo(parsed);
     setFilters((prev) => ({
       ...prev,
-      dateTo: newValue ? newValue.format("YYYY-MM-DD") : null,
+      dateTo: parsed ? parsed.format("YYYY-MM-DD") : null,
     }));
   };
 

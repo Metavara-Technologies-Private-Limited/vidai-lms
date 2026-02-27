@@ -71,7 +71,7 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
         body: data?.body || data?.email_body || data?.subject || ""
       });
     }
-  }, [initialData?.id]); // Re-sync when initialData id changes
+  }, [initialData]); // Re-sync when initialData changes
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
