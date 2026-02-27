@@ -41,7 +41,7 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/lms-frontend:latest
 
       # ------Deploy frontend to server----
-        - name: Deploy to VPS 
+      - name: Deploy to VPS 
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_IP }}
