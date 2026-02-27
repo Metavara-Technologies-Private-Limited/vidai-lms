@@ -19,8 +19,7 @@ import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import FormatSizeIcon from "@mui/icons-material/FormatSize";
-
-import type { Employee } from "../../../services/leads.api";
+// import type { Employee } from "../../../services/leads.api";
 import type { SxProps, Theme } from "@mui/material/styles";
 import DeleteMail from "../../../assets/icons/Delete_Icon.svg";
 
@@ -37,8 +36,7 @@ export interface TicketReplyEditorProps {
     replyMessage: string;
     setReplyMessage: (v: string) => void;
 
-    employees: Employee[];   // ✅ FIXED
-
+recipients: LeadRecipient[];
     anchorEl: HTMLElement | null;
     setAnchorEl: (v: HTMLElement | null) => void;
 
@@ -59,6 +57,11 @@ export interface TicketReplyEditorProps {
     iconSx: SxProps<Theme>;  // ✅ FIXED (MUI style type)
 }
 
+interface LeadRecipient {
+    id: string;
+    name: string;
+    email: string;
+}
 
 const TicketReplyEditor = ({
     openReply,
@@ -68,7 +71,7 @@ const TicketReplyEditor = ({
     setReplySubject,
     replyMessage,
     setReplyMessage,
-    employees,
+    recipients,
     anchorEl,
     setAnchorEl,
     showEmoji,
@@ -146,28 +149,29 @@ const TicketReplyEditor = ({
                     anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
                 >
                     <Box sx={{ width: 260, maxHeight: 250, overflowY: "auto", p: 1 }}>
-                        {employees.map((emp) => (
-                            <Box
-                                key={emp.id}
-                                onClick={() => {
-                                    setReplyTo(emp.emp_name);
-                                    setAnchorEl(null);
-                                }}
-                                sx={{
-                                    p: 1,
-                                    borderRadius: 1,
-                                    cursor: "pointer",
-                                    "&:hover": { backgroundColor: "#F5F5F5" },
-                                }}
-                            >
-                                <Typography fontSize={13} fontWeight={500}>
-                                    {emp.emp_name}
-                                </Typography>
-                                <Typography fontSize={12} color="text.secondary">
-                                    {emp.department_name}
-                                </Typography>
-                            </Box>
-                        ))}
+{recipients.map((lead) => (
+    <Box
+        key={lead.id}
+        onClick={() => {
+            setReplyTo(lead.email);   // ✅ we store email now
+            setAnchorEl(null);
+        }}
+        sx={{
+            p: 1,
+            borderRadius: 1,
+            cursor: "pointer",
+            "&:hover": { backgroundColor: "#F5F5F5" },
+        }}
+    >
+        <Typography fontSize={13} fontWeight={500}>
+            {lead.name}
+        </Typography>
+
+        <Typography fontSize={12} color="text.secondary">
+            {lead.email}
+        </Typography>
+    </Box>
+))}
                     </Box>
                 </Popover>
             </Box>

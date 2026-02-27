@@ -3,7 +3,8 @@ import clinicReducer from "./clinicSlice";
 import leadReducer from "./leadSlice";
 import emailTemplateReducer from "./emailTemplateSlice";
 import campaignReducer from "./campaignSlice";
-import ticketReducer from "./ticketSlice"; // 1. Import the ticket reducer
+import ticketReducer from "./ticketSlice"; 
+import emailHistoryReducer from "./emailHistorySlice";
 
 export const store = configureStore({
   reducer: {
@@ -11,7 +12,8 @@ export const store = configureStore({
     leads: leadReducer,
     emailTemplate: emailTemplateReducer,  
     campaign: campaignReducer, 
-    tickets: ticketReducer, // 2. Register it as "tickets"
+    tickets: ticketReducer, 
+    emailHistory: emailHistoryReducer,
   },
 });
 
