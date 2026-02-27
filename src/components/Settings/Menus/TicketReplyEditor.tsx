@@ -21,7 +21,7 @@ import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import FormatSizeIcon from "@mui/icons-material/FormatSize";
 // import type { Employee } from "../../../services/leads.api";
 import type { SxProps, Theme } from "@mui/material/styles";
-import DeleteMail from "../../../assets/icons/Delete_Icon.svg";
+import DeleteMail from "../../../assets/icons/Delete_icon.svg";
 
 export interface TicketReplyEditorProps {
     openReply: boolean;

@@ -13,7 +13,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import NotificationIcon from "@/assets/icons/notification.svg";
 import MessageQuestionIcon from "@/assets/icons/message-question.svg";
-import UserAvatarIcon from "@/assets/icons/ellipse_12.svg";
+import UserAvatarIcon from "@/assets/icons/Ellipse_12.svg";
 import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClinic, selectClinic } from "../../store/clinicSlice";
