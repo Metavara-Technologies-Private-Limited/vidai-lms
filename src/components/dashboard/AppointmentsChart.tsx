@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useEffect, useMemo, useState } from "react";
 import { LeadAPI, type Lead } from "../../services/leads.api";
 import { mockData } from "./mockData";
-import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style";
+import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 //import type{TooltipProps} from "recharts";
 import type { CustomTooltipProps, AppointmentChartData } from "../../types/dashboard.types";
 

@@ -1,5 +1,5 @@
 import { Box, Button } from "@mui/material";
-import { overviewTabsStyles } from "../../styles/Dashboard/OverviewTabs.styles";
+import { overviewTabsStyles } from "../../styles/dashboard/OverviewTabs.styles";
 
 export type OverviewTab =
   | "source"

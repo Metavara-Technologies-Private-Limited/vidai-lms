@@ -1,7 +1,7 @@
 import { Box, Typography, Stack } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { mockData } from "./mockData";
-import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style";
+import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {

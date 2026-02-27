@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { LeadAPI } from "../../services/leads.api";
 import type { Lead as ApiLead } from "../../services/leads.api";
 import type { Status } from "../../types/leads.types";
-import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style";
+import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 
 const normalizeLeadStatus = (status?: string | null): Status | null => {
   if (!status) return null;
