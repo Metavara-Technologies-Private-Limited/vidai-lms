@@ -16,7 +16,7 @@ import {
   Box, Typography, Button, Stack,
   CircularProgress, Alert,
 } from "@mui/material";
-import BackwardIcon from "../../../assets/icons/Backward_Icon.svg";
+import BackwardIcon from "../../../assets/icons/Backward_icon.svg";
 import { ticketsApi, clinicsApi } from "../../../services/tickets.api";
 import type { TicketDetail, TicketStatus, TicketPriority,EmailTemplate, } from "../../../types/tickets.types";
 import type { Employee } from "../../../services/leads.api";
