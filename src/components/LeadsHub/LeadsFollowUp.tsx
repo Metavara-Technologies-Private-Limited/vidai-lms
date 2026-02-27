@@ -2,7 +2,7 @@ import * as React from "react";
 import {
   Box, Checkbox, Chip, IconButton, Stack, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Typography,
-  Avatar, Paper, CircularProgress, Alert
+  Avatar, Paper, CircularProgress, Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -19,9 +19,51 @@ import {
 } from "../../store/leadSlice";
 
 import "../../styles/Leads/leads.css";
-import type { Lead, FilterValues } from "../../types/leads.types";
+// FIX: removed unused `Lead` import (ESLint no-unused-vars + TS 6196)
+import type { FilterValues } from "../../types/leads.types";
 import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
+
+// ====================== Types ======================
+// FIX: replaced all `any` with concrete interfaces
+
+/** Shape of a lead as it arrives from Redux (raw API response). */
+interface RawFollowUpLead {
+  id: string;
+  full_name?: string;
+  name?: string;
+  contact_no?: string;
+  email?: string;
+  assigned_to_id?: number;
+  assigned_to_name?: string;
+  next_action_description?: string;
+  next_action_status?: string;
+  next_action_type?: string;
+  task_type?: string;
+  task_status?: string;
+  lead_status?: string;
+  status?: string;
+  is_active?: boolean;
+  created_at?: string;
+  location?: string;
+  city?: string;
+  state?: string;
+  source?: string;
+  score?: number | string;
+  ai_score?: number | string;
+  activity?: string;
+  last_activity?: string;
+  initials?: string;
+  department_id?: number;
+}
+
+/** Shape after mapping — all display fields guaranteed present. */
+interface MappedFollowUpLead extends RawFollowUpLead {
+  assigned: string;
+  quality: "Hot" | "Warm" | "Cold";
+  task: string;
+  taskStatus: string;
+}
 
 interface Props {
   search: string;
@@ -31,142 +73,97 @@ interface Props {
 const rowsPerPage = 10;
 
 // ====================== Quality Derivation ======================
-const deriveQuality = (lead: any): "Hot" | "Warm" | "Cold" => {
-  const hasAssignee = Boolean(
-    lead.assigned_to_id || lead.assigned_to_name
-  );
-  const hasNextAction = Boolean(
-    lead.next_action_description &&
-    lead.next_action_description.trim() !== ""
-  );
+// FIX: replaced `lead: any` with `lead: RawFollowUpLead`
+const deriveQuality = (lead: RawFollowUpLead): "Hot" | "Warm" | "Cold" => {
+  const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
+  const hasNextAction = Boolean(lead.next_action_description?.trim());
   const nextActionPending = lead.next_action_status === "pending";
-
   if (hasAssignee && hasNextAction && nextActionPending) return "Hot";
   if (hasAssignee || hasNextAction) return "Warm";
   return "Cold";
 };
 
+// ====================== Component ======================
 const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [page, setPage] = React.useState(1);
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
-  // ====================== Redux State ======================
-  const reduxLeads = useSelector(selectLeads);
-  const loading = useSelector(selectLeadsLoading);
-  const error = useSelector(selectLeadsError);
+  const reduxLeads = useSelector(selectLeads) as RawFollowUpLead[] | null;
+  const loading = useSelector(selectLeadsLoading) as boolean;
+  const error = useSelector(selectLeadsError) as string | null;
 
-  // ====================== Local State ======================
-  const [leads, setLeads] = React.useState<any[]>([]);
+  // FIX: typed state — was `any[]`
+  const [leads, setLeads] = React.useState<MappedFollowUpLead[]>([]);
 
-  // ====================== Fetch Leads on Mount ======================
+  // ====================== Fetch on Mount ======================
   React.useEffect(() => {
-    dispatch(fetchLeads() as any);
+    // FIX: was `fetchLeads() as any` — use the same unknown cast pattern
+    dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
   }, [dispatch]);
 
-  // ====================== Sync Redux leads → Local State with Full Field Mapping ======================
+  // ====================== Sync Redux → Local ======================
   React.useEffect(() => {
     if (reduxLeads && reduxLeads.length > 0) {
-      const mappedLeads = reduxLeads.map((lead: any) => ({
-        ...lead,
-        // Core fields
-        name: lead.full_name || lead.name || "",
-        full_name: lead.full_name || lead.name || "",
-        
-        // Assignment
-        assigned: lead.assigned_to_name || "Unassigned",
-        assigned_to_name: lead.assigned_to_name,
-        assigned_to_id: lead.assigned_to_id,
-        
-        // Status
-        status: lead.lead_status || lead.status || "New",
-        lead_status: lead.lead_status || lead.status || "New",
-        
-        // Quality (derived)
-        quality: deriveQuality(lead),
-        
-        // Location & Source
-        location: lead.location || lead.city || lead.state || "N/A",
-        source: lead.source || "N/A",
-        
-        // Task fields
-        task: lead.next_action_type || lead.task_type || "N/A",
-        taskStatus: lead.next_action_status || lead.task_status || "Pending",
-        
-        // Activity
-        activity: lead.last_activity || lead.activity || "View Activity",
-        
-        // Score
-        score: lead.score || lead.ai_score || 0,
-        
-        // Preserve all original fields
-        initials: lead.initials || (lead.full_name || lead.name || "?").charAt(0).toUpperCase(),
-      }));
-      
+      // FIX: was `reduxLeads.map((lead: any)` — now typed
+      const mappedLeads: MappedFollowUpLead[] = reduxLeads.map(
+        (lead: RawFollowUpLead): MappedFollowUpLead => ({
+          ...lead,
+          name: lead.full_name || lead.name || "",
+          full_name: lead.full_name || lead.name || "",
+          assigned: lead.assigned_to_name || "Unassigned",
+          assigned_to_name: lead.assigned_to_name,
+          assigned_to_id: lead.assigned_to_id,
+          status: lead.lead_status || lead.status || "New",
+          lead_status: lead.lead_status || lead.status || "New",
+          quality: deriveQuality(lead),
+          location: lead.location || lead.city || lead.state || "N/A",
+          source: lead.source || "N/A",
+          task: lead.next_action_type || lead.task_type || "N/A",
+          taskStatus: lead.next_action_status || lead.task_status || "Pending",
+          activity: lead.last_activity || lead.activity || "View Activity",
+          score: lead.score || lead.ai_score || 0,
+          initials:
+            lead.initials ||
+            (lead.full_name || lead.name || "?").charAt(0).toUpperCase(),
+        }),
+      );
       setLeads(mappedLeads);
       console.log("✅ Follow-up leads mapped:", mappedLeads.length);
     }
   }, [reduxLeads]);
 
-  // ====================== Filter Follow-up Leads ======================
-  const filteredLeads = React.useMemo(() => {
-    // Follow-up statuses that should appear in this tab
+  // ====================== Filter ======================
+  const filteredLeads = React.useMemo<MappedFollowUpLead[]>(() => {
     const followUpStatuses = ["new", "lost", "cycle conversion"];
-    
-    return leads.filter((lead) => {
-      // Must be a follow-up status
+
+    // FIX: was `leads.filter((lead)` — implicit any; now typed via state
+    return leads.filter((lead: MappedFollowUpLead) => {
       const leadStatus = (lead.lead_status || lead.status || "").toLowerCase().trim();
       const matchesStatus = followUpStatuses.includes(leadStatus);
-      
-      // Must be active (not archived)
       const isActive = lead.is_active !== false;
-      
-      // Search filter
       const searchStr = `${lead.full_name || lead.name || ""} ${lead.id || ""}`.toLowerCase();
       const matchesSearch = searchStr.includes(search.toLowerCase());
-      
-      // Advanced filters
+
       if (filters) {
-        // Department filter
-        if (filters.department && lead.department_id !== Number(filters.department)) {
+        if (filters.department && lead.department_id !== Number(filters.department))
           return false;
-        }
-
-        // Assignee filter
-        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) {
+        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee))
           return false;
-        }
-
-        // Status filter (additional refinement)
         if (filters.status) {
-          const filterStatus = filters.status.toLowerCase();
-          if (leadStatus !== filterStatus) {
-            return false;
-          }
+          if (leadStatus !== filters.status.toLowerCase()) return false;
         }
-
-        // Quality filter
-        if (filters.quality && lead.quality !== filters.quality) {
-          return false;
-        }
-
-        // Source filter
-        if (filters.source && lead.source !== filters.source) {
-          return false;
-        }
-
-        // Date range filter
+        if (filters.quality && lead.quality !== filters.quality) return false;
+        if (filters.source && lead.source !== filters.source) return false;
         if (filters.dateFrom || filters.dateTo) {
           const leadDate = lead.created_at ? new Date(lead.created_at) : null;
           if (!leadDate) return false;
-
           if (filters.dateFrom) {
             const fromDate = new Date(filters.dateFrom);
             fromDate.setHours(0, 0, 0, 0);
             if (leadDate < fromDate) return false;
           }
-
           if (filters.dateTo) {
             const toDate = new Date(filters.dateTo);
             toDate.setHours(23, 59, 59, 999);
@@ -174,59 +171,55 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
           }
         }
       }
-      
+
       return matchesStatus && matchesSearch && isActive;
     });
   }, [leads, search, filters]);
 
-  // ====================== Reset Pagination on Filter Change ======================
+  // ====================== Pagination reset ======================
   React.useEffect(() => {
     setPage(1);
     setSelectedIds([]);
   }, [search, filters]);
 
-  // ====================== Pagination ======================
   const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
-
   React.useEffect(() => {
     if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [totalPages, page]);
 
   const currentLeads = filteredLeads.slice(
     (page - 1) * rowsPerPage,
-    page * rowsPerPage
+    page * rowsPerPage,
   );
-
   const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
-  // ====================== Selection Handlers ======================
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  // ====================== Selection ======================
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev: string[]) =>
+      prev.includes(id) ? prev.filter((x: string) => x !== id) : [...prev, id],
     );
-  };
-
   const isSelected = (id: string) => selectedIds.includes(id);
 
-  // ====================== Bulk Actions ======================
+  // ====================== Bulk actions ======================
   const handleBulkDelete = () => {
-    setLeads((prev) => prev.filter((l) => !selectedIds.includes(l.id)));
+    setLeads((prev: MappedFollowUpLead[]) =>
+      prev.filter((l: MappedFollowUpLead) => !selectedIds.includes(l.id)),
+    );
     setSelectedIds([]);
   };
-
   const handleBulkArchive = (archive: boolean) => {
-    setLeads((prev) =>
-      prev.map((l) =>
-        selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l
-      )
+    setLeads((prev: MappedFollowUpLead[]) =>
+      prev.map((l: MappedFollowUpLead) =>
+        selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l,
+      ),
     );
     setSelectedIds([]);
   };
 
-  // ====================== Loading State ======================
-  if (loading) {
+  // ====================== Loading ======================
+  if (loading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
@@ -235,10 +228,9 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
         </Stack>
       </Box>
     );
-  }
 
-  // ====================== Error State ======================
-  if (error) {
+  // ====================== Error ======================
+  if (error)
     return (
       <Alert severity="error" sx={{ mb: 3 }}>
         <Typography fontWeight={600}>Failed to load follow-ups</Typography>
@@ -246,16 +238,16 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
         <Typography
           variant="body2"
           sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
-          onClick={() => dispatch(fetchLeads() as any)}
+          // FIX: was `fetchLeads() as any` → same unknown cast
+          onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}
         >
           Try again
         </Typography>
       </Alert>
     );
-  }
 
-  // ====================== Empty State ======================
-  if (leads.length === 0) {
+  // ====================== Empty ======================
+  if (leads.length === 0)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
@@ -266,35 +258,30 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
         </Stack>
       </Box>
     );
-  }
 
-  // ====================== Empty Filtered State ======================
-  if (filteredLeads.length === 0) {
+  if (filteredLeads.length === 0)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
-          <Typography variant="h6" color="text.secondary">
-            No follow-ups found
-          </Typography>
+          <Typography variant="h6" color="text.secondary">No follow-ups found</Typography>
           <Typography variant="body2" color="text.secondary">
             {search
               ? `No results for "${search}"`
-              : filters && Object.values(filters).some(v => v !== "" && v !== null)
-              ? "No follow-ups match the selected filters"
-              : "No active follow-ups requiring attention"}
+              : filters && Object.values(filters).some((v) => v !== "" && v !== null)
+                ? "No follow-ups match the selected filters"
+                : "No active follow-ups requiring attention"}
           </Typography>
         </Stack>
       </Box>
     );
-  }
 
+  // ====================== Table ======================
   return (
     <>
       <TableContainer component={Paper} elevation={0} className="leads-table">
         <Table stickyHeader>
           <TableHead>
             <TableRow>
-              {/* Checkbox Column */}
               <TableCell padding="checkbox">
                 <Checkbox
                   indeterminate={
@@ -311,8 +298,6 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                   }}
                 />
               </TableCell>
-              
-              {/* All Columns - Same as LeadsTable */}
               <TableCell>Lead Name | No</TableCell>
               <TableCell>Date | Time</TableCell>
               <TableCell>Location</TableCell>
@@ -330,7 +315,8 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
           </TableHead>
 
           <TableBody>
-            {currentLeads.map((lead: any) => (
+            {/* FIX: was `currentLeads.map((lead: any)` — now typed */}
+            {currentLeads.map((lead: MappedFollowUpLead) => (
               <TableRow
                 key={lead.id}
                 hover
@@ -339,12 +325,10 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                   navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)
                 }
               >
-                {/* Checkbox */}
                 <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
                   <Checkbox checked={isSelected(lead.id)} onChange={() => toggleSelect(lead.id)} />
                 </TableCell>
 
-                {/* Lead Name & ID */}
                 <TableCell>
                   <Stack direction="row" spacing={2}>
                     <Avatar className="lead-avatar">
@@ -359,7 +343,6 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                   </Stack>
                 </TableCell>
 
-                {/* Date & Time */}
                 <TableCell>
                   <Typography className="lead-date">
                     {lead.created_at
@@ -376,22 +359,17 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                   </Typography>
                 </TableCell>
 
-                {/* Location */}
                 <TableCell>{lead.location || "N/A"}</TableCell>
-
-                {/* Source */}
                 <TableCell>{lead.source || "N/A"}</TableCell>
 
-                {/* Status */}
                 <TableCell>
                   <Chip
                     label={lead.status}
                     size="small"
-                    className={`lead-chip status-${lead.status?.toLowerCase()?.replace(/\s+/g, "-")}`}
+                    className={`lead-chip status-${(lead.status ?? "").toLowerCase().replace(/\s+/g, "-")}`}
                   />
                 </TableCell>
 
-                {/* Quality */}
                 <TableCell>
                   <Chip
                     label={lead.quality}
@@ -400,29 +378,20 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                   />
                 </TableCell>
 
-                {/* AI Score */}
                 <TableCell className="score">
                   {String(lead.score || 0).includes("%")
                     ? lead.score
                     : `${lead.score || 0}%`}
                 </TableCell>
 
-                {/* Assigned */}
                 <TableCell>{lead.assigned}</TableCell>
-
-                {/* Task Type */}
                 <TableCell>{lead.task || "N/A"}</TableCell>
 
-                {/* Task Status */}
                 <TableCell>
-                  <Chip
-                    label={lead.taskStatus || "Pending"}
-                    size="small"
-                    className="lead-chip"
-                  />
+                  {/* FIX: was `(opt: any)` — Chip takes string label, no map needed */}
+                  <Chip label={lead.taskStatus || "Pending"} size="small" className="lead-chip" />
                 </TableCell>
 
-                {/* Activity */}
                 <TableCell
                   sx={{ color: "primary.main", fontWeight: 700 }}
                   onClick={(e) => {
@@ -433,7 +402,6 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                   {lead.activity || "View Activity"}
                 </TableCell>
 
-                {/* Contact Actions */}
                 <TableCell align="center">
                   <Stack
                     direction="row"
@@ -451,7 +419,6 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                   </Stack>
                 </TableCell>
 
-                {/* Menu */}
                 <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                   <MenuButton lead={lead} setLeads={setLeads} tab="active" />
                 </TableCell>
@@ -488,15 +455,12 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
         </Stack>
       </Stack>
 
-      {/* Bulk Action Bar */}
       <BulkActionBar
         selectedIds={selectedIds}
         tab="active"
         onDelete={handleBulkDelete}
         onArchive={handleBulkArchive}
       />
-
-      {/* Dialogs */}
       <Dialogs />
     </>
   );

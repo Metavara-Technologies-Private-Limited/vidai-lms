@@ -1,4 +1,5 @@
-import type { Campaign } from "../../src/types/campaigns.types";
+// import type { Campaign } from "../../src/types/campaigns.types";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from "./http";
 
 export const CampaignAPI = {

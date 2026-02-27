@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, IconButton, Box, Stack, Typography } from '@mui/material';
 import { Visibility, Edit, ContentCopy } from '@mui/icons-material';
 import TrashIcon from '../../../assets/icons/trash.svg';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import styles from '../../../styles/Template/TemplateTable.module.css';
+import type { FormTemplate, EmailTemplate, SMSTemplate, WhatsAppTemplate } from '../../../types/templates.types';
+
+type TableTemplate = EmailTemplate | SMSTemplate | WhatsAppTemplate;
 
 const HighlightText = ({ text, highlight }: { text: string | undefined; highlight: string }) => {
   const safeText = text || ""; 
@@ -21,29 +24,20 @@ const HighlightText = ({ text, highlight }: { text: string | undefined; highligh
 };
 
 interface Props {
-  data: any[]; // Changed to any to support API/DB response objects
+  data: TableTemplate[];
   searchQuery: string;
-  onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: any) => void;
+  onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: TableTemplate) => void;
 }
 
 export const SmsTemplateTable: React.FC<Props> = ({ data = [], searchQuery, onAction }) => {
   const [page, setPage] = useState(0); 
   const rowsPerPage = 10;
   const totalPages = data.length === 0 ? 0 : Math.ceil(data.length / rowsPerPage);
-  const visibleRows = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const safePage = Math.min(page, Math.max(0, totalPages - 1));
+  const visibleRows = data.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
-  useEffect(() => {
-    if (totalPages === 0) {
-      setPage(0);
-      return;
-    }
-    if (page > totalPages - 1) {
-      setPage(Math.max(0, totalPages - 1));
-    }
-  }, [data.length, totalPages, page]);
-
-  const start = data.length === 0 ? 0 : page * rowsPerPage + 1;
-  const end = Math.min((page + 1) * rowsPerPage, data.length);
+  const start = data.length === 0 ? 0 : safePage * rowsPerPage + 1;
+  const end = Math.min((safePage + 1) * rowsPerPage, data.length);
 
   const handlePrev = () => setPage((p) => Math.max(0, p - 1));
   const handleNext = () => setPage((p) => Math.min(totalPages - 1, p + 1));
@@ -83,17 +77,18 @@ export const SmsTemplateTable: React.FC<Props> = ({ data = [], searchQuery, onAc
               </TableRow>
             ) : (
               visibleRows.map((row) => {
+                const record = row as FormTemplate;
                 // DB Field Mapping: Map audience_name and email_body from your API
-                const templateName = row.audience_name || row.name || 'Untitled SMS';
-                const bodyContent = row.email_body || row.subject || row.body || '--';
-                const useCase = row.use_case || row.useCase || 'General';
-                const date = row.modified_at || row.lastUpdatedAt || 'N/A';
-                const author = row.created_by_name || row.createdBy || 'System';
+                const templateName = record.audience_name || record.name || 'Untitled SMS';
+                const bodyContent = record.email_body || record.subject || record.body || '--';
+                const useCase = record.use_case || record.useCase || 'General';
+                const date = record.modified_at || record.lastUpdatedAt || record.updated_at || 'N/A';
+                const author = record.created_by_name || record.createdBy || 'System';
 
                 const ui = getUseCaseStyles(useCase);
 
                 return (
-                  <TableRow key={row.id} className={styles.bodyRow}>
+                  <TableRow key={String(record.id ?? templateName)} className={styles.bodyRow}>
                     <TableCell className={styles.nameCell}>
                       <HighlightText text={templateName} highlight={searchQuery} />
                     </TableCell>

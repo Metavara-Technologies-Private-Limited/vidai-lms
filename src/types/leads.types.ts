@@ -50,6 +50,9 @@ export type LeadActivity = {
   taskStatus: TaskStatus;
 };
 
+/* ================= NEXT ACTION STATUS ================= */
+export type NextActionStatus = "pending" | "completed";
+
 /*=====================Add New Lead=====================*/
 export type FormState = {
   full_name: string;
@@ -69,7 +72,7 @@ export type FormState = {
   source: string;
   subSource: string;
   campaign: string;
-  campaignName: string; // Read-only display label for selected campaign
+  campaignName: string;
 
   assignee: string;
   nextType: string;
@@ -78,7 +81,9 @@ export type FormState = {
 
   treatmentInterest: string;
   treatments: string[];
-  documents: File | null;
+  // ✅ REMOVED: documents: File | null
+  // Files are now managed via pendingFiles state (File[]) in AddNewLead.tsx
+  // using the multi-file drop zone — no longer part of FormState
 
   wantAppointment: "yes" | "no";
   department: string;

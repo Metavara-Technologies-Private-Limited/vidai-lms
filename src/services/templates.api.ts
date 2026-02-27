@@ -26,6 +26,8 @@ export interface SMSTemplateRequest {
   id?: string;
 }
 
+type TemplatePayload = FormData | Record<string, unknown>;
+
 const TemplateService = {
   /**
    * List all templates of a specific type
@@ -48,13 +50,13 @@ const TemplateService = {
   /**
    * Create a new template
    */
-  createTemplate: async (type: APITemplateType, data: any) => {
+  createTemplate: async (type: APITemplateType, data: TemplatePayload) => {
     // If 'data' is FormData, the header will automatically switch to 'multipart/form-data'
     const response = await http.post(`/templates/${type}/create/`, data);
     return response.data;
 },
 
-updateTemplate: async (type: APITemplateType, templateId: string, data: any) => {
+updateTemplate: async (type: APITemplateType, templateId: string, data: TemplatePayload) => {
     const response = await http.put(`/templates/${type}/${templateId}/update/`, data);
     return response.data;
 },

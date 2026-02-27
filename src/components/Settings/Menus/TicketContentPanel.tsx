@@ -3,11 +3,14 @@ import ReplyMail from "../../../assets/icons/Reply_Ticket_Mail.svg";
 import dayjs from "dayjs";
 import TicketReplyEditor from "./TicketReplyEditor";
 import type { TicketReplyEditorProps } from "./TicketReplyEditor";
+import { useDispatch, useSelector  } from "react-redux";
+import type { AppDispatch } from "../../../store";
+import { addEmail } from "../../../store/emailHistorySlice";
 import type {
   TicketDetail,
   TicketDocument,
 } from "../../../types/tickets.types";
-
+import { selectLeads } from "../../../store/leadSlice";
 
 interface Props {
   ticket: TicketDetail | null;
@@ -31,6 +34,16 @@ const TicketContentPanel = ({
   setOpenReply,
   replyProps,
 }: Props) => {
+const dispatch = useDispatch<AppDispatch>();
+const leads = useSelector(selectLeads) || [];
+//  Convert Leads into Email Recipients
+const recipients = leads
+  .filter((l: any) => l.email) 
+  .map((l: any) => ({
+    id: l.id,
+    name: l.full_name || l.name || "Unknown",
+    email: l.email,
+  }));
 
   if (!ticket) return null;
 
@@ -129,13 +142,33 @@ const TicketContentPanel = ({
       )}
 
       {/* Reply Editor shows BELOW */}
-      {openReply && replyProps ? (
-        <TicketReplyEditor
-          {...replyProps}
-          openReply={openReply}
-          setOpenReply={setOpenReply}
-        />
-      ) : null}
+{openReply && replyProps ? (
+  <TicketReplyEditor
+    {...replyProps}
+    recipients={recipients}
+    openReply={openReply}
+    setOpenReply={setOpenReply}
+
+    handleSendReply={() => {
+      // Save email into Redux history
+      dispatch(
+        addEmail({
+          id: Date.now().toString(),
+          to: replyProps.replyTo,
+          subject: replyProps.replySubject || "(No Subject)",
+          message: replyProps.replyMessage,
+          created_at: new Date().toISOString(),
+          ticket_id: ticket.id,   // link email to this ticket
+        })
+      );
+
+      // call original send logic if exists
+      replyProps.handleSendReply();
+
+      setOpenReply(false);
+    }}
+  />
+) : null}
 
     </Box>
   );

@@ -23,6 +23,7 @@ import Instagram from "../../assets/icons/Instagram.svg";
 import Linkedin from "../../assets/icons/Linkedin.svg";
 import GoogleAds from "../../assets/icons/Google_Ads.svg";
 import GoogleCalender from "../../assets/icons/Google_Calender.svg";
+import type { RootState } from "../../store";
 
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -42,7 +43,6 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import Lead_Subtract from "../../assets/icons/Lead_Subtract.svg";
-import type { RootState } from "../../store";
 
 import { CallButton, Dialogs } from "./LeadsMenuDialogs";
 
@@ -207,6 +207,14 @@ export default function LeadDetailView() {
     (state: RootState) => state.emailTemplate.selectedTemplate,
   );
 
+//  Ticket Emails Integration
+const ticketEmails = useSelector((state: RootState) => state.emailHistory.emails);
+
+const relatedEmails = ticketEmails.filter(
+  (mail) => String(mail.ticket_id) === String(id)
+);
+
+
   const leads = useSelector(selectLeads) as LeadRecord[] | null;
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
@@ -243,6 +251,8 @@ export default function LeadDetailView() {
   const [docsLoading, setDocsLoading] = React.useState(false);
   const [docsError, setDocsError] = React.useState<string | null>(null);
 
+
+  
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px",
     fontWeight: 500,
@@ -331,14 +341,15 @@ export default function LeadDetailView() {
     }
   }, []);
 
-  // ====================== Fetch Documents ======================
-  const fetchDocuments = React.useCallback(async (leadUuid: string) => {
+  // ====================== Fetch Documents (FIXED) ======================
+  // - Removed `lead` from the dependency array to prevent infinite re-renders
+  // - leadDocs passed as an explicit argument instead of captured from closure
+  const fetchDocuments = React.useCallback(async (leadUuid: string, leadDocs?: string[]) => {
     try {
       setDocsLoading(true);
       setDocsError(null);
-      // First try documents from lead object itself, fallback to API call
-      if (lead?.documents && lead.documents.length > 0) {
-        setDocuments(lead.documents);
+      if (leadDocs && leadDocs.length > 0) {
+        setDocuments(leadDocs);
       } else {
         const docs = await LeadAPI.getDocuments(leadUuid);
         setDocuments(docs);
@@ -352,13 +363,16 @@ export default function LeadDetailView() {
     } finally {
       setDocsLoading(false);
     }
-  }, [lead]);
+  }, []); // ← no dependencies: stable reference, no infinite loop
 
+  // ====================== Main data-fetch effect (FIXED) ======================
+  // - Uses lead.id (actual UUID) for documents API instead of URL param
+  // - Passes lead.documents so fetchDocuments can short-circuit when data exists
   React.useEffect(() => {
     if (lead) {
       const rawId = decodeURIComponent(id || "");
       fetchNotes(rawId);
-      fetchDocuments(rawId);
+      fetchDocuments(lead.id, lead.documents); // ← lead.id is the real UUID
     }
   }, [lead, fetchNotes, fetchDocuments, id]);
 
@@ -1008,6 +1022,7 @@ export default function LeadDetailView() {
                 </Box>
                 <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "#F8FAFC" }}>
                   <Stack spacing={3}>
+
                     <Card sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                       <Stack direction="row" justifyContent="space-between" mb={2}>
                         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1038,6 +1053,7 @@ export default function LeadDetailView() {
                       <Typography variant="body2" color="text.secondary">{leadName}</Typography>
                       <Typography variant="body2" color="text.secondary">{leadPhone}</Typography>
                     </Card>
+
                     {selectedTemplate && (
                       <Card sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                         <Stack direction="row" justifyContent="space-between" mb={2}>
@@ -1055,6 +1071,47 @@ export default function LeadDetailView() {
                         </Typography>
                       </Card>
                     )}
+                    
+{/* Ticket Email Replies */}
+{relatedEmails.map((mail) => (
+  <Card
+    key={mail.id}
+    sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}
+  >
+    <Stack direction="row" justifyContent="space-between" mb={2}>
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Avatar sx={{ width: 40, height: 40, bgcolor: "#FEF2F2", color: "#EF4444" }}>
+          CC
+        </Avatar>
+        <Box>
+          <Typography variant="body2" fontWeight={700}>
+            {mail.to}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            team@crystaivf.com
+          </Typography>
+        </Box>
+      </Stack>
+
+      <Typography variant="caption" color="text.secondary">
+        {new Date(mail.created_at).toLocaleString()}
+      </Typography>
+    </Stack>
+
+    <Typography variant="body2" fontWeight={700} mb={1}>
+      {mail.subject}
+    </Typography>
+
+    <Typography
+      variant="body2"
+      color="text.secondary"
+      sx={{ whiteSpace: "pre-line" }}
+    >
+      {mail.message}
+    </Typography>
+  </Card>
+))}
+
                   </Stack>
                 </Box>
               </>
@@ -1452,7 +1509,7 @@ const Info: React.FC<InfoProps> = ({ label, value, isAvatar }) => (
   </Box>
 );
 
-// ── Updated DocumentRow — supports real URLs with download & open ──
+// ── DocumentRow — supports real URLs with download & open ──
 const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, url, sx = {} }) => {
   const color = getDocColor(name);
   const ext = (name.split(".").pop() ?? "").toUpperCase();

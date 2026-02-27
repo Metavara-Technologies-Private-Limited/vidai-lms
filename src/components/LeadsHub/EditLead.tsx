@@ -1,4 +1,7 @@
-import * as React from "react";
+// ============================================================
+// EditLead.tsx  –  Pure JSX / render layer
+// All state & logic lives in useEditLead.ts
+// ============================================================
 import {
   Box,
   Button,
@@ -18,346 +21,70 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import dayjs, { Dayjs } from "dayjs";
-import { useNavigate, useParams } from "react-router-dom";
-import { useDispatch } from "react-redux";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
-import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
-import { fetchLeads } from "../../store/leadSlice";
-import type { Lead, Department, Employee } from "../../services/leads.api";
-import type { AppDispatch } from "../../store";
-import type { NextActionStatus } from "../../types/leads.types";
+import { TASK_TYPES } from "./LeadTaskConfig";
+import {
+  useEditLead,
+  formatLeadId,
+  TIME_SLOTS,
+  STEPS,
+  TOTAL_STEPS,
+  inputStyle,
+  readOnlyStyle,
+  labelStyle,
+  sectionLabelStyle,
+} from "./UseEditLead";
 
-// ====================== Task Type Config ======================
-// Single source of truth — same as AddNewLead.tsx
-export const TASK_TYPES = [
-  "Follow Up",
-  "Call Patient",
-  "Book Appointment",
-  "Send Message",
-  "Send Email",
-  "Review Details",
-  "No Action",
-] as const;
-
-export type TaskType = typeof TASK_TYPES[number];
-
-// Rules: "Book Appointment" → only "Done/completed", all others → only "To Do/pending"
-export const TASK_STATUS_FOR_TYPE: Record<string, { label: string; value: string }[]> = {
-  "Follow Up":        [{ label: "To Do", value: "pending"   }],
-  "Call Patient":     [{ label: "To Do", value: "pending"   }],
-  "Book Appointment": [{ label: "Done",  value: "completed" }],
-  "Send Message":     [{ label: "To Do", value: "pending"   }],
-  "Send Email":       [{ label: "To Do", value: "pending"   }],
-  "Review Details":   [{ label: "To Do", value: "pending"   }],
-  "No Action":        [{ label: "To Do", value: "pending"   }],
-};
-
-// Auto-derive status when task type is picked
-export const getAutoNextActionStatus = (taskType: string): "pending" | "completed" | "" => {
-  if (!taskType) return "";
-  return taskType === "Book Appointment" ? "completed" : "pending";
-};
-
-// ====================== Time Slots ======================
-const timeSlots = [
-  "09:00 AM - 09:30 AM", "09:30 AM - 10:00 AM", "10:00 AM - 10:30 AM",
-  "10:30 AM - 11:00 AM", "11:00 AM - 11:30 AM", "11:30 AM - 12:00 PM",
-  "12:00 PM - 12:30 PM", "12:30 PM - 01:00 PM", "02:00 PM - 02:30 PM",
-  "02:30 PM - 03:00 PM", "03:00 PM - 03:30 PM", "03:30 PM - 04:00 PM",
-  "04:00 PM - 04:30 PM", "04:30 PM - 05:00 PM", "05:00 PM - 05:30 PM",
-  "05:30 PM - 06:00 PM",
-];
-
-// ====================== Helpers ======================
-const strOrNull = (val: string | undefined | null): string | null =>
-  val && val.trim() !== "" ? val.trim() : null;
-
-const intOrNull = (val: string | undefined | null): number | null => {
-  const n = Number(val);
-  return val && val.trim() !== "" && !isNaN(n) ? n : null;
-};
-
-const intOrFallback = (val: string | undefined | null, fallback: number): number => {
-  const n = Number(val);
-  return val && val.trim() !== "" && !isNaN(n) && n > 0 ? n : fallback;
-};
-
-const isNextActionStatus = (v: string): v is NextActionStatus =>
-  v === "pending" || v === "completed";
-
-// ====================== Format Lead ID ======================
-const formatLeadId = (id: string): string => {
-  if (id.match(/^#?LN-\d+$/i)) return id.startsWith('#') ? id : `#${id}`;
-  const lnMatch = id.match(/#?LN-(\d+)/i);
-  if (lnMatch) return `#LN-${lnMatch[1]}`;
-  const numMatch = id.match(/\d+/);
-  if (numMatch) return `#LN-${numMatch[0]}`;
-  const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return `#LN-${(hash % 900) + 100}`;
-};
-
-// ====================== Stepper ======================
-const steps = ["Patient Details", "Medical Details", "Book Appointment"] as const;
-
-// ====================== Component ======================
 export default function EditLead() {
-  const navigate = useNavigate();
-  const { id } = useParams();
-  const dispatch = useDispatch<AppDispatch>();
+  const {
+    navigate,
+    currentStep, setCurrentStep,
+    showSuccess,
+    loading,
+    error, setError,
+    saving,
+    departments,
+    employees,
+    filteredPersonnel,
+    loadingDepartments,
+    loadingEmployees,
+    employeeError, setEmployeeError,
+    leadData,
+    fullName, setFullName,
+    contactNo, setContactNo,
+    email, setEmail,
+    location, setLocation,
+    gender, setGender,
+    age, setAge,
+    marital, setMarital,
+    address, setAddress,
+    language, setLanguage,
+    isCouple, setIsCouple,
+    partnerName, setPartnerName,
+    partnerAge, setPartnerAge,
+    partnerGender, setPartnerGender,
+    source, setSource,
+    subSource, setSubSource,
+    campaign, setCampaign,
+    assignee, setAssignee,
+    nextType,
+    nextStatus, setNextStatus,
+    nextDesc, setNextDesc,
+    availableTaskStatuses,
+    handleNextTypeChange,
+    treatmentInterest, setTreatmentInterest,
+    treatments, setTreatments,
+    wantAppointment, setWantAppointment,
+    department, setDepartment,
+    selectedDate,
+    handleDateChange,
+    slot, setSlot,
+    remark, setRemark,
+    handleSave,
+  } = useEditLead();
 
-  const [currentStep, setCurrentStep] = React.useState(1);
-  const [showSuccess, setShowSuccess] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [saving, setSaving] = React.useState(false);
-
-  const [departments, setDepartments] = React.useState<Department[]>([]);
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>([]);
-  const [loadingDepartments, setLoadingDepartments] = React.useState(false);
-  const [loadingEmployees, setLoadingEmployees] = React.useState(false);
-  const [employeeError, setEmployeeError] = React.useState<string | null>(null);
-
-  const [leadData, setLeadData] = React.useState<Lead | null>(null);
-  const [clinicId, setClinicId] = React.useState<number>(1);
-
-  // Step 1
-  const [fullName, setFullName] = React.useState("");
-  const [contactNo, setContactNo] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [location, setLocation] = React.useState("");
-  const [gender, setGender] = React.useState("");
-  const [age, setAge] = React.useState("");
-  const [marital, setMarital] = React.useState("");
-  const [address, setAddress] = React.useState("");
-  const [language, setLanguage] = React.useState("");
-  const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
-  const [partnerName, setPartnerName] = React.useState("");
-  const [partnerAge, setPartnerAge] = React.useState("");
-  const [partnerGender, setPartnerGender] = React.useState("");
-  const [source, setSource] = React.useState("");
-  const [subSource, setSubSource] = React.useState("");
-  const [campaign, setCampaign] = React.useState("");
-  const [assignee, setAssignee] = React.useState("");
-  const [nextType, setNextType] = React.useState("");
-  const [nextStatus, setNextStatus] = React.useState("");
-  const [nextDesc, setNextDesc] = React.useState("");
-
-  // Step 2
-  const [treatmentInterest, setTreatmentInterest] = React.useState("");
-  const [treatments, setTreatments] = React.useState<string[]>([]);
-
-  // Step 3
-  const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("yes");
-  const [department, setDepartment] = React.useState("");
-  const [appointmentDate, setAppointmentDate] = React.useState("");
-  const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
-  const [slot, setSlot] = React.useState("");
-  const [remark, setRemark] = React.useState("");
-
-  // ====================== Computed: available task statuses for selected type ======================
-  const availableTaskStatuses = React.useMemo<{ label: string; value: string }[]>(() => {
-    if (!nextType) {
-      return [
-        { label: "To Do", value: "pending"   },
-        { label: "Done", value: "completed" },
-      ];
-    }
-    return TASK_STATUS_FOR_TYPE[nextType] ?? [
-      { label: "To Do", value: "pending"   },
-      { label: "Done", value: "completed" },
-    ];
-  }, [nextType]);
-
-  // ====================== Handle task type change — auto-set status ======================
-  const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newType = e.target.value;
-    const autoStatus = getAutoNextActionStatus(newType);
-    setNextType(newType);
-    setNextStatus(autoStatus);
-  };
-
-  // ====================== Fetch Lead ======================
-  React.useEffect(() => {
-    if (!id) { setError("No lead ID provided"); setLoading(false); return; }
-    const load = async () => {
-      try {
-        setLoading(true);
-        const lead = await LeadAPI.getById(id);
-        setLeadData(lead);
-        setClinicId(lead.clinic_id ?? 1);
-        setFullName(lead.full_name ?? "");
-        setContactNo(lead.contact_no ?? "");
-        setEmail(lead.email ?? "");
-        setLocation(lead.location ?? "");
-        setGender(lead.partner_gender === "male" ? "Male" : lead.partner_gender === "female" ? "Female" : "");
-        setAge(lead.age?.toString() ?? "");
-        setMarital(lead.marital_status === "married" ? "Married" : lead.marital_status === "single" ? "Single" : "");
-        setAddress(lead.address ?? "");
-        setLanguage(lead.language_preference ?? "");
-        setIsCouple(lead.partner_inquiry ? "yes" : "no");
-        setPartnerName(lead.partner_full_name ?? "");
-        setPartnerAge(lead.partner_age?.toString() ?? "");
-        setPartnerGender(lead.partner_gender === "male" ? "Male" : lead.partner_gender === "female" ? "Female" : "");
-        setSource(lead.source ?? "");
-        setSubSource(lead.sub_source ?? "");
-        setAssignee(lead.assigned_to_id?.toString() ?? "");
-        // ✅ Load next_action_type from backend
-        setNextType((lead as any).next_action_type ?? "");
-        setNextStatus(lead.next_action_status ?? "");
-        setNextDesc(lead.next_action_description ?? "");
-        setTreatmentInterest(lead.treatment_interest ?? "");
-        if (lead.treatment_interest) {
-          setTreatments(lead.treatment_interest.split(",").map((t) => t.trim()));
-        }
-        setWantAppointment(lead.book_appointment ? "yes" : "no");
-        setDepartment(lead.department_id?.toString() ?? "");
-        setAppointmentDate(lead.appointment_date ?? "");
-        if (lead.appointment_date) setSelectedDate(dayjs(lead.appointment_date));
-        setSlot(lead.slot ?? "");
-        setRemark(lead.remark ?? "");
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load lead");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [id]);
-
-  // ====================== Fetch Departments ======================
-  React.useEffect(() => {
-    if (!clinicId) return;
-    const load = async () => {
-      try {
-        setLoadingDepartments(true);
-        setDepartments(await DepartmentAPI.listActiveByClinic(clinicId));
-      } catch (err: unknown) {
-        console.error("Failed to load departments:", err instanceof Error ? err.message : err);
-      } finally {
-        setLoadingDepartments(false);
-      }
-    };
-    load();
-  }, [clinicId]);
-
-  // ====================== Fetch Employees ======================
-  React.useEffect(() => {
-    if (!clinicId) return;
-    const load = async () => {
-      try {
-        setLoadingEmployees(true);
-        setEmployeeError(null);
-        const emps = await EmployeeAPI.listByClinic(clinicId);
-        setEmployees(Array.isArray(emps) ? emps : []);
-      } catch (err: unknown) {
-        setEmployeeError(err instanceof Error ? err.message : "Failed to load employees");
-        setEmployees([]);
-      } finally {
-        setLoadingEmployees(false);
-      }
-    };
-    load();
-  }, [clinicId]);
-
-  // ====================== Filter Personnel ======================
-  React.useEffect(() => {
-    if (!department || employees.length === 0) { setFilteredPersonnel([]); return; }
-    const selectedDept = departments.find((d) => d.id === Number(department));
-    if (!selectedDept) { setFilteredPersonnel([]); return; }
-    const normalize = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
-    setFilteredPersonnel(
-      employees.filter((emp) => normalize(emp.department_name) === normalize(selectedDept.name))
-    );
-  }, [department, employees, departments]);
-
-  // ====================== Styles ======================
-  const inputStyle = {
-    "& .MuiOutlinedInput-root": {
-      borderRadius: "8px",
-      fontSize: "0.875rem",
-      "& fieldset": { borderColor: "#E2E8F0" },
-      "&:hover fieldset": { borderColor: "#CBD5E1" },
-      "&.Mui-focused fieldset": { borderColor: "#6366F1" },
-    },
-  };
-
-  const readOnlyStyle = {
-    "& .MuiOutlinedInput-root": {
-      borderRadius: "8px",
-      fontSize: "0.875rem",
-      bgcolor: "#F1F5F9",
-      "& fieldset": { borderColor: "#E2E8F0" },
-      "&:hover fieldset": { borderColor: "#E2E8F0" },
-      "&.Mui-focused fieldset": { borderColor: "#E2E8F0" },
-    },
-  };
-
-  const labelStyle = {
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    color: "#475569",
-    mb: 0.5,
-    display: "block",
-  };
-
-  const sectionLabel = {
-    fontSize: "0.7rem",
-    fontWeight: 700,
-    color: "#94A3B8",
-    letterSpacing: "0.08em",
-    mb: 1.5,
-  };
-
-  // ====================== Save ======================
-  const handleSave = async () => {
-    if (!leadData || !id || saving) return;
-
-    const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
-    const updateData: Partial<Lead> = {
-      clinic_id: clinicId,
-      department_id: intOrFallback(department, 1),
-      full_name: fullName.trim(),
-      contact_no: contactNo.trim(),
-      email: strOrNull(email),
-      age: intOrNull(age),
-      marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
-      language_preference: language || "",
-      location: location || "",
-      address: address || "",
-      partner_inquiry: isCouple === "yes",
-      partner_full_name: partnerName || "",
-      partner_age: intOrNull(partnerAge),
-      partner_gender: partnerGender ? (partnerGender.toLowerCase() as "male" | "female") : null,
-      source,
-      sub_source: subSource || "",
-      assigned_to_id: intOrNull(assignee),
-      next_action_type: nextType || undefined,   // ✅ ADDED — send task type to backend
-      next_action_status: resolvedStatus,
-      next_action_description: nextDesc || "",
-      treatment_interest: treatments.join(",") || treatmentInterest,
-      book_appointment: wantAppointment === "yes",
-      appointment_date: appointmentDate,
-      slot,
-      remark: remark || "",
-    } as any;
-
-    // ── Optimistic: show success & navigate immediately ──
-    setSaving(true);
-    setShowSuccess(true);
-    setTimeout(() => navigate("/leads", { replace: true }), 800);
-
-    // ── Fire API in background ──
-    LeadAPI.update(id, updateData)
-      .then(() => dispatch(fetchLeads()))
-      .catch((err: unknown) => {
-        console.error("❌ Lead update failed:", err instanceof Error ? err.message : err);
-      });
-  };
-
-  // ====================== Loading / Error ======================
+  // ====================== Loading / Error states ======================
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
@@ -394,7 +121,11 @@ export default function EditLead() {
 
   return (
     <Box>
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
       {employeeError && (
         <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setEmployeeError(null)}>
           Could not load employees: <strong>{employeeError}</strong>
@@ -420,7 +151,7 @@ export default function EditLead() {
             bgcolor: "#F8FAFC", border: "1px solid #E2E8F0",
             borderRadius: "10px", px: 1, py: 0.75, gap: 0.5,
           }}>
-            {steps.map((label, index) => {
+            {STEPS.map((label, index) => {
               const step = index + 1;
               const active = currentStep === step;
               const completed = currentStep > step;
@@ -443,7 +174,9 @@ export default function EditLead() {
                   }}>
                     {completed ? "✓" : step}
                   </Box>
-                  <Typography fontSize="13px" fontWeight={600} color={textColor} noWrap>{label}</Typography>
+                  <Typography fontSize="13px" fontWeight={600} color={textColor} noWrap>
+                    {label}
+                  </Typography>
                 </Box>
               );
             })}
@@ -460,13 +193,26 @@ export default function EditLead() {
           {/* ===== STEP 1 ===== */}
           {currentStep === 1 && (
             <Box>
-              <Typography sx={sectionLabel}>LEAD INFORMATION</Typography>
+              <Typography sx={sectionLabelStyle}>LEAD INFORMATION</Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
-                <Box><Typography sx={labelStyle}>Full Name *</Typography><TextField fullWidth size="small" value={fullName} onChange={(e) => setFullName(e.target.value)} sx={inputStyle} /></Box>
-                <Box><Typography sx={labelStyle}>Contact No. *</Typography><TextField fullWidth size="small" value={contactNo} onChange={(e) => setContactNo(e.target.value)} sx={inputStyle} /></Box>
-                <Box><Typography sx={labelStyle}>Email *</Typography><TextField fullWidth size="small" value={email} onChange={(e) => setEmail(e.target.value)} sx={inputStyle} /></Box>
-                <Box><Typography sx={labelStyle}>Location/ Address</Typography><TextField fullWidth size="small" value={location} onChange={(e) => setLocation(e.target.value)} sx={inputStyle} /></Box>
+                <Box>
+                  <Typography sx={labelStyle}>Full Name *</Typography>
+                  <TextField fullWidth size="small" value={fullName} onChange={(e) => setFullName(e.target.value)} sx={inputStyle} />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Contact No. *</Typography>
+                  <TextField fullWidth size="small" value={contactNo} onChange={(e) => setContactNo(e.target.value)} sx={inputStyle} />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Email *</Typography>
+                  <TextField fullWidth size="small" value={email} onChange={(e) => setEmail(e.target.value)} sx={inputStyle} />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Location / Address</Typography>
+                  <TextField fullWidth size="small" value={location} onChange={(e) => setLocation(e.target.value)} sx={inputStyle} />
+                </Box>
               </Box>
+
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
                 <Box>
                   <Typography sx={labelStyle}>Gender *</Typography>
@@ -477,7 +223,10 @@ export default function EditLead() {
                     <MenuItem value="Other">Other</MenuItem>
                   </TextField>
                 </Box>
-                <Box><Typography sx={labelStyle}>Age *</Typography><TextField fullWidth size="small" type="number" value={age} onChange={(e) => setAge(e.target.value)} sx={inputStyle} /></Box>
+                <Box>
+                  <Typography sx={labelStyle}>Age *</Typography>
+                  <TextField fullWidth size="small" type="number" value={age} onChange={(e) => setAge(e.target.value)} sx={inputStyle} />
+                </Box>
                 <Box>
                   <Typography sx={labelStyle}>Marital Status</Typography>
                   <TextField select fullWidth size="small" value={marital} onChange={(e) => setMarital(e.target.value)} sx={inputStyle}>
@@ -486,11 +235,15 @@ export default function EditLead() {
                     <MenuItem value="Single">Single</MenuItem>
                   </TextField>
                 </Box>
-                <Box><Typography sx={labelStyle}>Address</Typography><TextField fullWidth size="small" value={address} onChange={(e) => setAddress(e.target.value)} sx={inputStyle} /></Box>
+                <Box>
+                  <Typography sx={labelStyle}>Address</Typography>
+                  <TextField fullWidth size="small" value={address} onChange={(e) => setAddress(e.target.value)} sx={inputStyle} />
+                </Box>
               </Box>
+
               <Box sx={{ mb: 3 }}>
                 <Typography sx={labelStyle}>Language Preference</Typography>
-                <TextField select fullWidth size="small" value={language} onChange={(e) => setLanguage(e.target.value)} sx={{ ...inputStyle, maxWidth: "25%" }}>
+                <TextField select size="small" value={language} onChange={(e) => setLanguage(e.target.value)} sx={{ ...inputStyle, maxWidth: "25%" }}>
                   <MenuItem value="">-- Select --</MenuItem>
                   <MenuItem value="English">English</MenuItem>
                   <MenuItem value="Hindi">Hindi</MenuItem>
@@ -498,7 +251,7 @@ export default function EditLead() {
                 </TextField>
               </Box>
 
-              <Typography sx={sectionLabel}>PARTNER INFORMATION</Typography>
+              <Typography sx={sectionLabelStyle}>PARTNER INFORMATION</Typography>
               <Box sx={{ mb: 1.5 }}>
                 <Typography sx={{ ...labelStyle, mb: 0.5 }}>Is This Inquiry For A Couple?</Typography>
                 <RadioGroup row value={isCouple} onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}>
@@ -508,8 +261,14 @@ export default function EditLead() {
               </Box>
               {isCouple === "yes" && (
                 <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 3 }}>
-                  <Box><Typography sx={labelStyle}>Full Name</Typography><TextField fullWidth size="small" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} sx={inputStyle} /></Box>
-                  <Box><Typography sx={labelStyle}>Age</Typography><TextField fullWidth size="small" type="number" value={partnerAge} onChange={(e) => setPartnerAge(e.target.value)} sx={inputStyle} /></Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Full Name</Typography>
+                    <TextField fullWidth size="small" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} sx={inputStyle} />
+                  </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Age</Typography>
+                    <TextField fullWidth size="small" type="number" value={partnerAge} onChange={(e) => setPartnerAge(e.target.value)} sx={inputStyle} />
+                  </Box>
                   <Box>
                     <Typography sx={labelStyle}>Gender</Typography>
                     <TextField select fullWidth size="small" value={partnerGender} onChange={(e) => setPartnerGender(e.target.value)} sx={inputStyle}>
@@ -521,7 +280,7 @@ export default function EditLead() {
                 </Box>
               )}
 
-              <Typography sx={sectionLabel}>SOURCE & CAMPAIGN DETAILS</Typography>
+              <Typography sx={sectionLabelStyle}>SOURCE & CAMPAIGN DETAILS</Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 3 }}>
                 <Box>
                   <Typography sx={labelStyle}>Source *</Typography>
@@ -549,16 +308,16 @@ export default function EditLead() {
                 </Box>
               </Box>
 
-              <Typography sx={sectionLabel}>ASSIGNEE & NEXT ACTION DETAILS</Typography>
+              <Typography sx={sectionLabelStyle}>ASSIGNEE & NEXT ACTION DETAILS</Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
-
-                {/* Assigned To */}
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField select fullWidth size="small" value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)} sx={inputStyle}
-                    disabled={loadingEmployees}
-                    InputProps={{ endAdornment: loadingEmployees ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null }}>
+                  <TextField
+                    select fullWidth size="small" value={assignee}
+                    onChange={(e) => setAssignee(e.target.value)}
+                    sx={inputStyle} disabled={loadingEmployees}
+                    InputProps={{ endAdornment: loadingEmployees ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null }}
+                  >
                     <MenuItem value=""><em>-- Select Employee --</em></MenuItem>
                     {employees.map((emp) => (
                       <MenuItem key={emp.id} value={emp.id.toString()}>
@@ -568,15 +327,9 @@ export default function EditLead() {
                   </TextField>
                 </Box>
 
-                {/* ✅ Next Action Type — full list matching AddNewLead */}
                 <Box>
                   <Typography sx={labelStyle}>Next Action Type</Typography>
-                  <TextField
-                    select fullWidth size="small"
-                    value={nextType}
-                    onChange={handleNextTypeChange}
-                    sx={inputStyle}
-                  >
+                  <TextField select fullWidth size="small" value={nextType} onChange={handleNextTypeChange} sx={inputStyle}>
                     <MenuItem value="">-- Select --</MenuItem>
                     {TASK_TYPES.map((t) => (
                       <MenuItem key={t} value={t}>{t}</MenuItem>
@@ -584,7 +337,6 @@ export default function EditLead() {
                   </TextField>
                 </Box>
 
-                {/* ✅ Next Action Status — auto-set based on task type, read-only when type selected */}
                 <Box>
                   <Typography sx={labelStyle}>
                     Next Action Status
@@ -602,14 +354,11 @@ export default function EditLead() {
                     InputProps={{ readOnly: Boolean(nextType) }}
                   >
                     {availableTaskStatuses.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
                     ))}
                   </TextField>
                 </Box>
 
-                {/* Next Action Description */}
                 <Box>
                   <Typography sx={labelStyle}>Next Action Description</Typography>
                   <TextField fullWidth size="small" value={nextDesc} onChange={(e) => setNextDesc(e.target.value)} sx={inputStyle} />
@@ -621,16 +370,18 @@ export default function EditLead() {
           {/* ===== STEP 2 ===== */}
           {currentStep === 2 && (
             <Box>
-              <Typography sx={sectionLabel}>TREATMENT INFORMATION</Typography>
+              <Typography sx={sectionLabelStyle}>TREATMENT INFORMATION</Typography>
               <Box sx={{ mb: 2 }}>
                 <Typography sx={labelStyle}>Treatment Interest *</Typography>
-                <TextField select fullWidth size="small" value={treatmentInterest}
+                <TextField
+                  select size="small" value={treatmentInterest}
                   onChange={(e) => {
                     const v = e.target.value;
                     setTreatmentInterest(v);
                     if (v && !treatments.includes(v)) setTreatments((prev) => [...prev, v]);
                   }}
-                  sx={{ ...inputStyle, maxWidth: "50%" }}>
+                  sx={{ ...inputStyle, maxWidth: "50%" }}
+                >
                   <MenuItem value="" disabled>Select</MenuItem>
                   <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
                   <MenuItem value="IVF">IVF</MenuItem>
@@ -641,20 +392,30 @@ export default function EditLead() {
               {treatments.length > 0 && (
                 <Stack direction="row" spacing={1} sx={{ mb: 3, flexWrap: "wrap" }}>
                   {treatments.map((t) => (
-                    <Chip key={t} label={t} size="small"
+                    <Chip
+                      key={t} label={t} size="small"
                       onDelete={() => setTreatments((prev) => prev.filter((x) => x !== t))}
-                      sx={{ bgcolor: "#FEE2E2", color: "#B91C1C", fontWeight: 600, border: "1px solid #FCA5A5",
-                        "& .MuiChip-deleteIcon": { color: "#B91C1C", "&:hover": { color: "#991B1B" } } }} />
+                      sx={{
+                        bgcolor: "#FEE2E2", color: "#B91C1C", fontWeight: 600,
+                        border: "1px solid #FCA5A5",
+                        "& .MuiChip-deleteIcon": { color: "#B91C1C", "&:hover": { color: "#991B1B" } },
+                      }}
+                    />
                   ))}
                 </Stack>
               )}
-              <Typography sx={sectionLabel}>DOCUMENTS & REPORTS</Typography>
+              <Typography sx={sectionLabelStyle}>DOCUMENTS & REPORTS</Typography>
               <Box sx={{ border: "2px dashed #E2E8F0", borderRadius: "10px", p: 3, display: "inline-block", bgcolor: "#F8FAFC", minWidth: "400px" }}>
-                <Button variant="contained" component="label"
-                  sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, "&:hover": { bgcolor: "#475569" } }}>
-                  Choose File <input type="file" hidden />
+                <Button
+                  variant="contained" component="label"
+                  sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, "&:hover": { bgcolor: "#475569" } }}
+                >
+                  Choose File
+                  <input type="file" hidden />
                 </Button>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>No File Chosen</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                  No File Chosen
+                </Typography>
               </Box>
             </Box>
           )}
@@ -662,7 +423,7 @@ export default function EditLead() {
           {/* ===== STEP 3 ===== */}
           {currentStep === 3 && (
             <Box>
-              <Typography sx={sectionLabel}>APPOINTMENT DETAILS</Typography>
+              <Typography sx={sectionLabelStyle}>APPOINTMENT DETAILS</Typography>
               <Box sx={{ mb: 2 }}>
                 <Typography sx={{ ...labelStyle, mb: 0.5 }}>Want to Book an Appointment?</Typography>
                 <RadioGroup row value={wantAppointment} onChange={(e) => setWantAppointment(e.target.value as "yes" | "no")}>
@@ -670,13 +431,16 @@ export default function EditLead() {
                   <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
                 </RadioGroup>
               </Box>
+
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
                 <Box>
                   <Typography sx={labelStyle}>Department *</Typography>
-                  <TextField select fullWidth size="small" value={department}
-                    onChange={(e) => { setDepartment(e.target.value); setAssignee(""); }}
+                  <TextField
+                    select fullWidth size="small" value={department}
+                    onChange={(e) => { setDepartment(e.target.value); }}
                     sx={inputStyle} disabled={loadingDepartments}
-                    InputProps={{ endAdornment: loadingDepartments ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null }}>
+                    InputProps={{ endAdornment: loadingDepartments ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null }}
+                  >
                     <MenuItem value=""><em>-- Select Department --</em></MenuItem>
                     {departments.map((dept) => (
                       <MenuItem key={dept.id} value={dept.id.toString()}>{dept.name}</MenuItem>
@@ -685,42 +449,54 @@ export default function EditLead() {
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField select fullWidth size="small" value={assignee}
+                  <TextField
+                    select fullWidth size="small" value={assignee}
                     onChange={(e) => setAssignee(e.target.value)}
-                    sx={inputStyle} disabled={loadingEmployees || !department}>
+                    sx={inputStyle} disabled={loadingEmployees || !department}
+                  >
                     {!department ? (
                       <MenuItem value="" disabled>Select department first</MenuItem>
                     ) : filteredPersonnel.length === 0 ? (
                       <MenuItem value="" disabled>No employees in this department</MenuItem>
                     ) : (
                       filteredPersonnel.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name} ({emp.emp_type})</MenuItem>
+                        <MenuItem key={emp.id} value={emp.id.toString()}>
+                          {emp.emp_name} ({emp.emp_type})
+                        </MenuItem>
                       ))
                     )}
                   </TextField>
                 </Box>
               </Box>
+
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
                 <Box>
                   <Typography sx={labelStyle}>Date *</Typography>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker value={selectedDate}
-                      onChange={(d) => { setSelectedDate(d); if (d) setAppointmentDate(d.format("YYYY-MM-DD")); }}
-                      slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }} />
+                    <DatePicker
+                      value={selectedDate}
+                      onChange={(val) => handleDateChange(val as Parameters<typeof handleDateChange>[0], {} as Parameters<typeof handleDateChange>[1])}
+                      slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
+                    />
                   </LocalizationProvider>
                 </Box>
                 <Box>
                   <Typography sx={labelStyle}>Select Slot *</Typography>
                   <TextField select fullWidth size="small" value={slot} onChange={(e) => setSlot(e.target.value)} sx={inputStyle}>
                     <MenuItem value=""><em>Select Time Slot</em></MenuItem>
-                    {timeSlots.map((ts) => <MenuItem key={ts} value={ts}>{ts}</MenuItem>)}
+                    {TIME_SLOTS.map((ts) => (
+                      <MenuItem key={ts} value={ts}>{ts}</MenuItem>
+                    ))}
                   </TextField>
                 </Box>
               </Box>
+
               <Box>
                 <Typography sx={labelStyle}>Remark</Typography>
-                <TextField fullWidth size="small" multiline rows={2} placeholder="Type Here..."
-                  value={remark} onChange={(e) => setRemark(e.target.value)} sx={inputStyle} />
+                <TextField
+                  fullWidth size="small" multiline rows={2} placeholder="Type Here..."
+                  value={remark} onChange={(e) => setRemark(e.target.value)} sx={inputStyle}
+                />
               </Box>
             </Box>
           )}
@@ -728,30 +504,34 @@ export default function EditLead() {
 
         {/* ---- Footer ---- */}
         <Box sx={{ bgcolor: "white", px: 4, py: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="caption" color="text.secondary">Step {currentStep} of 3</Typography>
+          <Typography variant="caption" color="text.secondary">Step {currentStep} of {TOTAL_STEPS}</Typography>
           <Box sx={{ display: "flex", gap: 1.5 }}>
-            <Button onClick={() => navigate("/leads")} disabled={saving}
-              sx={{ textTransform: "none", color: "#64748B", fontWeight: 600, px: 3, borderRadius: "8px",
-                border: "1px solid #E2E8F0", "&:hover": { bgcolor: "#F8FAFC" } }}>
+            <Button
+              onClick={() => navigate("/leads")} disabled={saving}
+              sx={{ textTransform: "none", color: "#64748B", fontWeight: 600, px: 3, borderRadius: "8px", border: "1px solid #E2E8F0", "&:hover": { bgcolor: "#F8FAFC" } }}
+            >
               Cancel
             </Button>
             {currentStep > 1 && (
-              <Button onClick={() => setCurrentStep((s) => s - 1)} disabled={saving} variant="outlined"
-                sx={{ textTransform: "none", borderColor: "#E2E8F0", color: "#1E293B", fontWeight: 600,
-                  px: 3, borderRadius: "8px", "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" } }}>
+              <Button
+                onClick={() => setCurrentStep((s) => s - 1)} disabled={saving} variant="outlined"
+                sx={{ textTransform: "none", borderColor: "#E2E8F0", color: "#1E293B", fontWeight: 600, px: 3, borderRadius: "8px", "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" } }}
+              >
                 Back
               </Button>
             )}
-            {currentStep < 3 ? (
-              <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={saving} variant="contained"
-                sx={{ bgcolor: "#1E293B", textTransform: "none", fontWeight: 600, px: 4, borderRadius: "8px", "&:hover": { bgcolor: "#0F172A" } }}>
+            {currentStep < TOTAL_STEPS ? (
+              <Button
+                onClick={() => setCurrentStep((s) => s + 1)} disabled={saving} variant="contained"
+                sx={{ bgcolor: "#1E293B", textTransform: "none", fontWeight: 600, px: 4, borderRadius: "8px", "&:hover": { bgcolor: "#0F172A" } }}
+              >
                 Next
               </Button>
             ) : (
-              <Button onClick={handleSave} disabled={saving} variant="contained"
-                sx={{ bgcolor: "#1E293B", textTransform: "none", fontWeight: 600, px: 4,
-                  minWidth: 100, borderRadius: "8px", boxShadow: "none",
-                  "&:hover": { bgcolor: "#0F172A", boxShadow: "none" } }}>
+              <Button
+                onClick={handleSave} disabled={saving} variant="contained"
+                sx={{ bgcolor: "#1E293B", textTransform: "none", fontWeight: 600, px: 4, minWidth: 100, borderRadius: "8px", boxShadow: "none", "&:hover": { bgcolor: "#0F172A", boxShadow: "none" } }}
+              >
                 {saving ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Save"}
               </Button>
             )}
@@ -761,10 +541,12 @@ export default function EditLead() {
 
       {/* Success Toast */}
       <Fade in={showSuccess}>
-        <Box sx={{ position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
+        <Box sx={{
+          position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
           bgcolor: "#10B981", color: "white", px: 4, py: 2, borderRadius: "12px",
           display: "flex", alignItems: "center", gap: 1.5, zIndex: 10000,
-          boxShadow: "0px 10px 20px rgba(16,185,129,0.3)" }}>
+          boxShadow: "0px 10px 20px rgba(16,185,129,0.3)",
+        }}>
           <CheckCircleIcon sx={{ fontSize: 24 }} />
           <Typography variant="body1" fontWeight={700}>Saved Successfully!</Typography>
         </Box>

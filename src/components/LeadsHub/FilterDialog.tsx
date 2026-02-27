@@ -32,8 +32,8 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
-  
-  const [loadingDepartments, setLoadingDepartments] = React.useState(false);
+
+  const setLoadingDepartments = React.useState(false)[1];
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
 
   const [filters, setFilters] = React.useState<FilterValues>({
@@ -51,14 +51,13 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   const [location, setLocation] = React.useState("");
   const [subSource, setSubSource] = React.useState("");
 
-  // ✅ FIX: Fetch departments on mount
   React.useEffect(() => {
     if (!open) return;
     const fetchDepartments = async () => {
       try {
         setLoadingDepartments(true);
-        const depts = await DepartmentAPI.listActiveByClinic(clinicId);
-        setDepartments(depts);
+        const departments = await DepartmentAPI.listActiveByClinic(clinicId);
+        setDepartments(departments);
       } catch (err) {
         console.error("Failed to load departments:", err);
       } finally {
@@ -68,14 +67,13 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     fetchDepartments();
   }, [open, clinicId]);
 
-  // ✅ FIX: Fetch employees on mount
   React.useEffect(() => {
     if (!open) return;
     const fetchEmployees = async () => {
       try {
         setLoadingEmployees(true);
-        const emps = await EmployeeAPI.listByClinic(clinicId);
-        setEmployees(Array.isArray(emps) ? emps : []);
+        const employees = await EmployeeAPI.listByClinic(clinicId);
+        setEmployees(Array.isArray(employees) ? employees : []);
       } catch (err) {
         console.error("Failed to load employees:", err);
         setEmployees([]);
@@ -86,7 +84,6 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     fetchEmployees();
   }, [open, clinicId]);
 
-  // ✅ FIX: Filter employees by department
   React.useEffect(() => {
     if (!filters.department || employees.length === 0) {
       setFilteredEmployees(employees);
@@ -112,19 +109,21 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     }));
   };
 
-  const handleDateFromChange = (newValue: Dayjs | null) => {
-    setDateFrom(newValue);
+  const handleDateFromChange = (newValue: Date | Dayjs | null) => {
+    const parsed = newValue ? dayjs(newValue) : null;
+    setDateFrom(parsed);
     setFilters((prev) => ({
       ...prev,
-      dateFrom: newValue ? newValue.format("YYYY-MM-DD") : null,
+      dateFrom: parsed ? parsed.format("YYYY-MM-DD") : null,
     }));
   };
 
-  const handleDateToChange = (newValue: Dayjs | null) => {
-    setDateTo(newValue);
+  const handleDateToChange = (newValue: Date | Dayjs | null) => {
+    const parsed = newValue ? dayjs(newValue) : null;
+    setDateTo(parsed);
     setFilters((prev) => ({
       ...prev,
-      dateTo: newValue ? newValue.format("YYYY-MM-DD") : null,
+      dateTo: parsed ? parsed.format("YYYY-MM-DD") : null,
     }));
   };
 
@@ -136,7 +135,6 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     onClose();
   };
 
-  // ✅ FIX: Clear All now properly resets filters AND notifies parent
   const handleClearAll = () => {
     const emptyFilters: FilterValues = {
       department: "",
@@ -147,19 +145,17 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       dateFrom: null,
       dateTo: null,
     };
-    
-    // Reset local state
+
     setFilters(emptyFilters);
     setDateFrom(null);
     setDateTo(null);
     setLocation("");
     setSubSource("");
-    
-    // ✅ CRITICAL: Notify parent component to clear filters
+
     if (onApplyFilters) {
       onApplyFilters(emptyFilters);
     }
-    
+
     console.log("🧹 Filters cleared and applied:", emptyFilters);
   };
 

@@ -9,6 +9,7 @@ import SocialCampaignModal from "../components/Layout/Campaign/SocialCampaignMod
 import CampaignDashboard from "../components/Layout/Campaign/CampaignDashboard";
 import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
 import { useSelector, useDispatch } from "react-redux";
+// import type { CampaignType } from "../components/Layout/Campaign/CampaignPage";
 import {
   selectCampaign,
   updateCampaignStatus,
@@ -24,7 +25,7 @@ type CampaignStatus =
   | "Completed"
   | "Failed";
 
-type CampaignType = "social" | "email";
+// type CampaignType = "social" | "email";
 type Tab = "all" | "social" | "email";
 
 export default function CampaignsScreen() {
@@ -36,7 +37,7 @@ const campaigns = (rawCampaigns || []).map((api: any) => {
 
 if (api.status === "live" || api.is_active === true) {
   status = "Live";
-} else if (api.status === "scheduled") {
+} else if (api.status === "schedule") {
   status = "Schedule";
 } else if (api.status === "draft") {
   status = "Draft";
@@ -56,8 +57,9 @@ if (api.status === "live" || api.is_active === true) {
         ? api.social_media?.map((s: any) => s.platform_name) || []
         : ["gmail"],
     leads: 0,
+    lead_generated: 0, 
     scheduledAt: api.selected_start,
-    objective: api.campaign_objective,
+    objective: api.campaign_objective, 
   };
 });
 
@@ -197,7 +199,7 @@ if (api.status === "live" || api.is_active === true) {
           filteredCampaigns.map((campaign) => (
             <CampaignCard
               key={campaign.id}
-              campaign={campaign}
+              campaign={campaign as any}
               openMenuId={openMenuId}
               setOpenMenuId={setOpenMenuId}
               onViewDetail={setSelectedCampaign}

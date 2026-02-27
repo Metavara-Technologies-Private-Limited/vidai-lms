@@ -54,6 +54,17 @@ const TicketDailog = ({
   setViewTemplateOpen,
   setViewTemplateData,
 }: TicketDailogProps) => {
+
+const formattedTemplate = viewTemplateData
+  ? {
+      id: String(viewTemplateData.id), 
+      audience_name: viewTemplateData.audience_name,
+      subject: viewTemplateData.subject,
+      email_body: viewTemplateData.body ?? "", 
+      type: "mail",
+    }
+  : undefined;
+
   return (
     <>
       {/* ================= FILE PREVIEW DIALOG ================= */}
@@ -193,12 +204,11 @@ const TicketDailog = ({
       </Dialog>
 
       {/* ================= VIEW TEMPLATE ================= */}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <NewTemplateModal
         open={viewTemplateOpen}
         onClose={() => setViewTemplateOpen(false)}
         onSave={() => {}}
-        initialData={viewTemplateData as any || undefined}
+initialData={formattedTemplate}
         mode="view"
       />
     </>

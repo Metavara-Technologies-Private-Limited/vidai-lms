@@ -192,6 +192,24 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
     onClose();
   };
 
+//  Filter employees by selected department (using dep_id relation)
+const filteredEmployees =
+  departmentId === ""
+    ? employees
+    : employees.filter((emp) => {
+        // Try ID match first (if backend sends dep_id)
+        if (emp.dep_id !== undefined && emp.dep_id !== null) {
+          return String(emp.dep_id) === String(departmentId);
+        }
+
+        // Fallback to department name match
+        const selectedDept = departments.find(
+          (d) => String(d.id) === String(departmentId)
+        );
+
+        return selectedDept && emp.department_name === selectedDept.name;
+      });
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth={false} PaperProps={{ sx: createTicketDialogPaperSx }}>
       <DialogTitle sx={{ position: "relative" }}>
@@ -266,9 +284,11 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
                 select
                 label="Department"
                 value={departmentId}
-                onChange={(e) =>
-                  setDepartmentId(e.target.value === "" ? "" : Number(e.target.value))
-                }
+onChange={(e) => {
+  const value = e.target.value === "" ? "" : Number(e.target.value);
+  setDepartmentId(value);
+  setAssigneeId(""); 
+}}
                 fullWidth
                 sx={createTicketFocusedFieldSx}
                 InputLabelProps={{ shrink: true }}
@@ -369,9 +389,9 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
                       );
                     }
 
-                    const emp = employees.find(
-                      (e) => String(e.id) === String(selected)
-                    );
+const emp = filteredEmployees.find(
+  (e) => String(e.id) === String(selected)
+);
 
                     return emp
                       ? `${emp.emp_name} (${emp.department_name})`
@@ -379,11 +399,21 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
                   },
                 }}
               >
-                {employees.map((e) => (
-                  <MenuItem key={e.id} value={e.id}>
-                    {e.emp_name} ({e.department_name})
-                  </MenuItem>
-                ))}
+{filteredEmployees.length > 0 ? (
+  filteredEmployees.map((e) => (
+    <MenuItem key={e.id} value={e.id}>
+      {e.emp_name} ({e.department_name})
+    </MenuItem>
+  ))
+) : (
+  <MenuItem disabled>
+    {departmentId
+      ? `No assignee in ${
+          departments.find((d) => String(d.id) === String(departmentId))?.name || "selected department"
+        }`
+      : "Select department first"}
+  </MenuItem>
+)}
               </TextField>
 
 
@@ -391,8 +421,7 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
   <DatePicker
     label="Due Date"
     value={dueDate}
-    onChange={(v: Dayjs | null) => setDueDate(v)}
-    disabled={loading}
+onChange={(v) => setDueDate(v as Dayjs | null)}    disabled={loading}
     slotProps={{
       textField: {
         fullWidth: true,

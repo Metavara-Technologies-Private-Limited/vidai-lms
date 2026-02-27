@@ -43,7 +43,7 @@ export interface TicketFilters {
   department: string;
 }
 
-import type { FilterTicketsPayload } from "./tickets.types";
+ 
 
 
 
