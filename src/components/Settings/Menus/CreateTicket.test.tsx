@@ -11,19 +11,24 @@ vi.mock("react-redux", () => ({
 vi.mock("../../../services/tickets.api", () => ({
   labsApi: {
     getLabs: vi.fn(() =>
-      Promise.resolve([{ id: "1", name: "Main Lab", is_active: true }])
+      Promise.resolve([{ id: "1", name: "Main Lab", is_active: true }]),
     ),
   },
   clinicsApi: {
     getClinicDetail: vi.fn(() =>
       Promise.resolve({
-        department: [{ id: 10, name: "Biochemistry" }],
-      })
+        department: [{ id: 10, name: "Biochemistry", is_active: true }],
+      }),
     ),
     getClinicEmployees: vi.fn(() =>
       Promise.resolve([
-        { id: 5, emp_name: "John", department_name: "Biochemistry" },
-      ])
+        {
+          id: 5,
+          emp_name: "John",
+          department_name: "Biochemistry",
+          dep_id: 10, // ✅ IMPORTANT (new filtering depends on this)
+        },
+      ]),
     ),
   },
   ticketsApi: {
@@ -44,21 +49,13 @@ vi.mock("react-toastify", () => ({
 describe("CreateTicket Component", () => {
   const onClose = vi.fn();
 
-  /**
-   * Helper:
-   * Render component and WAIT until async loading finishes.
-   * This is required because component loads dropdown data in useEffect.
-   */
   async function renderAndWait() {
     render(<CreateTicket open={true} onClose={onClose} />);
-
-    // Wait until form is visible (loader gone)
     await screen.findByLabelText("Subject");
   }
 
   test("renders dialog when open", async () => {
     await renderAndWait();
-
     expect(screen.getByText("New Ticket")).toBeInTheDocument();
   });
 
@@ -67,19 +64,35 @@ describe("CreateTicket Component", () => {
 
     const subjectInput = screen.getByLabelText("Subject");
 
-    fireEvent.change(subjectInput, { target: { value: "Test Ticket" } });
+    fireEvent.change(subjectInput, {
+      target: { value: "Test Ticket" },
+    });
 
     expect(subjectInput).toHaveValue("Test Ticket");
+  });
+
+  test("shows empty assignee message when no employees in department", async () => {
+    await renderAndWait();
+
+    // Open Department dropdown
+    fireEvent.mouseDown(screen.getByLabelText("Department"));
+
+    const deptOption = await screen.findByText("Biochemistry");
+    fireEvent.click(deptOption);
+
+    // Open Assignee dropdown
+    fireEvent.mouseDown(screen.getByLabelText("Assign To"));
+
+    // Since we mocked one employee, John should appear
+    expect(await screen.findByText("John (Biochemistry)")).toBeInTheDocument();
   });
 
   test("shows validation when submitting empty form", async () => {
     await renderAndWait();
 
     const saveButton = screen.getByRole("button", { name: /save/i });
-
     fireEvent.click(saveButton);
 
-    // Since toast is mocked, we just ensure button click didn't crash
     expect(saveButton).toBeInTheDocument();
   });
 
@@ -87,7 +100,6 @@ describe("CreateTicket Component", () => {
     await renderAndWait();
 
     const cancelButton = screen.getByRole("button", { name: /cancel/i });
-
     fireEvent.click(cancelButton);
 
     expect(onClose).toHaveBeenCalled();
