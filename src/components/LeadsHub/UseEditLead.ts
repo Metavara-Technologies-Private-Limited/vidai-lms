@@ -13,7 +13,7 @@ import { fetchLeads } from "../../store/leadSlice";
 import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import type { NextActionStatus } from "../../types/leads.types";
-import { TASK_STATUS_FOR_TYPE, getAutoNextActionStatus } from "./leadTaskConfig";
+import { TASK_STATUS_FOR_TYPE, getAutoNextActionStatus } from "./LeadTaskConfig";
 
 // ====================== Extended Lead type ======================
 // Covers API response fields not yet reflected in the generated Lead type.
