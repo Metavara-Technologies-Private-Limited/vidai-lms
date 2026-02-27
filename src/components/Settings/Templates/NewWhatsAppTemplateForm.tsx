@@ -83,7 +83,7 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
         body: data?.body || data?.email_body || data?.subject
       });
     }
-  }, [initialData?.id]); // Re-sync when initialData id changes (new template selected)
+  }, [initialData]); // Re-sync when initialData changes
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));

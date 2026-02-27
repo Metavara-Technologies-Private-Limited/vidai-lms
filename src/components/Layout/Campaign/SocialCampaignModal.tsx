@@ -242,7 +242,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       onSave(formattedCampaign);
       toast.success("Campaign created successfully");
       onClose();
-    } catch (error: any) {
+    } catch {
       toast.error("Failed to create campaign");
     }
   };
