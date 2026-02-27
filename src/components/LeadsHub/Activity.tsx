@@ -22,8 +22,26 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 const STORAGE_KEY = "vidai_leads_data";
 const ROWS_PER_PAGE = 10;
 
+/* ---------- Lead Type ---------- */
+interface Lead {
+  id: string;
+  name: string;
+  status: string;
+  assigned?: string;
+  activity?: string;
+  activityTime?: string;
+  task?: string;
+  taskHint?: string;
+  dueDate?: string;
+  taskStatus?: string;
+  archived?: boolean;
+}
+
 /* ---------- Status Chip Colors ---------- */
-const statusMap: Record<string, any> = {
+const statusMap: Record<
+  string,
+  { bg: string; color: string; border: string }
+> = {
   New: { bg: "#F3F3FF", color: "#6C6CFF", border: "#7C7CFF" },
   Appointment: { bg: "#EEF4FF", color: "#2F6FFF", border: "#4C8DFF" },
   "Follow-Ups": { bg: "#FFF6E5", color: "#FF9F0A", border: "#FFB020" },
@@ -32,8 +50,8 @@ const statusMap: Record<string, any> = {
 };
 
 const Activity = () => {
-  const [page, setPage] = React.useState(1);
-  const [leads, setLeads] = React.useState<any[]>([]);
+  const [page, setPage] = React.useState<number>(1);
+  const [leads, setLeads] = React.useState<Lead[]>([]);
 
   /* ---------- Fetch REAL Leads ---------- */
   React.useEffect(() => {
@@ -43,11 +61,11 @@ const Activity = () => {
       return;
     }
 
-    const allLeads = JSON.parse(stored);
+    const allLeads: Lead[] = JSON.parse(stored);
 
     // Only To Do activities
     const todoLeads = allLeads.filter(
-      (lead: any) =>
+      (lead: Lead) =>
         lead.taskStatus === "To Do" && lead.archived !== true,
     );
 
@@ -221,7 +239,7 @@ const Activity = () => {
 
           <IconButton
             size="small"
-            disabled={page === totalPages}
+            disabled={page === totalPages || totalPages === 0}
             onClick={() => setPage(page + 1)}
           >
             <ChevronRightIcon />
