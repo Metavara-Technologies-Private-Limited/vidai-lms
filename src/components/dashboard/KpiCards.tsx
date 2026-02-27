@@ -15,11 +15,12 @@ import FollowUpsIcon from "../../assets/icons/followUps.svg";
 import TotalConvertedIcon from "../../assets/icons/totalConverted.svg";
 import LostLeadsIcon from "../../assets/icons/lostLeads.svg";
 
-import { kpiCardsStyles } from "../../styles/Dashboard/KpiCards.styles";
+import { kpiCardsStyles } from "../../styles/dashboard/KpiCards.styles";
 import { fetchLeads, selectLeads } from "../../store/leadSlice";
 import { LEAD_STATUS } from "../../utils/constants";
 import type { KpiCardData, LiveKpiCounts } from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
+
 
 /* KPI → ICON MAP */
 const KPI_ICONS: Record<string, string> = {
