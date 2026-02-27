@@ -112,19 +112,21 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     }));
   };
 
-  const handleDateFromChange = (newValue: Dayjs | null) => {
-    setDateFrom(newValue);
+  const handleDateFromChange = (newValue: Date | Dayjs | null) => {
+    const parsed = newValue ? dayjs(newValue) : null;
+    setDateFrom(parsed);
     setFilters((prev) => ({
       ...prev,
-      dateFrom: newValue ? newValue.format("YYYY-MM-DD") : null,
+      dateFrom: parsed ? parsed.format("YYYY-MM-DD") : null,
     }));
   };
 
-  const handleDateToChange = (newValue: Dayjs | null) => {
-    setDateTo(newValue);
+  const handleDateToChange = (newValue: Date | Dayjs | null) => {
+    const parsed = newValue ? dayjs(newValue) : null;
+    setDateTo(parsed);
     setFilters((prev) => ({
       ...prev,
-      dateTo: newValue ? newValue.format("YYYY-MM-DD") : null,
+      dateTo: parsed ? parsed.format("YYYY-MM-DD") : null,
     }));
   };
 
