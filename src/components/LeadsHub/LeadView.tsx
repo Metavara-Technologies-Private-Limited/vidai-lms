@@ -331,14 +331,15 @@ export default function LeadDetailView() {
     }
   }, []);
 
-  // ====================== Fetch Documents ======================
-  const fetchDocuments = React.useCallback(async (leadUuid: string) => {
+  // ====================== Fetch Documents (FIXED) ======================
+  // - Removed `lead` from the dependency array to prevent infinite re-renders
+  // - leadDocs passed as an explicit argument instead of captured from closure
+  const fetchDocuments = React.useCallback(async (leadUuid: string, leadDocs?: string[]) => {
     try {
       setDocsLoading(true);
       setDocsError(null);
-      // First try documents from lead object itself, fallback to API call
-      if (lead?.documents && lead.documents.length > 0) {
-        setDocuments(lead.documents);
+      if (leadDocs && leadDocs.length > 0) {
+        setDocuments(leadDocs);
       } else {
         const docs = await LeadAPI.getDocuments(leadUuid);
         setDocuments(docs);
@@ -352,13 +353,16 @@ export default function LeadDetailView() {
     } finally {
       setDocsLoading(false);
     }
-  }, [lead]);
+  }, []); // ← no dependencies: stable reference, no infinite loop
 
+  // ====================== Main data-fetch effect (FIXED) ======================
+  // - Uses lead.id (actual UUID) for documents API instead of URL param
+  // - Passes lead.documents so fetchDocuments can short-circuit when data exists
   React.useEffect(() => {
     if (lead) {
       const rawId = decodeURIComponent(id || "");
       fetchNotes(rawId);
-      fetchDocuments(rawId);
+      fetchDocuments(lead.id, lead.documents); // ← lead.id is the real UUID
     }
   }, [lead, fetchNotes, fetchDocuments, id]);
 
@@ -1452,7 +1456,7 @@ const Info: React.FC<InfoProps> = ({ label, value, isAvatar }) => (
   </Box>
 );
 
-// ── Updated DocumentRow — supports real URLs with download & open ──
+// ── DocumentRow — supports real URLs with download & open ──
 const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, url, sx = {} }) => {
   const color = getDocColor(name);
   const ext = (name.split(".").pop() ?? "").toUpperCase();
