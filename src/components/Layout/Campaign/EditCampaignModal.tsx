@@ -301,9 +301,7 @@ export default function EditCampaignModal({
                   <DatePicker
                     format="DD/MM/YYYY"
                     value={startDate ? dayjs(startDate) : null}
-                    onChange={(v) =>
-                      setStartDate(v ? v.format("YYYY-MM-DD") : "")
-                    }
+                    onChange={(v) => setStartDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")}
                     slots={{ openPickerIcon: CalendarTodayIcon }}
                   />
                 </LocalizationProvider>
@@ -317,9 +315,7 @@ export default function EditCampaignModal({
                   <DatePicker
                     format="DD/MM/YYYY"
                     value={endDate ? dayjs(endDate) : null}
-                    onChange={(v) =>
-                      setEndDate(v ? v.format("YYYY-MM-DD") : "")
-                    }
+                    onChange={(v) => setEndDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")}
                     slots={{ openPickerIcon: CalendarTodayIcon }}
                   />
                 </LocalizationProvider>
@@ -568,7 +564,7 @@ export default function EditCampaignModal({
                       format="DD/MM/YYYY"
                       value={scheduleDate ? dayjs(scheduleDate) : null}
                       onChange={(v) =>
-                        setScheduleDate(v ? v.format("YYYY-MM-DD") : "")
+                        setScheduleDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")
                       }
                       slots={{ openPickerIcon: CalendarTodayIcon }}
                     />
@@ -619,9 +615,9 @@ export default function EditCampaignModal({
                     <DatePicker
                       format="DD/MM/YYYY"
                       value={scheduleDate ? dayjs(scheduleDate) : null}
-                      onChange={(v) =>
-                        setScheduleDate(v ? v.format("YYYY-MM-DD") : "")
-                      }
+                     onChange={(v) =>
+                      setScheduleDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")
+                    }
                       slots={{ openPickerIcon: CalendarTodayIcon }}
                     />
                   </LocalizationProvider>
@@ -638,7 +634,7 @@ export default function EditCampaignModal({
                           : null
                       }
                       onChange={(v) => {
-                        if (v) setScheduleTime(v.format("HH:mm"));
+                        if (v) setScheduleTime((v as import("dayjs").Dayjs).format("HH:mm"));
                       }}
                       ampm
                     />

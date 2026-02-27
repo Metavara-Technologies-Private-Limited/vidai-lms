@@ -1,11 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Modal, Box, Typography, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import "../../../styles/Campaign/EmailTemplateModal.css";
 import viewIcon from "./Icons/view.png";
 import editIcon from "./Icons/edit.png";
-
+import TextFieldsIcon from "@mui/icons-material/TextFields";
+import LinkIcon from "@mui/icons-material/Link";
+import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
+import PermMediaIcon from "@mui/icons-material/PermMedia";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 const templates = [
   {
     id: 1,
@@ -37,18 +42,81 @@ const templates = [
 export default function EmailTemplateModal({
   open,
   onClose,
-  onSelect,
+//   onSelect,
 }: any) {
   const [selected, setSelected] = useState<number | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  const emailEditorRef = useRef<HTMLDivElement>(null);
+const emailFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSelect = () => {
-    const chosen = templates.find((t) => t.id === selected);
-    if (chosen) {
-      onSelect(chosen);
-      onClose();
+const focusEmailEditor = () => {
+  if (emailEditorRef.current) {
+    emailEditorRef.current.focus();
+  }
+};
+
+const handleEmailBold = () => {
+  focusEmailEditor();
+  document.execCommand("bold");
+};
+
+const handleEmailLink = () => {
+  const url = prompt("Enter URL");
+  if (!url) return;
+
+  focusEmailEditor();
+  document.execCommand(
+    "insertHTML",
+    false,
+    `<a href="${url}" target="_blank" style="color:#2563eb; text-decoration:underline;">${url}</a>`
+  );
+};
+
+const handleEmailEmoji = () => {
+  focusEmailEditor();
+  document.execCommand("insertText", false, "😊");
+};
+
+const handleEmailImage = () => {
+  if (!emailFileInputRef.current) return;
+  emailFileInputRef.current.accept = "image/*";
+  emailFileInputRef.current.click();
+};
+
+const handleEmailAttachment = () => {
+  if (!emailFileInputRef.current) return;
+  emailFileInputRef.current.accept =
+    ".pdf,.doc,.docx,.xls,.xlsx,.txt";
+  emailFileInputRef.current.click();
+};
+
+const handleEmailFileChange = (e: any) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = (event: any) => {
+    focusEmailEditor();
+
+    if (file.type.startsWith("image/")) {
+      document.execCommand(
+        "insertHTML",
+        false,
+        `<img src="${event.target.result}" style="max-width:200px; border-radius:8px;" />`
+      );
+    } else {
+      document.execCommand(
+        "insertHTML",
+        false,
+        `<div style="color:#2563eb;">📎 ${file.name}</div>`
+      );
     }
   };
+
+  reader.readAsDataURL(file);
+  e.target.value = "";
+};
 
   return (
     <>
@@ -137,21 +205,26 @@ export default function EmailTemplateModal({
         </div>
 
         <div className="compose-body">
-          <textarea />
-        </div>
+  <div
+    ref={emailEditorRef}
+    className="editor"
+    contentEditable
+    suppressContentEditableWarning
+    data-placeholder="Write your email..."
+  />
+</div>
 
         <div className="compose-footer">
-          <div className="toolbar">
-            <span>A</span>
-            <span>📎</span>
-            <span>🔗</span>
-            <span>😊</span>
-            <span>⚠</span>
-            <span>🖼</span>
-            <span>🕒</span>
-            <span>✏</span>
-            <span>＋</span>
-          </div>
+          <div className="social-toolbar-container">
+  <div className="social-toolbar">
+  <TextFieldsIcon onClick={handleEmailBold} />
+  <LinkIcon onClick={handleEmailLink} />
+  <EmojiEmotionsIcon onClick={handleEmailEmoji} />
+  <PermMediaIcon onClick={handleEmailImage} />
+  <AttachFileIcon onClick={handleEmailAttachment} />
+  <AccessTimeIcon />
+</div>
+</div>
 
           <div className="compose-actions">
             <button
@@ -166,6 +239,12 @@ export default function EmailTemplateModal({
         </div>
       </Box>
     </Modal>
+    <input
+  ref={emailFileInputRef}
+  type="file"
+  style={{ display: "none" }}
+  onChange={handleEmailFileChange}
+/>
 </>
   );
 }
