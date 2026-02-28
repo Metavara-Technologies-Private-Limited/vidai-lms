@@ -164,7 +164,7 @@ const baseHook: MockHook = {
 let mockHookValues = { ...baseHook };
 
 vi.mock("./useEditLead", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./useEditLead")>();
+  const actual = await importOriginal<typeof import("./UseEditLead")>();
   return {
     ...actual,
     useEditLead: () => mockHookValues,
