@@ -4,6 +4,7 @@ import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { FormControl, InputLabel, Select, MenuItem, Modal, Typography, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -439,12 +440,11 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
                   className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}
                 >
                   <label>Enter Time</label>
-                  <input
-                    className="schedule-input"
-                    type="time"
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                  />
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <TimePicker format="hh:mm A" value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null} 
+                    onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }} ampm 
+                    slotProps={{ textField: { fullWidth: true } }} />
+                  </LocalizationProvider>
                 </div>
               </div>
             </div>

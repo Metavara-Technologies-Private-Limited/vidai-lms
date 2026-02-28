@@ -76,32 +76,49 @@ export default function EditCampaignModal({
   };
 
   useEffect(() => {
-    const fetchCampaign = async () => {
-      try {
-        const response = await CampaignAPI.get(campaign.id);
-        setFullCampaignData(response.data);
+  const fetchCampaign = async () => {
+    try {
+      const response = await CampaignAPI.get(campaign.id);
+      const data = response.data;
 
-        if (response.data.email && response.data.email.length > 0) {
-          setSubject(response.data.email[0].subject || "");
-          setEmailBody(response.data.email[0].email_body || "");
-        }
+      setFullCampaignData(data);
 
-        if (
-          response.data.social_media &&
-          response.data.social_media.length > 0
-        ) {
-          const platforms = response.data.social_media.map(
-            (sm: any) => sm.platform_name,
-          );
-          setAccounts(platforms);
-        }
-      } catch (error) {
-        console.error("Failed to fetch campaign:", error);
+      // ✅ STEP 1 BASIC DETAILS
+      setCampaignName(data.campaign_name || "");
+      setCampaignDescription(data.campaign_description || "");
+      setObjective(data.campaign_objective || "");
+      setAudience(data.target_audience || "");
+      setStartDate(data.start_date || "");
+      setEndDate(data.end_date || "");
+
+      // ✅ EMAIL DATA
+      if (data.email?.length > 0) {
+        setSubject(data.email[0].subject || "");
+        setEmailBody(data.email[0].email_body || "");
       }
-    };
 
-    fetchCampaign();
-  }, [campaign.id]);
+      // ✅ SOCIAL ACCOUNTS
+      if (data.social_media?.length > 0) {
+        const platforms = data.social_media.map(
+          (sm: any) => sm.platform_name
+        );
+        setAccounts(platforms);
+      }
+
+      //  MODE POPULATION
+      if (data.posting_mode === 1) setMode("organic");
+      if (data.posting_mode === 2) setMode("paid");
+
+      // If backend returns string instead:
+      // setMode(data.posting_mode || "");
+
+    } catch (error) {
+      console.error("Failed to fetch campaign:", error);
+    }
+  };
+
+  fetchCampaign();
+}, [campaign.id]);
 
   const step1Valid =
     campaignName.trim() &&
