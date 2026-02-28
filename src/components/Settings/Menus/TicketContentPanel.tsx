@@ -1,16 +1,24 @@
-import { Box, Typography, Divider, Avatar, Stack, TextField, Button } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Divider,
+  Avatar,
+  Stack,
+  TextField,
+  Button,
+} from "@mui/material";
 import ReplyMail from "../../../assets/icons/Reply_Ticket_Mail.svg";
 import dayjs from "dayjs";
 import TicketReplyEditor from "./TicketReplyEditor";
 import type { TicketReplyEditorProps } from "./TicketReplyEditor";
-import { useDispatch, useSelector  } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch } from "../../../store";
 import { addEmail } from "../../../store/emailHistorySlice";
 import type {
   TicketDetail,
   TicketDocument,
 } from "../../../types/tickets.types";
-import { selectLeads, fetchLeads  } from "../../../store/leadSlice";
+import { selectLeads, fetchLeads } from "../../../store/leadSlice";
 import { useEffect, useMemo } from "react";
 
 interface Lead {
@@ -44,35 +52,27 @@ const TicketContentPanel = ({
   setOpenReply,
   replyProps,
 }: Props) => {
-const dispatch = useDispatch<AppDispatch>();
-const leadsFromStore = useSelector(selectLeads);
+  const dispatch = useDispatch<AppDispatch>();
+  const leadsFromStore = useSelector(selectLeads);
 
-const leads: Lead[] = useMemo(() => {
-  return Array.isArray(leadsFromStore) ? leadsFromStore : [];
-}, [leadsFromStore]);
+  const leads: Lead[] = useMemo(() => {
+    return Array.isArray(leadsFromStore) ? leadsFromStore : [];
+  }, [leadsFromStore]);
 
+  useEffect(() => {
+    if (!leads || leads.length === 0) {
+      dispatch(fetchLeads());
+    }
+  }, [dispatch, leads]);
 
-const matchedLead = (Array.isArray(leads) ? leads : []).find(
-  (l: Lead) =>
-    (l.patient_name || l.full_name || l.name)
-      ?.toLowerCase()
-      .trim() === ticket?.requested_by?.toLowerCase().trim()
-);
-
-useEffect(() => {
-  if (!leads || leads.length === 0) {
-    dispatch(fetchLeads());
-  }
-}, [dispatch, leads]);
-
-//  Convert Leads into Email Recipients
-const recipients = (Array.isArray(leads) ? leads : [])
-  .filter((l: Lead) => l.email || l.email_id)
-  .map((l: Lead) => ({
-    id: l.id,
-    name: l.patient_name || l.full_name || l.name || "Unknown",
-    email: l.email || l.email_id || "",
-  }));
+  //  Convert Leads into Email Recipients
+  const recipients = (Array.isArray(leads) ? leads : [])
+    .filter((l: Lead) => l.email || l.email_id)
+    .map((l: Lead) => ({
+      id: l.id,
+      name: l.patient_name || l.full_name || l.name || "Unknown",
+      email: l.email || l.email_id || "",
+    }));
 
   if (!ticket) return null;
 
@@ -92,14 +92,23 @@ const recipients = (Array.isArray(leads) ? leads : [])
       <Divider sx={{ mb: 2 }} />
 
       {/* Content Section */}
-      <Box p={3} borderRadius={2} bgcolor="#FFFFFF" border="1px solid #ECECEC" mb={3}>
+      <Box
+        p={3}
+        borderRadius={2}
+        bgcolor="#FFFFFF"
+        border="1px solid #ECECEC"
+        mb={3}
+      >
         <Box display="flex" justifyContent="space-between" mb={2}>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Avatar src={`https://ui-avatars.com/api/?name=${ticket.requested_by}&background=random`} />
+            <Avatar
+              src={`https://ui-avatars.com/api/?name=${ticket.requested_by}&background=random`}
+            />
             <Box>
               <Typography fontWeight={700}>{ticket.requested_by}</Typography>
               <Typography variant="caption" color="text.secondary">
-                {ticket.requested_by.toLowerCase().replace(/\s/g, ".")}@fertility.com
+                {ticket.requested_by.toLowerCase().replace(/\s/g, ".")}
+                @fertility.com
               </Typography>
             </Box>
           </Stack>
@@ -165,41 +174,47 @@ const recipients = (Array.isArray(leads) ? leads : [])
 
       {/* Reply Button */}
       {!openReply && (
-        <Button onClick={() => setOpenReply(true)} sx={{ textTransform: "none", mt: 2 }}>
+        <Button
+          onClick={() => setOpenReply(true)}
+          sx={{ textTransform: "none", mt: 2 }}
+        >
           <img src={ReplyMail} alt="Reply" />
         </Button>
       )}
 
       {/* Reply Editor shows BELOW */}
-{openReply && replyProps ? (
-  <TicketReplyEditor
-    {...replyProps}
-    recipients={recipients}
-    openReply={openReply}
-    setOpenReply={setOpenReply}
+      {openReply && replyProps ? (
+        <TicketReplyEditor
+          {...replyProps}
+          recipients={recipients}
+          openReply={openReply}
+          setOpenReply={setOpenReply}
+          handleSendReply={() => {
+            // Save email into Redux history - create one record per recipient
+            replyProps.replyTo.forEach((email) => {
+              // Find which lead this email belongs to
+              const recipientLead = recipients.find((r) => r.email === email);
 
-    handleSendReply={() => {
-      // Save email into Redux history
-dispatch(
-  addEmail({
-    id: Date.now().toString(),
-    to: replyProps.replyTo.join(", "),
-    subject: replyProps.replySubject || "(No Subject)",
-    message: replyProps.replyMessage,
-    created_at: new Date().toISOString(),
-    ticket_id: ticket.id,
-    lead_id: matchedLead?.id || "", 
-  })
-);
+              dispatch(
+                addEmail({
+                  id: Date.now().toString() + "_" + email,
+                  to: email,
+                  subject: replyProps.replySubject || "(No Subject)",
+                  message: replyProps.replyMessage,
+                  created_at: new Date().toISOString(),
+                  ticket_id: ticket.id,
+                  lead_id: recipientLead?.id || "",
+                }),
+              );
+            });
 
-      // call original send logic if exists
-      replyProps.handleSendReply();
+            // call original send logic if exists
+            replyProps.handleSendReply();
 
-      setOpenReply(false);
-    }}
-  />
-) : null}
-
+            setOpenReply(false);
+          }}
+        />
+      ) : null}
     </Box>
   );
 };
