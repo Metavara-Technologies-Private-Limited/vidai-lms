@@ -104,6 +104,7 @@ const TicketPropertiesSidebar = ({
             <Box sx={propertyContainerSx}>
               {/* TYPE */}
               <TextField
+              key={type}
                 select
                 label="Type"
                 value={type}
@@ -123,6 +124,7 @@ const TicketPropertiesSidebar = ({
 
               {/* STATUS */}
               <TextField
+              key={status}
                 select
                 label="Status"
                 value={status}
@@ -142,6 +144,7 @@ const TicketPropertiesSidebar = ({
 
               {/* PRIORITY */}
               <TextField
+              key={priority}
                 select
                 label="Priority"
                 value={priority}
