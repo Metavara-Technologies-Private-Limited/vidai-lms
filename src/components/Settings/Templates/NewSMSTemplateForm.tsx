@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, IconButton, Select, MenuItem, OutlinedInput } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -84,7 +83,7 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const clinicId = getClinicId();
     
     // ✅ Use FormData for file upload compatibility
@@ -106,10 +105,7 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
 
     console.log("🚀 Saving SMS with File:", selectedFile?.name || "No file");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onSave(apiPayload as any);
-    const message = mode === 'edit' ? "SMS template updated successfully!" : "SMS template saved successfully!";
-    toast.success(message);
-    onClose();
+    await onSave(apiPayload as any);
   };
 
   if (showPreview) {

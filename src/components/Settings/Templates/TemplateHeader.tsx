@@ -11,10 +11,11 @@ interface TemplateHeaderProps {
   onSearch: (query: string) => void;
   onApplyFilters: (filters: Filters | null) => void;
   counts: { email: number; sms: number; whatsapp: number };
+  useCaseOptions?: string[];
 }
 
 export const TemplateHeader: React.FC<TemplateHeaderProps> = ({ 
-  onTabChange, onNewTemplate, onSearch, onApplyFilters, counts 
+  onTabChange, onNewTemplate, onSearch, onApplyFilters, counts, useCaseOptions = [] 
 }) => {
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   // 🆕 Changed from anchorEl to a simple boolean for centered display
@@ -59,6 +60,7 @@ export const TemplateHeader: React.FC<TemplateHeaderProps> = ({
             onClose={() => setIsFilterOpen(false)}
             onApply={onApplyFilters}
             onClear={() => onApplyFilters(null)}
+            useCaseOptions={useCaseOptions}
           />
           
           <Button 

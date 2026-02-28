@@ -1,6 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import 'react-toastify/dist/ReactToastify.css';
-import { toast } from 'react-toastify';
 import { Box, Typography, Button, IconButton, TextField, MenuItem, Select, Popover } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -260,7 +258,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     setShowPreview(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const clinicId = getClinicId();
     
     const apiPayload = {
@@ -273,10 +271,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
     console.log("📧 Email Template Payload:", JSON.stringify(apiPayload, null, 2));
 
-    onSave(apiPayload);
-    const message = mode === 'edit' ? "Email template updated successfully!" : "Email template saved successfully!";
-    toast.success(message);
-    onClose();
+    await onSave(apiPayload);
   };
 
   // Helper to generate random ID outside of render function

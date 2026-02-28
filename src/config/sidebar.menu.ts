@@ -34,6 +34,12 @@ export const LEADS_MENU: MenuItem[] = [
     page: lazy(() => import("../pages/Campaigns")),
   },
   {
+    key: "reports",
+    label: "Reports",
+    path: "/reports",
+    page: lazy(() => import("../pages/Reports.tsx")),
+  },
+  {
     key: "pipeline",
     label: "Sales Pipeline Configuration",
     path: "/pipeline",

@@ -7,7 +7,6 @@ import {
   IconButton,
   DialogContent,
   CircularProgress,
-  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import EmailIcon from "@mui/icons-material/Email";
@@ -37,7 +36,6 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 }) => {
   const [view, setView] = useState<"select" | "email" | "sms" | "whatsapp">("select");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -62,7 +60,6 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
       } else {
         setView("select");
       }
-      setError(null);
     }
   }, [open, initialData]);
 
@@ -71,14 +68,21 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     onClose();
     setTimeout(() => {
       setView("select");
-      setError(null);
     }, 300);
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleFormSave = async (formData: any) => {
+    const rawName = (formData?.name ?? formData?.audience_name ?? "") as string;
+    const templateName = rawName.trim();
+    const alphabetOnlyPattern = /^[A-Za-z\s]+$/;
+
+    if (!templateName || !alphabetOnlyPattern.test(templateName)) {
+      toast.error("Template name should contain only alphabets.");
+      return;
+    }
+
     setLoading(true);
-    setError(null);
     
     try {
       // Map UI type to API type
@@ -92,6 +96,11 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
       }
 
       await onSave(response);
+      const templateLabel = view === "email" ? "Email" : view === "sms" ? "SMS" : "WhatsApp";
+      const message = mode === "edit"
+        ? `${templateLabel} template updated successfully!`
+        : `${templateLabel} template saved successfully!`;
+      toast.success(message);
       handleClose();
     } catch (err) {
       // ✅ IMPROVED ERROR LOGGING: This will help you see the exact field validation error
@@ -104,14 +113,21 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
         // If the error is an object (Django validation errors), format it nicely
         if (typeof error.response.data === 'object') {
           errorMessage += Object.entries(error.response.data)
-            .map(([field, msg]) => `${field}: ${msg}`)
+            .map(([field, msg]) => {
+              if (Array.isArray(msg)) {
+                return `${field}: ${msg.join(', ')}`;
+              }
+              if (msg && typeof msg === 'object') {
+                return `${field}: ${JSON.stringify(msg)}`;
+              }
+              return `${field}: ${String(msg)}`;
+            })
             .join(", ");
         } else {
           errorMessage += error.response.data;
         }
       }
       
-      setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -125,16 +141,10 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     </Box>
   );
 
-  const ErrorDisplay = error && (
-    <Box sx={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 20, maxWidth: '90%' }}>
-      <Alert severity="error" onClose={() => setError(null)} sx={{ whiteSpace: 'pre-wrap' }}>{error}</Alert>
-    </Box>
-  );
-
   if (view === "email") {
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-        {LoaderOverlay} {ErrorDisplay}
+        {LoaderOverlay}
         <NewEmailTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as EmailTemplate | undefined} mode={mode} />
       </Dialog>
     );
@@ -143,7 +153,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
   if (view === "sms") {
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-        {LoaderOverlay} {ErrorDisplay}
+        {LoaderOverlay}
         <NewSMSTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as SMSTemplate | undefined} mode={mode} />
       </Dialog>
     );
@@ -152,7 +162,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
   if (view === "whatsapp") {
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-        {LoaderOverlay} {ErrorDisplay}
+        {LoaderOverlay}
         <NewWhatsAppTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as WhatsAppTemplate | undefined} mode={mode} />
       </Dialog>
     );

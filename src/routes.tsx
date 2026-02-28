@@ -8,11 +8,6 @@ import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
 
-// --- Added for Toast Notifications ---
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-// -------------------------------------
-
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
   return (
@@ -25,18 +20,6 @@ function LoadedComponent({ Comp }: LoaderProps) {
 export default function AppRoutes() {
   return (
     <>
-      {/* This container must exist for the toast.success() and toast.error() 
-          calls in your logic files to actually show up on the UI.
-      */}
-              <ToastContainer
-                position="top-right"
-                autoClose={3000}
-                newestOnTop
-                closeOnClick
-                pauseOnHover
-                draggable
-              />
-
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />

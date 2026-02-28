@@ -60,6 +60,10 @@ src/
 
 API handled via `src/services/http.ts`
 
+## Documentation
+
+* [Task Templates and Dashboard Pages](docs/TASK_TEMPLATES_AND_DASHBOARD.md)
+
 ## Current Status
 
 * ✅ Frontend UI: POC complete

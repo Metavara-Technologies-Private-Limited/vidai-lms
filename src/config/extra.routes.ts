@@ -2,6 +2,11 @@ import { lazy } from "react";
 
 export const EXTRA_ROUTES = [
   {
+    key: "reports-tab",
+    path: "reports/:tab",
+    page: lazy(() => import("../pages/Reports.tsx")),
+  },
+  {
     key: "ticket-view",
     path: "settings/tickets/:id",
     page: lazy(() => import("../components/Settings/Menus/TicketView")),

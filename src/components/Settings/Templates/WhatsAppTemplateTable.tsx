@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Table, TableBody, TableCell, TableContainer, TableHead, 
   TableRow, Paper, Chip, IconButton, Box, Stack, Typography 
@@ -8,46 +8,29 @@ import TrashIcon from '../../../assets/icons/trash.svg';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import styles from '../../../styles/Template/TemplateTable.module.css';
+import type { FormTemplate, EmailTemplate, SMSTemplate, WhatsAppTemplate } from '../../../types/templates.types';
 
-const HighlightText = ({ text, highlight }: { text: string | undefined; highlight: string }) => {
-  const safeText = text || "";
-  if (!highlight.trim()) return <>{safeText}</>;
-  const regex = new RegExp(`(${highlight})`, 'gi');
-  const parts = safeText.split(regex);
-  return (
-    <>
-      {parts.map((part, i) => regex.test(part) ? (
-        <span key={i} style={{ fontWeight: 700, color: '#111827' }}>{part}</span>
-      ) : (part))}
-    </>
-  );
-};
+type TableTemplate = EmailTemplate | SMSTemplate | WhatsAppTemplate;
 
 interface Props {
-  data: any[]; 
-  searchQuery: string;
-  onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: any) => void;
+  data: TableTemplate[];
+  onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: TableTemplate) => void;
 }
 
-export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery, onAction }) => {
+export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], onAction }) => {
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
   const totalPages = data.length === 0 ? 0 : Math.ceil(data.length / rowsPerPage);
-  const visibleRows = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const safePage = Math.min(page, Math.max(0, totalPages - 1));
+  const visibleRows = data.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
-  const start = data.length === 0 ? 0 : page * rowsPerPage + 1;
-  const end = Math.min((page + 1) * rowsPerPage, data.length);
+  const start = data.length === 0 ? 0 : safePage * rowsPerPage + 1;
+  const end = Math.min((safePage + 1) * rowsPerPage, data.length);
 
   // Pagination Handlers
   const handlePrev = () => setPage((p) => Math.max(0, p - 1));
   const handleNext = () => setPage((p) => Math.min(totalPages - 1, p + 1));
-  const goToPage = (pageIndex: number) => setPage(pageIndex);
-
-  useEffect(() => {
-    if (page > 0 && totalPages > 0 && page > totalPages - 1) {
-      setPage(Math.max(0, totalPages - 1));
-    }
-  }, [data.length, totalPages, page]);
+  const goToPage = (pageIndex: number) => setPage(Math.min(Math.max(0, pageIndex), Math.max(0, totalPages - 1)));
 
   /**
    * ✅ Use Case Styles: 
@@ -92,24 +75,25 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
               </TableRow>
             ) : (
               visibleRows.map((row) => {
-                const useCase = row.use_case || row.useCase || 'General';
+                const record = row as FormTemplate;
+                const useCase = record.use_case || record.useCase || 'General';
                 const ui = getUseCaseStyles(useCase);
-                const templateName = row.audience_name || row.name || 'Untitled WhatsApp';
-                const bodyContent = row.email_body || row.subject || row.body || '--';
+                const templateName = record.audience_name || record.name || 'Untitled WhatsApp';
+                const bodyContent = record.email_body || record.subject || record.body || '--';
                 
-                const rawDate = row.modified_at || row.lastUpdatedAt || 'N/A';
+                const rawDate = record.modified_at || record.lastUpdatedAt || 'N/A';
                 const formattedDate = (rawDate && rawDate !== 'N/A' && rawDate.includes('T')) 
                   ? new Date(rawDate).toLocaleDateString('en-GB') 
                   : rawDate;
 
                 return (
-                  <TableRow key={row.id} className={styles.bodyRow}>
+                  <TableRow key={String(record.id ?? templateName)} className={styles.bodyRow}>
                     <TableCell className={styles.nameCell}>
-                      <HighlightText text={templateName} highlight={searchQuery} />
+                      {templateName}
                     </TableCell>
                     <TableCell className={styles.subjectCell}>
                       <Typography variant="body2" noWrap sx={{ maxWidth: '250px', fontSize: '13px' }}>
-                        <HighlightText text={bodyContent} highlight={searchQuery} />
+                        {bodyContent}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -127,7 +111,7 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
                       />
                     </TableCell>
                     <TableCell className={styles.dateCell}>{formattedDate}</TableCell>
-                    <TableCell className={styles.authorCell}>{row.created_by_name || row.createdBy || 'System'}</TableCell>
+                    <TableCell className={styles.authorCell}>{record.created_by_name || record.createdBy || 'System'}</TableCell>
                     <TableCell align="right">
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('view', row)}>
@@ -180,7 +164,7 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], searchQuery,
           
           <Box sx={{ display: 'flex', gap: 1 }}>
             {Array.from({ length: totalPages }, (_, i) => i).map((index) => {
-              const isCurrentPage = page === index;
+              const isCurrentPage = safePage === index;
               return (
                 <Box
                   key={index}

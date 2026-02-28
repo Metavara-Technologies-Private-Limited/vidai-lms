@@ -15,8 +15,7 @@ import CloseIcon from "@mui/icons-material/Close";
 export interface Filters {
   fromDate: string;
   toDate: string;
-  priority: string;
-  department: string;
+  useCase: string;
 }
 
 interface Props {
@@ -24,6 +23,7 @@ interface Props {
   onClose: () => void;
   onApply: (filters: Filters) => void;
   onClear: () => void;
+  useCaseOptions?: string[];
 }
 
 export const TemplateFilterPopover: React.FC<Props> = ({
@@ -31,13 +31,26 @@ export const TemplateFilterPopover: React.FC<Props> = ({
   onClose,
   onApply,
   onClear,
+  useCaseOptions = [],
 }) => {
   const [filters, setFilters] = useState<Filters>({
     fromDate: "2025-12-01",
     toDate: "2025-12-31",
-    priority: "Low",
-    department: "Andrology",
+    useCase: "",
   });
+
+  const defaultUseCaseOptions = [
+    "Appointment",
+    "Reminder",
+    "Feedback",
+    "Marketing",
+    "Follow-Up",
+    "Re-engagement",
+  ];
+
+  const mergedUseCaseOptions = Array.from(
+    new Set([...defaultUseCaseOptions, ...useCaseOptions].filter(Boolean)),
+  );
 
   return (
     <Dialog
@@ -116,46 +129,28 @@ export const TemplateFilterPopover: React.FC<Props> = ({
           </Box>
         </Box>
 
-        <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography
-              variant="caption"
-              sx={{ color: "#9CA3AF", mb: 0.5, display: "block" }}
-            >
-              Priority
-            </Typography>
-            <Select
-              fullWidth
-              size="small"
-              value={filters.priority}
-              onChange={(e: SelectChangeEvent) =>
-                setFilters({ ...filters, priority: e.target.value as string })
-              }
-            >
-              <MenuItem value="Low">Low</MenuItem>
-              <MenuItem value="Medium">Medium</MenuItem>
-              <MenuItem value="High">High</MenuItem>
-            </Select>
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Typography
-              variant="caption"
-              sx={{ color: "#9CA3AF", mb: 0.5, display: "block" }}
-            >
-              Department
-            </Typography>
-            <Select
-              fullWidth
-              size="small"
-              value={filters.department}
-              onChange={(e: SelectChangeEvent) =>
-                setFilters({ ...filters, department: e.target.value as string })
-              }
-            >
-              <MenuItem value="Andrology">Andrology</MenuItem>
-              <MenuItem value="IVF">IVF</MenuItem>
-            </Select>
-          </Box>
+        <Box sx={{ mb: 3 }}>
+          <Typography
+            variant="caption"
+            sx={{ color: "#9CA3AF", mb: 0.5, display: "block" }}
+          >
+            Use Case
+          </Typography>
+          <Select
+            fullWidth
+            size="small"
+            value={filters.useCase}
+            onChange={(e: SelectChangeEvent) =>
+              setFilters({ ...filters, useCase: e.target.value as string })
+            }
+          >
+            <MenuItem value="">All</MenuItem>
+            {mergedUseCaseOptions.map((option) => (
+              <MenuItem key={option} value={option}>
+                {option}
+              </MenuItem>
+            ))}
+          </Select>
         </Box>
 
         <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
@@ -163,6 +158,11 @@ export const TemplateFilterPopover: React.FC<Props> = ({
             fullWidth
             variant="outlined"
             onClick={() => {
+              setFilters({
+                fromDate: "2025-12-01",
+                toDate: "2025-12-31",
+                useCase: "",
+              });
               onClear();
               onClose();
             }}
