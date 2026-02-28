@@ -42,7 +42,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
       // First, check if initialData has a 'type' field (from edit action)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dataType = (initialData as any)?.type;
-      
+
       if (dataType === 'whatsapp') {
         setView('whatsapp');
       } else if (dataType === 'sms') {
@@ -71,8 +71,16 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     }, 300);
   };
 
+  // ─── MAIN CHANGE: accepts files as optional second argument ──────────────────
+  // Form components call: onSave(payload, files?)
+  // This function:
+  //   1. Validates template name
+  //   2. Calls createTemplate/updateTemplate → gets response WITH id
+  //   3. If files present, POSTs each to /templates/{type}/{id}/documents/
+  //      which inserts rows into restapi_template_mail/sms/whatsapp_document
+  //   4. Calls parent onSave(response) → triggers loadTemplates()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleFormSave = async (formData: any) => {
+  const handleFormSave = async (formData: any, uploadedFiles?: File[]) => {
     const rawName = formData instanceof FormData
       ? ((formData.get("name") ?? formData.get("audience_name") ?? "") as string)
       : ((formData?.name ?? formData?.audience_name ?? "") as string);
@@ -85,16 +93,64 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     }
 
     setLoading(true);
-    
+
     try {
       // Map UI type to API type
       const apiType: APITemplateType = view === "email" ? "mail" : (view as APITemplateType);
-      
+
+      // Step 1: Save the template — response contains the id
       let response;
       if (mode === "edit" && initialData?.id) {
         response = await TemplateService.updateTemplate(apiType, initialData.id, formData);
       } else {
         response = await TemplateService.createTemplate(apiType, formData);
+      }
+
+      console.log("✅ Template saved:", response);
+
+      // Step 2: Upload documents using the returned template id
+      // FIX: Ensure templateId is always a string, handle both uuid and numeric ids
+      const templateId = response?.id ? String(response.id) : null;
+
+      console.log("📋 Template ID for document upload:", templateId);
+      console.log("📁 Files to upload:", uploadedFiles?.length ?? 0);
+
+      if (templateId && uploadedFiles && uploadedFiles.length > 0) {
+        console.log(`📎 Uploading ${uploadedFiles.length} document(s) for template id=${templateId}`);
+        
+        for (const file of uploadedFiles) {
+          try {
+            console.log(`📤 Uploading file: ${file.name} (${file.size} bytes, type: ${file.type})`);
+            
+            // FIX: Pass the raw File directly — let uploadTemplateDocument build FormData correctly
+            // with both `template` and `template_id` field names
+            const docResponse = await TemplateService.uploadTemplateDocument(apiType, templateId, file);
+            
+            console.log(`✅ Document uploaded successfully: ${file.name}`, docResponse);
+          } catch (docErr) {
+            // FIX: Log the full error response to diagnose field name mismatch
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const docError = docErr as any;
+            console.error(`❌ Failed to upload document: ${file.name}`);
+            console.error("   Status:", docError?.response?.status);
+            console.error("   Error data:", JSON.stringify(docError?.response?.data, null, 2));
+            console.error("   Full error:", docError);
+            
+            // Build a user-friendly error message from Django validation errors
+            let docErrMsg = `Template saved but failed to upload file: ${file.name}`;
+            if (docError?.response?.data && typeof docError.response.data === 'object') {
+              const fieldErrors = Object.entries(docError.response.data)
+                .map(([field, msg]) => `${field}: ${Array.isArray(msg) ? msg.join(', ') : String(msg)}`)
+                .join('; ');
+              docErrMsg += ` (${fieldErrors})`;
+            }
+            toast.warning(docErrMsg);
+          }
+        }
+      } else if (uploadedFiles && uploadedFiles.length > 0 && !templateId) {
+        // Edge case: files were selected but no template ID returned
+        console.warn("⚠️ Cannot upload documents: template ID not found in response", response);
+        toast.warning("Template saved but could not upload documents: template ID missing from response.");
       }
 
       await onSave(response);
@@ -109,7 +165,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = err as any;
       console.error("❌ API Error Details:", error?.response?.data);
-      
+
       let errorMessage = "Failed to save. ";
       if (error?.response?.data) {
         // If the error is an object (Django validation errors), format it nicely
@@ -129,7 +185,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
           errorMessage += error.response.data;
         }
       }
-      
+
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -177,7 +233,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
         <IconButton onClick={handleClose} size="small"><CloseIcon fontSize="small" /></IconButton>
       </Box>
       <DialogContent>
-        <Box className={styles.selectionGrid} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, py: 4, flexWrap: 'wrap' }}>
+        <Box className={styles.selectionGrid} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 3, py: 4, flexWrap: 'wrap' }}>        
           <SelectionCard icon={<EmailIcon sx={{ color: "#fff" }} />} title="Email" sub="Create new Email template" onClick={() => setView("email")} bgClass={styles.emailBg} />
           <SelectionCard icon={<SmsIcon sx={{ color: "#fff" }} />} title="SMS" sub="Create new SMS template" onClick={() => setView("sms")} bgClass={styles.smsBg} />
           <SelectionCard icon={<WhatsAppIcon sx={{ color: "#fff" }} />} title="WhatsApp" sub="Create new WhatsApp template" onClick={() => setView("whatsapp")} bgClass={styles.whatsappBg} />
