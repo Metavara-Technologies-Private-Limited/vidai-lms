@@ -185,6 +185,7 @@ export interface PaginatedResponse<T> {
 
 // Email Template used inside Tickets
 export interface EmailTemplate {
+  email_body: string;
   id: string | number;
   audience_name: string;
   subject: string;

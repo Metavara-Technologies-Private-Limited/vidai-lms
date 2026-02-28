@@ -109,7 +109,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
         subject: data?.subject || prev.subject
       }));
     }
-  }, [initialData?.id]); // Re-sync when initialData id changes
+  }, [initialData]); // Re-sync when initialData changes
 
   const [showPreview, setShowPreview] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);

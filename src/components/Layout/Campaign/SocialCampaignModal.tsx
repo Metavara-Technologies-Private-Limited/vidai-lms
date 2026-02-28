@@ -10,6 +10,7 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import { toast } from "react-toastify";
 import instagramIcon from "../../../components/Layout/Campaign/Icons/instagram.png";
 import facebookIcon from "../../../components/Layout/Campaign/Icons/facebook.png";
@@ -81,7 +82,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     ref.current?.focus();
   };
 
-  const handleText = (_platform: string) => { document.execCommand("bold"); };
+  const handleText = () => { document.execCommand("bold"); };
 
   const handleLink = (platform: string) => {
     const url = prompt("Enter URL");
@@ -241,7 +242,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       onSave(formattedCampaign);
       toast.success("Campaign created successfully");
       onClose();
-    } catch (error: any) {
+    } catch {
       toast.error("Failed to create campaign");
     }
   };
@@ -324,14 +325,18 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
               <div className={`form-group half ${submitted && !startDate ? "error" : ""}`}>
                 <label>Start Date *</label>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker format="DD/MM/YYYY" value={startDate ? dayjs(startDate) : null} onChange={(v) => setStartDate(v ? v.format("YYYY-MM-DD") : "")} slots={{ openPickerIcon: CalendarTodayIcon }} />
+                  <DatePicker format="DD/MM/YYYY" value={startDate ? dayjs(startDate) : null} 
+                   onChange={(v) => setStartDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")} 
+                  slots={{ openPickerIcon: CalendarTodayIcon }} />
                 </LocalizationProvider>
               </div>
 
               <div className={`form-group half ${submitted && !endDate ? "error" : ""}`}>
                 <label>End Date *</label>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker format="DD/MM/YYYY" value={endDate ? dayjs(endDate) : null} onChange={(v) => setEndDate(v ? v.format("YYYY-MM-DD") : "")} slots={{ openPickerIcon: CalendarTodayIcon }} />
+                  <DatePicker format="DD/MM/YYYY" value={endDate ? dayjs(endDate) : null} 
+                  onChange={(v) => setEndDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
+                  slots={{ openPickerIcon: CalendarTodayIcon }} />
                 </LocalizationProvider>
               </div>
             </div>
@@ -420,12 +425,12 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       className="editor"
       contentEditable
       suppressContentEditableWarning
-      placeholder="What would you like to share on Instagram?"
+      data-placeholder="What would you like to share on Instagram?"
     />
 
     <div className="social-toolbar-container">
       <div className="social-toolbar">
-        <TextFieldsIcon onClick={() => handleText("instagram")} />
+        <TextFieldsIcon onClick={() => handleText()} />
         <LinkIcon onClick={() => handleLink("instagram")} />
         <EmojiEmotionsIcon onClick={() => handleEmoji("instagram")} />
         <PermMediaIcon onClick={() => handleImage("instagram")} />
@@ -447,11 +452,11 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       className="editor"
       contentEditable
       suppressContentEditableWarning
-      placeholder="What would you like to share on Facebook?"
+      data-placeholder="What would you like to share on Facebook?"
     />
     <div className="social-toolbar-container">
       <div className="social-toolbar">
-        <TextFieldsIcon onClick={() => handleText("facebook")} />
+        <TextFieldsIcon onClick={() => handleText()} />
         <LinkIcon onClick={() => handleLink("facebook")} />
         <EmojiEmotionsIcon onClick={() => handleEmoji("facebook")} />
         <PermMediaIcon onClick={() => handleImage("facebook")} />
@@ -473,11 +478,11 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       className="editor"
       contentEditable
       suppressContentEditableWarning
-      placeholder="What would you like to share on LinkedIn?"
+      data-placeholder="What would you like to share on LinkedIn?"
     />
     <div className="social-toolbar-container">
       <div className="social-toolbar">
-        <TextFieldsIcon onClick={() => handleText("linkedin")} />
+        <TextFieldsIcon onClick={() => handleText()} />
         <LinkIcon onClick={() => handleLink("linkedin")} />
         <EmojiEmotionsIcon onClick={() => handleEmoji("linkedin")} />
         <PermMediaIcon onClick={() => handleImage("linkedin")} />
@@ -509,14 +514,18 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                 <div className="form-group half">
                   <label>Select Date</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker format="DD/MM/YYYY" value={scheduleDate ? dayjs(scheduleDate) : null} onChange={(v) => setScheduleDate(v ? v.format("YYYY-MM-DD") : "")} slots={{ openPickerIcon: CalendarTodayIcon }} />
+                    <DatePicker format="DD/MM/YYYY" value={scheduleDate ? dayjs(scheduleDate) : null} 
+                    onChange={(v) => setScheduleDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
+                    slots={{ openPickerIcon: CalendarTodayIcon }} />
                   </LocalizationProvider>
                 </div>
 
                 <div className="form-group half">
                   <label>Enter Time</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <TimePicker format="hh:mm A" value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null} onChange={(v) => { if (v) setScheduleTime(v.format("HH:mm")); }} ampm slotProps={{ textField: { fullWidth: true } }} />
+                    <TimePicker format="hh:mm A" value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null} 
+                    onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }} ampm 
+                    slotProps={{ textField: { fullWidth: true } }} />
                   </LocalizationProvider>
                 </div>
               </div>

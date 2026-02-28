@@ -8,6 +8,7 @@ import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { FormControl, InputLabel, Select, MenuItem, Modal, Typography, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import { toast } from "react-toastify";
 import viewIcon from "./Icons/view.png"; 
 import { CampaignAPI } from "../../../../src/services/campaign.api";
@@ -245,9 +246,7 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
                   <DatePicker
                     format="DD/MM/YYYY"
                     value={startDate ? dayjs(startDate) : null}
-                    onChange={(v) =>
-                      setStartDate(v ? v.format("YYYY-MM-DD") : "")
-                    }
+                    onChange={(v) => setStartDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
                     slots={{ openPickerIcon: CalendarTodayIcon }}
                   />
                 </LocalizationProvider>
@@ -261,9 +260,7 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
                   <DatePicker
                     format="DD/MM/YYYY"
                     value={endDate ? dayjs(endDate) : null}
-                    onChange={(v) =>
-                      setEndDate(v ? v.format("YYYY-MM-DD") : "")
-                    }
+                    onChange={(v) => setEndDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
                     slots={{ openPickerIcon: CalendarTodayIcon }}
                   />
                 </LocalizationProvider>
@@ -431,7 +428,7 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
                       format="DD/MM/YYYY"
                       value={scheduleDate ? dayjs(scheduleDate) : null}
                       onChange={(v) =>
-                        setScheduleDate(v ? v.format("YYYY-MM-DD") : "")
+                        setScheduleDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")
                       }
                       slots={{ openPickerIcon: CalendarTodayIcon }}
                     />

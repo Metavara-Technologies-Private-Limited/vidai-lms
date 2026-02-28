@@ -9,17 +9,18 @@ import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch } from "../../store/index";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
-import NewLeadsIcon from "../../assets/icons/newLeads.svg";
-import AppointmentsIcon from "../../assets/icons/appointments.svg";
-import FollowUpsIcon from "../../assets/icons/followUps.svg";
-import TotalConvertedIcon from "../../assets/icons/totalConverted.svg";
-import LostLeadsIcon from "../../assets/icons/lostLeads.svg";
+import NewLeadsIcon from "../../assets/icons/NewLeads.svg";
+import AppointmentsIcon from "../../assets/icons/Appointments.svg";
+import FollowUpsIcon from "../../assets/icons/FollowUps.svg";
+import TotalConvertedIcon from "../../assets/icons/TotalConverted.svg";
+import LostLeadsIcon from "../../assets/icons/LostLeads.svg";
 
-import { kpiCardsStyles } from "../../styles/Dashboard/KpiCards.styles";
+import { kpiCardsStyles } from "../../styles/dashboard/KpiCards.styles";
 import { fetchLeads, selectLeads } from "../../store/leadSlice";
 import { LEAD_STATUS } from "../../utils/constants";
 import type { KpiCardData, LiveKpiCounts } from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
+
 
 /* KPI → ICON MAP */
 const KPI_ICONS: Record<string, string> = {

@@ -1,0 +1,14 @@
+# ignore everything in devops except what we need
+devops/*
+!devops/Dockerfile
+!devops/nginx.conf
+node_modules
+dist
+.git
+.gitignore
+.github
+.vscode
+.DS_Store
+.env
+.env.*
+README.md

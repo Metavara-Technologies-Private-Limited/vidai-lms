@@ -35,8 +35,10 @@ export interface TicketReplyEditorProps {
   replyMessage: string;
   setReplyMessage: (v: string) => void;
 
-  anchorEl: HTMLElement | null;
-  setAnchorEl: (v: HTMLElement | null) => void;
+recipients?: LeadRecipient[];
+    employees?: unknown[];
+    anchorEl: HTMLElement | null;
+    setAnchorEl: (v: HTMLElement | null) => void;
 
   showEmoji: boolean;
   setShowEmoji: (v: boolean) => void;
@@ -65,28 +67,29 @@ interface TicketReplyEditorComponentProps extends TicketReplyEditorProps {
 }
 
 const TicketReplyEditor = ({
-  openReply,
-  replyTo,
-  setReplyTo,
-  replySubject,
-  setReplySubject,
-  replyMessage,
-  setReplyMessage,
-  recipients,
-  anchorEl,
-  setAnchorEl,
-  showEmoji,
-  setShowEmoji,
-  handleSendReply,
-  handleCancelReply,
-  handleAttachClick,
-  handleInsertLink,
-  handleInsertDriveLink,
-  handleImageClick,
-  handleEmojiInsert,
-  setOpenTemplateDialog,
-  iconSx,
-}: TicketReplyEditorComponentProps) => {
+    openReply,
+    replyTo,
+    setReplyTo,
+    replySubject,
+    setReplySubject,
+    replyMessage,
+    setReplyMessage,
+    recipients = [],
+    anchorEl,
+    setAnchorEl,
+    showEmoji,
+    setShowEmoji,
+    handleSendReply,
+    handleCancelReply,
+    handleAttachClick,
+    handleInsertLink,
+    handleInsertDriveLink,
+    handleImageClick,
+    handleEmojiInsert,
+    setOpenTemplateDialog,
+    iconSx,
+}: TicketReplyEditorProps) => {
+    if (!openReply) return null;
 
   if (!openReply) return null;
 

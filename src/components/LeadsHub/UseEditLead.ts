@@ -13,7 +13,7 @@ import { fetchLeads } from "../../store/leadSlice";
 import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import type { NextActionStatus } from "../../types/leads.types";
-import { TASK_STATUS_FOR_TYPE, getAutoNextActionStatus } from "./leadTaskConfig";
+import { TASK_STATUS_FOR_TYPE, getAutoNextActionStatus } from "./LeadTaskConfig";
 
 // ====================== Extended Lead type ======================
 // Covers API response fields not yet reflected in the generated Lead type.
@@ -183,12 +183,13 @@ export function useEditLead() {
   };
 
   const handleDateChange = (
-    d: Dayjs | null,
+    d: Date | Dayjs | null,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _context: PickerChangeHandlerContext<DateValidationError>
   ) => {
-    setSelectedDate(d);
-    if (d) setAppointmentDate(d.format("YYYY-MM-DD"));
+    const nextDate = d ? dayjs(d) : null;
+    setSelectedDate(nextDate);
+    if (nextDate) setAppointmentDate(nextDate.format("YYYY-MM-DD"));
   };
 
   // ====================== Fetch Lead ======================

@@ -23,7 +23,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
-import { TASK_TYPES } from "./leadTaskConfig";
+import { TASK_TYPES } from "./LeadTaskConfig";
 import {
   useEditLead,
   formatLeadId,
