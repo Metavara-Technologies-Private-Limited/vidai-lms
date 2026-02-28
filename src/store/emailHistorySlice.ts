@@ -7,6 +7,7 @@ export interface EmailHistoryItem {
   message: string;
   created_at: string;
   ticket_id: string; 
+  lead_id: string;
 }
 
 interface EmailHistoryState {

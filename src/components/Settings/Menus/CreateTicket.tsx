@@ -227,13 +227,27 @@ const filteredEmployees =
           </Box>
         ) : (
           <Stack spacing={2.5} mt={2}>
-            <TextField 
-            label="Subject" 
-            placeholder="Enter subject" 
-            value={subject} onChange={(e) => setSubject(e.target.value)} 
-            fullWidth sx={createTicketFocusedFieldSx} 
-            InputLabelProps={{ shrink: true }} 
-            disabled={loading} />
+<TextField 
+label="Subject" 
+placeholder="Enter subject" 
+value={subject} 
+onChange={(e) => {
+  const value = e.target.value;
+
+  const alphanumericRegex = /^[a-zA-Z0-9 ]*$/;
+
+  if (!alphanumericRegex.test(value)) {
+    toast.error("Enter Alphanumeric only");
+    return;
+  }
+
+  setSubject(value);
+}}
+fullWidth 
+sx={createTicketFocusedFieldSx} 
+InputLabelProps={{ shrink: true }} 
+disabled={loading} 
+/>
 
             <TextField
               label="Detailed Description"
@@ -321,13 +335,27 @@ onChange={(e) => {
             </Stack>
 
             <Stack direction="row" spacing={2}>
-              <TextField 
-              label="Requested By" 
-              placeholder="Enter Name" 
-              value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} 
-              fullWidth sx={createTicketFocusedFieldSx} 
-              InputLabelProps={{ shrink: true }} 
-              disabled={loading} />
+<TextField 
+label="Requested By" 
+placeholder="Enter Name" 
+value={requestedBy} 
+onChange={(e) => {
+  const value = e.target.value;
+
+  const alphabetRegex = /^[a-zA-Z ]*$/;
+
+  if (!alphabetRegex.test(value)) {
+    toast.error("Enter Alphabets only");
+    return;
+  }
+
+  setRequestedBy(value);
+}}
+fullWidth 
+sx={createTicketFocusedFieldSx} 
+InputLabelProps={{ shrink: true }} 
+disabled={loading} 
+/>
 
               <TextField
                 select

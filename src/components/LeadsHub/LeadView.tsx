@@ -203,21 +203,23 @@ export default function LeadDetailView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+
   const selectedTemplate = useSelector(
     (state: RootState) => state.emailTemplate.selectedTemplate,
   );
 
-//  Ticket Emails Integration
-const ticketEmails = useSelector((state: RootState) => state.emailHistory.emails);
 
-const relatedEmails = ticketEmails.filter(
-  (mail) => String(mail.ticket_id) === String(id)
-);
 
 
   const leads = useSelector(selectLeads) as LeadRecord[] | null;
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
+
+//  Ticket Emails Integration
+const ticketEmails = useSelector(
+  (state: RootState) => state.emailHistory.emails
+);
 
   const [activeTab, setActiveTab] = React.useState("Patient Info");
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
@@ -315,6 +317,15 @@ const relatedEmails = ticketEmails.filter(
       return leadCleanId === cleanId;
     });
   }, [leads, id]);
+
+// ✅ Emails linked to this lead
+const relatedEmails = React.useMemo(() => {
+  if (!lead) return [];
+
+  return ticketEmails.filter(
+    (mail) => String(mail.lead_id) === String(lead.id)
+  );
+}, [ticketEmails, lead]);
 
   const fetchNotes = React.useCallback(async (leadUuid: string) => {
     try {
