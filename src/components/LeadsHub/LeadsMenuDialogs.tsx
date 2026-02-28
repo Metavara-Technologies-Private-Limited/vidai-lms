@@ -16,31 +16,55 @@ import DeleteLeadDialog from "../../components/LeadsHub/DeleteLeadDialog";
 import ReassignAssigneeDialog from "../../components/LeadsHub/ReassignAssigneeDialog";
 import CallDialog from "../../components/LeadsHub/CallDialog";
 
-// ✅ Import delete actions and API from Redux
 import { deleteLead, selectIsLeadDeleting, fetchLeads } from "../../store/leadSlice";
-
-// ✅ Import LeadAPI for archive/unarchive
 import { LeadAPI } from "../../services/leads.api";
+import type { AppDispatch } from "../../store"; // ✅ Import AppDispatch from your store
 
-interface MenuProps {
-  lead: any;
-  setLeads: React.Dispatch<React.SetStateAction<any[]>>;
+// ─── Lead Type ───────────────────────────────────────────────────────────────
+export interface Lead {
+  id: string;
+  full_name?: string;
+  name?: string;
+  is_active?: boolean;
+}
+
+// ─── Axios-style error helper ─────────────────────────────────────────────────
+interface AxiosLikeError extends Error {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+}
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) {
+    const axiosErr = err as AxiosLikeError;
+    return axiosErr?.response?.data?.detail || axiosErr.message || fallback;
+  }
+  return fallback;
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+interface MenuProps<T extends Lead> {
+  lead: T;
+  setLeads: React.Dispatch<React.SetStateAction<T[]>>;
   tab: "active" | "archived";
 }
 
 let openCallSetter: ((name: string) => void) | null = null;
 
 /* ---------------- CALL BUTTON ---------------- */
-export const CallButton = ({ lead }: { lead: any }) => (
-  <IconButton onClick={() => openCallSetter?.(lead.full_name || lead.name)}>
+export const CallButton = ({ lead }: { lead: Lead }) => (
+  <IconButton onClick={() => openCallSetter?.(lead.full_name || lead.name || "")}>
     <CallIcon fontSize="small" />
   </IconButton>
 );
 
 /* ---------------- MENU BUTTON ---------------- */
-export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
+export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>) {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>(); // ✅ Typed dispatch
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [openArchive, setOpenArchive] = React.useState(false);
@@ -50,114 +74,81 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
   const [archiveError, setArchiveError] = React.useState<string | null>(null);
   const [isArchiving, setIsArchiving] = React.useState(false);
 
-  // ✅ Check if this lead is being deleted
   const isDeleting = useSelector(selectIsLeadDeleting(lead.id));
 
-  // Helper function to clean lead ID for URL
   const getCleanLeadId = (leadId: string) => {
     return leadId.replace("#", "").replace("LN-", "").replace("LD-", "");
   };
 
-  // ✅ Handle delete with API integration - TRUE DELETE (not archive)
+  const leadName = lead.full_name || lead.name || "";
+
+  // ✅ Handle Delete
   const handleDeleteConfirm = async () => {
     try {
       setDeleteError(null);
-
       console.log("🗑️ Permanently deleting lead:", lead.id);
 
-      // ✅ Use Redux delete action
-      const result = await dispatch(deleteLead(lead.id) as any);
+      const result = await dispatch(deleteLead(lead.id));
 
       if (deleteLead.fulfilled.match(result)) {
         console.log("✅ Lead permanently deleted successfully");
-        
-        // ✅ Redux already removed it from state
-        // Just update local state for immediate UI feedback
         setLeads((prev) => prev.filter((l) => l.id !== lead.id));
         setOpenDelete(false);
+        await dispatch(fetchLeads());
 
-        // Refetch to ensure UI is in sync
-        await dispatch(fetchLeads() as any);
-
-        // Emit event for sync with other components
-        const event = new CustomEvent("lead-deleted", {
-          detail: { id: lead.id },
-        });
-        window.dispatchEvent(event);
+        window.dispatchEvent(new CustomEvent("lead-deleted", { detail: { id: lead.id } }));
       } else {
-        // Error - show message in dialog
-        console.error("❌ Delete failed:", result.payload);
-        setDeleteError(result.payload as string || "Failed to delete lead");
+        const errMsg = typeof result.payload === "string" ? result.payload : "Failed to delete lead";
+        console.error("❌ Delete failed:", errMsg);
+        setDeleteError(errMsg);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Delete error:", err);
-      setDeleteError(err.message || "Failed to delete lead");
+      setDeleteError(getErrorMessage(err, "Failed to delete lead"));
     }
   };
 
-  // ✅ Handle Archive - Direct API call (matching BulkActionBar)
+  // ✅ Handle Archive
   const handleArchiveConfirm = async () => {
     try {
       setIsArchiving(true);
       setArchiveError(null);
-
       console.log(`📦 Archiving lead ${lead.id} (calling inactivate API)...`);
 
-      // ✅ Call inactivate API
       await LeadAPI.inactivate(lead.id);
-
       console.log("✅ Lead archived successfully");
 
-      // Refetch leads to update UI
-      await dispatch(fetchLeads() as any);
-
-      // Update local state for immediate UI feedback
+      await dispatch(fetchLeads());
       setLeads((prev) =>
         prev.map((l) => (l.id === lead.id ? { ...l, is_active: false } : l))
       );
-
       setOpenArchive(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Archive error:", err);
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Failed to archive lead";
-      setArchiveError(errorMsg);
+      setArchiveError(getErrorMessage(err, "Failed to archive lead"));
     } finally {
       setIsArchiving(false);
     }
   };
 
-  // ✅ Handle Unarchive - Direct API call (matching BulkActionBar)
+  // ✅ Handle Unarchive
   const handleUnarchiveConfirm = async () => {
     try {
       setIsArchiving(true);
       setArchiveError(null);
-
       console.log(`📂 Unarchiving lead ${lead.id} (calling activate API)...`);
 
-      // ✅ Call activate API
       await LeadAPI.activate(lead.id);
-
       console.log("✅ Lead unarchived successfully");
 
-      // Refetch leads to update UI
-      await dispatch(fetchLeads() as any);
-
-      // Update local state for immediate UI feedback
+      await dispatch(fetchLeads());
       setLeads((prev) =>
         prev.map((l) => (l.id === lead.id ? { ...l, is_active: true } : l))
       );
-
       setAnchorEl(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Unarchive error:", err);
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Failed to unarchive lead";
-      setArchiveError(errorMsg);
+      setArchiveError(getErrorMessage(err, "Failed to unarchive lead"));
     } finally {
       setIsArchiving(false);
     }
@@ -179,9 +170,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
           <>
             <MenuItem
               onClick={() => {
-                navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, {
-                  state: { lead },
-                });
+                navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, { state: { lead } });
                 setAnchorEl(null);
               }}
               disabled={isDeleting || isArchiving}
@@ -229,10 +218,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
               disabled={isDeleting || isArchiving}
             >
               <ListItemIcon>
-                <DeleteOutlineOutlinedIcon 
-                  fontSize="small" 
-                  sx={{ color: "error.main" }}
-                />
+                <DeleteOutlineOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
               </ListItemIcon>
               {isDeleting ? "Deleting..." : "Delete"}
             </MenuItem>
@@ -262,10 +248,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
               disabled={isDeleting || isArchiving}
             >
               <ListItemIcon>
-                <DeleteOutlineOutlinedIcon 
-                  fontSize="small" 
-                  sx={{ color: "error.main" }}
-                />
+                <DeleteOutlineOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
               </ListItemIcon>
               {isDeleting ? "Deleting..." : "Delete"}
             </MenuItem>
@@ -276,7 +259,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
       {/* Archive Dialog */}
       <ArchiveLeadDialog
         open={openArchive}
-        leadName={lead.full_name || lead.name}
+        leadName={leadName}
         onClose={() => !isArchiving && setOpenArchive(false)}
         onConfirm={handleArchiveConfirm}
         isUnarchive={false}
@@ -287,7 +270,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
       {/* Delete Dialog */}
       <DeleteLeadDialog
         open={openDelete}
-        leadName={lead.full_name || lead.name}
+        leadName={leadName}
         leadId={lead.id}
         isDeleting={isDeleting}
         error={deleteError}
@@ -306,7 +289,7 @@ export const MenuButton: React.FC<MenuProps> = ({ lead, setLeads, tab }) => {
       />
     </>
   );
-};
+}
 
 /* ---------------- CALL DIALOG ---------------- */
 export const Dialogs = () => {
