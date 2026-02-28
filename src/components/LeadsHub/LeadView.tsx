@@ -150,11 +150,7 @@ interface LeadRecord {
   documents?: string[];
 }
 
-interface CallMessageProps {
-  speaker: string;
-  time: string;
-  text: string;
-}
+
 
 interface TimelineItemProps {
   icon?: React.ReactNode;
@@ -1802,16 +1798,6 @@ export default function LeadDetailView() {
 }
 
 // ====================== Sub-components ======================
-
-const CallMessage: React.FC<CallMessageProps> = ({ speaker, time, text }) => (
-  <Box>
-    <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
-      <Typography variant="caption" fontWeight={700} color="text.primary">{speaker}</Typography>
-      <Typography variant="caption" color="text.secondary">{time}</Typography>
-    </Stack>
-    <Typography variant="body2" color="text.secondary">{text}</Typography>
-  </Box>
-);
 
 const TimelineItem: React.FC<TimelineItemProps> = ({ icon, title, time, isAvatar, avatarInitial, isLast, onClick, isClickable }) => (
   <Stack direction="row" spacing={2}>
