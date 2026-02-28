@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, IconButton, Select, MenuItem, OutlinedInput, Chip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -94,7 +93,7 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
     if (file) setSelectedFile(file);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const clinicId = getClinicId();
     const apiPayload = {
       name: formData.name,
@@ -104,10 +103,7 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
       subject: "WhatsApp Message",
       is_active: true
     };
-    onSave(apiPayload);
-    const message = mode === 'edit' ? "WhatsApp template updated successfully!" : "WhatsApp template saved successfully!";
-    toast.success(message);
-    onClose();
+    await onSave(apiPayload);
   };
 
   if (showPreview) {

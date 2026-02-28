@@ -9,27 +9,12 @@ import type { FormTemplate, EmailTemplate, SMSTemplate, WhatsAppTemplate } from 
 
 type TableTemplate = EmailTemplate | SMSTemplate | WhatsAppTemplate;
 
-const HighlightText = ({ text, highlight }: { text: string | undefined; highlight: string }) => {
-  const safeText = text || ""; 
-  if (!highlight.trim()) return <>{safeText}</>;
-  const regex = new RegExp(`(${highlight})`, 'gi');
-  const parts = safeText.split(regex);
-  return (
-    <>
-      {parts.map((part, i) => regex.test(part) ? (
-        <span key={i} style={{ fontWeight: 700, color: '#111827' }}>{part}</span>
-      ) : (part))}
-    </>
-  );
-};
-
 interface Props {
   data: TableTemplate[];
-  searchQuery: string;
   onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: TableTemplate) => void;
 }
 
-export const SmsTemplateTable: React.FC<Props> = ({ data = [], searchQuery, onAction }) => {
+export const SmsTemplateTable: React.FC<Props> = ({ data = [], onAction }) => {
   const [page, setPage] = useState(0); 
   const rowsPerPage = 10;
   const totalPages = data.length === 0 ? 0 : Math.ceil(data.length / rowsPerPage);
@@ -90,10 +75,10 @@ export const SmsTemplateTable: React.FC<Props> = ({ data = [], searchQuery, onAc
                 return (
                   <TableRow key={String(record.id ?? templateName)} className={styles.bodyRow}>
                     <TableCell className={styles.nameCell}>
-                      <HighlightText text={templateName} highlight={searchQuery} />
+                      {templateName}
                     </TableCell>
                     <TableCell className={styles.subjectCell}>
-                      <HighlightText text={bodyContent} highlight={searchQuery} />
+                      {bodyContent}
                     </TableCell>
                     <TableCell>
                       <Chip 

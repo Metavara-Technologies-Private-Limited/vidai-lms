@@ -33,6 +33,26 @@ const TemplatesPage: React.FC = () => {
   const [templateInAction, setTemplateInAction] = useState<Template | null>(null);
   const [activeFilters, setActiveFilters] = useState<TemplateFilters | null>(null);
 
+  const useCaseOptions = React.useMemo(() => {
+    const allTemplates = [
+      ...templates.mail,
+      ...templates.sms,
+      ...templates.whatsapp,
+    ];
+
+    return Array.from(
+      new Set(
+        allTemplates
+          .map((template) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const tAny = template as any;
+            return ((tAny.use_case || tAny.useCase || '') as string).trim();
+          })
+          .filter(Boolean),
+      ),
+    );
+  }, [templates]);
+
   const getApiType = (tab: string): APITemplateType => {
     if (tab === 'Email') return 'mail';
     return tab.toLowerCase() as APITemplateType;
@@ -74,9 +94,7 @@ const TemplatesPage: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tAny = t as any;
         const name = (tAny.audience_name || tAny.name || '') as string;
-        const subject = (tAny.subject || '') as string;
-        return name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-               subject.toLowerCase().includes(searchQuery.toLowerCase());
+        return name.toLowerCase().includes(searchQuery.toLowerCase());
       });
     }
     if (activeFilters?.useCase) {
@@ -137,10 +155,11 @@ const TemplatesPage: React.FC = () => {
   return (
     <Box className={styles.pageContainer} sx={{ overflow: 'hidden', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <TemplateHeader 
-        onTabChange={(tab) => { setActiveTab(tab); setSearchQuery(''); }}
+        onTabChange={(tab) => { setActiveTab(tab); }}
         onNewTemplate={() => { setViewMode('create'); setActiveTemplate(null); setModalOpen(true); }}
         onSearch={setSearchQuery}
         onApplyFilters={(filters) => setActiveFilters(filters as TemplateFilters | null)}
+        useCaseOptions={useCaseOptions}
         // ✅ UPDATED: All counts show immediately from the bulk load
         counts={{
           email: templates.mail.length,
@@ -155,9 +174,9 @@ const TemplatesPage: React.FC = () => {
         ) : (
           <>
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {activeTab === 'Email' && <EmailTemplateTable data={getFilteredData()} searchQuery={searchQuery} onAction={handleAction as any} />}
-            {activeTab === 'SMS' && <SmsTemplateTable data={getFilteredData()} searchQuery={searchQuery} onAction={handleAction} />}
-            {activeTab === 'WhatsApp' && <WhatsAppTemplateTable data={getFilteredData()} searchQuery={searchQuery} onAction={handleAction} />}
+            {activeTab === 'Email' && <EmailTemplateTable data={getFilteredData()} onAction={handleAction as any} />}
+            {activeTab === 'SMS' && <SmsTemplateTable data={getFilteredData()} onAction={handleAction} />}
+            {activeTab === 'WhatsApp' && <WhatsAppTemplateTable data={getFilteredData()} onAction={handleAction} />}
           </>
         )}
       </Box>

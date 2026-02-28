@@ -1,0 +1,24 @@
+<svg width="40" height="39" viewBox="0 0 40 39" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#filter0_di_397_16054)">
+<path d="M29.25 9.14969C26.94 5.51969 23.56 3.42969 20 3.42969C18.22 3.42969 16.49 3.94969 14.91 4.91969C13.33 5.89969 11.91 7.32969 10.75 9.14969C9.75 10.7197 9.75 13.2697 10.75 14.8397C13.06 18.4797 16.44 20.5597 20 20.5597C21.78 20.5597 23.51 20.0397 25.09 19.0697C26.67 18.0897 28.09 16.6597 29.25 14.8397C30.25 13.2797 30.25 10.7197 29.25 9.14969ZM20 16.0397C17.76 16.0397 15.96 14.2297 15.96 11.9997C15.96 9.76969 17.76 7.95969 20 7.95969C22.24 7.95969 24.04 9.76969 24.04 11.9997C24.04 14.2297 22.24 16.0397 20 16.0397Z" fill="#4072DF"/>
+<path d="M20.0004 9.14062C18.4304 9.14062 17.1504 10.4206 17.1504 12.0006C17.1504 13.5706 18.4304 14.8506 20.0004 14.8506C21.5704 14.8506 22.8604 13.5706 22.8604 12.0006C22.8604 10.4306 21.5704 9.14062 20.0004 9.14062Z" fill="#4072DF"/>
+</g>
+<defs>
+<filter id="filter0_di_397_16054" x="-2" y="-2" width="44" height="44" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="8"/>
+<feGaussianBlur stdDeviation="5"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.176471 0 0 0 0 0.419608 0 0 0 0 0.941176 0 0 0 0.3 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_397_16054"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_397_16054" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="-2"/>
+<feGaussianBlur stdDeviation="2"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.4 0"/>
+<feBlend mode="normal" in2="shape" result="effect2_innerShadow_397_16054"/>
+</filter>
+</defs>
+</svg>

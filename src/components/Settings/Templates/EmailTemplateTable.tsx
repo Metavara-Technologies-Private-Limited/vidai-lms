@@ -9,33 +9,14 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import styles from '../../../styles/Template/TemplateTable.module.css';
 
-const HighlightText = ({ text, highlight }: { text: string | undefined; highlight: string }) => {
-  const safeText = text || ""; 
-  if (!highlight.trim()) return <>{safeText}</>;
-  const regex = new RegExp(`(${highlight})`, 'gi');
-  const parts = safeText.split(regex);
-  return (
-    <>
-      {parts.map((part, i) => 
-        regex.test(part) ? (
-          <span key={i} style={{ fontWeight: 700, color: '#111827' }}>
-            {part}
-          </span>
-        ) : (part)
-      )}
-    </>
-  );
-};
-
 interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any[]; 
-  searchQuery: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: any) => void;
 }
 
-export const EmailTemplateTable: React.FC<Props> = ({ data = [], searchQuery, onAction }) => {
+export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => {
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
   const totalPages = data.length === 0 ? 0 : Math.ceil(data.length / rowsPerPage);
@@ -90,10 +71,10 @@ export const EmailTemplateTable: React.FC<Props> = ({ data = [], searchQuery, on
                 return (
                   <TableRow key={row.id} className={styles.bodyRow}>
                     <TableCell className={styles.nameCell}>
-                      <HighlightText text={templateName} highlight={searchQuery} />
+                      {templateName}
                     </TableCell>
                     <TableCell className={styles.subjectCell}>
-                      <HighlightText text={subject} highlight={searchQuery} />
+                      {subject}
                     </TableCell>
                     <TableCell>
                       <Chip 
