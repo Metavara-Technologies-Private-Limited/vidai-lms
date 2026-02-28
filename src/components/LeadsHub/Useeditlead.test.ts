@@ -60,7 +60,7 @@ import {
   intOrFallback,
   isNextActionStatus,
   formatLeadId,
-} from "./useEditLead";
+} from "./UseEditLead";
 import * as React from "react";
 
 // =====================================================

@@ -253,11 +253,8 @@ const ticketEmails = useSelector(
   const [docsLoading, setDocsLoading] = React.useState(false);
   const [docsError, setDocsError] = React.useState<string | null>(null);
 
-<<<<<<< Updated upstream
 
   
-=======
->>>>>>> Stashed changes
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px",
     fontWeight: 500,
@@ -355,7 +352,6 @@ const relatedEmails = React.useMemo(() => {
     }
   }, []);
 
-<<<<<<< Updated upstream
   // ====================== Fetch Documents (FIXED) ======================
   // - Removed `lead` from the dependency array to prevent infinite re-renders
   // - leadDocs passed as an explicit argument instead of captured from closure
@@ -365,16 +361,6 @@ const relatedEmails = React.useMemo(() => {
       setDocsError(null);
       if (leadDocs && leadDocs.length > 0) {
         setDocuments(leadDocs);
-=======
-  // ====================== Fetch Documents ======================
-  const fetchDocuments = React.useCallback(async (leadUuid: string) => {
-    try {
-      setDocsLoading(true);
-      setDocsError(null);
-      // First try documents from lead object itself, fallback to API call
-      if (lead?.documents && lead.documents.length > 0) {
-        setDocuments(lead.documents);
->>>>>>> Stashed changes
       } else {
         const docs = await LeadAPI.getDocuments(leadUuid);
         setDocuments(docs);
@@ -388,25 +374,16 @@ const relatedEmails = React.useMemo(() => {
     } finally {
       setDocsLoading(false);
     }
-<<<<<<< Updated upstream
   }, []); // ← no dependencies: stable reference, no infinite loop
 
   // ====================== Main data-fetch effect (FIXED) ======================
   // - Uses lead.id (actual UUID) for documents API instead of URL param
   // - Passes lead.documents so fetchDocuments can short-circuit when data exists
-=======
-  }, [lead]);
-
->>>>>>> Stashed changes
   React.useEffect(() => {
     if (lead) {
       const rawId = decodeURIComponent(id || "");
       fetchNotes(rawId);
-<<<<<<< Updated upstream
       fetchDocuments(lead.id, lead.documents); // ← lead.id is the real UUID
-=======
-      fetchDocuments(rawId);
->>>>>>> Stashed changes
     }
   }, [lead, fetchNotes, fetchDocuments, id]);
 
@@ -1543,11 +1520,7 @@ const Info: React.FC<InfoProps> = ({ label, value, isAvatar }) => (
   </Box>
 );
 
-<<<<<<< Updated upstream
 // ── DocumentRow — supports real URLs with download & open ──
-=======
-// ── Updated DocumentRow — supports real URLs with download & open ──
->>>>>>> Stashed changes
 const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, url, sx = {} }) => {
   const color = getDocColor(name);
   const ext = (name.split(".").pop() ?? "").toUpperCase();
