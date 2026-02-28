@@ -53,7 +53,7 @@ const TicketView = () => {
   const [description, setDescription] = useState(""); // State for editable description
   const [openReply, setOpenReply] = useState(false);
   const [replyMessage, setReplyMessage] = useState("");
-  const [replyTo, setReplyTo] = useState(ticket?.requested_by || "");
+const [replyTo, setReplyTo] = useState<string[]>([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [replySubject, setReplySubject] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -152,11 +152,13 @@ useEffect(() => {
     }
   }, [ticket]);
 
-  useEffect(() => {
-    if (ticket?.requested_by) {
-      setReplyTo(ticket.requested_by);
-    }
-  }, [ticket]);
+useEffect(() => {
+  if (ticket?.requested_by) {
+    setReplyTo([ticket.requested_by]);
+  } else {
+    setReplyTo([]);
+  }
+}, [ticket]);
 
   //  File Preview Handlers
   const handlePreviewOpen = (file: string) => {
@@ -231,30 +233,27 @@ useEffect(() => {
     }
   };
 
-  const handleSendReply = async () => {
-    if (!replyTo) {
-      toast.warn("Please select a recipient.");
-      return;
-    }
+const handleSendReply = async () => {
+  if (replyTo.length === 0) {
+    toast.warn("Please select at least one recipient.");
+    return;
+  }
 
-    if (!replyMessage.trim()) {
-      toast.warn("Reply message cannot be empty.");
-      return;
-    }
+  if (!replyMessage.trim()) {
+    toast.warn("Reply message cannot be empty.");
+    return;
+  }
 
-    try {
-      // 👉 When backend API is ready, call here
-      // await ticketsApi.sendReply(id, { message: replyMessage });
+  try {
+    toast.success("Reply sent successfully!");
 
-      toast.success("Reply sent successfully!");
-
-      // Reset UI
-      setReplyMessage("");
-      setOpenReply(false);
-    } catch  {
-      toast.error("Failed to send reply.");
-    }
-  };
+    setReplyMessage("");
+    setReplyTo([]);
+    setOpenReply(false);
+  } catch {
+    toast.error("Failed to send reply.");
+  }
+};
 
   const convertHtmlToText = (html: string) => {
     if (!html) return "";
@@ -446,7 +445,6 @@ useEffect(() => {
     setReplySubject,
     replyMessage,
     setReplyMessage,
-    employees,
     anchorEl,
     setAnchorEl,
     showEmoji,

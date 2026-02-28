@@ -10,7 +10,8 @@ import type {
   TicketDetail,
   TicketDocument,
 } from "../../../types/tickets.types";
-import { selectLeads } from "../../../store/leadSlice";
+import { selectLeads, fetchLeads  } from "../../../store/leadSlice";
+import { useEffect } from "react";
 
 interface Props {
   ticket: TicketDetail | null;
@@ -36,13 +37,28 @@ const TicketContentPanel = ({
 }: Props) => {
 const dispatch = useDispatch<AppDispatch>();
 const leads = useSelector(selectLeads) || [];
+
+const matchedLead = (Array.isArray(leads) ? leads : []).find(
+  (l: any) =>
+    (l.patient_name || l.full_name || l.name)
+      ?.toLowerCase()
+      .trim() === ticket?.requested_by?.toLowerCase().trim()
+);
+
+useEffect(() => {
+  // Load leads when Ticket screen opens
+  if (!leads || leads.length === 0) {
+    dispatch(fetchLeads());
+  }
+}, [dispatch]);
+
 //  Convert Leads into Email Recipients
-const recipients = leads
-  .filter((l: any) => l.email) 
+const recipients = (Array.isArray(leads) ? leads : [])
+  .filter((l: any) => l.email || l.email_id)
   .map((l: any) => ({
     id: l.id,
-    name: l.full_name || l.name || "Unknown",
-    email: l.email,
+    name: l.patient_name || l.full_name || l.name || "Unknown",
+    email: l.email || l.email_id,
   }));
 
   if (!ticket) return null;
@@ -151,16 +167,17 @@ const recipients = leads
 
     handleSendReply={() => {
       // Save email into Redux history
-      dispatch(
-        addEmail({
-          id: Date.now().toString(),
-          to: replyProps.replyTo,
-          subject: replyProps.replySubject || "(No Subject)",
-          message: replyProps.replyMessage,
-          created_at: new Date().toISOString(),
-          ticket_id: ticket.id,   // link email to this ticket
-        })
-      );
+dispatch(
+  addEmail({
+    id: Date.now().toString(),
+    to: replyProps.replyTo.join(", "),
+    subject: replyProps.replySubject || "(No Subject)",
+    message: replyProps.replyMessage,
+    created_at: new Date().toISOString(),
+    ticket_id: ticket.id,
+    lead_id: matchedLead?.id || "", 
+  })
+);
 
       // call original send logic if exists
       replyProps.handleSendReply();

@@ -24,17 +24,24 @@ export const DynamicBreadcrumbs = () => {
   const pathnames = location.pathname.split("/").filter(Boolean);
 
   // 👇 Fetch lead name if id exists
-  React.useEffect(() => {
-    if (!id) return;
+// 👇 Fetch lead name ONLY for Leads module (skip Tickets and others)
+React.useEffect(() => {
+  if (!id) return;
 
-    LeadAPI.getById(id)
-      .then((lead) => {
-        setLeadName(lead.full_name);
-      })
-      .catch(() => {
-        setLeadName("");
-      });
-  }, [id]);
+  // 🚫 Skip API call when we are inside Tickets module
+  if (location.pathname.includes("/settings/tickets")) {
+    return;
+  }
+
+  // ✅ Existing behaviour for Leads stays untouched
+  LeadAPI.getById(id)
+    .then((lead) => {
+      setLeadName(lead.full_name);
+    })
+    .catch(() => {
+      setLeadName("");
+    });
+}, [id, location.pathname]);
 
   // Custom SVG separator
   const separator = (
