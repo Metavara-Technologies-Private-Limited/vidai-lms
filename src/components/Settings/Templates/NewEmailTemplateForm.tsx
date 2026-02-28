@@ -258,26 +258,12 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     setShowPreview(false);
   };
 
+  // ─── ONLY CHANGE: pass uploadedFiles as second argument ──────────────────────
+  // NewTemplateModal.handleFormSaveWithFiles(payload, files) receives both,
+  // saves the template first (gets id back), then POSTs each file to
+  // POST /api/templates/mail/{id}/documents/ → inserts into restapi_template_mail_document
   const handleSave = async () => {
     const clinicId = getClinicId();
-
-    const hasFiles = uploadedFiles.length > 0;
-    if (hasFiles) {
-      const apiPayload = new FormData();
-      apiPayload.append('name', formData.name);
-      apiPayload.append('use_case', formData.useCase);
-      apiPayload.append('body', editor?.getHTML() || '');
-      apiPayload.append('subject', formData.subject);
-      apiPayload.append('clinic', String(clinicId));
-      apiPayload.append('is_active', 'true');
-
-      uploadedFiles.forEach((file) => {
-        apiPayload.append('file_attachment', file);
-      });
-
-      await onSave(apiPayload);
-      return;
-    }
 
     const apiPayload = {
       name: formData.name,
@@ -288,7 +274,11 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     };
 
     console.log("📧 Email Template Payload:", JSON.stringify(apiPayload, null, 2));
-    await onSave(apiPayload);
+
+    // Pass plain payload + files separately so NewTemplateModal can
+    // upload files AFTER getting the template id from the save response
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (onSave as any)(apiPayload, uploadedFiles);
   };
 
   // Helper to generate random ID outside of render function

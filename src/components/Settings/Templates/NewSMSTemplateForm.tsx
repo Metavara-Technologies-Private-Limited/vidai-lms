@@ -83,29 +83,27 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
     }
   };
 
+  // ─── ONLY CHANGE: pass selectedFile as second argument ───────────────────────
+  // NewTemplateModal.handleFormSaveWithFiles(payload, files) receives both,
+  // saves the template first (gets id back), then POSTs the file to
+  // POST /api/templates/sms/{id}/documents/ → inserts into restapi_template_sms_document
   const handleSave = async () => {
     const clinicId = getClinicId();
     
-    // ✅ Use FormData for file upload compatibility
-    const apiPayload = new FormData();
-    
-    // Append data fields (using keys verified by your backend)
-    apiPayload.append('name', formData.name);
-    apiPayload.append('body', formData.body);
-    apiPayload.append('use_case', formData.useCase);
-    apiPayload.append('clinic', String(clinicId));
-    apiPayload.append('is_active', 'true');
-    apiPayload.append('subject', "SMS Template");
-
-    // ✅ Append the file only if one is selected
-    if (selectedFile) {
-      // Ensure 'file_attachment' matches the field name in your Django Serializer
-      apiPayload.append('file_attachment', selectedFile); 
-    }
+    const apiPayload = {
+      name: formData.name,
+      body: formData.body,
+      use_case: formData.useCase,
+      clinic: clinicId,
+      is_active: true,
+      subject: "SMS Template",
+    };
 
     console.log("🚀 Saving SMS with File:", selectedFile?.name || "No file");
+
+    const files = selectedFile ? [selectedFile] : [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await onSave(apiPayload as any);
+    await (onSave as any)(apiPayload, files);
   };
 
   if (showPreview) {
