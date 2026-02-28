@@ -15,7 +15,7 @@ const createProps = (): TicketReplyEditorProps => ({
   openReply: true,
   setOpenReply: vi.fn(),
 
-  replyTo: "",
+  replyTo: [],
   setReplyTo: vi.fn(),
 
   replySubject: "",
