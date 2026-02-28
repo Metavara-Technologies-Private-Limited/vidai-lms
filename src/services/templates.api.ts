@@ -51,13 +51,18 @@ const TemplateService = {
    * Create a new template
    */
   createTemplate: async (type: APITemplateType, data: TemplatePayload) => {
-    // If 'data' is FormData, the header will automatically switch to 'multipart/form-data'
-    const response = await http.post(`/templates/${type}/create/`, data);
+    const config = data instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : undefined;
+    const response = await http.post(`/templates/${type}/create/`, data, config);
     return response.data;
 },
 
 updateTemplate: async (type: APITemplateType, templateId: string, data: TemplatePayload) => {
-    const response = await http.put(`/templates/${type}/${templateId}/update/`, data);
+    const config = data instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : undefined;
+    const response = await http.put(`/templates/${type}/${templateId}/update/`, data, config);
     return response.data;
 },
 

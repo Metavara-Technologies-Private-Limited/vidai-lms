@@ -95,14 +95,18 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
 
   const handleSave = async () => {
     const clinicId = getClinicId();
-    const apiPayload = {
-      name: formData.name,
-      body: formData.body,
-      use_case: formData.useCase,
-      clinic: clinicId,
-      subject: "WhatsApp Message",
-      is_active: true
-    };
+    const apiPayload = new FormData();
+    apiPayload.append('name', formData.name);
+    apiPayload.append('body', formData.body);
+    apiPayload.append('use_case', formData.useCase);
+    apiPayload.append('clinic', String(clinicId));
+    apiPayload.append('subject', 'WhatsApp Message');
+    apiPayload.append('is_active', 'true');
+
+    if (selectedFile) {
+      apiPayload.append('file_attachment', selectedFile);
+    }
+
     await onSave(apiPayload);
   };
 

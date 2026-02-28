@@ -260,7 +260,25 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
   const handleSave = async () => {
     const clinicId = getClinicId();
-    
+
+    const hasFiles = uploadedFiles.length > 0;
+    if (hasFiles) {
+      const apiPayload = new FormData();
+      apiPayload.append('name', formData.name);
+      apiPayload.append('use_case', formData.useCase);
+      apiPayload.append('body', editor?.getHTML() || '');
+      apiPayload.append('subject', formData.subject);
+      apiPayload.append('clinic', String(clinicId));
+      apiPayload.append('is_active', 'true');
+
+      uploadedFiles.forEach((file) => {
+        apiPayload.append('file_attachment', file);
+      });
+
+      await onSave(apiPayload);
+      return;
+    }
+
     const apiPayload = {
       name: formData.name,
       use_case: formData.useCase,
@@ -270,7 +288,6 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     };
 
     console.log("📧 Email Template Payload:", JSON.stringify(apiPayload, null, 2));
-
     await onSave(apiPayload);
   };
 

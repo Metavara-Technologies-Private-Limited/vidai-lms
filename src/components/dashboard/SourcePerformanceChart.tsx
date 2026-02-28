@@ -16,12 +16,18 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import type { TimeRange } from "./TimeRangeSelector";
+import { scaleValueByRange } from "./timeRange.utils";
 
 type Metric = "volume" | "rate" | "revenue" | "cost";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
+
+interface SourcePerformanceChartProps {
+  timeRange: TimeRange;
+}
 
 // Custom Tooltip
 
@@ -67,9 +73,21 @@ const CustomTooltip = ({
   );
 };
 
-const SourcePerformanceChart = () => {
+const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
   const [metric, setMetric] = useState<Metric>("volume");
-  const data = mockData.overview.sourcePerformance;
+  const data = useMemo(
+    () =>
+      mockData.overview.sourcePerformance.map((row) => ({
+        ...row,
+        hot: Math.round(scaleValueByRange(row.hot, timeRange)),
+        warm: Math.round(scaleValueByRange(row.warm, timeRange)),
+        cold: Math.round(scaleValueByRange(row.cold, timeRange)),
+        convRate: scaleValueByRange(row.convRate, timeRange),
+        revenue: scaleValueByRange(row.revenue, timeRange),
+        cost: scaleValueByRange(row.cost, timeRange),
+      })),
+    [timeRange],
+  );
 
   const config = {
     volume: { key: "volume", label: "No. of Leads" },

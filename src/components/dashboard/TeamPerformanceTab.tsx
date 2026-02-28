@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import { mockData } from "./mockData";
+import type { TimeRange } from "./TimeRangeSelector";
 import type{
   TeamMember,
   MedalType,
@@ -80,7 +81,11 @@ const generateMemberPerformanceData = (): PerformanceChartPoint[] => {
   }));
 };
 
-const TeamPerformanceTab = () => {
+interface TeamPerformanceTabProps {
+  timeRange: TimeRange;
+}
+
+const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
   const { members, overview } = mockData.overview.teamPerformance;
 const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
@@ -101,12 +106,26 @@ const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
     };
   };
 
-const performanceData: PerformanceChartPoint[] =
+const fullPerformanceData: PerformanceChartPoint[] =
   selectedMember ? generateMemberPerformanceData() : [];
+
+const pointsToShow =
+  timeRange === "today"
+    ? 1
+    : timeRange === "week"
+      ? 3
+      : timeRange === "month"
+        ? 6
+        : 12;
+
+const performanceData: PerformanceChartPoint[] = fullPerformanceData.slice(
+  Math.max(0, fullPerformanceData.length - pointsToShow),
+);
 
 const memberStats: MemberStats | null =
   selectedMember ? getMemberData() : null;
 const stats = memberStats!;
+const pointDivisor = Math.max(1, performanceData.length - 1);
 
   return (
     <Box sx={{ p: 2, height: "calc(100vh - 200px)", overflowY: "auto" }}>
@@ -255,7 +274,7 @@ const stats = memberStats!;
 
                   {/* Line chart */}
                   <polyline
-                    points={performanceData.map((d, i) => `${(i * 800) / 11},${300 - (d.value * 2.7)}`).join(" ")}
+                    points={performanceData.map((d, i) => `${(i * 800) / pointDivisor},${300 - (d.value * 2.7)}`).join(" ")}
                     fill="none"
                     stroke="#5b8def"
                     strokeWidth="3"
@@ -265,7 +284,7 @@ const stats = memberStats!;
                   {performanceData.map((d, i) => (
                     <g key={i}>
                       <circle
-                        cx={(i * 800) / 11}
+                        cx={(i * 800) / pointDivisor}
                         cy={300 - (d.value * 2.7)}
                         r="5"
                         fill="#5b8def"
@@ -273,7 +292,7 @@ const stats = memberStats!;
                       {/* Show percentage on some points */}
                       {i % 3 === 1 && (
                         <text
-                          x={(i * 800) / 11}
+                          x={(i * 800) / pointDivisor}
                           y={300 - (d.value * 2.7) - 10}
                           textAnchor="middle"
                           fontSize="11"
