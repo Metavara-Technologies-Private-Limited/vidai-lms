@@ -89,7 +89,6 @@ interface Props {
 }
 
 // ====================== API error helper ======================
-// Replaces all `catch (err: any)` — keeps error access fully typed.
 interface ApiErrorShape {
   response?: { data?: { detail?: string; message?: string } };
   message?: string;
@@ -314,15 +313,23 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
       setError("This lead has no contact number.");
       return;
     }
+    // ✅ FIX: lead_uuid is now included — required by /twilio/send-sms/ endpoint
+    if (!lead?.id) {
+      setError("Lead ID is missing. Cannot send SMS.");
+      return;
+    }
     setSending(true);
     setError(null);
     try {
-      await TwilioAPI.sendSMS({ to: phone, message: message.trim() });
+      await TwilioAPI.sendSMS({
+        lead_uuid: lead.id,       // ✅ FIXED: was missing, caused 400 error
+        to: phone,
+        message: message.trim(),
+      });
       setSuccess(true);
       setMessage("");
       onClose();
     } catch (err: unknown) {
-      // FIX (line 308): catch (err: any) → unknown + typed helper
       setError(extractErrorMessage(err, "Failed to send SMS. Please try again."));
     } finally {
       setSending(false);
@@ -503,6 +510,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
     );
   const isSelected = (id: string) => selectedIds.includes(id);
 
+  // ✅ FIX: lead_uuid is now included — required by /twilio/make-call/ endpoint
   const handleCallOpen = async (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
     const phone = normalizePhone(lead.contact_no);
@@ -510,11 +518,17 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       setCallSnackbar({ open: true, message: "No contact number for this lead." });
       return;
     }
+    if (!lead.id) {
+      setCallSnackbar({ open: true, message: "Lead ID is missing. Cannot initiate call." });
+      return;
+    }
     setCallLead(lead);
     try {
-      await TwilioAPI.makeCall({ to: phone });
+      await TwilioAPI.makeCall({
+        lead_uuid: lead.id,   // ✅ FIXED: was missing, caused 400 error
+        to: phone,
+      });
     } catch (err: unknown) {
-      // FIX (line 521): catch (err: any) → unknown + typed helper
       setCallLead(null);
       setCallSnackbar({
         open: true,

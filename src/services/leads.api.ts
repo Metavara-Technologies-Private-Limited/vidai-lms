@@ -193,13 +193,14 @@ export const LeadAPI = {
 };
 
 // ====================== Twilio API ======================
-// Connects the Call and SMS buttons in the LeadsTable Contact Option column
+// ✅ FIXED: Added lead_uuid to both makeCall and sendSMS payloads
+// Swagger docs require lead_uuid as a mandatory field for both endpoints
 export const TwilioAPI = {
   /**
    * Initiate an outbound call to the lead's contact number.
-   * POST /twilio/make-call/  →  { to: "+91XXXXXXXXXX" }
+   * POST /twilio/make-call/  →  { lead_uuid: "uuid", to: "+91XXXXXXXXXX" }
    */
-  makeCall: async (payload: { to: string }): Promise<unknown> => {
+  makeCall: async (payload: { lead_uuid: string; to: string }): Promise<unknown> => {
     const response = await api.post('/twilio/make-call/', payload);
     console.log("📞 Call initiated:", response.data);
     return response.data;
@@ -207,9 +208,9 @@ export const TwilioAPI = {
 
   /**
    * Send an SMS to the lead's contact number.
-   * POST /twilio/send-sms/  →  { to: "+91XXXXXXXXXX", message: "..." }
+   * POST /twilio/send-sms/  →  { lead_uuid: "uuid", to: "+91XXXXXXXXXX", message: "..." }
    */
-  sendSMS: async (payload: { to: string; message: string }): Promise<unknown> => {
+  sendSMS: async (payload: { lead_uuid: string; to: string; message: string }): Promise<unknown> => {
     const response = await api.post('/twilio/send-sms/', payload);
     console.log("💬 SMS sent:", response.data);
     return response.data;
