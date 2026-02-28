@@ -35,10 +35,10 @@ export interface TicketReplyEditorProps {
   replyMessage: string;
   setReplyMessage: (v: string) => void;
 
-recipients?: LeadRecipient[];
-    employees?: unknown[];
-    anchorEl: HTMLElement | null;
-    setAnchorEl: (v: HTMLElement | null) => void;
+  recipients?: LeadRecipient[];
+  employees?: unknown[];
+  anchorEl: HTMLElement | null;
+  setAnchorEl: (v: HTMLElement | null) => void;
 
   showEmoji: boolean;
   setShowEmoji: (v: boolean) => void;
@@ -62,36 +62,33 @@ interface LeadRecipient {
   name: string;
   email: string;
 }
-interface TicketReplyEditorComponentProps extends TicketReplyEditorProps {
-  recipients: LeadRecipient[];
-}
 
 const TicketReplyEditor = ({
-    openReply,
-    replyTo,
-    setReplyTo,
-    replySubject,
-    setReplySubject,
-    replyMessage,
-    setReplyMessage,
-    recipients = [],
-    anchorEl,
-    setAnchorEl,
-    showEmoji,
-    setShowEmoji,
-    handleSendReply,
-    handleCancelReply,
-    handleAttachClick,
-    handleInsertLink,
-    handleInsertDriveLink,
-    handleImageClick,
-    handleEmojiInsert,
-    setOpenTemplateDialog,
-    iconSx,
+  openReply,
+  replyTo,
+  setReplyTo,
+  replySubject,
+  setReplySubject,
+  replyMessage,
+  setReplyMessage,
+  recipients = [],
+  anchorEl,
+  setAnchorEl,
+  showEmoji,
+  setShowEmoji,
+  handleSendReply,
+  handleCancelReply,
+  handleAttachClick,
+  handleInsertLink,
+  handleInsertDriveLink,
+  handleImageClick,
+  handleEmojiInsert,
+  setOpenTemplateDialog,
+  iconSx,
 }: TicketReplyEditorProps) => {
-    if (!openReply) return null;
-
   if (!openReply) return null;
+
+  const openPicker = Boolean(anchorEl);
 
   return (
     <Box mt={3} p={3} borderRadius={2} bgcolor="#FFFFFF">
@@ -102,22 +99,19 @@ const TicketReplyEditor = ({
         gap={1}
         pb={1.5}
         borderBottom="1px solid #E6E6E6"
-
-          onClick={(e) => {
-    e.stopPropagation(); // prevents screen freeze
-    if (recipients.length > 0) {
-      setAnchorEl(e.currentTarget);
-    }
-  }}
-  sx={{
-    display: "flex",
-    gap: 1,
-    flexWrap: "wrap",
-    cursor: "pointer",
-  }}
+        onClick={(e) => {
+          e.stopPropagation(); // prevents screen freeze
+          if (recipients.length > 0) {
+            setAnchorEl(e.currentTarget);
+          }
+        }}
+        sx={{
+          display: "flex",
+          gap: 1,
+          flexWrap: "wrap",
+          cursor: "pointer",
+        }}
       >
-
-
         <Typography fontSize={14} color="#7A7A7A">
           To :
         </Typography>
@@ -159,19 +153,20 @@ const TicketReplyEditor = ({
           </Box>
         ))}
 
-<Popover
-  open={Boolean(anchorEl)}
-  anchorEl={anchorEl}
-  onClose={() => setAnchorEl(null)}
-  anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-  transformOrigin={{ vertical: "top", horizontal: "left" }}
-  disableAutoFocus
-  disableEnforceFocus
-  disableRestoreFocus
-  PaperProps={{
-    onClick: (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation(),
-  }}
->
+        <Popover
+          open={openPicker}
+          anchorEl={anchorEl}
+          onClose={() => setAnchorEl(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          disableAutoFocus
+          disableEnforceFocus
+          disableRestoreFocus
+          PaperProps={{
+            onClick: (e: React.MouseEvent<HTMLDivElement>) =>
+              e.stopPropagation(),
+          }}
+        >
           <Box sx={{ width: 260, maxHeight: 250, overflowY: "auto", p: 1 }}>
             {recipients.length === 0 ? (
               <Typography fontSize={13} color="text.secondary" p={1}>

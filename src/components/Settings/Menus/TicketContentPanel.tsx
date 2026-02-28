@@ -11,7 +11,16 @@ import type {
   TicketDocument,
 } from "../../../types/tickets.types";
 import { selectLeads, fetchLeads  } from "../../../store/leadSlice";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+
+interface Lead {
+  id: string;
+  patient_name?: string;
+  full_name?: string;
+  name?: string;
+  email?: string;
+  email_id?: string;
+}
 
 interface Props {
   ticket: TicketDetail | null;
@@ -36,29 +45,33 @@ const TicketContentPanel = ({
   replyProps,
 }: Props) => {
 const dispatch = useDispatch<AppDispatch>();
-const leads = useSelector(selectLeads) || [];
+const leadsFromStore = useSelector(selectLeads);
+
+const leads: Lead[] = useMemo(() => {
+  return Array.isArray(leadsFromStore) ? leadsFromStore : [];
+}, [leadsFromStore]);
+
 
 const matchedLead = (Array.isArray(leads) ? leads : []).find(
-  (l: any) =>
+  (l: Lead) =>
     (l.patient_name || l.full_name || l.name)
       ?.toLowerCase()
       .trim() === ticket?.requested_by?.toLowerCase().trim()
 );
 
 useEffect(() => {
-  // Load leads when Ticket screen opens
   if (!leads || leads.length === 0) {
     dispatch(fetchLeads());
   }
-}, [dispatch]);
+}, [dispatch, leads]);
 
 //  Convert Leads into Email Recipients
 const recipients = (Array.isArray(leads) ? leads : [])
-  .filter((l: any) => l.email || l.email_id)
-  .map((l: any) => ({
+  .filter((l: Lead) => l.email || l.email_id)
+  .map((l: Lead) => ({
     id: l.id,
     name: l.patient_name || l.full_name || l.name || "Unknown",
-    email: l.email || l.email_id,
+    email: l.email || l.email_id || "",
   }));
 
   if (!ticket) return null;
