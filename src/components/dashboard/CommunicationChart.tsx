@@ -1,8 +1,15 @@
 import { Box, Typography, Stack } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useMemo } from "react";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import type { TimeRange } from "./TimeRangeSelector";
+import { scaleValueByRange } from "./timeRange.utils";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
+
+interface CommunicationChartProps {
+  timeRange: TimeRange;
+}
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
@@ -20,8 +27,17 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   return null;
 };
 
-const CommunicationChart = () => {
-  const data = mockData.overview.communicationPerformance;
+const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
+  const data = useMemo(
+    () =>
+      mockData.overview.communicationPerformance.map((row) => ({
+        ...row,
+        high: Math.round(scaleValueByRange(row.high, timeRange)),
+        low: Math.round(scaleValueByRange(row.low, timeRange)),
+        no: Math.round(scaleValueByRange(row.no, timeRange)),
+      })),
+    [timeRange],
+  );
 
   return (
     <Box sx={chartStyles.container}>

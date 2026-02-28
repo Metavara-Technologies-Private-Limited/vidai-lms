@@ -5,6 +5,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 import { selectLeads } from "../../store/leadSlice";
+import type { TimeRange } from "./TimeRangeSelector";
+import { isWithinTimeRange } from "./timeRange.utils";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
 
@@ -14,6 +16,10 @@ type LeadWithTemplateMeta = Lead & {
   message_template_id?: string | number | null;
   whatsapp_template_id?: string | number | null;
 };
+
+interface ConversionTrendChartProps {
+  timeRange: TimeRange;
+}
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
@@ -28,15 +34,15 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   return null;
 };
 
-const ConversionTrendChart = () => {
+const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
   const leads = useSelector(selectLeads) as LeadWithTemplateMeta[];
 
   const data = useMemo(() => {
+    const monthKeys = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
     if (!Array.isArray(leads) || leads.length === 0) {
       return mockData.overview.conversionTrendPerformance;
     }
-
-    const monthKeys = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
     const hasTemplateId = (lead: LeadWithTemplateMeta): boolean => {
       const templateId =
@@ -48,11 +54,19 @@ const ConversionTrendChart = () => {
       return templateId !== null && templateId !== undefined && String(templateId).trim() !== "";
     };
 
-    const eligibleLeads = leads.filter((lead) => lead.is_active !== false && hasTemplateId(lead));
+    const filteredByRange = leads.filter(
+      (lead) => lead.is_active !== false && isWithinTimeRange(lead.modified_at, timeRange),
+    );
+
+    const eligibleLeads = filteredByRange.filter((lead) => hasTemplateId(lead));
 
     const leadsForCalculation = eligibleLeads.length > 0
       ? eligibleLeads
-      : leads.filter((lead) => lead.is_active !== false);
+      : filteredByRange;
+
+    if (leadsForCalculation.length === 0) {
+      return mockData.overview.conversionTrendPerformance;
+    }
 
     const monthlyTotals = new Array<number>(12).fill(0);
     const monthlyConverted = new Array<number>(12).fill(0);
@@ -82,7 +96,8 @@ const ConversionTrendChart = () => {
       const rate = total > 0 ? Number(((converted / total) * 100).toFixed(1)) : 0;
       return { month, rate };
     });
-  }, [leads]);
+
+  }, [leads, timeRange]);
 
   return (
     <Box sx={chartStyles.container}>

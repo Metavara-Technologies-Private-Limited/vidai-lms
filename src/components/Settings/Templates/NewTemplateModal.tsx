@@ -73,7 +73,9 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleFormSave = async (formData: any) => {
-    const rawName = (formData?.name ?? formData?.audience_name ?? "") as string;
+    const rawName = formData instanceof FormData
+      ? ((formData.get("name") ?? formData.get("audience_name") ?? "") as string)
+      : ((formData?.name ?? formData?.audience_name ?? "") as string);
     const templateName = rawName.trim();
     const alphabetOnlyPattern = /^[A-Za-z\s]+$/;
 

@@ -5,18 +5,17 @@ import IconButton from "@mui/material/IconButton";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useRef, useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import type { AppDispatch } from "../../store/index";
+import { useSelector } from "react-redux";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
-import NewLeadsIcon from "../../assets/icons/NewLeads.svg";
-import AppointmentsIcon from "../../assets/icons/Appointments.svg";
-import FollowUpsIcon from "../../assets/icons/FollowUps.svg";
-import TotalConvertedIcon from "../../assets/icons/TotalConverted.svg";
-import LostLeadsIcon from "../../assets/icons/LostLeads.svg";
+import NewLeadsIcon from "../../assets/icons/newLeads.svg";
+import AppointmentsIcon from "../../assets/icons/appointments.svg";
+import FollowUpsIcon from "../../assets/icons/followUps.svg";
+import TotalConvertedIcon from "../../assets/icons/totalConverted.svg";
+import LostLeadsIcon from "../../assets/icons/lostLeads.svg";
 
 import { kpiCardsStyles } from "../../styles/dashboard/KpiCards.styles";
-import { fetchLeads, selectLeads } from "../../store/leadSlice";
+import { selectLeads } from "../../store/leadSlice";
 import { LEAD_STATUS } from "../../utils/constants";
 import type { KpiCardData, LiveKpiCounts } from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
@@ -45,17 +44,11 @@ const getCardStyle = (id: string) => {
 };
 
 const KpiCards = () => {
-  const dispatch = useDispatch<AppDispatch>();
   const leads = useSelector(selectLeads);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
-
-  // ── Fetch leads on mount if not already loaded ──
-  useEffect(() => {
-    dispatch(fetchLeads());
-  }, [dispatch]);
 
   // ── Live counts derived from Redux store ──
   // Updates automatically whenever leads change in Redux

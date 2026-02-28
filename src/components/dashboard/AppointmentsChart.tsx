@@ -1,11 +1,19 @@
 import { Box, CircularProgress } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { useEffect, useMemo, useState } from "react";
-import { LeadAPI, type Lead } from "../../services/leads.api";
+import { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+import type { Lead } from "../../services/leads.api";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import type { TimeRange } from "./TimeRangeSelector";
+import { isWithinTimeRange } from "./timeRange.utils";
+import { selectLeads, selectLeadsLoading } from "../../store/leadSlice";
 //import type{TooltipProps} from "recharts";
 import type { CustomTooltipProps, AppointmentChartData } from "../../types/dashboard.types";
+
+interface AppointmentsChartProps {
+  timeRange: TimeRange;
+}
 
 
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
@@ -32,31 +40,20 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   );
 };
 
-const AppointmentsChart = () => {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
+  const leads = useSelector(selectLeads) as Lead[];
+  const loading = useSelector(selectLeadsLoading);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    const fetchLeads = async () => {
-      try {
-        const response = await LeadAPI.list();
-        setLeads(Array.isArray(response) ? response : []);
-      } catch (error) {
-        console.error("Appointments chart API error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeads();
-  }, []);
 
   const data = useMemo((): AppointmentChartData[] => {
     let appointmentsBooked = 0;
     let completed = 0;
 
-    leads.forEach((lead: Lead) => {
+    const filteredLeads = leads.filter((lead) =>
+      lead.is_active !== false && isWithinTimeRange(lead.modified_at || lead.created_at, timeRange),
+    );
+
+    filteredLeads.forEach((lead: Lead) => {
       const leadData = lead as Lead & Record<string, unknown>;
       const rawStatus = (
         leadData.next_action_status ||
@@ -94,7 +91,7 @@ const AppointmentsChart = () => {
       { status: "No-shows", value: noShows, color: "#7d859d" },
       { status: "Cancelled", value: cancelled, color: "#daddf0" },
     ];
-  }, [leads]);
+  }, [leads, timeRange]);
 
   if (loading) {
     return (

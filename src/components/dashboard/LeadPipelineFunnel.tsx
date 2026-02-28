@@ -1,10 +1,16 @@
 import { Box, Typography, CircularProgress } from "@mui/material";
-import { useState, useEffect, useMemo } from "react";
-// ✅ Integration Imports
-import { LeadAPI } from "../../services/leads.api";
+import { useState, useMemo } from "react";
+import { useSelector } from "react-redux";
 import type { Lead as ApiLead } from "../../services/leads.api";
 import type { Status } from "../../types/leads.types";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import type { TimeRange } from "./TimeRangeSelector";
+import { isWithinTimeRange } from "./timeRange.utils";
+import { selectLeads, selectLeadsLoading } from "../../store/leadSlice";
+
+interface LeadPipelineFunnelProps {
+  timeRange: TimeRange;
+}
 
 const normalizeLeadStatus = (status?: string | null): Status | null => {
   if (!status) return null;
@@ -12,49 +18,40 @@ const normalizeLeadStatus = (status?: string | null): Status | null => {
   const value = status.toLowerCase().trim().replace(/[_\s]+/g, "-");
 
   if (value === "new") return "New";
-  if (value === "appointment") return "Appointment";
-  if (value === "follow-up" || value === "follow-ups") return "Follow-Ups";
+  if (value === "appointment" || value === "appointments") return "Appointment";
+  if (value === "follow-up" || value === "follow-ups" || value === "followup" || value === "followups") return "Follow-Ups";
   if (value === "converted") return "Converted";
   if (value === "lost") return "Lost";
-  if (value === "cycle-conversion") return "Cycle Conversion";
+  if (value === "cycle-conversion" || value === "cycleconversion") return "Cycle Conversion";
 
   return null;
 };
 
-const LeadPipelineFunnel = () => {
-  const [leads, setLeads] = useState<ApiLead[]>([]);
-  const [loading, setLoading] = useState(true);
+const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
+  const leads = useSelector(selectLeads) as ApiLead[];
+  const loading = useSelector(selectLeadsLoading);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(5);
-
-  // ✅ Fetch dynamic data from your LeadAPI
-  useEffect(() => {
-    const fetchLeads = async () => {
-      try {
-        const response = await LeadAPI.list();
-        setLeads(Array.isArray(response) ? response : []);
-      } catch (error) {
-        console.error("Funnel API Error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLeads();
-  }, []);
 
   // ✅ Process leads into the specific SVG stages matching your Status types
   const data = useMemo(() => {
     // These keys match your status values and visual order in the design
     const stages = [
       { stage: "New Leads", key: "New" as Status, color: "#7e879d" },
-      { stage: "Appointments", key: "Appointment" as Status, color: "#8a92a8" },
-      { stage: "Follow-Ups", key: "Follow-Ups" as Status, color: "#9ba3b5" },
-      { stage: "Converted Leads", key: "Converted" as Status, color: "#b8bdcc" },
+      { stage: "Converted Leads", key: "Converted" as Status, color: "#8a92a8" },
+      { stage: "Appointments", key: "Appointment" as Status, color: "#9ba3b5" },
+      { stage: "Follow-Ups", key: "Follow-Ups" as Status, color: "#b8bdcc" },
       { stage: "Cycle Conversion", key: "Cycle Conversion" as Status, color: "#d1d4de" },
       { stage: "Lost Leads", key: "Lost" as Status, color: "#eceef4" },
     ];
 
+    const filteredLeads = leads.filter(
+      (lead) =>
+        lead.is_active !== false &&
+        isWithinTimeRange(lead.modified_at || lead.created_at, timeRange),
+    );
+
     return stages.map(item => {
-      const count = leads.filter((lead) => {
+      const count = filteredLeads.filter((lead) => {
         const normalized = normalizeLeadStatus(
           (lead.lead_status as string | undefined) || (lead as { status?: string }).status
         );
@@ -66,7 +63,7 @@ const LeadPipelineFunnel = () => {
         value: count || 0,
       };
     });
-  }, [leads]);
+  }, [leads, timeRange]);
 
   if (loading) {
     return (

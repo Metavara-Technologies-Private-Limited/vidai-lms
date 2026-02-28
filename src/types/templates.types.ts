@@ -146,7 +146,7 @@ export interface FormTemplate {
  */
 export interface NewEmailTemplateFormProps {
   onClose: () => void;
-  onSave: (template: FormTemplate | EmailTemplate) => void;
+  onSave: (template: FormTemplate | EmailTemplate | FormData) => void | Promise<void>;
   initialData?: FormTemplate | EmailTemplate;
   mode: 'create' | 'edit' | 'view';
 }
@@ -156,7 +156,7 @@ export interface NewEmailTemplateFormProps {
  */
 export interface NewSMSTemplateFormProps {
   onClose: () => void;
-  onSave: (template: FormTemplate | SMSTemplate) => void;
+  onSave: (template: FormTemplate | SMSTemplate | FormData) => void | Promise<void>;
   initialData?: FormTemplate | SMSTemplate;
   mode: 'create' | 'edit' | 'view';
 }
@@ -166,7 +166,7 @@ export interface NewSMSTemplateFormProps {
  */
 export interface NewWhatsAppTemplateFormProps {
   onClose: () => void;
-  onSave: (template: FormTemplate | WhatsAppTemplate) => void;
+  onSave: (template: FormTemplate | WhatsAppTemplate | FormData) => void | Promise<void>;
   initialData?: FormTemplate | WhatsAppTemplate;
   mode: 'create' | 'edit' | 'view';
 }

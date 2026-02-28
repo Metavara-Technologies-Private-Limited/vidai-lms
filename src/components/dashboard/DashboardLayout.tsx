@@ -1,7 +1,8 @@
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import KpiCards from "./KpiCards";
 import SlaAlerts from "./SlaAlerts";
 import TimeRangeSelector from "./TimeRangeSelector";
@@ -14,10 +15,22 @@ import ConversionTrendChart from "./ConversionTrendChart";
 import LeadPipelineFunnel from "./LeadPipelineFunnel";
 import AppointmentsChart from "./AppointmentsChart";
 import TeamPerformanceTab from "./TeamPerformanceTab";
+import type { AppDispatch } from "../../store";
+import { fetchLeads, selectLeads, selectLeadsLoading } from "../../store/leadSlice";
 
 const DashboardLayout = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const leads = useSelector(selectLeads);
+  const leadsLoading = useSelector(selectLeadsLoading);
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
   const [activeTab, setActiveTab] = useState<OverviewTab>("source");
+
+  useEffect(() => {
+    if (!leadsLoading && leads.length === 0) {
+      dispatch(fetchLeads());
+    }
+  }, [dispatch, leads.length, leadsLoading]);
+
   return (
     <Box
       sx={{
@@ -67,12 +80,12 @@ const DashboardLayout = () => {
           </Box>
 
           {/* TAB CONTENT (placeholder for now) */}
-          {activeTab === "source" && <SourcePerformanceChart />}
-          {activeTab === "communication" && <CommunicationChart />}
-          {activeTab === "conversion" && <ConversionTrendChart />}
-          {activeTab === "pipeline" && <LeadPipelineFunnel />}
-          {activeTab === "appointments" && <AppointmentsChart />}
-          {activeTab === "team" && <TeamPerformanceTab />}
+          {activeTab === "source" && <SourcePerformanceChart timeRange={timeRange} />}
+          {activeTab === "communication" && <CommunicationChart timeRange={timeRange} />}
+          {activeTab === "conversion" && <ConversionTrendChart timeRange={timeRange} />}
+          {activeTab === "pipeline" && <LeadPipelineFunnel timeRange={timeRange} />}
+          {activeTab === "appointments" && <AppointmentsChart timeRange={timeRange} />}
+          {activeTab === "team" && <TeamPerformanceTab timeRange={timeRange} />}
         </Card>
       </Box>
 
