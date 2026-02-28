@@ -1,5 +1,5 @@
 import { Box, Card, Typography } from "@mui/material";
-
+import { useNavigate } from "react-router-dom";
 // ######### Referral icons ########
 import Referral_HR from "../assets/icons/Referral_HR.svg";
 import Referral_Practo from "../assets/icons/Referral_Practo.svg";
@@ -7,47 +7,82 @@ import Referral_Doctor from "../assets/icons/Referral_Doc.svg";
 import Referral_Zoya from "../assets/icons/Referral_Zoya.svg";
 import Referral_Insurance from "../assets/icons/Referral_Insurance.svg";
 import Referral_Daignostic from "../assets/icons/Referral_Daignostic.svg";
-
+//  mock data importing 
+import {doctorsMock} from "../components/Referrals/doctors.mock";
+import {corporateMock} from "../components/Referrals/corporate.mock";
+import {insuranceMock} from "../components/Referrals/insurance.mock";
+import  { zoyaMock } from "../components/Referrals/zoya.mock";
+import { practoMock } from "../components/Referrals/practo.mock";
+import {diagnosticMock} from "../components/Referrals/diagnostic.mock";
 const referralData = [
   {
     title: "Doctors",
-    count: 12,
+    count: doctorsMock.length,
     icon: Referral_Doctor,
     bg: "linear-gradient(to top, #ffffff 0%, #ffffff 55%, rgba(83,146,242,0.18) 140%)",
   },
   {
     title: "Corporate HR",
-    count: 8,
+    count: corporateMock.length,
     icon: Referral_HR,
     bg: "linear-gradient(to top, #ffffff 0%, #ffffff 55%, rgba(71,179,95,0.18) 140%)",
   },
   {
     title: "Insurance Partners",
-    count: 6,
+    count: insuranceMock.length,
     icon: Referral_Insurance,
     bg: "linear-gradient(to top, #ffffff 0%, #ffffff 55%, rgba(236,189,86,0.18) 140%)",
   },
   {
     title: "Diagnostic Labs",
-    count: 16,
+    count: diagnosticMock.length,
     icon: Referral_Daignostic,
     bg: "linear-gradient(to top, #ffffff 0%, #ffffff 55%, rgba(242,91,91,0.18) 140%)",
   },
   {
     title: "Zoya",
-    count: 12,
+    count: zoyaMock.length,
     icon: Referral_Zoya,
     bg: "linear-gradient(to top, #ffffff 0%, #ffffff 55%, rgba(131,93,239,0.18) 140%)",
   },
   {
     title: "Practo",
-    count: 12,
+    count: practoMock.length,
     icon: Referral_Practo,
     bg: "linear-gradient(to top, #ffffff 0%, #ffffff 55%, rgba(45,107,240,0.18) 140%)",
   },
 ];
 
 const Referrals = () => {
+
+  const navigate = useNavigate(); // MUST be inside component
+
+  const handleCardClick = (title: string) => {
+if (title === "Doctors") {
+  navigate("/referrals/doctors");
+}
+
+if (title === "Corporate HR") {
+  navigate("/referrals/corporate");
+}
+
+if (title === "Insurance Partners") {
+  navigate("/referrals/insurance");
+}
+
+if (title === "Diagnostic Labs") {
+  navigate("/referrals/diagnostic");
+}
+
+if (title === "Zoya") {
+  navigate("/referrals/zoya");
+}
+
+if (title === "Practo") {
+  navigate("/referrals/practo");
+}
+  };
+
   return (
     <Box sx={{ p: 1, width: "100%" }}>
       {/* Page Title */}
@@ -66,6 +101,7 @@ const Referrals = () => {
         {referralData.map((item, index) => (
           <Card
             key={index}
+            onClick={() => handleCardClick(item.title)}
             sx={{
               p: 2,
               borderRadius: "12px",
