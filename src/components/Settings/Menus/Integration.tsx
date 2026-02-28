@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Card, Box, Typography, Button } from "@mui/material";
 
 import Facebook from "../../../assets/icons/Facebook.svg";
@@ -10,8 +11,9 @@ import GoogleCalender from "../../../assets/icons/Google_Calender.svg";
 import ConnectedLogo from "../../../assets/icons/Connected-Logo.svg";
 import NotConnectedLogo from "../../../assets/icons/Not-Connected-Logo.svg";
 
-import type{ IntegrationCardProps } from "../../../types/Settings.types";
+import type { IntegrationCardProps } from "../../../types/Settings.types";
 import { styles } from "../../../styles/Settings/Integration.styles";
+import { integrationApi } from "../../../services/integration.api";
 
 /* ------------------------------------------------------------------ */
 /* Reusable Integration Card */
@@ -22,7 +24,33 @@ const IntegrationCard = ({
   icon,
   headerBgColor,
 }: IntegrationCardProps) => {
+  const storageKey = `integration_${name}`;
   const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    setConnected(localStorage.getItem(storageKey) === "true");
+  }, [storageKey]);
+
+  const handleConnect = () => {
+    if (name === "LinkedIn") {
+      integrationApi.connectLinkedIn();
+      return;
+    }
+
+    if (name === "Facebook" || name === "Instagram") {
+      integrationApi.connectFacebook();
+      return;
+    }
+
+    // Demo connect for other platforms
+    localStorage.setItem(storageKey, "true");
+    setConnected(true);
+  };
+
+  const handleDisconnect = () => {
+    localStorage.removeItem(storageKey);
+    setConnected(false);
+  };
 
   return (
     <Card sx={styles.card}>
@@ -31,9 +59,7 @@ const IntegrationCard = ({
         <Box component="img" src={icon} alt={name} sx={styles.headerIcon} />
         <Box>
           <Typography sx={styles.headerTitle}>{name}</Typography>
-          <Typography sx={styles.headerDescription}>
-            {description}
-          </Typography>
+          <Typography sx={styles.headerDescription}>{description}</Typography>
         </Box>
       </Box>
 
@@ -64,10 +90,8 @@ const IntegrationCard = ({
         <Button
           variant="outlined"
           sx={styles.actionButton(connected)}
-          onClick={() => setConnected(!connected)}
-          startIcon={
-            <Box component="img" src={icon} sx={styles.buttonIcon} />
-          }
+          onClick={connected ? handleDisconnect : handleConnect}
+          startIcon={<Box component="img" src={icon} sx={styles.buttonIcon} />}
         >
           {connected ? "Disconnect" : "Connect"}
         </Button>
@@ -80,6 +104,23 @@ const IntegrationCard = ({
 /* Integration Page */
 /* ------------------------------------------------------------------ */
 const Integration = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+
+    if (params.get("linkedin") === "connected") {
+      localStorage.setItem("integration_LinkedIn", "true");
+    }
+
+    if (params.get("facebook") === "connected") {
+      localStorage.setItem("integration_Facebook", "true");
+      localStorage.setItem("integration_Instagram", "true"); // via FB
+    }
+
+    window.history.replaceState({}, document.title, "/settings/integration");
+  }, [location]);
+
   return (
     <Box>
       <Typography sx={styles.pageTitle}>Integration</Typography>

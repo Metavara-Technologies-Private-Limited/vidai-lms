@@ -19,10 +19,14 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchClinic, selectClinic } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
 import { fetchCampaign } from "../../store/campaignSlice";
-
+import { fetchAllTemplates, selectTemplatesByType } from "../../store/templateSlice";
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const smsTemplates = useSelector(selectTemplatesByType("sms"));
+  const mailTemplates = useSelector(selectTemplatesByType("mail"));
+  const whatsappTemplates = useSelector(selectTemplatesByType("whatsapp"));
+  console.log("templates:", smsTemplates, mailTemplates, whatsappTemplates);
 
   const clinic = useSelector(selectClinic);
   const clinicName = clinic?.name || "";
@@ -36,6 +40,7 @@ const Header = () => {
   useEffect(() => {
     dispatch(fetchClinic(1));
     dispatch(fetchCampaign());
+    dispatch(fetchAllTemplates());
   }, [dispatch]);
 
   const handleIconClick = (
