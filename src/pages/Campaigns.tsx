@@ -16,6 +16,7 @@ import {
 } from "../store/campaignSlice";
 import type { AppDispatch } from "../store";
 import EditCampaignModal from "../components/Layout/Campaign/EditCampaignModal";
+import DuplicateCampaignModal from "../components/Layout/Campaign/DuplicateCampaignModal";
 type CampaignStatus =
   | "Live"
   | "Draft"
@@ -86,12 +87,6 @@ if (api.status === "live" || api.is_active === true) {
   };
   const handleDuplicate = (campaign: any) => {
   setDuplicatingCampaign(campaign);
-
-  if (campaign.type === "social") {
-    setShowSocialModal(true);
-  } else {
-    setShowEmailModal(true);
-  }
 };
 
   const filteredCampaigns = useMemo(() => {
@@ -226,30 +221,14 @@ if (api.status === "live" || api.is_active === true) {
       )}
       {showSocialModal && (
         <SocialCampaignModal
-          campaign={duplicatingCampaign}
-          isDuplicate={true}
-          onClose={() => {
-            setShowSocialModal(false);
-            setDuplicatingCampaign(null);
-          }}
-          onSave={() => {
-            setShowSocialModal(false);
-            setDuplicatingCampaign(null);
-          }}
+          onClose={() => setShowSocialModal(false)}
+          onSave={() => setShowSocialModal(false)}
         />
       )}
       {showEmailModal && (
         <EmailCampaignModal
-          campaign={duplicatingCampaign}
-          isDuplicate={true}
-          onClose={() => {
-            setShowEmailModal(false);
-            setDuplicatingCampaign(null);
-          }}
-          onSave={() => {
-            setShowEmailModal(false);
-            setDuplicatingCampaign(null);
-          }}
+          onClose={() => setShowEmailModal(false)}
+          onSave={() => setShowEmailModal(false)}
         />
       )}
       {showEditModal && editingCampaign && (
@@ -259,6 +238,13 @@ if (api.status === "live" || api.is_active === true) {
           onSave={() => {
             setShowEditModal(false);
           }}
+        />
+      )}
+      {duplicatingCampaign && (
+        <DuplicateCampaignModal
+          campaign={duplicatingCampaign}
+          onClose={() => setDuplicatingCampaign(null)}
+          onSave={() => setDuplicatingCampaign(null)}
         />
       )}
     </div>
