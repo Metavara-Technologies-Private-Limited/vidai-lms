@@ -234,10 +234,16 @@ value={subject}
 onChange={(e) => {
   const value = e.target.value;
 
+  // Allow only alphanumeric + space
   const alphanumericRegex = /^[a-zA-Z0-9 ]*$/;
 
   if (!alphanumericRegex.test(value)) {
-    toast.error("Enter Alphanumeric only");
+    toast.error("Only letters and numbers are allowed");
+    return;
+  }
+
+  if (value.length === 1 && !/^[a-zA-Z]/.test(value)) {
+    toast.error("Subject must start with a letter");
     return;
   }
 
@@ -253,8 +259,16 @@ disabled={loading}
               label="Detailed Description"
               placeholder="Enter description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              multiline
+onChange={(e) => {
+  const value = e.target.value;
+
+  if (value.length === 1 && !/^[a-zA-Z]/.test(value)) {
+    toast.error("Description must start with a letter");
+    return;
+  }
+
+  setDescription(value);
+}}              multiline
               minRows={1}
               maxRows={3}
               fullWidth
