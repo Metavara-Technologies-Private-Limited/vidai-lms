@@ -1,8 +1,19 @@
 import { Box, Typography } from "@mui/material";
+import { useMemo } from "react";
+import { useSelector } from "react-redux";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import { selectLeads } from "../../store/leadSlice";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
+import type { Lead } from "../../services/leads.api";
+
+type LeadWithTemplateMeta = Lead & {
+  template_id?: string | number | null;
+  templateId?: string | number | null;
+  message_template_id?: string | number | null;
+  whatsapp_template_id?: string | number | null;
+};
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
@@ -18,7 +29,60 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 };
 
 const ConversionTrendChart = () => {
-  const data = mockData.overview.conversionTrendPerformance;
+  const leads = useSelector(selectLeads) as LeadWithTemplateMeta[];
+
+  const data = useMemo(() => {
+    if (!Array.isArray(leads) || leads.length === 0) {
+      return mockData.overview.conversionTrendPerformance;
+    }
+
+    const monthKeys = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    const hasTemplateId = (lead: LeadWithTemplateMeta): boolean => {
+      const templateId =
+        lead.template_id ??
+        lead.templateId ??
+        lead.message_template_id ??
+        lead.whatsapp_template_id ??
+        null;
+      return templateId !== null && templateId !== undefined && String(templateId).trim() !== "";
+    };
+
+    const eligibleLeads = leads.filter((lead) => lead.is_active !== false && hasTemplateId(lead));
+
+    const leadsForCalculation = eligibleLeads.length > 0
+      ? eligibleLeads
+      : leads.filter((lead) => lead.is_active !== false);
+
+    const monthlyTotals = new Array<number>(12).fill(0);
+    const monthlyConverted = new Array<number>(12).fill(0);
+
+    leadsForCalculation.forEach((lead) => {
+      if (!lead.modified_at) {
+        return;
+      }
+
+      const modifiedDate = new Date(lead.modified_at);
+      if (Number.isNaN(modifiedDate.getTime())) {
+        return;
+      }
+
+      const monthIndex = modifiedDate.getMonth();
+      monthlyTotals[monthIndex] += 1;
+
+      const status = (lead.lead_status || "").toString().trim().toLowerCase();
+      if (status === "converted" || status === "cycle_conversion") {
+        monthlyConverted[monthIndex] += 1;
+      }
+    });
+
+    return monthKeys.map((month, index) => {
+      const total = monthlyTotals[index];
+      const converted = monthlyConverted[index];
+      const rate = total > 0 ? Number(((converted / total) * 100).toFixed(1)) : 0;
+      return { month, rate };
+    });
+  }, [leads]);
 
   return (
     <Box sx={chartStyles.container}>
