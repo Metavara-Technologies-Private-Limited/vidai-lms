@@ -233,10 +233,19 @@ export default function CampaignCard({
                   />
                   Duplicate
                 </div>
-                <div className="menu-item stop-item">
-                  <img src={stopIcon} alt="Stop" className="menu-icon" />
-                  Stop
-                </div>
+                {c.status !== "Stopped" && (
+              <div
+                className="menu-item stop-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenMenuId(null);
+                  setShowStopModal(true);
+                }}
+              >
+                <img src={stopIcon} alt="Stop" className="menu-icon" />
+                Stop
+              </div>
+            )}
               </div>
             )}
           </div>
