@@ -458,23 +458,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const [page, setPage] = React.useState(1);
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
-<<<<<<< Updated upstream
   const [callLead, setCallLead] = React.useState<ProcessedLead | null>(null);
-=======
-  // ── Call Dialog state ────────────────────────────────────────────────
-  const [callLead, setCallLead] = React.useState<ProcessedLead | null>(null);
-
-  // ── SMS state ───────────────────────────────────────────────────────
->>>>>>> Stashed changes
   const [smsLead, setSmsLead] = React.useState<ProcessedLead | null>(null);
   const [callSnackbar, setCallSnackbar] = React.useState<{
     open: boolean;
     message: string;
-  }>({ open: false, message: "" });
-
-  // ── Call error snackbar (if API fails before dialog opens) ──────────
-  const [callSnackbar, setCallSnackbar] = React.useState<{
-    open: boolean; message: string;
   }>({ open: false, message: "" });
 
   React.useEffect(() => {
@@ -515,19 +503,13 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
     );
   const isSelected = (id: string) => selectedIds.includes(id);
 
-<<<<<<< Updated upstream
-=======
-  // ── Call: open dialog + fire Twilio API simultaneously ──────────────
->>>>>>> Stashed changes
   const handleCallOpen = async (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
-
     const phone = normalizePhone(lead.contact_no);
     if (!phone) {
       setCallSnackbar({ open: true, message: "No contact number for this lead." });
       return;
     }
-<<<<<<< Updated upstream
     setCallLead(lead);
     try {
       await TwilioAPI.makeCall({ to: phone });
@@ -537,25 +519,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       setCallSnackbar({
         open: true,
         message: extractErrorMessage(err, "Failed to initiate call."),
-=======
-
-    // 1. Open the beautiful CallDialog immediately (shows "Ringing...")
-    setCallLead(lead);
-
-    // 2. Fire the Twilio API in the background
-    try {
-      await TwilioAPI.makeCall({ to: phone });
-    } catch (err: any) {
-      // If API fails, close dialog and show error
-      setCallLead(null);
-      setCallSnackbar({
-        open: true,
-        message:
-          err?.response?.data?.detail ||
-          err?.response?.data?.message ||
-          err?.message ||
-          "Failed to initiate call.",
->>>>>>> Stashed changes
       });
     }
   };
@@ -813,40 +776,15 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   {lead.activity || "View Activity"}
                 </TableCell>
 
-<<<<<<< Updated upstream
                 <TableCell align="center" sx={stickyContactStyle} onClick={(e) => e.stopPropagation()}>
                   <Stack direction="row" spacing={1} justifyContent="center">
                     <Tooltip title={`Call ${lead.contact_no || "N/A"}`}>
                       <span>
                         <IconButton className="action-btn" size="small" onClick={(e) => handleCallOpen(e, lead)}>
-=======
-                {/* ====================================================
-                    CONTACT OPTION COLUMN
-                    📞 Call  → opens CallDialog + fires /twilio/make-call/
-                    💬 SMS   → opens SMSDialog  → fires /twilio/send-sms/
-                    ✉️ Email → mailto: link
-                ===================================================== */}
-                <TableCell align="center" sx={stickyContactStyle} onClick={(e) => e.stopPropagation()}>
-                  <Stack direction="row" spacing={1} justifyContent="center">
-
-                    {/* 📞 CALL — opens CallDialog */}
-                    <Tooltip title={`Call ${lead.contact_no || "N/A"}`}>
-                      <span>
-                        <IconButton
-                          className="action-btn"
-                          size="small"
-                          onClick={(e) => handleCallOpen(e, lead)}
-                        >
->>>>>>> Stashed changes
                           <PhoneIcon fontSize="small" />
                         </IconButton>
                       </span>
                     </Tooltip>
-<<<<<<< Updated upstream
-=======
-
-                    {/* 💬 SMS — opens SMSDialog */}
->>>>>>> Stashed changes
                     <Tooltip title={`SMS ${lead.contact_no || "N/A"}`}>
                       <IconButton className="action-btn" size="small" onClick={(e) => handleSMSOpen(e, lead)}>
                         <ChatBubbleOutlineIcon fontSize="small" />
@@ -870,10 +808,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Stack>
                 </TableCell>
 
-<<<<<<< Updated upstream
-=======
-                {/* 3-dot menu — untouched */}
->>>>>>> Stashed changes
                 <TableCell align="center" sx={stickyMenuStyle} onClick={(e) => e.stopPropagation()}>
                   <MenuButton lead={lead} setLeads={setLocalLeads} tab={tab} />
                 </TableCell>
@@ -918,30 +852,14 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       />
       <Dialogs />
 
-<<<<<<< Updated upstream
-=======
-      {/* ── CallDialog — shows for whichever lead's call button was clicked ── */}
->>>>>>> Stashed changes
       <CallDialog
         open={Boolean(callLead)}
         name={callLead?.full_name || callLead?.name || "Unknown"}
         onClose={() => setCallLead(null)}
       />
-<<<<<<< Updated upstream
 
       <SMSDialog open={Boolean(smsLead)} lead={smsLead} onClose={() => setSmsLead(null)} />
 
-=======
-
-      {/* ── SMS Dialog — one instance shared across all rows ── */}
-      <SMSDialog
-        open={Boolean(smsLead)}
-        lead={smsLead}
-        onClose={() => setSmsLead(null)}
-      />
-
-      {/* ── Call error snackbar ── */}
->>>>>>> Stashed changes
       <Snackbar
         open={callSnackbar.open}
         autoHideDuration={4000}
