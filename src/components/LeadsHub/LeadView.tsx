@@ -42,6 +42,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import EventNoteIcon from "@mui/icons-material/EventNote";
+import SmsOutlinedIcon from "@mui/icons-material/SmsOutlined";
 import Lead_Subtract from "../../assets/icons/Lead_Subtract.svg";
 
 import { CallButton, Dialogs } from "./LeadsMenuDialogs";
@@ -70,6 +72,29 @@ interface RawNote {
   note?: string;
   created_at?: string;
   is_deleted?: boolean;
+}
+
+// Twilio API types
+interface TwilioCall {
+  id: number;
+  lead_uuid: string;
+  sid: string;
+  from_number: string;
+  to_number: string;
+  status?: string;
+  created_at: string;
+}
+
+interface TwilioSMS {
+  id: number;
+  lead_uuid: string;
+  sid: string;
+  from_number: string;
+  to_number: string;
+  body: string;
+  status?: string;
+  direction: "inbound" | "outbound";
+  created_at: string;
 }
 
 interface LeadRecord {
@@ -199,33 +224,56 @@ const getFileNameFromUrl = (url: string): string => {
   }
 };
 
+// ====================== Status color helper ======================
+const getCallStatusColor = (status?: string) => {
+  const s = (status || "").toLowerCase();
+  if (s === "completed") return { bg: "#F0FDF4", color: "#16A34A" };
+  if (s === "failed" || s === "busy" || s === "no-answer") return { bg: "#FEF2F2", color: "#EF4444" };
+  if (s === "initiated" || s === "ringing" || s === "in-progress") return { bg: "#EFF6FF", color: "#3B82F6" };
+  return { bg: "#F1F5F9", color: "#64748B" };
+};
+
+const getSMSStatusColor = (status?: string) => {
+  const s = (status || "").toLowerCase();
+  if (s === "delivered") return { bg: "#F0FDF4", color: "#16A34A" };
+  if (s === "failed" || s === "undelivered") return { bg: "#FEF2F2", color: "#EF4444" };
+  if (s === "sent" || s === "queued") return { bg: "#EFF6FF", color: "#3B82F6" };
+  return { bg: "#F1F5F9", color: "#64748B" };
+};
+
+const formatDateTime = (iso: string): string => {
+  try {
+    return new Date(iso).toLocaleString("en-IN", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+};
+
 export default function LeadDetailView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-
   const selectedTemplate = useSelector(
     (state: RootState) => state.emailTemplate.selectedTemplate,
   );
-
-
-
 
   const leads = useSelector(selectLeads) as LeadRecord[] | null;
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
 
-//  Ticket Emails Integration
-const ticketEmails = useSelector(
-  (state: RootState) => state.emailHistory.emails
-);
+  const ticketEmails = useSelector(
+    (state: RootState) => state.emailHistory.emails
+  );
 
   const [activeTab, setActiveTab] = React.useState("Patient Info");
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
   const [convertLoading, setConvertLoading] = React.useState(false);
   const [convertError, setConvertError] = React.useState<string | null>(null);
-  const [historyView, setHistoryView] = React.useState<"chatbot" | "call" | "email">("chatbot");
+  const [historyView, setHistoryView] = React.useState<"chatbot" | "call" | "sms" | "email" | "appointment">("chatbot");
 
   const [notes, setNotes] = React.useState<NoteData[]>([]);
   const [notesLoading, setNotesLoading] = React.useState(false);
@@ -253,8 +301,15 @@ const ticketEmails = useSelector(
   const [docsLoading, setDocsLoading] = React.useState(false);
   const [docsError, setDocsError] = React.useState<string | null>(null);
 
+  // ====================== Twilio state ======================
+  const [callHistory, setCallHistory] = React.useState<TwilioCall[]>([]);
+  const [callHistoryLoading, setCallHistoryLoading] = React.useState(false);
+  const [callHistoryError, setCallHistoryError] = React.useState<string | null>(null);
 
-  
+  const [smsHistory, setSmsHistory] = React.useState<TwilioSMS[]>([]);
+  const [smsHistoryLoading, setSmsHistoryLoading] = React.useState(false);
+  const [smsHistoryError, setSmsHistoryError] = React.useState<string | null>(null);
+
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px",
     fontWeight: 500,
@@ -315,14 +370,12 @@ const ticketEmails = useSelector(
     });
   }, [leads, id]);
 
-// ✅ Emails linked to this lead
-const relatedEmails = React.useMemo(() => {
-  if (!lead) return [];
-
-  return ticketEmails.filter(
-    (mail) => String(mail.lead_id) === String(lead.id)
-  );
-}, [ticketEmails, lead]);
+  const relatedEmails = React.useMemo(() => {
+    if (!lead) return [];
+    return ticketEmails.filter(
+      (mail) => String(mail.lead_id) === String(lead.id)
+    );
+  }, [ticketEmails, lead]);
 
   const fetchNotes = React.useCallback(async (leadUuid: string) => {
     try {
@@ -352,9 +405,6 @@ const relatedEmails = React.useMemo(() => {
     }
   }, []);
 
-  // ====================== Fetch Documents (FIXED) ======================
-  // - Removed `lead` from the dependency array to prevent infinite re-renders
-  // - leadDocs passed as an explicit argument instead of captured from closure
   const fetchDocuments = React.useCallback(async (leadUuid: string, leadDocs?: string[]) => {
     try {
       setDocsLoading(true);
@@ -374,18 +424,56 @@ const relatedEmails = React.useMemo(() => {
     } finally {
       setDocsLoading(false);
     }
-  }, []); // ← no dependencies: stable reference, no infinite loop
+  }, []);
 
-  // ====================== Main data-fetch effect (FIXED) ======================
-  // - Uses lead.id (actual UUID) for documents API instead of URL param
-  // - Passes lead.documents so fetchDocuments can short-circuit when data exists
+  // ====================== Fetch Twilio Call History ======================
+  const fetchCallHistory = React.useCallback(async (leadUuid: string) => {
+    try {
+      setCallHistoryLoading(true);
+      setCallHistoryError(null);
+      const { data } = await api.get(`/twilio/calls/?lead_uuid=${leadUuid}`);
+      const results: TwilioCall[] = Array.isArray(data) ? data : (data.results ?? []);
+      setCallHistory(results);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to load call history";
+      setCallHistoryError(message);
+    } finally {
+      setCallHistoryLoading(false);
+    }
+  }, []);
+
+  // ====================== Fetch Twilio SMS History ======================
+  const fetchSMSHistory = React.useCallback(async (leadUuid: string) => {
+    try {
+      setSmsHistoryLoading(true);
+      setSmsHistoryError(null);
+      const { data } = await api.get(`/twilio/sms/?lead_uuid=${leadUuid}`);
+      const results: TwilioSMS[] = Array.isArray(data) ? data : (data.results ?? []);
+      setSmsHistory(results);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to load SMS history";
+      setSmsHistoryError(message);
+    } finally {
+      setSmsHistoryLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (lead) {
       const rawId = decodeURIComponent(id || "");
       fetchNotes(rawId);
-      fetchDocuments(lead.id, lead.documents); // ← lead.id is the real UUID
+      fetchDocuments(lead.id, lead.documents);
+      // Fetch Twilio history using actual lead UUID
+      fetchCallHistory(lead.id);
+      fetchSMSHistory(lead.id);
     }
-  }, [lead, fetchNotes, fetchDocuments, id]);
+  }, [lead, fetchNotes, fetchDocuments, fetchCallHistory, fetchSMSHistory, id]);
 
   // ====================== Note Operations ======================
   const handleAddNote = async () => {
@@ -540,7 +628,6 @@ const relatedEmails = React.useMemo(() => {
     setConvertError(null);
   };
 
-  // ====================== Convert Lead Handler ======================
   const handleConvertLead = async () => {
     if (!lead) return;
     try {
@@ -584,7 +671,6 @@ const relatedEmails = React.useMemo(() => {
     setActionError(null);
   };
 
-  // ====================== Loading / Error / Not Found ======================
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
@@ -695,6 +781,8 @@ const relatedEmails = React.useMemo(() => {
         { value: "Follow Up", label: "Follow Up" },
         { value: "Appointment", label: "Appointment" },
       ];
+
+  const hasAppointment = lead.book_appointment || (lead.appointment_date && lead.appointment_date !== "");
 
   return (
     <Box p={1} minHeight="100vh">
@@ -900,11 +988,10 @@ const relatedEmails = React.useMemo(() => {
               </Stack>
             </Card>
 
-            {/* ── DOCUMENTS CARD (API-connected) ── */}
+            {/* ── DOCUMENTS CARD ── */}
             <Card sx={{ p: 2, borderRadius: "10px", mb: 2, backgroundColor: "#fcfcfc", border: "none", boxShadow: "none" }}>
               <Typography fontWeight={700} variant="subtitle2" mb={2}>Documents</Typography>
               <Divider sx={{ mb: 2, mx: -3 }} />
-
               {docsLoading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
                   <Stack alignItems="center" spacing={1}>
@@ -913,19 +1000,13 @@ const relatedEmails = React.useMemo(() => {
                   </Stack>
                 </Box>
               ) : docsError ? (
-                <Alert
-                  severity="error"
-                  onClose={() => setDocsError(null)}
-                  sx={{ borderRadius: "8px", fontSize: "12px" }}
-                >
+                <Alert severity="error" onClose={() => setDocsError(null)} sx={{ borderRadius: "8px", fontSize: "12px" }}>
                   {docsError}
                 </Alert>
               ) : documents.length === 0 ? (
                 <Box sx={{ textAlign: "center", py: 2 }}>
                   <InsertDriveFileOutlinedIcon sx={{ fontSize: 32, color: "#CBD5E1", mb: 0.5 }} />
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    No documents uploaded
-                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">No documents uploaded</Typography>
                 </Box>
               ) : (
                 <Stack spacing={2}>
@@ -950,18 +1031,337 @@ const relatedEmails = React.useMemo(() => {
       {/* ── HISTORY TAB ── */}
       {activeTab === "History" && (
         <Stack direction="row" spacing={3}>
+          {/* LEFT: Activity Timeline */}
           <Card sx={{ flex: 1, p: 3, borderRadius: "16px" }}>
             <Typography variant="subtitle1" fontWeight={700} mb={3}>Activity Timeline</Typography>
             <Stack spacing={0}>
-              <TimelineItem icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: "#6366F1" }} />} title="Appointment Booked - Confirmation sent (SMS)" time={leadCreatedAt} />
-              <TimelineItem icon={<CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />} title="Outgoing call attempted - Connected" time={leadCreatedAt} onClick={() => setHistoryView("call")} isClickable />
-              <TimelineItem icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />} title="Patient shared contact number and email" time={leadCreatedAt} onClick={() => setHistoryView("email")} isClickable />
-              <TimelineItem icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: "#3B82F6" }} />} title="Sent an Welcome Email" time={leadCreatedAt} onClick={() => setHistoryView("email")} isClickable />
-              <TimelineItem isAvatar avatarInitial={leadAssigned.charAt(0)} title={`Assigned to ${leadAssigned}`} time={leadCreatedAt} />
-              <TimelineItem icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />} title="Lead arrived from Website Chatbot" time={leadCreatedAt} onClick={() => setHistoryView("chatbot")} isClickable isLast />
+              {/* Appointment — only show if lead has appointment */}
+              {hasAppointment && (
+                <TimelineItem
+                  icon={<EventNoteIcon sx={{ fontSize: 16, color: "#10B981" }} />}
+                  title={`Appointment Booked — ${appointmentDate} at ${appointmentSlot}`}
+                  time={leadCreatedAt}
+                  onClick={() => setHistoryView("appointment")}
+                  isClickable
+                />
+              )}
+              {/* SMS history */}
+              <TimelineItem
+                icon={<SmsOutlinedIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />}
+                title={`SMS History (${smsHistory.length} messages)`}
+                time={smsHistory.length > 0 ? formatDateTime(smsHistory[0].created_at) : leadCreatedAt}
+                onClick={() => setHistoryView("sms")}
+                isClickable
+              />
+              {/* Call history */}
+              <TimelineItem
+                icon={<CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />}
+                title={`Call History (${callHistory.length} calls)`}
+                time={callHistory.length > 0 ? formatDateTime(callHistory[0].created_at) : leadCreatedAt}
+                onClick={() => setHistoryView("call")}
+                isClickable
+              />
+              <TimelineItem
+                icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />}
+                title="Patient shared contact number and email"
+                time={leadCreatedAt}
+                onClick={() => setHistoryView("email")}
+                isClickable
+              />
+              <TimelineItem
+                icon={<EmailOutlinedIcon sx={{ fontSize: 16, color: "#3B82F6" }} />}
+                title="Sent a Welcome Email"
+                time={leadCreatedAt}
+                onClick={() => setHistoryView("email")}
+                isClickable
+              />
+              <TimelineItem
+                isAvatar
+                avatarInitial={leadAssigned.charAt(0)}
+                title={`Assigned to ${leadAssigned}`}
+                time={leadCreatedAt}
+              />
+              <TimelineItem
+                icon={<ChatBubbleOutlineIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />}
+                title="Lead arrived from Website Chatbot"
+                time={leadCreatedAt}
+                onClick={() => setHistoryView("chatbot")}
+                isClickable
+                isLast
+              />
             </Stack>
           </Card>
+
+          {/* RIGHT: Detail Panel */}
           <Card sx={{ flex: 2, borderRadius: "16px", display: "flex", flexDirection: "column", maxHeight: "600px" }}>
+
+            {/* ── APPOINTMENT VIEW ── */}
+            {historyView === "appointment" && (
+              <>
+                <Box p={2} borderBottom="1px solid #E2E8F0">
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <EventNoteIcon sx={{ color: "#10B981", fontSize: 20 }} />
+                    <Typography variant="subtitle1" fontWeight={700}>Appointment Details</Typography>
+                  </Stack>
+                </Box>
+                <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "#F8FAFC" }}>
+                  {hasAppointment ? (
+                    <Card sx={{ p: 3, borderRadius: "14px", border: "1px solid #D1FAE5", bgcolor: "#FFFFFF" }}>
+                      <Stack direction="row" alignItems="center" spacing={1} mb={3}>
+                        <Box sx={{ p: 1, bgcolor: "#ECFDF5", borderRadius: "8px" }}>
+                          <EventNoteIcon sx={{ color: "#10B981", fontSize: 22 }} />
+                        </Box>
+                        <Box>
+                          <Typography fontWeight={700} fontSize="15px">Appointment Booked</Typography>
+                          <Chip
+                            label="Confirmed"
+                            size="small"
+                            sx={{ bgcolor: "#ECFDF5", color: "#10B981", fontWeight: 600, fontSize: "11px", height: 20, mt: 0.5 }}
+                          />
+                        </Box>
+                      </Stack>
+                      <Divider sx={{ mb: 2.5 }} />
+                      <Stack spacing={2.5}>
+                        <Stack direction="row" spacing={4}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>
+                              DATE
+                            </Typography>
+                            <Typography fontWeight={700} fontSize="14px" mt={0.3}>{appointmentDate}</Typography>
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>
+                              TIME SLOT
+                            </Typography>
+                            <Typography fontWeight={700} fontSize="14px" mt={0.3}>{appointmentSlot}</Typography>
+                          </Box>
+                        </Stack>
+                        <Stack direction="row" spacing={4}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>
+                              DEPARTMENT
+                            </Typography>
+                            <Typography fontWeight={600} fontSize="14px" mt={0.3}>{appointmentDepartment}</Typography>
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>
+                              ASSIGNED TO
+                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center" mt={0.3}>
+                              <Avatar sx={{ width: 22, height: 22, fontSize: "11px", bgcolor: "#EEF2FF", color: "#6366F1" }}>
+                                {appointmentPersonnel.charAt(0)}
+                              </Avatar>
+                              <Typography fontWeight={600} fontSize="14px">{appointmentPersonnel}</Typography>
+                            </Stack>
+                          </Box>
+                        </Stack>
+                        {appointmentRemark && appointmentRemark !== "N/A" && (
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>
+                              REMARK
+                            </Typography>
+                            <Box sx={{ mt: 0.5, p: 1.5, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+                              <Typography fontSize="13px" color="text.primary">{appointmentRemark}</Typography>
+                            </Box>
+                          </Box>
+                        )}
+                        {treatmentInterest.length > 0 && (
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>
+                              TREATMENT INTEREST
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" mt={0.5}>
+                              {treatmentInterest.map((t, i) => (
+                                <Chip key={i} label={t} size="small" sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", fontWeight: 500, mb: 0.5 }} />
+                              ))}
+                            </Stack>
+                          </Box>
+                        )}
+                      </Stack>
+                    </Card>
+                  ) : (
+                    <Box sx={{ textAlign: "center", py: 6 }}>
+                      <EventNoteIcon sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }} />
+                      <Typography color="text.secondary" fontWeight={600}>No Appointment Booked</Typography>
+                      <Typography variant="caption" color="text.secondary">This lead has no appointment scheduled yet.</Typography>
+                    </Box>
+                  )}
+                </Box>
+              </>
+            )}
+
+            {/* ── SMS VIEW ── */}
+            {historyView === "sms" && (
+              <>
+                <Box p={2} borderBottom="1px solid #E2E8F0">
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <SmsOutlinedIcon sx={{ color: "#8B5CF6", fontSize: 20 }} />
+                      <Typography variant="subtitle1" fontWeight={700}>SMS History</Typography>
+                      <Chip
+                        label={`${smsHistory.length} messages`}
+                        size="small"
+                        sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", fontWeight: 600, fontSize: "11px", height: 20 }}
+                      />
+                    </Stack>
+                    <IconButton
+                      size="small"
+                      onClick={() => lead && fetchSMSHistory(lead.id)}
+                      sx={{ bgcolor: "#F8FAFC", "&:hover": { bgcolor: "#E2E8F0" } }}
+                    >
+                      <Typography fontSize="11px" px={1}>Refresh</Typography>
+                    </IconButton>
+                  </Stack>
+                </Box>
+                <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "#F8FAFC" }}>
+                  {smsHistoryLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                      <Stack alignItems="center" spacing={1}>
+                        <CircularProgress size={24} />
+                        <Typography variant="caption" color="text.secondary">Loading SMS history...</Typography>
+                      </Stack>
+                    </Box>
+                  ) : smsHistoryError ? (
+                    <Alert severity="error" sx={{ borderRadius: "10px" }}>{smsHistoryError}</Alert>
+                  ) : smsHistory.length === 0 ? (
+                    <Box sx={{ textAlign: "center", py: 6 }}>
+                      <SmsOutlinedIcon sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }} />
+                      <Typography color="text.secondary" fontWeight={600}>No SMS Sent Yet</Typography>
+                      <Typography variant="caption" color="text.secondary">SMS messages sent to this lead will appear here.</Typography>
+                    </Box>
+                  ) : (
+                    <Stack spacing={2}>
+                      {smsHistory.map((sms) => {
+                        const statusStyle = getSMSStatusColor(sms.status);
+                        return (
+                          <Card key={sms.id} sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Box sx={{ p: 0.8, bgcolor: "#F5F3FF", borderRadius: "8px" }}>
+                                  <SmsOutlinedIcon sx={{ color: "#8B5CF6", fontSize: 16 }} />
+                                </Box>
+                                <Box>
+                                  <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.6rem" }}>
+                                    {sms.direction === "outbound" ? "Sent To" : "Received From"}
+                                  </Typography>
+                                  <Typography fontWeight={600} fontSize="13px">{sms.to_number}</Typography>
+                                </Box>
+                              </Stack>
+                              <Stack alignItems="flex-end" spacing={0.5}>
+                                <Chip
+                                  label={sms.status || "sent"}
+                                  size="small"
+                                  sx={{ bgcolor: statusStyle.bg, color: statusStyle.color, fontWeight: 600, fontSize: "11px", height: 20, textTransform: "capitalize" }}
+                                />
+                                <Typography variant="caption" color="text.secondary" fontSize="11px">
+                                  {formatDateTime(sms.created_at)}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                            <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #F1F5F9" }}>
+                              <Typography fontSize="13px" color="text.primary" sx={{ lineHeight: 1.6 }}>{sms.body}</Typography>
+                            </Box>
+                            <Stack direction="row" justifyContent="space-between" mt={1}>
+                              <Typography variant="caption" color="text.secondary">From: {sms.from_number}</Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace", fontSize: "10px" }}>
+                                SID: {sms.sid.slice(0, 20)}...
+                              </Typography>
+                            </Stack>
+                          </Card>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Box>
+              </>
+            )}
+
+            {/* ── CALL VIEW ── */}
+            {historyView === "call" && (
+              <>
+                <Box p={2} borderBottom="1px solid #E2E8F0">
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <CallOutlinedIcon sx={{ color: "#10B981", fontSize: 20 }} />
+                      <Typography variant="subtitle1" fontWeight={700}>Call History</Typography>
+                      <Chip
+                        label={`${callHistory.length} calls`}
+                        size="small"
+                        sx={{ bgcolor: "#F0FDF4", color: "#10B981", fontWeight: 600, fontSize: "11px", height: 20 }}
+                      />
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                      <IconButton
+                        size="small"
+                        onClick={() => lead && fetchCallHistory(lead.id)}
+                        sx={{ bgcolor: "#F8FAFC", "&:hover": { bgcolor: "#E2E8F0" } }}
+                      >
+                        <Typography fontSize="11px" px={1}>Refresh</Typography>
+                      </IconButton>
+                      <CallButton lead={lead} />
+                    </Stack>
+                  </Stack>
+                </Box>
+                <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "#F8FAFC" }}>
+                  {callHistoryLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                      <Stack alignItems="center" spacing={1}>
+                        <CircularProgress size={24} />
+                        <Typography variant="caption" color="text.secondary">Loading call history...</Typography>
+                      </Stack>
+                    </Box>
+                  ) : callHistoryError ? (
+                    <Alert severity="error" sx={{ borderRadius: "10px" }}>{callHistoryError}</Alert>
+                  ) : callHistory.length === 0 ? (
+                    <Box sx={{ textAlign: "center", py: 6 }}>
+                      <CallOutlinedIcon sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }} />
+                      <Typography color="text.secondary" fontWeight={600}>No Calls Made Yet</Typography>
+                      <Typography variant="caption" color="text.secondary">Calls made to this lead will appear here.</Typography>
+                    </Box>
+                  ) : (
+                    <Stack spacing={2}>
+                      {callHistory.map((call) => {
+                        const statusStyle = getCallStatusColor(call.status);
+                        return (
+                          <Card key={call.id} sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                              <Stack direction="row" spacing={1.5} alignItems="center">
+                                <Box sx={{ p: 1, bgcolor: "#F0FDF4", borderRadius: "8px" }}>
+                                  <CallOutlinedIcon sx={{ color: "#10B981", fontSize: 20 }} />
+                                </Box>
+                                <Box>
+                                  <Typography fontWeight={700} fontSize="13px">Outbound Call</Typography>
+                                  <Typography variant="caption" color="text.secondary">To: {call.to_number}</Typography>
+                                </Box>
+                              </Stack>
+                              <Stack alignItems="flex-end" spacing={0.5}>
+                                <Chip
+                                  label={call.status || "initiated"}
+                                  size="small"
+                                  sx={{ bgcolor: statusStyle.bg, color: statusStyle.color, fontWeight: 600, fontSize: "11px", height: 20, textTransform: "capitalize" }}
+                                />
+                                <Typography variant="caption" color="text.secondary" fontSize="11px">
+                                  {formatDateTime(call.created_at)}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                            <Divider sx={{ my: 1.5 }} />
+                            <Stack direction="row" justifyContent="space-between">
+                              <Typography variant="caption" color="text.secondary">From: {call.from_number}</Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace", fontSize: "10px" }}>
+                                SID: {call.sid.slice(0, 20)}...
+                              </Typography>
+                            </Stack>
+                          </Card>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Box>
+              </>
+            )}
+
+            {/* ── CHATBOT VIEW ── */}
             {historyView === "chatbot" && (
               <>
                 <Box p={2} borderBottom="1px solid #E2E8F0">
@@ -997,30 +1397,8 @@ const relatedEmails = React.useMemo(() => {
                 </Box>
               </>
             )}
-            {historyView === "call" && (
-              <>
-                <Box p={2} borderBottom="1px solid #E2E8F0">
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="subtitle1" fontWeight={700}>Call Transcript</Typography>
-                    <CallButton lead={lead} />
-                  </Stack>
-                </Box>
-                <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "#F8FAFC" }}>
-                  <Stack spacing={3}>
-                    <Typography variant="caption" align="center" color="text.secondary" display="block">
-                      CALL -{" "}
-                      {lead.created_at
-                        ? new Date(lead.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }).toUpperCase()
-                        : "TODAY"}
-                    </Typography>
-                    <CallMessage speaker="Mike" time="0:03" text="Good morning! You've reached Bloom Fertility Center. This is Mike. How can I help you today?" />
-                    <CallMessage speaker={leadName.split(" ")[0]} time="0:15" text="Hi Mike, I'm calling to get some information about IVF. My wife and I are considering starting treatment." />
-                    <CallMessage speaker="Mike" time="0:25" text="Of course. I'd be happy to guide you. May I know your wife's age and how long you both have been trying to conceive?" />
-                    <CallMessage speaker={leadName.split(" ")[0]} time="0:32" text="She's 32, and we've been trying for about four years now." />
-                  </Stack>
-                </Box>
-              </>
-            )}
+
+            {/* ── EMAIL VIEW ── */}
             {historyView === "email" && (
               <>
                 <Box p={2} borderBottom="1px solid #E2E8F0">
@@ -1033,7 +1411,6 @@ const relatedEmails = React.useMemo(() => {
                 </Box>
                 <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "#F8FAFC" }}>
                   <Stack spacing={3}>
-
                     <Card sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                       <Stack direction="row" justifyContent="space-between" mb={2}>
                         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1082,47 +1459,25 @@ const relatedEmails = React.useMemo(() => {
                         </Typography>
                       </Card>
                     )}
-                    
-{/* Ticket Email Replies */}
-{relatedEmails.map((mail) => (
-  <Card
-    key={mail.id}
-    sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}
-  >
-    <Stack direction="row" justifyContent="space-between" mb={2}>
-      <Stack direction="row" spacing={1.5} alignItems="center">
-        <Avatar sx={{ width: 40, height: 40, bgcolor: "#FEF2F2", color: "#EF4444" }}>
-          CC
-        </Avatar>
-        <Box>
-          <Typography variant="body2" fontWeight={700}>
-            {mail.to}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            team@crystaivf.com
-          </Typography>
-        </Box>
-      </Stack>
 
-      <Typography variant="caption" color="text.secondary">
-        {new Date(mail.created_at).toLocaleString()}
-      </Typography>
-    </Stack>
-
-    <Typography variant="body2" fontWeight={700} mb={1}>
-      {mail.subject}
-    </Typography>
-
-    <Typography
-      variant="body2"
-      color="text.secondary"
-      sx={{ whiteSpace: "pre-line" }}
-    >
-      {mail.message}
-    </Typography>
-  </Card>
-))}
-
+                    {relatedEmails.map((mail) => (
+                      <Card key={mail.id} sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
+                        <Stack direction="row" justifyContent="space-between" mb={2}>
+                          <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Avatar sx={{ width: 40, height: 40, bgcolor: "#FEF2F2", color: "#EF4444" }}>CC</Avatar>
+                            <Box>
+                              <Typography variant="body2" fontWeight={700}>{mail.to}</Typography>
+                              <Typography variant="caption" color="text.secondary">team@crystaivf.com</Typography>
+                            </Box>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(mail.created_at).toLocaleString()}
+                          </Typography>
+                        </Stack>
+                        <Typography variant="body2" fontWeight={700} mb={1}>{mail.subject}</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-line" }}>{mail.message}</Typography>
+                      </Card>
+                    ))}
                   </Stack>
                 </Box>
               </>
@@ -1156,11 +1511,9 @@ const relatedEmails = React.useMemo(() => {
                   </Typography>
                   <Typography variant="caption" color="#6366F1" sx={{ cursor: "pointer", fontWeight: 600 }}>Apply suggestion</Typography>
                 </Box>
-
                 <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.8px", display: "block", mb: 1.5 }}>
                   Next Action
                 </Typography>
-
                 <Card variant="outlined" sx={{ p: 2, borderRadius: "12px", mb: 3, border: "1px solid #E2E8F0" }}>
                   <Stack direction="row" spacing={1.5} alignItems="flex-start">
                     <Box sx={{ p: 1, bgcolor: "#EFF6FF", borderRadius: "8px", mt: 0.25 }}>
@@ -1193,11 +1546,9 @@ const relatedEmails = React.useMemo(() => {
                     </Box>
                   </Stack>
                 </Card>
-
                 <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.8px", display: "block", mb: 1.5 }}>
                   Previous Actions
                 </Typography>
-
                 <Card variant="outlined" sx={{ p: 2, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                   <Stack direction="row" spacing={1.5} alignItems="flex-start">
                     <Box sx={{ p: 1, bgcolor: "#F0FDF4", borderRadius: "8px", mt: 0.25 }}>
@@ -1285,7 +1636,6 @@ const relatedEmails = React.useMemo(() => {
                     )}
                   </Box>
                 )}
-
                 <Card variant="outlined" sx={{ borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden" }}>
                   <TextField
                     fullWidth placeholder="Title" value={newNoteTitle} onChange={(e) => setNewNoteTitle(e.target.value)}
@@ -1520,7 +1870,6 @@ const Info: React.FC<InfoProps> = ({ label, value, isAvatar }) => (
   </Box>
 );
 
-// ── DocumentRow — supports real URLs with download & open ──
 const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, url, sx = {} }) => {
   const color = getDocColor(name);
   const ext = (name.split(".").pop() ?? "").toUpperCase();
@@ -1547,37 +1896,14 @@ const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, url, sx = {} }) =
   return (
     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={sx}>
       <Stack direction="row" spacing={1.5} alignItems="center">
-        <Box
-          sx={{
-            width: 36,
-            height: 36,
-            borderRadius: "8px",
-            bgcolor: `${color}18`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
+        <Box sx={{ width: 36, height: 36, borderRadius: "8px", bgcolor: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <DescriptionOutlinedIcon sx={{ color, fontSize: 18 }} />
         </Box>
         <Box>
-          <Typography
-            variant="body2"
-            fontWeight={600}
-            sx={{
-              maxWidth: 160,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-            title={name}
-          >
+          <Typography variant="body2" fontWeight={600} sx={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={name}>
             {name}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {ext}{size ? ` · ${size}` : ""}
-          </Typography>
+          <Typography variant="caption" color="text.secondary">{ext}{size ? ` · ${size}` : ""}</Typography>
         </Box>
       </Stack>
       <Stack direction="row" spacing={0.5}>
