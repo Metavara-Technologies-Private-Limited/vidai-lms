@@ -24,6 +24,7 @@ import {
   Button,
   TextField,
   Tooltip,
+<<<<<<< Updated upstream
   List,
   ListItem,
   ListItemButton,
@@ -31,6 +32,12 @@ import {
   Divider,
   MenuItem,
   Menu,
+=======
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  Divider,
+>>>>>>> Stashed changes
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -40,6 +47,20 @@ import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
+<<<<<<< Updated upstream
+=======
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import SendIcon from "@mui/icons-material/Send";
+import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import LinkIcon from "@mui/icons-material/Link";
+import EmojiEmotionsOutlinedIcon from "@mui/icons-material/EmojiEmotionsOutlined";
+import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
+import FormatColorTextOutlinedIcon from "@mui/icons-material/FormatColorTextOutlined";
+import BrushOutlinedIcon from "@mui/icons-material/BrushOutlined";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+>>>>>>> Stashed changes
 
 import {
   fetchLeads,
@@ -1280,6 +1301,358 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
   );
 };
 
+// ====================== Email Templates ======================
+interface EmailTemplate {
+  id: string;
+  name: string;
+  description: string;
+  subject: string;
+  body: string;
+}
+
+const EMAIL_TEMPLATES: EmailTemplate[] = [
+  {
+    id: "ivf-next-steps",
+    name: "IVF Next Steps Form Request",
+    description: "Requests the patient to fill out a form to share medical and contact details.",
+    subject: "Thank You for Your IVF Inquiry – Next Steps",
+    body: `Hi {{name}},
+
+Thank you for reaching out to Crysta IVF, Bangalore. We are honored to be part of your journey toward parenthood.
+
+To ensure we provide the most accurate guidance tailored to your medical history, please complete our secure intake form:
+
+📋 Fill the IVF Inquiry Form
+https://example.com/ivf-inquiry-form
+
+What happens next? After you submit the form, our specialist team will:
+• Review: A senior consultant will evaluate your requirements.
+• Connect: We will schedule a 15-minute discovery call.
+• Plan: You'll receive a personalized roadmap including estimated costs and timelines.
+
+We understand this is a big step—our team is here to support you every step of the way.
+
+Warm regards,
+Crysta IVF, Banglore
+(935) 555-0128 | crysta@gmail.com`,
+  },
+  {
+    id: "ivf-treatment-info",
+    name: "IVF Treatment Information",
+    description: "Provides an overview of IVF process, timelines, and general treatment details.",
+    subject: "IVF Treatment Information – Crysta IVF",
+    body: `Hi {{name}},
+
+Thank you for your interest in IVF treatment at Crysta IVF, Bangalore.
+
+We'd like to share some key information about our IVF process to help you understand what to expect.
+
+Please don't hesitate to reach out if you have any questions.
+
+Warm regards,
+Crysta IVF, Banglore`,
+  },
+  {
+    id: "ivf-followup",
+    name: "IVF Follow-Up Reminder",
+    description: "Gentle reminder for patients who have not responded or taken action.",
+    subject: "A Gentle Follow-Up from Crysta IVF",
+    body: `Hi {{name}},
+
+We wanted to follow up on your recent inquiry about IVF treatment at Crysta IVF.
+
+We understand you're busy, and we're here whenever you're ready to take the next step.
+
+Warm regards,
+Crysta IVF, Banglore`,
+  },
+  {
+    id: "consultation-confirm",
+    name: "New Consultation Confirmation",
+    description: "Confirms appointment date, time, and doctor details.",
+    subject: "Your Consultation is Confirmed – Crysta IVF",
+    body: `Hi {{name}},
+
+Your consultation appointment at Crysta IVF has been confirmed.
+
+We look forward to meeting you and discussing your journey toward parenthood.
+
+Warm regards,
+Crysta IVF, Banglore`,
+  },
+  {
+    id: "welcome-inquiry",
+    name: "Welcome Email – Patient Inquiry",
+    description: "Introduces the clinic and builds trust after the first inquiry.",
+    subject: "Welcome to Crysta IVF – We're Here for You",
+    body: `Hi {{name}},
+
+Thank you for reaching out to Crysta IVF, Bangalore. We're so glad you took this step.
+
+At Crysta IVF, we believe every patient deserves compassionate, personalized care on their path to parenthood.
+
+Warm regards,
+Crysta IVF, Banglore`,
+  },
+];
+
+// ====================== Email Dialog ======================
+interface EmailDialogProps {
+  open: boolean;
+  lead: ProcessedLead | null;
+  onClose: () => void;
+}
+
+const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
+  const [step, setStep] = React.useState<"template" | "compose">("template");
+  const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
+  const [subject, setSubject] = React.useState("");
+  const [body, setBody] = React.useState("");
+  const [sending, setSending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open) {
+      setStep("template");
+      setSelectedTemplateId(null);
+      setSubject("");
+      setBody("");
+      setError(null);
+      setSending(false);
+    }
+  }, [open]);
+
+  const handleClose = () => {
+    if (sending) return;
+    onClose();
+  };
+
+  const handleComposeNew = () => {
+    setSelectedTemplateId(null);
+    setSubject("");
+    setBody("");
+    setStep("compose");
+  };
+
+  const handleNext = () => {
+    if (!selectedTemplateId) return;
+    const template = EMAIL_TEMPLATES.find((t) => t.id === selectedTemplateId);
+    if (template) {
+      const recipientName = lead?.full_name || lead?.name || "Patient";
+      setSubject(template.subject);
+      setBody(template.body.replace(/\{\{name\}\}/g, recipientName));
+    }
+    setStep("compose");
+  };
+
+  const handleSend = async () => {
+    if (!subject.trim() || !body.trim()) return;
+    if (!lead?.email) {
+      setError("This lead has no email address.");
+      return;
+    }
+    setSending(true);
+    setError(null);
+    try {
+      // TODO: Replace with your actual API call:
+      // await EmailAPI.sendEmail({
+      //   lead_uuid: lead.id,
+      //   to: lead.email,
+      //   subject: subject.trim(),
+      //   body: body.trim(),
+      // });
+      await new Promise((res) => setTimeout(res, 1200));
+      setSuccess(true);
+      onClose();
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, "Failed to send email. Please try again."));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const toolbarItems = [
+    { icon: <AttachFileIcon sx={{ fontSize: 18 }} />, title: "Attach file" },
+    { icon: <LinkIcon sx={{ fontSize: 18 }} />, title: "Insert link" },
+    { icon: <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />, title: "Emoji" },
+    { icon: <ImageOutlinedIcon sx={{ fontSize: 18 }} />, title: "Image" },
+    { icon: <FormatColorTextOutlinedIcon sx={{ fontSize: 18 }} />, title: "Format text" },
+    { icon: <BrushOutlinedIcon sx={{ fontSize: 18 }} />, title: "Draw" },
+    { icon: <AddCircleOutlineIcon sx={{ fontSize: 18 }} />, title: "More" },
+  ];
+
+  return (
+    <>
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}
+      >
+        {/* ====== STEP 1: Template Selection ====== */}
+        {step === "template" && (
+          <>
+            <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              New Email
+              <IconButton size="small" onClick={handleClose}><CloseIcon fontSize="small" /></IconButton>
+            </DialogTitle>
+
+            <DialogContent sx={{ pt: 1, pb: 0 }}>
+              <Box
+                onClick={handleComposeNew}
+                sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, py: 1.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}
+              >
+                <EditOutlinedIcon sx={{ fontSize: 18, color: "#475569" }} />
+                <Typography fontWeight={600} fontSize="14px" color="#475569">Compose New Email</Typography>
+              </Box>
+
+              <Divider sx={{ my: 1.5 }}>
+                <Typography fontSize="12px" color="text.secondary">OR</Typography>
+              </Divider>
+
+              <Typography fontSize="13px" color="text.secondary" fontWeight={500} mb={1.5}>
+                Select Email Template
+              </Typography>
+
+              <RadioGroup value={selectedTemplateId || ""} onChange={(e) => setSelectedTemplateId(e.target.value)}>
+                <Stack spacing={0} divider={<Divider />}>
+                  {EMAIL_TEMPLATES.map((template) => (
+                    <Box
+                      key={template.id}
+                      onClick={() => setSelectedTemplateId(template.id)}
+                      sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1.5, px: 0.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}
+                    >
+                      <FormControlLabel
+                        value={template.id}
+                        control={
+                          <Radio size="small" sx={{ color: selectedTemplateId === template.id ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }} />
+                        }
+                        label={
+                          <Box>
+                            <Typography fontWeight={600} fontSize="13.5px" color="#1E293B">{template.name}</Typography>
+                            <Typography fontSize="12px" color="#64748B" mt={0.2}>{template.description}</Typography>
+                          </Box>
+                        }
+                        sx={{ m: 0, flex: 1 }}
+                      />
+                      <Tooltip title="Preview template">
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); setSelectedTemplateId(template.id); }} sx={{ color: "#93C5FD", ml: 1 }}>
+                          <VisibilityOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  ))}
+                </Stack>
+              </RadioGroup>
+            </DialogContent>
+
+            <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
+              <Button onClick={handleClose} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
+                Cancel
+              </Button>
+              <Button onClick={handleNext} disabled={!selectedTemplateId} variant="contained"
+                sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" } }}>
+                Next
+              </Button>
+            </DialogActions>
+          </>
+        )}
+
+        {/* ====== STEP 2: Compose Email ====== */}
+        {step === "compose" && (
+          <>
+            <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              New Email
+              <IconButton size="small" onClick={handleClose}><CloseIcon fontSize="small" /></IconButton>
+            </DialogTitle>
+
+            <DialogContent sx={{ pt: 0, pb: 0 }}>
+              <Stack spacing={0} divider={<Divider />}>
+                {/* To */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
+                  <Typography fontSize="13px" color="text.secondary" minWidth={55}>To:</Typography>
+                  <Box sx={{ flex: 1 }}>
+                    <Chip
+                      label={lead?.full_name || lead?.name || lead?.email || "Unknown"}
+                      size="small"
+                      onDelete={() => {}}
+                      deleteIcon={<CloseIcon sx={{ fontSize: "14px !important" }} />}
+                      sx={{ bgcolor: "#EFF6FF", color: "#1D4ED8", fontWeight: 500, fontSize: "12px", height: 24, "& .MuiChip-deleteIcon": { color: "#93C5FD" } }}
+                    />
+                  </Box>
+                  <Typography fontSize="12px" color="text.secondary" sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" } }}>
+                    Cc | Bcc
+                  </Typography>
+                </Box>
+
+                {/* Subject */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
+                  <Typography fontSize="13px" color="text.secondary" minWidth={55}>Subject:</Typography>
+                  <TextField
+                    fullWidth variant="standard" value={subject}
+                    onChange={(e) => setSubject(e.target.value)} disabled={sending}
+                    InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }}
+                    placeholder="Enter subject..."
+                  />
+                </Box>
+
+                {/* Body */}
+                <Box sx={{ py: 1.5 }}>
+                  <TextField
+                    fullWidth multiline minRows={10} maxRows={16} variant="standard"
+                    value={body} onChange={(e) => setBody(e.target.value)} disabled={sending}
+                    InputProps={{ disableUnderline: true, sx: { fontSize: "13px", lineHeight: 1.7 } }}
+                    placeholder="Write your email..."
+                  />
+                </Box>
+
+                {error && <Alert severity="error" sx={{ borderRadius: "8px", my: 1 }}>{error}</Alert>}
+              </Stack>
+            </DialogContent>
+
+            <DialogActions sx={{ px: 3, pb: 3, pt: 1, flexDirection: "column", gap: 0 }}>
+              {/* Toolbar */}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1.5, width: "100%", borderTop: "1px solid #E5E7EB", pt: 1.5 }}>
+                {toolbarItems.map((item, idx) => (
+                  <Tooltip key={idx} title={item.title}>
+                    <IconButton size="small" sx={{ color: "#64748B" }}>{item.icon}</IconButton>
+                  </Tooltip>
+                ))}
+              </Box>
+
+              {/* Buttons */}
+              <Box sx={{ display: "flex", gap: 1, width: "100%", justifyContent: "flex-end" }}>
+                <Button onClick={handleClose} disabled={sending}
+                  sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
+                  Cancel
+                </Button>
+                <Button onClick={() => console.log("Save as template:", { subject, body })} disabled={sending}
+                  startIcon={<BookmarkBorderIcon fontSize="small" />}
+                  sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 2, "&:hover": { bgcolor: "#F3F4F6" } }}>
+                  Save as Template
+                </Button>
+                <Button onClick={handleSend} disabled={sending || !subject.trim() || !body.trim()} variant="contained"
+                  startIcon={sending ? <CircularProgress size={14} sx={{ color: "white" }} /> : <SendIcon fontSize="small" />}
+                  sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>
+                  {sending ? "Sending..." : "Send"}
+                </Button>
+              </Box>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      <Snackbar open={success} autoHideDuration={3000} onClose={() => setSuccess(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Alert onClose={() => setSuccess(false)} severity="success" sx={{ borderRadius: "10px" }}>
+          Email sent to {lead?.full_name || lead?.name}!
+        </Alert>
+      </Snackbar>
+    </>
+  );
+};
+
 // ====================== Main Component ======================
 const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const navigate = useNavigate();
@@ -1295,6 +1668,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
 
   const [callLead, setCallLead] = React.useState<ProcessedLead | null>(null);
   const [smsLead, setSmsLead] = React.useState<ProcessedLead | null>(null);
+  const [emailLead, setEmailLead] = React.useState<ProcessedLead | null>(null);
   const [callSnackbar, setCallSnackbar] = React.useState<{
     open: boolean;
     message: string;
@@ -1742,8 +2116,12 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                           disabled={!lead.email}
                           onClick={(e) => {
                             e.stopPropagation();
+<<<<<<< Updated upstream
                             if (lead.email)
                               window.location.href = `mailto:${lead.email}`;
+=======
+                            setEmailLead(lead);
+>>>>>>> Stashed changes
                           }}
                         >
                           <EmailOutlinedIcon fontSize="small" />
@@ -1819,6 +2197,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         lead={smsLead}
         onClose={() => setSmsLead(null)}
       />
+
+      <EmailDialog open={Boolean(emailLead)} lead={emailLead} onClose={() => setEmailLead(null)} />
 
       <Snackbar
         open={callSnackbar.open}
