@@ -6,6 +6,16 @@ import { http } from "./http";
  */
 export type APITemplateType = 'mail' | 'sms' | 'whatsapp';
 
+export interface TemplateDocument {
+  id?: string | number;
+  file?: string;
+  file_url?: string;
+  url?: string;
+  name?: string;
+  filename?: string;
+  uploaded_at?: string;
+}
+
 /**
  * API Request Interfaces
  */
@@ -28,6 +38,30 @@ export interface SMSTemplateRequest {
 
 type TemplatePayload = FormData | Record<string, unknown>;
 
+const extractDocumentsFromTemplate = (template: unknown): TemplateDocument[] => {
+  if (!template || typeof template !== 'object') {
+    return [];
+  }
+
+  const payload = template as Record<string, unknown>;
+  const sources = [
+    payload.documents,
+    payload.template_documents,
+    payload.files,
+    payload.attachments,
+    (payload.data as Record<string, unknown> | undefined)?.documents,
+    (payload.data as Record<string, unknown> | undefined)?.attachments,
+  ];
+
+  for (const source of sources) {
+    if (Array.isArray(source)) {
+      return source as TemplateDocument[];
+    }
+  }
+
+  return [];
+};
+
 const TemplateService = {
   /**
    * List all templates of a specific type
@@ -45,6 +79,16 @@ const TemplateService = {
   getTemplateById: async (type: APITemplateType, templateId: string) => {
     const response = await http.get(`/templates/${type}/${templateId}/`);
     return response.data;
+  },
+
+  /**
+   * Get documents attached to a template.
+   * Reuses GET /api/templates/{type}/{templateId}/ and extracts document arrays
+   * from known response shapes.
+   */
+  getTemplateDocuments: async (type: APITemplateType, templateId: string): Promise<TemplateDocument[]> => {
+    const template = await TemplateService.getTemplateById(type, templateId);
+    return extractDocumentsFromTemplate(template);
   },
 
   /**
@@ -148,6 +192,32 @@ const TemplateService = {
   deleteTemplate: async (type: APITemplateType, templateId: string) => {
     console.log('🗑️ Deleting template:', { type, templateId });
     return await http.delete(`/templates/${type}/${templateId}/delete/`);
+  },
+
+  /**
+   * Delete a document from a template.
+   * Backend route naming can vary, so this tries common endpoint patterns.
+   */
+  deleteTemplateDocument: async (type: APITemplateType, templateId: string, documentId: string) => {
+    const deleteRoutes = [
+      `/templates/${type}/${templateId}/documents/${documentId}/delete/`,
+      `/templates/${type}/${templateId}/documents/${documentId}/`,
+      `/templates/${type}/documents/${documentId}/delete/`,
+      `/templates/${type}/documents/${documentId}/`,
+    ];
+
+    let lastError: unknown = null;
+
+    for (const route of deleteRoutes) {
+      try {
+        const response = await http.delete(route);
+        return response.data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error('Unable to delete template document');
   },
 };
 

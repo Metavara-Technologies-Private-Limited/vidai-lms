@@ -34,8 +34,30 @@ import { Image as TiptapImage } from '@tiptap/extension-image';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import { PreviewTemplateModal } from './PreviewEmailTemplateModal';
-import type { NewEmailTemplateFormProps } from '../../../types/templates.types';
+import type { NewEmailTemplateFormProps, TemplateDocument } from '../../../types/templates.types';
 import type { EmailTemplate } from '../../../types/tickets.types';
+
+const getDocumentUrl = (doc: TemplateDocument): string => {
+  const candidate = doc.file_url || doc.file || doc.url || '';
+  if (!candidate) return '';
+  if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
+    return candidate;
+  }
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/api\/?$/, '');
+  return `${baseUrl}${candidate}`;
+};
+
+const getDocumentName = (doc: TemplateDocument): string => {
+  return doc.name || doc.filename || doc.file?.split('/').pop() || doc.file_url?.split('/').pop() || 'Document';
+};
+
+const extractDocuments = (payload: unknown): TemplateDocument[] => {
+  if (!payload || typeof payload !== 'object') return [];
+  const record = payload as Record<string, unknown>;
+  const candidates = [record.documents, record.template_documents, record.files, record.attachments];
+  const match = candidates.find((value) => Array.isArray(value));
+  return Array.isArray(match) ? (match as TemplateDocument[]) : [];
+};
 
 export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
   const isViewOnly = mode === 'view';
@@ -95,6 +117,16 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     subject: ((initialData as EmailTemplate)?.subject || 'Your Consultation is Confirmed - {appointment_date}'),
   });
 
+  const [showPreview, setShowPreview] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [existingDocuments, setExistingDocuments] = useState<TemplateDocument[]>([]);
+  const [removedExistingDocumentIds, setRemovedExistingDocumentIds] = useState<string[]>([]);
+  const [colorAnchor, setColorAnchor] = useState<HTMLButtonElement | null>(null);
+  const [currentFont] = useState('Nunito');
+  const [currentHeading] = useState('Tt');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   // Sync formData when initialData changes (for edit/view mode)
   React.useEffect(() => {
     if (initialData) {
@@ -106,16 +138,11 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
         useCase: normalizeUseCase(data?.use_case || data?.useCase || prev.useCase),
         subject: data?.subject || prev.subject
       }));
+      setExistingDocuments(extractDocuments(initialData));
+      setRemovedExistingDocumentIds([]);
+      setUploadedFiles([]);
     }
-  }, [initialData]); // Re-sync when initialData changes
-
-  const [showPreview, setShowPreview] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [colorAnchor, setColorAnchor] = useState<HTMLButtonElement | null>(null);
-  const [currentFont] = useState('Nunito');
-  const [currentHeading] = useState('Tt');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  }, [initialData]);
 
   // Rainbow color palette
   const colors = [
@@ -250,6 +277,13 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
   };
 
+  const removeExistingDocument = (documentId?: string | number) => {
+    if (documentId === undefined || documentId === null) return;
+    const normalized = String(documentId);
+    setExistingDocuments((prev) => prev.filter((doc) => String(doc.id) !== normalized));
+    setRemovedExistingDocumentIds((prev) => prev.includes(normalized) ? prev : [...prev, normalized]);
+  };
+
   const handlePreview = () => {
     setShowPreview(true);
   };
@@ -275,10 +309,9 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
     console.log("📧 Email Template Payload:", JSON.stringify(apiPayload, null, 2));
 
-    // Pass plain payload + files separately so NewTemplateModal can
-    // upload files AFTER getting the template id from the save response
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (onSave as any)(apiPayload, uploadedFiles);
+    // Pass plain payload + files + removed document ids so modal can
+    // delete previous files and then upload new files.
+    await onSave(apiPayload, uploadedFiles, removedExistingDocumentIds);
   };
 
   // Helper to generate random ID outside of render function
@@ -703,9 +736,46 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
               Choose File
             </Button>
             <Typography sx={{ color: '#9CA3AF', fontSize: '12px' }}>
-              No File Chosen
+              {uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s) selected` : 'No File Chosen'}
             </Typography>
           </Box>
+
+          {existingDocuments.length > 0 && (
+            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {existingDocuments.map((doc) => {
+                const url = getDocumentUrl(doc);
+                const name = getDocumentName(doc);
+                return (
+                  <Box key={String(doc.id ?? name)} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: '#F9FAFB', borderRadius: '6px' }}>
+                    <AttachFileIcon sx={{ fontSize: 16, color: '#6B7280' }} />
+                    <Typography
+                      component={url ? 'a' : 'span'}
+                      href={url || undefined}
+                      target={url ? '_blank' : undefined}
+                      rel={url ? 'noopener noreferrer' : undefined}
+                      sx={{
+                        flex: 1,
+                        fontSize: '12px',
+                        color: url ? '#2563EB' : '#374151',
+                        textDecoration: url ? 'underline' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {name}
+                    </Typography>
+                    {!isViewOnly && (
+                      <IconButton size="small" onClick={() => removeExistingDocument(doc.id)} sx={{ p: 0.5 }}>
+                        <CloseIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+
           {uploadedFiles.length > 0 && (
             <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
               {uploadedFiles.map((file, index) => (

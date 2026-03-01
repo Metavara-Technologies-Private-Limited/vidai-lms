@@ -5,13 +5,37 @@ import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import styles from "../../../styles/Template/NewTemplateModal.module.css";
 import { PreviewWhatsAppTemplateModal } from './PreviewWhatsAppTemplateModal';
-import type { NewWhatsAppTemplateFormProps } from '../../../types/templates.types';
+import type { NewWhatsAppTemplateFormProps, TemplateDocument } from '../../../types/templates.types';
+
+const getDocumentUrl = (doc: TemplateDocument): string => {
+  const candidate = doc.file_url || doc.file || doc.url || '';
+  if (!candidate) return '';
+  if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
+    return candidate;
+  }
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/api\/?$/, '');
+  return `${baseUrl}${candidate}`;
+};
+
+const getDocumentName = (doc: TemplateDocument): string => {
+  return doc.name || doc.filename || doc.file?.split('/').pop() || doc.file_url?.split('/').pop() || 'Document';
+};
+
+const extractDocuments = (payload: unknown): TemplateDocument[] => {
+  if (!payload || typeof payload !== 'object') return [];
+  const record = payload as Record<string, unknown>;
+  const candidates = [record.documents, record.template_documents, record.files, record.attachments];
+  const match = candidates.find((value) => Array.isArray(value));
+  return Array.isArray(match) ? (match as TemplateDocument[]) : [];
+};
 
 export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
   const isViewOnly = mode === 'view';
   const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [existingDocuments, setExistingDocuments] = useState<TemplateDocument[]>([]);
+  const [removedExistingDocumentIds, setRemovedExistingDocumentIds] = useState<string[]>([]);
 
   // Helper to get styling for the chips (matched to Table styles)
   const getUseCaseStyles = (useCase: string | undefined) => {
@@ -76,6 +100,9 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
         useCase: normalizeUseCase(data?.useCase || data?.use_case || ""),
         body: data?.body || data?.email_body || data?.subject || ""
       });
+      setExistingDocuments(extractDocuments(initialData));
+      setRemovedExistingDocumentIds([]);
+      setSelectedFile(null);
       console.log("WhatsApp Form - Updated formData from initialData:", {
         name: data?.name || data?.audience_name,
         useCase: normalizeUseCase(data?.useCase || data?.use_case),
@@ -91,6 +118,13 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) setSelectedFile(file);
+  };
+
+  const removeExistingDocument = (documentId?: string | number) => {
+    if (documentId === undefined || documentId === null) return;
+    const normalized = String(documentId);
+    setExistingDocuments((prev) => prev.filter((doc) => String(doc.id) !== normalized));
+    setRemovedExistingDocumentIds((prev) => prev.includes(normalized) ? prev : [...prev, normalized]);
   };
 
   // ─── ONLY CHANGE: pass selectedFile as second argument ───────────────────────
@@ -112,8 +146,7 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
     console.log("🚀 Saving WhatsApp with File:", selectedFile?.name || "No file");
 
     const files = selectedFile ? [selectedFile] : [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (onSave as any)(apiPayload, files);
+    await onSave(apiPayload, files, removedExistingDocumentIds);
   };
 
   if (showPreview) {
@@ -238,6 +271,52 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
               {selectedFile ? selectedFile.name : 'No File Chosen'}
             </Typography>
           </Box>
+
+          {existingDocuments.length > 0 && (
+            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {existingDocuments.map((doc) => {
+                const url = getDocumentUrl(doc);
+                const name = getDocumentName(doc);
+                return (
+                  <Box
+                    key={String(doc.id ?? name)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      p: 1,
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '6px',
+                      bgcolor: '#F9FAFB',
+                    }}
+                  >
+                    <Typography
+                      component={url ? 'a' : 'span'}
+                      href={url || undefined}
+                      target={url ? '_blank' : undefined}
+                      rel={url ? 'noopener noreferrer' : undefined}
+                      sx={{
+                        flex: 1,
+                        fontSize: '12px',
+                        color: url ? '#2563EB' : '#374151',
+                        textDecoration: url ? 'underline' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {name}
+                    </Typography>
+                    {!isViewOnly && (
+                      <IconButton size="small" onClick={() => removeExistingDocument(doc.id)} sx={{ p: 0.5 }}>
+                        <CloseIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
         </Box>
       </Box>
 
