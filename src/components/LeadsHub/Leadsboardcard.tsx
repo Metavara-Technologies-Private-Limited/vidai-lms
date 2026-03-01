@@ -10,14 +10,11 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
+import PhoneIcon from "@mui/icons-material/Phone";
 import { useNavigate } from "react-router-dom";
 
-import { MenuButton, CallButton } from "./LeadsMenuDialogs";
+import { MenuButton } from "./LeadsMenuDialogs";
 
-// FIX: import LeadItem and ColumnConfig from the single source of truth
-// (Leadsboardtypes.ts) instead of redefining them here.
-// This eliminates all TS2322 errors caused by two separate LeadItem
-// definitions that TypeScript treats as incompatible types.
 import type { LeadItem, ColumnConfig } from "./Leadsboardtypes";
 
 // Re-export so any file that was importing LeadItem from here still works
@@ -40,10 +37,11 @@ interface CardContentProps {
   onOpenSms:  (lead: LeadItem) => void;
   onOpenMail: (lead: LeadItem) => void;
   onOpenBook: (lead: LeadItem) => void;
+  onOpenCall: (lead: LeadItem) => void;
 }
 
 export const CardContent: React.FC<CardContentProps> = ({
-  lead, columnLabel, isHovered, onOpenSms, onOpenMail, onOpenBook,
+  lead, columnLabel, isHovered, onOpenSms, onOpenMail, onOpenBook, onOpenCall,
 }) => {
   // Collapsed view
   if (!isHovered) {
@@ -126,9 +124,14 @@ export const CardContent: React.FC<CardContentProps> = ({
         CONTACT OPTION
       </Typography>
       <Stack direction="row" spacing={1.5} sx={{ mb: showBookButton ? 2 : 0 }}>
-        <Box sx={iconBtnSx} onClick={(e) => e.stopPropagation()}>
-          <CallButton lead={lead} />
-        </Box>
+        {/* Call button — now wired to working handler */}
+        <IconButton
+          size="small"
+          sx={iconBtnSx}
+          onClick={(e) => { e.stopPropagation(); onOpenCall(lead); }}
+        >
+          <PhoneIcon sx={{ fontSize: 16 }} />
+        </IconButton>
         <IconButton
           size="small"
           sx={iconBtnSx}
@@ -178,14 +181,14 @@ interface LeadCardProps {
   onOpenSms:  (lead: LeadItem) => void;
   onOpenMail: (lead: LeadItem) => void;
   onOpenBook: (lead: LeadItem) => void;
-  // FIX: any[] so this is compatible with LeadsMenuDialogs MenuButton setLeads prop
+  onOpenCall: (lead: LeadItem) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setLeads: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const LeadCard: React.FC<LeadCardProps> = ({
   lead, columnLabel, columnColor, isHovered,
-  onHover, onOpenSms, onOpenMail, onOpenBook, setLeads,
+  onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, setLeads,
 }) => {
   const navigate = useNavigate();
 
@@ -271,6 +274,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({
         onOpenSms={onOpenSms}
         onOpenMail={onOpenMail}
         onOpenBook={onOpenBook}
+        onOpenCall={onOpenCall}
       />
     </Paper>
   );
@@ -285,13 +289,13 @@ export interface LeadColumnProps {
   onOpenSms:  (lead: LeadItem) => void;
   onOpenMail: (lead: LeadItem) => void;
   onOpenBook: (lead: LeadItem) => void;
-  // FIX: any[] to match MenuButton's setLeads signature
+  onOpenCall: (lead: LeadItem) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setLeads: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const LeadColumn: React.FC<LeadColumnProps> = ({
-  col, leads, hoveredId, onHover, onOpenSms, onOpenMail, onOpenBook, setLeads,
+  col, leads, hoveredId, onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, setLeads,
 }) => (
   <Box
     sx={{
@@ -348,6 +352,7 @@ export const LeadColumn: React.FC<LeadColumnProps> = ({
           onOpenSms={onOpenSms}
           onOpenMail={onOpenMail}
           onOpenBook={onOpenBook}
+          onOpenCall={onOpenCall}
           setLeads={setLeads}
         />
       ))}
