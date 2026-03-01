@@ -70,10 +70,34 @@ const KpiCards = () => {
     // Only count active (non-archived) leads
     const activeLeads = leads.filter((l: Lead) => l.is_active !== false);
 
+    const normalizeLeadStatus = (status?: string | null): string => {
+      if (!status) return "";
+
+      const value = status.toLowerCase().trim().replace(/[_\s]+/g, "-");
+
+      if (value === "new" || value === "new-lead" || value === "new-leads") return LEAD_STATUS.NEW.toLowerCase();
+      if (value === "appointment" || value === "appointments") return LEAD_STATUS.APPOINTMENT.toLowerCase();
+      if (
+        value === "follow-up" ||
+        value === "follow-ups" ||
+        value === "followup" ||
+        value === "followups" ||
+        value === "follow-up-lead" ||
+        value === "follow-up-leads"
+      ) {
+        return LEAD_STATUS.FOLLOW_UPS.toLowerCase();
+      }
+      if (value === "converted") return LEAD_STATUS.CONVERTED.toLowerCase();
+      if (value === "cycle-conversion" || value === "cycleconversion") return LEAD_STATUS.CYCLE_CONVERSION.toLowerCase();
+      if (value === "lost") return LEAD_STATUS.LOST.toLowerCase();
+
+      return value;
+    };
+
     const byStatus = (...statuses: string[]) =>
       activeLeads.filter((l: Lead) => {
-        const s = (l.lead_status || "").toLowerCase().trim();
-        return statuses.some((t) => s === t.toLowerCase());
+        const s = normalizeLeadStatus(l.lead_status);
+        return statuses.some((t) => s === normalizeLeadStatus(t));
       }).length;
 
     return {

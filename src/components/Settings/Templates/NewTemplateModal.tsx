@@ -36,32 +36,63 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 }) => {
   const [view, setView] = useState<"select" | "email" | "sms" | "whatsapp">("select");
   const [loading, setLoading] = useState(false);
+  const [resolvedInitialData, setResolvedInitialData] = useState<EmailTemplate | SMSTemplate | WhatsAppTemplate | undefined>(initialData);
+
+  const getViewFromData = (data: EmailTemplate | SMSTemplate | WhatsAppTemplate | undefined) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dataType = (data as any)?.type;
+
+    if (dataType === 'whatsapp') return 'whatsapp' as const;
+    if (dataType === 'sms') return 'sms' as const;
+    if (dataType === 'email') return 'email' as const;
+
+    if (data && ('audience_name' in data || 'subject' in data)) {
+      return 'email' as const;
+    }
+
+    return 'sms' as const;
+  };
 
   useEffect(() => {
     if (open) {
-      // First, check if initialData has a 'type' field (from edit action)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const dataType = (initialData as any)?.type;
-
-      if (dataType === 'whatsapp') {
-        setView('whatsapp');
-      } else if (dataType === 'sms') {
-        setView('sms');
-      } else if (dataType === 'email') {
-        setView('email');
-      } else if (initialData) {
-        // Fallback to field-based detection for templates without explicit type
-        if ('audience_name' in initialData || 'subject' in initialData) {
-          setView('email');
-        } else if ('body' in initialData && !('audience_name' in initialData) && !('subject' in initialData)) {
-          // Could be SMS or WhatsApp - default to SMS
-          setView('sms');
-        }
+      if (initialData) {
+        setView(getViewFromData(initialData));
       } else {
         setView("select");
       }
     }
   }, [open, initialData]);
+
+  useEffect(() => {
+    const resolveTemplateDetails = async () => {
+      if (!open) return;
+
+      if (!initialData?.id || mode === 'create') {
+        setResolvedInitialData(initialData);
+        return;
+      }
+
+      const apiType: APITemplateType = getViewFromData(initialData) === 'email'
+        ? 'mail'
+        : (getViewFromData(initialData) as APITemplateType);
+
+      try {
+        setLoading(true);
+        const fullTemplate = await TemplateService.getTemplateById(apiType, String(initialData.id));
+        setResolvedInitialData({
+          ...initialData,
+          ...fullTemplate,
+        });
+      } catch (error) {
+        console.error('Failed to fetch full template details:', error);
+        setResolvedInitialData(initialData);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    resolveTemplateDetails();
+  }, [open, initialData, mode]);
 
   const handleClose = () => {
     if (loading) return;
@@ -80,7 +111,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
   //      which inserts rows into restapi_template_mail/sms/whatsapp_document
   //   4. Calls parent onSave(response) → triggers loadTemplates()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleFormSave = async (formData: any, uploadedFiles?: File[]) => {
+  const handleFormSave = async (formData: any, uploadedFiles?: File[], removedDocumentIds?: string[]) => {
     const rawName = formData instanceof FormData
       ? ((formData.get("name") ?? formData.get("audience_name") ?? "") as string)
       : ((formData?.name ?? formData?.audience_name ?? "") as string);
@@ -100,8 +131,8 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 
       // Step 1: Save the template — response contains the id
       let response;
-      if (mode === "edit" && initialData?.id) {
-        response = await TemplateService.updateTemplate(apiType, initialData.id, formData);
+      if (mode === "edit" && resolvedInitialData?.id) {
+        response = await TemplateService.updateTemplate(apiType, resolvedInitialData.id, formData);
       } else {
         response = await TemplateService.createTemplate(apiType, formData);
       }
@@ -110,10 +141,40 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
 
       // Step 2: Upload documents using the returned template id
       // FIX: Ensure templateId is always a string, handle both uuid and numeric ids
-      const templateId = response?.id ? String(response.id) : null;
+      const templateId = response?.id
+        ? String(response.id)
+        : (resolvedInitialData?.id ? String(resolvedInitialData.id) : null);
 
       console.log("📋 Template ID for document upload:", templateId);
       console.log("📁 Files to upload:", uploadedFiles?.length ?? 0);
+
+      if (templateId) {
+        const pendingDeleteIds = new Set<string>((removedDocumentIds || []).filter(Boolean));
+
+        if (mode === 'edit' && uploadedFiles && uploadedFiles.length > 0) {
+          try {
+            const existingDocuments = await TemplateService.getTemplateDocuments(apiType, templateId);
+            existingDocuments.forEach((doc) => {
+              if (doc.id !== undefined && doc.id !== null) {
+                pendingDeleteIds.add(String(doc.id));
+              }
+            });
+          } catch (docFetchErr) {
+            console.warn('Could not fetch existing documents before replacement:', docFetchErr);
+          }
+        }
+
+        if (pendingDeleteIds.size > 0) {
+          for (const documentId of pendingDeleteIds) {
+            try {
+              await TemplateService.deleteTemplateDocument(apiType, templateId, documentId);
+            } catch (deleteErr) {
+              console.error(`❌ Failed to delete document id=${documentId}`, deleteErr);
+              toast.warning(`Failed to delete previous file (id: ${documentId}).`);
+            }
+          }
+        }
+      }
 
       if (templateId && uploadedFiles && uploadedFiles.length > 0) {
         console.log(`📎 Uploading ${uploadedFiles.length} document(s) for template id=${templateId}`);
@@ -203,7 +264,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay}
-        <NewEmailTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as EmailTemplate | undefined} mode={mode} />
+        <NewEmailTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={resolvedInitialData as EmailTemplate | undefined} mode={mode} />
       </Dialog>
     );
   }
@@ -212,7 +273,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay}
-        <NewSMSTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as SMSTemplate | undefined} mode={mode} />
+        <NewSMSTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={resolvedInitialData as SMSTemplate | undefined} mode={mode} />
       </Dialog>
     );
   }
@@ -221,7 +282,7 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay}
-        <NewWhatsAppTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={initialData as WhatsAppTemplate | undefined} mode={mode} />
+        <NewWhatsAppTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={resolvedInitialData as WhatsAppTemplate | undefined} mode={mode} />
       </Dialog>
     );
   }

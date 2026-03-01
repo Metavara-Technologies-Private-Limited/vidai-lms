@@ -17,9 +17,18 @@ const normalizeLeadStatus = (status?: string | null): Status | null => {
 
   const value = status.toLowerCase().trim().replace(/[_\s]+/g, "-");
 
-  if (value === "new") return "New";
+  if (value === "new" || value === "new-lead" || value === "new-leads") return "New";
   if (value === "appointment" || value === "appointments") return "Appointment";
-  if (value === "follow-up" || value === "follow-ups" || value === "followup" || value === "followups") return "Follow-Ups";
+  if (
+    value === "follow-up" ||
+    value === "follow-ups" ||
+    value === "followup" ||
+    value === "followups" ||
+    value === "follow-up-lead" ||
+    value === "follow-up-leads"
+  ) {
+    return "Follow-Ups";
+  }
   if (value === "converted") return "Converted";
   if (value === "lost") return "Lost";
   if (value === "cycle-conversion" || value === "cycleconversion") return "Cycle Conversion";
@@ -36,8 +45,8 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
   const data = useMemo(() => {
     // These keys match your status values and visual order in the design
     const stages = [
-      { stage: "New Leads", key: "New" as Status, color: "#7e879d" },
-      { stage: "Converted Leads", key: "Converted" as Status, color: "#8a92a8" },
+      { stage: "Converted Leads", key: "Converted" as Status, color: "#7e879d" },
+      { stage: "New Leads", key: "New" as Status, color: "#8a92a8" },
       { stage: "Appointments", key: "Appointment" as Status, color: "#9ba3b5" },
       { stage: "Follow-Ups", key: "Follow-Ups" as Status, color: "#b8bdcc" },
       { stage: "Cycle Conversion", key: "Cycle Conversion" as Status, color: "#d1d4de" },

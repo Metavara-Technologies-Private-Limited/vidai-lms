@@ -68,6 +68,17 @@ export interface Template {
   createdBy?: string;
   type: TemplateType;
   body?: string;
+  documents?: TemplateDocument[];
+}
+
+export interface TemplateDocument {
+  id?: string | number;
+  file?: string;
+  file_url?: string;
+  url?: string;
+  name?: string;
+  filename?: string;
+  uploaded_at?: string;
 }
 
 /**
@@ -139,6 +150,7 @@ export interface FormTemplate {
   createdBy?: string;
   created_by_name?: string;
   modified_at?: string;
+  documents?: TemplateDocument[];
 }
 
 /**
@@ -146,7 +158,11 @@ export interface FormTemplate {
  */
 export interface NewEmailTemplateFormProps {
   onClose: () => void;
-  onSave: (template: FormTemplate | EmailTemplate | FormData) => void | Promise<void>;
+  onSave: (
+    template: FormTemplate | EmailTemplate | FormData,
+    uploadedFiles?: File[],
+    removedDocumentIds?: string[]
+  ) => void | Promise<void>;
   initialData?: FormTemplate | EmailTemplate;
   mode: 'create' | 'edit' | 'view';
 }
@@ -156,7 +172,11 @@ export interface NewEmailTemplateFormProps {
  */
 export interface NewSMSTemplateFormProps {
   onClose: () => void;
-  onSave: (template: FormTemplate | SMSTemplate | FormData) => void | Promise<void>;
+  onSave: (
+    template: FormTemplate | SMSTemplate | FormData,
+    uploadedFiles?: File[],
+    removedDocumentIds?: string[]
+  ) => void | Promise<void>;
   initialData?: FormTemplate | SMSTemplate;
   mode: 'create' | 'edit' | 'view';
 }
@@ -166,7 +186,11 @@ export interface NewSMSTemplateFormProps {
  */
 export interface NewWhatsAppTemplateFormProps {
   onClose: () => void;
-  onSave: (template: FormTemplate | WhatsAppTemplate | FormData) => void | Promise<void>;
+  onSave: (
+    template: FormTemplate | WhatsAppTemplate | FormData,
+    uploadedFiles?: File[],
+    removedDocumentIds?: string[]
+  ) => void | Promise<void>;
   initialData?: FormTemplate | WhatsAppTemplate;
   mode: 'create' | 'edit' | 'view';
 }
