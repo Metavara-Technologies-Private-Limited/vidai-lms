@@ -24,20 +24,16 @@ import {
   Button,
   TextField,
   Tooltip,
-<<<<<<< Updated upstream
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  Divider,
-  MenuItem,
-  Menu,
-=======
   Radio,
   RadioGroup,
   FormControlLabel,
   Divider,
->>>>>>> Stashed changes
+  MenuItem,
+  Menu,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -47,8 +43,6 @@ import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
-<<<<<<< Updated upstream
-=======
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import SendIcon from "@mui/icons-material/Send";
@@ -60,7 +54,6 @@ import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import FormatColorTextOutlinedIcon from "@mui/icons-material/FormatColorTextOutlined";
 import BrushOutlinedIcon from "@mui/icons-material/BrushOutlined";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
->>>>>>> Stashed changes
 
 import {
   fetchLeads,
@@ -354,7 +347,7 @@ const getUseCaseChipSx = (useCase: string | undefined) => {
   };
 };
 
-// ====================== New SMS Template Dialog (matches Figma) ======================
+// ====================== New SMS Template Dialog ======================
 interface NewSMSTemplateDialogProps {
   open: boolean;
   onClose: () => void;
@@ -363,7 +356,6 @@ interface NewSMSTemplateDialogProps {
 
 type TemplateFormView = "form" | "preview";
 
-// Suggested body text per use case — autofills when user picks a use case
 const USE_CASE_BODY_SUGGESTIONS: Record<string, string> = {
   Appointment:
     "Hi {lead_first_name}, your appointment at {clinic_name} is on {appointment_date} at {appointment_time}. Reply YES to confirm.",
@@ -408,7 +400,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
   const handleSelectUseCase = (uc: string) => {
     setUseCase(uc);
     setDropdownAnchor(null);
-    // Auto-suggest body only if body is empty — don't overwrite user's custom text
     if (!body.trim()) {
       setBody(USE_CASE_BODY_SUGGESTIONS[uc] || "");
     }
@@ -455,7 +446,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
     }
   };
 
-  /* ── shared button styles ── */
   const outlineBtn = {
     height: 40, px: 3, textTransform: "none" as const, fontWeight: 500,
     borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151",
@@ -477,7 +467,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
       PaperProps={{ sx: { borderRadius: "16px" } }}
       sx={{ zIndex: 1500 }}
     >
-      {/* ══════════════ FORM VIEW ══════════════ */}
       {view === "form" && (
         <>
           <DialogTitle sx={{
@@ -492,8 +481,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
 
           <DialogContent sx={{ pt: 2 }}>
             <Stack spacing={2}>
-
-              {/* ── Name ── */}
               <TextField
                 label="Name"
                 value={name}
@@ -504,13 +491,10 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
               />
 
-              {/* ── Use Case custom dropdown ── */}
               <Box>
                 <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>
                   Use Case
                 </Typography>
-
-                {/* Trigger box */}
                 <Box
                   onClick={(e) => setDropdownAnchor(e.currentTarget)}
                   sx={{
@@ -538,7 +522,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
                   }}>▼</Typography>
                 </Box>
 
-                {/* Options menu — portals to body, always above everything */}
                 <Menu
                   anchorEl={dropdownAnchor}
                   open={dropdownOpen}
@@ -573,7 +556,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
                 </Menu>
               </Box>
 
-              {/* ── Body ── */}
               <Box>
                 <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>
                   Body
@@ -635,7 +617,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
         </>
       )}
 
-      {/* ══════════════ PREVIEW VIEW ══════════════ */}
       {view === "preview" && (
         <>
           <DialogTitle sx={{
@@ -649,7 +630,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
           </DialogTitle>
 
           <DialogContent sx={{ pt: 2 }}>
-            {/* Template meta */}
             <Stack direction="row" spacing={1} alignItems="center" mb={2}>
               <Typography fontSize="13px" color="#64748B">Template:</Typography>
               <Typography fontSize="13px" fontWeight={600} color="#1E293B">{name}</Typography>
@@ -658,7 +638,6 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({
               )}
             </Stack>
 
-            {/* SMS bubble preview */}
             <Box sx={{
               bgcolor: "#F8FAFC", border: "1px solid #E2E8F0",
               borderRadius: "12px", p: 2, minHeight: 160,
@@ -752,8 +731,6 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({
 
   const handleNewTemplateSaved = (tpl: SMSTemplate) => {
     setNewTemplateOpen(false);
-    // Auto-select the newly saved template body into the SMS message field
-    // and close the picker entirely — no need to go back to the list
     onSelect(tpl.body);
     setSavedSnackbar(true);
     onClose();
@@ -761,12 +738,6 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({
 
   return (
     <>
-      {/*
-        NewSMSTemplateDialog is rendered OUTSIDE + BEFORE the picker Dialog.
-        This prevents MUI nested-Dialog z-index issues where the inner dialog
-        gets hidden behind the outer one's backdrop.
-        We give it sx zIndex 1500 (above MUI's default 1300) so it always shows on top.
-      */}
       <NewSMSTemplateDialog
         open={newTemplateOpen}
         onClose={() => setNewTemplateOpen(false)}
@@ -792,19 +763,12 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({
         PaperProps={{ sx: { borderRadius: "16px" } }}
         sx={{ zIndex: 1300 }}
       >
-        {/* ── LIST VIEW ── */}
         {view === "list" && (
           <>
-            <DialogTitle
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                fontWeight: 700,
-                fontSize: "1.05rem",
-                pb: 1,
-              }}
-            >
+            <DialogTitle sx={{
+              display: "flex", justifyContent: "space-between",
+              alignItems: "center", fontWeight: 700, fontSize: "1.05rem", pb: 1,
+            }}>
               Select SMS Template
               <IconButton size="small" onClick={onClose}>
                 <CloseIcon fontSize="small" />
@@ -828,122 +792,53 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({
                       <ListItem disablePadding>
                         <ListItemButton
                           onClick={() => handlePickTemplate(tpl)}
-                          sx={{
-                            borderRadius: "8px",
-                            px: 1.5,
-                            py: 1.25,
-                            "&:hover": { bgcolor: "#F8FAFC" },
-                          }}
+                          sx={{ borderRadius: "8px", px: 1.5, py: 1.25, "&:hover": { bgcolor: "#F8FAFC" } }}
                         >
                           <ListItemText
                             primary={
-                              <Stack
-                                direction="row"
-                                spacing={1}
-                                alignItems="center"
-                              >
-                                <Typography
-                                  fontSize="14px"
-                                  fontWeight={600}
-                                  color="#1E293B"
-                                >
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography fontSize="14px" fontWeight={600} color="#1E293B">
                                   {tpl.name}
                                 </Typography>
                                 {tpl.use_case && (
-                                  <Chip
-                                    label={tpl.use_case}
-                                    size="small"
-                                    sx={getUseCaseChipSx(tpl.use_case)}
-                                  />
+                                  <Chip label={tpl.use_case} size="small" sx={getUseCaseChipSx(tpl.use_case)} />
                                 )}
                               </Stack>
                             }
                             secondary={
-                              <Typography
-                                fontSize="12px"
-                                color="#64748B"
-                                sx={{
-                                  mt: 0.5,
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                }}
-                              >
+                              <Typography fontSize="12px" color="#64748B"
+                                sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                                 {tpl.body}
                               </Typography>
                             }
                           />
                         </ListItemButton>
                       </ListItem>
-                      {idx < templates.length - 1 && (
-                        <Divider sx={{ my: 0.25 }} />
-                      )}
+                      {idx < templates.length - 1 && <Divider sx={{ my: 0.25 }} />}
                     </React.Fragment>
                   ))}
                 </List>
               )}
             </DialogContent>
-            <DialogActions
-              sx={{
-                px: 3,
-                pb: 3,
-                pt: 2,
-                flexDirection: "column",
-                gap: 1,
-                alignItems: "stretch",
-              }}
-            >
-              {/* New Template button */}
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={() => setNewTemplateOpen(true)}
-                sx={{
-                  height: 44,
-                  textTransform: "none",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  borderRadius: "8px",
-                  borderColor: "#D1D5DB",
-                  color: "#374151",
-                  "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" },
-                }}
-              >
+            <DialogActions sx={{ px: 3, pb: 3, pt: 2, flexDirection: "column", gap: 1, alignItems: "stretch" }}>
+              <Button fullWidth variant="outlined" onClick={() => setNewTemplateOpen(true)}
+                sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>
                 + New Template
               </Button>
-              <Button
-                fullWidth
-                onClick={onClose}
-                sx={{
-                  height: 44,
-                  backgroundColor: "#F3F4F6",
-                  color: "black",
-                  fontWeight: 500,
-                  textTransform: "none",
-                  borderRadius: "8px",
-                  "&:hover": { backgroundColor: "#E5E7EB" },
-                }}
-              >
+              <Button fullWidth onClick={onClose}
+                sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>
                 Cancel
               </Button>
             </DialogActions>
           </>
         )}
 
-        {/* ── PREVIEW VIEW ── */}
         {view === "preview" && (
           <>
-            <DialogTitle
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                fontWeight: 700,
-                fontSize: "1.05rem",
-                pb: 1,
-              }}
-            >
+            <DialogTitle sx={{
+              display: "flex", justifyContent: "space-between",
+              alignItems: "center", fontWeight: 700, fontSize: "1.05rem", pb: 1,
+            }}>
               Preview Template
               <IconButton size="small" onClick={onClose}>
                 <CloseIcon fontSize="small" />
@@ -951,91 +846,41 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({
             </DialogTitle>
             <DialogContent sx={{ pt: 1 }}>
               <Stack spacing={2}>
-                {/* Template badge */}
                 {selected && (
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography fontSize="13px" color="#64748B">
-                      Template:
-                    </Typography>
-                    <Typography
-                      fontSize="13px"
-                      fontWeight={600}
-                      color="#1E293B"
-                    >
-                      {selected.name}
-                    </Typography>
+                    <Typography fontSize="13px" color="#64748B">Template:</Typography>
+                    <Typography fontSize="13px" fontWeight={600} color="#1E293B">{selected.name}</Typography>
                     {selected.use_case && (
-                      <Chip
-                        label={selected.use_case}
-                        size="small"
-                        sx={getUseCaseChipSx(selected.use_case)}
-                      />
+                      <Chip label={selected.use_case} size="small" sx={getUseCaseChipSx(selected.use_case)} />
                     )}
                   </Stack>
                 )}
 
-                {/* Chat bubble preview */}
-                <Box
-                  sx={{
-                    bgcolor: "#F8FAFC",
-                    border: "1px solid #E2E8F0",
-                    borderRadius: "12px",
-                    p: 2,
-                    minHeight: 120,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <Box
-                    sx={{
-                      alignSelf: "flex-start",
-                      bgcolor: "#FFFFFF",
-                      border: "1px solid #E2E8F0",
-                      borderRadius: "0px 12px 12px 12px",
-                      px: 2,
-                      py: 1.25,
-                      maxWidth: "90%",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <Typography
-                      fontSize="13px"
-                      color="#1E293B"
-                      sx={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}
-                    >
+                <Box sx={{
+                  bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", p: 2,
+                  minHeight: 120, display: "flex", flexDirection: "column", justifyContent: "flex-end",
+                }}>
+                  <Box sx={{
+                    alignSelf: "flex-start", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0",
+                    borderRadius: "0px 12px 12px 12px", px: 2, py: 1.25, maxWidth: "90%",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                  }}>
+                    <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
                       {previewBody.split(/(\{[^}]+\})/g).map((part, i) =>
                         /^\{[^}]+\}$/.test(part) ? (
-                          <Box
-                            key={i}
-                            component="span"
-                            sx={{ color: "#4F46E5", fontWeight: 500 }}
-                          >
-                            {part}
-                          </Box>
-                        ) : (
-                          part
-                        ),
+                          <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 500 }}>{part}</Box>
+                        ) : part
                       )}
                     </Typography>
                   </Box>
-                  <Typography
-                    fontSize="11px"
-                    color="#94A3B8"
-                    sx={{ mt: 0.75, alignSelf: "flex-end" }}
-                  >
-                    {new Date().toLocaleTimeString("en-IN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                  <Typography fontSize="11px" color="#94A3B8" sx={{ mt: 0.75, alignSelf: "flex-end" }}>
+                    {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                   </Typography>
                 </Box>
 
-                {/* Editable body */}
                 <TextField
                   label="Edit message before sending"
-                  multiline
-                  rows={4}
+                  multiline rows={4}
                   value={previewBody}
                   onChange={(e) => setPreviewBody(e.target.value)}
                   inputProps={{ maxLength: 1600 }}
@@ -1045,36 +890,12 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({
               </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-              <Button
-                fullWidth
-                onClick={() => setView("list")}
-                sx={{
-                  height: 44,
-                  backgroundColor: "#F3F4F6",
-                  color: "black",
-                  fontWeight: 500,
-                  textTransform: "none",
-                  borderRadius: "8px",
-                  "&:hover": { backgroundColor: "#E5E7EB" },
-                }}
-              >
+              <Button fullWidth onClick={() => setView("list")}
+                sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>
                 Back to Edit
               </Button>
-              <Button
-                fullWidth
-                onClick={handleSave}
-                disabled={!previewBody.trim()}
-                sx={{
-                  height: 44,
-                  backgroundColor: "#1F2937",
-                  color: "white",
-                  fontWeight: 500,
-                  textTransform: "none",
-                  borderRadius: "8px",
-                  "&:hover": { backgroundColor: "#111827" },
-                  "&:disabled": { backgroundColor: "#9CA3AF", color: "white" },
-                }}
-              >
+              <Button fullWidth onClick={handleSave} disabled={!previewBody.trim()}
+                sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>
                 Use Template
               </Button>
             </DialogActions>
@@ -1107,34 +928,19 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
   };
 
   const handleSend = async () => {
-    if (!message.trim()) {
-      setError("Message cannot be empty.");
-      return;
-    }
+    if (!message.trim()) { setError("Message cannot be empty."); return; }
     const phone = normalizePhone(lead?.contact_no);
-    if (!phone) {
-      setError("This lead has no contact number.");
-      return;
-    }
-    if (!lead?.id) {
-      setError("Lead ID is missing. Cannot send SMS.");
-      return;
-    }
+    if (!phone) { setError("This lead has no contact number."); return; }
+    if (!lead?.id) { setError("Lead ID is missing. Cannot send SMS."); return; }
     setSending(true);
     setError(null);
     try {
-      await TwilioAPI.sendSMS({
-        lead_uuid: lead.id,
-        to: phone,
-        message: message.trim(),
-      });
+      await TwilioAPI.sendSMS({ lead_uuid: lead.id, to: phone, message: message.trim() });
       setSuccess(true);
       setMessage("");
       onClose();
     } catch (err: unknown) {
-      setError(
-        extractErrorMessage(err, "Failed to send SMS. Please try again."),
-      );
+      setError(extractErrorMessage(err, "Failed to send SMS. Please try again."));
     } finally {
       setSending(false);
     }
@@ -1142,10 +948,6 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
 
   return (
     <>
-      {/*
-        SMSTemplatePicker rendered BEFORE main dialog — same top-level fragment trick.
-        It closes and reopens the send dialog by controlling `open && !templatePickerOpen`.
-      */}
       <SMSTemplatePicker
         open={templatePickerOpen}
         onClose={() => setTemplatePickerOpen(false)}
@@ -1166,134 +968,45 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
 
         <DialogContent sx={{ pt: 1 }}>
           <Stack spacing={2}>
-            {/* Lead info */}
-            <Box
-              sx={{
-                backgroundColor: "#F8FAFC",
-                borderRadius: "10px",
-                px: 2,
-                py: 1.5,
-                border: "1px solid #E2E8F0",
-              }}
-            >
-              <Typography variant="body2" color="text.secondary" fontSize="12px">
-                Sending to
-              </Typography>
-              <Typography fontWeight={600} fontSize="14px">
-                {lead?.full_name || lead?.name || "Unknown"}
-              </Typography>
-              <Typography color="text.secondary" fontSize="13px">
-                {lead?.contact_no || "No number"}
-              </Typography>
+            <Box sx={{ backgroundColor: "#F8FAFC", borderRadius: "10px", px: 2, py: 1.5, border: "1px solid #E2E8F0" }}>
+              <Typography variant="body2" color="text.secondary" fontSize="12px">Sending to</Typography>
+              <Typography fontWeight={600} fontSize="14px">{lead?.full_name || lead?.name || "Unknown"}</Typography>
+              <Typography color="text.secondary" fontSize="13px">{lead?.contact_no || "No number"}</Typography>
             </Box>
 
-            {/* Message textarea */}
             <TextField
-              label="Message"
-              multiline
-              rows={4}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={sending}
-              placeholder="Type your message here..."
-              inputProps={{ maxLength: 1600 }}
-              helperText={`${message.length}/1600`}
+              label="Message" multiline rows={4}
+              value={message} onChange={(e) => setMessage(e.target.value)}
+              disabled={sending} placeholder="Type your message here..."
+              inputProps={{ maxLength: 1600 }} helperText={`${message.length}/1600`}
               sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
             />
 
-            {error && (
-              <Alert severity="error" sx={{ borderRadius: "8px" }}>
-                {error}
-              </Alert>
-            )}
+            {error && <Alert severity="error" sx={{ borderRadius: "8px" }}>{error}</Alert>}
           </Stack>
         </DialogContent>
 
-        <DialogActions
-          sx={{
-            px: 3,
-            pb: 3,
-            pt: 0,
-            flexDirection: "column",
-            gap: 1,
-            alignItems: "stretch",
-          }}
-        >
-          {/* Row 1 — SMS Template button */}
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={() => setTemplatePickerOpen(true)}
-            disabled={sending}
-            sx={{
-              height: 44,
-              textTransform: "none",
-              fontSize: "14px",
-              fontWeight: 500,
-              borderRadius: "8px",
-              borderColor: "#D1D5DB",
-              color: "#374151",
-              "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" },
-            }}
-          >
+        <DialogActions sx={{ px: 3, pb: 3, pt: 0, flexDirection: "column", gap: 1, alignItems: "stretch" }}>
+          <Button fullWidth variant="outlined" onClick={() => setTemplatePickerOpen(true)} disabled={sending}
+            sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>
             SMS Template
           </Button>
-
-          {/* Row 2 — Cancel | Send SMS */}
           <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
-            <Button
-              fullWidth
-              onClick={handleClose}
-              disabled={sending}
-              sx={{
-                height: 44,
-                backgroundColor: "#F3F4F6",
-                color: "black",
-                fontWeight: 500,
-                textTransform: "none",
-                borderRadius: "8px",
-                "&:hover": { backgroundColor: "#E5E7EB" },
-              }}
-            >
+            <Button fullWidth onClick={handleClose} disabled={sending}
+              sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>
               Cancel
             </Button>
-            <Button
-              fullWidth
-              onClick={handleSend}
-              disabled={sending || !message.trim()}
-              startIcon={
-                sending ? (
-                  <CircularProgress size={16} sx={{ color: "white" }} />
-                ) : null
-              }
-              sx={{
-                height: 44,
-                backgroundColor: "#1F2937",
-                color: "white",
-                fontWeight: 500,
-                textTransform: "none",
-                borderRadius: "8px",
-                "&:hover": { backgroundColor: "#111827" },
-                "&:disabled": { backgroundColor: "#9CA3AF", color: "white" },
-              }}
-            >
+            <Button fullWidth onClick={handleSend} disabled={sending || !message.trim()}
+              startIcon={sending ? <CircularProgress size={16} sx={{ color: "white" }} /> : null}
+              sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>
               {sending ? "Sending..." : "Send SMS"}
             </Button>
           </Stack>
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={success}
-        autoHideDuration={3000}
-        onClose={() => setSuccess(false)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          onClose={() => setSuccess(false)}
-          severity="success"
-          sx={{ borderRadius: "10px" }}
-        >
+      <Snackbar open={success} autoHideDuration={3000} onClose={() => setSuccess(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Alert onClose={() => setSuccess(false)} severity="success" sx={{ borderRadius: "10px" }}>
           SMS sent to {lead?.full_name || lead?.name}!
         </Alert>
       </Snackbar>
@@ -1396,6 +1109,108 @@ Crysta IVF, Banglore`,
   },
 ];
 
+// ====================== Emoji Picker Popover ======================
+const EMOJI_LIST = [
+  "😊","😀","😂","🥰","😍","🤔","😎","🙏","👍","👏",
+  "❤️","🎉","🔥","✅","⭐","📋","📅","💊","🏥","🩺",
+  "💉","🧬","🌸","🌟","💙","📞","📧","🕐","✉️","📝",
+];
+
+interface EmojiPickerProps {
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
+  onSelect: (emoji: string) => void;
+}
+
+const EmojiPicker: React.FC<EmojiPickerProps> = ({ anchorEl, onClose, onSelect }) => (
+  <Menu
+    anchorEl={anchorEl}
+    open={Boolean(anchorEl)}
+    onClose={onClose}
+    PaperProps={{
+      sx: { borderRadius: "12px", p: 1, boxShadow: "0 8px 30px rgba(0,0,0,0.15)", width: 220 },
+    }}
+  >
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.25 }}>
+      {EMOJI_LIST.map((emoji) => (
+        <Box
+          key={emoji}
+          onClick={() => { onSelect(emoji); onClose(); }}
+          sx={{
+            width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "18px", cursor: "pointer", borderRadius: "6px",
+            "&:hover": { bgcolor: "#F1F5F9" }, transition: "background 0.1s",
+          }}
+        >
+          {emoji}
+        </Box>
+      ))}
+    </Box>
+  </Menu>
+);
+
+// ====================== Format Menu Popover ======================
+interface FormatMenuProps {
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
+  onFormat: (type: string) => void;
+}
+
+const FormatMenu: React.FC<FormatMenuProps> = ({ anchorEl, onClose, onFormat }) => (
+  <Menu
+    anchorEl={anchorEl}
+    open={Boolean(anchorEl)}
+    onClose={onClose}
+    PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 160 } }}
+  >
+    {[
+      { label: "Bold", wrap: ["**", "**"], shortcut: "Ctrl+B" },
+      { label: "Italic", wrap: ["_", "_"], shortcut: "Ctrl+I" },
+      { label: "Underline", wrap: ["__", "__"], shortcut: "Ctrl+U" },
+      { label: "Strikethrough", wrap: ["~~", "~~"], shortcut: "" },
+      { label: "Bullet list", wrap: ["\n• ", ""], shortcut: "" },
+      { label: "Numbered list", wrap: ["\n1. ", ""], shortcut: "" },
+      { label: "Quote", wrap: ["\n> ", ""], shortcut: "" },
+      { label: "Code", wrap: ["`", "`"], shortcut: "" },
+    ].map(({ label, shortcut }) => (
+      <MenuItem
+        key={label}
+        onClick={() => { onFormat(label); onClose(); }}
+        sx={{ fontSize: "13px", py: 1, display: "flex", justifyContent: "space-between", gap: 2 }}
+      >
+        <span>{label}</span>
+        {shortcut && <Typography fontSize="11px" color="text.secondary">{shortcut}</Typography>}
+      </MenuItem>
+    ))}
+  </Menu>
+);
+
+// ====================== More Menu Popover ======================
+interface MoreMenuProps {
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
+  onAction: (action: string) => void;
+}
+
+const MoreMenu: React.FC<MoreMenuProps> = ({ anchorEl, onClose, onAction }) => (
+  <Menu
+    anchorEl={anchorEl}
+    open={Boolean(anchorEl)}
+    onClose={onClose}
+    PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 180 } }}
+  >
+    {["Insert signature", "Insert divider", "Insert table", "Clear formatting"].map((action) => (
+      <MenuItem
+        key={action}
+        onClick={() => { onAction(action); onClose(); }}
+        sx={{ fontSize: "13px", py: 1 }}
+      >
+        {action}
+      </MenuItem>
+    ))}
+  </Menu>
+);
+
 // ====================== Email Dialog ======================
 interface EmailDialogProps {
   open: boolean;
@@ -1412,6 +1227,63 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
 
+  // Toolbar popover anchors
+  const [emojiAnchor, setEmojiAnchor]   = React.useState<HTMLElement | null>(null);
+  const [formatAnchor, setFormatAnchor] = React.useState<HTMLElement | null>(null);
+  const [moreAnchor, setMoreAnchor]     = React.useState<HTMLElement | null>(null);
+
+  // Hidden file inputs
+  const fileInputRef  = React.useRef<HTMLInputElement>(null);
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Cursor tracking for body textarea
+  const bodyRef    = React.useRef<HTMLTextAreaElement>(null);
+  const cursorPos  = React.useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  const saveCursor = () => {
+    const el = bodyRef.current;
+    if (el) cursorPos.current = { start: el.selectionStart, end: el.selectionEnd };
+  };
+
+  /** Insert text at cursor position and restore focus */
+  const insertAtCursor = React.useCallback((text: string) => {
+    const { start, end } = cursorPos.current;
+    setBody((prev) => {
+      const next = prev.substring(0, start) + text + prev.substring(end);
+      // Restore cursor after React re-renders
+      requestAnimationFrame(() => {
+        const el = bodyRef.current;
+        if (el) {
+          el.focus();
+          el.setSelectionRange(start + text.length, start + text.length);
+          cursorPos.current = { start: start + text.length, end: start + text.length };
+        }
+      });
+      return next;
+    });
+  }, []);
+
+  /** Wrap selected text (or placeholder) with before/after markers */
+  const wrapSelection = React.useCallback((before: string, after: string, placeholder = "text") => {
+    const { start, end } = cursorPos.current;
+    setBody((prev) => {
+      const selected = prev.substring(start, end) || placeholder;
+      const wrapped  = before + selected + after;
+      const next     = prev.substring(0, start) + wrapped + prev.substring(end);
+      requestAnimationFrame(() => {
+        const el = bodyRef.current;
+        if (el) {
+          el.focus();
+          const newStart = start + before.length;
+          const newEnd   = newStart + selected.length;
+          el.setSelectionRange(newStart, newEnd);
+          cursorPos.current = { start: newStart, end: newEnd };
+        }
+      });
+      return next;
+    });
+  }, []);
+
   React.useEffect(() => {
     if (open) {
       setStep("template");
@@ -1420,6 +1292,9 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
       setBody("");
       setError(null);
       setSending(false);
+      setEmojiAnchor(null);
+      setFormatAnchor(null);
+      setMoreAnchor(null);
     }
   }, [open]);
 
@@ -1448,20 +1323,11 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
 
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) return;
-    if (!lead?.email) {
-      setError("This lead has no email address.");
-      return;
-    }
+    if (!lead?.email) { setError("This lead has no email address."); return; }
     setSending(true);
     setError(null);
     try {
-      // TODO: Replace with your actual API call:
-      // await EmailAPI.sendEmail({
-      //   lead_uuid: lead.id,
-      //   to: lead.email,
-      //   subject: subject.trim(),
-      //   body: body.trim(),
-      // });
+      // TODO: Replace with your actual API call
       await new Promise((res) => setTimeout(res, 1200));
       setSuccess(true);
       onClose();
@@ -1472,25 +1338,88 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     }
   };
 
-  const toolbarItems = [
-    { icon: <AttachFileIcon sx={{ fontSize: 18 }} />, title: "Attach file" },
-    { icon: <LinkIcon sx={{ fontSize: 18 }} />, title: "Insert link" },
-    { icon: <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />, title: "Emoji" },
-    { icon: <ImageOutlinedIcon sx={{ fontSize: 18 }} />, title: "Image" },
-    { icon: <FormatColorTextOutlinedIcon sx={{ fontSize: 18 }} />, title: "Format text" },
-    { icon: <BrushOutlinedIcon sx={{ fontSize: 18 }} />, title: "Draw" },
-    { icon: <AddCircleOutlineIcon sx={{ fontSize: 18 }} />, title: "More" },
-  ];
+  // ── Toolbar handlers ──────────────────────────────────────────
+
+  const handleAttach = () => fileInputRef.current?.click();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    saveCursor();
+    const names = files.map((f) => f.name).join(", ");
+    insertAtCursor(`\n[📎 Attachment: ${names}]\n`);
+    e.target.value = "";
+  };
+
+  const handleImageAttach = () => imageInputRef.current?.click();
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    saveCursor();
+    insertAtCursor(`\n[🖼 Image: ${file.name}]\n`);
+    e.target.value = "";
+  };
+
+  const handleInsertLink = () => {
+    saveCursor();
+    const url   = window.prompt("Enter URL:", "https://");
+    if (!url) return;
+    const label = window.prompt("Link label:", "Click here") || url;
+    insertAtCursor(`[${label}](${url})`);
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    saveCursor();
+    insertAtCursor(emoji);
+  };
+
+  const handleFormat = (type: string) => {
+    saveCursor();
+    const formats: Record<string, [string, string, string?]> = {
+      "Bold":           ["**", "**", "bold text"],
+      "Italic":         ["_", "_", "italic text"],
+      "Underline":      ["__", "__", "underlined text"],
+      "Strikethrough":  ["~~", "~~", "strikethrough"],
+      "Bullet list":    ["\n• ", "", "item"],
+      "Numbered list":  ["\n1. ", "", "item"],
+      "Quote":          ["\n> ", "", "quote"],
+      "Code":           ["`", "`", "code"],
+    };
+    const fmt = formats[type];
+    if (fmt) wrapSelection(fmt[0], fmt[1], fmt[2]);
+  };
+
+  const handleMoreAction = (action: string) => {
+    saveCursor();
+    const snippets: Record<string, string> = {
+      "Insert signature": `\n\n---\nWarm regards,\nCrysta IVF, Bangalore\n(935) 555-0128 | crysta@gmail.com`,
+      "Insert divider":   "\n\n---\n\n",
+      "Insert table":     "\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n",
+      "Clear formatting": "",
+    };
+    if (action === "Clear formatting") {
+      // Strip common markdown markers from the whole body
+      setBody((prev) => prev.replace(/(\*\*|__|~~|_|`)/g, ""));
+    } else {
+      insertAtCursor(snippets[action] || "");
+    }
+  };
 
   return (
     <>
-      <Dialog
-        open={open}
-        onClose={handleClose}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}
-      >
+      {/* Hidden file inputs */}
+      <input ref={fileInputRef}  type="file" multiple style={{ display: "none" }} onChange={handleFileChange} />
+      <input ref={imageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageChange} />
+
+      {/* Emoji / Format / More popovers — rendered outside Dialog to avoid z-index issues */}
+      <EmojiPicker  anchorEl={emojiAnchor}  onClose={() => setEmojiAnchor(null)}  onSelect={handleEmojiSelect} />
+      <FormatMenu   anchorEl={formatAnchor} onClose={() => setFormatAnchor(null)} onFormat={handleFormat} />
+      <MoreMenu     anchorEl={moreAnchor}   onClose={() => setMoreAnchor(null)}   onAction={handleMoreAction} />
+
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}>
+
         {/* ====== STEP 1: Template Selection ====== */}
         {step === "template" && (
           <>
@@ -1500,10 +1429,8 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
             </DialogTitle>
 
             <DialogContent sx={{ pt: 1, pb: 0 }}>
-              <Box
-                onClick={handleComposeNew}
-                sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, py: 1.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}
-              >
+              <Box onClick={handleComposeNew}
+                sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, py: 1.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}>
                 <EditOutlinedIcon sx={{ fontSize: 18, color: "#475569" }} />
                 <Typography fontWeight={600} fontSize="14px" color="#475569">Compose New Email</Typography>
               </Box>
@@ -1519,16 +1446,11 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
               <RadioGroup value={selectedTemplateId || ""} onChange={(e) => setSelectedTemplateId(e.target.value)}>
                 <Stack spacing={0} divider={<Divider />}>
                   {EMAIL_TEMPLATES.map((template) => (
-                    <Box
-                      key={template.id}
-                      onClick={() => setSelectedTemplateId(template.id)}
-                      sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1.5, px: 0.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}
-                    >
+                    <Box key={template.id} onClick={() => setSelectedTemplateId(template.id)}
+                      sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1.5, px: 0.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}>
                       <FormControlLabel
                         value={template.id}
-                        control={
-                          <Radio size="small" sx={{ color: selectedTemplateId === template.id ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }} />
-                        }
+                        control={<Radio size="small" sx={{ color: selectedTemplateId === template.id ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }} />}
                         label={
                           <Box>
                             <Typography fontWeight={600} fontSize="13.5px" color="#1E293B">{template.name}</Typography>
@@ -1549,7 +1471,8 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
             </DialogContent>
 
             <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
-              <Button onClick={handleClose} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
+              <Button onClick={handleClose}
+                sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
                 Cancel
               </Button>
               <Button onClick={handleNext} disabled={!selectedTemplateId} variant="contained"
@@ -1598,13 +1521,31 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                   />
                 </Box>
 
-                {/* Body */}
+                {/* Body — native textarea so cursor tracking works reliably */}
                 <Box sx={{ py: 1.5 }}>
-                  <TextField
-                    fullWidth multiline minRows={10} maxRows={16} variant="standard"
-                    value={body} onChange={(e) => setBody(e.target.value)} disabled={sending}
-                    InputProps={{ disableUnderline: true, sx: { fontSize: "13px", lineHeight: 1.7 } }}
+                  <textarea
+                    ref={bodyRef}
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    onSelect={saveCursor}
+                    onKeyUp={saveCursor}
+                    onMouseUp={saveCursor}
+                    disabled={sending}
                     placeholder="Write your email..."
+                    rows={12}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      resize: "vertical",
+                      border: "none",
+                      outline: "none",
+                      fontSize: "13px",
+                      lineHeight: 1.7,
+                      fontFamily: "inherit",
+                      color: "#1E293B",
+                      background: "transparent",
+                      padding: 0,
+                    }}
                   />
                 </Box>
 
@@ -1613,22 +1554,76 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
             </DialogContent>
 
             <DialogActions sx={{ px: 3, pb: 3, pt: 1, flexDirection: "column", gap: 0 }}>
-              {/* Toolbar */}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1.5, width: "100%", borderTop: "1px solid #E5E7EB", pt: 1.5 }}>
-                {toolbarItems.map((item, idx) => (
-                  <Tooltip key={idx} title={item.title}>
-                    <IconButton size="small" sx={{ color: "#64748B" }}>{item.icon}</IconButton>
-                  </Tooltip>
-                ))}
+              {/* ── Toolbar ── */}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, mb: 1.5, width: "100%", borderTop: "1px solid #E5E7EB", pt: 1.5, flexWrap: "wrap" }}>
+
+                {/* Attach file */}
+                <Tooltip title="Attach file">
+                  <IconButton size="small" onClick={handleAttach} sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}>
+                    <AttachFileIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {/* Insert link */}
+                <Tooltip title="Insert link">
+                  <IconButton size="small" onClick={handleInsertLink} sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}>
+                    <LinkIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {/* Emoji picker */}
+                <Tooltip title="Emoji">
+                  <IconButton size="small"
+                    onClick={(e) => { saveCursor(); setEmojiAnchor(e.currentTarget); }}
+                    sx={{ color: emojiAnchor ? "#F59E0B" : "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#F59E0B" } }}>
+                    <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {/* Image */}
+                <Tooltip title="Insert image">
+                  <IconButton size="small" onClick={handleImageAttach} sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}>
+                    <ImageOutlinedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {/* Format text */}
+                <Tooltip title="Format text">
+                  <IconButton size="small"
+                    onClick={(e) => { saveCursor(); setFormatAnchor(e.currentTarget); }}
+                    sx={{ color: formatAnchor ? "#6366F1" : "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#6366F1" } }}>
+                    <FormatColorTextOutlinedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {/* Draw / highlight */}
+                <Tooltip title="Highlight">
+                  <IconButton size="small"
+                    onClick={() => { saveCursor(); wrapSelection("==", "==", "highlighted text"); }}
+                    sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}>
+                    <BrushOutlinedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {/* More */}
+                <Tooltip title="More options">
+                  <IconButton size="small"
+                    onClick={(e) => { saveCursor(); setMoreAnchor(e.currentTarget); }}
+                    sx={{ color: moreAnchor ? "#10B981" : "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#10B981" } }}>
+                    <AddCircleOutlineIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
               </Box>
 
-              {/* Buttons */}
+              {/* ── Action buttons ── */}
               <Box sx={{ display: "flex", gap: 1, width: "100%", justifyContent: "flex-end" }}>
                 <Button onClick={handleClose} disabled={sending}
                   sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
                   Cancel
                 </Button>
-                <Button onClick={() => console.log("Save as template:", { subject, body })} disabled={sending}
+                <Button
+                  onClick={() => console.log("Save as template:", { subject, body })}
+                  disabled={sending}
                   startIcon={<BookmarkBorderIcon fontSize="small" />}
                   sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 2, "&:hover": { bgcolor: "#F3F4F6" } }}>
                   Save as Template
@@ -1669,10 +1664,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const [callLead, setCallLead] = React.useState<ProcessedLead | null>(null);
   const [smsLead, setSmsLead] = React.useState<ProcessedLead | null>(null);
   const [emailLead, setEmailLead] = React.useState<ProcessedLead | null>(null);
-  const [callSnackbar, setCallSnackbar] = React.useState<{
-    open: boolean;
-    message: string;
-  }>({ open: false, message: "" });
+  const [callSnackbar, setCallSnackbar] = React.useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
   React.useEffect(() => {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
@@ -1707,37 +1699,20 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   }, [leads]);
 
   const toggleSelect = (id: string) =>
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   const isSelected = (id: string) => selectedIds.includes(id);
 
   const handleCallOpen = async (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
     const phone = normalizePhone(lead.contact_no);
-    if (!phone) {
-      setCallSnackbar({
-        open: true,
-        message: "No contact number for this lead.",
-      });
-      return;
-    }
-    if (!lead.id) {
-      setCallSnackbar({
-        open: true,
-        message: "Lead ID is missing. Cannot initiate call.",
-      });
-      return;
-    }
+    if (!phone) { setCallSnackbar({ open: true, message: "No contact number for this lead." }); return; }
+    if (!lead.id) { setCallSnackbar({ open: true, message: "Lead ID is missing. Cannot initiate call." }); return; }
     setCallLead(lead);
     try {
       await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
     } catch (err: unknown) {
       setCallLead(null);
-      setCallSnackbar({
-        open: true,
-        message: extractErrorMessage(err, "Failed to initiate call."),
-      });
+      setCallSnackbar({ open: true, message: extractErrorMessage(err, "Failed to initiate call.") });
     }
   };
 
@@ -1748,24 +1723,12 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
 
   const filteredLeads = React.useMemo(() => {
     return localLeads.filter((lead: ProcessedLead) => {
-      const searchStr =
-        `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
+      const searchStr = `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
-      const matchTab =
-        tab === "archived"
-          ? lead.is_active === false
-          : lead.is_active !== false;
+      const matchTab = tab === "archived" ? lead.is_active === false : lead.is_active !== false;
       if (filters) {
-        if (
-          filters.department &&
-          lead.department_id !== Number(filters.department)
-        )
-          return false;
-        if (
-          filters.assignee &&
-          lead.assigned_to_id !== Number(filters.assignee)
-        )
-          return false;
+        if (filters.department && lead.department_id !== Number(filters.department)) return false;
+        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) return false;
         if (filters.status) {
           const ls = (lead.lead_status || lead.status || "").toLowerCase();
           if (ls !== filters.status.toLowerCase()) return false;
@@ -1802,12 +1765,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
     if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [totalPages, page]);
 
-  const currentLeads = filteredLeads.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage,
-  );
-  const startEntry =
-    totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
+  const currentLeads = filteredLeads.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
   const handleBulkDelete = () => {
@@ -1815,24 +1774,13 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
     setSelectedIds([]);
   };
   const handleBulkArchive = (archive: boolean) => {
-    setLocalLeads((p) =>
-      p.map((l) =>
-        selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l,
-      ),
-    );
+    setLocalLeads((p) => p.map((l) => selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l));
     setSelectedIds([]);
   };
 
   if (loading)
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
           <Typography color="text.secondary">Loading leads...</Typography>
@@ -1845,20 +1793,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       <Alert severity="error" sx={{ mb: 3 }}>
         <Typography fontWeight={600}>Failed to load leads</Typography>
         <Typography variant="body2">{error}</Typography>
-        <Typography
-          variant="body2"
-          sx={{
-            mt: 1,
-            color: "primary.main",
-            cursor: "pointer",
-            textDecoration: "underline",
-          }}
-          onClick={() =>
-            dispatch(
-              fetchLeads() as unknown as Parameters<typeof dispatch>[0],
-            )
-          }
-        >
+        <Typography variant="body2"
+          sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
+          onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}>
           Try again
         </Typography>
       </Alert>
@@ -1866,22 +1803,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
 
   if (localLeads.length === 0)
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
-          <Typography variant="h6" color="text.secondary">
-            No leads found
-          </Typography>
+          <Typography variant="h6" color="text.secondary">No leads found</Typography>
           <Typography variant="body2" color="text.secondary">
-            {tab === "archived"
-              ? "No archived leads yet"
-              : "Create your first lead to get started"}
+            {tab === "archived" ? "No archived leads yet" : "Create your first lead to get started"}
           </Typography>
         </Stack>
       </Box>
@@ -1889,14 +1815,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
 
   if (filteredLeads.length === 0)
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
           <Typography variant="h6" color="text.secondary">
             No {tab === "archived" ? "archived" : "active"} leads found
@@ -1904,12 +1823,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
           <Typography variant="body2" color="text.secondary">
             {search
               ? `No results for "${search}"`
-              : filters &&
-                  Object.values(filters).some((v) => v !== "" && v !== null)
+              : filters && Object.values(filters).some((v) => v !== "" && v !== null)
                 ? "No leads match the selected filters"
-                : tab === "archived"
-                  ? "No archived leads yet"
-                  : "No active leads"}
+                : tab === "archived" ? "No archived leads yet" : "No active leads"}
           </Typography>
         </Stack>
       </Box>
@@ -1917,12 +1833,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
 
   return (
     <>
-      <TableContainer
-        component={Paper}
-        elevation={0}
-        className="leads-table"
-        sx={{ overflowX: "auto" }}
-      >
+      <TableContainer component={Paper} elevation={0} className="leads-table" sx={{ overflowX: "auto" }}>
         <Table stickyHeader sx={{ minWidth: 1200 }}>
           <TableHead>
             <TableRow>
@@ -1932,13 +1843,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                     currentLeads.some((l) => selectedIds.includes(l.id)) &&
                     !currentLeads.every((l) => selectedIds.includes(l.id))
                   }
-                  checked={
-                    currentLeads.length > 0 &&
-                    currentLeads.every((l) => selectedIds.includes(l.id))
-                  }
+                  checked={currentLeads.length > 0 && currentLeads.every((l) => selectedIds.includes(l.id))}
                   onChange={(e) => {
-                    if (e.target.checked)
-                      setSelectedIds(currentLeads.map((l) => l.id));
+                    if (e.target.checked) setSelectedIds(currentLeads.map((l) => l.id));
                     else setSelectedIds([]);
                   }}
                 />
@@ -1954,9 +1861,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
               <TableCell>Task Type</TableCell>
               <TableCell>Task Status</TableCell>
               <TableCell>Activity</TableCell>
-              <TableCell align="center" sx={stickyHeaderContactStyle}>
-                Contact Option
-              </TableCell>
+              <TableCell align="center" sx={stickyHeaderContactStyle}>Contact Option</TableCell>
               <TableCell align="center" sx={stickyHeaderMenuStyle} />
             </TableRow>
           </TableHead>
@@ -1966,53 +1871,32 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
               <TableRow
                 key={lead.id}
                 sx={{ cursor: "pointer" }}
-                onClick={() =>
-                  navigate(
-                    `/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`,
-                  )
-                }
+                onClick={() => navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)}
                 className={isSelected(lead.id) ? "row-selected" : ""}
               >
-                <TableCell
-                  padding="checkbox"
-                  className="checkbox-cell"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Checkbox
-                    checked={isSelected(lead.id)}
-                    onChange={() => toggleSelect(lead.id)}
-                  />
+                <TableCell padding="checkbox" className="checkbox-cell" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox checked={isSelected(lead.id)} onChange={() => toggleSelect(lead.id)} />
                 </TableCell>
 
                 <TableCell>
                   <Stack direction="row" spacing={2} alignItems="center">
                     <Avatar className="lead-avatar">
-                      {lead.initials ||
-                        lead.full_name?.charAt(0)?.toUpperCase()}
+                      {lead.initials || lead.full_name?.charAt(0)?.toUpperCase()}
                     </Avatar>
                     <Box>
-                      <Typography className="lead-name-text">
-                        {lead.full_name}
-                      </Typography>
-                      <Typography className="lead-id-text">
-                        {lead.displayId}
-                      </Typography>
+                      <Typography className="lead-name-text">{lead.full_name}</Typography>
+                      <Typography className="lead-id-text">{lead.displayId}</Typography>
                     </Box>
                   </Stack>
                 </TableCell>
 
                 <TableCell>
                   <Typography className="lead-date">
-                    {lead.created_at
-                      ? new Date(lead.created_at).toLocaleDateString("en-GB")
-                      : "N/A"}
+                    {lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-GB") : "N/A"}
                   </Typography>
                   <Typography className="lead-time">
                     {lead.created_at
-                      ? new Date(lead.created_at).toLocaleTimeString("en-IN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                      ? new Date(lead.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
                       : "N/A"}
                   </Typography>
                 </TableCell>
@@ -2021,94 +1905,55 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                 <TableCell>{lead.source || "N/A"}</TableCell>
 
                 <TableCell>
-                  <Chip
-                    label={lead.status}
-                    size="small"
-                    sx={getStatusChipSx(lead.status ?? "")}
-                  />
+                  <Chip label={lead.status} size="small" sx={getStatusChipSx(lead.status ?? "")} />
                 </TableCell>
 
                 <TableCell>
-                  <Chip
-                    label={lead.quality}
-                    size="small"
-                    className={`lead-chip quality-${lead.quality?.toLowerCase()}`}
-                  />
+                  <Chip label={lead.quality} size="small" className={`lead-chip quality-${lead.quality?.toLowerCase()}`} />
                 </TableCell>
 
                 <TableCell className="score">
-                  {String(lead.score || 0).includes("%")
-                    ? lead.score
-                    : `${lead.score || 0}%`}
+                  {String(lead.score || 0).includes("%") ? lead.score : `${lead.score || 0}%`}
                 </TableCell>
 
                 <TableCell>{lead.assigned}</TableCell>
 
                 <TableCell>
-                  <Typography
-                    sx={{
-                      fontSize: "13px",
-                      color: lead.taskType ? "#1E293B" : "#94A3B8",
-                      fontWeight: lead.taskType ? 500 : 400,
-                    }}
-                  >
+                  <Typography sx={{ fontSize: "13px", color: lead.taskType ? "#1E293B" : "#94A3B8", fontWeight: lead.taskType ? 500 : 400 }}>
                     {lead.taskType || "—"}
                   </Typography>
                 </TableCell>
 
                 <TableCell>
                   {lead.taskStatus ? (
-                    <Chip
-                      label={lead.taskStatus}
-                      size="small"
-                      sx={getTaskStatusChipSx(lead.taskStatus)}
-                    />
+                    <Chip label={lead.taskStatus} size="small" sx={getTaskStatusChipSx(lead.taskStatus)} />
                   ) : (
-                    <Typography sx={{ fontSize: "13px", color: "#94A3B8" }}>
-                      —
-                    </Typography>
+                    <Typography sx={{ fontSize: "13px", color: "#94A3B8" }}>—</Typography>
                   )}
                 </TableCell>
 
                 <TableCell
                   sx={{ color: "primary.main", fontWeight: 700 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate("/leads/activity", { state: { lead } });
-                  }}
+                  onClick={(e) => { e.stopPropagation(); navigate("/leads/activity", { state: { lead } }); }}
                 >
                   {lead.activity || "View Activity"}
                 </TableCell>
 
-                <TableCell
-                  align="center"
-                  sx={stickyContactStyle}
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <TableCell align="center" sx={stickyContactStyle} onClick={(e) => e.stopPropagation()}>
                   <Stack direction="row" spacing={1} justifyContent="center">
                     <Tooltip title={`Call ${lead.contact_no || "N/A"}`}>
                       <span>
-                        <IconButton
-                          className="action-btn"
-                          size="small"
-                          onClick={(e) => handleCallOpen(e, lead)}
-                        >
+                        <IconButton className="action-btn" size="small" onClick={(e) => handleCallOpen(e, lead)}>
                           <PhoneIcon fontSize="small" />
                         </IconButton>
                       </span>
                     </Tooltip>
                     <Tooltip title={`SMS ${lead.contact_no || "N/A"}`}>
-                      <IconButton
-                        className="action-btn"
-                        size="small"
-                        onClick={(e) => handleSMSOpen(e, lead)}
-                      >
+                      <IconButton className="action-btn" size="small" onClick={(e) => handleSMSOpen(e, lead)}>
                         <ChatBubbleOutlineIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip
-                      title={lead.email ? `Email ${lead.email}` : "No email"}
-                    >
+                    <Tooltip title={lead.email ? `Email ${lead.email}` : "No email"}>
                       <span>
                         <IconButton
                           className="action-btn"
@@ -2116,12 +1961,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                           disabled={!lead.email}
                           onClick={(e) => {
                             e.stopPropagation();
-<<<<<<< Updated upstream
-                            if (lead.email)
-                              window.location.href = `mailto:${lead.email}`;
-=======
                             setEmailLead(lead);
->>>>>>> Stashed changes
                           }}
                         >
                           <EmailOutlinedIcon fontSize="small" />
@@ -2131,11 +1971,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
                   </Stack>
                 </TableCell>
 
-                <TableCell
-                  align="center"
-                  sx={stickyMenuStyle}
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <TableCell align="center" sx={stickyMenuStyle} onClick={(e) => e.stopPropagation()}>
                   <MenuButton lead={lead} setLeads={setLocalLeads} tab={tab} />
                 </TableCell>
               </TableRow>
@@ -2145,45 +1981,26 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       </TableContainer>
 
       {/* Pagination */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        sx={{ mt: 2, px: 2 }}
-      >
+      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
         <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
         <Stack direction="row" spacing={1}>
-          <IconButton
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
+          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
             <ChevronLeftIcon />
           </IconButton>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Box
-              key={p}
-              onClick={() => setPage(p)}
-              className={`page-number ${page === p ? "active" : ""}`}
-            >
+            <Box key={p} onClick={() => setPage(p)} className={`page-number ${page === p ? "active" : ""}`}>
               {p}
             </Box>
           ))}
-          <IconButton
-            disabled={page === totalPages || totalPages === 0}
-            onClick={() => setPage((p) => p + 1)}
-          >
+          <IconButton disabled={page === totalPages || totalPages === 0} onClick={() => setPage((p) => p + 1)}>
             <ChevronRightIcon />
           </IconButton>
         </Stack>
       </Stack>
 
-      <BulkActionBar
-        selectedIds={selectedIds}
-        tab={tab}
-        onDelete={handleBulkDelete}
-        onArchive={handleBulkArchive}
-      />
+      <BulkActionBar selectedIds={selectedIds} tab={tab} onDelete={handleBulkDelete} onArchive={handleBulkArchive} />
       <Dialogs />
 
       <CallDialog
@@ -2192,11 +2009,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         onClose={() => setCallLead(null)}
       />
 
-      <SMSDialog
-        open={Boolean(smsLead)}
-        lead={smsLead}
-        onClose={() => setSmsLead(null)}
-      />
+      <SMSDialog open={Boolean(smsLead)} lead={smsLead} onClose={() => setSmsLead(null)} />
 
       <EmailDialog open={Boolean(emailLead)} lead={emailLead} onClose={() => setEmailLead(null)} />
 
@@ -2206,11 +2019,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
         onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert
-          onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))}
-          severity="error"
-          sx={{ borderRadius: "10px" }}
-        >
+        <Alert onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))} severity="error" sx={{ borderRadius: "10px" }}>
           {callSnackbar.message}
         </Alert>
       </Snackbar>
