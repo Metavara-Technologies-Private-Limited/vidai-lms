@@ -38,7 +38,6 @@ interface HistoryTabProps {
   setHistoryView: (view: HistoryView) => void;
   onComposeEmail: () => void;
   leadName: string;
-  leadInitials: string;
   leadPhone: string;
   leadEmail: string;
   leadAssigned: string;
@@ -58,7 +57,6 @@ interface HistoryTabProps {
   smsHistoryLoading: boolean;
   smsHistoryError: string | null;
   onRefreshSmsHistory: () => void;
-  selectedTemplate: { subject: string; content: string } | null;
 }
 
 // ── Email status chip colors ──
@@ -107,7 +105,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   setHistoryView,
   onComposeEmail,
   leadName,
-  leadInitials,
   leadPhone,
   leadEmail,
   leadAssigned,
@@ -127,7 +124,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   smsHistoryLoading,
   smsHistoryError,
   onRefreshSmsHistory,
-  selectedTemplate,
 }) => {
 
   // ── Call state (mirrors LeadsTable) ──

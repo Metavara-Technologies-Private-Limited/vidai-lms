@@ -745,6 +745,7 @@ describe("CardContent", () => {
     onOpenSms: vi.fn(),
     onOpenMail: vi.fn(),
     onOpenBook: vi.fn(),
+    onOpenCall: vi.fn(),
   };
 
   beforeEach(() => vi.clearAllMocks());
@@ -821,6 +822,7 @@ describe("LeadCard", () => {
     onOpenSms: vi.fn(),
     onOpenMail: vi.fn(),
     onOpenBook: vi.fn(),
+    onOpenCall: vi.fn(),
     setLeads: vi.fn() as React.Dispatch<React.SetStateAction<LeadItem[]>>,
   };
 
@@ -884,6 +886,7 @@ describe("LeadColumn", () => {
     onOpenSms: vi.fn(),
     onOpenMail: vi.fn(),
     onOpenBook: vi.fn(),
+    onOpenCall: vi.fn(),
     setLeads: vi.fn() as React.Dispatch<React.SetStateAction<LeadItem[]>>,
   };
 
