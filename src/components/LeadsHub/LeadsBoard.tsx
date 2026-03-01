@@ -897,7 +897,8 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
   const [callLead,      setCallLead     ] = React.useState<LeadItem | null>(null);
   const [callSnackbar,  setCallSnackbar ] = React.useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [appointment,   setAppointment  ] = React.useState<AppointmentState>(emptyAppointment());
-  const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
+  // FIX: removed unused setShowSaveSuccess setter
+  const [showSaveSuccess] = React.useState(false);
 
   const handleCallOpen = async (lead: LeadItem) => {
     const phone = normalizePhone(lead.contact_no as string | undefined);

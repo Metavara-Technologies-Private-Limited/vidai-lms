@@ -25,7 +25,6 @@ import Lead_Subtract from "../../assets/icons/Lead_Subtract.svg";
 
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import type { RootState } from "../../store";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import CloseIcon from "@mui/icons-material/Close";
@@ -584,7 +583,7 @@ export default function LeadDetailView() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const selectedTemplate = useSelector((state: RootState) => state.emailTemplate.selectedTemplate);
+  // ✅ FIX 1: Removed unused `RootState` import — useSelector infers types automatically
   const leads        = useSelector(selectLeads) as LeadRecord[] | null;
   const loading      = useSelector(selectLeadsLoading) as boolean;
   const error        = useSelector(selectLeadsError) as string | null;
@@ -1003,11 +1002,12 @@ export default function LeadDetailView() {
       )}
 
       {activeTab === "History" && (
+        // ✅ FIX 2: Removed leadInitials prop — not in HistoryTabProps interface
         <HistoryTab
           lead={lead}
           historyView={historyView} setHistoryView={setHistoryView}
           onComposeEmail={() => setEmailDialogOpen(true)}
-          leadName={leadName} leadInitials={leadInitials} leadPhone={leadPhone}
+          leadName={leadName} leadPhone={leadPhone}
           leadEmail={leadEmail} leadAssigned={leadAssigned} leadCreatedAt={leadCreatedAt}
           appointmentDate={appointmentDate} appointmentSlot={appointmentSlot}
           appointmentDepartment={appointmentDepartment} appointmentPersonnel={appointmentPersonnel}
@@ -1017,7 +1017,6 @@ export default function LeadDetailView() {
           onRefreshCallHistory={() => fetchCallHistory(lead.id)}
           smsHistory={smsHistory} smsHistoryLoading={smsHistoryLoading} smsHistoryError={smsHistoryError}
           onRefreshSmsHistory={() => fetchSMSHistory(lead.id)}
-          selectedTemplate={selectedTemplate}
         />
       )}
 
@@ -1077,7 +1076,7 @@ export default function LeadDetailView() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Email Dialog (API-backed, same as LeadsTable) ── */}
+      {/* ── Email Dialog (API-backed) ── */}
       <EmailDialog
         open={emailDialogOpen}
         lead={lead}
