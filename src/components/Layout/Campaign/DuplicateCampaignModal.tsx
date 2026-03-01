@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {useState } from "react";
+import {useEffect,useState } from "react";
 import {
   Modal,
   Box,
@@ -22,7 +22,7 @@ import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
 import { CampaignAPI } from "../../../../src/services/campaign.api";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
-
+import EmailTemplateModal from "../../../../src/components/Layout/Campaign/EmailTemplateModal";
 interface DuplicateCampaignModalProps { 
   campaign: any;
   onClose: () => void;
@@ -42,8 +42,8 @@ export default function DuplicateCampaignModal({
   campaign.name + " (Copy)"
 );
   const [campaignDescription, setCampaignDescription] = useState(
-    campaign.description || "",
-  );
+  campaign.campaign_description || "",
+);
   const [objective, setObjective] = useState(campaign.objective || "");
   const [audience, setAudience] = useState(campaign.audience || "");
   const [startDate, setStartDate] = useState(campaign.start);
@@ -52,13 +52,12 @@ export default function DuplicateCampaignModal({
   const [subject, setSubject] = useState(campaign.subject || "");
   const [emailBody, setEmailBody] = useState(campaign.email_body || "");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
 
  const [accounts, setAccounts] = useState<string[]>(
   campaign.platforms || []
 );
-  const [mode, setMode] = useState<"organic" | "paid" | "">(
-  campaign.mode || ""
-);
+  const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
   const [scheduleDate, setScheduleDate] = useState(
     campaign.scheduledAt
@@ -78,33 +77,43 @@ export default function DuplicateCampaignModal({
     );
   };
 
-//   useEffect(() => {
-//     const fetchCampaign = async () => {
-//       try {
-//         const response = await CampaignAPI.get(campaign.id);
-//         setFullCampaignData(response.data);
+useEffect(() => {
+  const fetchCampaign = async () => {
+    try {
+      const response = await CampaignAPI.get(campaign.id);
+      const data = response.data;
 
-//         if (response.data.email && response.data.email.length > 0) {
-//           setSubject(response.data.email[0].subject || "");
-//           setEmailBody(response.data.email[0].email_body || "");
-//         }
+      // Basic
+      setObjective(data.campaign_objective || "");
+      setCampaignDescription(data.campaign_description || "");
+      setAudience(data.target_audience || "");
+      setStartDate(data.start_date || "");
+      setEndDate(data.end_date || "");
+      setMode(data.posting_mode || data.mode || "");
+      setMode(data.posting_mode || "");
 
-//         if (
-//           response.data.social_media &&
-//           response.data.social_media.length > 0
-//         ) {
-//           const platforms = response.data.social_media.map(
-//             (sm: any) => sm.platform_name,
-//           );
-//           setAccounts(platforms);
-//         }
-//       } catch (error) {
-//         console.error("Failed to fetch campaign:", error);
-//       }
-//     };
+      // Email
+      if (data.email?.length > 0) {
+        setSubject(data.email[0].subject || "");
+        setEmailBody(data.email[0].email_body || "");
+      }
 
-//     fetchCampaign();
-//   }, [campaign.id]);
+      // Social
+      if (data.social_media?.length > 0) {
+        setAccounts(
+          data.social_media.map((sm: any) => sm.platform_name)
+        );
+      }
+      if (data.posting_mode === 1) setMode("organic");
+      if (data.posting_mode === 2) setMode("paid");
+
+    } catch (error) {
+      console.error("Failed to fetch campaign:", error);
+    }
+  };
+
+  fetchCampaign();
+}, [campaign.id]);
 
   const step1Valid =
     campaignName.trim() &&
@@ -204,6 +213,7 @@ export default function DuplicateCampaignModal({
     : "";
 
   return (
+    <>
     <Modal open={true} onClose={onClose}>
       <Box className="email-campaign-modal">
         <div className="add-modal-header">
@@ -395,7 +405,7 @@ export default function DuplicateCampaignModal({
         Preview Email
       </button>
 
-      <button className="light-btn">
+      <button className="light-btn" onClick={() => setTemplateOpen(true)}>
         + Email Template
       </button>
     </div>
@@ -825,5 +835,14 @@ export default function DuplicateCampaignModal({
         </div>
       </Box>
     </Modal>
+    <EmailTemplateModal
+  open={templateOpen}
+  onClose={() => setTemplateOpen(false)}
+  onSelect={(template: any) => {
+    setSubject(template.title);
+    setEmailBody(template.subtitle);
+  }}
+/>
+</>
   );
 }

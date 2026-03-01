@@ -1,7 +1,6 @@
 .email-template-modal {
   width: 720px;
   background: #fff;
-  margin: 80px auto;
   border-radius: 16px;
   padding: 24px;
   outline: none;
@@ -147,11 +146,11 @@
 
 .template-actions {
   display: flex;
-  justify-content: center; /* center the button */
+  justify-content: flex-end; /* center the button */
   margin-top: 24px;
 }
 
-.cancel-btn {
+.cancel {
   padding: 10px 26px;
   border-radius: 14px;
   border: 1px solid #cfcfcf;
@@ -165,8 +164,8 @@
   transition: background 0.2s ease;
 }
 
-.cancel-btn:hover {
-  background: #f3f4f6;
+.cancel:hover {
+  background: #cecfd1;
 }
 
 .compose-modal {
