@@ -90,6 +90,68 @@ export type LeadPayload = {
   is_active: boolean;
 };
 
+// ====================== Lead Email Types ======================
+export type LeadEmailPayload = {
+  lead: string;
+  subject: string;
+  email_body: string;
+  sender_email?: string | null;
+  scheduled_at?: string | null;
+  send_now?: boolean;
+};
+
+export type LeadEmailStatus = "DRAFT" | "SCHEDULED" | "SENT" | "FAILED" | "CANCELLED";
+
+export type LeadEmailResponse = {
+  id: number;
+  lead: string;
+  subject: string;
+  email_body: string;
+  sender_email?: string | null;
+  scheduled_at?: string | null;
+  status: LeadEmailStatus;
+  sent_at?: string | null;
+  failed_reason?: string | null;
+  created_at: string;
+  send_now?: boolean;
+};
+
+export type LeadMailListItem = {
+  id: number;
+  lead_uuid: string;
+  subject: string;
+  sender_email?: string | null;
+  email_body: string;
+  status: LeadEmailStatus;
+  scheduled_at?: string | null;
+  sent_at?: string | null;
+  created_at: string;
+};
+
+// ====================== Email Template Types ======================
+export type EmailTemplate = {
+  id: string | number;
+  name: string;
+  subject: string;
+  body: string;
+  description?: string;
+  use_case?: string;
+  clinic?: number;
+  is_active?: boolean;
+  created_at?: string;
+};
+
+export type EmailTemplatePayload = {
+  clinic: number;
+  name: string;
+  subject: string;
+  body: string;
+  description?: string;
+  use_case?: string;
+  is_active?: boolean;
+  created_by?: number;
+};
+
 // ====================== Axios Instance ======================
 const api = axios.create({
   baseURL: 'http://127.0.0.1:8000/api',
@@ -120,14 +182,12 @@ export const LeadAPI = {
     return response.data;
   },
 
-  // Original create — plain JSON, no files
   create: async (data: LeadPayload): Promise<Lead> => {
     const response = await api.post<Lead>('/leads/', data);
     console.log("✅ Lead created:", response.data);
     return response.data;
   },
 
-  // ✅ NEW — create lead + upload documents in ONE multipart POST /leads/
   createWithDocuments: async (data: LeadPayload, files: File[]): Promise<Lead> => {
     const formData = new FormData();
     (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
@@ -192,24 +252,100 @@ export const LeadAPI = {
   },
 };
 
-// ====================== Twilio API ======================
-// ✅ FIXED: Added lead_uuid to both makeCall and sendSMS payloads
-// Swagger docs require lead_uuid as a mandatory field for both endpoints
-export const TwilioAPI = {
+// ====================== Lead Email API ======================
+export const LeadEmailAPI = {
+  create: async (data: LeadEmailPayload): Promise<LeadEmailResponse> => {
+    const response = await api.post<LeadEmailResponse>('/lead-email/', data);
+    console.log("✅ Lead email created:", response.data);
+    return response.data;
+  },
+
+  sendNow: async (data: Omit<LeadEmailPayload, 'send_now'>): Promise<LeadEmailResponse> => {
+    return LeadEmailAPI.create({ ...data, send_now: true });
+  },
+
+  saveAsDraft: async (data: Omit<LeadEmailPayload, 'send_now'>): Promise<LeadEmailResponse> => {
+    return LeadEmailAPI.create({ ...data, send_now: false });
+  },
+
+  list: async (leadUuid?: string): Promise<LeadMailListItem[]> => {
+    const params = leadUuid ? { lead_uuid: leadUuid } : {};
+    const response = await api.get<LeadMailListItem[]>('/lead-mail/', { params });
+    return response.data;
+  },
+
+  listByLead: async (leadId: string): Promise<LeadMailListItem[]> => {
+    return LeadEmailAPI.list(leadId);
+  },
+};
+
+// ====================== Email Template API ======================
+// Endpoints confirmed from Postman:
+//   POST /api/templates/mail/create/   → create
+//   GET  /api/templates/mail/          → list all
+//   GET  /api/templates/mail/<id>/     → get by id
+//   PUT  /api/templates/mail/<id>/     → update
+//   DELETE /api/templates/mail/<id>/   → delete
+export const EmailTemplateAPI = {
   /**
-   * Initiate an outbound call to the lead's contact number.
-   * POST /twilio/make-call/  →  { lead_uuid: "uuid", to: "+91XXXXXXXXXX" }
+   * List all email templates.
+   * GET /templates/mail/
    */
+  list: async (): Promise<EmailTemplate[]> => {
+    const response = await api.get<EmailTemplate[] | { results: EmailTemplate[] }>(
+      '/templates/mail/'
+    );
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object' && 'results' in data) return data.results;
+    return [];
+  },
+
+  /**
+   * Create a new email template.
+   * POST /templates/mail/create/
+   */
+  create: async (data: EmailTemplatePayload): Promise<EmailTemplate> => {
+    const response = await api.post<EmailTemplate>('/templates/mail/create/', data);
+    console.log("✅ Email template created:", response.data);
+    return response.data;
+  },
+
+  /**
+   * Get a single email template by id.
+   * GET /templates/mail/<id>/
+   */
+  getById: async (id: string | number): Promise<EmailTemplate> => {
+    const response = await api.get<EmailTemplate>(`/templates/mail/${id}/`);
+    return response.data;
+  },
+
+  /**
+   * Update an existing email template.
+   * PUT /templates/mail/<id>/
+   */
+  update: async (id: string | number, data: Partial<EmailTemplatePayload>): Promise<EmailTemplate> => {
+    const response = await api.put<EmailTemplate>(`/templates/mail/${id}/`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete an email template.
+   * DELETE /templates/mail/<id>/
+   */
+  delete: async (id: string | number): Promise<void> => {
+    await api.delete(`/templates/mail/${id}/`);
+  },
+};
+
+// ====================== Twilio API ======================
+export const TwilioAPI = {
   makeCall: async (payload: { lead_uuid: string; to: string }): Promise<unknown> => {
     const response = await api.post('/twilio/make-call/', payload);
     console.log("📞 Call initiated:", response.data);
     return response.data;
   },
 
-  /**
-   * Send an SMS to the lead's contact number.
-   * POST /twilio/send-sms/  →  { lead_uuid: "uuid", to: "+91XXXXXXXXXX", message: "..." }
-   */
   sendSMS: async (payload: { lead_uuid: string; to: string; message: string }): Promise<unknown> => {
     const response = await api.post('/twilio/send-sms/', payload);
     console.log("💬 SMS sent:", response.data);
