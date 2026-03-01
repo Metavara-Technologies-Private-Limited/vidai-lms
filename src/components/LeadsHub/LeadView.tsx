@@ -75,125 +75,6 @@ import type {
 
 interface EmailTemplate {
   id: string;
-<<<<<<< Updated upstream
-  uuid?: string;
-  title: string;
-  content: string;
-  time: string;
-}
-
-interface RawNote {
-  id: string;
-  title?: string;
-  note?: string;
-  created_at?: string;
-  is_deleted?: boolean;
-}
-
-// Twilio API types
-interface TwilioCall {
-  id: number;
-  lead_uuid: string;
-  sid: string;
-  from_number: string;
-  to_number: string;
-  status?: string;
-  created_at: string;
-}
-
-interface TwilioSMS {
-  id: number;
-  lead_uuid: string;
-  sid: string;
-  from_number: string;
-  to_number: string;
-  body: string;
-  status?: string;
-  direction: "inbound" | "outbound";
-  created_at: string;
-}
-
-interface LeadRecord {
-  id: string;
-  full_name?: string;
-  name?: string;
-  assigned_to_name?: string;
-  assigned?: string;
-  status?: string;
-  lead_status?: string;
-  quality?: string;
-  score?: number | string;
-  source?: string;
-  sub_source?: string;
-  campaign_name?: string;
-  campaign_duration?: string;
-  phone?: string;
-  contact_number?: string;
-  contact_no?: string;
-  email?: string;
-  location?: string;
-  gender?: string;
-  age?: number | string;
-  marital_status?: string;
-  address?: string;
-  language_preference?: string;
-  created_at?: string;
-  initials?: string;
-  department?: string;
-  department_name?: string;
-  department_id?: number;
-  clinic_id?: number;
-  personnel?: string;
-  appointment_date?: string;
-  slot?: string;
-  appointment_slot?: string;
-  remark?: string;
-  appointment_remark?: string;
-  treatment_interest?: string;
-  partner_name?: string;
-  partner_full_name?: string;
-  partner_age?: number | string;
-  partner_gender?: string;
-  next_action_type?: string;
-  next_action_status?: string;
-  next_action_description?: string;
-  task?: string;
-  taskStatus?: string;
-  is_active?: boolean;
-  book_appointment?: boolean;
-  partner_inquiry?: boolean;
-  phone_number?: string;
-  documents?: string[];
-}
-
-
-
-interface TimelineItemProps {
-  icon?: React.ReactNode;
-  title: string;
-  time: string;
-  isAvatar?: boolean;
-  avatarInitial?: string;
-  isLast?: boolean;
-  onClick?: () => void;
-  isClickable?: boolean;
-}
-
-interface ChatBubbleProps {
-  side: "left" | "right";
-  text: string;
-  time: string;
-}
-
-interface InfoProps {
-  label: string;
-  value: string;
-  isAvatar?: boolean;
-}
-
-interface DocumentRowProps {
-=======
->>>>>>> Stashed changes
   name: string;
   subject: string;
   preview: string;
@@ -543,7 +424,6 @@ interface ComposeEmailDialogProps {
   onClose: () => void;
 }
 
-// ONLY CHANGE: ToolbarBtn now accepts onClick prop
 const ToolbarBtn: React.FC<{ children: React.ReactNode; title?: string; onClick?: () => void }> = ({ children, title, onClick }) => (
   <IconButton size="small" title={title} onClick={onClick}
     sx={{ color: "#6B7280", borderRadius: "6px", p: 0.6, "&:hover": { bgcolor: "#F3F4F6", color: "#111827" } }}>
@@ -560,7 +440,6 @@ const ComposeEmailDialog: React.FC<ComposeEmailDialogProps> = ({
   const [saving, setSaving]   = React.useState(false);
   const [error, setError]     = React.useState<string | null>(null);
 
-  // ONLY CHANGE: added refs and cursor tracking for toolbar functionality
   const fileRef     = React.useRef<HTMLInputElement>(null);
   const imageRef    = React.useRef<HTMLInputElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -624,15 +503,14 @@ const ComposeEmailDialog: React.FC<ComposeEmailDialogProps> = ({
     } finally { setSaving(false); }
   };
 
-  // ONLY CHANGE: toolbar onClick handlers
-  const handleBold     = () => { saveCursor(); wrapSelection("**", "**"); };
-  const handleAttach   = () => fileRef.current?.click();
-  const handleImage    = () => imageRef.current?.click();
-  const handleLink     = () => { saveCursor(); const url = window.prompt("Enter URL:", "https://"); if (url) insertAtCursor(`[link](${url})`); };
-  const handleEmoji    = () => { saveCursor(); const e = window.prompt("Enter emoji:", "😊"); if (e) insertAtCursor(e); };
-  const handleVariable = () => { saveCursor(); const v = window.prompt("Variable name:", "lead_first_name"); if (v) insertAtCursor(`{${v}}`); };
+  const handleBold      = () => { saveCursor(); wrapSelection("**", "**"); };
+  const handleAttach    = () => fileRef.current?.click();
+  const handleImage     = () => imageRef.current?.click();
+  const handleLink      = () => { saveCursor(); const url = window.prompt("Enter URL:", "https://"); if (url) insertAtCursor(`[link](${url})`); };
+  const handleEmoji     = () => { saveCursor(); const e = window.prompt("Enter emoji:", "😊"); if (e) insertAtCursor(e); };
+  const handleVariable  = () => { saveCursor(); const v = window.prompt("Variable name:", "lead_first_name"); if (v) insertAtCursor(`{${v}}`); };
   const handleHighlight = () => { saveCursor(); wrapSelection("==", "=="); };
-  const handleMore     = () => { saveCursor(); insertAtCursor("\n\n"); };
+  const handleMore      = () => { saveCursor(); insertAtCursor("\n\n"); };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -674,7 +552,6 @@ const ComposeEmailDialog: React.FC<ComposeEmailDialogProps> = ({
         {/* ── To field ── */}
         <Box sx={{ px: 3, py: 1.5, borderBottom: "1px solid #F3F4F6", display: "flex", alignItems: "center", gap: 1 }}>
           <Typography fontSize="13px" color="#6B7280" fontWeight={500} sx={{ flexShrink: 0 }}>To :</Typography>
-          {/* Recipient chip */}
           <Box sx={{
             display: "flex", alignItems: "center", gap: 0.75,
             px: 1, py: 0.4, borderRadius: "6px",
@@ -688,7 +565,6 @@ const ComposeEmailDialog: React.FC<ComposeEmailDialogProps> = ({
               <CloseIcon sx={{ fontSize: 12 }} />
             </IconButton>
           </Box>
-          {/* Cc | Bcc */}
           <Box sx={{ ml: "auto", display: "flex", gap: 1.5 }}>
             <Typography fontSize="13px" color="#6B7280" sx={{ cursor: "pointer", "&:hover": { color: "#374151" } }}>Cc</Typography>
             <Typography fontSize="13px" color="#6B7280">|</Typography>
@@ -743,7 +619,6 @@ const ComposeEmailDialog: React.FC<ComposeEmailDialogProps> = ({
           borderTop: "1px solid #F3F4F6",
           display: "flex", alignItems: "center", gap: 0.5,
         }}>
-          {/* hidden file inputs */}
           <input ref={fileRef} type="file" multiple style={{ display: "none" }} onChange={handleFileChange} />
           <input ref={imageRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageChange} />
 
@@ -1352,115 +1227,4 @@ export default function LeadDetailView() {
       <Dialogs />
     </Box>
   );
-<<<<<<< Updated upstream
 }
-
-// ====================== Sub-components ======================
-
-const TimelineItem: React.FC<TimelineItemProps> = ({ icon, title, time, isAvatar, avatarInitial, isLast, onClick, isClickable }) => (
-  <Stack direction="row" spacing={2}>
-    <Stack alignItems="center">
-      <Box sx={{ width: 32, height: 32, borderRadius: "50%", bgcolor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {isAvatar ? <Avatar sx={{ width: 20, height: 20, fontSize: "10px" }}>{avatarInitial}</Avatar> : icon}
-      </Box>
-      {!isLast && <Box sx={{ width: "2px", flexGrow: 1, bgcolor: "#E2E8F0", my: 0.5 }} />}
-    </Stack>
-    <Box pb={3} onClick={onClick} sx={{ cursor: isClickable ? "pointer" : "default", "&:hover": isClickable ? { opacity: 0.7 } : {} }}>
-      <Typography variant="body2" fontWeight={600}>{title}</Typography>
-      <Typography variant="caption" color="text.secondary">{time}</Typography>
-    </Box>
-  </Stack>
-);
-
-const ChatBubble: React.FC<ChatBubbleProps> = ({ side, text, time }) => (
-  <Box sx={{ alignSelf: side === "left" ? "flex-start" : "flex-end", maxWidth: "70%" }}>
-    <Box sx={{ p: 1.5, borderRadius: side === "left" ? "0 12px 12px 12px" : "12px 0 12px 12px", bgcolor: side === "left" ? "#FFF" : "#1E293B", color: side === "left" ? "text.primary" : "#FFF", boxShadow: "0px 1px 2px rgba(0,0,0,0.05)" }}>
-      <Typography variant="body2">{text}</Typography>
-    </Box>
-    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block", textAlign: side === "right" ? "right" : "left" }}>{time}</Typography>
-  </Box>
-);
-
-const getSubSourceIcon = (source?: string): string | null => {
-  const key = (source || "").toLowerCase();
-  if (key.includes("facebook")) return Facebook as string;
-  if (key.includes("instagram")) return Instagram as string;
-  if (key.includes("linkedin")) return Linkedin as string;
-  if (key.includes("google ads")) return GoogleAds as string;
-  if (key.includes("google")) return GoogleCalender as string;
-  return null;
-};
-
-const Info: React.FC<InfoProps> = ({ label, value, isAvatar }) => (
-  <Box sx={{ flex: 1, minWidth: 0 }}>
-    <Typography variant="caption" sx={{ color: "#9E9E9E", fontSize: "12px", fontWeight: 500, display: "block", mb: 0.5 }}>
-      {label}
-    </Typography>
-    {label === "SUB-SOURCE" ? (
-      <Stack direction="row" spacing={1} alignItems="center">
-        {getSubSourceIcon(value) && (
-          <Box component="img" src={getSubSourceIcon(value)!} alt="" sx={{ width: 16, height: 16 }} />
-        )}
-        <Typography sx={{ color: "#232323", fontSize: "14px", fontWeight: 500 }}>{value}</Typography>
-      </Stack>
-    ) : isAvatar ? (
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Avatar sx={{ width: 20, height: 20, fontSize: "10px" }}>{value?.charAt(0) || "U"}</Avatar>
-        <Typography sx={{ color: "#232323", fontSize: "14px", fontWeight: 500 }}>{value}</Typography>
-      </Stack>
-    ) : (
-      <Typography sx={{ color: "#232323", fontSize: "14px", fontWeight: 500 }}>{value}</Typography>
-    )}
-  </Box>
-);
-
-const DocumentRow: React.FC<DocumentRowProps> = ({ name, size, url, sx = {} }) => {
-  const color = getDocColor(name);
-  const ext = (name.split(".").pop() ?? "").toUpperCase();
-
-  const handleDownload = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
-  const handleOpen = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  return (
-    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={sx}>
-      <Stack direction="row" spacing={1.5} alignItems="center">
-        <Box sx={{ width: 36, height: 36, borderRadius: "8px", bgcolor: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <DescriptionOutlinedIcon sx={{ color, fontSize: 18 }} />
-        </Box>
-        <Box>
-          <Typography variant="body2" fontWeight={600} sx={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={name}>
-            {name}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">{ext}{size ? ` · ${size}` : ""}</Typography>
-        </Box>
-      </Stack>
-      <Stack direction="row" spacing={0.5}>
-        <IconButton size="small" onClick={handleDownload} disabled={!url} title="Download">
-          <FileDownloadOutlinedIcon fontSize="inherit" />
-        </IconButton>
-        <IconButton size="small" onClick={handleOpen} disabled={!url} title="Open in new tab">
-          <ShortcutIcon sx={{ transform: "rotate(90deg)", fontSize: "14px" }} />
-        </IconButton>
-      </Stack>
-    </Stack>
-  );
-};
-=======
-}
->>>>>>> Stashed changes
