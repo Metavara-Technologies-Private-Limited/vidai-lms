@@ -12,24 +12,11 @@ export type CampaignType = "social" | "email";
 export type CampaignStatus =
   | "Live"
   | "Draft"
-  | "Schedule"
+  | "Scheduled"
   | "Paused"
   | "Stopped"
   | "Completed"
   | "Failed";
-
-export interface Campaign {
-  id: string;
-  name: string;
-  type: CampaignType;
-  status: CampaignStatus;
-  start: string;
-  end: string;
-  platforms: ("facebook" | "instagram" | "linkedin" | "gmail")[];
-  leads: number;
-  scheduledAt?: string;
-}
-
 
 export default function CampaignPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);

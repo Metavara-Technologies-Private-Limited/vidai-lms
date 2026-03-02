@@ -1,9 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import "../../../../src/styles/Campaign/SocialCampaignModal.css";
-import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 import { CampaignAPI } from "../../../../src/services/campaign.api";
-import {FormControl, Select, MenuItem, Modal, Typography, IconButton} from "@mui/material";
+import {
+  FormControl,
+  Select,
+  MenuItem,
+  Modal,
+  Typography,
+  IconButton,
+} from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
@@ -17,13 +22,30 @@ import facebookIcon from "../../../components/Layout/Campaign/Icons/facebook.png
 import linkedinIcon from "../../../components/Layout/Campaign/Icons/linkedin.png";
 import { Box } from "@mui/system";
 import CloseIcon from "@mui/icons-material/Close";
-import TextFieldsIcon from "@mui/icons-material/TextFields";
-import LinkIcon from "@mui/icons-material/Link";
-import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
-import PermMediaIcon from "@mui/icons-material/PermMedia";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
+import type {
+  Campaign,
+  Platform,
+  SocialCampaignPayload,
+} from "../../../types/campaigns.types";
+import SocialContentBox from "./SocialContentBox";
+import { useSelector } from "react-redux";
+import { selectClinic } from "../../../store/clinicSlice";
 
-export default function SocialCampaignModal({ onClose, onSave }: any) {
+type Props = {
+  onClose: () => void;
+  onSave: (campaign: Campaign) => void;
+};
+
+const PLATFORMS: { id: Platform; label: string; icon: string; cpc: number }[] =
+  [
+    { id: "instagram", label: "Instagram", icon: instagramIcon, cpc: 3.5 },
+    { id: "facebook", label: "Facebook", icon: facebookIcon, cpc: 2.5 },
+    { id: "linkedin", label: "LinkedIn", icon: linkedinIcon, cpc: 1.5 },
+  ];
+
+export default function SocialCampaignModal({ onClose, onSave }: Props) {
+  const clinic = useSelector(selectClinic);
+  const clinicId = clinic?.id || 1;
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
 
@@ -44,7 +66,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     endDate;
 
   /* ================= STEP 2 ================= */
-  const [accounts, setAccounts] = useState<string[]>([]);
+  const [accounts, setAccounts] = useState<Platform[]>([]);
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
   const instagramRef = useRef<HTMLDivElement>(null);
@@ -58,8 +80,51 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
   const linkedinImageRef = useRef<HTMLInputElement>(null);
   const linkedinFileRef = useRef<HTMLInputElement>(null);
 
-  // ✅ inlinePreview state
-  const [inlinePreview, setInlinePreview] = useState<{ src: string; type: "image" | "file"; name: string } | null>(null);
+  // Ref lookup map — inside the component, but refs never stored in objects passed to render
+  const platformRefs: Record<
+    Platform,
+    React.RefObject<HTMLDivElement | null>
+  > = {
+    instagram: instagramRef,
+    facebook: facebookRef,
+    linkedin: linkedinRef,
+  };
+  const imageInputRefs: Record<
+    Platform,
+    React.RefObject<HTMLInputElement | null>
+  > = {
+    instagram: instagramImageRef,
+    facebook: facebookImageRef,
+    linkedin: linkedinImageRef,
+  };
+
+  const fileInputRefs: Record<
+    Platform,
+    React.RefObject<HTMLInputElement | null>
+  > = {
+    instagram: instagramFileRef,
+    facebook: facebookFileRef,
+    linkedin: linkedinFileRef,
+  };
+
+  // inlinePreview state
+  const [inlinePreview, setInlinePreview] = useState<{
+    src: string;
+    type: "image" | "file";
+    name: string;
+  } | null>(null);
+
+  const step2Valid = accounts.length > 0 && mode;
+
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [budgets, setBudgets] = useState<Record<Platform, number>>({
+    instagram: 350,
+    facebook: 250,
+    linkedin: 150,
+  });
+  const setBudget = (platform: Platform, value: number) =>
+    setBudgets((prev) => ({ ...prev, [platform]: value }));
 
   const getEditorRef = (platform: string) => {
     if (platform === "instagram") return instagramRef;
@@ -82,20 +147,25 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     ref.current?.focus();
   };
 
-  const handleText = () => { document.execCommand("bold"); };
+  const handleText = () => {
+    document.execCommand("bold");
+  };
 
   const handleLink = (platform: string) => {
     const url = prompt("Enter URL");
     if (!url) return;
-    insertHTML(platform, `<a href="${url}" target="_blank" style="color:#2563eb; text-decoration:underline;">${url}</a>`);
+    insertHTML(
+      platform,
+      `<a href="${url}" target="_blank" style="color:#2563eb; text-decoration:underline;">${url}</a>`,
+    );
   };
 
   const handleEmoji = (platform: string) => {
-  const ref = getEditorRef(platform);
-  const editorEl = ref.current?.nextElementSibling as HTMLElement;
-  editorEl?.focus();
-  document.execCommand("insertText", false, "😊");
-};
+    const ref = getEditorRef(platform);
+    const editorEl = ref.current?.nextElementSibling as HTMLElement;
+    editorEl?.focus();
+    document.execCommand("insertText", false, "😊");
+  };
 
   const handleImage = (platform: string) => {
     if (platform === "instagram") instagramImageRef.current?.click();
@@ -109,16 +179,20 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     if (platform === "linkedin") linkedinFileRef.current?.click();
   };
 
-  const handleFileInsert = (e: any, platform: string, type: "image" | "file") => {
-    const file = e.target.files[0];
+  const handleFileInsert = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    platform: string,
+    type: "image" | "file",
+  ) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const ref = getEditorRef(platform);
 
     if (type === "image") {
       const reader = new FileReader();
-      reader.onload = (event: any) => {
-        const src = event.target.result;
+      reader.onload = (event: ProgressEvent<FileReader>) => {
+        const src = event.target?.result as string;
 
         const wrapper = document.createElement("div");
         wrapper.className = "inserted-image-wrapper";
@@ -126,8 +200,9 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
         const img = document.createElement("img");
         img.src = src;
         img.style.cursor = "pointer";
-        // ✅ click image → open inline preview
-        img.onclick = () => setInlinePreview({ src, type: "image", name: file.name });
+        // click image → open inline preview
+        img.onclick = () =>
+          setInlinePreview({ src, type: "image", name: file.name });
 
         const removeBtn = document.createElement("button");
         removeBtn.textContent = "✕";
@@ -141,7 +216,7 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       };
       reader.readAsDataURL(file);
     } else {
-      // ✅ objectUrl defined here properly
+      // objectUrl defined here properly
       const objectUrl = URL.createObjectURL(file);
 
       const wrapper = document.createElement("div");
@@ -151,8 +226,8 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
       label.className = "file-label";
       label.textContent = `${file.name}`;
       label.style.cursor = "pointer";
-      // ✅ click file → open inline preview
-      label.onclick = () => setInlinePreview({ src: objectUrl, type: "file", name: file.name });
+      label.onclick = () =>
+        setInlinePreview({ src: objectUrl, type: "file", name: file.name });
 
       const removeBtn = document.createElement("button");
       removeBtn.textContent = "✕";
@@ -168,71 +243,112 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     e.target.value = "";
   };
 
-  const step2Valid = accounts.length > 0 && mode;
-
-  const toggleAccount = (id: string) => {
+  const toggleAccount = (id: Platform) => {
     setAccounts((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
-
   const handleNext = () => {
     setSubmitted(true);
-    if (step === 1 && step1Valid) { setStep(2); setSubmitted(false); }
-    else if (step === 2 && step2Valid) { setStep(3); setSubmitted(false); }
+    if (step === 1 && step1Valid) {
+      setStep(2);
+      setSubmitted(false);
+    } else if (step === 2 && step2Valid) {
+      setStep(3);
+      setSubmitted(false);
+    }
   };
 
   const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
     setSubmitted(true);
     if (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime) return;
-    if (type === "live" && (!step1Valid || !step2Valid || !scheduleTime)) return;
-    if (type === "scheduled" && (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime)) return;
+    if (type === "live" && (!step1Valid || !step2Valid || !scheduleTime))
+      return;
+    if (
+      type === "scheduled" &&
+      (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime)
+    )
+      return;
 
     try {
       const scheduledDateTime =
         scheduleDate && scheduleTime
-          ? dayjs(`${scheduleDate} ${scheduleTime}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DDTHH:mm:ss")
+          ? dayjs(`${scheduleDate} ${scheduleTime}`, "YYYY-MM-DD HH:mm").format(
+              "YYYY-MM-DDTHH:mm:ss",
+            )
           : null;
 
-      const totalSpend =
-        (accounts.includes("instagram") ? instagramBudget : 0) +
-        (accounts.includes("facebook") ? facebookBudget : 0) +
-        (accounts.includes("linkedin") ? linkedinBudget : 0);
+      // After — use budgets object
+      const totalSpend = PLATFORMS.filter((p) =>
+        accounts.includes(p.id),
+      ).reduce((sum, p) => sum + budgets[p.id], 0);
 
       const estimatedCPC = totalSpend > 0 ? (totalSpend / 100).toFixed(2) : 0;
+      const facebookEditor = facebookRef.current
+        ?.nextElementSibling as HTMLElement | null;
 
-      const payload = {
-        clinic: 1,
+      const facebookContent = facebookEditor?.innerText?.trim() || "";
+
+      const campaignMode: ("paid_advertising" | "organic_posting")[] = [
+        mode === "paid" ? "paid_advertising" : "organic_posting",
+      ];
+
+      const getEditorContent = (platform: Platform): string =>
+        (platformRefs[platform].current?.nextElementSibling as HTMLElement | null)
+          ?.innerText?.trim() || "";
+
+      const payload: SocialCampaignPayload = {
+        clinic: clinicId,
         campaign_name: campaignName,
         campaign_description: campaignDescription,
         campaign_objective: objective,
         target_audience: audience,
         start_date: startDate,
         end_date: endDate,
-        campaign_mode: 1,
-        selected_start: scheduledDateTime,
-        selected_end: scheduledDateTime,
-        enter_time: scheduleTime,
-        is_active: type === "live",
-        social_media: accounts.map((platform) => ({
-          platform_name: platform,
-          is_active: true,
-        })),
-      };
 
-      const response = await CampaignAPI.create(payload);
+        campaign_content: facebookContent || "Post content",
+
+        campaign_mode: campaignMode,
+
+        select_ad_accounts: accounts,
+
+        enter_time: scheduleTime,
+
+        platform_data: PLATFORMS.reduce(
+          (acc, p) => ({ ...acc, [p.id]: getEditorContent(p.id) }),
+          {} as Record<Platform, string>,
+        ),
+
+        budget_data: {
+          ...budgets,
+          total: PLATFORMS.filter((p) => accounts.includes(p.id)).reduce(
+            (sum, p) => sum + budgets[p.id],
+            0,
+          ),
+        },
+
+        status:
+          type === "live"
+            ? "live"
+            : type === "scheduled"
+              ? "scheduled"
+              : "draft",
+
+        is_active: type === "live",
+      };
+      const response = await CampaignAPI.createSocial(payload);
       const apiData = response.data;
-      const formattedCampaign = {
+      const formattedCampaign: Campaign = {
         id: apiData.id,
         name: apiData.campaign_name,
         type: "social",
-        status: type === "live" ? "Live" : type === "draft" ? "Draft" : "scheduled",
+        status:
+          type === "live" ? "Live" : type === "draft" ? "Draft" : "Scheduled",
         start: apiData.start_date,
         end: apiData.end_date,
         platforms: accounts,
+        leads: 0,
         lead_generated: 0,
         scheduledAt: type === "scheduled" ? scheduledDateTime : null,
         total_spend: mode === "paid" ? totalSpend : 0,
@@ -247,14 +363,9 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
     }
   };
 
-  const [instagramBudget, setInstagramBudget] = useState(350);
-  const [facebookBudget, setFacebookBudget] = useState(250);
-  const [linkedinBudget, setLinkedinBudget] = useState(150);
-
   return (
     <Modal open={true} onClose={onClose}>
       <Box className="email-campaign-modal">
-
         {/* HEADER */}
         <div className="add-modal-header">
           <Typography variant="h6">Add Social Media Campaign</Typography>
@@ -267,12 +378,16 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
         {/* STEPPER */}
         <div className="stepper">
-          <div className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}>
+          <div
+            className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
+          >
             <div className="circle">{step > 1 ? "✓" : "1"}</div>
             <span>Campaign Details</span>
           </div>
           <div className="line" />
-          <div className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}>
+          <div
+            className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}
+          >
             <div className="circle">{step > 2 ? "✓" : "2"}</div>
             <span>Content & Configuration</span>
           </div>
@@ -286,23 +401,43 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
         {/* ================= STEP 1 ================= */}
         {step === 1 && (
           <div className="step-content">
-            <Typography variant="h6" sx={{ mb: 3 }}>Campaign Details</Typography>
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Campaign Details
+            </Typography>
 
-            <div className={`form-group ${submitted && !campaignName ? "error" : ""}`}>
+            <div
+              className={`form-group ${submitted && !campaignName ? "error" : ""}`}
+            >
               <label>Campaign Name *</label>
-              <input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="e.g. New Product Launch" />
+              <input
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="e.g. New Product Launch"
+              />
             </div>
 
-            <div className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}>
+            <div
+              className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}
+            >
               <label>Campaign Description *</label>
-              <input value={campaignDescription} onChange={(e) => setCampaignDescription(e.target.value)} placeholder="e.g. Contains records of routine checks..." />
+              <input
+                value={campaignDescription}
+                onChange={(e) => setCampaignDescription(e.target.value)}
+                placeholder="e.g. Contains records of routine checks..."
+              />
             </div>
 
             <div className="form-row">
-              <div className={`form-group half ${submitted && !objective ? "error" : ""}`}>
+              <div
+                className={`form-group half ${submitted && !objective ? "error" : ""}`}
+              >
                 <label>Campaign Objective *</label>
                 <FormControl fullWidth variant="outlined">
-                  <Select value={objective} onChange={(e) => setObjective(e.target.value)} displayEmpty>
+                  <Select
+                    value={objective}
+                    onChange={(e) => setObjective(e.target.value)}
+                    displayEmpty
+                  >
                     <MenuItem value="">Select Objective</MenuItem>
                     <MenuItem value="leads">Lead Generation</MenuItem>
                     <MenuItem value="awareness">Brand Awareness</MenuItem>
@@ -310,10 +445,16 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                 </FormControl>
               </div>
 
-              <div className={`form-group half ${submitted && !audience ? "error" : ""}`}>
+              <div
+                className={`form-group half ${submitted && !audience ? "error" : ""}`}
+              >
                 <label>Target Audience *</label>
                 <FormControl fullWidth variant="outlined">
-                  <Select value={audience} onChange={(e) => setAudience(e.target.value)} displayEmpty>
+                  <Select
+                    value={audience}
+                    onChange={(e) => setAudience(e.target.value)}
+                    displayEmpty
+                  >
                     <MenuItem value="">Select Audience</MenuItem>
                     <MenuItem value="all">All Users</MenuItem>
                   </Select>
@@ -322,21 +463,45 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
             </div>
 
             <div className="form-row">
-              <div className={`form-group half ${submitted && !startDate ? "error" : ""}`}>
+              <div
+                className={`form-group half ${submitted && !startDate ? "error" : ""}`}
+              >
                 <label>Start Date *</label>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker format="DD/MM/YYYY" value={startDate ? dayjs(startDate) : null} 
-                   onChange={(v) => setStartDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")} 
-                  slots={{ openPickerIcon: CalendarTodayIcon }} />
+                  <DatePicker
+                    format="DD/MM/YYYY"
+                    value={startDate ? dayjs(startDate) : null}
+                    onChange={(v) =>
+                      setStartDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")
+                    }
+                    slots={{ openPickerIcon: CalendarTodayIcon }}
+                    slotProps={{
+                      textField: {
+                        error: submitted && !startDate,
+                      },
+                    }}
+                  />
                 </LocalizationProvider>
               </div>
 
-              <div className={`form-group half ${submitted && !endDate ? "error" : ""}`}>
+              <div
+                className={`form-group half ${submitted && !endDate ? "error" : ""}`}
+              >
                 <label>End Date *</label>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker format="DD/MM/YYYY" value={endDate ? dayjs(endDate) : null} 
-                  onChange={(v) => setEndDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
-                  slots={{ openPickerIcon: CalendarTodayIcon }} />
+                  <DatePicker
+                    format="DD/MM/YYYY"
+                    value={endDate ? dayjs(endDate) : null}
+                    onChange={(v) =>
+                      setEndDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")
+                    }
+                    slots={{ openPickerIcon: CalendarTodayIcon }}
+                    slotProps={{
+                      textField: {
+                        error: submitted && !endDate,
+                      },
+                    }}
+                  />
                 </LocalizationProvider>
               </div>
             </div>
@@ -346,46 +511,70 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
         {/* ================= STEP 2 ================= */}
         {step === 2 && (
           <div className="step-content">
-            <Typography variant="h6" sx={{ mb: 3 }}>Content & Configuration</Typography>
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Content & Configuration
+            </Typography>
 
-            <div className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}>
+            <div
+              className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
+            >
               <h3>Select Ad Accounts</h3>
-              <p className="section-subtitle">Select your social media ad accounts</p>
+              <p className="section-subtitle">
+                Select your social media ad accounts
+              </p>
               <div className="account-row">
-                {[
-                  { id: "instagram", label: "Instagram", icon: instagramIcon },
-                  { id: "facebook", label: "Facebook", icon: facebookIcon },
-                  { id: "linkedin", label: "LinkedIn", icon: linkedinIcon },
-                ].map((acc) => (
-                  <div key={acc.id} className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`} onClick={() => toggleAccount(acc.id)}>
+                {PLATFORMS.map((acc) => (
+                  <div
+                    key={acc.id}
+                    className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
+                    onClick={() => toggleAccount(acc.id)}
+                  >
                     <div className="account-left">
                       <img src={acc.icon} alt={acc.label} />
                       <span>{acc.label}</span>
                     </div>
-                    <div className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`} />
+                    <div
+                      className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
+                    />
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className={`section-card ${submitted && !mode ? "error" : ""}`}>
+            <div
+              className={`section-card ${submitted && !mode ? "error" : ""}`}
+            >
               <h3>Campaign Mode</h3>
-              <p className="section-subtitle">Choose a campaign mode to optimize your ad strategy</p>
+              <p className="section-subtitle">
+                Choose a campaign mode to optimize your ad strategy
+              </p>
               <div className="mode-row">
-                <div className={`mode-card ${mode === "organic" ? "selected" : ""}`} onClick={() => setMode("organic")}>
+                <div
+                  className={`mode-card ${mode === "organic" ? "selected" : ""}`}
+                  onClick={() => setMode("organic")}
+                >
                   <div className="mode-left">
-                    <div className={`radio ${mode === "organic" ? "checked" : ""}`} />
+                    <div
+                      className={`radio ${mode === "organic" ? "checked" : ""}`}
+                    />
                     <div className="mode-text">
                       <h4>Organic Posting</h4>
-                      <p>Post to your connected social accounts without ad spend.</p>
+                      <p>
+                        Post to your connected social accounts without ad spend.
+                      </p>
                     </div>
                   </div>
                   <span className="badge">No Budget Required</span>
                 </div>
 
-                <div className={`mode-card ${mode === "paid" ? "selected" : ""}`} onClick={() => setMode("paid")}>
+                <div
+                  className={`mode-card ${mode === "paid" ? "selected" : ""}`}
+                  onClick={() => setMode("paid")}
+                >
                   <div className="mode-left">
-                    <div className={`radio ${mode === "paid" ? "checked" : ""}`} />
+                    <div
+                      className={`radio ${mode === "paid" ? "checked" : ""}`}
+                    />
                     <div className="mode-text">
                       <h4>Paid Advertising</h4>
                       <p>Boost your reach and engagement with targeted ads.</p>
@@ -399,98 +588,46 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
             {mode && (
               <div className="section-card">
                 <h2>Campaign Content</h2>
-                <p className="section-subtitle">Create your post content with AI assistance</p>
+                <p className="section-subtitle">
+                  Create your post content with AI assistance
+                </p>
 
                 {/* Hidden file inputs */}
-                <input ref={instagramImageRef} type="file" accept="image/*" hidden onChange={(e) => handleFileInsert(e, "instagram", "image")} />
-                <input ref={instagramFileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" hidden onChange={(e) => handleFileInsert(e, "instagram", "file")} />
-                <input ref={facebookImageRef} type="file" accept="image/*" hidden onChange={(e) => handleFileInsert(e, "facebook", "image")} />
-                <input ref={facebookFileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" hidden onChange={(e) => handleFileInsert(e, "facebook", "file")} />
-                <input ref={linkedinImageRef} type="file" accept="image/*" hidden onChange={(e) => handleFileInsert(e, "linkedin", "image")} />
-                <input ref={linkedinFileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" hidden onChange={(e) => handleFileInsert(e, "linkedin", "file")} />
+                {PLATFORMS.map((p) => (
+                  <React.Fragment key={p.id}>
+                    <input
+                      key={`${p.id}-image`}
+                      ref={imageInputRefs[p.id]}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => handleFileInsert(e, p.id, "image")}
+                    />
+                    <input
+                      key={`${p.id}-file`}
+                      ref={fileInputRefs[p.id]}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                      hidden
+                      onChange={(e) => handleFileInsert(e, p.id, "file")}
+                    />
+                  </React.Fragment>
+                ))}
 
-{/* Instagram */}
-{accounts.includes("instagram") && (
-  <div className="social-content-box">
-    <div className="social-header">
-      <img src={instagramIcon} alt="Instagram" />
-      <span>Instagram</span>
-    </div>
-
-    {/* ✅ Media preview area — images and files appear here */}
-    <div ref={instagramRef} className="media-preview-area" />
-
-    {/* ✅ Separate text editor below */}
-    <div
-      className="editor"
-      contentEditable
-      suppressContentEditableWarning
-      data-placeholder="What would you like to share on Instagram?"
-    />
-
-    <div className="social-toolbar-container">
-      <div className="social-toolbar">
-        <TextFieldsIcon onClick={() => handleText()} />
-        <LinkIcon onClick={() => handleLink("instagram")} />
-        <EmojiEmotionsIcon onClick={() => handleEmoji("instagram")} />
-        <PermMediaIcon onClick={() => handleImage("instagram")} />
-        <AttachFileIcon onClick={() => handleAttachment("instagram")} />
-      </div>
-    </div>
-  </div>
-)}
-
-{/* Facebook */}
-{accounts.includes("facebook") && (
-  <div className="social-content-box">
-    <div className="social-header">
-      <img src={facebookIcon} alt="Facebook" />
-      <span>Facebook</span>
-    </div>
-    <div ref={facebookRef} className="media-preview-area" />
-    <div
-      className="editor"
-      contentEditable
-      suppressContentEditableWarning
-      data-placeholder="What would you like to share on Facebook?"
-    />
-    <div className="social-toolbar-container">
-      <div className="social-toolbar">
-        <TextFieldsIcon onClick={() => handleText()} />
-        <LinkIcon onClick={() => handleLink("facebook")} />
-        <EmojiEmotionsIcon onClick={() => handleEmoji("facebook")} />
-        <PermMediaIcon onClick={() => handleImage("facebook")} />
-        <AttachFileIcon onClick={() => handleAttachment("facebook")} />
-      </div>
-    </div>
-  </div>
-)}
-
-{/* LinkedIn */}
-{accounts.includes("linkedin") && (
-  <div className="social-content-box">
-    <div className="social-header">
-      <img src={linkedinIcon} alt="LinkedIn" />
-      <span>LinkedIn</span>
-    </div>
-    <div ref={linkedinRef} className="media-preview-area" />
-    <div
-      className="editor"
-      contentEditable
-      suppressContentEditableWarning
-      data-placeholder="What would you like to share on LinkedIn?"
-    />
-    <div className="social-toolbar-container">
-      <div className="social-toolbar">
-        <TextFieldsIcon onClick={() => handleText()} />
-        <LinkIcon onClick={() => handleLink("linkedin")} />
-        <EmojiEmotionsIcon onClick={() => handleEmoji("linkedin")} />
-        <PermMediaIcon onClick={() => handleImage("linkedin")} />
-        <AttachFileIcon onClick={() => handleAttachment("linkedin")} />
-      </div>
-    </div>
-  </div>
-)}
+                {PLATFORMS.filter((p) => accounts.includes(p.id)).map((p) => (
+                  <SocialContentBox
+                    key={p.id}
+                    ref={platformRefs[p.id]}
+                    platform={p.id}
+                    icon={p.icon}
+                    label={p.label}
+                    onText={handleText}
+                    onLink={handleLink}
+                    onEmoji={handleEmoji}
+                    onImage={handleImage}
+                    onAttachment={handleAttachment}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -499,13 +636,23 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
         {/* ================= STEP 3 ================= */}
         {step === 3 && (
           <div className="step-content">
-            <Typography variant="h6" sx={{ mb: 3 }}>Schedule Campaign</Typography>
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Schedule Campaign
+            </Typography>
 
             <div className="section-card">
               <div className="schedule-header">
                 <div>
-                  <h3>{mode === "paid" ? "Schedule & Budget Allocation" : "Schedule"}</h3>
-                  <p className="section-subtitle">{mode === "paid" ? "Establish your schedule and budget for every platform." : "Select a date and time for the campaign."}</p>
+                  <h3>
+                    {mode === "paid"
+                      ? "Schedule & Budget Allocation"
+                      : "Schedule"}
+                  </h3>
+                  <p className="section-subtitle">
+                    {mode === "paid"
+                      ? "Establish your schedule and budget for every platform."
+                      : "Select a date and time for the campaign."}
+                  </p>
                 </div>
                 <button className="ai-btn">✨ AI-Optimization Timing</button>
               </div>
@@ -514,18 +661,35 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                 <div className="form-group half">
                   <label>Select Date</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker format="DD/MM/YYYY" value={scheduleDate ? dayjs(scheduleDate) : null} 
-                    onChange={(v) => setScheduleDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
-                    slots={{ openPickerIcon: CalendarTodayIcon }} />
+                    <DatePicker
+                      format="DD/MM/YYYY"
+                      value={scheduleDate ? dayjs(scheduleDate) : null}
+                      onChange={(v) =>
+                        setScheduleDate(
+                          v ? (v as Dayjs).format("YYYY-MM-DD") : "",
+                        )
+                      }
+                      slots={{ openPickerIcon: CalendarTodayIcon }}
+                    />
                   </LocalizationProvider>
                 </div>
 
                 <div className="form-group half">
                   <label>Enter Time</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <TimePicker format="hh:mm A" value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null} 
-                    onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }} ampm 
-                    slotProps={{ textField: { fullWidth: true } }} />
+                    <TimePicker
+                      format="hh:mm A"
+                      value={
+                        scheduleTime
+                          ? dayjs(`2024-01-01 ${scheduleTime}`)
+                          : null
+                      }
+                      onChange={(v) => {
+                        if (v) setScheduleTime((v as Dayjs).format("HH:mm"));
+                      }}
+                      ampm
+                      slotProps={{ textField: { fullWidth: true } }}
+                    />
                   </LocalizationProvider>
                 </div>
               </div>
@@ -536,48 +700,45 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
                   <div className="budget-section">
                     <h3>Budget Allocation</h3>
                     <div className="budget-row">
-                      {accounts.includes("instagram") && (
-                        <div className="budget-card">
-                          <div className="budget-title">
-                            <img src={instagramIcon} alt="Instagram" />
-                            <span>Instagram (Estimate CPC : $3.5)</span>
+                      {PLATFORMS.filter((p) => accounts.includes(p.id)).map(
+                        (p) => (
+                          <div key={p.id} className="budget-card">
+                            <div className="budget-title">
+                              <img src={p.icon} alt={p.label} />
+                              <span>
+                                {p.label} (Estimate CPC : ${p.cpc})
+                              </span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="10"
+                                value={budgets[p.id]}
+                                onChange={(e) =>
+                                  setBudget(p.id, Number(e.target.value))
+                                }
+                                className="budget-input"
+                              />
+                            </div>
                           </div>
-                          <div className="budget-input-wrapper">
-                            <label>Enter Amount ($)</label>
-                            <input type="number" min="0" step="10" value={instagramBudget} onChange={(e) => setInstagramBudget(Number(e.target.value))} className="budget-input" />
-                          </div>
-                        </div>
-                      )}
-                      {accounts.includes("facebook") && (
-                        <div className="budget-card">
-                          <div className="budget-title">
-                            <img src={facebookIcon} alt="Facebook" />
-                            <span>Facebook (Estimate CPC : $2.5)</span>
-                          </div>
-                          <div className="budget-input-wrapper">
-                            <label>Enter Amount ($)</label>
-                            <input type="number" min="0" step="10" value={facebookBudget} onChange={(e) => setFacebookBudget(Number(e.target.value))} className="budget-input" />
-                          </div>
-                        </div>
-                      )}
-                      {accounts.includes("linkedin") && (
-                        <div className="budget-card">
-                          <div className="budget-title">
-                            <img src={linkedinIcon} alt="LinkedIn" />
-                            <span>LinkedIn (Estimate CPC : $1.5)</span>
-                          </div>
-                          <div className="budget-input-wrapper">
-                            <label>Enter Amount ($)</label>
-                            <input type="number" min="0" step="10" value={linkedinBudget} onChange={(e) => setLinkedinBudget(Number(e.target.value))} className="budget-input" />
-                          </div>
-                        </div>
+                        ),
                       )}
                     </div>
 
                     <div className="total-budget">
                       <div>
-                        <h4>Total Budget : ${(accounts.includes("instagram") ? instagramBudget : 0) + (accounts.includes("facebook") ? facebookBudget : 0) + (accounts.includes("linkedin") ? linkedinBudget : 0)}</h4>
-                        <p>Ad spend is charged directly by each connected social media platform. We don't handle payments.</p>
+                        <h4>
+                          Total Budget : $
+                          {PLATFORMS.filter((p) =>
+                            accounts.includes(p.id),
+                          ).reduce((sum, p) => sum + budgets[p.id], 0)}
+                        </h4>
+                        <p>
+                          Ad spend is charged directly by each connected social
+                          media platform. We don't handle payments.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -589,26 +750,56 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
 
         {/* FOOTER */}
         <div className="modal-actions">
-          <button className="cancel-btn" onClick={onClose}>Cancel</button>
+          <button className="cancel-btn" onClick={onClose}>
+            Cancel
+          </button>
           {step === 3 ? (
             mode === "paid" ? (
               <>
-                <button className="cancel-btn" onClick={() => handleCreateCampaign("draft")}>Save as Draft</button>
-                <button className="next-btn" onClick={() => handleCreateCampaign("scheduled")}>Schedule</button>
+                <button
+                  className="cancel-btn"
+                  onClick={() => handleCreateCampaign("draft")}
+                >
+                  Save as Draft
+                </button>
+                <button
+                  className="next-btn"
+                  onClick={() => handleCreateCampaign("scheduled")}
+                >
+                  Schedule
+                </button>
               </>
             ) : (
-              <button className="next-btn" onClick={() => handleCreateCampaign("live")}>Save & Post</button>
+              <button
+                className="next-btn"
+                onClick={() => handleCreateCampaign("live")}
+              >
+                Save & Post
+              </button>
             )
           ) : (
-            <button className="next-btn" onClick={handleNext}>Next</button>
+            <button className="next-btn" onClick={handleNext}>
+              Next
+            </button>
           )}
         </div>
 
         {/* ✅ INLINE PREVIEW POPUP — was completely missing from your file */}
         {inlinePreview && (
-          <div className="inline-preview-backdrop" onClick={() => setInlinePreview(null)}>
-            <div className="inline-preview-popup" onClick={(e) => e.stopPropagation()}>
-              <button className="preview-close-btn" onClick={() => setInlinePreview(null)}>✕</button>
+          <div
+            className="inline-preview-backdrop"
+            onClick={() => setInlinePreview(null)}
+          >
+            <div
+              className="inline-preview-popup"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="preview-close-btn"
+                onClick={() => setInlinePreview(null)}
+              >
+                ✕
+              </button>
               <span className="preview-filename">{inlinePreview.name}</span>
               {inlinePreview.type === "image" ? (
                 <img src={inlinePreview.src} alt={inlinePreview.name} />
@@ -618,7 +809,6 @@ export default function SocialCampaignModal({ onClose, onSave }: any) {
             </div>
           </div>
         )}
-
       </Box>
     </Modal>
   );

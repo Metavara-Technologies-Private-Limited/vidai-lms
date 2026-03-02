@@ -316,6 +316,14 @@ const theme = createTheme({
         },
       },
     },
+    MuiSelect: {
+      styleOverrides: {
+        select: {
+          position: "relative",
+          zIndex: 1,
+        },
+      },
+    },
   },
 });
 

@@ -55,7 +55,7 @@ export const LEADS_MENU: MenuItem[] = [
         key: "integration",
         label: "Integration",
         path: "/settings/integration",
-        page: lazy(() => import("../components/Settings/Menus/Integration")),
+        page: lazy(() => import("../components/Settings/Integration/Integration.tsx")),
       },
       {
         key: "tickets",
