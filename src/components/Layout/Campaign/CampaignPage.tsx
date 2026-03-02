@@ -12,7 +12,7 @@ export type CampaignType = "social" | "email";
 export type CampaignStatus =
   | "Live"
   | "Draft"
-  | "Scheduled"
+  | "Schedule"
   | "Paused"
   | "Stopped"
   | "Completed"
