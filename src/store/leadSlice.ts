@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { LeadAPI, api, type Lead } from "../services/leads.api";
 
@@ -19,7 +20,6 @@ interface LeadState {
   loading: boolean;
   error: string | null;
   deletingIds: string[];
-  // ✅ Document state
   documentsUploading: boolean;
   documentsError: string | null;
 }
@@ -312,14 +312,20 @@ const leadSlice = createSlice({
             : lead
         );
       })
-      .addCase(bookAppointment.fulfilled, (_state, _action) => {
-        // already patched optimistically
+      // ✅ Fixed: removed unused _state and _action parameters
+      .addCase(bookAppointment.fulfilled, () => {
+        // already patched optimistically in .pending
       })
       .addCase(bookAppointment.rejected, (state, action) => {
         const { leadId } = action.meta.arg;
         state.leads = state.leads.map((lead) =>
           lead.id === leadId
-            ? { ...lead, status: "New" as any, lead_status: "new" as any, book_appointment: false }
+            ? {
+                ...lead,
+                status: "New" as any,
+                lead_status: "new" as any,
+                book_appointment: false,
+              }
             : lead
         );
         state.error = action.payload ?? "Failed to book appointment";
@@ -373,7 +379,6 @@ const leadSlice = createSlice({
       .addCase(uploadLeadDocument.fulfilled, (state, action) => {
         state.documentsUploading = false;
         const { leadId, updatedLead } = action.payload;
-        // Patch the lead's documents array with the fresh server response
         state.leads = state.leads.map((lead) =>
           lead.id === leadId
             ? { ...lead, documents: updatedLead.documents ?? lead.documents }
@@ -426,7 +431,7 @@ export const selectIsLeadDeleting =
   (leadId: string) => (state: { leads: LeadState }) =>
     state.leads.deletingIds.includes(leadId);
 
-// ✅ Document selectors
+// ── Document selectors ─────────────────────────────────────────
 export const selectDocumentsUploading = (state: { leads: LeadState }) =>
   state.leads.documentsUploading;
 export const selectDocumentsError = (state: { leads: LeadState }) =>
