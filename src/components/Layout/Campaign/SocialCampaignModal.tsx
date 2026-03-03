@@ -52,7 +52,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const [accounts, setAccounts] = useState<Platform[]>([]);
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
-  // ✅ THE REAL FIX: content stored in state on every keystroke — never lost on unmount
   const [platformContent, setPlatformContent] = useState<Record<Platform, string>>({ instagram: "", facebook: "", linkedin: "" });
 
   const handleEditorInput = (platform: Platform, value: string) => {
@@ -236,9 +235,25 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       const estimatedCPC = totalSpend > 0 ? (totalSpend / 100).toFixed(2) : 0;
       const campaignMode: ("paid_advertising" | "organic_posting")[] = [mode === "paid" ? "paid_advertising" : "organic_posting"];
 
-      // ✅ Read directly from React state — always up to date, never lost
-      const platformData = platformContent;
-      const firstSelectedContent = accounts.length > 0 ? platformContent[accounts[0]] : "";
+      // ✅ FIX: Read content from refs as fallback in case state didn't sync
+      const refsMap: Record<Platform, React.RefObject<HTMLDivElement | null>> = {
+        instagram: instagramRef,
+        facebook: facebookRef,
+        linkedin: linkedinRef,
+      };
+
+      const resolvedContent: Record<Platform, string> = { instagram: "", facebook: "", linkedin: "" };
+      for (const platform of accounts) {
+        const fromState = platformContent[platform]?.trim();
+        const fromRef = refsMap[platform]?.current?.innerText?.trim() || "";
+        resolvedContent[platform] = fromState || fromRef;
+      }
+
+      const platformData = resolvedContent;
+
+      // ✅ FIX: Pick first non-empty content from selected accounts
+      const firstSelectedContent =
+        accounts.map((p) => resolvedContent[p]).find((c) => c.trim() !== "") ?? "campaign post";
 
       const payload: SocialCampaignPayload = {
         clinic: clinicId,
@@ -248,6 +263,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         target_audience: audience,
         start_date: startDate,
         end_date: endDate,
+        // ✅ FIX: added schedule_date_range — backend requires this field
+        schedule_date_range: `${startDate},${endDate}`,
         campaign_content: firstSelectedContent,
         campaign_mode: campaignMode,
         select_ad_accounts: accounts,
