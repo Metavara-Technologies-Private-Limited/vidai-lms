@@ -16,6 +16,7 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import viewIcon from "./Icons/view.png";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
@@ -69,6 +70,8 @@ export default function EditCampaignModal({
   const [facebookBudget, setFacebookBudget] = useState(250);
   const [linkedinBudget, setLinkedinBudget] = useState(150);
 
+  const [campaignContent, setCampaignContent] = useState("");
+
   const toggleAccount = (id: string) => {
     setAccounts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
@@ -90,6 +93,8 @@ export default function EditCampaignModal({
       setAudience(data.target_audience || "");
       setStartDate(data.start_date || "");
       setEndDate(data.end_date || "");
+      // ✅ SOCIAL CONTENT
+     setCampaignContent(data.campaign_content || "");
 
       // ✅ EMAIL DATA
       if (data.email?.length > 0) {
@@ -105,12 +110,19 @@ export default function EditCampaignModal({
         setAccounts(platforms);
       }
 
-      //  MODE POPULATION
-      if (data.posting_mode === 1) setMode("organic");
-      if (data.posting_mode === 2) setMode("paid");
+      // ✅ MODE FROM BACKEND
+      if (data.budget_data && data.budget_data.total_budget > 0) {
+        setMode("paid");
+      } else {
+        setMode("organic");
+      }
 
-      // If backend returns string instead:
-      // setMode(data.posting_mode || "");
+      // ✅ BUDGET POPULATION
+      if (data.budget_data?.allocation) {
+        setInstagramBudget(data.budget_data.allocation.instagram || 0);
+        setFacebookBudget(data.budget_data.allocation.facebook || 0);
+        setLinkedinBudget(data.budget_data.allocation.linkedin || 0);
+      }
 
     } catch (error) {
       console.error("Failed to fetch campaign:", error);
@@ -156,48 +168,70 @@ export default function EditCampaignModal({
         "YYYY-MM-DD HH:mm",
       ).format("YYYY-MM-DDTHH:mm:ss");
 
-      const payload = {
-        clinic: 1,
-        campaign_name: campaignName,
-        campaign_description: campaignDescription,
-        campaign_objective: objective,
-        target_audience: audience,
-        start_date: startDate,
-        end_date: endDate,
-        campaign_mode: campaign.type === "email" ? 2 : 1,
-        selected_start: scheduledDateTime,
-        selected_end: scheduledDateTime,
-        enter_time: scheduleTime,
-        email:
-          campaign.type === "email"
-            ? [
-                {
-                  id: fullCampaignData.email?.[0]?.id,
-                  audience_name: audience,
-                  subject: subject,
-                  email_body: emailBody,
-                  template_name: "EMAIL",
-                  sender_email: "noreply@clinic.com",
-                  scheduled_at: scheduledDateTime,
-                  is_active: true,
-                },
-              ]
-            : [],
-        social_media:
-          campaign.type === "social"
-            ? accounts.map((platform) => {
-                const existing = fullCampaignData.social_media?.find(
-                  (sm: any) => sm.platform_name === platform,
-                );
-                return {
-                  id: existing?.id,
-                  platform_name: platform,
-                  is_active: true,
-                };
-              })
-            : [],
-      };
+     const payload = {
+  clinic: 1,
+  campaign_name: campaignName,
+  campaign_description: campaignDescription,
+  campaign_objective: objective,
+  target_audience: audience,
+  start_date: startDate,
+  end_date: endDate,
+  campaign_mode: campaign.type === "email" ? 2 : 1,
+  selected_start: scheduledDateTime,
+  selected_end: scheduledDateTime,
+  enter_time: scheduleTime,
 
+  status: fullCampaignData?.status || "draft",
+
+  // ✅ EMAIL
+  email:
+    campaign.type === "email"
+      ? [
+          {
+            id: fullCampaignData.email?.[0]?.id,
+            audience_name: audience,
+            subject: subject,
+            email_body: emailBody,
+            template_name: "EMAIL",
+            sender_email: "noreply@clinic.com",
+            scheduled_at: scheduledDateTime,
+            is_active: true,
+          },
+        ]
+      : [],
+
+  // ✅ SOCIAL
+  ...(campaign.type === "social" && {
+    campaign_content: campaignContent,
+
+    platform_data: {
+      instagram: accounts.includes("instagram")
+        ? { is_active: true }
+        : undefined,
+      facebook: accounts.includes("facebook")
+        ? { is_active: true }
+        : undefined,
+      linkedin: accounts.includes("linkedin")
+        ? { is_active: true }
+        : undefined,
+    },
+
+    budget_data:
+      mode === "paid"
+        ? {
+            total_budget:
+              instagramBudget +
+              facebookBudget +
+              linkedinBudget,
+            allocation: {
+              instagram: instagramBudget,
+              facebook: facebookBudget,
+              linkedin: linkedinBudget,
+            },
+          }
+        : null,
+  }),
+};
       const response = await CampaignAPI.update(campaign.id, payload);
       onSave(response.data);
       onClose();
@@ -575,15 +609,17 @@ export default function EditCampaignModal({
                 <div className="content-row">
                   <img src={instagramIcon} alt="Instagram" />
                   <textarea
-                    placeholder="What would you like to share on Instagram?"
-                    disabled={!accounts.includes("instagram")}
-                    style={{
-                      opacity: accounts.includes("instagram") ? 1 : 0.5,
-                      cursor: accounts.includes("instagram")
-                        ? "text"
-                        : "not-allowed",
-                    }}
-                  />
+                  value={campaignContent}
+                  onChange={(e) => setCampaignContent(e.target.value)}
+                  placeholder="What would you like to share on Instagram?"
+                  disabled={!accounts.includes("instagram")}
+                  style={{
+                    opacity: accounts.includes("instagram") ? 1 : 0.5,
+                    cursor: accounts.includes("instagram")
+                      ? "text"
+                      : "not-allowed",
+                  }}
+                />
                 </div>
 
                 <div className="content-row">
@@ -654,12 +690,11 @@ export default function EditCampaignModal({
                   className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}
                 >
                   <label>Enter Time</label>
-                  <input
-                    className="schedule-input"
-                    type="time"
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                  />
+                   <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <TimePicker format="hh:mm A" value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null} 
+                      onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }} ampm 
+                      slotProps={{ textField: { fullWidth: true } }} />
+                   </LocalizationProvider>
                 </div>
               </div>
             </div>

@@ -18,6 +18,7 @@ import cpcIcon from "./Icons/cpc.png";
 import cpaIcon from "./Icons/cpa.png";
 import CampaignTabContent from "./CampaignTabContent";
 import { IconButton } from "@mui/material";
+import { CampaignAPI } from "../../../../src/services/campaign.api";
 
 interface Campaign {
   id: string;
@@ -67,6 +68,7 @@ const CampaignDashboard = ({
     : "-";
 
   const platforms = campaign.platforms || [];
+  const [fullData, setFullData] = React.useState<any>(null);
 
   const metrics = [
     { title: "Total Impressions", value: "0", icon: impressionsIcon },
@@ -76,12 +78,25 @@ const CampaignDashboard = ({
       value: campaign.lead_generated || "0",
       icon: conversionsIcon,
     },
-    {title: "Total Spend",value: `$${campaign.total_spend ?? 0}`,icon: spendIcon,},
+    {title: "Total Spend",value: `$${fullData?.budget_data?.total_budget ?? 0}`,icon: spendIcon,},
     { title: "CTR", value: "0%", icon: ctrIcon },
     { title: "Conversion Rate", value: "0%", icon: conversionRateIcon },
     {title: "CPC",value: `$${campaign.cpc?.toFixed(2) ?? 0}`,icon: cpcIcon,},
     { title: "CPA", value: "$0", icon: cpaIcon },
   ];
+
+React.useEffect(() => {
+  const fetchDetails = async () => {
+    try {
+      const response = await CampaignAPI.get(campaign.id);
+      setFullData(response.data);
+    } catch (error) {
+      console.error("Failed to fetch campaign details", error);
+    }
+  };
+
+  fetchDetails();
+}, [campaign.id]);
 
   return (
     <div className="cd-wrapper">
@@ -188,10 +203,10 @@ const CampaignDashboard = ({
 
       {/* ================= TAB CONTENT ================= */}
       <CampaignTabContent
-        campaign={campaign as any}
-        activeTab={activeTab}
-        activeSubTab={activeSubTab}
-      />
+  campaign={fullData || campaign}
+  activeTab={activeTab}
+  // activeSubTab={activeSubTab}
+/>
     </div>
   );
 };

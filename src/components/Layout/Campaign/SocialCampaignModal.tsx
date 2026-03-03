@@ -20,7 +20,7 @@ import SocialContentBox from "./SocialContentBox";
 import { useSelector } from "react-redux";
 import { selectClinic } from "../../../store/clinicSlice";
 
-type Props = {
+type Props = {  
   onClose: () => void;
   onSave: (campaign: Campaign) => void;
 };
@@ -266,7 +266,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
       const formattedCampaign: Campaign = {
         id: apiData.id,
-        name: apiData.campaign_name,
+        campaign_name: apiData.campaign_name,
         type: "social",
         status: type === "live" ? "Live" : type === "draft" ? "Draft" : "Scheduled",
         start: apiData.start_date,
@@ -274,7 +274,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         platforms: accounts,
         leads: 0,
         lead_generated: 0,
-        scheduledAt: type === "scheduled" ? scheduledDateTime : null,
+        scheduledAt: apiData.scheduled_at ?? undefined,
         total_spend: mode === "paid" ? totalSpend : 0,
         cpc: mode === "paid" ? Number(estimatedCPC) : 0,
       };

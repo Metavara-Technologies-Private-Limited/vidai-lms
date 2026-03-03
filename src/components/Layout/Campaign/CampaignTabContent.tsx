@@ -23,26 +23,45 @@ import {
 interface Props {
   campaign: Campaign;   
   activeTab: string;
-  activeSubTab: string;
+  // activeSubTab: string;
 }
 
-const performanceData = [
-  { date: "1 Jan", facebook: 650, instagram: 520 },
-  { date: "2 Jan", facebook: 630, instagram: 600 },
-  { date: "3 Jan", facebook: 520, instagram: 480 },
-  { date: "4 Jan", facebook: 280, instagram: 320 },
-  { date: "5 Jan", facebook: 240, instagram: 260 },
-  { date: "6 Jan", facebook: 620, instagram: 580 },
-  { date: "7 Jan", facebook: 160, instagram: 220 }
-];
+// const performanceData = campaign.performance_data || [];
 
-const platformData = [
-  { name: "Instagram", value: 30, color: "#A8AEBF" },
-  { name: "Facebook", value: 20, color: "#C5CAD8" },
-  { name: "LinkedIn", value: 50, color: "#8D95A8" }
-];
+// const allocation = campaign.budget_data?.allocation || {};
 
-const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
+// const platformData = Object.keys(allocation).map((key) => ({
+//   name: key.charAt(0).toUpperCase() + key.slice(1),
+//   value:
+//     campaign.budget_data?.total_budget > 0
+//       ? Math.round(
+//           (allocation[key] /
+//             campaign.budget_data.total_budget) *
+//             100,
+//         )
+//       : 0,
+//   color: "#A8AEBF"
+// }));
+
+const CampaignTabContent: React.FC<Props> = ({
+  campaign,
+  activeTab
+  // activeSubTab
+}) => {
+  const performanceData = campaign.performance_data || [];
+
+const allocation = campaign.budget_data?.allocation || {};
+
+const totalBudget = campaign.budget_data?.total_budget || 0;
+
+const platformData = Object.keys(allocation).map((key) => ({
+  name: key.charAt(0).toUpperCase() + key.slice(1),
+  value:
+    totalBudget > 0
+      ? Math.round((allocation[key] / totalBudget) * 100)
+      : 0,
+  color: "#A8AEBF",
+}));
   const [selectedPlatform, setSelectedPlatform] =
     React.useState<"facebook" | "instagram">("facebook");
   // const [activeIndex, setActiveIndex] =
@@ -50,38 +69,32 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
 
   /* ================= CONTENT ================= */
   if (activeTab === "Content") {
-    return (
-      <div className="cd-content-card">
-        <div className="cd-content-text">
-          <h3 className="cd-content-title">IVF Awareness</h3>
+  return (
+    <div className="cd-content-card">
+      
+      {/* LEFT SIDE TEXT */}
+      <div className="cd-content-text">
+        <h3 className="cd-content-title">
+          {campaign.type === "email"
+            ? campaign.email?.[0]?.subject || "No Subject"
+            : campaign.campaign_name || "Campaign"}
+        </h3>
 
-          <p>
-            Struggling to conceive can feel overwhelming—but you’re not alone.
-            Millions of couples across the world face fertility challenges, and
-            IVF has become a proven, safe, and effective path toward parenthood.
-            With the right medical guidance, advanced technology, and
-            compassionate care, many families have successfully taken their
-            first step toward a brighter future.
-          </p>
-
-          <p>
-            Our fertility experts are here to support you at every stage of
-            your journey—helping you understand your options, address concerns,
-            and choose a treatment plan tailored to your needs.
-          </p>
-
-          <p className="cd-content-tags">
-            #IVFAwareness #FertilityCare #ParenthoodJourney
-            #IVFSupport #HopeStartsHere
-          </p>
-        </div>
-
-        <div className="cd-content-image">
-          <img src={contentImage} alt="IVF Awareness Ad" />
-        </div>
+        <p>
+          {campaign.type === "email"
+            ? campaign.email?.[0]?.email_body || "No Email Content"
+            : campaign.campaign_content || "No Content Available"}
+        </p>
       </div>
-    );
-  }
+
+      {/* RIGHT SIDE IMAGE (UNCHANGED) */}
+      <div className="cd-content-image">
+        <img src={contentImage} alt="Campaign Content" />
+      </div>
+
+    </div>
+  );
+}
 
   /* ================= PERFORMANCE ================= */
  if (activeTab === "Performance") {
@@ -318,14 +331,27 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
         </div>
         <div className="cd-platform-cards">
 
-          <PlatformCard
-            icon={instagramIcon}
-            title="Instagram"
-            spend="$1200"
-            conversion="60"
-          />
+          {Object.keys(allocation).map((platform) => {
+  const spend = allocation[platform] || 0;
 
-          <PlatformCard
+  return (
+    <PlatformCard
+      key={platform}
+      icon={
+        platform === "instagram"
+          ? instagramIcon
+          : platform === "facebook"
+          ? facebookIcon
+          : linkedinIcon
+      }
+      title={platform.charAt(0).toUpperCase() + platform.slice(1)}
+      spend={`$${spend}`}
+      conversion={String(campaign.lead_generated ?? 0)}
+    />
+  );
+})}
+
+          {/* <PlatformCard
             icon={facebookIcon}
             title="Facebook"
             spend="$1300"
@@ -337,7 +363,7 @@ const CampaignTabContent: React.FC<Props> = ({ activeTab }) => {
             title="LinkedIn"
             spend="$1500"
             conversion="80"
-          />
+          /> */}
 
         </div>
 
