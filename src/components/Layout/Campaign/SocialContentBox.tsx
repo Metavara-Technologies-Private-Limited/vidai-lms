@@ -10,18 +10,17 @@ interface Props {
   platform: Platform;
   icon: string;
   label: string;
+  mediaRef: React.RefObject<HTMLDivElement | null>;
   onText: () => void;
   onLink: (platform: Platform) => void;
   onEmoji: (platform: Platform) => void;
   onImage: (platform: Platform) => void;
   onAttachment: (platform: Platform) => void;
+  onInput: (platform: Platform, value: string) => void; // ✅ NEW
 }
 
 const SocialContentBox = forwardRef<HTMLDivElement, Props>(
-  (
-    { platform, icon, label, onText, onLink, onEmoji, onImage, onAttachment },
-    ref,
-  ) => {
+  ({ platform, icon, label, mediaRef, onText, onLink, onEmoji, onImage, onAttachment, onInput }, ref) => {
     return (
       <div className="social-content-box">
         <div className="social-header">
@@ -29,13 +28,17 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
           <span>{label}</span>
         </div>
 
-        <div ref={ref} className="media-preview-area" />
+        <div ref={mediaRef} className="media-preview-area" />
 
         <div
+          ref={ref}
           className="editor"
           contentEditable
           suppressContentEditableWarning
+          data-platform={platform}
           data-placeholder={`What would you like to share on ${label}?`}
+          // ✅ NEW: fires on every keystroke, emoji, paste, bold etc.
+          onInput={(e) => onInput(platform, (e.currentTarget.innerText || e.currentTarget.textContent || "").trim())}
         />
 
         <div className="social-toolbar-container">
@@ -53,5 +56,4 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
 );
 
 SocialContentBox.displayName = "SocialContentBox";
-
 export default SocialContentBox;
