@@ -1,6 +1,17 @@
 import type { SxProps, Theme } from "@mui/material";
 
 export const slaAlertsStyles = {
+  scrollArea: {
+    maxHeight: { xs: 360, md: 640 },
+    overflowY: "auto",
+    pr: 0.5,
+    scrollbarWidth: "none",
+    msOverflowStyle: "none",
+    "&::-webkit-scrollbar": {
+      display: "none",
+    },
+  },
+
   alertItem: {
     display: "flex",
     gap: 1.5,

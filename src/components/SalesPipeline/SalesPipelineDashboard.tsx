@@ -19,7 +19,7 @@ import {
 	Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import CreateNewPipeline from "./createnewpipeline";
+import CreateNewPipeline from "./CreateNewPipeline";
 import SalesPipeLineData from "./SalesPipeLineData";
 
 type PipelineCard = {
