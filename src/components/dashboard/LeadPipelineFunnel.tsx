@@ -59,7 +59,7 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
         isWithinTimeRange(lead.modified_at || lead.created_at, timeRange),
     );
 
-    return stages.map(item => {
+    const stageCounts = stages.map((item, order) => {
       const count = filteredLeads.filter((lead) => {
         const normalized = normalizeLeadStatus(
           (lead.lead_status as string | undefined) || (lead as { status?: string }).status
@@ -70,8 +70,14 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
       return {
         ...item,
         value: count || 0,
+        order,
       };
     });
+
+    return stageCounts
+      .sort((a, b) => b.value - a.value || a.order - b.order)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .map(({ order, ...item }) => item);
   }, [leads, timeRange]);
 
   if (loading) {
