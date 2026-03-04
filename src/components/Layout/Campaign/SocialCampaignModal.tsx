@@ -31,7 +31,7 @@ const PLATFORMS: { id: Platform; label: string; icon: string; cpc: number }[] = 
   { id: "linkedin", label: "LinkedIn", icon: linkedinIcon, cpc: 1.5 },
 ];
 
-// ✅ Helper: check if a string is a plain URL (no spaces, starts with http)
+// Helper: check if a string is a plain URL (no spaces, starts with http)
 const isPlainUrl = (str: string) =>
   str.trim().startsWith("http") && !str.trim().includes(" ");
 
@@ -67,14 +67,14 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     linkedin: "",
   });
 
-  // ✅ Per-platform image URLs — typed into the Image URL field in SocialContentBox
+  // Per-platform image URLs — typed into the Image URL field in SocialContentBox
   const [platformImageUrls, setPlatformImageUrls] = useState<Record<Platform, string>>({
     instagram: "",
     facebook: "",
     linkedin: "",
   });
 
-  // ✅ Also mirror platformImageUrls in a ref so it's always current at submit time
+  // Also mirror platformImageUrls in a ref so it's always current at submit time
   const platformImageUrlsRef = useRef<Record<Platform, string>>({
     instagram: "",
     facebook: "",
@@ -235,7 +235,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
   const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
     setSubmitted(true);
-    if (!step1Valid || !step2Valid || !scheduleDate || !scheduleTime) return;
+
+    // FIX: For organic "live" posts, schedule date/time are not required
+    const needsSchedule = type === "scheduled" || type === "draft";
+    if (!step1Valid || !step2Valid) return;
+    if (needsSchedule && (!scheduleDate || !scheduleTime)) return;
 
     try {
       const scheduledDateTime =
@@ -269,7 +273,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         resolvedContent[platform] = fromState || fromRef;
       }
 
-      // ✅ Resolve image_url — priority order:
+      // Resolve image_url — priority order:
       //    1. Image URL field (ref — always current, no stale closure)
       //    2. Image URL field (state — fallback)
       //    3. If content editor only has a plain URL, use that as image_url
@@ -297,7 +301,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         }
       }
 
-      // ✅ campaign_content: use first non-empty, non-URL content; fallback to campaign name
+      // campaign_content: use first non-empty, non-URL content; fallback to campaign name
       const firstSelectedContent =
         accounts
           .map((p) => resolvedContent[p])
@@ -305,6 +309,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
       console.log("📸 image_url to send:", image_url ?? "none");
       console.log("📝 campaign_content:", firstSelectedContent);
+      console.log("📱 platforms (accounts):", accounts); // DEBUG
 
       const payload: SocialCampaignPayload = {
         clinic: clinicId,
@@ -328,20 +333,28 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         },
         status: type === "live" ? "live" : type === "scheduled" ? "scheduled" : "draft",
         is_active: type === "live",
-        // ✅ Sent to backend — stored in campaign.image_url, used by post_to_facebook()
         image_url: image_url,
       };
 
       const response = await CampaignAPI.createSocial(payload);
-      const apiData = response.data;
+
+      // Create API returns: { message: "...", campaigns: [{ campaign_id, mode, platforms, fb_post_id }] }
+      // Fields like campaign_name, start_date are NOT in the response — use local form state instead.
+      const createdCampaign = response.data?.campaigns?.[0] ?? {};
+
+      const mappedStatus =
+        type === "live" ? "Live" : type === "draft" ? "Draft" : "Scheduled";
 
       const formattedCampaign: Campaign = {
-        id: apiData.id,
-        name: apiData.campaign_name,
+        // campaign_id is in the nested campaigns[0] object, not response.data directly
+        id: createdCampaign.campaign_id ?? createdCampaign.id ?? crypto.randomUUID(),
+        // Use local form state for all display fields (not returned by create API)
+        name: campaignName,
         type: "social",
-        status: type === "live" ? "Live" : type === "draft" ? "Draft" : "Scheduled",
-        start: apiData.start_date,
-        end: apiData.end_date,
+        status: mappedStatus,
+        start: startDate,
+        end: endDate,
+        // accounts state always has the correct selected platforms
         platforms: accounts,
         leads: 0,
         lead_generated: 0,
@@ -349,6 +362,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         total_spend: mode === "paid" ? totalSpend : 0,
         cpc: mode === "paid" ? Number(estimatedCPC) : 0,
       };
+
+      console.log("✅ formattedCampaign.platforms:", formattedCampaign.platforms); // DEBUG
 
       onSave(formattedCampaign);
       toast.success("Campaign created successfully");
@@ -667,6 +682,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 </button>
               </>
             ) : (
+              // FIX: organic "Save & Post" → type "live" — no schedule date/time required
               <button className="next-btn" onClick={() => handleCreateCampaign("live")}>
                 Save & Post
               </button>
