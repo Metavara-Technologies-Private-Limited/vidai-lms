@@ -31,7 +31,6 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
       onText,
       onLink,
       onEmoji,
-      onImage,
       onAttachment,
       onInput,
       onImageUrl,
@@ -73,7 +72,7 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
           }
         />
 
-        {/* ✅ Image URL input */}
+        {/* Image URL input */}
         <div className="image-url-section">
           <label className="image-url-label">
             <ImageIcon
@@ -123,10 +122,10 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
         {/* Toolbar */}
         <div className="social-toolbar-container">
           <div className="social-toolbar">
-            <TextFieldsIcon onClick={onText} title="Bold" />
-            <LinkIcon onClick={() => onLink(platform)} title="Insert link" />
-            <EmojiEmotionsIcon onClick={() => onEmoji(platform)} title="Insert emoji" />
-            <AttachFileIcon onClick={() => onAttachment(platform)} title="Attach file" />
+            <span title="Bold"><TextFieldsIcon onClick={onText} /></span>
+            <span title="Insert link"><LinkIcon onClick={() => onLink(platform)} /></span>
+            <span title="Insert emoji"><EmojiEmotionsIcon onClick={() => onEmoji(platform)} /></span>
+            <span title="Attach file"><AttachFileIcon onClick={() => onAttachment(platform)} /></span>
           </div>
         </div>
       </div>
