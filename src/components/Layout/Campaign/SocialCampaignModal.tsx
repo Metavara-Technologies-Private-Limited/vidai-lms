@@ -31,6 +31,10 @@ const PLATFORMS: { id: Platform; label: string; icon: string; cpc: number }[] = 
   { id: "linkedin", label: "LinkedIn", icon: linkedinIcon, cpc: 1.5 },
 ];
 
+// ✅ Helper: check if a string is a plain URL (no spaces, starts with http)
+const isPlainUrl = (str: string) =>
+  str.trim().startsWith("http") && !str.trim().includes(" ");
+
 export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
@@ -46,18 +50,47 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const [endDate, setEndDate] = useState("");
 
   const step1Valid =
-    campaignName.trim() && campaignDescription.trim() && objective && audience && startDate && endDate;
+    campaignName.trim() &&
+    campaignDescription.trim() &&
+    objective &&
+    audience &&
+    startDate &&
+    endDate;
 
   /* ================= STEP 2 ================= */
   const [accounts, setAccounts] = useState<Platform[]>([]);
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
-  const [platformContent, setPlatformContent] = useState<Record<Platform, string>>({ instagram: "", facebook: "", linkedin: "" });
+  const [platformContent, setPlatformContent] = useState<Record<Platform, string>>({
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+  });
+
+  // ✅ Per-platform image URLs — typed into the Image URL field in SocialContentBox
+  const [platformImageUrls, setPlatformImageUrls] = useState<Record<Platform, string>>({
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+  });
+
+  // ✅ Also mirror platformImageUrls in a ref so it's always current at submit time
+  const platformImageUrlsRef = useRef<Record<Platform, string>>({
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+  });
 
   const handleEditorInput = (platform: Platform, value: string) => {
     setPlatformContent((prev) => ({ ...prev, [platform]: value }));
   };
 
+  const handleImageUrl = (platform: Platform, url: string) => {
+    platformImageUrlsRef.current[platform] = url;
+    setPlatformImageUrls((prev) => ({ ...prev, [platform]: url }));
+  };
+
+  /* ---- Refs ---- */
   const instagramRef = useRef<HTMLDivElement>(null);
   const facebookRef = useRef<HTMLDivElement>(null);
   const linkedinRef = useRef<HTMLDivElement>(null);
@@ -66,11 +99,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const facebookMediaRef = useRef<HTMLDivElement>(null);
   const linkedinMediaRef = useRef<HTMLDivElement>(null);
 
-  const instagramImageRef = useRef<HTMLInputElement>(null);
   const instagramFileRef = useRef<HTMLInputElement>(null);
-  const facebookImageRef = useRef<HTMLInputElement>(null);
   const facebookFileRef = useRef<HTMLInputElement>(null);
-  const linkedinImageRef = useRef<HTMLInputElement>(null);
   const linkedinFileRef = useRef<HTMLInputElement>(null);
 
   const platformRefs: Record<Platform, React.RefObject<HTMLDivElement | null>> = {
@@ -85,25 +115,27 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     linkedin: linkedinMediaRef,
   };
 
-  const imageInputRefs: Record<Platform, React.RefObject<HTMLInputElement | null>> = {
-    instagram: instagramImageRef,
-    facebook: facebookImageRef,
-    linkedin: linkedinImageRef,
-  };
-
   const fileInputRefs: Record<Platform, React.RefObject<HTMLInputElement | null>> = {
     instagram: instagramFileRef,
     facebook: facebookFileRef,
     linkedin: linkedinFileRef,
   };
 
-  const [inlinePreview, setInlinePreview] = useState<{ src: string; type: "image" | "file"; name: string } | null>(null);
+  const [inlinePreview, setInlinePreview] = useState<{
+    src: string;
+    type: "image" | "file";
+    name: string;
+  } | null>(null);
 
   const step2Valid = accounts.length > 0 && mode;
 
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
-  const [budgets, setBudgets] = useState<Record<Platform, number>>({ instagram: 350, facebook: 250, linkedin: 150 });
+  const [budgets, setBudgets] = useState<Record<Platform, number>>({
+    instagram: 350,
+    facebook: 250,
+    linkedin: 150,
+  });
 
   const setBudget = (platform: Platform, value: number) =>
     setBudgets((prev) => ({ ...prev, [platform]: value }));
@@ -140,7 +172,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const handleLink = (platform: string) => {
     const url = prompt("Enter URL");
     if (!url) return;
-    insertHTML(platform, `<a href="${url}" target="_blank" style="color:#2563eb;text-decoration:underline;">${url}</a>`);
+    insertHTML(
+      platform,
+      `<a href="${url}" target="_blank" style="color:#2563eb;text-decoration:underline;">${url}</a>`
+    );
   };
 
   const handleEmoji = (platform: string) => {
@@ -149,10 +184,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     document.execCommand("insertText", false, "😊");
   };
 
-  const handleImage = (platform: string) => {
-    if (platform === "instagram") instagramImageRef.current?.click();
-    if (platform === "facebook") facebookImageRef.current?.click();
-    if (platform === "linkedin") linkedinImageRef.current?.click();
+  const handleImage = (_platform: string) => {
+    // No-op: images handled via URL input field in SocialContentBox
   };
 
   const handleAttachment = (platform: string) => {
@@ -161,64 +194,43 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     if (platform === "linkedin") linkedinFileRef.current?.click();
   };
 
-  const handleFileInsert = (e: React.ChangeEvent<HTMLInputElement>, platform: string, type: "image" | "file") => {
+  const handleFileInsert = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    platform: string
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const mediaRef = getMediaRef(platform);
-    if (type === "image") {
-      const reader = new FileReader();
-      reader.onload = (event: ProgressEvent<FileReader>) => {
-        const src = event.target?.result as string;
-        const wrapper = document.createElement("div");
-        wrapper.className = "inserted-image-wrapper";
-        const img = document.createElement("img");
-        img.src = src;
-        img.style.cursor = "pointer";
-        img.onclick = () => setInlinePreview({ src, type: "image", name: file.name });
-        const removeBtn = document.createElement("button");
-        removeBtn.textContent = "✕";
-        removeBtn.className = "remove-btn";
-        removeBtn.contentEditable = "false";
-        removeBtn.onclick = () => wrapper.remove();
-        wrapper.appendChild(img);
-        wrapper.appendChild(removeBtn);
-        mediaRef.current?.appendChild(wrapper);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      const objectUrl = URL.createObjectURL(file);
-      const wrapper = document.createElement("div");
-      wrapper.className = "inserted-file-wrapper";
-      const label = document.createElement("span");
-      label.className = "file-label";
-      label.textContent = file.name;
-      label.style.cursor = "pointer";
-      label.onclick = () => setInlinePreview({ src: objectUrl, type: "file", name: file.name });
-      const removeBtn = document.createElement("button");
-      removeBtn.textContent = "✕";
-      removeBtn.className = "remove-btn";
-      removeBtn.contentEditable = "false";
-      removeBtn.onclick = () => wrapper.remove();
-      wrapper.appendChild(label);
-      wrapper.appendChild(removeBtn);
-      mediaRef.current?.appendChild(wrapper);
-    }
+    const objectUrl = URL.createObjectURL(file);
+    const wrapper = document.createElement("div");
+    wrapper.className = "inserted-file-wrapper";
+    const label = document.createElement("span");
+    label.className = "file-label";
+    label.textContent = file.name;
+    label.style.cursor = "pointer";
+    label.onclick = () => setInlinePreview({ src: objectUrl, type: "file", name: file.name });
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "✕";
+    removeBtn.className = "remove-btn";
+    removeBtn.contentEditable = "false";
+    removeBtn.onclick = () => wrapper.remove();
+    wrapper.appendChild(label);
+    wrapper.appendChild(removeBtn);
+    mediaRef.current?.appendChild(wrapper);
     e.target.value = "";
   };
 
   const toggleAccount = (id: Platform) => {
-    setAccounts((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    setAccounts((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   const handleNext = () => {
     setSubmitted(true);
-    if (step === 1 && step1Valid) {
-      setStep(2);
-      setSubmitted(false);
-    } else if (step === 2 && step2Valid) {
-      setStep(3);
-      setSubmitted(false);
-    }
+    if (step === 1 && step1Valid) { setStep(2); setSubmitted(false); }
+    else if (step === 2 && step2Valid) { setStep(3); setSubmitted(false); }
   };
 
   const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
@@ -231,29 +243,68 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           ? dayjs(`${scheduleDate} ${scheduleTime}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DDTHH:mm:ss")
           : null;
 
-      const totalSpend = PLATFORMS.filter((p) => accounts.includes(p.id)).reduce((sum, p) => sum + budgets[p.id], 0);
+      const totalSpend = PLATFORMS.filter((p) => accounts.includes(p.id)).reduce(
+        (sum, p) => sum + budgets[p.id], 0
+      );
       const estimatedCPC = totalSpend > 0 ? (totalSpend / 100).toFixed(2) : 0;
-      const campaignMode: ("paid_advertising" | "organic_posting")[] = [mode === "paid" ? "paid_advertising" : "organic_posting"];
+      const campaignMode: ("paid_advertising" | "organic_posting")[] = [
+        mode === "paid" ? "paid_advertising" : "organic_posting",
+      ];
 
-      // ✅ FIX: Read content from refs as fallback in case state didn't sync
       const refsMap: Record<Platform, React.RefObject<HTMLDivElement | null>> = {
         instagram: instagramRef,
         facebook: facebookRef,
         linkedin: linkedinRef,
       };
 
-      const resolvedContent: Record<Platform, string> = { instagram: "", facebook: "", linkedin: "" };
+      const resolvedContent: Record<Platform, string> = {
+        instagram: "",
+        facebook: "",
+        linkedin: "",
+      };
+
       for (const platform of accounts) {
         const fromState = platformContent[platform]?.trim();
         const fromRef = refsMap[platform]?.current?.innerText?.trim() || "";
         resolvedContent[platform] = fromState || fromRef;
       }
 
-      const platformData = resolvedContent;
+      // ✅ Resolve image_url — priority order:
+      //    1. Image URL field (ref — always current, no stale closure)
+      //    2. Image URL field (state — fallback)
+      //    3. If content editor only has a plain URL, use that as image_url
+      let image_url: string | null = null;
 
-      // ✅ FIX: Pick first non-empty content from selected accounts
+      for (const p of accounts) {
+        const fromRef = platformImageUrlsRef.current[p]?.trim();
+        const fromState = platformImageUrls[p]?.trim();
+        const candidate = fromRef || fromState || "";
+        if (candidate) {
+          image_url = candidate;
+          break;
+        }
+      }
+
+      // Fallback: if user pasted URL into content editor instead of image field
+      if (!image_url) {
+        for (const p of accounts) {
+          const content = resolvedContent[p]?.trim();
+          if (content && isPlainUrl(content)) {
+            image_url = content;
+            resolvedContent[p] = ""; // clear it from content so it's not used as post text
+            break;
+          }
+        }
+      }
+
+      // ✅ campaign_content: use first non-empty, non-URL content; fallback to campaign name
       const firstSelectedContent =
-        accounts.map((p) => resolvedContent[p]).find((c) => c.trim() !== "") ?? "campaign post";
+        accounts
+          .map((p) => resolvedContent[p])
+          .find((c) => c.trim() !== "" && !isPlainUrl(c)) ?? campaignName;
+
+      console.log("📸 image_url to send:", image_url ?? "none");
+      console.log("📝 campaign_content:", firstSelectedContent);
 
       const payload: SocialCampaignPayload = {
         clinic: clinicId,
@@ -263,19 +314,22 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         target_audience: audience,
         start_date: startDate,
         end_date: endDate,
-        // ✅ FIX: added schedule_date_range — backend requires this field
         schedule_date_range: `${startDate},${endDate}`,
         campaign_content: firstSelectedContent,
         campaign_mode: campaignMode,
         select_ad_accounts: accounts,
         enter_time: scheduleTime,
-        platform_data: platformData,
+        platform_data: resolvedContent,
         budget_data: {
           ...budgets,
-          total: PLATFORMS.filter((p) => accounts.includes(p.id)).reduce((sum, p) => sum + budgets[p.id], 0),
+          total: PLATFORMS.filter((p) => accounts.includes(p.id)).reduce(
+            (sum, p) => sum + budgets[p.id], 0
+          ),
         },
         status: type === "live" ? "live" : type === "scheduled" ? "scheduled" : "draft",
         is_active: type === "live",
+        // ✅ Sent to backend — stored in campaign.image_url, used by post_to_facebook()
+        image_url: image_url,
       };
 
       const response = await CampaignAPI.createSocial(payload);
@@ -342,12 +396,20 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
             <div className={`form-group ${submitted && !campaignName ? "error" : ""}`}>
               <label>Campaign Name *</label>
-              <input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="e.g. New Product Launch" />
+              <input
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="e.g. New Product Launch"
+              />
             </div>
 
             <div className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}>
               <label>Campaign Description *</label>
-              <input value={campaignDescription} onChange={(e) => setCampaignDescription(e.target.value)} placeholder="e.g. Contains records of routine checks..." />
+              <input
+                value={campaignDescription}
+                onChange={(e) => setCampaignDescription(e.target.value)}
+                placeholder="e.g. Contains records of routine checks..."
+              />
             </div>
 
             <div className="form-row">
@@ -430,7 +492,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
               <h3>Campaign Mode</h3>
               <p className="section-subtitle">Choose a campaign mode to optimize your ad strategy</p>
               <div className="mode-row">
-                <div className={`mode-card ${mode === "organic" ? "selected" : ""}`} onClick={() => setMode("organic")}>
+                <div
+                  className={`mode-card ${mode === "organic" ? "selected" : ""}`}
+                  onClick={() => setMode("organic")}
+                >
                   <div className="mode-left">
                     <div className={`radio ${mode === "organic" ? "checked" : ""}`} />
                     <div className="mode-text">
@@ -440,7 +505,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   </div>
                   <span className="badge">No Budget Required</span>
                 </div>
-                <div className={`mode-card ${mode === "paid" ? "selected" : ""}`} onClick={() => setMode("paid")}>
+                <div
+                  className={`mode-card ${mode === "paid" ? "selected" : ""}`}
+                  onClick={() => setMode("paid")}
+                >
                   <div className="mode-left">
                     <div className={`radio ${mode === "paid" ? "checked" : ""}`} />
                     <div className="mode-text">
@@ -458,10 +526,16 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 <h2>Campaign Content</h2>
                 <p className="section-subtitle">Create your post content with AI assistance</p>
 
+                {/* File attachment inputs */}
                 {PLATFORMS.map((p) => (
                   <React.Fragment key={p.id}>
-                    <input ref={imageInputRefs[p.id]} type="file" accept="image/*" hidden onChange={(e) => handleFileInsert(e, p.id, "image")} />
-                    <input ref={fileInputRefs[p.id]} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" hidden onChange={(e) => handleFileInsert(e, p.id, "file")} />
+                    <input
+                      ref={fileInputRefs[p.id]}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                      hidden
+                      onChange={(e) => handleFileInsert(e, p.id)}
+                    />
                   </React.Fragment>
                 ))}
 
@@ -479,6 +553,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     onImage={handleImage}
                     onAttachment={handleAttachment}
                     onInput={handleEditorInput}
+                    onImageUrl={handleImageUrl}
+                    imageUrl={platformImageUrls[p.id]}
                   />
                 ))}
               </div>
@@ -496,7 +572,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 <div>
                   <h3>{mode === "paid" ? "Schedule & Budget Allocation" : "Schedule"}</h3>
                   <p className="section-subtitle">
-                    {mode === "paid" ? "Establish your schedule and budget for every platform." : "Select a date and time for the campaign."}
+                    {mode === "paid"
+                      ? "Establish your schedule and budget for every platform."
+                      : "Select a date and time for the campaign."}
                   </p>
                 </div>
                 <button className="ai-btn">✨ AI-Optimization Timing</button>
@@ -557,9 +635,15 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     <div className="total-budget">
                       <div>
                         <h4>
-                          Total Budget : ${PLATFORMS.filter((p) => accounts.includes(p.id)).reduce((sum, p) => sum + budgets[p.id], 0)}
+                          Total Budget : $
+                          {PLATFORMS.filter((p) => accounts.includes(p.id)).reduce(
+                            (sum, p) => sum + budgets[p.id], 0
+                          )}
                         </h4>
-                        <p>Ad spend is charged directly by each connected social media platform. We don't handle payments.</p>
+                        <p>
+                          Ad spend is charged directly by each connected social media platform.
+                          We don't handle payments.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -575,11 +659,17 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           {step === 3 ? (
             mode === "paid" ? (
               <>
-                <button className="cancel-btn" onClick={() => handleCreateCampaign("draft")}>Save as Draft</button>
-                <button className="next-btn" onClick={() => handleCreateCampaign("scheduled")}>Schedule</button>
+                <button className="cancel-btn" onClick={() => handleCreateCampaign("draft")}>
+                  Save as Draft
+                </button>
+                <button className="next-btn" onClick={() => handleCreateCampaign("scheduled")}>
+                  Schedule
+                </button>
               </>
             ) : (
-              <button className="next-btn" onClick={() => handleCreateCampaign("live")}>Save & Post</button>
+              <button className="next-btn" onClick={() => handleCreateCampaign("live")}>
+                Save & Post
+              </button>
             )
           ) : (
             <button className="next-btn" onClick={handleNext}>Next</button>
