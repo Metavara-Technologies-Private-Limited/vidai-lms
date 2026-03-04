@@ -1,5 +1,5 @@
-import "../../../../src/styles/Campaign/CampaignCard.css";
-import StopCampaignModal from "../../../components/Layout/Campaign/StopCampaignModal";
+import "../../../styles/Campaign/CampaignCard.css";
+import StopCampaignModal from "./StopCampaignModal";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
@@ -16,37 +16,14 @@ import mailCardIcon from "./Icons/mail-card.png";
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
-
-type CampaignStatus =
-  | "Live"
-  | "Draft"
-  | "Schedule"
-  | "Paused"
-  | "Stopped"
-  | "Completed"
-  | "Failed";
-
-type CampaignType = "social" | "email";
-
-interface Campaign {
-  id: string;
-  name: string;
-  type: CampaignType;
-  status: CampaignStatus;
-  start: string;
-  end: string;
-  platforms: ("facebook" | "instagram" | "linkedin" | "gmail")[];
-  leads: number;
-  lead_generated: number;
-  scheduledAt?: string;
-}
+import type { Campaign, CampaignStatus } from "../../../types/campaigns.types";
 
 interface CampaignCardProps {
   campaign: Campaign;
   openMenuId: string | null;
   setOpenMenuId: (id: string | null) => void;
   onViewDetail: (campaign: Campaign) => void;
-  onStatusChange: (id: string, status: CampaignStatus) => void; // already added in your file
+  onStatusChange: (id: string, status: CampaignStatus) => void;
   onEdit?: (campaign: Campaign) => void;
   onDuplicate?: (campaign: Campaign) => void;
 }
@@ -69,6 +46,12 @@ export default function CampaignCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const [showStopModal, setShowStopModal] = useState(false);
 
+  // Normalise platforms to a lowercase string array — guards against
+  // undefined, null, or any unexpected shape coming from the API mapper.
+  const platforms = (c.platforms ?? []).map((p) =>
+    (p ?? "").toLowerCase()
+  ) as ("facebook" | "instagram" | "linkedin" | "gmail")[];
+
   const toggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
     setOpenMenuId(isMenuOpen ? null : c.id);
@@ -80,12 +63,8 @@ export default function CampaignCard({
         setOpenMenuId(null);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setOpenMenuId]);
 
   return (
@@ -105,7 +84,6 @@ export default function CampaignCard({
           </div>
           <span className="title-text">{c.name}</span>
         </div>
-
         <span className={`status ${c.status.toLowerCase()}`}>{c.status}</span>
       </div>
 
@@ -122,28 +100,20 @@ export default function CampaignCard({
         <div>
           <label>Platform:</label>
           <div className="platform-icons">
-            {c.platforms.includes("facebook") && (
-              <img
-                src={facebookIcon}
-                className="platform-icon"
-                alt="Facebook"
-              />
+            {platforms.includes("facebook") && (
+              <img src={facebookIcon} className="platform-icon" alt="Facebook" />
             )}
-            {c.platforms.includes("instagram") && (
-              <img
-                src={instagramIcon}
-                className="platform-icon"
-                alt="Instagram"
-              />
+            {platforms.includes("instagram") && (
+              <img src={instagramIcon} className="platform-icon" alt="Instagram" />
             )}
-            {c.platforms.includes("linkedin") && (
-              <img
-                src={linkedinIcon}
-                className="platform-icon"
-                alt="LinkedIn"
-              />
+            {platforms.includes("linkedin") && (
+              <img src={linkedinIcon} className="platform-icon" alt="LinkedIn" />
             )}
-            {c.platforms.includes("gmail") && (
+            {platforms.includes("gmail") && (
+              <img src={emailIcon} className="platform-icon" alt="Email" />
+            )}
+            {/* Show email icon for email-type campaigns that have no platform set */}
+            {platforms.length === 0 && c.type === "email" && (
               <img src={emailIcon} className="platform-icon" alt="Email" />
             )}
           </div>
@@ -153,7 +123,7 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-        {c.status === "Schedule" && c.scheduledAt ? (
+        {c.status === "Scheduled" && c.scheduledAt ? (
           <span>
             <label>SCHEDULED:</label>{" "}
             {dayjs(c.scheduledAt).format("DD MMM [at] hh:mm A")}
@@ -175,11 +145,11 @@ export default function CampaignCard({
           >
             <img src={viewIcon} alt="View" width={20} height={20} />
           </button>
+
           <button
             className="action-btn pause-btn"
             onClick={(e) => {
               e.stopPropagation();
-
               if (c.status === "Stopped") {
                 onStatusChange(c.id, "Live");
                 toast.success("Campaign is Live now");
@@ -226,37 +196,32 @@ export default function CampaignCard({
                     onDuplicate?.(c);
                   }}
                 >
-                  <img
-                    src={duplicateIcon}
-                    alt="Duplicate"
-                    className="menu-icon"
-                  />
+                  <img src={duplicateIcon} alt="Duplicate" className="menu-icon" />
                   Duplicate
                 </div>
                 {c.status !== "Stopped" && (
-              <div
-                className="menu-item stop-item"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenMenuId(null);
-                  setShowStopModal(true);
-                }}
-              >
-                <img src={stopIcon} alt="Stop" className="menu-icon" />
-                Stop
-              </div>
-            )}
+                  <div
+                    className="menu-item stop-item"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(null);
+                      setShowStopModal(true);
+                    }}
+                  >
+                    <img src={stopIcon} alt="Stop" className="menu-icon" />
+                    Stop
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* ✅ Stop Modal */}
       {showStopModal && (
         <StopCampaignModal
           campaignName={c.name}
-          platforms={c.platforms}
+          platforms={platforms}
           onClose={() => setShowStopModal(false)}
           onStop={() => {
             onStatusChange(c.id, "Stopped");
