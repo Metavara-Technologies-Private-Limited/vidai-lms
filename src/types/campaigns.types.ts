@@ -22,7 +22,7 @@ export interface Campaign {
   start: string;
   end: string;
   platforms?: string[];
-  scheduledAt?:string | null;
+  scheduledAt?: string | null;
 
   lead_generated: number;
   leads?: number;
@@ -38,6 +38,7 @@ export interface SocialCampaignPayload {
 
   start_date: string;
   end_date: string;
+  schedule_date_range: string;       // ✅ added
 
   campaign_content: string;
   campaign_mode: ("paid_advertising" | "organic_posting")[];
@@ -60,4 +61,5 @@ export interface SocialCampaignPayload {
 
   status: "live" | "scheduled" | "draft";
   is_active: boolean;
+  image_url: string | null;          // ✅ added
 }
