@@ -4,7 +4,7 @@ import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
@@ -43,6 +43,30 @@ const getCardStyle = (id: string) => {
   }
 };
 
+const normalizeLeadStatus = (status?: string | null): string => {
+  if (!status) return "";
+
+  const value = status.toLowerCase().trim().replace(/[_\s]+/g, "-");
+
+  if (value === "new" || value === "new-lead" || value === "new-leads") return LEAD_STATUS.NEW.toLowerCase();
+  if (value === "appointment" || value === "appointments") return LEAD_STATUS.APPOINTMENT.toLowerCase();
+  if (
+    value === "follow-up" ||
+    value === "follow-ups" ||
+    value === "followup" ||
+    value === "followups" ||
+    value === "follow-up-lead" ||
+    value === "follow-up-leads"
+  ) {
+    return LEAD_STATUS.FOLLOW_UPS.toLowerCase();
+  }
+  if (value === "converted") return LEAD_STATUS.CONVERTED.toLowerCase();
+  if (value === "cycle-conversion" || value === "cycleconversion") return LEAD_STATUS.CYCLE_CONVERSION.toLowerCase();
+  if (value === "lost") return LEAD_STATUS.LOST.toLowerCase();
+
+  return value;
+};
+
 const KpiCards = () => {
   const leads = useSelector(selectLeads);
 
@@ -53,7 +77,7 @@ const KpiCards = () => {
   // ── Live counts derived from Redux store ──
   // Updates automatically whenever leads change in Redux
   // (e.g. appointment booked, lead converted, new lead added)
-  const counts: LiveKpiCounts = (() => {
+  const counts: LiveKpiCounts = useMemo(() => {
     if (!leads || leads.length === 0) {
       return {
         totalLeads: 0,
@@ -67,60 +91,49 @@ const KpiCards = () => {
       };
     }
 
-    // Only count active (non-archived) leads
-    const activeLeads = leads.filter((l: Lead) => l.is_active !== false);
+    let totalLeads = 0;
+    let newLeads = 0;
+    let appointments = 0;
+    let followUps = 0;
+    let converted = 0;
+    let cycleConversion = 0;
+    let lostLeads = 0;
 
-    const normalizeLeadStatus = (status?: string | null): string => {
-      if (!status) return "";
+    for (const lead of leads as Lead[]) {
+      if (lead.is_active === false) continue;
 
-      const value = status.toLowerCase().trim().replace(/[_\s]+/g, "-");
+      totalLeads += 1;
+      const status = normalizeLeadStatus(lead.lead_status);
 
-      if (value === "new" || value === "new-lead" || value === "new-leads") return LEAD_STATUS.NEW.toLowerCase();
-      if (value === "appointment" || value === "appointments") return LEAD_STATUS.APPOINTMENT.toLowerCase();
-      if (
-        value === "follow-up" ||
-        value === "follow-ups" ||
-        value === "followup" ||
-        value === "followups" ||
-        value === "follow-up-lead" ||
-        value === "follow-up-leads"
-      ) {
-        return LEAD_STATUS.FOLLOW_UPS.toLowerCase();
-      }
-      if (value === "converted") return LEAD_STATUS.CONVERTED.toLowerCase();
-      if (value === "cycle-conversion" || value === "cycleconversion") return LEAD_STATUS.CYCLE_CONVERSION.toLowerCase();
-      if (value === "lost") return LEAD_STATUS.LOST.toLowerCase();
-
-      return value;
-    };
-
-    const byStatus = (...statuses: string[]) =>
-      activeLeads.filter((l: Lead) => {
-        const s = normalizeLeadStatus(l.lead_status);
-        return statuses.some((t) => s === normalizeLeadStatus(t));
-      }).length;
+      if (status === LEAD_STATUS.NEW.toLowerCase()) newLeads += 1;
+      else if (status === LEAD_STATUS.APPOINTMENT.toLowerCase()) appointments += 1;
+      else if (status === LEAD_STATUS.FOLLOW_UPS.toLowerCase()) followUps += 1;
+      else if (status === LEAD_STATUS.CONVERTED.toLowerCase()) converted += 1;
+      else if (status === LEAD_STATUS.CYCLE_CONVERSION.toLowerCase()) cycleConversion += 1;
+      else if (status === LEAD_STATUS.LOST.toLowerCase()) lostLeads += 1;
+    }
 
     return {
-      totalLeads:     activeLeads.length,
-      newLeads:       byStatus(LEAD_STATUS.NEW),
-      appointments:   byStatus(LEAD_STATUS.APPOINTMENT),
-      followUps:      byStatus(LEAD_STATUS.FOLLOW_UPS),
-      totalConverted: byStatus(LEAD_STATUS.CONVERTED, LEAD_STATUS.CYCLE_CONVERSION),
-      lostLeads:      byStatus(LEAD_STATUS.LOST),
-      registered:     byStatus(LEAD_STATUS.CONVERTED),        // breakdown: Registered
-      treatment:      byStatus(LEAD_STATUS.CYCLE_CONVERSION), // breakdown: Treatment
+      totalLeads,
+      newLeads,
+      appointments,
+      followUps,
+      totalConverted: converted + cycleConversion,
+      lostLeads,
+      registered: converted,
+      treatment: cycleConversion,
     };
-  })();
+  }, [leads]);
 
   // ── Scroll arrow visibility ──
-  const checkScroll = () => {
+  const checkScroll = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setShowLeftArrow(scrollLeft > 10);
       const isAtEnd = scrollLeft >= scrollWidth - clientWidth - 10;
       setShowRightArrow(!isAtEnd && scrollWidth > clientWidth);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => checkScroll(), 100);
@@ -129,7 +142,7 @@ const KpiCards = () => {
       clearTimeout(timer);
       window.removeEventListener("resize", checkScroll);
     };
-  }, []);
+  }, [checkScroll]);
 
   const handleScrollLeft = () => {
     scrollContainerRef.current?.scrollBy({ left: -300, behavior: "smooth" });
@@ -139,22 +152,22 @@ const KpiCards = () => {
     scrollContainerRef.current?.scrollBy({ left: 300, behavior: "smooth" });
   };
 
-  const dynamicKpis: KpiCardData[] = [
-    { id: "totalLeads",     label: "Total Leads",     value: counts.totalLeads },
-    { id: "newLeads",       label: "New Leads",       value: counts.newLeads },
-    { id: "appointments",   label: "Appointments",    value: counts.appointments },
-    { id: "followUps",      label: "Follow Ups",      value: counts.followUps },
+  const dynamicKpis: KpiCardData[] = useMemo(() => [
+    { id: "totalLeads", label: "Total Leads", value: counts.totalLeads },
+    { id: "newLeads", label: "New Leads", value: counts.newLeads },
+    { id: "appointments", label: "Appointments", value: counts.appointments },
+    { id: "followUps", label: "Follow Ups", value: counts.followUps },
     {
       id: "totalConverted",
       label: "Total Converted",
       value: counts.totalConverted,
       breakdown: [
         { label: "Registered", value: counts.registered },
-        { label: "Treatment",  value: counts.treatment  },
+        { label: "Treatment", value: counts.treatment },
       ],
     },
     { id: "lostLeads", label: "Lost Leads", value: counts.lostLeads },
-  ];
+  ], [counts]);
 
   return (
     <Box sx={{ position: "relative", width: "100%", px: 1 }}>

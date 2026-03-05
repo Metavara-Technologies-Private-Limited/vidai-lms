@@ -16,24 +16,27 @@ import Filter_Leads from "../assets/icons/Filter_Leads.svg";
 import Leads_Gridview from "../assets/icons/Leads_Gridview.svg";
 import Leads_Tableview_icon from "../assets/icons/Leads_Tableview_icon.svg";
 
-import LeadsTable from "../components/LeadsHub/LeadsTable";
-import LeadsBoard from "../components/LeadsHub/LeadsBoard";
-import LeadsConversation from "../components/LeadsHub/LeadsConversation";
-import Activity from "../components/LeadsHub/Activity";
-import FilterDialog from "../components/LeadsHub/FilterDialog";
-import LeadsFollowUp from "../components/LeadsHub/LeadsFollowUp";
 import type { FilterValues } from "../types/leads.types";
+import type { Lead } from "../services/leads.api";
 
 import { fetchLeads, selectLeads } from "../store/leadSlice";
+import type { AppDispatch } from "../store";
 import "../styles/Leads/leads.css";
 
 const STORAGE_KEY_FILTERS = "leads_filters";
 const STORAGE_KEY_TAB = "leads_active_tab";
 const STORAGE_KEY_VIEW = "leads_view_mode";
 
+const LeadsTable = React.lazy(() => import("../components/LeadsHub/LeadsTable"));
+const LeadsBoard = React.lazy(() => import("../components/LeadsHub/LeadsBoard"));
+const LeadsConversation = React.lazy(() => import("../components/LeadsHub/LeadsConversation"));
+const Activity = React.lazy(() => import("../components/LeadsHub/Activity"));
+const FilterDialog = React.lazy(() => import("../components/LeadsHub/FilterDialog"));
+const LeadsFollowUp = React.lazy(() => import("../components/LeadsHub/LeadsFollowUp"));
+
 const Leads: React.FC = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
 
   // ====================== Redux State ======================
   const leads = useSelector(selectLeads);
@@ -95,80 +98,8 @@ const Leads: React.FC = () => {
     archived: 0,
   });
 
-  // ====================== Save to localStorage when filters change ======================
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(activeFilters));
-    } catch (error) {
-      console.error("Failed to save filters:", error);
-    }
-  }, [activeFilters]);
-
-  // ====================== Save tab to localStorage ======================
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_TAB, tab.toString());
-    } catch (error) {
-      console.error("Failed to save tab:", error);
-    }
-  }, [tab]);
-
-  // ====================== Save view mode to localStorage ======================
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_VIEW, viewMode);
-    } catch (error) {
-      console.error("Failed to save view mode:", error);
-    }
-  }, [viewMode]);
-
-  // ====================== Fetch Leads on Mount ======================
-  React.useEffect(() => {
-    dispatch(fetchLeads() as any);
-  }, [dispatch]);
-
-  // ====================== Calculate Counts (with Filters) ======================
-  React.useEffect(() => {
-    if (leads && leads.length > 0) {
-      const followUpStatuses = ["new", "lost", "cycle conversion"];
-
-      // Apply filters to leads before counting
-      const filteredLeads = applyFilters(leads);
-
-      // Active leads: is_active !== false (true or undefined)
-      // Archived leads: is_active === false
-      const allCount = filteredLeads.filter((l) => l.is_active !== false).length;
-
-      const followUpCount = filteredLeads.filter((l) => {
-        const status = (l.lead_status || "").toLowerCase().trim();
-        return l.is_active !== false && followUpStatuses.includes(status);
-      }).length;
-
-      const archivedCount = filteredLeads.filter((l) => l.is_active === false).length;
-
-      setCounts({
-        all: allCount,
-        followUps: followUpCount,
-        archived: archivedCount,
-      });
-
-      console.log("📊 Counts updated:", {
-        all: allCount,
-        followUps: followUpCount,
-        archived: archivedCount,
-        total: filteredLeads.length,
-      });
-    } else {
-      setCounts({
-        all: 0,
-        followUps: 0,
-        archived: 0,
-      });
-    }
-  }, [leads, activeFilters]);
-
   // ====================== Apply Filters Function ======================
-  const applyFilters = (leadsToFilter: any[]) => {
+  const applyFilters = React.useCallback((leadsToFilter: Array<Lead & { status?: string }>) => {
     return leadsToFilter.filter((lead) => {
       // Department filter
       if (activeFilters.department && lead.department_id !== Number(activeFilters.department)) {
@@ -233,7 +164,79 @@ const Leads: React.FC = () => {
 
       return true;
     });
-  };
+  }, [activeFilters]);
+
+  // ====================== Save to localStorage when filters change ======================
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(activeFilters));
+    } catch (error) {
+      console.error("Failed to save filters:", error);
+    }
+  }, [activeFilters]);
+
+  // ====================== Save tab to localStorage ======================
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_TAB, tab.toString());
+    } catch (error) {
+      console.error("Failed to save tab:", error);
+    }
+  }, [tab]);
+
+  // ====================== Save view mode to localStorage ======================
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_VIEW, viewMode);
+    } catch (error) {
+      console.error("Failed to save view mode:", error);
+    }
+  }, [viewMode]);
+
+  // ====================== Fetch Leads on Mount ======================
+  React.useEffect(() => {
+    dispatch(fetchLeads());
+  }, [dispatch]);
+
+  // ====================== Calculate Counts (with Filters) ======================
+  React.useEffect(() => {
+    if (leads && leads.length > 0) {
+      const followUpStatuses = ["new", "lost", "cycle conversion"];
+
+      // Apply filters to leads before counting
+      const filteredLeads = applyFilters(leads);
+
+      // Active leads: is_active !== false (true or undefined)
+      // Archived leads: is_active === false
+      const allCount = filteredLeads.filter((l) => l.is_active !== false).length;
+
+      const followUpCount = filteredLeads.filter((l) => {
+        const status = (l.lead_status || "").toLowerCase().trim();
+        return l.is_active !== false && followUpStatuses.includes(status);
+      }).length;
+
+      const archivedCount = filteredLeads.filter((l) => l.is_active === false).length;
+
+      setCounts({
+        all: allCount,
+        followUps: followUpCount,
+        archived: archivedCount,
+      });
+
+      console.log("📊 Counts updated:", {
+        all: allCount,
+        followUps: followUpCount,
+        archived: archivedCount,
+        total: filteredLeads.length,
+      });
+    } else {
+      setCounts({
+        all: 0,
+        followUps: 0,
+        archived: 0,
+      });
+    }
+  }, [leads, applyFilters]);
 
   // ====================== Handle Filter Apply ======================
   const handleApplyFilters = (filters: FilterValues) => {
@@ -353,31 +356,37 @@ const Leads: React.FC = () => {
       </Stack>
 
       {/* ================= CONTENT SWITCH ================= */}
-      {tab === 1 && <LeadsFollowUp search={search} filters={activeFilters} />}
-      {tab === 3 && <LeadsConversation />}
-      {tab === 4 && <Activity />}
+      <React.Suspense fallback={<Box sx={{ py: 4, textAlign: "center" }}><Typography variant="caption" color="text.secondary">Loading...</Typography></Box>}>
+        {tab === 1 && <LeadsFollowUp search={search} filters={activeFilters} />}
+        {tab === 3 && <LeadsConversation />}
+        {tab === 4 && <Activity />}
 
-      {tab !== 1 && tab !== 3 && tab !== 4 && (
-        viewMode === "table" ? (
-          <LeadsTable 
-            search={search} 
-            tab={tab === 2 ? "archived" : "active"} 
-            filters={activeFilters}
-          />
-        ) : (
-          <LeadsBoard 
-            search={search} 
-            filters={activeFilters}
-          />
-        )
-      )}
+        {tab !== 1 && tab !== 3 && tab !== 4 && (
+          viewMode === "table" ? (
+            <LeadsTable
+              search={search}
+              tab={tab === 2 ? "archived" : "active"}
+              filters={activeFilters}
+            />
+          ) : (
+            <LeadsBoard
+              search={search}
+              filters={activeFilters}
+            />
+          )
+        )}
+      </React.Suspense>
 
       {/* Filter Dialog with API Integration */}
-      <FilterDialog 
-        open={filterOpen} 
-        onClose={() => setFilterOpen(false)}
-        onApplyFilters={handleApplyFilters}
-      />
+      {filterOpen && (
+        <React.Suspense fallback={null}>
+          <FilterDialog
+            open={filterOpen}
+            onClose={() => setFilterOpen(false)}
+            onApplyFilters={handleApplyFilters}
+          />
+        </React.Suspense>
+      )}
     </Box>
   );
 };

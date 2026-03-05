@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, Button, IconButton, TextField, MenuItem, Select, Popover } from '@mui/material';
+import { Box, Typography, Button, IconButton, TextField, MenuItem, Select, Popover, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -20,9 +20,7 @@ import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import CodeIcon from '@mui/icons-material/Code';
 import LinkIcon from '@mui/icons-material/Link';
 import ImageIcon from '@mui/icons-material/Image';
-import AttachmentIcon from '@mui/icons-material/Attachment';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
-import EditIcon from '@mui/icons-material/Edit';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -33,6 +31,11 @@ import { Link as TiptapLink } from '@tiptap/extension-link';
 import { Image as TiptapImage } from '@tiptap/extension-image';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
+import FontFamily from '@tiptap/extension-font-family';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
+import ListItem from '@tiptap/extension-list-item';
+import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import { PreviewTemplateModal } from './PreviewEmailTemplateModal';
 import type { NewEmailTemplateFormProps, TemplateDocument } from '../../../types/templates.types';
 import type { EmailTemplate } from '../../../types/tickets.types';
@@ -57,6 +60,22 @@ const extractDocuments = (payload: unknown): TemplateDocument[] => {
   const candidates = [record.documents, record.template_documents, record.files, record.attachments];
   const match = candidates.find((value) => Array.isArray(value));
   return Array.isArray(match) ? (match as TemplateDocument[]) : [];
+};
+
+const DEFAULT_EDITOR_CONTENT = `<p>Hi {lead_first_name},</p><p><br></p><p>Thank you for choosing {clinic_name}.</p><p>Your fertility consultation has been successfully scheduled!</p><p><br></p><ul><li><p>Date : {appointment_date}</p></li><li><p>Time : {appointment_time}</p></li><li><p>Location : {clinic_name} {clinic_address}</p></li></ul><p><br></p><p>Please arrive 10 minutes early and bring any relevant medical reports.</p><p><br></p><p>If you need to reschedule, please let us know.</p><p><br></p><p>Warm regards,</p><p>The Vidal Team</p>`;
+
+const normalizeEditorHtml = (html: string): string => {
+  if (!html) return html;
+
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/api\/?$/, '');
+
+  return html.replace(/<img([^>]*?)src=["']([^"']+)["']([^>]*)>/gi, (_match, pre, src, post) => {
+    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
+      return `<img${pre}src="${src}"${post}>`;
+    }
+    const absoluteSrc = `${baseUrl}${src.startsWith('/') ? src : `/${src}`}`;
+    return `<img${pre}src="${absoluteSrc}"${post}>`;
+  });
 };
 
 export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
@@ -122,10 +141,17 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   const [existingDocuments, setExistingDocuments] = useState<TemplateDocument[]>([]);
   const [removedExistingDocumentIds, setRemovedExistingDocumentIds] = useState<string[]>([]);
   const [colorAnchor, setColorAnchor] = useState<HTMLButtonElement | null>(null);
-  const [currentFont] = useState('Nunito');
-  const [currentHeading] = useState('Tt');
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLButtonElement | null>(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [currentFont, setCurrentFont] = useState('Nunito');
+  const [currentHeading, setCurrentHeading] = useState<'Tt' | 'H1' | 'H2'>('Tt');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const initialEditorContent = normalizeEditorHtml(((initialData as any)?.body || (initialData as any)?.email_body || DEFAULT_EDITOR_CONTENT));
 
   // Sync formData when initialData changes (for edit/view mode)
   React.useEffect(() => {
@@ -162,8 +188,16 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+      }),
       Underline,
+      FontFamily,
+      BulletList,
+      OrderedList,
+      ListItem,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
@@ -174,8 +208,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       TextStyle,
       Color,
     ],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    content: ((initialData as any)?.body || (initialData as any)?.email_body || `<p>Hi {lead_first_name},</p><p><br></p><p>Thank you for choosing {clinic_name}.</p><p>Your fertility consultation has been successfully scheduled!</p><p><br></p><ul><li><p>Date : {appointment_date}</p></li><li><p>Time : {appointment_time}</p></li><li><p>Location : {clinic_name} {clinic_address}</p></li></ul><p><br></p><p>Please arrive 10 minutes early and bring any relevant medical reports.</p><p><br></p><p>If you need to reschedule, please let us know.</p><p><br></p><p>Warm regards,</p><p>The Vidal Team</p>`),
+    content: initialEditorContent,
     editable: !isViewOnly,
   });
 
@@ -183,7 +216,27 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   const [, setToolbarTick] = useState(0);
   useEffect(() => {
     if (!editor) return;
-    const update = () => setToolbarTick(t => t + 1);
+
+    const update = () => {
+      setToolbarTick(t => t + 1);
+
+      const heading: 'Tt' | 'H1' | 'H2' = editor.isActive('heading', { level: 1 })
+        ? 'H1'
+        : editor.isActive('heading', { level: 2 })
+          ? 'H2'
+          : 'Tt';
+      setCurrentHeading(heading);
+
+      const fontFamily = (editor.getAttributes('textStyle').fontFamily as string | undefined) || 'Nunito';
+      setCurrentFont(fontFamily);
+
+      lastSelectionRef.current = {
+        from: editor.state.selection.from,
+        to: editor.state.selection.to,
+      };
+    };
+
+    update();
     editor.on('transaction', update);
     editor.on('selectionUpdate', update);
     editor.on('update', update);
@@ -193,6 +246,11 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       editor.off('update', update);
     };
   }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.commands.setContent(initialEditorContent, { emitUpdate: false });
+  }, [editor, initialEditorContent]);
 
   const handleColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setColorAnchor(event.currentTarget);
@@ -209,24 +267,52 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     handleColorClose();
   };
 
-  const handleFontChange = (value: string) => {
-    if (!editor) return;
-    editor.chain().focus().setMark('textStyle', { fontFamily: value }).run();
+  const handleEmojiClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setEmojiAnchor(event.currentTarget);
   };
 
-  const handleHeadingChange = (value: string) => {
+  const handleEmojiClose = () => {
+    setEmojiAnchor(null);
+  };
+
+  const onEmojiSelect = (emojiData: EmojiClickData) => {
+    if (editor) {
+      editor.chain().focus().insertContent(emojiData.emoji).run();
+    }
+    handleEmojiClose();
+  };
+
+  const keepSelection = (event: React.MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+  };
+
+  const handleFontChange = (value: string) => {
     if (!editor) return;
+    setCurrentFont(value);
+
+    const chain = editor.chain().focus();
+    if (lastSelectionRef.current) {
+      chain.setTextSelection(lastSelectionRef.current);
+    }
+    chain.setFontFamily(value).run();
+  };
+
+  const handleHeadingChange = (value: 'Tt' | 'H1' | 'H2') => {
+    if (!editor) return;
+    setCurrentHeading(value);
+
+    const chain = editor.chain().focus();
+    if (lastSelectionRef.current) {
+      chain.setTextSelection(lastSelectionRef.current);
+    }
+
     if (value === 'Tt') {
-      try {
-        editor.chain().focus().setParagraph().run();
-      } catch {
-        editor.chain().focus().toggleHeading({ level: 1 }).run();
-        editor.chain().focus().toggleHeading({ level: 1 }).run();
-      }
+      chain.setParagraph().run();
       return;
     }
-    if (value === 'H1') editor.chain().focus().toggleHeading({ level: 1 }).run();
-    if (value === 'H2') editor.chain().focus().toggleHeading({ level: 2 }).run();
+
+    if (value === 'H1') chain.setHeading({ level: 1 }).run();
+    if (value === 'H2') chain.setHeading({ level: 2 }).run();
   };
 
   const adjustIndent = (delta: number) => {
@@ -244,10 +330,28 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   };
 
   const addLink = () => {
-    const url = window.prompt('Enter URL:');
-    if (url && editor) {
-      editor.chain().focus().setLink({ href: url }).run();
+    if (!editor) return;
+    const currentHref = (editor.getAttributes('link').href as string | undefined) || '';
+    setLinkUrl(currentHref);
+    setLinkDialogOpen(true);
+  };
+
+  const handleApplyLink = () => {
+    if (!editor) return;
+
+    const chain = editor.chain().focus();
+    if (lastSelectionRef.current) {
+      chain.setTextSelection(lastSelectionRef.current);
     }
+
+    if (!linkUrl.trim()) {
+      chain.unsetLink().run();
+    } else {
+      chain.extendMarkRange('link').setLink({ href: linkUrl.trim() }).run();
+    }
+
+    setLinkDialogOpen(false);
+    setLinkUrl('');
   };
 
   const addImage = () => {
@@ -500,7 +604,11 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                 lineHeight: 1.6,
                 color: '#374151',
                 '& p': { margin: '0 0 4px 0' },
-                '& ul, & ol': { paddingLeft: '20px', margin: '4px 0' },
+                '& h1': { fontSize: '2rem', fontWeight: 700, margin: '8px 0' },
+                '& h2': { fontSize: '1.5rem', fontWeight: 600, margin: '8px 0' },
+                '& ul': { listStyleType: 'disc', paddingLeft: '20px', margin: '4px 0' },
+                '& ol': { listStyleType: 'decimal', paddingLeft: '20px', margin: '4px 0' },
+                '& li': { display: 'list-item' },
                 '& li p': { margin: 0 },
                 '& a': { color: '#6366F1', textDecoration: 'underline' },
                 '& img': { maxWidth: '100%', height: 'auto', borderRadius: '4px' },
@@ -520,10 +628,10 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                   bgcolor: '#FAFBFC',
                   flexWrap: 'wrap'
                 }}>
-                  <IconButton size="small" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} sx={{ p: 0.5 }}>
+                  <IconButton title="Undo" aria-label="Undo" size="small" onMouseDown={keepSelection} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} sx={{ p: 0.5 }}>
                     <UndoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} sx={{ p: 0.5 }}>
+                  <IconButton title="Redo" aria-label="Redo" size="small" onMouseDown={keepSelection} onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} sx={{ p: 0.5 }}>
                     <RedoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
                   </IconButton>
 
@@ -534,16 +642,17 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                     onChange={(e) => handleFontChange(e.target.value as string)}
                     sx={{ width: 120, height: 28, fontSize: '12px', ml: 1, '& fieldset': { border: 'none' } }}
                   >
-                    <MenuItem value="Nunito">Nunito</MenuItem>
-                    <MenuItem value="Arial">Arial</MenuItem>
-                    <MenuItem value="Times New Roman">Times</MenuItem>
+                    <MenuItem value="Nunito" sx={{ fontFamily: 'Nunito' }}>Nunito</MenuItem>
+                    <MenuItem value="Arial" sx={{ fontFamily: 'Arial' }}>Arial</MenuItem>
+                    <MenuItem value="Times New Roman" sx={{ fontFamily: 'Times New Roman' }}>Times New Roman</MenuItem>
+                    <MenuItem value="Courier New" sx={{ fontFamily: 'Courier New' }}>Courier New</MenuItem>
                   </Select>
 
                   {/* Size / Heading selector */}
                   <Select
                     size="small"
                     value={currentHeading}
-                    onChange={(e) => handleHeadingChange(e.target.value as string)}
+                    onChange={(e) => handleHeadingChange(e.target.value as 'Tt' | 'H1' | 'H2')}
                     sx={{ width: 60, height: 28, fontSize: '12px', '& fieldset': { border: 'none' } }}
                   >
                     <MenuItem value="Tt">Tt</MenuItem>
@@ -552,7 +661,10 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                   </Select>
 
                   <IconButton
+                    title="Bold"
+                    aria-label="Bold"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleBold().run()}
                     sx={{ p: 0.5, bgcolor: editor.isActive('bold') ? '#E5E7EB' : 'transparent' }}
                     aria-pressed={editor.isActive('bold')}
@@ -561,7 +673,10 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                   </IconButton>
 
                   <IconButton
+                    title="Italic"
+                    aria-label="Italic"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleItalic().run()}
                     sx={{ p: 0.5, bgcolor: editor.isActive('italic') ? '#E5E7EB' : 'transparent' }}
                     aria-pressed={editor.isActive('italic')}
@@ -570,7 +685,10 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                   </IconButton>
 
                   <IconButton
+                    title="Underline"
+                    aria-label="Underline"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleUnderline().run()}
                     sx={{ p: 0.5, bgcolor: editor.isActive('underline') ? '#E5E7EB' : 'transparent' }}
                     aria-pressed={editor.isActive('underline')}
@@ -579,7 +697,10 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                   </IconButton>
 
                   <IconButton
+                    title="Strikethrough"
+                    aria-label="Strikethrough"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleStrike().run()}
                     sx={{ p: 0.5, bgcolor: editor.isActive('strike') ? '#E5E7EB' : 'transparent' }}
                     aria-pressed={editor.isActive('strike')}
@@ -588,67 +709,100 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                   </IconButton>
 
                   <IconButton
+                    title="Text Color"
+                    aria-label="Text Color"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={handleColorClick}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('textStyle') ? '#E5E7EB' : 'transparent' }}
                   >
                     <FormatColorTextIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
 
                   <IconButton
+                    title="Align Left"
+                    aria-label="Align Left"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().setTextAlign('left').run()}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'left' }) ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive({ textAlign: 'left' })}
                   >
                     <FormatAlignLeftIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
                   <IconButton
+                    title="Align Center"
+                    aria-label="Align Center"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().setTextAlign('center').run()}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'center' }) ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive({ textAlign: 'center' })}
                   >
                     <FormatAlignCenterIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
                   <IconButton
+                    title="Align Right"
+                    aria-label="Align Right"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().setTextAlign('right').run()}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'right' }) ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive({ textAlign: 'right' })}
                   >
                     <FormatAlignRightIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
                   <IconButton
+                    title="Justify"
+                    aria-label="Justify"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'justify' }) ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive({ textAlign: 'justify' })}
                   >
                     <FormatAlignJustifyIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
 
                   <IconButton
+                    title="Bulleted List"
+                    aria-label="Bulleted List"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleBulletList().run()}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('bulletList') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('bulletList')}
                   >
                     <FormatListBulletedIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
                   <IconButton
+                    title="Numbered List"
+                    aria-label="Numbered List"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('orderedList') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('orderedList')}
                   >
                     <FormatListNumberedIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
 
                   {/* Indent controls */}
                   <IconButton
+                    title="Decrease Indent"
+                    aria-label="Decrease Indent"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => adjustIndent(-20)}
                     sx={{ p: 0.5 }}
                   >
                     <FormatIndentDecreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
                   <IconButton
+                    title="Increase Indent"
+                    aria-label="Increase Indent"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => adjustIndent(20)}
                     sx={{ p: 0.5 }}
                   >
@@ -656,16 +810,24 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                   </IconButton>
 
                   <IconButton
+                    title="Quote"
+                    aria-label="Quote"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('blockquote') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('blockquote')}
                   >
                     <FormatQuoteIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
                   <IconButton
+                    title="Code Block"
+                    aria-label="Code Block"
                     size="small"
+                    onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-                    sx={{ p: 0.5 }}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('codeBlock') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('codeBlock')}
                   >
                     <CodeIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
@@ -681,29 +843,25 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                   borderBottomLeftRadius: '8px',
                   borderBottomRightRadius: '8px'
                 }}>
-                  <IconButton size="small" onClick={handleColorClick} sx={{ p: 0.5 }}>
-                    <FormatColorTextIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  <IconButton title="Attach File" aria-label="Attach File" size="small" onMouseDown={keepSelection} onClick={() => fileInputRef.current?.click()} sx={{ p: 0.5 }}>
+                    <AttachFileIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ p: 0.5 }}>
-                    <AttachmentIcon sx={{ fontSize: 18, color: '#374151' }} />
-                  </IconButton>
-                  <IconButton size="small" onClick={addLink} sx={{ p: 0.5 }}>
+                  <IconButton
+                    title="Insert Link"
+                    aria-label="Insert Link"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={addLink}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('link') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('link')}
+                  >
                     <LinkIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" sx={{ p: 0.5 }}>
+                  <IconButton title="Insert Emoji" aria-label="Insert Emoji" size="small" onMouseDown={keepSelection} onClick={handleEmojiClick} sx={{ p: 0.5 }}>
                     <EmojiEmotionsIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
-                  <IconButton size="small" sx={{ p: 0.5 }}>
-                    <AttachFileIcon sx={{ fontSize: 18, color: '#374151' }} />
-                  </IconButton>
-                  <IconButton size="small" onClick={addImage} sx={{ p: 0.5 }}>
+                  <IconButton title="Insert Image" aria-label="Insert Image" size="small" onMouseDown={keepSelection} onClick={addImage} sx={{ p: 0.5 }}>
                     <ImageIcon sx={{ fontSize: 18, color: '#374151' }} />
-                  </IconButton>
-                  <IconButton size="small" sx={{ p: 0.5 }}>
-                    <AttachFileIcon sx={{ fontSize: 18, color: '#374151' }} />
-                  </IconButton>
-                  <IconButton size="small" sx={{ p: 0.5 }}>
-                    <EditIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
                 </Box>
               </>
@@ -886,6 +1044,41 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
           ))}
         </Box>
       </Popover>
+
+      <Popover
+        open={Boolean(emojiAnchor)}
+        anchorEl={emojiAnchor}
+        onClose={handleEmojiClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <EmojiPicker onEmojiClick={onEmojiSelect} />
+      </Popover>
+
+      <Dialog open={linkDialogOpen} onClose={() => setLinkDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Add Link</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            margin="dense"
+            label="URL"
+            placeholder="https://example.com"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleApplyLink}>Apply</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
