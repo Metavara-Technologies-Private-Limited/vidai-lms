@@ -661,9 +661,7 @@ export default function LeadDetailView() {
     } finally { setNotesLoading(false); }
   }, []);
 
-  // ── Documents are already embedded in the lead object returned by the list API.
-  // We just normalize them (fixing relative /media/ paths → absolute URLs).
-  // After edit+save, dispatch(fetchLeads()) refreshes Redux and lead.documents updates.
+  // ── Documents are embedded in the lead object returned by the list API.
   const fetchDocuments = React.useCallback((leadDocs: DocumentEntry[]) => {
     setDocsLoading(true); setDocsError(null);
     try {

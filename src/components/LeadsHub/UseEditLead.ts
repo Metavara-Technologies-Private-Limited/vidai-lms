@@ -199,6 +199,7 @@ export function useEditLead() {
 
   // Step 2 – Existing documents from server
   const [existingDocuments, setExistingDocuments] = React.useState<ExistingDocument[]>([]);
+  const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
 
   // Step 3
@@ -305,7 +306,9 @@ export function useEditLead() {
         // First try: documents embedded in the lead response
         const embeddedDocs = (lead as unknown as { documents?: unknown[] }).documents;
         if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
-          setExistingDocuments(embeddedDocs.map((d) => normalizeDocument(d as Parameters<typeof normalizeDocument>[0])));
+          const normalized = embeddedDocs.map((d) => normalizeDocument(d as Parameters<typeof normalizeDocument>[0]));
+          setExistingDocuments(normalized);
+          initialExistingDocuments.current = normalized;
         } else {
           // Second try: dedicated endpoint
           try {
@@ -425,43 +428,21 @@ export function useEditLead() {
     // before LeadView reads lead.documents on arrival.
 
     const doSave = async () => {
-      const API_ORIGIN = (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } })
-        .env?.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ?? "";
-
-      // Strip absolute URL → relative path the backend expects e.g. /media/lead_documents/file.pdf
-      const toRelativePath = (url: string) => {
-        let p = url;
-        if (API_ORIGIN && p.startsWith(API_ORIGIN)) p = p.slice(API_ORIGIN.length);
-        p = p.replace(/^https?:\/\/[^/]+/, "");
-        return p;
-      };
-
-      const keptPaths = existingDocuments.map((d) => toRelativePath(d.url));
-      console.log("📋 SAVE — kept existing:", keptPaths, "| new files:", documents.map(f => f.name));
-
-      // Single multipart PUT with ALL fields + kept doc paths as strings + new File objects.
-      // The backend replaces the documents list with whatever is sent.
+      // Single multipart PUT with all lead fields + new file uploads.
+      // The backend appends uploaded files to the existing document set.
       const formData = new FormData();
 
-      // All lead fields
       (Object.keys(updateData) as (keyof typeof updateData)[]).forEach((key) => {
         const value = updateData[key];
         if (value === null || value === undefined) return;
         formData.append(key, typeof value === "boolean" ? (value ? "true" : "false") : String(value));
       });
 
-      // Existing kept documents as string paths (removes any the user deleted)
-      keptPaths.forEach((p) => formData.append("documents", p));
-
-      // New file uploads
       documents.forEach((file) => formData.append("documents", file));
 
-      const response = await api.put(`/leads/${id}/update/`, formData, {
+      await api.put(`/leads/${id}/update/`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-
-      // Log the response so we can see what documents the backend now has
-      console.log("✅ Save response documents:", (response.data as { documents?: unknown }).documents);
 
       await dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
       navigate("/leads", { replace: true });
