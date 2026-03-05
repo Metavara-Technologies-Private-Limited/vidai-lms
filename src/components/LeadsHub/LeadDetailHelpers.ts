@@ -1,5 +1,19 @@
 import type { DocumentEntry } from "./LeadDetailTypes";
 
+// ====================== Base URL for media files ======================
+// Relative paths like /media/lead_documents/file.pdf need the backend origin prepended.
+const API_BASE =
+  (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } }).env
+    ?.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ?? "";
+
+const toAbsoluteUrl = (raw: string): string => {
+  if (!raw) return "";
+  // Already absolute (http/https/blob/data)
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
+  // Relative path — prepend backend origin
+  return `${API_BASE}${raw.startsWith("/") ? "" : "/"}${raw}`;
+};
+
 // ====================== Format Lead ID ======================
 export const formatLeadId = (id: string): string => {
   if (id.match(/^#?LN-\d+$/i)) {
@@ -29,35 +43,42 @@ export const getDocColor = (name: string): string => {
 };
 
 export const normalizeDocument = (doc: DocumentEntry): { url: string; name: string } => {
+  // ── String form (plain URL or path) ──
   if (typeof doc === "string") {
-    const url = doc;
+    const abs = toAbsoluteUrl(doc);
     let name = "";
     try {
-      const decoded = decodeURIComponent(url);
+      const decoded = decodeURIComponent(doc);
       const parts = decoded.split("/");
       name = parts[parts.length - 1].split("?")[0];
     } catch {
-      name = url;
+      name = doc;
     }
-    if (!name || name === url) name = "document";
-    return { url, name };
+    if (!name || name === doc) name = "document";
+    return { url: abs, name };
   }
-  const url =
+
+  // ── Object form — API returns { id, file, uploaded_at } ──
+  const rawUrl =
     (typeof doc.url === "string" ? doc.url : "") ||
     (typeof doc.file === "string" ? doc.file : "") ||
     "";
+
+  const abs = toAbsoluteUrl(rawUrl);
+
   let name = typeof doc.name === "string" && doc.name ? doc.name : "";
-  if (!name && url) {
+  if (!name && rawUrl) {
     try {
-      const decoded = decodeURIComponent(url);
+      const decoded = decodeURIComponent(rawUrl);
       const parts = decoded.split("/");
       name = parts[parts.length - 1].split("?")[0];
     } catch {
-      name = url;
+      name = rawUrl;
     }
   }
   if (!name) name = "document";
-  return { url, name };
+
+  return { url: abs, name };
 };
 
 // ====================== Status color helpers ======================

@@ -21,6 +21,13 @@ export type Employee = {
   department_name: string;
 };
 
+// ── Document object shape returned by the API ──
+export type LeadDocument = {
+  id: string;
+  file: string;          // relative path e.g. /media/lead_documents/file.pdf
+  uploaded_at: string;
+};
+
 export type Lead = {
   id: string;
   clinic_id: number;
@@ -51,7 +58,7 @@ export type Lead = {
   appointment_date: string;
   slot: string;
   remark?: string;
-  documents?: string[];
+  documents?: LeadDocument[];   // ← FIXED: was string[], now object[]
   is_active: boolean;
   created_at: string;
   modified_at: string;
@@ -91,14 +98,13 @@ export type LeadPayload = {
 };
 
 // ====================== Lead Email Types ======================
-// Matches POST /lead-email/ swagger definition
 export type LeadEmailPayload = {
-  lead: string;           // Lead UUID — required
-  subject: string;        // required
-  email_body: string;     // required
+  lead: string;
+  subject: string;
+  email_body: string;
   sender_email?: string | null;
   scheduled_at?: string | null;
-  send_now?: boolean;     // true → send immediately; false → save as DRAFT
+  send_now?: boolean;
 };
 
 export type LeadEmailStatus = "DRAFT" | "SCHEDULED" | "SENT" | "FAILED" | "CANCELLED";
@@ -117,7 +123,6 @@ export type LeadEmailResponse = {
   send_now?: boolean;
 };
 
-// Matches GET /lead-mail/ swagger definition (LeadMailList)
 export type LeadMailListItem = {
   id: number;
   lead_uuid: string;
@@ -131,9 +136,6 @@ export type LeadMailListItem = {
 };
 
 // ====================== Axios Instance ======================
-// Reads VITE_API_BASE_URL from your .env file.
-// Local dev:   VITE_API_BASE_URL=http://127.0.0.1:8000/api
-// Production:  VITE_API_BASE_URL=http://72.62.227.137:8000/api
 const API_BASE_URL: string =
   (import.meta as unknown as { env: Record<string, string> }).env?.VITE_API_BASE_URL ??
   'http://127.0.0.1:8000/api';
@@ -167,14 +169,12 @@ export const LeadAPI = {
     return response.data;
   },
 
-  // Original create — plain JSON, no files
   create: async (data: LeadPayload): Promise<Lead> => {
     const response = await api.post<Lead>('/leads/', data);
     console.log("✅ Lead created:", response.data);
     return response.data;
   },
 
-  // ✅ NEW — create lead + upload documents in ONE multipart POST /leads/
   createWithDocuments: async (data: LeadPayload, files: File[]): Promise<Lead> => {
     const formData = new FormData();
     (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
@@ -203,6 +203,34 @@ export const LeadAPI = {
     return response.data;
   },
 
+  // ── Send lead fields + new documents together in ONE multipart PUT ──
+  // This is the correct way to update a lead with new files.
+  // Do NOT call update() then uploadDocuments() separately — the second
+  // PUT would overwrite the lead with an incomplete payload.
+  updateWithDocuments: async (
+    leadId: string,
+    data: Partial<LeadPayload>,
+    files: File[]
+  ): Promise<Lead> => {
+    const formData = new FormData();
+    (Object.keys(data) as (keyof Partial<LeadPayload>)[]).forEach((key) => {
+      const value = data[key];
+      if (value === null || value === undefined) return;
+      // Booleans must be sent as "true"/"false" strings for Django multipart
+      if (typeof value === "boolean") {
+        formData.append(key, value ? "true" : "false");
+      } else {
+        formData.append(key, String(value));
+      }
+    });
+    files.forEach((file) => formData.append('documents', file));
+    const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    console.log("✅ Lead + documents updated:", response.data);
+    return response.data;
+  },
+
   activate: async (leadId: string): Promise<void> => {
     await api.post(`/leads/${leadId}/activate/`);
   },
@@ -215,7 +243,8 @@ export const LeadAPI = {
     await api.patch(`/leads/${leadId}/delete/`);
   },
 
-  getDocuments: async (leadId: string): Promise<string[]> => {
+  // Returns embedded documents from the lead object (no extra API call)
+  getDocuments: async (leadId: string): Promise<LeadDocument[]> => {
     const lead = await LeadAPI.getById(leadId);
     return lead.documents ?? [];
   },
@@ -230,8 +259,31 @@ export const LeadAPI = {
   },
 
   uploadDocuments: async (leadId: string, files: File[]): Promise<Lead> => {
+    // First fetch the current lead so we can re-send all required fields.
+    // A bare multipart PUT with only `documents` causes Django to reset other
+    // fields (including is_active → false), archiving the lead.
+    const current = await LeadAPI.getById(leadId);
     const formData = new FormData();
+
+    // Re-send all required lead fields so nothing gets wiped
+    const safeFields: Record<string, string> = {
+      clinic_id:          String(current.clinic_id ?? 1),
+      department_id:      String(current.department_id ?? 1),
+      full_name:          current.full_name ?? "",
+      contact_no:         current.contact_no ?? "",
+      source:             current.source ?? "",
+      treatment_interest: current.treatment_interest ?? "",
+      book_appointment:   current.book_appointment ? "true" : "false",
+      appointment_date:   current.appointment_date ?? "",
+      slot:               current.slot ?? "",
+      partner_inquiry:    current.partner_inquiry ? "true" : "false",
+      is_active:          current.is_active ? "true" : "false",
+    };
+    Object.entries(safeFields).forEach(([k, v]) => formData.append(k, v));
+
+    // Append new files
     files.forEach((file) => formData.append('documents', file));
+
     const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -240,56 +292,33 @@ export const LeadAPI = {
 };
 
 // ====================== Lead Email API ======================
-// POST /lead-email/  → create/send email
-// GET  /lead-mail/   → list emails (optional ?lead_uuid=)
 export const LeadEmailAPI = {
-
-  /**
-   * Create a lead email record.
-   * - send_now: true  → email sent immediately (status: SENT)
-   * - send_now: false → saved as DRAFT
-   * POST /lead-email/
-   */
   create: async (data: LeadEmailPayload): Promise<LeadEmailResponse> => {
     const response = await api.post<LeadEmailResponse>('/lead-email/', data);
     console.log("✅ Lead email created:", response.data);
     return response.data;
   },
 
-  /**
-   * Send immediately — shorthand for create() with send_now: true
-   */
   sendNow: async (data: Omit<LeadEmailPayload, 'send_now'>): Promise<LeadEmailResponse> => {
     return LeadEmailAPI.create({ ...data, send_now: true });
   },
 
-  /**
-   * Save as draft only — shorthand for create() with send_now: false
-   */
   saveAsDraft: async (data: Omit<LeadEmailPayload, 'send_now'>): Promise<LeadEmailResponse> => {
     return LeadEmailAPI.create({ ...data, send_now: false });
   },
 
-  /**
-   * List all emails, optionally filtered by lead UUID.
-   * GET /lead-mail/?lead_uuid=<uuid>
-   */
   list: async (leadUuid?: string): Promise<LeadMailListItem[]> => {
     const params = leadUuid ? { lead_uuid: leadUuid } : {};
     const response = await api.get<LeadMailListItem[]>('/lead-mail/', { params });
     return response.data;
   },
 
-  /**
-   * Get all emails for a specific lead.
-   */
   listByLead: async (leadId: string): Promise<LeadMailListItem[]> => {
     return LeadEmailAPI.list(leadId);
   },
 };
 
 // ====================== Email Template Types ======================
-// Matches GET/POST /templates/mail/ swagger definition
 export type EmailTemplate = {
   id: string | number;
   name: string;
@@ -313,18 +342,9 @@ export type EmailTemplatePayload = {
 };
 
 // ====================== Email Template API ======================
-// GET  /templates/mail/        → list all mail templates
-// POST /templates/mail/create/ → create a new mail template
-// GET  /templates/mail/:id/    → get single template
 export const EmailTemplateAPI = {
-
-  /**
-   * List all email (mail) templates.
-   * GET /templates/mail/
-   */
   list: async (): Promise<EmailTemplate[]> => {
     const response = await api.get<EmailTemplate[]>('/templates/mail/');
-    // API may return array or { results: [] }
     const data = response.data;
     if (Array.isArray(data)) return data;
     if (data && typeof data === 'object' && 'results' in (data as object)) {
@@ -333,52 +353,30 @@ export const EmailTemplateAPI = {
     return [];
   },
 
-  /**
-   * Create a new email template.
-   * POST /templates/mail/create/
-   */
   create: async (payload: EmailTemplatePayload): Promise<EmailTemplate> => {
     const response = await api.post<EmailTemplate>('/templates/mail/create/', payload);
     console.log("✅ Email template created:", response.data);
     return response.data;
   },
 
-  /**
-   * Get a single email template by ID.
-   * GET /templates/mail/:id/
-   */
   getById: async (templateId: string | number): Promise<EmailTemplate> => {
     const response = await api.get<EmailTemplate>(`/templates/mail/${templateId}/`);
     return response.data;
   },
 
-  /**
-   * Delete an email template.
-   * DELETE /templates/mail/:id/delete/
-   */
   delete: async (templateId: string | number): Promise<void> => {
     await api.delete(`/templates/mail/${templateId}/delete/`);
   },
 };
 
 // ====================== Twilio API ======================
-// ✅ FIXED: Added lead_uuid to both makeCall and sendSMS payloads
-// Swagger docs require lead_uuid as a mandatory field for both endpoints
 export const TwilioAPI = {
-  /**
-   * Initiate an outbound call to the lead's contact number.
-   * POST /twilio/make-call/  →  { lead_uuid: "uuid", to: "+91XXXXXXXXXX" }
-   */
   makeCall: async (payload: { lead_uuid: string; to: string }): Promise<unknown> => {
     const response = await api.post('/twilio/make-call/', payload);
     console.log("📞 Call initiated:", response.data);
     return response.data;
   },
 
-  /**
-   * Send an SMS to the lead's contact number.
-   * POST /twilio/send-sms/  →  { lead_uuid: "uuid", to: "+91XXXXXXXXXX", message: "..." }
-   */
   sendSMS: async (payload: { lead_uuid: string; to: string; message: string }): Promise<unknown> => {
     const response = await api.post('/twilio/send-sms/', payload);
     console.log("💬 SMS sent:", response.data);
@@ -417,10 +415,6 @@ export const ClinicAPI = {
       }
       return [];
     }
-    console.log("=== EMPLOYEES FROM API ===");
-    data.forEach(e =>
-      console.log(`  id=${e.id} | emp_name="${e.emp_name}" | department_name="${e.department_name}"`)
-    );
     return data;
   },
 };
@@ -429,10 +423,6 @@ export const ClinicAPI = {
 export const DepartmentAPI = {
   listByClinic: async (clinicId: number): Promise<Department[]> => {
     const clinic = await ClinicAPI.getById(clinicId);
-    console.log("=== DEPARTMENTS FROM API ===");
-    (clinic.department || []).forEach(d =>
-      console.log(`  id=${d.id} | name="${d.name}" | is_active=${d.is_active}`)
-    );
     return clinic.department || [];
   },
 
