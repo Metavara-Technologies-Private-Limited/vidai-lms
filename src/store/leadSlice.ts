@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { LeadAPI, api, type Lead } from "../services/leads.api";
+import { LeadAPI, api, type Lead, type LeadDocument } from "../services/leads.api";
 
 // ====================== API Error Type ======================
 type ApiError = {
@@ -197,7 +197,6 @@ export const deleteLeads = createAsyncThunk<
 /**
  * Upload a single document file to a lead.
  * PUT /leads/{lead_id}/update/ with multipart/form-data
- * Updates the lead's documents array in the store on success.
  */
 export const uploadLeadDocument = createAsyncThunk<
   { leadId: string; updatedLead: Lead },
@@ -216,9 +215,8 @@ export const uploadLeadDocument = createAsyncThunk<
 });
 
 /**
- * Upload multiple document files to a lead sequentially.
- * Each file calls PUT /leads/{lead_id}/update/ with multipart/form-data.
- * Updates the lead's documents array in the store on success.
+ * Upload multiple document files to a lead.
+ * PUT /leads/{lead_id}/update/ with multipart/form-data
  */
 export const uploadLeadDocuments = createAsyncThunk<
   { leadId: string; updatedLead: Lead },
@@ -238,11 +236,13 @@ export const uploadLeadDocuments = createAsyncThunk<
 
 /**
  * Fetch the documents list for a specific lead from the API.
- * GET /leads/{lead_id}/ → returns lead.documents[]
- * Refreshes the lead's documents in the store.
+ * GET /leads/{lead_id}/ → returns lead.documents[] as LeadDocument[]
+ *
+ * FIX: was typed as `documents: string[]` which conflicted with
+ * Lead.documents: LeadDocument[] after the API type was updated.
  */
 export const fetchLeadDocuments = createAsyncThunk<
-  { leadId: string; documents: string[] },
+  { leadId: string; documents: LeadDocument[] },  // ← was string[], now LeadDocument[]
   string,
   { rejectValue: string }
 >("leads/fetchDocuments", async (leadId, { rejectWithValue }) => {
@@ -312,7 +312,6 @@ const leadSlice = createSlice({
             : lead
         );
       })
-      // ✅ Fixed: removed unused _state and _action parameters
       .addCase(bookAppointment.fulfilled, () => {
         // already patched optimistically in .pending
       })
@@ -410,6 +409,7 @@ const leadSlice = createSlice({
       })
 
       // ── Fetch Documents ────────────────────────────────────────
+      // FIX: documents is now LeadDocument[] (was string[]) to match Lead type
       .addCase(fetchLeadDocuments.fulfilled, (state, action) => {
         const { leadId, documents } = action.payload;
         state.leads = state.leads.map((lead) =>
