@@ -235,8 +235,15 @@ useEffect(() => {
   };
 
 const handleSendReply = async () => {
+  // No recipients selected
   if (replyTo.length === 0) {
-    toast.warn("Please select at least one recipient.");
+    toast.warn("No recipient in leads.");
+    return;
+  }
+
+  // Validate recipient exists in ticket lead
+  if (!ticket?.requested_by || !replyTo.includes(ticket.requested_by)) {
+    toast.warn("No recipient in leads.");
     return;
   }
 
@@ -255,21 +262,6 @@ const handleSendReply = async () => {
     toast.error("Failed to send reply.");
   }
 };
-
-  const convertHtmlToText = (html: string) => {
-    if (!html) return "";
-
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = html;
-
-    // Convert <br> and <p> to new lines
-    const text = tempDiv.innerText || tempDiv.textContent || "";
-
-    return text.trim();
-  };
-
-
-
 
   const handleCancelReply = () => {
     setOpenReply(false);
@@ -500,9 +492,8 @@ const handleSendReply = async () => {
         onInsertTemplate={(selectedTemplate) => {
           if (!selectedTemplate) return;
 
-          const plainText = convertHtmlToText(selectedTemplate.body || "");
-          setReplyMessage(prev => prev + "\n\n" + plainText);
-
+const templateContent = selectedTemplate.body || "";
+setReplyMessage(prev => prev + "<br/><br/>" + templateContent);
           if (!replySubject) {
             setReplySubject(selectedTemplate.subject || "");
           }
