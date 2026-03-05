@@ -10,12 +10,6 @@ import {
   updateCampaignStatus,
 } from "../store/campaignSlice";
 import type { AppDispatch } from "../store";
-<<<<<<< Updated upstream
-import EditCampaignModal from "../components/Layout/Campaign/EditCampaignModal";
-import DuplicateCampaignModal from "../components/Layout/Campaign/DuplicateCampaignModal";
-import type { CampaignStatus } from "../types/campaigns.types";
-=======
-
 const AddNewCampaign = lazy(() => import("../components/Layout/Campaign/AddNewCampaign"));
 const SocialCampaignModal = lazy(() => import("../components/Layout/Campaign/SocialCampaignModal"));
 const CampaignDashboard = lazy(() => import("../components/Layout/Campaign/CampaignDashboard"));
@@ -26,11 +20,11 @@ type CampaignStatus =
   | "Live"
   | "Draft"
   | "Schedule"
+  | "Scheduled"
   | "Paused"
   | "Stopped"
   | "Completed"
   | "Failed";
->>>>>>> Stashed changes
 
 type Tab = "all" | "social" | "email";
 
@@ -44,7 +38,7 @@ export default function CampaignsScreen() {
     if (api.status === "live" || api.is_active === true) {
       status = "Live";
     } else if (api.status === "schedule" || api.status === "scheduled") {
-      status = "Scheduled";
+      status = "Schedule";
     } else if (api.status === "draft") {
       status = "Draft";
     } else {
@@ -209,7 +203,7 @@ export default function CampaignsScreen() {
                     "Live",
                     "Stopped",
                     "Draft",
-                    "Scheduled",
+                    "Schedule",
                   ] as (CampaignStatus | "all")[]
                 ).map((item) => (
                   <div
