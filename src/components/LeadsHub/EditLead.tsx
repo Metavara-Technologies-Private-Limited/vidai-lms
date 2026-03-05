@@ -17,16 +17,23 @@ import {
   Fade,
   Alert,
   CircularProgress,
+  IconButton,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CloseIcon from "@mui/icons-material/Close";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { TASK_TYPES } from "./LeadTaskConfig";
 import {
   useEditLead,
   formatLeadId,
+  formatBytes,
+  getFileTypeLabel,
   TIME_SLOTS,
   STEPS,
   TOTAL_STEPS,
@@ -75,6 +82,12 @@ export default function EditLead() {
     handleNextTypeChange,
     treatmentInterest, setTreatmentInterest,
     treatments, setTreatments,
+    documents,
+    handleFileChange,
+    handleRemoveDocument,
+    existingDocuments,
+    docsLoading,
+    handleRemoveExistingDocument,
     wantAppointment, setWantAppointment,
     department, setDepartment,
     selectedDate,
@@ -404,19 +417,182 @@ export default function EditLead() {
                   ))}
                 </Stack>
               )}
+
+              {/* ---- Documents & Reports ---- */}
               <Typography sx={sectionLabelStyle}>DOCUMENTS & REPORTS</Typography>
-              <Box sx={{ border: "2px dashed #E2E8F0", borderRadius: "10px", p: 3, display: "inline-block", bgcolor: "#F8FAFC", minWidth: "400px" }}>
+
+              {/* ── Previously uploaded documents from server ── */}
+              {docsLoading && (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                  <CircularProgress size={14} />
+                  <Typography fontSize="0.78rem" color="text.secondary">Loading saved documents…</Typography>
+                </Box>
+              )}
+
+              {!docsLoading && existingDocuments.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography sx={{ ...sectionLabelStyle, mb: 1 }}>PREVIOUSLY UPLOADED</Typography>
+                  <Stack spacing={1} sx={{ maxWidth: 470 }}>
+                    {existingDocuments.map((doc, idx) => {
+                      const isPdf = doc.name.toLowerCase().endsWith(".pdf");
+                      const ext = doc.name.split(".").pop()?.toUpperCase() ?? "FILE";
+                      return (
+                        <Box
+                          key={`existing-${idx}`}
+                          sx={{
+                            display: "flex", alignItems: "center", gap: 1.5,
+                            px: 2, py: 1.25,
+                            border: "1px solid #E2E8F0",
+                            borderRadius: "10px",
+                            bgcolor: "#F8FAFC",
+                          }}
+                        >
+                          {isPdf ? (
+                            <PictureAsPdfIcon sx={{ fontSize: 28, color: "#EF4444", flexShrink: 0 }} />
+                          ) : (
+                            <InsertDriveFileIcon sx={{ fontSize: 28, color: "#6366F1", flexShrink: 0 }} />
+                          )}
+
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography
+                              fontSize="0.82rem" fontWeight={600} color="#1E293B"
+                              noWrap title={doc.name}
+                            >
+                              {doc.name}
+                            </Typography>
+                            <Typography fontSize="0.72rem" color="#94A3B8">
+                              {ext} · Saved
+                            </Typography>
+                          </Box>
+
+                          {/* View button */}
+                          {doc.url && (
+                            <IconButton
+                              size="small"
+                              component="a"
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{ color: "#6366F1", flexShrink: 0, "&:hover": { bgcolor: "#EEF2FF" } }}
+                            >
+                              <OpenInNewIcon fontSize="small" />
+                            </IconButton>
+                          )}
+
+                          {/* Remove button */}
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRemoveExistingDocument(idx)}
+                            sx={{
+                              color: "#94A3B8", flexShrink: 0,
+                              "&:hover": { color: "#EF4444", bgcolor: "#FEF2F2" },
+                            }}
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* ── Upload box for new files ── */}
+              <Box sx={{
+                border: "2px dashed #E2E8F0",
+                borderRadius: "10px",
+                p: 3,
+                bgcolor: "#F8FAFC",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 1.5,
+                width: 370,
+              }}>
+                <Box sx={{ color: "#94A3B8", fontSize: 36, lineHeight: 1 }}>
+                  <InsertDriveFileIcon sx={{ fontSize: 36 }} />
+                </Box>
+
                 <Button
-                  variant="contained" component="label"
-                  sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, "&:hover": { bgcolor: "#475569" } }}
+                  variant="contained"
+                  component="label"
+                  sx={{
+                    bgcolor: "#64748B",
+                    textTransform: "none",
+                    borderRadius: "8px",
+                    fontWeight: 600,
+                    px: 3,
+                    "&:hover": { bgcolor: "#475569" },
+                  }}
                 >
                   Choose File
-                  <input type="file" hidden />
+                  <input
+                    type="file"
+                    hidden
+                    multiple
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+                    onChange={handleFileChange}
+                  />
                 </Button>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                  No File Chosen
+
+                <Typography variant="caption" color="text.secondary">
+                  {documents.length === 0
+                    ? "No File Chosen"
+                    : `${documents.length} new file${documents.length > 1 ? "s" : ""} selected`}
                 </Typography>
               </Box>
+
+              {/* ── Newly selected files (not yet uploaded) ── */}
+              {documents.length > 0 && (
+                <Stack spacing={1} sx={{ mt: 2, width: 470 }}>
+                  <Typography sx={{ ...sectionLabelStyle, mb: 0.5 }}>NEW FILES TO UPLOAD</Typography>
+                  {documents.map((file, idx) => {
+                    const isPdf = file.type === "application/pdf";
+                    const typeLabel = getFileTypeLabel(file);
+                    return (
+                      <Box
+                        key={`${file.name}-${idx}`}
+                        sx={{
+                          display: "flex", alignItems: "center", gap: 1.5,
+                          px: 2, py: 1.25,
+                          border: "1px solid #E2E8F0",
+                          borderRadius: "10px",
+                          bgcolor: "#FFFFFF",
+                        }}
+                      >
+                        {isPdf ? (
+                          <PictureAsPdfIcon sx={{ fontSize: 28, color: "#EF4444", flexShrink: 0 }} />
+                        ) : (
+                          <InsertDriveFileIcon sx={{ fontSize: 28, color: "#6366F1", flexShrink: 0 }} />
+                        )}
+
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography
+                            fontSize="0.82rem" fontWeight={600} color="#1E293B"
+                            noWrap title={file.name}
+                          >
+                            {file.name}
+                          </Typography>
+                          <Typography fontSize="0.72rem" color="#94A3B8">
+                            {typeLabel} · {formatBytes(file.size)}
+                          </Typography>
+                        </Box>
+
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRemoveDocument(idx)}
+                          sx={{
+                            color: "#94A3B8", flexShrink: 0,
+                            "&:hover": { color: "#EF4444", bgcolor: "#FEF2F2" },
+                          }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              )}
             </Box>
           )}
 

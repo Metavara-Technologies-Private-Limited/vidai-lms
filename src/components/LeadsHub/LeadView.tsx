@@ -23,7 +23,7 @@ import {
 } from "@mui/material";
 import Lead_Subtract from "../../assets/icons/Lead_Subtract.svg";
 
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
@@ -53,7 +53,7 @@ import {
   selectLeadsLoading,
   selectLeadsError,
 } from "../../store/leadSlice";
-import { api, LeadAPI, LeadEmailAPI, EmailTemplateAPI } from "../../services/leads.api";
+import { api, LeadEmailAPI, EmailTemplateAPI } from "../../services/leads.api";
 import type { EmailTemplate, EmailTemplatePayload } from "../../services/leads.api";
 
 import {
@@ -156,7 +156,7 @@ const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({ open, o
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EmailDialog — API-backed templates + real send via POST /lead-email/
+// EmailDialog
 // ─────────────────────────────────────────────────────────────────────────────
 interface EmailDialogProps {
   open: boolean;
@@ -486,14 +486,12 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
 
             <DialogContent sx={{ pt: 0, pb: 0 }}>
               <Stack spacing={0} divider={<Divider />}>
-                {/* To */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
                   <Typography fontSize="13px" color="text.secondary" minWidth={55}>To:</Typography>
                   <Chip label={recipientName} size="small"
                     sx={{ bgcolor: "#EFF6FF", color: "#1D4ED8", fontWeight: 500, fontSize: "12px", height: 24 }} />
                   <Typography fontSize="12px" color="text.secondary" sx={{ ml: "auto", cursor: "pointer" }}>Cc | Bcc</Typography>
                 </Box>
-                {/* Subject */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
                   <Typography fontSize="13px" color="text.secondary" minWidth={55}>Subject:</Typography>
                   <TextField fullWidth variant="standard" value={subject}
@@ -501,7 +499,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                     InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }}
                     placeholder="Enter subject..." />
                 </Box>
-                {/* Body */}
                 <Box sx={{ py: 1.5 }}>
                   {error && (
                     <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: "8px", mb: 1.5, fontSize: "13px" }}>
@@ -527,7 +524,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
               </Stack>
             </DialogContent>
 
-            {/* Toolbar */}
             <Box sx={{ px: 2, py: 1, borderTop: "1px solid #F3F4F6", display: "flex", alignItems: "center", gap: 0.5 }}>
               {([
                 { icon: <Typography fontWeight={700} fontSize="14px" sx={{ lineHeight: 1, fontFamily: "serif" }}>T</Typography>, title: "Bold",
@@ -552,7 +548,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
               ))}
             </Box>
 
-            {/* Footer */}
             <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, borderTop: "1px solid #E5E7EB", gap: 1 }}>
               <Button onClick={handleClose} disabled={sending}
                 sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
@@ -581,9 +576,9 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
 export default function LeadDetailView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation(); // ← used to detect navigation back from edit
   const dispatch = useDispatch();
 
-  // ✅ FIX 1: Removed unused `RootState` import — useSelector infers types automatically
   const leads        = useSelector(selectLeads) as LeadRecord[] | null;
   const loading      = useSelector(selectLeadsLoading) as boolean;
   const error        = useSelector(selectLeadsError) as string | null;
@@ -594,7 +589,6 @@ export default function LeadDetailView() {
   const [convertError, setConvertError]         = React.useState<string | null>(null);
   const [historyView, setHistoryView]           = React.useState<HistoryView>("chatbot");
 
-  // ── Email dialog state ──
   const [emailDialogOpen, setEmailDialogOpen] = React.useState(false);
 
   const [notes, setNotes]               = React.useState<NoteData[]>([]);
@@ -667,18 +661,15 @@ export default function LeadDetailView() {
     } finally { setNotesLoading(false); }
   }, []);
 
-  const fetchDocuments = React.useCallback(async (leadUuid: string, leadDocs?: DocumentEntry[]) => {
+  // ── Documents are already embedded in the lead object returned by the list API.
+  // We just normalize them (fixing relative /media/ paths → absolute URLs).
+  // After edit+save, dispatch(fetchLeads()) refreshes Redux and lead.documents updates.
+  const fetchDocuments = React.useCallback((leadDocs: DocumentEntry[]) => {
+    setDocsLoading(true); setDocsError(null);
     try {
-      setDocsLoading(true); setDocsError(null);
-      if (leadDocs && leadDocs.length > 0) {
-        setDocuments(leadDocs.map(normalizeDocument));
-      } else {
-        const rawDocs: DocumentEntry[] = await LeadAPI.getDocuments(leadUuid);
-        setDocuments(rawDocs.map(normalizeDocument));
-      }
+      setDocuments(Array.isArray(leadDocs) ? leadDocs.map(normalizeDocument) : []);
     } catch (err: unknown) {
-      setDocsError(err instanceof Error ? err.message :
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to load documents");
+      setDocsError(err instanceof Error ? err.message : "Failed to load documents");
     } finally { setDocsLoading(false); }
   }, []);
 
@@ -704,15 +695,25 @@ export default function LeadDetailView() {
     } finally { setSmsHistoryLoading(false); }
   }, []);
 
+  // ── Fetch all data when lead is available.
+  // `location.key` changes every time React Router navigates to this page,
+  // so coming back from the edit page triggers a fresh document fetch automatically.
+  // Refresh leads from API every time we navigate to this page (location.key changes).
+  // This ensures documents deleted/added in the edit form are reflected immediately.
+  React.useEffect(() => {
+    dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key, dispatch]);
+
   React.useEffect(() => {
     if (lead) {
       const rawId = decodeURIComponent(id || "");
       fetchNotes(rawId);
-      fetchDocuments(lead.id, lead.documents);
+      fetchDocuments((lead.documents ?? []) as DocumentEntry[]);
       fetchCallHistory(lead.id);
       fetchSMSHistory(lead.id);
     }
-  }, [lead, fetchNotes, fetchDocuments, fetchCallHistory, fetchSMSHistory, id]);
+  }, [lead?.id, lead?.documents, location.key, fetchNotes, fetchDocuments, fetchCallHistory, fetchSMSHistory, id]);
 
   // ── Note operations ──
   const handleAddNote = async () => {
@@ -1002,7 +1003,6 @@ export default function LeadDetailView() {
       )}
 
       {activeTab === "History" && (
-        // ✅ FIX 2: Removed leadInitials prop — not in HistoryTabProps interface
         <HistoryTab
           lead={lead}
           historyView={historyView} setHistoryView={setHistoryView}
@@ -1076,7 +1076,7 @@ export default function LeadDetailView() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Email Dialog (API-backed) ── */}
+      {/* ── Email Dialog ── */}
       <EmailDialog
         open={emailDialogOpen}
         lead={lead}
