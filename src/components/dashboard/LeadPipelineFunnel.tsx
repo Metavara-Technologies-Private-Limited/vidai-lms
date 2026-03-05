@@ -12,6 +12,15 @@ interface LeadPipelineFunnelProps {
   timeRange: TimeRange;
 }
 
+const stages = [
+  { stage: "Converted Leads", key: "Converted" as Status, color: "#7e879d" },
+  { stage: "New Leads", key: "New" as Status, color: "#8a92a8" },
+  { stage: "Appointments", key: "Appointment" as Status, color: "#9ba3b5" },
+  { stage: "Follow-Ups", key: "Follow-Ups" as Status, color: "#b8bdcc" },
+  { stage: "Cycle Conversion", key: "Cycle Conversion" as Status, color: "#d1d4de" },
+  { stage: "Lost Leads", key: "Lost" as Status, color: "#eceef4" },
+];
+
 const normalizeLeadStatus = (status?: string | null): Status | null => {
   if (!status) return null;
 
@@ -43,36 +52,25 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
 
   // ✅ Process leads into the specific SVG stages matching your Status types
   const data = useMemo(() => {
-    // These keys match your status values and visual order in the design
-    const stages = [
-      { stage: "Converted Leads", key: "Converted" as Status, color: "#7e879d" },
-      { stage: "New Leads", key: "New" as Status, color: "#8a92a8" },
-      { stage: "Appointments", key: "Appointment" as Status, color: "#9ba3b5" },
-      { stage: "Follow-Ups", key: "Follow-Ups" as Status, color: "#b8bdcc" },
-      { stage: "Cycle Conversion", key: "Cycle Conversion" as Status, color: "#d1d4de" },
-      { stage: "Lost Leads", key: "Lost" as Status, color: "#eceef4" },
-    ];
+    const countsByStage: Partial<Record<Status, number>> = {};
 
-    const filteredLeads = leads.filter(
-      (lead) =>
-        lead.is_active !== false &&
-        isWithinTimeRange(lead.modified_at || lead.created_at, timeRange),
-    );
+    for (const lead of leads) {
+      if (lead.is_active === false) continue;
+      if (!isWithinTimeRange(lead.modified_at || lead.created_at, timeRange)) continue;
 
-    const stageCounts = stages.map((item, order) => {
-      const count = filteredLeads.filter((lead) => {
-        const normalized = normalizeLeadStatus(
-          (lead.lead_status as string | undefined) || (lead as { status?: string }).status
-        );
-        return normalized === item.key;
-      }).length;
+      const normalized = normalizeLeadStatus(
+        (lead.lead_status as string | undefined) || (lead as { status?: string }).status
+      );
 
-      return {
-        ...item,
-        value: count || 0,
-        order,
-      };
-    });
+      if (!normalized) continue;
+      countsByStage[normalized] = (countsByStage[normalized] || 0) + 1;
+    }
+
+    const stageCounts = stages.map((item, order) => ({
+      ...item,
+      value: countsByStage[item.key] || 0,
+      order,
+    }));
 
     return stageCounts
       .sort((a, b) => b.value - a.value || a.order - b.order)

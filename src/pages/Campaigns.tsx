@@ -1,22 +1,36 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import "../styles/Campaign/campaigns.css";
 import searchIcon from "../components/Layout/Campaign/Icons/search.png";
 import CampaignHeader from "../components/Layout/Campaign/CampaignHeader";
 import CampaignCard from "../components/Layout/Campaign/CampaignCard";
-import AddNewCampaign from "../components/Layout/Campaign/AddNewCampaign";
-import SocialCampaignModal from "../components/Layout/Campaign/SocialCampaignModal";
-import CampaignDashboard from "../components/Layout/Campaign/CampaignDashboard";
-import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
 import { useSelector, useDispatch } from "react-redux";
 import {
   selectCampaign,
   updateCampaignStatus,
 } from "../store/campaignSlice";
 import type { AppDispatch } from "../store";
+<<<<<<< Updated upstream
 import EditCampaignModal from "../components/Layout/Campaign/EditCampaignModal";
 import DuplicateCampaignModal from "../components/Layout/Campaign/DuplicateCampaignModal";
 import type { CampaignStatus } from "../types/campaigns.types";
+=======
+
+const AddNewCampaign = lazy(() => import("../components/Layout/Campaign/AddNewCampaign"));
+const SocialCampaignModal = lazy(() => import("../components/Layout/Campaign/SocialCampaignModal"));
+const CampaignDashboard = lazy(() => import("../components/Layout/Campaign/CampaignDashboard"));
+const EmailCampaignModal = lazy(() => import("../components/Layout/Campaign/EmailCampaignModal"));
+const EditCampaignModal = lazy(() => import("../components/Layout/Campaign/EditCampaignModal"));
+const DuplicateCampaignModal = lazy(() => import("../components/Layout/Campaign/DuplicateCampaignModal"));
+type CampaignStatus =
+  | "Live"
+  | "Draft"
+  | "Schedule"
+  | "Paused"
+  | "Stopped"
+  | "Completed"
+  | "Failed";
+>>>>>>> Stashed changes
 
 type Tab = "all" | "social" | "email";
 
@@ -133,10 +147,12 @@ export default function CampaignsScreen() {
 
   if (selectedCampaign) {
     return (
-      <CampaignDashboard
-        campaign={selectedCampaign}
-        onBack={() => setSelectedCampaign(null)}
-      />
+      <Suspense fallback={<div className="empty-state">Loading campaign...</div>}>
+        <CampaignDashboard
+          campaign={selectedCampaign}
+          onBack={() => setSelectedCampaign(null)}
+        />
+      </Suspense>
     );
   }
 
@@ -236,45 +252,55 @@ export default function CampaignsScreen() {
 
       {/* ================= MODALS ================= */}
       {showAddCampaign && (
-        <AddNewCampaign
-          onClose={() => setShowAddCampaign(false)}
-          onSocialSelect={() => {
-            setShowAddCampaign(false);
-            setShowSocialModal(true);
-          }}
-          onEmailSelect={() => {
-            setShowAddCampaign(false);
-            setShowEmailModal(true);
-          }}
-        />
+        <Suspense fallback={null}>
+          <AddNewCampaign
+            onClose={() => setShowAddCampaign(false)}
+            onSocialSelect={() => {
+              setShowAddCampaign(false);
+              setShowSocialModal(true);
+            }}
+            onEmailSelect={() => {
+              setShowAddCampaign(false);
+              setShowEmailModal(true);
+            }}
+          />
+        </Suspense>
       )}
       {showSocialModal && (
-        <SocialCampaignModal
-          onClose={() => setShowSocialModal(false)}
-          onSave={() => setShowSocialModal(false)}
-        />
+        <Suspense fallback={null}>
+          <SocialCampaignModal
+            onClose={() => setShowSocialModal(false)}
+            onSave={() => setShowSocialModal(false)}
+          />
+        </Suspense>
       )}
       {showEmailModal && (
-        <EmailCampaignModal
-          onClose={() => setShowEmailModal(false)}
-          onSave={() => setShowEmailModal(false)}
-        />
+        <Suspense fallback={null}>
+          <EmailCampaignModal
+            onClose={() => setShowEmailModal(false)}
+            onSave={() => setShowEmailModal(false)}
+          />
+        </Suspense>
       )}
       {showEditModal && editingCampaign && (
-        <EditCampaignModal
-          campaign={editingCampaign}
-          onClose={() => setShowEditModal(false)}
-          onSave={() => {
-            setShowEditModal(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <EditCampaignModal
+            campaign={editingCampaign}
+            onClose={() => setShowEditModal(false)}
+            onSave={() => {
+              setShowEditModal(false);
+            }}
+          />
+        </Suspense>
       )}
       {duplicatingCampaign && (
-        <DuplicateCampaignModal
-          campaign={duplicatingCampaign}
-          onClose={() => setDuplicatingCampaign(null)}
-          onSave={() => setDuplicatingCampaign(null)}
-        />
+        <Suspense fallback={null}>
+          <DuplicateCampaignModal
+            campaign={duplicatingCampaign}
+            onClose={() => setDuplicatingCampaign(null)}
+            onSave={() => setDuplicatingCampaign(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

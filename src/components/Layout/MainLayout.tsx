@@ -1,9 +1,11 @@
 import { Outlet } from "react-router-dom";
 import { Box } from "@mui/material";
-import Header from "./Header";
-import Sidebar from "./Sidebar";
+import { lazy, Suspense } from "react";
 
 import styles from "../../styles/sidebar.module.css";
+
+const Header = lazy(() => import("./Header"));
+const Sidebar = lazy(() => import("./Sidebar"));
 
 const MainLayout = () => {
   return (
@@ -15,7 +17,9 @@ const MainLayout = () => {
         bgcolor: "background.default",
       }}
     >
-      <Sidebar />
+      <Suspense fallback={<Box sx={{ width: 320, bgcolor: "background.default" }} />}>
+        <Sidebar />
+      </Suspense>
       <Box
         sx={{
           flexGrow: 1,
@@ -24,7 +28,9 @@ const MainLayout = () => {
           overflow: "hidden",
         }}
       >
-        <Header />
+        <Suspense fallback={<Box sx={{ height: 88, bgcolor: "background.default" }} />}>
+          <Header />
+        </Suspense>
         <Box
           className={styles.cardWrapper}
           sx={{m:0, pb:2}}

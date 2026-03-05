@@ -1,17 +1,19 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import {
+  lazy,
   Suspense,
   type ComponentType,
   type LazyExoticComponent,
 } from "react";
-import MainLayout from "./components/Layout/MainLayout";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
+
+const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div style={{ padding: 12 }}>Loading...</div>}>
       <Comp />
     </Suspense>
   );
@@ -21,7 +23,14 @@ export default function AppRoutes() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<MainLayout />}>
+        <Route
+          path="/"
+          element={(
+            <Suspense fallback={<div style={{ padding: 12 }}>Loading app...</div>}>
+              <MainLayout />
+            </Suspense>
+          )}
+        >
           <Route index element={<Navigate to="/dashboard" replace />} />
 
           {/* Sidebar routes */}

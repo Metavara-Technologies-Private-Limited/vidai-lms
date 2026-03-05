@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import {
   Box, Button, Chip, IconButton, InputBase, Stack, Tab, Tabs, Typography, Avatar, CircularProgress, Alert,
 } from "@mui/material";
@@ -7,8 +7,6 @@ import { useDispatch, useSelector } from "react-redux";
 import SearchIcon from "@mui/icons-material/Search";
 import Filter_Leads from "../../../assets/icons/Filter_Leads.svg";
 import AddIcon from "@mui/icons-material/Add";
-import CreateTicket from "./CreateTicket";
-import FilterTickets from "./FilterTicket";
 import dayjs from "dayjs";
 
 // Types & Styles
@@ -45,6 +43,9 @@ import {
 import type { AppDispatch } from "../../../store";
 import type { Employee } from "../../../services/leads.api";
 import { clinicsApi } from "../../../services/tickets.api";
+
+const CreateTicket = lazy(() => import("./CreateTicket"));
+const FilterTickets = lazy(() => import("./FilterTicket"));
 
 const Tickets = () => {
   const navigate = useNavigate();
@@ -348,33 +349,42 @@ const getCount = (status: string): number => {
         </Stack>
       </Stack>
 
-      <CreateTicket open={openCreate} onClose={() => setOpenCreate(false)} />
-      <FilterTickets
-        open={openFilter}
-        onClose={() => setOpenFilter(false)}
-        onApply={(appliedFilters: FilterTicketsPayload | null) => {
+      {openCreate && (
+        <Suspense fallback={null}>
+          <CreateTicket open={openCreate} onClose={() => setOpenCreate(false)} />
+        </Suspense>
+      )}
 
-          if (!appliedFilters) {
-            setFilters(null);
-            setPage(1);
-            return;
-          }
+      {openFilter && (
+        <Suspense fallback={null}>
+          <FilterTickets
+            open={openFilter}
+            onClose={() => setOpenFilter(false)}
+            onApply={(appliedFilters: FilterTicketsPayload | null) => {
 
-          const apiFilters: TicketFilters = {
-            priority: appliedFilters.priority || undefined,
-            department_id: appliedFilters.department_id || undefined,
-            from_date: appliedFilters.fromDate
-              ? appliedFilters.fromDate.format("YYYY-MM-DD")
-              : undefined,
-            to_date: appliedFilters.toDate
-              ? appliedFilters.toDate.format("YYYY-MM-DD")
-              : undefined,
-          };
+              if (!appliedFilters) {
+                setFilters(null);
+                setPage(1);
+                return;
+              }
 
-          setFilters(apiFilters);
-          setPage(1);
-        }}
-      />
+              const apiFilters: TicketFilters = {
+                priority: appliedFilters.priority || undefined,
+                department_id: appliedFilters.department_id || undefined,
+                from_date: appliedFilters.fromDate
+                  ? appliedFilters.fromDate.format("YYYY-MM-DD")
+                  : undefined,
+                to_date: appliedFilters.toDate
+                  ? appliedFilters.toDate.format("YYYY-MM-DD")
+                  : undefined,
+              };
+
+              setFilters(apiFilters);
+              setPage(1);
+            }}
+          />
+        </Suspense>
+      )}
 
     </Box>
   );
