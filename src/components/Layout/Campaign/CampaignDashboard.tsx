@@ -34,6 +34,10 @@ interface Campaign {
   total_spend?: number;
   cpc?: number;
   budget?: number;
+  budget_data?: Record<string, number>;
+  image_url?: string;
+  platform_data?: Record<string, string>;
+  campaign_content?: string;
   start_date?: string;
   end_date?: string;
   created_at?: string;
@@ -70,6 +74,19 @@ const CampaignDashboard = ({
   const platforms = campaign.platforms || [];
   const [fullData, setFullData] = React.useState<any>(null);
 
+  // ─── Resolve total budget ─────────────────────────────────────────────────
+  // Priority 1: budget_data.total
+  // Priority 2: sum of all platform budgets in budget_data
+  // Priority 3: total_spend flat field
+  const budgetData: Record<string, number> = campaign.budget_data ?? {};
+  // Only sum budgets for platforms actually selected in this campaign
+  const sumFromSelectedPlatforms = platforms
+    .filter((p) => p !== "gmail")
+    .reduce((sum, p) => sum + (Number(budgetData[p]) || 0), 0);
+
+  const totalBudget: number =
+    sumFromSelectedPlatforms > 0 ? sumFromSelectedPlatforms : (campaign.total_spend ?? 0);
+
   const metrics = [
     { title: "Total Impressions", value: "0", icon: impressionsIcon },
     { title: "Total Clicks", value: "0", icon: clicksIcon },
@@ -78,10 +95,22 @@ const CampaignDashboard = ({
       value: campaign.lead_generated || "0",
       icon: conversionsIcon,
     },
+<<<<<<< HEAD
     {title: "Total Spend",value: `$${fullData?.budget_data?.total_budget ?? 0}`,icon: spendIcon,},
+=======
+    {
+      title: "Total Budget",
+      value: `$${totalBudget}`,
+      icon: spendIcon,
+    },
+>>>>>>> 6752c625df204b680dc54719a352b49be1cb8755
     { title: "CTR", value: "0%", icon: ctrIcon },
     { title: "Conversion Rate", value: "0%", icon: conversionRateIcon },
-    {title: "CPC",value: `$${campaign.cpc?.toFixed(2) ?? 0}`,icon: cpcIcon,},
+    {
+      title: "CPC",
+      value: `$${campaign.cpc?.toFixed(2) ?? "0.00"}`,
+      icon: cpcIcon,
+    },
     { title: "CPA", value: "$0", icon: cpaIcon },
   ];
 
@@ -125,9 +154,7 @@ React.useEffect(() => {
               <div className="cd-globe">
                 <img src={globeIcon} alt="Global" />
               </div>
-
               <span className="cd-header-title">{campaign.name}</span>
-
               <span className={`cd-live ${campaign.status.toLowerCase()}`}>
                 {campaign.status}
               </span>
@@ -141,7 +168,6 @@ React.useEffect(() => {
               label="Campaign Objective"
               value={campaign.objective || "-"}
             />
-
             <Meta
               label="Platform"
               value={
@@ -152,7 +178,6 @@ React.useEffect(() => {
                 </div>
               }
             />
-
             <Meta label="Campaign Type" value={campaign.type.toUpperCase()} />
             <Meta
               label="Leads Generated"

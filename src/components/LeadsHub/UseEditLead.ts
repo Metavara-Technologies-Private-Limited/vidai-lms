@@ -8,7 +8,7 @@ import type { DateValidationError, PickerChangeHandlerContext } from "@mui/x-dat
 import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 
-import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
+import { api, LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import { fetchLeads } from "../../store/leadSlice";
 import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
@@ -16,11 +16,17 @@ import type { NextActionStatus } from "../../types/leads.types";
 import { TASK_STATUS_FOR_TYPE, getAutoNextActionStatus } from "./LeadTaskConfig";
 
 // ====================== Extended Lead type ======================
-// Covers API response fields not yet reflected in the generated Lead type.
 export interface LeadResponse extends Lead {
   gender?: "male" | "female" | "other" | null;
   language_preference?: string | null;
-  next_action_type?: string; // no null — Lead.next_action_type is string | undefined
+  next_action_type?: string;
+}
+
+// ====================== Existing document shape ======================
+export interface ExistingDocument {
+  url: string;
+  name: string;
+  id?: number | string;
 }
 
 // ====================== Helpers ======================
@@ -48,6 +54,41 @@ export const formatLeadId = (id: string): string => {
   if (numMatch) return `#LN-${numMatch[0]}`;
   const hash = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return `#LN-${(hash % 900) + 100}`;
+};
+
+// ====================== File size formatter ======================
+export const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// ====================== File type label ======================
+export const getFileTypeLabel = (file: File): string => {
+  if (file.type === "application/pdf") return "PDF";
+  if (file.type.startsWith("image/")) return file.type.split("/")[1].toUpperCase();
+  if (file.type.includes("word")) return "DOC";
+  return file.name.split(".").pop()?.toUpperCase() ?? "FILE";
+};
+
+// ====================== Normalize document from API ======================
+export const normalizeDocument = (doc: {
+  url?: string;
+  file?: string;
+  document?: string;
+  name?: string;
+  file_name?: string;
+  original_name?: string;
+  id?: number | string;
+}): ExistingDocument => {
+  const url = doc.url || doc.file || doc.document || "";
+  const rawName =
+    doc.name ||
+    doc.file_name ||
+    doc.original_name ||
+    url.split("/").pop() ||
+    "Document";
+  return { url, name: rawName, id: doc.id };
 };
 
 // ====================== Time Slots (shared with Step 3 JSX) ======================
@@ -153,6 +194,14 @@ export function useEditLead() {
   const [treatmentInterest, setTreatmentInterest] = React.useState("");
   const [treatments, setTreatments] = React.useState<string[]>([]);
 
+  // Step 2 – New files to upload
+  const [documents, setDocuments] = React.useState<File[]>([]);
+
+  // Step 2 – Existing documents from server
+  const [existingDocuments, setExistingDocuments] = React.useState<ExistingDocument[]>([]);
+  const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
+  const [docsLoading, setDocsLoading] = React.useState(false);
+
   // Step 3
   const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("yes");
   const [department, setDepartment] = React.useState("");
@@ -165,13 +214,13 @@ export function useEditLead() {
   const availableTaskStatuses = React.useMemo<{ label: string; value: string }[]>(() => {
     if (!nextType) {
       return [
-        { label: "To Do", value: "pending"   },
-        { label: "Done",  value: "completed" },
+        { label: "To Do", value: "pending" },
+        { label: "Done", value: "completed" },
       ];
     }
     return TASK_STATUS_FOR_TYPE[nextType] ?? [
-      { label: "To Do", value: "pending"   },
-      { label: "Done",  value: "completed" },
+      { label: "To Do", value: "pending" },
+      { label: "Done", value: "completed" },
     ];
   }, [nextType]);
 
@@ -192,6 +241,25 @@ export function useEditLead() {
     if (nextDate) setAppointmentDate(nextDate.format("YYYY-MM-DD"));
   };
 
+  // ====================== File Handler ======================
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const incoming = Array.from(e.target.files ?? []);
+    if (incoming.length === 0) return;
+    setDocuments((prev) => {
+      const existingNames = new Set(prev.map((f) => f.name));
+      return [...prev, ...incoming.filter((f) => !existingNames.has(f.name))];
+    });
+    e.target.value = "";
+  };
+
+  const handleRemoveDocument = (index: number) => {
+    setDocuments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveExistingDocument = (index: number) => {
+    setExistingDocuments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   // ====================== Fetch Lead ======================
   React.useEffect(() => {
     if (!id) { setError("No lead ID provided"); setLoading(false); return; }
@@ -202,32 +270,19 @@ export function useEditLead() {
         setLeadData(lead as unknown as Lead);
         setClinicId(lead.clinic_id ?? 1);
 
-        // Step 1
         setFullName(lead.full_name ?? "");
         setContactNo(lead.contact_no ?? "");
         setEmail(lead.email ?? "");
         setLocation(lead.location ?? "");
-        setGender(
-          lead.gender === "male" ? "Male"
-          : lead.gender === "female" ? "Female"
-          : ""
-        );
+        setGender(lead.gender === "male" ? "Male" : lead.gender === "female" ? "Female" : "");
         setAge(lead.age?.toString() ?? "");
-        setMarital(
-          lead.marital_status === "married" ? "Married"
-          : lead.marital_status === "single" ? "Single"
-          : ""
-        );
+        setMarital(lead.marital_status === "married" ? "Married" : lead.marital_status === "single" ? "Single" : "");
         setAddress(lead.address ?? "");
         setLanguage(lead.language_preference ?? "");
         setIsCouple(lead.partner_inquiry ? "yes" : "no");
         setPartnerName(lead.partner_full_name ?? "");
         setPartnerAge(lead.partner_age?.toString() ?? "");
-        setPartnerGender(
-          lead.partner_gender === "male" ? "Male"
-          : lead.partner_gender === "female" ? "Female"
-          : ""
-        );
+        setPartnerGender(lead.partner_gender === "male" ? "Male" : lead.partner_gender === "female" ? "Female" : "");
         setSource(lead.source ?? "");
         setSubSource(lead.sub_source ?? "");
         setAssignee(lead.assigned_to_id?.toString() ?? "");
@@ -235,19 +290,40 @@ export function useEditLead() {
         setNextStatus(lead.next_action_status ?? "");
         setNextDesc(lead.next_action_description ?? "");
 
-        // Step 2
         setTreatmentInterest(lead.treatment_interest ?? "");
         if (lead.treatment_interest) {
           setTreatments(lead.treatment_interest.split(",").map((t) => t.trim()));
         }
 
-        // Step 3
         setWantAppointment(lead.book_appointment ? "yes" : "no");
         setDepartment(lead.department_id?.toString() ?? "");
         setAppointmentDate(lead.appointment_date ?? "");
         if (lead.appointment_date) setSelectedDate(dayjs(lead.appointment_date));
         setSlot(lead.slot ?? "");
         setRemark(lead.remark ?? "");
+
+        // ====================== Fetch existing documents ======================
+        // First try: documents embedded in the lead response
+        const embeddedDocs = (lead as unknown as { documents?: unknown[] }).documents;
+        if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
+          const normalized = embeddedDocs.map((d) => normalizeDocument(d as Parameters<typeof normalizeDocument>[0]));
+          setExistingDocuments(normalized);
+          initialExistingDocuments.current = normalized;
+        } else {
+          // Second try: dedicated endpoint
+          try {
+            setDocsLoading(true);
+            const rawDocs = await LeadAPI.getDocuments(id);
+            if (Array.isArray(rawDocs) && rawDocs.length > 0) {
+              setExistingDocuments(rawDocs.map((d) => normalizeDocument(d as Parameters<typeof normalizeDocument>[0])));
+            }
+          } catch {
+            // silently ignore — not critical for edit flow
+          } finally {
+            setDocsLoading(false);
+          }
+        }
+
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load lead");
       } finally {
@@ -309,8 +385,6 @@ export function useEditLead() {
 
     const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
 
-    // Fields that exist in the API payload but are absent from the generated LeadPayload type.
-    // Spread them separately with a minimal cast so the rest of updateData stays fully typed.
     const extraFields = {
       gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
       language_preference: language || "",
@@ -341,39 +415,59 @@ export function useEditLead() {
       appointment_date: appointmentDate,
       slot,
       remark: remark || "",
+      // ── Always preserve is_active from original lead ──
+      // Without this, a PUT request to Django sets is_active=false
+      // which makes the lead disappear from the list (appears "deleted").
+      is_active: leadData?.is_active !== false,  // preserve active status; default true if undefined
       ...extraFields,
     } as Partial<LeadPayload>;
 
     setSaving(true);
     setShowSuccess(true);
-    setTimeout(() => navigate("/leads", { replace: true }), 800);
+    // Navigate after save completes — fetchLeads runs first so Redux is fresh
+    // before LeadView reads lead.documents on arrival.
 
-    LeadAPI.update(id, updateData)
-      .then(() => dispatch(fetchLeads()))
-      .catch((err: unknown) => {
-        console.error("❌ Lead update failed:", err instanceof Error ? err.message : err);
+    const doSave = async () => {
+      // Single multipart PUT with all lead fields + new file uploads.
+      // The backend appends uploaded files to the existing document set.
+      const formData = new FormData();
+
+      (Object.keys(updateData) as (keyof typeof updateData)[]).forEach((key) => {
+        const value = updateData[key];
+        if (value === null || value === undefined) return;
+        formData.append(key, typeof value === "boolean" ? (value ? "true" : "false") : String(value));
       });
+
+      documents.forEach((file) => formData.append("documents", file));
+
+      await api.put(`/leads/${id}/update/`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      await dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+      navigate("/leads", { replace: true });
+    };
+
+    doSave().catch((err: unknown) => {
+      console.error("❌ Lead save failed:", err instanceof Error ? err.message : err);
+      navigate("/leads", { replace: true });
+    });
   };
 
   return {
-    // navigation
     navigate,
-    // UI state
     currentStep, setCurrentStep,
     showSuccess,
     loading,
     error, setError,
     saving,
-    // lookup data
     departments,
     employees,
     filteredPersonnel,
     loadingDepartments,
     loadingEmployees,
     employeeError, setEmployeeError,
-    // lead meta
     leadData,
-    // step 1
     fullName, setFullName,
     contactNo, setContactNo,
     email, setEmail,
@@ -396,17 +490,20 @@ export function useEditLead() {
     nextDesc, setNextDesc,
     availableTaskStatuses,
     handleNextTypeChange,
-    // step 2
     treatmentInterest, setTreatmentInterest,
     treatments, setTreatments,
-    // step 3
+    documents,
+    handleFileChange,
+    handleRemoveDocument,
+    existingDocuments,
+    docsLoading,
+    handleRemoveExistingDocument,
     wantAppointment, setWantAppointment,
     department, setDepartment,
     selectedDate,
     handleDateChange,
     slot, setSlot,
     remark, setRemark,
-    // actions
     handleSave,
   };
 }

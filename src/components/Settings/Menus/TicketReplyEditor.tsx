@@ -5,20 +5,19 @@ import {
   Stack,
   Popover,
   InputBase,
-  TextField,
   Divider,
   Button,
 } from "@mui/material";
-
+import { useEffect, useRef } from "react";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import LinkIcon from "@mui/icons-material/Link";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
-import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
-import FormatSizeIcon from "@mui/icons-material/FormatSize";
+import FormatBoldIcon from "@mui/icons-material/FormatBold";
+import FormatItalicIcon from "@mui/icons-material/FormatItalic";
+import FormatUnderlinedIcon from "@mui/icons-material/FormatUnderlined";
 // import type { Employee } from "../../../services/leads.api";
 import type { SxProps, Theme } from "@mui/material/styles";
 import DeleteMail from "../../../assets/icons/Delete_icon.svg";
@@ -86,25 +85,55 @@ const TicketReplyEditor = ({
   setOpenTemplateDialog,
   iconSx,
 }: TicketReplyEditorProps) => {
+
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+useEffect(() => {
+  if (!editorRef.current) return;
+
+  if (replyMessage && editorRef.current.innerHTML !== replyMessage) {
+    editorRef.current.innerHTML = replyMessage;
+  }
+}, [replyMessage]);
+
   if (!openReply) return null;
 
   const openPicker = Boolean(anchorEl);
 
+
+
+const handleBold = () => {
+  editorRef.current?.focus();
+  document.execCommand("bold");
+};
+
+const handleItalic = () => {
+  editorRef.current?.focus();
+  document.execCommand("italic");
+};
+
+const handleUnderline = () => {
+  editorRef.current?.focus();
+  document.execCommand("underline");
+};
+
   return (
     <Box mt={3} p={3} borderRadius={2} bgcolor="#FFFFFF">
       {/* TO ROW */}
-      <Box
-        display="flex"
-        alignItems="center"
-        gap={1}
-        pb={1.5}
-        borderBottom="1px solid #E6E6E6"
-        onClick={(e) => {
-          e.stopPropagation(); // prevents screen freeze
-          if (recipients.length > 0) {
-            setAnchorEl(e.currentTarget);
-          }
-        }}
+<Box
+  display="flex"
+  alignItems="center"
+  gap={1}
+  pb={1.5}
+  borderBottom="1px solid #E6E6E6"
+  onClick={(e) => {
+    if ((e.target as HTMLElement).closest('[contenteditable="true"]')) return;
+
+    e.stopPropagation();
+    if (recipients.length > 0) {
+      setAnchorEl(e.currentTarget);
+    }
+  }}
         sx={{
           display: "flex",
           gap: 1,
@@ -224,28 +253,39 @@ const TicketReplyEditor = ({
       </Box>
 
       {/* MESSAGE */}
-      <TextField
-        fullWidth
-        multiline
-        minRows={6}
-        variant="standard"
-        placeholder="Write your reply..."
-        value={replyMessage}
-        onChange={(e) => setReplyMessage(e.target.value)}
-        InputProps={{ disableUnderline: true }}
-        sx={{
-          mt: 1,
-          "& .MuiInputBase-root": { fontSize: 14, lineHeight: 1.6, padding: 0 },
-          "& textarea": { padding: 0 },
-        }}
-      />
+<Box
+  ref={editorRef}
+  contentEditable
+  suppressContentEditableWarning
+  onInput={(e) =>
+    setReplyMessage((e.target as HTMLDivElement).innerHTML)
+  }
+  sx={{
+    mt: 1,
+    width: "100%",
+    minHeight: 150,
+    fontSize: 14,
+    lineHeight: 1.6,
+    padding: 0,
+    outline: "none",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    "&:empty:before": {
+  content: '"Write your reply..."',
+  color: "#9E9E9E",
+},
+  }}
+  data-placeholder="Write your reply..."
+/>
 
       <Divider sx={{ my: 1.5 }} />
 
       {/* TOOLBAR */}
       <Stack direction="row" alignItems="center" spacing={1.5}>
-        <FormatSizeIcon sx={iconSx} />
-        <AttachFileIcon sx={iconSx} onClick={handleAttachClick} />
+  <FormatBoldIcon sx={iconSx} onClick={handleBold} />
+  <FormatItalicIcon sx={iconSx} onClick={handleItalic} />
+  <FormatUnderlinedIcon sx={iconSx} onClick={handleUnderline} />
+          <AttachFileIcon sx={iconSx} onClick={handleAttachClick} />
         <LinkIcon sx={iconSx} onClick={handleInsertLink} />
         <InsertEmoticonIcon
           sx={iconSx}
@@ -253,8 +293,6 @@ const TicketReplyEditor = ({
         />
         <CloudOutlinedIcon sx={iconSx} onClick={handleInsertDriveLink} />
         <ImageOutlinedIcon sx={iconSx} onClick={handleImageClick} />
-        <PhotoCameraOutlinedIcon sx={iconSx} onClick={handleImageClick} />
-        <EditOutlinedIcon sx={iconSx} />
         <AddBoxOutlinedIcon
           sx={iconSx}
           onClick={() => setOpenTemplateDialog(true)}
@@ -299,20 +337,34 @@ const TicketReplyEditor = ({
         </Button>
 
         <Button
-          variant="contained"
-          onClick={handleSendReply}
-          sx={{
-            height: 32,
-            px: 2.2,
-            fontSize: "13px",
-            textTransform: "none",
-            bgcolor: "#505050",
-            borderRadius: "6px",
-            "&:hover": { bgcolor: "#232323" },
-          }}
-        >
-          Send
-        </Button>
+  variant="contained"
+  onClick={() => {
+    const validRecipients = recipients.filter((lead: LeadRecipient) =>
+      replyTo.includes(lead.email)
+    );
+
+    if (validRecipients.length === 0) {
+      import("react-toastify").then(({ toast }) => {
+        toast.warn("No recipient in leads.");
+      });
+      return;
+    }
+
+    handleSendReply();
+  }}
+  sx={{
+    height: 32,
+    px: 2.2,
+    fontSize: "13px",
+    textTransform: "none",
+    bgcolor: "#505050",
+    borderRadius: "6px",
+    "&:hover": { bgcolor: "#232323" },
+  }}
+>
+  Send
+</Button>
+
       </Stack>
     </Box>
   );

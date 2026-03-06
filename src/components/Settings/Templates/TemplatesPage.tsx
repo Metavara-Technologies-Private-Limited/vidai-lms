@@ -1,17 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, CircularProgress } from '@mui/material';
-import { TemplateHeader } from './TemplateHeader';
-import { EmailTemplateTable } from './EmailTemplateTable';
-import { SmsTemplateTable } from './SmsTemplateTable';
-import { WhatsAppTemplateTable } from './WhatsAppTemplateTable';
-import { NewTemplateModal } from './NewTemplateModal';
-import { DeleteConfirmModal } from './DeleteConfirmModal';
-import { CopyDetailsModal } from './CopyDetailsModal';
 import TemplateService, { type APITemplateType } from "../../../services/templates.api";
 import styles from "../../../styles/Template/TemplatesPage.module.css";
 import type { EmailTemplate, SMSTemplate, WhatsAppTemplate, Template, TemplatesState, TemplateFilters } from '../../../types/templates.types';
+
+const TemplateHeader = lazy(() =>
+  import('./TemplateHeader').then((module) => ({ default: module.TemplateHeader }))
+);
+const EmailTemplateTable = lazy(() =>
+  import('./EmailTemplateTable').then((module) => ({ default: module.EmailTemplateTable }))
+);
+const SmsTemplateTable = lazy(() =>
+  import('./SmsTemplateTable').then((module) => ({ default: module.SmsTemplateTable }))
+);
+const WhatsAppTemplateTable = lazy(() =>
+  import('./WhatsAppTemplateTable').then((module) => ({ default: module.WhatsAppTemplateTable }))
+);
+const NewTemplateModal = lazy(() =>
+  import('./NewTemplateModal').then((module) => ({ default: module.NewTemplateModal }))
+);
+const DeleteConfirmModal = lazy(() =>
+  import('./DeleteConfirmModal').then((module) => ({ default: module.DeleteConfirmModal }))
+);
+const CopyDetailsModal = lazy(() =>
+  import('./CopyDetailsModal').then((module) => ({ default: module.CopyDetailsModal }))
+);
 
 const TemplatesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('Email');
@@ -154,56 +169,69 @@ const TemplatesPage: React.FC = () => {
 
   return (
     <Box className={styles.pageContainer} sx={{ overflow: 'hidden', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <TemplateHeader 
-        onTabChange={(tab) => { setActiveTab(tab); }}
-        onNewTemplate={() => { setViewMode('create'); setActiveTemplate(null); setModalOpen(true); }}
-        onSearch={setSearchQuery}
-        onApplyFilters={(filters) => setActiveFilters(filters as TemplateFilters | null)}
-        useCaseOptions={useCaseOptions}
-        // ✅ UPDATED: All counts show immediately from the bulk load
-        counts={{
-          email: templates.mail.length,
-          sms: templates.sms.length,
-          whatsapp: templates.whatsapp.length,
-        }} 
-      />
+      <Suspense fallback={<Box sx={{ p: 2 }} />}>
+        <TemplateHeader
+          onTabChange={(tab) => { setActiveTab(tab); }}
+          onNewTemplate={() => { setViewMode('create'); setActiveTemplate(null); setModalOpen(true); }}
+          onSearch={setSearchQuery}
+          onApplyFilters={(filters) => setActiveFilters(filters as TemplateFilters | null)}
+          useCaseOptions={useCaseOptions}
+          counts={{
+            email: templates.mail.length,
+            sms: templates.sms.length,
+            whatsapp: templates.whatsapp.length,
+          }}
+        />
+      </Suspense>
 
       <Box className={styles.tableWrapper} sx={{ flexGrow: 1, overflowY: 'auto', p: 2, position: 'relative' }}>
         {loading && templates.mail.length === 0 ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>
         ) : (
-          <>
+          <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}><CircularProgress size={24} /></Box>}>
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {activeTab === 'Email' && <EmailTemplateTable data={getFilteredData()} onAction={handleAction as any} />}
             {activeTab === 'SMS' && <SmsTemplateTable data={getFilteredData()} onAction={handleAction} />}
             {activeTab === 'WhatsApp' && <WhatsAppTemplateTable data={getFilteredData()} onAction={handleAction} />}
-          </>
+          </Suspense>
         )}
       </Box>
 
-      <NewTemplateModal 
-        open={isModalOpen} 
-        onClose={() => setModalOpen(false)} 
-        onSave={() => { loadTemplates(); }} 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        initialData={activeTemplate as any || undefined} 
-        mode={viewMode} 
-      />
+      {isModalOpen && (
+        <Suspense fallback={null}>
+          <NewTemplateModal
+            open={isModalOpen}
+            onClose={() => setModalOpen(false)}
+            onSave={() => { loadTemplates(); }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            initialData={activeTemplate as any || undefined}
+            mode={viewMode}
+          />
+        </Suspense>
+      )}
 
-      <DeleteConfirmModal 
-        open={isDeleteModalOpen} 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        templateName={((templateInAction as any)?.audience_name || (templateInAction as any)?.name || '')} 
-        onClose={() => setIsDeleteModalOpen(false)} 
-        onConfirm={handleConfirmDelete} 
-      />
+      {isDeleteModalOpen && (
+        <Suspense fallback={null}>
+          <DeleteConfirmModal
+            open={isDeleteModalOpen}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            templateName={((templateInAction as any)?.audience_name || (templateInAction as any)?.name || '')}
+            onClose={() => setIsDeleteModalOpen(false)}
+            onConfirm={handleConfirmDelete}
+          />
+        </Suspense>
+      )}
 
-      <CopyDetailsModal 
-        open={isCopyModalOpen} 
-        template={templateInAction || ({} as Template)} 
-        onClose={() => setIsCopyModalOpen(false)} 
-        onCopySuccess={() => toast.success('Details copied to clipboard!')}
-      />
+      {isCopyModalOpen && (
+        <Suspense fallback={null}>
+          <CopyDetailsModal
+            open={isCopyModalOpen}
+            template={templateInAction || ({} as Template)}
+            onClose={() => setIsCopyModalOpen(false)}
+            onCopySuccess={() => toast.success('Details copied to clipboard!')}
+          />
+        </Suspense>
+      )}
 
     </Box>
   );
