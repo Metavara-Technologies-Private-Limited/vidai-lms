@@ -14,6 +14,7 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 interface Props {
   open: boolean;
   leadName: string;
+  leadId?: string;
   isDeleting?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -23,6 +24,7 @@ interface Props {
 const DeleteLeadDialog: React.FC<Props> = ({
   open,
   leadName,
+  leadId,
   isDeleting = false,
   error,
   onClose,
@@ -61,6 +63,13 @@ const DeleteLeadDialog: React.FC<Props> = ({
           Delete Lead
         </Typography>
 
+        {/* Lead ID */}
+        {leadId && (
+          <Typography fontSize="13px" color="text.secondary" mb={1}>
+            ID: {leadId}
+          </Typography>
+        )}
+
         {/* Error */}
         {error && (
           <Alert severity="error" sx={{ mb: 2, textAlign: "left", borderRadius: 2 }}>
@@ -68,7 +77,7 @@ const DeleteLeadDialog: React.FC<Props> = ({
           </Alert>
         )}
 
-        {/* Message — matches Figma: Delete "John Smith" Lead permanently? */}
+        {/* Message */}
         <Typography color="text.secondary" fontSize="14px" lineHeight={1.6} px={1}>
           This action cannot be undone. Are you sure you want to Delete{" "}
           <Typography component="span" fontWeight={700} color="text.primary" fontSize="14px">
@@ -112,9 +121,14 @@ const DeleteLeadDialog: React.FC<Props> = ({
             "&:disabled": { backgroundColor: "#9CA3AF", color: "white" },
           }}
         >
-          {isDeleting
-            ? <CircularProgress size={16} sx={{ color: "white" }} />
-            : "Delete"}
+          {isDeleting ? (
+            <>
+              <CircularProgress size={16} sx={{ color: "white", mr: 1 }} />
+              Deleting...
+            </>
+          ) : (
+            "Delete"
+          )}
         </Button>
       </DialogActions>
     </Dialog>
