@@ -26,6 +26,29 @@ import { EmojiPicker, FormatMenu, MoreMenu } from "./LeadsTable.toolbarcomponent
 import { EmailTemplateAPI, LeadEmailAPI } from "../../services/leads.api";
 import type { EmailTemplate } from "../../services/leads.api";
 
+// ── Convert plain-text body to HTML before sending ──
+const toHtml = (text: string): string => {
+  // If it already contains HTML tags, return as-is
+  if (/<[a-z][\s\S]*>/i.test(text)) return text;
+  return text
+    .split(/\n\n+/)
+    .map((para) =>
+      `<p>${para
+        .split(/\n/)
+        .map((line) =>
+          line
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+        )
+        .join("<br/>")}</p>`
+    )
+    .join("");
+};
+
+// ── Check if string contains HTML tags ──
+const isHtml = (text: string): boolean => /<[a-z][\s\S]*>/i.test(text);
+
 // ====================== New Email Template Dialog ======================
 interface NewEmailTemplateDialogProps {
   open: boolean;
@@ -106,6 +129,8 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
   const [subject, setSubject] = React.useState("");
   const [body, setBody] = React.useState("");
+  // ── Track whether the body came from an HTML template (skip toHtml on send) ──
+  const [bodyIsHtml, setBodyIsHtml] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
@@ -171,22 +196,35 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
   React.useEffect(() => {
     if (open) {
       setStep("template"); setSelectedTemplateId(null); setPreviewTemplate(null);
-      setSubject(""); setBody(""); setError(null); setSending(false);
+      setSubject(""); setBody(""); setBodyIsHtml(false); setError(null); setSending(false);
       setEmojiAnchor(null); setFormatAnchor(null); setMoreAnchor(null);
       loadEmailTemplates();
     }
   }, [open, loadEmailTemplates]);
 
   const handleClose = () => { if (sending) return; onClose(); };
-  const handleComposeNew = () => { setSelectedTemplateId(null); setSubject(""); setBody(""); setStep("compose"); };
+
+  const handleComposeNew = () => {
+    setSelectedTemplateId(null);
+    setSubject("");
+    setBody("");
+    setBodyIsHtml(false);
+    setStep("compose");
+  };
 
   const handleNext = () => {
     if (!selectedTemplateId) return;
     const template = emailTemplates.find((t) => String(t.id) === selectedTemplateId);
     if (template) {
       const recipientName = lead?.full_name || lead?.name || "Patient";
+      const resolvedBody = (template.body || "")
+        .replace(/\{\{name\}\}/g, recipientName)
+        .replace(/\{\{lead_name\}\}/g, recipientName)
+        .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
       setSubject(template.subject);
-      setBody((template.body || "").replace(/\{\{name\}\}/g, recipientName).replace(/\{\{lead_name\}\}/g, recipientName));
+      setBody(resolvedBody);
+      // ── Mark as HTML if the template body contains HTML tags ──
+      setBodyIsHtml(isHtml(resolvedBody));
     }
     setStep("compose");
   };
@@ -203,7 +241,14 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
     if (!lead?.email) { setError("This lead has no email address."); return; }
     setSending(true); setError(null);
     try {
-      await LeadEmailAPI.sendNow({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: lead.email ?? null });
+      // ── If body is already HTML, send as-is; otherwise convert plain text ──
+      const emailBody = bodyIsHtml ? body.trim() : toHtml(body.trim());
+      await LeadEmailAPI.sendNow({
+        lead: lead.id,
+        subject: subject.trim(),
+        email_body: emailBody,
+        sender_email: lead.email ?? null,
+      });
       setSuccess(true); onClose();
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to send email. Please try again."));
@@ -215,7 +260,13 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
   const handleSaveAsTemplate = async () => {
     if (!subject.trim() || !body.trim() || !lead?.id) return;
     try {
-      await LeadEmailAPI.saveAsDraft({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: lead.email ?? null });
+      const emailBody = bodyIsHtml ? body.trim() : toHtml(body.trim());
+      await LeadEmailAPI.saveAsDraft({
+        lead: lead.id,
+        subject: subject.trim(),
+        email_body: emailBody,
+        sender_email: lead.email ?? null,
+      });
     } catch (err) { console.error("Failed to save draft:", err); }
   };
 
@@ -352,13 +403,23 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
                     <Stack direction="row" spacing={1} alignItems="flex-start"><Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>Subject:</Typography><Typography fontSize="12px" color="#1E293B" fontWeight={700}>{previewTemplate.subject}</Typography></Stack>
                   </Stack>
                 </Box>
+                {/* Preview renders HTML correctly */}
                 <Box sx={{ bgcolor: "#FFFFFF", px: 2.5, py: 2.5, maxHeight: 260, overflowY: "auto" }}>
-                  <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.85, whiteSpace: "pre-wrap", fontFamily: "Georgia, serif" }}>
-                    {(previewTemplate.body || "").replace(/\{\{name\}\}/g, recipientName).replace(/\{\{lead_name\}\}/g, recipientName).replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0])
-                      .split(/(\{\{[^}]+\}\}|\{[^}]+\})/g).map((part, i) =>
-                        /^(\{\{[^}]+\}\}|\{[^}]+\})$/.test(part) ? <Box key={i} component="span" sx={{ color: "#7C3AED", fontWeight: 600, bgcolor: "#F5F3FF", borderRadius: "3px", px: 0.5 }}>{part}</Box> : part
-                      )}
-                  </Typography>
+                  <Box
+                    sx={{
+                      fontSize: "13px", color: "#1E293B", lineHeight: 1.85,
+                      fontFamily: "Georgia, serif",
+                      "& p": { margin: "0 0 10px 0" },
+                      "& a": { color: "#3B82F6" },
+                      "& strong, & b": { fontWeight: 700 },
+                    }}
+                    dangerouslySetInnerHTML={{
+                      __html: (previewTemplate.body || "")
+                        .replace(/\{\{name\}\}/g, recipientName)
+                        .replace(/\{\{lead_name\}\}/g, recipientName)
+                        .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]),
+                    }}
+                  />
                 </Box>
                 <Box sx={{ bgcolor: "#F8FAFC", borderTop: "1px solid #E2E8F0", px: 2.5, py: 1.25, textAlign: "center" }}>
                   <Typography fontSize="11px" color="#94A3B8">Variables shown in <Box component="span" sx={{ color: "#7C3AED", fontWeight: 600 }}>purple</Box> will be auto-filled when sent</Typography>
@@ -367,7 +428,23 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
               <Button onClick={() => { setStep("template"); setPreviewTemplate(null); }} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>Back</Button>
-              <Button onClick={() => { setSubject(previewTemplate.subject || ""); setBody((previewTemplate.body || "").replace(/\{\{name\}\}/g, recipientName).replace(/\{\{lead_name\}\}/g, recipientName).replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0])); setStep("compose"); }} variant="contained" sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" } }}>Use This Template</Button>
+              <Button
+                onClick={() => {
+                  const resolvedBody = (previewTemplate.body || "")
+                    .replace(/\{\{name\}\}/g, recipientName)
+                    .replace(/\{\{lead_name\}\}/g, recipientName)
+                    .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
+                  setSubject(previewTemplate.subject || "");
+                  // ── Keep HTML body as-is; flag it so send skips toHtml() conversion ──
+                  setBody(resolvedBody);
+                  setBodyIsHtml(isHtml(resolvedBody));
+                  setStep("compose");
+                }}
+                variant="contained"
+                sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" } }}
+              >
+                Use This Template
+              </Button>
             </DialogActions>
           </>
         )}
@@ -392,10 +469,37 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
                   <Typography fontSize="13px" color="text.secondary" minWidth={55}>Subject:</Typography>
                   <TextField fullWidth variant="standard" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={sending} InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }} placeholder="Enter subject..." />
                 </Box>
-                <Box sx={{ py: 1.5 }}>
-                  <textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} onSelect={saveCursor} onKeyUp={saveCursor} onMouseUp={saveCursor} disabled={sending} placeholder="Write your email..." rows={12}
-                    style={{ width: "100%", boxSizing: "border-box", resize: "vertical", border: "none", outline: "none", fontSize: "13px", lineHeight: 1.7, fontFamily: "inherit", color: "#1E293B", background: "transparent", padding: 0 }} />
+
+                {/* ── Body: render as HTML if from template, else plain textarea ── */}
+                <Box sx={{ py: 1.5, minHeight: 200 }}>
+                  {bodyIsHtml ? (
+                    <Box
+                      sx={{
+                        fontSize: "13px", lineHeight: 1.7, color: "#1E293B",
+                        fontFamily: "inherit",
+                        "& p": { margin: "0 0 8px 0" },
+                        "& a": { color: "#3B82F6" },
+                        "& strong, & b": { fontWeight: 700 },
+                        "& ul, & ol": { paddingLeft: "20px", margin: "0 0 8px 0" },
+                      }}
+                      dangerouslySetInnerHTML={{ __html: body }}
+                    />
+                  ) : (
+                    <textarea
+                      ref={bodyRef}
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      onSelect={saveCursor}
+                      onKeyUp={saveCursor}
+                      onMouseUp={saveCursor}
+                      disabled={sending}
+                      placeholder="Write your email..."
+                      rows={12}
+                      style={{ width: "100%", boxSizing: "border-box", resize: "vertical", border: "none", outline: "none", fontSize: "13px", lineHeight: 1.7, fontFamily: "inherit", color: "#1E293B", background: "transparent", padding: 0 }}
+                    />
+                  )}
                 </Box>
+
                 {error && <Alert severity="error" sx={{ borderRadius: "8px", my: 1 }}>{error}</Alert>}
               </Stack>
             </DialogContent>
