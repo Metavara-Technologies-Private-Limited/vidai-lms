@@ -53,12 +53,19 @@ export const ticketsApi = {
     return response.data;
   },
   
-  updateTicketStatus: async (ticketId: string, status: string): Promise<TicketDetail> => {
-    const response = await apiClient.post(`/tickets/${ticketId}/status/`, { status });
-    return response.data;
-  },
+updateTicketStatus: async (
+  ticketId: string,
+  payload: {
+    status: string;
+    priority?: string;
+    assigned_to?: number | "";
+  }
+): Promise<TicketDetail> => {
+  const response = await apiClient.post(`/tickets/${ticketId}/status/`, payload);
+  return response.data;
+},
   
-  uploadDocument: async (ticketId: string, file: File): Promise<any> => {
+  uploadDocument: async (ticketId: string, file: File): Promise<unknown> => {
     const formData = new FormData();
     formData.append("file", file);
     const response = await apiClient.post(`/tickets/${ticketId}/documents/`, formData, {
