@@ -48,3 +48,4 @@ const clinicSlice = createSlice({
 export default clinicSlice.reducer;
 
 export const selectClinic = (state: RootState) => state.clinic.data;
+export const selectClinicLoading = (state: RootState) => state.clinic.loading;

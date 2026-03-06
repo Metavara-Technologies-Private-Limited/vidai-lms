@@ -120,6 +120,9 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
               axisLine={false} 
               tickLine={false} 
               tick={{ fontSize: 11, fill: "#666" }}
+              domain={[0, 100]}
+              ticks={[0, 20, 40, 60, 80, 100]}
+              allowDecimals={false}
               label={{ 
                 value: 'Conversion Rate (in %)', 
                 angle: -90, 
@@ -144,6 +147,13 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
             />
           </LineChart>
         </SafeResponsiveContainer>
+      </Box>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.5, px: 2 }}>
+        <Box sx={{ flex: 1, height: "1px", bgcolor: "#e6e6e6" }} />
+        <Typography variant="caption" sx={{ fontSize: 20, color: "#b3b3b3", lineHeight: 1 }}>
+          Time Period
+        </Typography>
+        <Box sx={{ flex: 1, height: "1px", bgcolor: "#e6e6e6" }} />
       </Box>
     </Box>
   );
