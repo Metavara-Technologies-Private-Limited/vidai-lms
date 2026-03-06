@@ -44,7 +44,12 @@ interface Props {
   assignTo: number | "";
   setAssignTo: (v: number | "") => void;
 
-  handleUpdate: () => void;
+  handleUpdate: (payload: {
+  status: TicketStatus;
+  priority: TicketPriority;
+  assigned_to: number | "";
+}) => void;
+
   updating: boolean;
 
   ticketTypes: string[];
@@ -70,9 +75,38 @@ const TicketPropertiesSidebar = ({
 }: Props) => {
   if (!ticket) return null;
 
+const handleUpdateWithTimeline = () => {
+  const actions: string[] = [];
+
+  if (ticket.status !== status) {
+    actions.push(`Status changed from ${ticket.status} to ${status}`);
+  }
+
+  if (ticket.priority !== priority) {
+    actions.push(`Priority changed from ${ticket.priority} to ${priority}`);
+  }
+
+
+  if (ticket.assigned_to !== assignTo) {
+    const emp = employees.find(e => e.id === assignTo);
+    actions.push(`Assigned to ${emp?.emp_name}`);
+  }
+
+  console.log("Timeline actions:", actions);
+
+    handleUpdate({
+    status,
+    priority,
+    assigned_to: assignTo
+  });
+};
+
   return (
     <Box flex={1} bgcolor="#FAFAFA" p={3} borderRadius={2} border="1px solid #E0E0E0">
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ ...ticketDetailsTabsSx, mb: 3 }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} 
+      sx={{ ...ticketDetailsTabsSx,
+       mb: 3,
+        }}>
         <Tab label="Ticket Details" />
         <Tab label="Timeline" />
       </Tabs>
@@ -192,7 +226,7 @@ const TicketPropertiesSidebar = ({
           <Button
             variant="contained"
             fullWidth
-            onClick={handleUpdate}
+            onClick={handleUpdateWithTimeline}
             disabled={updating}
             sx={{ bgcolor: "#505050", py: 1.5, borderRadius: 2, "&:hover": { bgcolor: "#232323" } }}
           >

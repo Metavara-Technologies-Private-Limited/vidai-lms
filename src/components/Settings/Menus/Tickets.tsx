@@ -177,7 +177,7 @@ const getCount = (status: string): number => {
 
 
   return (
-    <Box p={3}>
+    <Box pt={2} px={0.1}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <Typography sx={ticketsTitleSx}>Tickets</Typography>
