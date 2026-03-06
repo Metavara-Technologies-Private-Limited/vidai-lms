@@ -6,11 +6,14 @@ export const chartStyles = {
     bgcolor: "#fff",
     borderRadius: 2,
     height: "100%",
+    minWidth: 0,
   },
 
   chartWrapper: {
     width: "100%",
     height: 260,
+    minWidth: 0,
+    minHeight: 260,
   },
 
   tooltipContainer: {
