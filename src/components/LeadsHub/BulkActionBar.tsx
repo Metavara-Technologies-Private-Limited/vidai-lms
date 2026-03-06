@@ -46,7 +46,6 @@ import { LeadAPI, LeadEmailAPI, EmailTemplateAPI, TwilioAPI } from "../../servic
 import type { EmailTemplate } from "../../services/leads.api";
 import TemplateService from "../../services/templates.api";
 import ArchiveLeadDialog from "./ArchiveLeadDialog";
-import DeleteLeadDialog from "./DeleteLeadDialog";
 
 // ── Types ─────────────────────────────────────────────────────────────
 type ApiError = {
@@ -369,21 +368,45 @@ const BulkActionBar: React.FC<Props> = ({
         </Button>
       </Stack>
 
-      {/* ── Delete Dialog ── */}
-      <DeleteLeadDialog
+      {/* ── Delete Dialog (Figma-matched inline) ── */}
+      <Dialog
         open={openDelete}
-        leadName={selectedIds.length === 1 ? selectedIds[0] : `${selectedIds.length} leads`}
-        isDeleting={isDeleting}
-        error={deleteError}
-        onClose={() => { setOpenDelete(false); setDeleteError(null); }}
-        onConfirm={handleDelete}
-      />
+        onClose={() => !isDeleting && setOpenDelete(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px", px: 3, py: 4, textAlign: "center" } }}
+      >
+        <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center", mx: "auto", mb: 2.5 }}>
+          <DeleteOutlineOutlinedIcon sx={{ fontSize: 30, color: "#EF4444" }} />
+        </Box>
+        <Typography fontWeight={700} fontSize="18px" color="#111827" mb={1.5}>
+          Delete Lead
+        </Typography>
+        <Typography fontSize="14px" color="#6B7280" lineHeight={1.6} mb={2} px={1}>
+          This action cannot be undone. Are you sure you want to Delete selected Lead permanently?
+        </Typography>
+        {deleteError && (
+          <Alert severity="error" sx={{ borderRadius: "10px", mb: 2, textAlign: "left" }}>
+            {deleteError}
+          </Alert>
+        )}
+        <Stack direction="row" spacing={1.5}>
+          <Button fullWidth onClick={() => { setOpenDelete(false); setDeleteError(null); }} disabled={isDeleting}
+            sx={{ height: 48, fontSize: "15px", fontWeight: 600, textTransform: "none", borderRadius: "10px", bgcolor: "#F3F4F6", color: "#374151", "&:hover": { bgcolor: "#E5E7EB" } }}>
+            Cancel
+          </Button>
+          <Button fullWidth onClick={handleDelete} disabled={isDeleting}
+            sx={{ height: 48, fontSize: "15px", fontWeight: 600, textTransform: "none", borderRadius: "10px", bgcolor: "#1F2937", color: "#fff", "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "#fff" } }}>
+            {isDeleting ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Delete"}
+          </Button>
+        </Stack>
+      </Dialog>
 
       {/* ── Archive Dialog ── */}
       <ArchiveLeadDialog
         open={openArchive}
         onClose={() => !isArchiving && setOpenArchive(false)}
-        leadName={selectedIds.length === 1 ? selectedIds[0] : `${selectedIds.length} leads`}
+        leadName={`${selectedIds.length} lead${selectedIds.length > 1 ? "s" : ""}`}
         onConfirm={handleArchiveConfirm}
         isUnarchive={tab === "archived"}
         isArchiving={isArchiving}
@@ -633,9 +656,18 @@ const BulkActionBar: React.FC<Props> = ({
           <Divider sx={{ mb: 2 }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}
             sx={{ textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px" }}>BODY</Typography>
-          <Box sx={{ mt: 0.5, p: 2, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-            <Typography fontSize="13px" sx={{ whiteSpace: "pre-line", lineHeight: 1.75 }}>{previewTemplate?.body}</Typography>
-          </Box>
+          {/* ── FIX: render template body as HTML ── */}
+          <Box
+            sx={{
+              mt: 0.5, p: 2, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0",
+              fontSize: "13px", lineHeight: 1.75,
+              "& p": { margin: "0 0 8px 0" },
+              "& a": { color: "#3B82F6" },
+              "& strong, & b": { fontWeight: 700 },
+              "& ul, & ol": { paddingLeft: "20px", margin: "0 0 8px 0" },
+            }}
+            dangerouslySetInnerHTML={{ __html: previewTemplate?.body ?? "" }}
+          />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setPreviewTemplate(null)} variant="outlined" sx={{ borderColor: "#D1D5DB", color: "#374151" }}>Close</Button>
@@ -677,9 +709,25 @@ const BulkActionBar: React.FC<Props> = ({
           <TextField fullWidth variant="standard" placeholder="Subject" value={subject}
             onChange={(e) => setSubject(e.target.value)} InputProps={{ disableUnderline: true }}
             sx={{ py: 1.5, borderBottom: "1px solid #E5E7EB", mt: 1 }} disabled={isSending} />
-          <TextField fullWidth multiline rows={10} variant="outlined" placeholder="Type your message here..."
-            value={messageBody} onChange={(e) => setMessageBody(e.target.value)}
-            sx={{ mt: 2, "& .MuiOutlinedInput-root": { borderRadius: 2 } }} disabled={isSending} />
+
+          {/* ── FIX: show HTML preview when a template is selected, plain textarea otherwise ── */}
+          {selectedTemplate ? (
+            <Box
+              sx={{
+                mt: 2, p: 2, minHeight: 220, border: "1px solid #E5E7EB", borderRadius: 2,
+                bgcolor: "#FAFAFA", fontSize: "13px", lineHeight: 1.75, overflowY: "auto",
+                "& p": { margin: "0 0 8px 0" },
+                "& a": { color: "#3B82F6" },
+                "& strong, & b": { fontWeight: 700 },
+                "& ul, & ol": { paddingLeft: "20px", margin: "0 0 8px 0" },
+              }}
+              dangerouslySetInnerHTML={{ __html: messageBody }}
+            />
+          ) : (
+            <TextField fullWidth multiline rows={10} variant="outlined" placeholder="Type your message here..."
+              value={messageBody} onChange={(e) => setMessageBody(e.target.value)}
+              sx={{ mt: 2, "& .MuiOutlinedInput-root": { borderRadius: 2 } }} disabled={isSending} />
+          )}
         </DialogContent>
 
         <Box sx={{ px: 3, py: 2, borderTop: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

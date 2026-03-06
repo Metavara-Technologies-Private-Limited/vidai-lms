@@ -1,18 +1,18 @@
 import * as React from "react";
 import {
   Box,
-  Stack,
+  Button,
+  TextField,
   Typography,
-  Card,
+  Stack,
   Chip,
+  CircularProgress,
+  IconButton,
+  Card,
   Divider,
   Avatar,
-  IconButton,
-  TextField,
   InputAdornment,
-  CircularProgress,
   Alert,
-  Button,
   Snackbar,
 } from "@mui/material";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -75,7 +75,7 @@ const getEmailStatusSx = (status: string) => {
   return { bgcolor: "#F1F5F9", color: "#64748B", fontWeight: 600, fontSize: "11px", height: 20, textTransform: "capitalize" as const };
 };
 
-// ── Phone normalizer (same as LeadsTable) ──
+// ── Phone normalizer ──
 const normalizePhone = (phone: string | undefined): string => {
   if (!phone) return "";
   const cleaned = phone.replace(/\s+/g, "").replace(/-/g, "");
@@ -126,7 +126,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   onRefreshSmsHistory,
 }) => {
 
-  // ── Call state (mirrors LeadsTable) ──
+  // ── Call state ──
   const [callDialogOpen, setCallDialogOpen] = React.useState(false);
   const [callSnackbar, setCallSnackbar] = React.useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
@@ -149,7 +149,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     }
   };
 
-  // ── Email history state (fetched from GET /lead-mail/?lead_uuid=) ──
+  // ── Email history state ──
   const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>([]);
   const [emailLoading, setEmailLoading] = React.useState(false);
   const [emailError, setEmailError] = React.useState<string | null>(null);
@@ -163,15 +163,12 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       setEmailHistory(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      setEmailError(
-        e?.response?.data?.detail || e?.message || "Failed to load email history."
-      );
+      setEmailError(e?.response?.data?.detail || e?.message || "Failed to load email history.");
     } finally {
       setEmailLoading(false);
     }
   }, [lead?.id]);
 
-  // Fetch when switching to email view
   React.useEffect(() => {
     if (historyView === "email") {
       fetchEmailHistory();
@@ -455,7 +452,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                       sx={{ bgcolor: "#F8FAFC", "&:hover": { bgcolor: "#E2E8F0" } }}>
                       <Typography fontSize="11px" px={1}>Refresh</Typography>
                     </IconButton>
-                    {/* Working Call Button — same logic as LeadsTable */}
                     <Button
                       size="small"
                       variant="outlined"
@@ -577,10 +573,9 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
             </>
           )}
 
-          {/* ── EMAIL VIEW — fetched from GET /lead-mail/?lead_uuid= ── */}
+          {/* ── EMAIL VIEW ── */}
           {historyView === "email" && (
             <>
-              {/* Header */}
               <Box p={2} borderBottom="1px solid #E2E8F0">
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Stack direction="row" alignItems="center" spacing={1}>
@@ -595,7 +590,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     )}
                   </Stack>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    {/* Refresh button */}
                     <IconButton
                       size="small"
                       onClick={fetchEmailHistory}
@@ -607,7 +601,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                         : <RefreshIcon sx={{ fontSize: 16, color: "#64748B" }} />
                       }
                     </IconButton>
-                    {/* New Mail button */}
                     <Button
                       onClick={onComposeEmail}
                       size="small"
@@ -632,10 +625,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                 </Stack>
               </Box>
 
-              {/* Body */}
               <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "#F8FAFC" }}>
-
-                {/* Loading */}
                 {emailLoading && (
                   <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                     <Stack alignItems="center" spacing={1}>
@@ -645,7 +635,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   </Box>
                 )}
 
-                {/* Error */}
                 {!emailLoading && emailError && (
                   <Alert
                     severity="error"
@@ -660,7 +649,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   </Alert>
                 )}
 
-                {/* Empty state */}
                 {!emailLoading && !emailError && emailHistory.length === 0 && (
                   <Box sx={{ textAlign: "center", py: 6 }}>
                     <EmailOutlinedIcon sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }} />
@@ -690,12 +678,10 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   </Box>
                 )}
 
-                {/* Email list from API */}
                 {!emailLoading && !emailError && emailHistory.length > 0 && (
                   <Stack spacing={2}>
                     {emailHistory.map((mail) => (
                       <Card key={mail.id} sx={{ p: 2.5, borderRadius: "12px", border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
-                        {/* Card header */}
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
                           <Stack direction="row" spacing={1.5} alignItems="center">
                             <Avatar sx={{ width: 40, height: 40, bgcolor: "#FEF2F2", color: "#EF4444" }}>CC</Avatar>
@@ -707,11 +693,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                             </Box>
                           </Stack>
                           <Stack alignItems="flex-end" spacing={0.5}>
-                            <Chip
-                              label={mail.status}
-                              size="small"
-                              sx={getEmailStatusSx(mail.status)}
-                            />
+                            <Chip label={mail.status} size="small" sx={getEmailStatusSx(mail.status)} />
                             <Typography variant="caption" color="text.secondary" fontSize="11px">
                               {mail.created_at
                                 ? new Date(mail.created_at).toLocaleDateString("en-US", {
@@ -723,7 +705,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                           </Stack>
                         </Stack>
 
-                        {/* To field */}
                         <Stack direction="row" spacing={1} mb={1} alignItems="center">
                           <Typography variant="caption" color="text.secondary" fontWeight={600}
                             sx={{ textTransform: "uppercase", fontSize: "0.6rem", minWidth: 24 }}>
@@ -734,24 +715,26 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                           </Typography>
                         </Stack>
 
-                        {/* Subject */}
                         <Typography variant="body2" fontWeight={700} color="#1E293B" mb={1}>
                           {mail.subject}
                         </Typography>
 
-                        {/* Divider */}
                         <Divider sx={{ mb: 1.5 }} />
 
-                        {/* Body */}
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ whiteSpace: "pre-line", lineHeight: 1.75, fontSize: "13px" }}
-                        >
-                          {mail.email_body}
-                        </Typography>
+                        {/* ── FIX: render email_body as HTML instead of plain text ── */}
+                        <Box
+                          sx={{
+                            fontSize: "13px",
+                            color: "text.secondary",
+                            lineHeight: 1.75,
+                            "& p": { margin: "0 0 8px 0" },
+                            "& a": { color: "#3B82F6" },
+                            "& strong, & b": { fontWeight: 700 },
+                            "& ul, & ol": { paddingLeft: "20px", margin: "0 0 8px 0" },
+                          }}
+                          dangerouslySetInnerHTML={{ __html: mail.email_body }}
+                        />
 
-                        {/* Sent time footer */}
                         {mail.sent_at && (
                           <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid #F1F5F9" }}>
                             <Typography variant="caption" color="text.secondary" fontSize="11px">
@@ -767,7 +750,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     ))}
                   </Stack>
                 )}
-
               </Box>
             </>
           )}
@@ -775,14 +757,12 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
         </Card>
       </Stack>
 
-      {/* ── Call Dialog (same as LeadsTable) ── */}
       <CallDialog
         open={callDialogOpen}
         name={leadName || "Unknown"}
         onClose={() => setCallDialogOpen(false)}
       />
 
-      {/* ── Call Error Snackbar ── */}
       <Snackbar
         open={callSnackbar.open}
         autoHideDuration={4000}
