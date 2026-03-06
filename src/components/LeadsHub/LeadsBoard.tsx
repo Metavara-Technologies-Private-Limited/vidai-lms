@@ -6,6 +6,7 @@ import { Box, Stack, Typography, CircularProgress, Alert } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
 import type { AppDispatch } from "../../store";
 
 import { Dialogs } from "./LeadsMenuDialogs";
@@ -34,7 +35,7 @@ import {
   BOARD_COLUMNS,
   mapRawToLeadItem,
 } from "./Leadsboardtypes";
-import { BookAppointmentModal, SuccessToast } from "./Leadsboardmodals";
+import { BookAppointmentModal } from "./Leadsboardmodals";
 import { LeadColumn } from "./Leadsboardcard";
 import CallDialog from "./CallDialog";
 
@@ -56,7 +57,6 @@ import {
   MenuItem,
   Radio,
   RadioGroup,
-  Snackbar,
   TextField,
   Tooltip,
   Alert as MuiAlert,
@@ -315,7 +315,6 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, on
   const [selected, setSelected] = React.useState<SMSTemplate | null>(null);
   const [previewBody, setPreviewBody] = React.useState("");
   const [newTemplateOpen, setNewTemplateOpen] = React.useState(false);
-  const [savedSnackbar, setSavedSnackbar] = React.useState(false);
 
   const loadTemplates = React.useCallback(() => {
     setLoadingTpl(true);
@@ -338,16 +337,13 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, on
   const handleNewTemplateSaved = (tpl: SMSTemplate) => {
     setNewTemplateOpen(false);
     onSelect(tpl.body);
-    setSavedSnackbar(true);
+    toast.success("Template saved and applied to your message!", { position: "top-right", autoClose: 3000, theme: "colored" });
     onClose();
   };
 
   return (
     <>
       <NewSMSTemplateDialog open={newTemplateOpen} onClose={() => setNewTemplateOpen(false)} onSaved={handleNewTemplateSaved} />
-      <Snackbar open={savedSnackbar} autoHideDuration={3000} onClose={() => setSavedSnackbar(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <MuiAlert onClose={() => setSavedSnackbar(false)} severity="success" sx={{ borderRadius: "10px" }}>Template saved and applied to your message!</MuiAlert>
-      </Snackbar>
 
       <Dialog open={open && !newTemplateOpen} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1300 }}>
         {view === "list" && (
@@ -443,7 +439,6 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
   const [message, setMessage] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
 
   const handleClose = () => {
@@ -459,7 +454,8 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
     setSending(true); setError(null);
     try {
       await TwilioAPI.sendSMS({ lead_uuid: lead.id, to: phone, message: message.trim() });
-      setSuccess(true); setMessage(""); onClose();
+      toast.success(`SMS sent to ${lead?.full_name ?? lead?.name ?? ""}!`, { position: "top-right", autoClose: 3000, theme: "colored" });
+      setMessage(""); onClose();
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to send SMS. Please try again."));
     } finally { setSending(false); }
@@ -496,12 +492,6 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
           </Stack>
         </DialogActions>
       </Dialog>
-
-      <Snackbar open={success} autoHideDuration={3000} onClose={() => setSuccess(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <MuiAlert onClose={() => setSuccess(false)} severity="success" sx={{ borderRadius: "10px" }}>
-          SMS sent to {(lead?.full_name ?? lead?.name) as string}!
-        </MuiAlert>
-      </Snackbar>
     </>
   );
 };
@@ -620,7 +610,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
   const [body, setBody] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState(false);
   const [emailTemplates, setEmailTemplates] = React.useState<EmailTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = React.useState(false);
   const [templateError, setTemplateError] = React.useState<string | null>(null);
@@ -690,7 +679,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     if (!lead?.id) { setError("Lead ID is missing."); return; }
     if (!leadEmail) { setError("This lead has no email address."); return; }
     setSending(true); setError(null);
-    try { await LeadEmailAPI.sendNow({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: leadEmail ?? null }); setSuccess(true); onClose(); }
+    try { await LeadEmailAPI.sendNow({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: leadEmail ?? null }); toast.success(`Email sent to ${recipientName}!`, { position: "top-right", autoClose: 3000, theme: "colored" }); onClose(); }
     catch (err: unknown) { setError(extractErrorMessage(err, "Failed to send email. Please try again.")); }
     finally { setSending(false); }
   };
@@ -863,10 +852,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
           </>
         )}
       </Dialog>
-
-      <Snackbar open={success} autoHideDuration={3000} onClose={() => setSuccess(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <MuiAlert onClose={() => setSuccess(false)} severity="success" sx={{ borderRadius: "10px" }}>Email sent to {recipientName}!</MuiAlert>
-      </Snackbar>
     </>
   );
 };
@@ -890,23 +875,20 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     }
   }, [reduxLeads]);
 
-  const [openBookModal, setOpenBookModal] = React.useState(false);
-  const [selectedLead,  setSelectedLead ] = React.useState<LeadItem | null>(null);
-  const [smsLead,       setSmsLead      ] = React.useState<LeadItem | null>(null);
-  const [emailLead,     setEmailLead    ] = React.useState<LeadItem | null>(null);
-  const [callLead,      setCallLead     ] = React.useState<LeadItem | null>(null);
-  const [callSnackbar,  setCallSnackbar ] = React.useState<{ open: boolean; message: string }>({ open: false, message: "" });
-  const [appointment,   setAppointment  ] = React.useState<AppointmentState>(emptyAppointment());
-  // FIX: removed unused setShowSaveSuccess setter
-  const [showSaveSuccess] = React.useState(false);
+  const [openBookModal, setOpenBookModal]   = React.useState(false);
+  const [selectedLead,  setSelectedLead ]   = React.useState<LeadItem | null>(null);
+  const [smsLead,       setSmsLead      ]   = React.useState<LeadItem | null>(null);
+  const [emailLead,     setEmailLead    ]   = React.useState<LeadItem | null>(null);
+  const [callLead,      setCallLead     ]   = React.useState<LeadItem | null>(null);
+  const [appointment,   setAppointment  ]   = React.useState<AppointmentState>(emptyAppointment());
 
   const handleCallOpen = async (lead: LeadItem) => {
     const phone = normalizePhone(lead.contact_no as string | undefined);
-    if (!phone) { setCallSnackbar({ open: true, message: "No contact number for this lead." }); return; }
-    if (!lead.id) { setCallSnackbar({ open: true, message: "Lead ID is missing. Cannot initiate call." }); return; }
+    if (!phone) { toast.error("No contact number for this lead.", { position: "top-right", autoClose: 3000, theme: "colored" }); return; }
+    if (!lead.id) { toast.error("Lead ID is missing. Cannot initiate call.", { position: "top-right", autoClose: 3000, theme: "colored" }); return; }
     setCallLead(lead);
     try { await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone }); }
-    catch (err: unknown) { setCallLead(null); setCallSnackbar({ open: true, message: extractErrorMessage(err, "Failed to initiate call.") }); }
+    catch (err: unknown) { setCallLead(null); toast.error(extractErrorMessage(err, "Failed to initiate call."), { position: "top-right", autoClose: 3000, theme: "colored" }); }
   };
 
   React.useEffect(() => {
@@ -965,9 +947,8 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     const result = await dispatch(bookAppointment({ leadId, payload: { department_id: Number(appointment.selectedDepartmentId), appointment_date: formattedDate, slot: appointment.slot, remark: appointment.remark, ...(appointment.selectedEmployeeId && { assigned_to_id: Number(appointment.selectedEmployeeId) }) } }));
     setAppointment((p) => ({ ...p, submitting: false }));
     if (bookAppointment.rejected.match(result)) { const errMsg = typeof result.payload === "string" ? result.payload : "Failed to book appointment. Please try again."; setAppointment((p) => ({ ...p, error: errMsg })); return; }
-    setAppointment((p) => ({ ...p, success: true }));
     handleCloseBook();
-    setTimeout(() => setAppointment((p) => ({ ...p, success: false })), 2000);
+    toast.success("Appointment booked successfully!", { position: "top-right", autoClose: 3000, theme: "colored" });
   };
 
   const handleOpenBookModal = (lead: LeadItem) => {
@@ -1023,22 +1004,15 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         })}
 
         <Dialogs />
-        <SuccessToast show={showSaveSuccess} message="Saved as A Template successfully!" />
-        <SuccessToast show={appointment.success} message="Appointment booked successfully!" />
 
-        {/* ── SMS Dialog — exact same as LeadsTable ── */}
+        {/* ── SMS Dialog ── */}
         <SMSDialog open={Boolean(smsLead)} lead={smsLead} onClose={() => setSmsLead(null)} />
 
-        {/* ── Email Dialog — exact same as LeadsTable ── */}
+        {/* ── Email Dialog ── */}
         <EmailDialog open={Boolean(emailLead)} lead={emailLead} onClose={() => setEmailLead(null)} />
 
-        {/* ── Call Dialog — exact same as LeadsTable ── */}
+        {/* ── Call Dialog ── */}
         <CallDialog open={Boolean(callLead)} name={(callLead?.full_name ?? callLead?.name ?? "Unknown") as string} onClose={() => setCallLead(null)} />
-
-        {/* ── Call Error Snackbar ── */}
-        <Snackbar open={callSnackbar.open} autoHideDuration={4000} onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-          <MuiAlert onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))} severity="error" sx={{ borderRadius: "10px" }}>{callSnackbar.message}</MuiAlert>
-        </Snackbar>
 
         <BookAppointmentModal
           open={openBookModal}
