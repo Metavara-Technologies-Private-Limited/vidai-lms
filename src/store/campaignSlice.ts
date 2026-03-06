@@ -60,3 +60,5 @@ export const { updateCampaignStatus } = campaignSlice.actions;
 // Selector
 export const selectCampaign = (state: RootState) =>
   state.campaign.data;
+export const selectCampaignLoading = (state: RootState) =>
+  state.campaign.loading;
