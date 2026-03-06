@@ -13,12 +13,12 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   Cell,
 } from "recharts";
 import { useMemo, useState } from "react";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import type { TimeRange } from "./TimeRangeSelector";
 import { scaleValueByRange } from "./timeRange.utils";
 
@@ -172,7 +172,7 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
 
       {/* CHART */}
       <Box sx={chartStyles.chartWrapper}>
-        <ResponsiveContainer width="100%" height="100%">
+        <SafeResponsiveContainer minHeight={260}>
           <BarChart
             data={data}
             margin={{ top: 30, right: 30, left: 10, bottom: 0 }}
@@ -235,7 +235,7 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
               </Bar>
             )}
           </BarChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </Box>
     </Box>
   );

@@ -1,9 +1,10 @@
 import { Box, Typography } from "@mui/material";
 import { useMemo } from "react";
 import { useSelector } from "react-redux";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import { selectLeads } from "../../store/leadSlice";
 import type { TimeRange } from "./TimeRangeSelector";
 import { isWithinTimeRange } from "./timeRange.utils";
@@ -102,7 +103,7 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
   return (
     <Box sx={chartStyles.container}>
       <Box sx={chartStyles.chartWrapper}>
-        <ResponsiveContainer width="100%" height="100%">
+        <SafeResponsiveContainer minHeight={260}>
           <LineChart data={data} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
             {/* Horizontal Grid Lines */}
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
@@ -142,7 +143,7 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
               animationDuration={1000}
             />
           </LineChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </Box>
     </Box>
   );

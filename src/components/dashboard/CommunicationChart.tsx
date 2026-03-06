@@ -1,8 +1,9 @@
 import { Box, Typography, Stack } from "@mui/material";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useMemo } from "react";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import type { TimeRange } from "./TimeRangeSelector";
 import { scaleValueByRange } from "./timeRange.utils";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
@@ -59,7 +60,7 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
 
       {/* CHART */}
       <Box sx={chartStyles.chartWrapper}>
-        <ResponsiveContainer width="100%" height="100%">
+        <SafeResponsiveContainer minHeight={260}>
           <BarChart data={data} margin={{ top: 20, right: 30, left: 10, bottom: 0 }} barSize={24}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
             <XAxis 
@@ -76,7 +77,7 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
             <Bar dataKey="low" stackId="a" fill="#a3abc1" />
             <Bar dataKey="no" stackId="a" fill="#daddf0" radius={[4, 4, 0, 0]} />
           </BarChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </Box>
     </Box>
   );

@@ -7,15 +7,53 @@ import {
   Chip,
   Grid,
 } from "@mui/material";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import { mockData } from "./mockData";
 import type { TimeRange } from "./TimeRangeSelector";
+import { selectLeads } from "../../store/leadSlice";
+import { selectCampaign } from "../../store/campaignSlice";
+import type { Lead } from "../../services/leads.api";
 import type{
   TeamMember,
   MedalType,
   MemberStats,
   PerformanceChartPoint,
 } from "../../types/dashboard.types";
+
+type CampaignItem = {
+  id?: string | number;
+  campaign_name?: string;
+  campaign_mode?: number;
+  assigned_to_id?: number;
+  assigned_to_name?: string;
+  status?: string;
+  is_active?: boolean;
+};
+
+type DerivedMemberStats = MemberStats & {
+  campaigns: number;
+  conversionRate: number;
+  revenueValue: number;
+  slaValue: number;
+  lostLeads: number;
+};
+
+const normalizeLeadStatus = (status?: string | null): string => {
+  if (!status) return "";
+  const value = status.toLowerCase().trim().replace(/[_\s]+/g, "-");
+  if (value === "new" || value === "new-lead" || value === "new-leads") return "new";
+  if (value === "appointment" || value === "appointments") return "appointment";
+  if (value.includes("follow")) return "follow-ups";
+  if (value === "converted") return "converted";
+  if (value === "cycle-conversion" || value === "cycleconversion") return "cycle-conversion";
+  if (value === "lost") return "lost";
+  return value;
+};
+
+const monthKeys = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const formatInteger = (value: number): string => value.toLocaleString("en-US");
 
 // Medal Icon Component
 const MedalIcon = ({ type }: { type: MedalType }) => {
@@ -72,42 +110,206 @@ const MedalIcon = ({ type }: { type: MedalType }) => {
   );
 };
 
-// Mock data for individual performance chart
-const generateMemberPerformanceData = (): PerformanceChartPoint[] => {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return months.map(month => ({
-    month,
-    value: Math.floor(Math.random() * 60) + 20 // Random value between 20-80
-  }));
-};
-
 interface TeamPerformanceTabProps {
   timeRange: TimeRange;
 }
 
 const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
-  const { members, overview } = mockData.overview.teamPerformance;
-const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const leads = useSelector(selectLeads) as Lead[];
+  const campaigns = useSelector(selectCampaign) as CampaignItem[];
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+
+  const { members, overview, memberStatsMap, memberPerformanceMap } = useMemo(() => {
+    const activeLeads = (leads || []).filter((lead) => lead.is_active !== false);
+
+    if (activeLeads.length === 0) {
+      return {
+        members: mockData.overview.teamPerformance.members,
+        overview: mockData.overview.teamPerformance.overview,
+        memberStatsMap: {} as Record<string, DerivedMemberStats>,
+        memberPerformanceMap: {} as Record<string, PerformanceChartPoint[]>,
+      };
+    }
+
+    const memberMap = new Map<string, DerivedMemberStats & { name: string; role: string; img: string }>();
+
+    activeLeads.forEach((lead) => {
+      const memberName = (lead.assigned_to_name || "Unassigned").trim() || "Unassigned";
+      const memberId = lead.assigned_to_id ? String(lead.assigned_to_id) : memberName.toLowerCase();
+      const key = `${memberId}::${memberName}`;
+
+      if (!memberMap.has(key)) {
+        memberMap.set(key, {
+          name: memberName,
+          role: "Team Member",
+          img: "",
+          assignedLeads: 0,
+          callsMade: 0,
+          followUps: 0,
+          appointments: 0,
+          leadConverted: 0,
+          revenueGenerated: "$0",
+          slaCompliance: "0%",
+          campaigns: 0,
+          conversionRate: 0,
+          revenueValue: 0,
+          slaValue: 0,
+          lostLeads: 0,
+        });
+      }
+
+      const stats = memberMap.get(key)!;
+      stats.assignedLeads += 1;
+
+      const normalizedStatus = normalizeLeadStatus(lead.lead_status);
+      if (normalizedStatus === "appointment") stats.appointments += 1;
+      if (normalizedStatus === "follow-ups") stats.followUps += 1;
+      if (normalizedStatus === "converted" || normalizedStatus === "cycle-conversion") stats.leadConverted += 1;
+      if (normalizedStatus === "lost") stats.lostLeads += 1;
+
+      const actionType = (lead.next_action_type || "").toLowerCase();
+      if (actionType.includes("call") || normalizedStatus === "follow-ups") {
+        stats.callsMade += 1;
+      }
+
+      const referenceDate = new Date(lead.modified_at || lead.created_at);
+      if (!Number.isNaN(referenceDate.getTime())) {
+        // eslint-disable-next-line react-hooks/purity
+        const hoursSinceTouch = (Date.now() - referenceDate.getTime()) / (1000 * 60 * 60);
+        if (hoursSinceTouch <= 24) {
+          stats.slaValue += 1;
+        }
+      }
+    });
+
+    (campaigns || []).forEach((campaign) => {
+      const ownerName = (campaign.assigned_to_name || "").trim();
+      if (!ownerName) return;
+
+      const matchedEntry = Array.from(memberMap.entries()).find(([, stats]) => stats.name === ownerName);
+      if (!matchedEntry) return;
+
+      const [key, stats] = matchedEntry;
+      memberMap.set(key, { ...stats, campaigns: stats.campaigns + 1 });
+    });
+
+    const membersWithStats = Array.from(memberMap.values()).map((stats) => {
+      const conversionRate = stats.assignedLeads > 0 ? (stats.leadConverted / stats.assignedLeads) * 100 : 0;
+      const growthBase = stats.assignedLeads > 0
+        ? ((stats.leadConverted - stats.lostLeads) / stats.assignedLeads) * 100
+        : 0;
+      const slaPercent = stats.assignedLeads > 0 ? (stats.slaValue / stats.assignedLeads) * 100 : 0;
+      const revenueValue = stats.leadConverted * 750 + stats.campaigns * 120;
+
+      const growth = `${growthBase >= 0 ? "+" : ""}${growthBase.toFixed(1)}%`;
+
+      return {
+        ...stats,
+        role: stats.campaigns > 0 ? "Campaign + Leads" : "Leads",
+        conversionRate,
+        growth,
+        slaValue: slaPercent,
+        revenueValue,
+        revenueGenerated: `$${revenueValue.toLocaleString("en-US")}`,
+        slaCompliance: `${slaPercent.toFixed(1)}%`,
+      };
+    });
+
+    membersWithStats.sort((a, b) =>
+      b.leadConverted - a.leadConverted || b.assignedLeads - a.assignedLeads
+    );
+
+    const rankedMembers: TeamMember[] = membersWithStats.map((member, index) => ({
+      name: member.name,
+      role: member.role,
+      img: member.img,
+      growth: member.growth,
+      rank: index === 0 ? "1st (Top)" : index === 1 ? "2nd" : index === 2 ? "3rd" : undefined,
+    }));
+
+    const totals = membersWithStats.reduce(
+      (acc, member) => {
+        acc.calls += member.callsMade;
+        acc.followUps += member.followUps;
+        acc.appointments += member.appointments;
+        acc.converted += member.leadConverted;
+        acc.assigned += member.assignedLeads;
+        acc.revenue += member.revenueValue;
+        acc.sla += member.slaValue;
+        return acc;
+      },
+      { calls: 0, followUps: 0, appointments: 0, converted: 0, assigned: 0, revenue: 0, sla: 0 },
+    );
+
+    const teamOverview = {
+      calls: formatInteger(totals.calls),
+      followUps: formatInteger(totals.followUps),
+      appointments: formatInteger(totals.appointments),
+      converted: formatInteger(totals.converted),
+      rate: `${totals.assigned > 0 ? ((totals.converted / totals.assigned) * 100).toFixed(1) : "0.0"}%`,
+      revenue: `$${totals.revenue.toLocaleString("en-US")}`,
+      sla: `${membersWithStats.length > 0 ? (totals.sla / membersWithStats.length).toFixed(1) : "0.0"}%`,
+    };
+
+    const derivedMemberStatsMap: Record<string, DerivedMemberStats> = {};
+    membersWithStats.forEach((member) => {
+      derivedMemberStatsMap[member.name] = {
+        assignedLeads: member.assignedLeads,
+        callsMade: member.callsMade,
+        followUps: member.followUps,
+        appointments: member.appointments,
+        leadConverted: member.leadConverted,
+        revenueGenerated: member.revenueGenerated,
+        slaCompliance: member.slaCompliance,
+        campaigns: member.campaigns,
+        conversionRate: member.conversionRate,
+        revenueValue: member.revenueValue,
+        slaValue: member.slaValue,
+        lostLeads: member.lostLeads,
+      };
+    });
+
+    const memberPerformance: Record<string, PerformanceChartPoint[]> = {};
+    membersWithStats.forEach((member) => {
+      const monthlyTotals = new Array<number>(12).fill(0);
+      const monthlyConverted = new Array<number>(12).fill(0);
+
+      activeLeads
+        .filter((lead) => (lead.assigned_to_name || "Unassigned") === member.name)
+        .forEach((lead) => {
+          const date = new Date(lead.modified_at || lead.created_at);
+          if (Number.isNaN(date.getTime())) return;
+          const month = date.getMonth();
+          monthlyTotals[month] += 1;
+
+          const status = normalizeLeadStatus(lead.lead_status);
+          if (status === "converted" || status === "cycle-conversion") {
+            monthlyConverted[month] += 1;
+          }
+        });
+
+      memberPerformance[member.name] = monthKeys.map((month, index) => {
+        const total = monthlyTotals[index];
+        const converted = monthlyConverted[index];
+        const value = total > 0 ? Math.round((converted / total) * 100) : 0;
+        return { month, value };
+      });
+    });
+
+    return {
+      members: rankedMembers,
+      overview: teamOverview,
+      memberStatsMap: derivedMemberStatsMap,
+      memberPerformanceMap: memberPerformance,
+    };
+  }, [leads, campaigns]);
 
   const topPerformer = members.find((m) => m.rank === "1st (Top)");
   const otherTops = members.filter((m) => m.rank === "2nd" || m.rank === "3rd");
   const lowPerformers = members.filter((m) => m.growth.startsWith("-"));
 
-  // Get member data for display
- const getMemberData = (): MemberStats => {
-    return {
-      assignedLeads: 46,
-      callsMade: 146,
-      followUps: 92,
-      appointments: 38,
-      leadConverted: 14,
-      revenueGenerated: "$10,954.0",
-      slaCompliance: "94.2%"
-    };
-  };
-
 const fullPerformanceData: PerformanceChartPoint[] =
-  selectedMember ? generateMemberPerformanceData() : [];
+  selectedMember ? (memberPerformanceMap[selectedMember.name] || []) : [];
 
 const pointsToShow =
   timeRange === "today"
@@ -123,7 +325,7 @@ const performanceData: PerformanceChartPoint[] = fullPerformanceData.slice(
 );
 
 const memberStats: MemberStats | null =
-  selectedMember ? getMemberData() : null;
+  selectedMember ? (memberStatsMap[selectedMember.name] || null) : null;
 const stats = memberStats!;
 const pointDivisor = Math.max(1, performanceData.length - 1);
 
@@ -379,9 +581,12 @@ const pointDivisor = Math.max(1, performanceData.length - 1);
               {/* Nested Grid for Metrics */}
               <Grid container spacing={2}>
                 {[
-                  { l: "Leads Generated", v: "21" }, { l: "Assigned Leads", v: "46" },
-                  { l: "Calls Made", v: "146" }, { l: "Follow-Ups", v: "92" },
-                  { l: "Appointments", v: "38" }, { l: "Lead Converted", v: "14" },
+                  { l: "Leads Generated", v: String(memberStatsMap[topPerformer.name]?.assignedLeads ?? 0) },
+                  { l: "Assigned Leads", v: String(memberStatsMap[topPerformer.name]?.assignedLeads ?? 0) },
+                  { l: "Calls Made", v: String(memberStatsMap[topPerformer.name]?.callsMade ?? 0) },
+                  { l: "Follow-Ups", v: String(memberStatsMap[topPerformer.name]?.followUps ?? 0) },
+                  { l: "Appointments", v: String(memberStatsMap[topPerformer.name]?.appointments ?? 0) },
+                  { l: "Lead Converted", v: String(memberStatsMap[topPerformer.name]?.leadConverted ?? 0) },
                 ].map((stat) => (
                   <Grid size={{ xs: 4 }} key={stat.l}>
                     <Box sx={{ p: 1.5, bgcolor: "#f9fafb", borderRadius: "8px" }}>
@@ -429,11 +634,15 @@ const pointDivisor = Math.max(1, performanceData.length - 1);
                   </Stack>
                   <Stack direction="row" spacing={2} sx={{ bgcolor: "#f9fafb", p: 1, borderRadius: "8px" }}>
                     <Box>
-                      <Typography variant="caption" fontWeight={700} sx={{ display: "block" }}>60.3%</Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ display: "block" }}>
+                        {(memberStatsMap[tp.name]?.conversionRate ?? 0).toFixed(1)}%
+                      </Typography>
                       <Typography variant="caption" sx={{ fontSize: "8px" }}>Conv. Rate</Typography>
                     </Box>
                     <Box>
-                      <Typography variant="caption" fontWeight={700} sx={{ display: "block" }}>$1452</Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ display: "block" }}>
+                        ${Math.round(memberStatsMap[tp.name]?.revenueValue ?? 0).toLocaleString("en-US")}
+                      </Typography>
                       <Typography variant="caption" sx={{ fontSize: "8px" }}>Revenue</Typography>
                     </Box>
                   </Stack>
