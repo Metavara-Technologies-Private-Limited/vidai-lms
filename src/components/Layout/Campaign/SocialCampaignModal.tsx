@@ -332,8 +332,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           ),
         },
         status: type === "live" ? "live" : type === "scheduled" ? "scheduled" : "draft",
-        is_active: type === "live",
-        image_url: image_url,
+is_active: type === "live" ? true : undefined,
+image_url: image_url,
       };
 
       const response = await CampaignAPI.createSocial(payload);
@@ -346,10 +346,15 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         type === "live" ? "Live" : type === "draft" ? "Draft" : "Scheduled";
 
       const formattedCampaign: Campaign = {
+<<<<<<< HEAD
         // campaign_id is in the nested campaigns[0] object, not response.data directly
         id: createdCampaign.campaign_id ?? createdCampaign.id ?? crypto.randomUUID(),
         // Use local form state for all display fields (not returned by create API)
         name: campaignName,
+=======
+        id: apiData.id,
+        campaign_name: apiData.campaign_name,
+>>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
         type: "social",
         status: mappedStatus,
         start: startDate,
@@ -678,7 +683,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   Save as Draft
                 </button>
                 <button className="next-btn" onClick={() => handleCreateCampaign("scheduled")}>
-                  Schedule
+                  Scheduled
                 </button>
               </>
             ) : (

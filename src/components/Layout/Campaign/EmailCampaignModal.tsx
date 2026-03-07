@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useState, useRef, } from "react";
 import "../../../../src/styles/Campaign/EmailCampaignModal.css";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -26,6 +26,10 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
   const [audience, setAudience] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const editorRef = useRef<HTMLDivElement>(null);
+  
+   
+ 
 
   const step1Valid =
     campaignName.trim() &&
@@ -40,6 +44,12 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
   const [emailBody, setEmailBody] = useState("");
   const [templateOpen, setTemplateOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+//   useEffect(() => {
+//   if (editorRef.current) {
+//     editorRef.current.innerHTML = emailBody;
+//   }
+// }, [emailBody]);
 
   const step2Valid = audience && subject.trim() && emailBody.trim();
 
@@ -355,12 +365,12 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
         className={`form-group ${submitted && !emailBody ? "error" : ""}`}
       >
         <label>Email *</label>
-        <textarea
-          value={emailBody}
-          onChange={(e) => setEmailBody(e.target.value)}
-          placeholder="Enter email content"
-          rows={8}
-        />
+       <div
+  ref={editorRef}
+  className="email-editor"
+  contentEditable
+  onInput={(e:any) => setEmailBody(e.currentTarget.innerHTML)}
+/>
         <span className="ai-suggest">✨ AI Suggest</span>
       </div>
 
@@ -389,9 +399,10 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
 
           <div className="preview-divider"></div>
 
-          <div className="preview-email-content">
-            <p>{emailBody}</p>
-          </div>
+          <div
+  className="preview-email-content"
+  dangerouslySetInnerHTML={{ __html: emailBody }}
+/>
 
         </div>
 
@@ -482,13 +493,17 @@ export default function EmailCampaignModal({ onClose, onSave }: any) {
       </Box>
     </Modal>
     <EmailTemplateModal
-      open={templateOpen}
-      onClose={() => setTemplateOpen(false)}
-      onSelect={(template: any) => {
-        setSubject(template.title);
-        setEmailBody(template.subtitle);
-      }}
-    />
+  open={templateOpen}
+  onClose={() => setTemplateOpen(false)}
+  onSelect={(template: any) => {
+    setSubject(template.subject);
+    setEmailBody(template.body);
+
+    if (editorRef.current) {
+      editorRef.current.innerHTML = template.body;
+    }
+  }}
+/>
  </>
     
   );

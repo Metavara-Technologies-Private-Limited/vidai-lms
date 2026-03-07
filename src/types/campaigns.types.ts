@@ -22,10 +22,13 @@ export interface Campaign {
   start: string;
   end: string;
   platforms?: string[];
+<<<<<<< HEAD
   scheduledAt?: string | null;
 
   lead_generated: number;
   leads?: number;
+=======
+>>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
 }
 
 export interface SocialCampaignPayload {
@@ -60,6 +63,6 @@ export interface SocialCampaignPayload {
   };
 
   status: "live" | "scheduled" | "draft";
-  is_active: boolean;
+  is_active?: boolean;
   image_url: string | null;          // ✅ added
 }
