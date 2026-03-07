@@ -93,6 +93,13 @@ export default function EditCampaignModal({
       setAudience(data.target_audience || "");
       setStartDate(data.start_date || "");
       setEndDate(data.end_date || "");
+
+      // ✅ FIX TIME POPULATION
+      if (data.selected_start) {
+        setScheduleDate(dayjs(data.selected_start).format("YYYY-MM-DD"));
+        setScheduleTime(dayjs(data.selected_start).format("HH:mm"));
+      }
+      
       // ✅ SOCIAL CONTENT
      setCampaignContent(data.campaign_content || "");
 
@@ -102,27 +109,32 @@ export default function EditCampaignModal({
         setEmailBody(data.email[0].email_body || "");
       }
 
-      // ✅ SOCIAL ACCOUNTS
-      if (data.social_media?.length > 0) {
-        const platforms = data.social_media.map(
-          (sm: any) => sm.platform_name
-        );
-        setAccounts(platforms);
-      }
+      // ✅ Populate only selected accounts
+if (Array.isArray(data.social_media)) {
+  const platforms = data.social_media
+    .filter((sm: any) => sm.is_active === true) // only active ones
+    .map((sm: any) => (sm.platform_name || "").toLowerCase());
 
-      // ✅ MODE FROM BACKEND
-      if (data.budget_data && data.budget_data.total_budget > 0) {
-        setMode("paid");
-      } else {
-        setMode("organic");
-      }
+  setAccounts(platforms);
+}
+
+      // ✅ CAMPAIGN MODE POPULATION
+if (campaign.type === "social") {
+  if (data.campaign_mode === 2) {
+    setMode("paid");
+  } else {
+    setMode("organic");
+  }
+}
 
       // ✅ BUDGET POPULATION
-      if (data.budget_data?.allocation) {
-        setInstagramBudget(data.budget_data.allocation.instagram || 0);
-        setFacebookBudget(data.budget_data.allocation.facebook || 0);
-        setLinkedinBudget(data.budget_data.allocation.linkedin || 0);
-      }
+if (data.budget_data && data.budget_data.allocation) {
+  const allocation = data.budget_data.allocation;
+
+  setInstagramBudget(allocation.instagram ?? 0);
+  setFacebookBudget(allocation.facebook ?? 0);
+  setLinkedinBudget(allocation.linkedin ?? 0);
+}
 
     } catch (error) {
       console.error("Failed to fetch campaign:", error);
@@ -884,4 +896,4 @@ export default function EditCampaignModal({
     />
   </>
   );
-}
+} 

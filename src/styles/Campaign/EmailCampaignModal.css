@@ -320,6 +320,18 @@ select:invalid {
   gap: 12px;
   flex: 1;
   min-width: 0;
+} 
+.email-editor {
+  min-height: 180px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  outline: none;
+}
+
+.email-editor:empty:before {
+  content: "Enter email content";
+  color: #9ca3af;
 }
 
 

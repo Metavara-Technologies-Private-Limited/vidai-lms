@@ -17,7 +17,7 @@ const API_BASE_URL = "http://127.0.0.1:8000/api/templates";
 export default function EmailTemplateModal({
   open,
   onClose,
-//   onSelect,
+  onSelect,
 }: any) {
   const [selected, setSelected] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -123,13 +123,18 @@ export default function EmailTemplateModal({
 
   // Insert template body into compose editor
   const handleInsertTemplate = () => {
-    if (previewTemplate && emailEditorRef.current) {
-      emailEditorRef.current.innerHTML = previewTemplate.body || "";
-      setComposeSubject(previewTemplate.subject || "");
-    }
-    setPreviewOpen(false);
-    setComposeOpen(true);
-  };
+  if (previewTemplate) {
+    onSelect?.({
+      subject: previewTemplate.subject,
+      body: previewTemplate.body,
+    });
+  }
+
+  setPreviewOpen(false);
+  setTemplateConfirmOpen(false);
+  setComposeOpen(false);
+  onClose();
+};
 
   return (
     <>

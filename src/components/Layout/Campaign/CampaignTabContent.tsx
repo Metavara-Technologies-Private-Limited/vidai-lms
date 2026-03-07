@@ -22,7 +22,7 @@ import {
 interface Props {
   campaign: Campaign;
   activeTab: string;
-  // activeSubTab: string;
+  activeSubTab: string;
 }
 
 <<<<<<< HEAD
@@ -192,15 +192,8 @@ const platformData = Object.keys(allocation).map((key) => ({
         </p>
 >>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
       </div>
-
-      {/* RIGHT SIDE IMAGE (UNCHANGED) */}
-      <div className="cd-content-image">
-        <img src={contentImage} alt="Campaign Content" />
-      </div>
-
-    </div>
-  );
-}
+    );
+  }
 
   /* ================= PERFORMANCE ================= */
   if (activeTab === "Performance") {
@@ -417,6 +410,7 @@ const platformData = Object.keys(allocation).map((key) => ({
           </div>
 
         </div>
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 <<<<<<< HEAD
 =======
@@ -464,6 +458,8 @@ const platformData = Object.keys(allocation).map((key) => ({
 >>>>>>> 6752c625df204b680dc54719a352b49be1cb8755
 =======
 >>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
+=======
+>>>>>>> Stashed changes
       </div>
     );
   }

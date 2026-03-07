@@ -20,7 +20,7 @@ import SocialContentBox from "./SocialContentBox";
 import { useSelector } from "react-redux";
 import { selectClinic } from "../../../store/clinicSlice";
 
-type Props = {  
+type Props = {
   onClose: () => void;
   onSave: (campaign: Campaign) => void;
 };
@@ -332,8 +332,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           ),
         },
         status: type === "live" ? "live" : type === "scheduled" ? "scheduled" : "draft",
-        is_active: type === "live",
-        image_url: image_url,
+is_active: type === "live" ? true : undefined,
+image_url: image_url,
       };
 
       const response = await CampaignAPI.createSocial(payload);
@@ -363,7 +363,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         platforms: accounts,
         leads: 0,
         lead_generated: 0,
-        scheduledAt: apiData.scheduled_at ?? undefined,
+        scheduledAt: type === "scheduled" ? scheduledDateTime : null,
         total_spend: mode === "paid" ? totalSpend : 0,
         cpc: mode === "paid" ? Number(estimatedCPC) : 0,
       };
@@ -683,7 +683,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   Save as Draft
                 </button>
                 <button className="next-btn" onClick={() => handleCreateCampaign("scheduled")}>
-                  Schedule
+                  Scheduled
                 </button>
               </>
             ) : (

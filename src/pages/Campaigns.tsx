@@ -1,30 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState, lazy, Suspense } from "react";
+import { useMemo, useState } from "react";
+import { useEffect } from "react";
 import "../styles/Campaign/campaigns.css";
 import searchIcon from "../components/Layout/Campaign/Icons/search.png";
 import CampaignHeader from "../components/Layout/Campaign/CampaignHeader";
 import CampaignCard from "../components/Layout/Campaign/CampaignCard";
+import AddNewCampaign from "../components/Layout/Campaign/AddNewCampaign";
+import SocialCampaignModal from "../components/Layout/Campaign/SocialCampaignModal";
+import CampaignDashboard from "../components/Layout/Campaign/CampaignDashboard";
+import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
 import { useSelector, useDispatch } from "react-redux";
-import {
-  selectCampaign,
-  updateCampaignStatus,
-} from "../store/campaignSlice";
+import {selectCampaign,updateCampaignStatus,} from "../store/campaignSlice";
 import type { AppDispatch } from "../store";
-const AddNewCampaign = lazy(() => import("../components/Layout/Campaign/AddNewCampaign"));
-const SocialCampaignModal = lazy(() => import("../components/Layout/Campaign/SocialCampaignModal"));
-const CampaignDashboard = lazy(() => import("../components/Layout/Campaign/CampaignDashboard"));
-const EmailCampaignModal = lazy(() => import("../components/Layout/Campaign/EmailCampaignModal"));
-const EditCampaignModal = lazy(() => import("../components/Layout/Campaign/EditCampaignModal"));
-const DuplicateCampaignModal = lazy(() => import("../components/Layout/Campaign/DuplicateCampaignModal"));
-type CampaignStatus =
-  | "Live"
-  | "Draft"
-  | "Schedule"
-  | "Scheduled"
-  | "Paused"
-  | "Stopped"
-  | "Completed"
-  | "Failed";
+import EditCampaignModal from "../components/Layout/Campaign/EditCampaignModal";
+import DuplicateCampaignModal from "../components/Layout/Campaign/DuplicateCampaignModal";
+import type { CampaignStatus } from "../types/campaigns.types";
+// import { setCampaigns } from "../store/campaignSlice"
+// import { CampaignAPI } from "../services/campaign.api"
+import { fetchCampaign } from "../store/campaignSlice";
+import { toast } from "react-toastify";
 
 type Tab = "all" | "social" | "email";
 
@@ -32,18 +26,39 @@ export default function CampaignsScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const rawCampaigns = useSelector(selectCampaign);
 
-  const campaigns = (rawCampaigns || []).map((api: any) => {
-    let status: CampaignStatus;
+  useEffect(() => {
+    dispatch(fetchCampaign());
+  }, [dispatch]);
 
-    if (api.status === "live" || api.is_active === true) {
-      status = "Live";
-    } else if (api.status === "schedule" || api.status === "scheduled") {
-      status = "Schedule";
-    } else if (api.status === "draft") {
-      status = "Draft";
-    } else {
-      status = "Stopped";
-    }
+ // AFTER ✅ — trusts Redux status first, falls back to API fields
+const campaigns = (rawCampaigns || []).map((api: any) => {
+  console.log("BACKEND STATUS:", api.status);
+  console.log("BACKEND ACTIVE:", api.is_active);
+  let status: CampaignStatus;
+
+const backendStatus = (api.status || "").toLowerCase();
+
+if (backendStatus === "scheduled") {
+  status = "Scheduled";
+}
+else if (backendStatus === "draft") {
+  status = "Draft";
+}
+else if (backendStatus === "stopped") {
+  status = "Stopped";
+}
+else if (backendStatus === "completed") {
+  status = "Stopped"; // or "Completed" if you support it
+}
+else if (backendStatus === "live") {
+  status = "Live";
+}
+else if (api.is_active === true) {
+  status = "Live";
+}
+else {
+  status = "Draft";
+}
 
     // ─── Resolve platforms ────────────────────────────────────────────────
     // campaign_mode: 1 = organic (social), 2 = paid (social), 3 = email
@@ -74,7 +89,16 @@ export default function CampaignsScreen() {
       if (platforms.length === 0 && Array.isArray(api.select_ad_accounts)) {
         platforms = api.select_ad_accounts.map((p: string) => p.toLowerCase()) as ("instagram" | "facebook" | "linkedin" | "gmail")[];
       }
+
+      // ⭐ FIX: handle platform_data (used by duplicate campaign)
+if (platforms.length === 0 && api.platform_data) {
+  platforms = Object.entries(api.platform_data)
+    .filter(([, v]: any) => v?.is_active === true)
+    .map(([key]) => key.toLowerCase()) as ("instagram" | "facebook" | "linkedin" | "gmail")[];
+}
+
     }
+
 
     return {
       id: api.id,
@@ -111,9 +135,13 @@ export default function CampaignsScreen() {
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
   const [duplicatingCampaign, setDuplicatingCampaign] = useState<any>(null);
 
-  const handleStatusChange = (id: string, status: CampaignStatus) => {
-    dispatch(updateCampaignStatus({ id, status }));
-  };
+ const handleStatusChange = (id: string, status: CampaignStatus) => {
+  dispatch(updateCampaignStatus({ id, status })).unwrap().catch(() => {
+    // API failed — re-fetch to revert UI back to real status
+    dispatch(fetchCampaign());
+    toast.error("Failed to update campaign status");
+  });
+};
 
   const handleEdit = (campaign: any) => {
     setEditingCampaign(campaign);
@@ -141,12 +169,10 @@ export default function CampaignsScreen() {
 
   if (selectedCampaign) {
     return (
-      <Suspense fallback={<div className="empty-state">Loading campaign...</div>}>
-        <CampaignDashboard
-          campaign={selectedCampaign}
-          onBack={() => setSelectedCampaign(null)}
-        />
-      </Suspense>
+      <CampaignDashboard
+        campaign={selectedCampaign}
+        onBack={() => setSelectedCampaign(null)}
+      />
     );
   }
 
@@ -203,7 +229,7 @@ export default function CampaignsScreen() {
                     "Live",
                     "Stopped",
                     "Draft",
-                    "Schedule",
+                    "Scheduled",
                   ] as (CampaignStatus | "all")[]
                 ).map((item) => (
                   <div
@@ -246,55 +272,54 @@ export default function CampaignsScreen() {
 
       {/* ================= MODALS ================= */}
       {showAddCampaign && (
-        <Suspense fallback={null}>
-          <AddNewCampaign
-            onClose={() => setShowAddCampaign(false)}
-            onSocialSelect={() => {
-              setShowAddCampaign(false);
-              setShowSocialModal(true);
-            }}
-            onEmailSelect={() => {
-              setShowAddCampaign(false);
-              setShowEmailModal(true);
-            }}
-          />
-        </Suspense>
+        <AddNewCampaign
+          onClose={() => setShowAddCampaign(false)}
+          onSocialSelect={() => {
+            setShowAddCampaign(false);
+            setShowSocialModal(true);
+          }}
+          onEmailSelect={() => {
+            setShowAddCampaign(false);
+            setShowEmailModal(true);
+          }}
+        />
       )}
-      {showSocialModal && (
-        <Suspense fallback={null}>
-          <SocialCampaignModal
-            onClose={() => setShowSocialModal(false)}
-            onSave={() => setShowSocialModal(false)}
-          />
-        </Suspense>
-      )}
+     {showSocialModal && (
+  <SocialCampaignModal
+    onClose={() => setShowSocialModal(false)}
+    onSave={() => {
+      setShowSocialModal(false);
+      dispatch(fetchCampaign());
+    }}
+  />
+)}
       {showEmailModal && (
-        <Suspense fallback={null}>
-          <EmailCampaignModal
-            onClose={() => setShowEmailModal(false)}
-            onSave={() => setShowEmailModal(false)}
-          />
-        </Suspense>
-      )}
+  <EmailCampaignModal
+    onClose={() => setShowEmailModal(false)}
+    onSave={() => {
+      setShowEmailModal(false);
+      dispatch(fetchCampaign());
+    }}
+  />
+)}
       {showEditModal && editingCampaign && (
-        <Suspense fallback={null}>
-          <EditCampaignModal
-            campaign={editingCampaign}
-            onClose={() => setShowEditModal(false)}
-            onSave={() => {
-              setShowEditModal(false);
-            }}
-          />
-        </Suspense>
+        <EditCampaignModal
+          campaign={editingCampaign}
+          onClose={() => setShowEditModal(false)}
+          onSave={() => {
+            setShowEditModal(false);
+          }}
+        />
       )}
       {duplicatingCampaign && (
-        <Suspense fallback={null}>
-          <DuplicateCampaignModal
-            campaign={duplicatingCampaign}
-            onClose={() => setDuplicatingCampaign(null)}
-            onSave={() => setDuplicatingCampaign(null)}
-          />
-        </Suspense>
+        <DuplicateCampaignModal
+          campaign={duplicatingCampaign}
+          onClose={() => setDuplicatingCampaign(null)}
+          onSave={() => {
+          setDuplicatingCampaign(null);
+          dispatch(fetchCampaign());
+        }}
+        />
       )}
     </div>
   );

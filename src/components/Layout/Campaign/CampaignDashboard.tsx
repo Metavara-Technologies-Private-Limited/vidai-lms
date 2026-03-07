@@ -7,6 +7,7 @@ import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
 import emailIcon from "./Icons/Email.png";
 import globeIcon from "./Images/globe.png";
+import mailCardIcon from "./Icons/mail-card.png";
 import TurnLeftIcon from "@mui/icons-material/TurnLeft";
 import impressionsIcon from "./Icons/impressions.png";
 import clicksIcon from "./Icons/clicks.png";
@@ -18,7 +19,6 @@ import cpcIcon from "./Icons/cpc.png";
 import cpaIcon from "./Icons/cpa.png";
 import CampaignTabContent from "./CampaignTabContent";
 import { IconButton } from "@mui/material";
-import { CampaignAPI } from "../../../../src/services/campaign.api";
 
 interface Campaign {
   id: string;
@@ -72,7 +72,6 @@ const CampaignDashboard = ({
     : "-";
 
   const platforms = campaign.platforms || [];
-  const [fullData, setFullData] = React.useState<any>(null);
 
   // ─── Resolve total budget ─────────────────────────────────────────────────
   // Priority 1: budget_data.total
@@ -95,19 +94,25 @@ const CampaignDashboard = ({
       value: campaign.lead_generated || "0",
       icon: conversionsIcon,
     },
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 <<<<<<< HEAD
     {title: "Total Spend",value: `$${fullData?.budget_data?.total_budget ?? 0}`,icon: spendIcon,},
 =======
+=======
+>>>>>>> Stashed changes
     {
       title: "Total Budget",
       value: `$${totalBudget}`,
       icon: spendIcon,
     },
+<<<<<<< Updated upstream
 >>>>>>> 6752c625df204b680dc54719a352b49be1cb8755
 =======
     {title: "Total Spend",value: `$${fullData?.budget_data?.total_budget ?? 0}`,icon: spendIcon,},
 >>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
+=======
+>>>>>>> Stashed changes
     { title: "CTR", value: "0%", icon: ctrIcon },
     { title: "Conversion Rate", value: "0%", icon: conversionRateIcon },
     {
@@ -117,19 +122,6 @@ const CampaignDashboard = ({
     },
     { title: "CPA", value: "$0", icon: cpaIcon },
   ];
-
-React.useEffect(() => {
-  const fetchDetails = async () => {
-    try {
-      const response = await CampaignAPI.get(campaign.id);
-      setFullData(response.data);
-    } catch (error) {
-      console.error("Failed to fetch campaign details", error);
-    }
-  };
-
-  fetchDetails();
-}, [campaign.id]);
 
   return (
     <div className="cd-wrapper">
@@ -155,8 +147,12 @@ React.useEffect(() => {
         <div className="cd-header-card">
           <div className="cd-header-top">
             <div className="cd-header-left">
-              <div className="cd-globe">
-                <img src={globeIcon} alt="Global" />
+              <div className={`title-icon-box ${campaign.type}`}>
+                <img 
+                  src={campaign.type === "email" ? mailCardIcon : globeIcon} 
+                  alt={campaign.type}
+                  className="title-icon"
+                />
               </div>
               <span className="cd-header-title">{campaign.name}</span>
               <span className={`cd-live ${campaign.status.toLowerCase()}`}>
@@ -232,10 +228,10 @@ React.useEffect(() => {
 
       {/* ================= TAB CONTENT ================= */}
       <CampaignTabContent
-  campaign={fullData || campaign}
-  activeTab={activeTab}
-  // activeSubTab={activeSubTab}
-/>
+        campaign={campaign as any}
+        activeTab={activeTab}
+        activeSubTab={activeSubTab}
+      />
     </div>
   );
 };

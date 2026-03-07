@@ -92,6 +92,12 @@ useEffect(() => {
       setStartDate(data.start_date || "");
       setEndDate(data.end_date || "");
 
+      // ✅ FIX TIME POPULATION
+        if (data.selected_start) {
+        setScheduleDate(dayjs(data.selected_start).format("YYYY-MM-DD"));
+        setScheduleTime(dayjs(data.selected_start).format("HH:mm"));
+        }
+
       // EMAIL
       if (data.email?.length > 0) {
         setSubject(data.email[0].subject || "");
@@ -101,11 +107,14 @@ useEffect(() => {
       // SOCIAL CONTENT
       setCampaignContent(data.campaign_content || "");
 
-      // PLATFORM DATA (NEW STRUCTURE)
-      if (data.platform_data) {
-        const platforms = Object.keys(data.platform_data);
-        setAccounts(platforms);
-      }
+      /// ✅ POPULATE ONLY ACTIVE PLATFORMS
+if (data.platform_data) {
+  const platforms = Object.entries(data.platform_data)
+    .filter(([, value]: any) => value?.is_active === true)
+    .map(([key]) => key);
+
+  setAccounts(platforms);
+}
 
       // MODE FROM BUDGET
       if (data.budget_data && data.budget_data.total_budget > 0) {

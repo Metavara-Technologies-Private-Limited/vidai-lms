@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export type CampaignStatus = "Live" | "Draft" | "Scheduled" | "Stopped";
 
 export type CampaignType = "social" | "email";
@@ -7,44 +6,21 @@ export type Platform = "instagram" | "facebook" | "linkedin";
 
 export interface Campaign {
   id: string;
+  name: string;
+  objective?: string;
 
-  // Common
-  name?: string;              // list view
-  campaign_name?: string;     // backend full object
-  campaign_description?: string;
-  campaign_objective?: string;
-  target_audience?: string;
+  type: CampaignType;
+  status: CampaignStatus;
 
-  type?: "social" | "email";
-  status?: string;
-
-  start?: string;
-  end?: string;
-  start_date?: string;
-  end_date?: string;
-
-  scheduledAt?: string;
-
-  // Email
-  email?: {
-    subject: string;
-    email_body: string;
-  }[];
-
-  // Social
-  campaign_content?: string;
-
-  budget_data?: {
-    total_budget: number;
-    allocation: Record<string, number>;
-  };
-
-  performance_data?: any[];
-
-  lead_generated?: number;
+  budget?: number;
   total_spend?: number;
   cpc?: number;
 
+  start_date?: string;
+  end_date?: string;
+  created_at?: string;
+  start: string;
+  end: string;
   platforms?: string[];
 <<<<<<< HEAD
   scheduledAt?: string | null;
@@ -87,6 +63,6 @@ export interface SocialCampaignPayload {
   };
 
   status: "live" | "scheduled" | "draft";
-  is_active: boolean;
+  is_active?: boolean;
   image_url: string | null;          // ✅ added
 }

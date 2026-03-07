@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SocialCampaignPayload } from "../types/campaigns.types";
 import { http } from "./http";
 
@@ -18,4 +19,7 @@ export const CampaignAPI = {
   update: (id: string, data: any) => http.put(`/campaigns/${id}/update/`, data),
 
   delete: (id: string) => http.delete(`/campaigns/${id}/delete/`),
+
+ updateStatus: (id: string, status: string, fullData: any) =>
+  http.put(`/campaigns/${id}/update/`, { ...fullData, status }),
 };
