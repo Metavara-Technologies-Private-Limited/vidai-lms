@@ -44,10 +44,12 @@ interface Props {
   assignTo: number | "";
   setAssignTo: (v: number | "") => void;
 
-  handleUpdate: (payload: {
+handleUpdate: (payload: {
   status: TicketStatus;
   priority: TicketPriority;
   assigned_to: number | "";
+  type: string;
+  actions: string[];
 }) => void;
 
   updating: boolean;
@@ -82,23 +84,32 @@ const handleUpdateWithTimeline = () => {
     actions.push(`Status changed from ${ticket.status} to ${status}`);
   }
 
+if (ticket.type !== type) {
+  actions.push(`Type changed from ${ticket.type} to ${type}`);
+}
   if (ticket.priority !== priority) {
     actions.push(`Priority changed from ${ticket.priority} to ${priority}`);
   }
+  
+if (ticket.assigned_to !== assignTo) {
+  const oldEmp = employees.find(e => e.id === ticket.assigned_to);
+  const newEmp = employees.find(e => e.id === assignTo);
 
-
-  if (ticket.assigned_to !== assignTo) {
-    const emp = employees.find(e => e.id === assignTo);
-    actions.push(`Assigned to ${emp?.emp_name}`);
-  }
+  actions.push(
+    `Assigned changed from ${oldEmp?.emp_name || "Unassigned"} to ${newEmp?.emp_name}`
+  );
+}
 
   console.log("Timeline actions:", actions);
 
-    handleUpdate({
-    status,
-    priority,
-    assigned_to: assignTo
-  });
+handleUpdate({
+  status,
+  priority,
+  assigned_to: assignTo,
+  type, 
+  actions
+});
+
 };
 
   return (
@@ -239,7 +250,9 @@ const handleUpdateWithTimeline = () => {
             const timeline = (ticket.timeline || []) as TicketTimeline[];
 
             const displayItems: (TicketTimeline & { is_injected?: boolean })[] = [...timeline];
-            const hasAssignment = displayItems.some(t => t.action?.toLowerCase().includes("assign"));
+const hasAssignment = displayItems.some(t =>
+  t.action?.toLowerCase().includes("assigned")
+);
 
             if (!hasAssignment && ticket.assigned_to) {
               const assignItem = {
@@ -294,8 +307,7 @@ const handleUpdateWithTimeline = () => {
                   >
                     {isAssigned ? (
                       <Avatar
-                        src={`https://ui-avatars.com/api/?name=${ticket.requested_by}`}
-                        sx={{ width: 34, height: 34 }}
+src={`https://ui-avatars.com/api/?name=${ticket.assigned_to_name || "User"}`}                        sx={{ width: 34, height: 34 }}
                       />
                     ) : (
                       <Box
@@ -312,9 +324,7 @@ const handleUpdateWithTimeline = () => {
                   {/* TEXT CONTENT */}
                   <Box ml={5}>
                     <Typography fontSize={14} fontWeight={500}>
-                      {isAssigned
-                        ? `Assigned to ${ticket.requested_by}`
-                        : item.action}
+                      {item.action}
                     </Typography>
 
                     <Typography fontSize={12} color="#8A8A8A">

@@ -211,13 +211,15 @@ const handleUpdate = async () => {
     if (
       status !== ticket.status ||
       priority !== ticket.priority ||
-      assignTo !== (ticket.assigned_to || "")
+      assignTo !== (ticket.assigned_to || "") ||
+      type !== ticket.type
     ) {
 
       await ticketsApi.updateTicketStatus(id, {
         status,
         priority,
         assigned_to: assignTo || "",
+        type
       });
 
       hasChanges = true;
