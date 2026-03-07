@@ -59,6 +59,7 @@ updateTicketStatus: async (
     status: string;
     priority?: string;
     assigned_to?: number | "";
+    type?: string;
   }
 ): Promise<TicketDetail> => {
   const response = await apiClient.post(`/tickets/${ticketId}/status/`, payload);

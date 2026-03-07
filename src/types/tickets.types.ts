@@ -59,6 +59,7 @@ export interface UpdateTicketRequest {
   assigned_to?: number | null;
   priority: TicketPriority;
   status?: TicketStatus;
+  type?: string;
   due_date?: string | null;
   documents?: TicketDocument[];
 }
@@ -92,6 +93,7 @@ export interface TicketDetail {
   department: number;
   department_name: string;
   requested_by: string;
+   type: string;
   assigned_to?: number | null;
   assigned_to_name?: string;
   priority: TicketPriority;
