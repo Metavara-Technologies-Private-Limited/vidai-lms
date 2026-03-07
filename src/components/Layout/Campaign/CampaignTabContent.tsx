@@ -25,6 +25,7 @@ interface Props {
   // activeSubTab: string;
 }
 
+<<<<<<< HEAD
 const performanceData = [
   { date: "1 Jan", facebook: 650, instagram: 520 },
   { date: "2 Jan", facebook: 630, instagram: 600 },
@@ -129,6 +130,67 @@ const CampaignTabContent: React.FC<Props> = ({
             />
           </div>
         )}
+=======
+// const performanceData = campaign.performance_data || [];
+
+// const allocation = campaign.budget_data?.allocation || {};
+
+// const platformData = Object.keys(allocation).map((key) => ({
+//   name: key.charAt(0).toUpperCase() + key.slice(1),
+//   value:
+//     campaign.budget_data?.total_budget > 0
+//       ? Math.round(
+//           (allocation[key] /
+//             campaign.budget_data.total_budget) *
+//             100,
+//         )
+//       : 0,
+//   color: "#A8AEBF"
+// }));
+
+const CampaignTabContent: React.FC<Props> = ({
+  campaign,
+  activeTab
+  // activeSubTab
+}) => {
+  const performanceData = campaign.performance_data || [];
+
+const allocation = campaign.budget_data?.allocation || {};
+
+const totalBudget = campaign.budget_data?.total_budget || 0;
+
+const platformData = Object.keys(allocation).map((key) => ({
+  name: key.charAt(0).toUpperCase() + key.slice(1),
+  value:
+    totalBudget > 0
+      ? Math.round((allocation[key] / totalBudget) * 100)
+      : 0,
+  color: "#A8AEBF",
+}));
+  const [selectedPlatform, setSelectedPlatform] =
+    React.useState<"facebook" | "instagram">("facebook");
+  // const [activeIndex, setActiveIndex] =
+  // React.useState<number | undefined>(undefined);
+
+  /* ================= CONTENT ================= */
+  if (activeTab === "Content") {
+  return (
+    <div className="cd-content-card">
+      
+      {/* LEFT SIDE TEXT */}
+      <div className="cd-content-text">
+        <h3 className="cd-content-title">
+          {campaign.type === "email"
+            ? campaign.email?.[0]?.subject || "No Subject"
+            : campaign.campaign_name || "Campaign"}
+        </h3>
+
+        <p>
+          {campaign.type === "email"
+            ? campaign.email?.[0]?.email_body || "No Email Content"
+            : campaign.campaign_content || "No Content Available"}
+        </p>
+>>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
       </div>
 
       {/* RIGHT SIDE IMAGE (UNCHANGED) */}
@@ -353,28 +415,12 @@ const CampaignTabContent: React.FC<Props> = ({
               </div>
             </div>
           </div>
-          <div className="cd-platform-cards">
-            <PlatformCard
-              icon={instagramIcon}
-              title="Instagram"
-              spend="$1200"
-              conversion="60"
-            />
-            <PlatformCard
-              icon={facebookIcon}
-              title="Facebook"
-              spend="$1300"
-              conversion="40"
-            />
-            <PlatformCard
-              icon={linkedinIcon}
-              title="LinkedIn"
-              spend="$1500"
-              conversion="80"
-            />
-          </div>
+
         </div>
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
         <div className="cd-platform-cards">
 
           {Object.keys(allocation).map((platform) => {
@@ -412,9 +458,12 @@ const CampaignTabContent: React.FC<Props> = ({
           /> */}
 
         </div>
+<<<<<<< HEAD
 
 =======
 >>>>>>> 6752c625df204b680dc54719a352b49be1cb8755
+=======
+>>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
       </div>
     );
   }

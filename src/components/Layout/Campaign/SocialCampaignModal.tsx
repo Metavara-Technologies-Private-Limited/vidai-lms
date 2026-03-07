@@ -346,10 +346,15 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         type === "live" ? "Live" : type === "draft" ? "Draft" : "Scheduled";
 
       const formattedCampaign: Campaign = {
+<<<<<<< HEAD
         // campaign_id is in the nested campaigns[0] object, not response.data directly
         id: createdCampaign.campaign_id ?? createdCampaign.id ?? crypto.randomUUID(),
         // Use local form state for all display fields (not returned by create API)
         name: campaignName,
+=======
+        id: apiData.id,
+        campaign_name: apiData.campaign_name,
+>>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
         type: "social",
         status: mappedStatus,
         start: startDate,

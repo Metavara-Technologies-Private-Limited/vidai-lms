@@ -96,6 +96,7 @@ const CampaignDashboard = ({
       icon: conversionsIcon,
     },
 <<<<<<< HEAD
+<<<<<<< HEAD
     {title: "Total Spend",value: `$${fullData?.budget_data?.total_budget ?? 0}`,icon: spendIcon,},
 =======
     {
@@ -104,6 +105,9 @@ const CampaignDashboard = ({
       icon: spendIcon,
     },
 >>>>>>> 6752c625df204b680dc54719a352b49be1cb8755
+=======
+    {title: "Total Spend",value: `$${fullData?.budget_data?.total_budget ?? 0}`,icon: spendIcon,},
+>>>>>>> d00cc67f27fab285147f213cf9b08d18b129f618
     { title: "CTR", value: "0%", icon: ctrIcon },
     { title: "Conversion Rate", value: "0%", icon: conversionRateIcon },
     {
