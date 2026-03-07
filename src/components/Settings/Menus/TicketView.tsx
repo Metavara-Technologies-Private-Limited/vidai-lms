@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef,useCallback  } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -13,13 +13,23 @@ import TemplateService from "../../../services/templates.api";
 import TicketDailog from "../Menus/TicketDailogs";
 
 import {
-  Box, Typography, Button, Stack,
-  CircularProgress, Alert,
+  Box,
+  Typography,
+  Button,
+  Stack,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import BackwardIcon from "../../../assets/icons/Backward_icon.svg";
 import { ticketsApi, clinicsApi } from "../../../services/tickets.api";
-import type { TicketDetail, TicketStatus, TicketPriority,EmailTemplate, } from "../../../types/tickets.types";
-import type { Employee } from "../../../services/leads.api";
+import type {
+  TicketDetail,
+  TicketStatus,
+  TicketPriority,
+  EmailTemplate,
+} from "../../../types/tickets.types";
+import type { Employee, LeadEmailPayload } from "../../../services/leads.api";
+import { LeadEmailAPI, LeadAPI } from "../../../services/leads.api";
 import { toast } from "react-toastify";
 import TicketPropertiesSidebar from "../Menus/TicketPropertiesSidebar";
 
@@ -34,11 +44,18 @@ const ticketTypes = [
   "Login creation",
 ];
 
+type Lead = {
+  id: string;
+  full_name?: string;
+  email?: string;
+};
+
 const TicketView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +70,7 @@ const TicketView = () => {
   const [description, setDescription] = useState(""); // State for editable description
   const [openReply, setOpenReply] = useState(false);
   const [replyMessage, setReplyMessage] = useState("");
-const [replyTo, setReplyTo] = useState<string[]>([]);
+  const [replyTo, setReplyTo] = useState<string[]>([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [replySubject, setReplySubject] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -62,90 +79,96 @@ const [replyTo, setReplyTo] = useState<string[]>([]);
   const [type, setType] = useState<string>("Question");
   const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<EmailTemplate | null>(null);
   const [viewTemplateOpen, setViewTemplateOpen] = useState(false);
-  const [viewTemplateData, setViewTemplateData] = useState<EmailTemplate | null>(null);
+  const [viewTemplateData, setViewTemplateData] =
+    useState<EmailTemplate | null>(null);
 
-type TicketEmployeeApi = {
-  id: number;
-  emp_name: string;
-  emp_type: string;
-  department_name?: string;
-};
+  type TicketEmployeeApi = {
+    id: number;
+    emp_name: string;
+    emp_type: string;
+    department_name?: string;
+  };
 
-const loadData = useCallback(async () => {    if (!id) return;
+  const loadData = useCallback(async () => {
+    if (!id) return;
     try {
       setLoading(true);
-      const [ticketData, empData] = await Promise.all([
+      const [ticketData, empData, leadsData] = await Promise.all([
         ticketsApi.getTicketById(id),
-        clinicsApi.getClinicEmployees("1")
+        clinicsApi.getClinicEmployees("1"),
+        LeadAPI.list(),
       ]);
 
-setTicket(ticketData);
+      setTicket(ticketData);
+      setLeads(leadsData);
 
-// ✅ Normalize employee type
-const normalizedEmployees: Employee[] = (empData as TicketEmployeeApi[]).map((emp) => ({
-  id: emp.id,
-  emp_name: emp.emp_name,
-  emp_type: emp.emp_type,
-  department_name: emp.department_name ?? "",
-}));
+      // ✅ Normalize employee type
+      const normalizedEmployees: Employee[] = (
+        empData as TicketEmployeeApi[]
+      ).map((emp) => ({
+        id: emp.id,
+        emp_name: emp.emp_name,
+        emp_type: emp.emp_type,
+        department_name: emp.department_name ?? "",
+      }));
 
-setEmployees(normalizedEmployees);
+      setEmployees(normalizedEmployees);
 
       // Sync local states with DB response
       setStatus(ticketData.status);
       setPriority(ticketData.priority);
       setAssignTo(ticketData.assigned_to || "");
       setDescription(ticketData.description);
-    } catch  {
+    } catch {
       setError("Failed to load ticket details from server.");
     } finally {
       setLoading(false);
     }
-}, [id]);
+  }, [id]);
 
-useEffect(() => {
-  loadData();
-}, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-useEffect(() => {
-  if (!openTemplateDialog) return;
+  useEffect(() => {
+    if (!openTemplateDialog) return;
 
-  const loadTemplates = async () => {
-    try {
-      const response = await TemplateService.getTemplates("mail");
+    const loadTemplates = async () => {
+      try {
+        const response = await TemplateService.getTemplates("mail");
 
-      // ✅ Define API response shape (instead of using any)
-      type TemplateApiItem = {
-        id: string | number;
-        name: string;
-        subject: string;
-        body?: string;
-      };
+        // ✅ Define API response shape (instead of using any)
+        type TemplateApiItem = {
+          id: string | number;
+          name: string;
+          subject: string;
+          body?: string;
+        };
 
-      const templateList: TemplateApiItem[] = Array.isArray(response)
-        ? response
-        : response?.results ?? [];
+        const templateList: TemplateApiItem[] = Array.isArray(response)
+          ? response
+          : (response?.results ?? []);
 
-      // ✅ Normalize into Ticket EmailTemplate type
-      const normalized: EmailTemplate[] = templateList.map((t) => ({
-        id: t.id,
-        audience_name: t.name,
-        subject: t.subject,
-        email_body: t.body ?? "",
-        body: t.body,
-      }));
+        // ✅ Normalize into Ticket EmailTemplate type
+        const normalized: EmailTemplate[] = templateList.map((t) => ({
+          id: t.id,
+          audience_name: t.name,
+          subject: t.subject,
+          email_body: t.body ?? "",
+          body: t.body,
+        }));
 
-      setTemplates(normalized);
-    } catch (error) {
-      console.error("Error fetching templates:", error);
-    }
-  };
+        setTemplates(normalized);
+      } catch (error) {
+        console.error("Error fetching templates:", error);
+      }
+    };
 
-  loadTemplates();
-}, [openTemplateDialog]);
-
+    loadTemplates();
+  }, [openTemplateDialog]);
 
   useEffect(() => {
     if (ticket?.subject) {
@@ -153,24 +176,17 @@ useEffect(() => {
     }
   }, [ticket]);
 
-useEffect(() => {
-  if (ticket?.requested_by) {
-    setReplyTo([ticket.requested_by]);
-  } else {
+  useEffect(() => {
     setReplyTo([]);
-  }
-}, [ticket]);
+  }, [ticket]);
 
   //  File Preview Handlers
   const handlePreviewOpen = (file: string) => {
-    const fullUrl = file.startsWith("http")
-      ? file
-      : `${FILE_BASE_URL}${file}`;
+    const fullUrl = file.startsWith("http") ? file : `${FILE_BASE_URL}${file}`;
 
     setPreviewFile(fullUrl);
     setPreviewOpen(true);
   };
-
 
   const handlePreviewClose = () => {
     setPreviewOpen(false);
@@ -178,94 +194,117 @@ useEffect(() => {
   };
 
   // Handle saving all changes to the Database
-  const handleUpdate = async () => {
-    if (!id) return;
+const handleUpdate = async () => {
+  if (!id) return;
 
-    if (!ticket) {
-      toast.warn("No ticket data found.");
-      return;
-    }
-    setUpdating(true);
-    setError(null);
-
-    try {
-      let hasChanges = false;
-
-      // 1. Status
-      if (status !== ticket.status) {
-        await ticketsApi.updateTicketStatus(id, status);
-        hasChanges = true;
-      }
-
-      // 2. Assignee
-      if (assignTo !== (ticket.assigned_to || "")) {
-        await ticketsApi.assignTicket(id, String(assignTo));
-        hasChanges = true;
-      }
-
-      // 3. Priority / Description
-      if (priority !== ticket.priority || description !== ticket.description) {
-        await ticketsApi.updateTicket(id, {
-          subject: ticket.subject,
-          description: description.trim(),
-          lab: ticket.lab,
-          department: ticket.department,
-          requested_by: ticket.requested_by,
-          priority: priority,
-          status: status
-        });
-        hasChanges = true;
-      }
-
-      if (!hasChanges) {
-        toast.info("No changes made.");
-        setUpdating(false);
-        return;
-      }
-
-      await loadData();
-      toast.success("Ticket updated successfully!");
-    } catch {
-      const msg = "Failed to update ticket.";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-const handleSendReply = async () => {
-  // No recipients selected
-  if (replyTo.length === 0) {
-    toast.warn("No recipient in leads.");
+  if (!ticket) {
+    toast.warn("No ticket data found.");
     return;
   }
 
-  // Validate recipient exists in ticket lead
-  if (!ticket?.requested_by || !replyTo.includes(ticket.requested_by)) {
-    toast.warn("No recipient in leads.");
-    return;
-  }
-
-  if (!replyMessage.trim()) {
-    toast.warn("Reply message cannot be empty.");
-    return;
-  }
+  setUpdating(true);
+  setError(null);
 
   try {
-    toast.success("Reply sent successfully!");
+    let hasChanges = false;
 
-    setReplyMessage("");
-    setReplyTo([]);
-    setOpenReply(false);
+    if (
+      status !== ticket.status ||
+      priority !== ticket.priority ||
+      assignTo !== (ticket.assigned_to || "") ||
+      type !== ticket.type
+    ) {
+
+      await ticketsApi.updateTicketStatus(id, {
+        status,
+        priority,
+        assigned_to: assignTo || "",
+        type
+      });
+
+      hasChanges = true;
+    }
+
+    if (!hasChanges) {
+      toast.info("No changes made.");
+      setUpdating(false);
+      return;
+    }
+
+    await loadData();
+    toast.success("Ticket updated successfully!");
   } catch {
-    toast.error("Failed to send reply.");
+    const msg = "Failed to update ticket.";
+    setError(msg);
+    toast.error(msg);
+  } finally {
+    setUpdating(false);
   }
 };
+
+  const handleSendReply = async () => {
+    // No recipients selected
+    if (replyTo.length === 0) {
+      toast.warn("No recipient in leads.");
+      return;
+    }
+
+    if (!replyMessage.trim()) {
+      toast.warn("Reply message cannot be empty.");
+      return;
+    }
+
+    try {
+      // Send email to each recipient and save to their lead email history
+      const sendPromises = replyTo.map(async (recipientEmail) => {
+        // Find the lead with this email
+        const lead = leads.find(
+          (l) => l.email?.toLowerCase() === recipientEmail.toLowerCase(),
+        );
+
+        if (!lead) {
+          console.warn(`Lead not found for email: ${recipientEmail}`);
+          return;
+        }
+
+        // Create email payload for LeadEmailAPI
+        const emailPayload: LeadEmailPayload = {
+          lead: lead.id,
+          subject: replySubject || "Reply",
+          email_body: replyMessage,
+          send_now: true,
+        };
+
+        // Send email and save to lead's email history
+        await LeadEmailAPI.sendNow(emailPayload);
+      });
+
+const toastId = toast.loading("Sending reply...");
+
+await Promise.all(sendPromises);
+
+toast.update(toastId, {
+  render: "Reply sent successfully!",
+  type: "success",
+  isLoading: false,
+  autoClose: 3000,
+});
+
+      setReplyMessage("");
+      setReplyTo([]);
+      setOpenReply(false);
+      setReplySubject("");
+    } catch (err) {
+      console.error("Failed to send reply:", err);
+      toast.error("Failed to send reply. Please try again.");
+    }
+  };
 
   const handleCancelReply = () => {
     setOpenReply(false);
     setReplyMessage("");
+    setReplyTo([]);
+    setReplySubject("");
   };
 
   const handleAttachClick = () => {
@@ -280,18 +319,18 @@ const handleSendReply = async () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setReplyMessage(prev => prev + `\n📎 Attached: ${file.name}\n`);
+    setReplyMessage((prev) => prev + `\n📎 Attached: ${file.name}\n`);
   };
 
   const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setReplyMessage(prev => prev + `\n🖼 Image: ${file.name}\n`);
+    setReplyMessage((prev) => prev + `\n🖼 Image: ${file.name}\n`);
   };
 
   const handleEmojiInsert = (emoji: string) => {
-    setReplyMessage(prev => prev + emoji);
+    setReplyMessage((prev) => prev + emoji);
     setShowEmoji(false);
   };
 
@@ -343,7 +382,7 @@ const handleSendReply = async () => {
         autoClose: false,
         closeOnClick: false,
         draggable: false,
-      }
+      },
     );
   };
 
@@ -371,10 +410,7 @@ const handleSendReply = async () => {
           />
 
           <Stack direction="row" justifyContent="flex-end" spacing={1}>
-            <Button
-              size="small"
-              onClick={() => closeToast?.()}
-            >
+            <Button size="small" onClick={() => closeToast?.()}>
               Cancel
             </Button>
 
@@ -398,14 +434,22 @@ const handleSendReply = async () => {
         autoClose: false,
         closeOnClick: false,
         draggable: false,
-      }
+      },
     );
   };
 
-
-
-  if (loading) return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
-  if (error || !ticket) return <Alert severity="error" sx={{ m: 3 }}>{error || "Ticket not found."}</Alert>;
+  if (loading)
+    return (
+      <Box display="flex" justifyContent="center" mt={10}>
+        <CircularProgress />
+      </Box>
+    );
+  if (error || !ticket)
+    return (
+      <Alert severity="error" sx={{ m: 3 }}>
+        {error || "Ticket not found."}
+      </Alert>
+    );
 
   return (
     <Box sx={ticketViewWrapperSx}>
@@ -421,40 +465,37 @@ const handleSendReply = async () => {
 
       <Box display="flex" gap={4}>
         {/*#####    Ticket Content comes here ################ */}
-<TicketContentPanel
-  ticket={ticket}
-  description={description}
-  setDescription={setDescription}
-  handlePreviewOpen={handlePreviewOpen}
-  openReply={openReply}
-  setOpenReply={setOpenReply}
-
-  replyProps={{
-    openReply,
-    setOpenReply,
-    replyTo,
-    setReplyTo,
-    replySubject,
-    setReplySubject,
-    replyMessage,
-    setReplyMessage,
-    anchorEl,
-    setAnchorEl,
-    showEmoji,
-    setShowEmoji,
-    handleSendReply,
-    handleCancelReply,
-    handleAttachClick,
-    handleInsertLink,
-    handleInsertDriveLink,
-    handleImageClick,
-    handleEmojiInsert,
-    setOpenTemplateDialog,
-    iconSx: replyToolbarIconSx,
-  }}
-/>
-
-
+        <TicketContentPanel
+          ticket={ticket}
+          description={description}
+          setDescription={setDescription}
+          handlePreviewOpen={handlePreviewOpen}
+          openReply={openReply}
+          setOpenReply={setOpenReply}
+          replyProps={{
+            openReply,
+            setOpenReply,
+            replyTo,
+            setReplyTo,
+            replySubject,
+            setReplySubject,
+            replyMessage,
+            setReplyMessage,
+            anchorEl,
+            setAnchorEl,
+            showEmoji,
+            setShowEmoji,
+            handleSendReply,
+            handleCancelReply,
+            handleAttachClick,
+            handleInsertLink,
+            handleInsertDriveLink,
+            handleImageClick,
+            handleEmojiInsert,
+            setOpenTemplateDialog,
+            iconSx: replyToolbarIconSx,
+          }}
+        />
 
         {/* RIGHT PANEL: PROPERTIES SIDEBAR */}
         <TicketPropertiesSidebar
@@ -474,26 +515,22 @@ const handleSendReply = async () => {
           updating={updating}
           ticketTypes={ticketTypes}
         />
-
-
       </Box>
       {/*   #################  dailogs used in ticket view page    ################ */}
       <TicketDailog
         previewOpen={previewOpen}
         previewFile={previewFile}
         handlePreviewClose={handlePreviewClose}
-
         openTemplateDialog={openTemplateDialog}
         templates={templates}
         selectedTemplate={selectedTemplate}
         setSelectedTemplate={setSelectedTemplate}
         setOpenTemplateDialog={setOpenTemplateDialog}
-
         onInsertTemplate={(selectedTemplate) => {
           if (!selectedTemplate) return;
 
-const templateContent = selectedTemplate.body || "";
-setReplyMessage(prev => prev + "<br/><br/>" + templateContent);
+          const templateContent = selectedTemplate.body || "";
+          setReplyMessage((prev) => prev + "<br/><br/>" + templateContent);
           if (!replySubject) {
             setReplySubject(selectedTemplate.subject || "");
           }
@@ -501,7 +538,6 @@ setReplyMessage(prev => prev + "<br/><br/>" + templateContent);
           setOpenTemplateDialog(false);
           setSelectedTemplate(null);
         }}
-
         viewTemplateOpen={viewTemplateOpen}
         viewTemplateData={viewTemplateData}
         setViewTemplateOpen={setViewTemplateOpen}
@@ -527,5 +563,4 @@ setReplyMessage(prev => prev + "<br/><br/>" + templateContent);
   );
 };
 
-
-export default TicketView; 
+export default TicketView;

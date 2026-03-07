@@ -1,9 +1,10 @@
 import { Box, Typography } from "@mui/material";
 import { useMemo } from "react";
 import { useSelector } from "react-redux";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import { selectLeads } from "../../store/leadSlice";
 import type { TimeRange } from "./TimeRangeSelector";
 import { isWithinTimeRange } from "./timeRange.utils";
@@ -102,7 +103,7 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
   return (
     <Box sx={chartStyles.container}>
       <Box sx={chartStyles.chartWrapper}>
-        <ResponsiveContainer width="100%" height="100%">
+        <SafeResponsiveContainer minHeight={260}>
           <LineChart data={data} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
             {/* Horizontal Grid Lines */}
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
@@ -119,6 +120,9 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
               axisLine={false} 
               tickLine={false} 
               tick={{ fontSize: 11, fill: "#666" }}
+              domain={[0, 100]}
+              ticks={[0, 20, 40, 60, 80, 100]}
+              allowDecimals={false}
               label={{ 
                 value: 'Conversion Rate (in %)', 
                 angle: -90, 
@@ -142,7 +146,14 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
               animationDuration={1000}
             />
           </LineChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
+      </Box>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.5, px: 2 }}>
+        <Box sx={{ flex: 1, height: "1px", bgcolor: "#e6e6e6" }} />
+        <Typography variant="caption" sx={{ fontSize: 20, color: "#b3b3b3", lineHeight: 1 }}>
+          Time Period
+        </Typography>
+        <Box sx={{ flex: 1, height: "1px", bgcolor: "#e6e6e6" }} />
       </Box>
     </Box>
   );

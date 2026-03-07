@@ -82,6 +82,37 @@ function extractErr(err: unknown, fallback = "Something went wrong."): string {
   return e?.response?.data?.detail || e?.response?.data?.non_field_errors?.[0] || e?.message || fallback;
 }
 
+// Convert plain-text body to HTML before sending.
+// If it already contains HTML tags, returns as-is.
+function toHtml(text: string): string {
+  if (/<[a-z][\s\S]*>/i.test(text)) return text;
+  return text
+    .split(/\n\n+/)
+    .map((para) =>
+      `<p>${para
+        .split(/\n/)
+        .map((line) =>
+          line
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+        )
+        .join("<br/>")}</p>`
+    )
+    .join("");
+}
+
+// Strip HTML tags for display in plain-text textarea.
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .trim();
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // NewEmailTemplateDialog
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,9 +261,13 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
       .replace(/\{\{lead_first_name\}\}/g, name.split(" ")[0]);
   };
 
+  // FIX: strip HTML for textarea display; toHtml() re-applies on send
   const handleNext = () => {
     const template = emailTemplates.find((t) => String(t.id) === selectedTemplateId);
-    if (template) { setSubject(template.subject); setBody(resolveBody(template.body || "")); }
+    if (template) {
+      setSubject(template.subject);
+      setBody(stripHtml(resolveBody(template.body || "")));
+    }
     setStep("compose");
   };
 
@@ -242,6 +277,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     setNewTplOpen(false);
   };
 
+  // FIX: convert body to HTML before sending
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) { setError("Subject and body are required."); return; }
     if (!lead?.id) { setError("Lead ID is missing."); return; }
@@ -250,7 +286,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
       await LeadEmailAPI.sendNow({
         lead: lead.id,
         subject: subject.trim(),
-        email_body: body.trim(),
+        email_body: toHtml(body.trim()),
         sender_email: lead.email ?? null,
       });
       onClose();
@@ -259,12 +295,14 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     } finally { setSending(false); }
   };
 
+  // FIX: convert body to HTML before saving draft
   const handleSaveAsDraft = async () => {
     if (!subject.trim() || !body.trim() || !lead?.id) return;
     try {
       await LeadEmailAPI.saveAsDraft({
         lead: lead.id, subject: subject.trim(),
-        email_body: body.trim(), sender_email: lead.email ?? null,
+        email_body: toHtml(body.trim()),
+        sender_email: lead.email ?? null,
       });
     } catch { /* silent */ }
   };
@@ -438,20 +476,18 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                   </Stack>
                 </Box>
 
+                {/* FIX: render HTML correctly in preview */}
                 <Box sx={{ bgcolor: "#FFFFFF", px: 2.5, py: 2.5, maxHeight: 260, overflowY: "auto" }}>
-                  <Typography fontSize="13px" color="#1E293B"
-                    sx={{ lineHeight: 1.85, whiteSpace: "pre-wrap", fontFamily: "Georgia, serif" }}>
-                    {resolveBody(previewTemplate.body || "")
-                      .split(/(\{\{[^}]+\}\}|\{[^}]+\})/g)
-                      .map((part, i) =>
-                        /^(\{\{[^}]+\}\}|\{[^}]+\})$/.test(part) ? (
-                          <Box key={i} component="span" sx={{ color: "#7C3AED", fontWeight: 600, bgcolor: "#F5F3FF", borderRadius: "3px", px: 0.5 }}>
-                            {part}
-                          </Box>
-                        ) : part
-                      )
-                    }
-                  </Typography>
+                  <Box
+                    sx={{
+                      fontSize: "13px", color: "#1E293B", lineHeight: 1.85,
+                      fontFamily: "Georgia, serif",
+                      "& p": { margin: "0 0 10px 0" },
+                      "& a": { color: "#3B82F6" },
+                      "& strong, & b": { fontWeight: 700 },
+                    }}
+                    dangerouslySetInnerHTML={{ __html: resolveBody(previewTemplate.body || "") }}
+                  />
                 </Box>
 
                 <Box sx={{ bgcolor: "#F8FAFC", borderTop: "1px solid #E2E8F0", px: 2.5, py: 1.25, textAlign: "center" }}>
@@ -467,8 +503,13 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                 sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
                 Back
               </Button>
+              {/* FIX: strip HTML for textarea; toHtml() re-applies on send */}
               <Button variant="contained"
-                onClick={() => { setSubject(previewTemplate.subject || ""); setBody(resolveBody(previewTemplate.body || "")); setStep("compose"); }}
+                onClick={() => {
+                  setSubject(previewTemplate.subject || "");
+                  setBody(stripHtml(resolveBody(previewTemplate.body || "")));
+                  setStep("compose");
+                }}
                 sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" } }}>
                 Use This Template
               </Button>
@@ -576,7 +617,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
 export default function LeadDetailView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation(); // ← used to detect navigation back from edit
+  const location = useLocation();
   const dispatch = useDispatch();
 
   const leads        = useSelector(selectLeads) as LeadRecord[] | null;
@@ -661,7 +702,6 @@ export default function LeadDetailView() {
     } finally { setNotesLoading(false); }
   }, []);
 
-  // ── Documents are embedded in the lead object returned by the list API.
   const fetchDocuments = React.useCallback((leadDocs: DocumentEntry[]) => {
     setDocsLoading(true); setDocsError(null);
     try {
@@ -693,11 +733,6 @@ export default function LeadDetailView() {
     } finally { setSmsHistoryLoading(false); }
   }, []);
 
-  // ── Fetch all data when lead is available.
-  // `location.key` changes every time React Router navigates to this page,
-  // so coming back from the edit page triggers a fresh document fetch automatically.
-  // Refresh leads from API every time we navigate to this page (location.key changes).
-  // This ensures documents deleted/added in the edit form are reflected immediately.
   React.useEffect(() => {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -713,7 +748,6 @@ export default function LeadDetailView() {
     }
   }, [lead?.id, lead?.documents, location.key, fetchNotes, fetchDocuments, fetchCallHistory, fetchSMSHistory, id]);
 
-  // ── Note operations ──
   const handleAddNote = async () => {
     if (!newNoteTitle.trim() && !newNoteContent.trim()) return;
     if (!lead) return;
@@ -773,7 +807,6 @@ export default function LeadDetailView() {
     }
   };
 
-  // ── Next Action ──
   const handleAddNextAction = async () => {
     if (!actionType.trim() || !actionDescription.trim() || !lead) return;
     try {
@@ -805,7 +838,6 @@ export default function LeadDetailView() {
     setActionType(""); setActionStatus("pending"); setActionDescription(""); setActionError(null);
   };
 
-  // ── Convert lead ──
   const handleOpenPopup  = () => { setConvertError(null); setOpenConvertPopup(true); };
   const handleClosePopup = () => { setOpenConvertPopup(false); setConvertError(null); };
 
@@ -833,7 +865,6 @@ export default function LeadDetailView() {
     navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, { state: { lead } });
   };
 
-  // ── Loading / Error / Not Found ──
   if (loading) return (
     <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
       <Stack alignItems="center" spacing={2}><CircularProgress /><Typography color="text.secondary">Loading lead details...</Typography></Stack>
@@ -860,7 +891,6 @@ export default function LeadDetailView() {
     </Box>
   );
 
-  // ── Extract display data ──
   const leadName          = lead.full_name || lead.name || "Unknown";
   const leadInitials      = lead.initials || leadName.charAt(0).toUpperCase();
   const leadPhone         = lead.phone || lead.contact_number || lead.contact_no || "N/A";

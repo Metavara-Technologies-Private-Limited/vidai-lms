@@ -451,6 +451,7 @@ export const filterTicketsSelectFieldSx = {
 // ================================
 export const ticketDetailsTabsSx = {
   minHeight: 40,
+  height: 40,
   bgcolor: "#e2e3e5",
   borderRadius: "10px",
   p: "4px",
@@ -460,26 +461,23 @@ export const ticketDetailsTabsSx = {
     display: "none",
   },
 
-  /* Make tabs stretch full width */
   "& .MuiTabs-flexContainer": {
     width: "100%",
     display: "flex",
-  },
-
-  /* FIRST TAB → stick left */
-  "& .MuiTab-root:first-of-type": {
-    mr: "auto",
+    justifyContent: "center",
+    gap: "20px",
   },
 
   "& .MuiTab-root": {
     textTransform: "none",
-    minHeight: 32,
-    fontSize: "14px",
+    minHeight: 30,
+    height: 30,
+    fontSize: "13px",
     fontWeight: 500,
     color: "#232323",
     borderRadius: "8px",
     transition: "all 0.2s ease",
-    px: 3,
+    px: 4,
   },
 
   "& .MuiTab-root.Mui-selected": {

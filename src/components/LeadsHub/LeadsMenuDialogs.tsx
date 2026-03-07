@@ -18,9 +18,8 @@ import CallDialog from "../../components/LeadsHub/CallDialog";
 
 import { deleteLead, selectIsLeadDeleting, fetchLeads } from "../../store/leadSlice";
 import { LeadAPI } from "../../services/leads.api";
-import type { AppDispatch } from "../../store"; // ✅ Import AppDispatch from your store
+import type { AppDispatch } from "../../store";
 
-// ─── Lead Type ───────────────────────────────────────────────────────────────
 export interface Lead {
   id: string;
   full_name?: string;
@@ -28,13 +27,8 @@ export interface Lead {
   is_active?: boolean;
 }
 
-// ─── Axios-style error helper ─────────────────────────────────────────────────
 interface AxiosLikeError extends Error {
-  response?: {
-    data?: {
-      detail?: string;
-    };
-  };
+  response?: { data?: { detail?: string } };
 }
 
 function getErrorMessage(err: unknown, fallback: string): string {
@@ -45,7 +39,6 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
 interface MenuProps<T extends Lead> {
   lead: T;
   setLeads: React.Dispatch<React.SetStateAction<T[]>>;
@@ -54,17 +47,15 @@ interface MenuProps<T extends Lead> {
 
 let openCallSetter: ((name: string) => void) | null = null;
 
-/* ---------------- CALL BUTTON ---------------- */
 export const CallButton = ({ lead }: { lead: Lead }) => (
   <IconButton onClick={() => openCallSetter?.(lead.full_name || lead.name || "")}>
     <CallIcon fontSize="small" />
   </IconButton>
 );
 
-/* ---------------- MENU BUTTON ---------------- */
 export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>) {
   const navigate = useNavigate();
-  const dispatch = useDispatch<AppDispatch>(); // ✅ Typed dispatch
+  const dispatch = useDispatch<AppDispatch>();
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [openArchive, setOpenArchive] = React.useState(false);
@@ -82,72 +73,48 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
 
   const leadName = lead.full_name || lead.name || "";
 
-  // ✅ Handle Delete
   const handleDeleteConfirm = async () => {
     try {
       setDeleteError(null);
-      console.log("🗑️ Permanently deleting lead:", lead.id);
-
       const result = await dispatch(deleteLead(lead.id));
-
       if (deleteLead.fulfilled.match(result)) {
-        console.log("✅ Lead permanently deleted successfully");
         setLeads((prev) => prev.filter((l) => l.id !== lead.id));
         setOpenDelete(false);
         await dispatch(fetchLeads());
-
         window.dispatchEvent(new CustomEvent("lead-deleted", { detail: { id: lead.id } }));
       } else {
         const errMsg = typeof result.payload === "string" ? result.payload : "Failed to delete lead";
-        console.error("❌ Delete failed:", errMsg);
         setDeleteError(errMsg);
       }
     } catch (err: unknown) {
-      console.error("❌ Delete error:", err);
       setDeleteError(getErrorMessage(err, "Failed to delete lead"));
     }
   };
 
-  // ✅ Handle Archive
   const handleArchiveConfirm = async () => {
     try {
       setIsArchiving(true);
       setArchiveError(null);
-      console.log(`📦 Archiving lead ${lead.id} (calling inactivate API)...`);
-
       await LeadAPI.inactivate(lead.id);
-      console.log("✅ Lead archived successfully");
-
       await dispatch(fetchLeads());
-      setLeads((prev) =>
-        prev.map((l) => (l.id === lead.id ? { ...l, is_active: false } : l))
-      );
+      setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, is_active: false } : l)));
       setOpenArchive(false);
     } catch (err: unknown) {
-      console.error("❌ Archive error:", err);
       setArchiveError(getErrorMessage(err, "Failed to archive lead"));
     } finally {
       setIsArchiving(false);
     }
   };
 
-  // ✅ Handle Unarchive
   const handleUnarchiveConfirm = async () => {
     try {
       setIsArchiving(true);
       setArchiveError(null);
-      console.log(`📂 Unarchiving lead ${lead.id} (calling activate API)...`);
-
       await LeadAPI.activate(lead.id);
-      console.log("✅ Lead unarchived successfully");
-
       await dispatch(fetchLeads());
-      setLeads((prev) =>
-        prev.map((l) => (l.id === lead.id ? { ...l, is_active: true } : l))
-      );
+      setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, is_active: true } : l)));
       setAnchorEl(null);
     } catch (err: unknown) {
-      console.error("❌ Unarchive error:", err);
       setArchiveError(getErrorMessage(err, "Failed to unarchive lead"));
     } finally {
       setIsArchiving(false);
@@ -160,103 +127,63 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
         <MoreVertIcon fontSize="small" />
       </IconButton>
 
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={() => setAnchorEl(null)}
-      >
-        {/* 🔵 ACTIVE LEADS MENU */}
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
         {tab === "active" && (
           <>
             <MenuItem
-              onClick={() => {
-                navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, { state: { lead } });
-                setAnchorEl(null);
-              }}
+              onClick={() => { navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, { state: { lead } }); setAnchorEl(null); }}
               disabled={isDeleting || isArchiving}
             >
-              <ListItemIcon>
-                <EditOutlinedIcon fontSize="small" />
-              </ListItemIcon>
+              <ListItemIcon><EditOutlinedIcon fontSize="small" /></ListItemIcon>
               Edit
             </MenuItem>
 
             <MenuItem
-              onClick={() => {
-                setOpenReassign(true);
-                setAnchorEl(null);
-              }}
+              onClick={() => { setOpenReassign(true); setAnchorEl(null); }}
               disabled={isDeleting || isArchiving}
             >
-              <ListItemIcon>
-                <PersonAddAltOutlinedIcon fontSize="small" />
-              </ListItemIcon>
+              <ListItemIcon><PersonAddAltOutlinedIcon fontSize="small" /></ListItemIcon>
               Reassign
             </MenuItem>
 
             <MenuItem
-              onClick={() => {
-                setOpenArchive(true);
-                setArchiveError(null);
-                setAnchorEl(null);
-              }}
+              onClick={() => { setOpenArchive(true); setArchiveError(null); setAnchorEl(null); }}
               disabled={isDeleting || isArchiving}
             >
-              <ListItemIcon>
-                <ArchiveOutlinedIcon fontSize="small" />
-              </ListItemIcon>
+              <ListItemIcon><ArchiveOutlinedIcon fontSize="small" /></ListItemIcon>
               {isArchiving ? "Archiving..." : "Archive"}
             </MenuItem>
 
             <MenuItem
               sx={{ color: "error.main" }}
-              onClick={() => {
-                setOpenDelete(true);
-                setDeleteError(null);
-                setAnchorEl(null);
-              }}
+              onClick={() => { setOpenDelete(true); setDeleteError(null); setAnchorEl(null); }}
               disabled={isDeleting || isArchiving}
             >
-              <ListItemIcon>
-                <DeleteOutlineOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-              </ListItemIcon>
+              <ListItemIcon><DeleteOutlineOutlinedIcon fontSize="small" sx={{ color: "error.main" }} /></ListItemIcon>
               {isDeleting ? "Deleting..." : "Delete"}
             </MenuItem>
           </>
         )}
 
-        {/* 🟠 ARCHIVED LEADS MENU */}
         {tab === "archived" && (
           <>
-            <MenuItem
-              onClick={handleUnarchiveConfirm}
-              disabled={isDeleting || isArchiving}
-            >
-              <ListItemIcon>
-                <UnarchiveOutlinedIcon fontSize="small" />
-              </ListItemIcon>
+            <MenuItem onClick={handleUnarchiveConfirm} disabled={isDeleting || isArchiving}>
+              <ListItemIcon><UnarchiveOutlinedIcon fontSize="small" /></ListItemIcon>
               {isArchiving ? "Restoring..." : "Unarchive"}
             </MenuItem>
 
             <MenuItem
               sx={{ color: "error.main" }}
-              onClick={() => {
-                setOpenDelete(true);
-                setDeleteError(null);
-                setAnchorEl(null);
-              }}
+              onClick={() => { setOpenDelete(true); setDeleteError(null); setAnchorEl(null); }}
               disabled={isDeleting || isArchiving}
             >
-              <ListItemIcon>
-                <DeleteOutlineOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-              </ListItemIcon>
+              <ListItemIcon><DeleteOutlineOutlinedIcon fontSize="small" sx={{ color: "error.main" }} /></ListItemIcon>
               {isDeleting ? "Deleting..." : "Delete"}
             </MenuItem>
           </>
         )}
       </Menu>
 
-      {/* Archive Dialog */}
       <ArchiveLeadDialog
         open={openArchive}
         leadName={leadName}
@@ -267,21 +194,16 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
         error={archiveError}
       />
 
-      {/* Delete Dialog */}
+      {/* ── leadId prop removed — no longer in DeleteLeadDialog Props ── */}
       <DeleteLeadDialog
         open={openDelete}
         leadName={leadName}
-        leadId={lead.id}
         isDeleting={isDeleting}
         error={deleteError}
-        onClose={() => {
-          setOpenDelete(false);
-          setDeleteError(null);
-        }}
+        onClose={() => { setOpenDelete(false); setDeleteError(null); }}
         onConfirm={handleDeleteConfirm}
       />
 
-      {/* Reassign Dialog */}
       <ReassignAssigneeDialog
         open={openReassign}
         lead={lead}
@@ -291,7 +213,6 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
   );
 }
 
-/* ---------------- CALL DIALOG ---------------- */
 export const Dialogs = () => {
   const [openCall, setOpenCall] = React.useState(false);
   const [name, setName] = React.useState("");
@@ -303,11 +224,5 @@ export const Dialogs = () => {
     };
   }, []);
 
-  return (
-    <CallDialog
-      open={openCall}
-      name={name}
-      onClose={() => setOpenCall(false)}
-    />
-  );
+  return <CallDialog open={openCall} name={name} onClose={() => setOpenCall(false)} />;
 };

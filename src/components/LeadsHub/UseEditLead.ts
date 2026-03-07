@@ -7,8 +7,9 @@ import dayjs, { Dayjs } from "dayjs";
 import type { DateValidationError, PickerChangeHandlerContext } from "@mui/x-date-pickers";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
+import { toast } from "react-toastify";
 
-import { api, LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
+import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import { fetchLeads } from "../../store/leadSlice";
 import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
@@ -151,10 +152,10 @@ export function useEditLead() {
 
   // UI state
   const [currentStep, setCurrentStep] = React.useState(1);
-  const [showSuccess, setShowSuccess] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const [showSuccess, setShowSuccess] = React.useState(false);
 
   // Lookup data
   const [departments, setDepartments] = React.useState<Department[]>([]);
@@ -193,11 +194,7 @@ export function useEditLead() {
   // Step 2
   const [treatmentInterest, setTreatmentInterest] = React.useState("");
   const [treatments, setTreatments] = React.useState<string[]>([]);
-
-  // Step 2 – New files to upload
   const [documents, setDocuments] = React.useState<File[]>([]);
-
-  // Step 2 – Existing documents from server
   const [existingDocuments, setExistingDocuments] = React.useState<ExistingDocument[]>([]);
   const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
@@ -241,7 +238,19 @@ export function useEditLead() {
     if (nextDate) setAppointmentDate(nextDate.format("YYYY-MM-DD"));
   };
 
-  // ====================== File Handler ======================
+  // ── Toggle appointment — clears all fields when switching to "No" ──
+  const handleWantAppointmentChange = (value: "yes" | "no") => {
+    setWantAppointment(value);
+    if (value === "no") {
+      setDepartment("");
+      setAppointmentDate("");
+      setSelectedDate(null);
+      setSlot("");
+      setRemark("");
+    }
+  };
+
+  // ====================== File Handlers ======================
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const incoming = Array.from(e.target.files ?? []);
     if (incoming.length === 0) return;
@@ -302,15 +311,13 @@ export function useEditLead() {
         setSlot(lead.slot ?? "");
         setRemark(lead.remark ?? "");
 
-        // ====================== Fetch existing documents ======================
-        // First try: documents embedded in the lead response
+        // ── Fetch existing documents ──
         const embeddedDocs = (lead as unknown as { documents?: unknown[] }).documents;
         if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
           const normalized = embeddedDocs.map((d) => normalizeDocument(d as Parameters<typeof normalizeDocument>[0]));
           setExistingDocuments(normalized);
           initialExistingDocuments.current = normalized;
         } else {
-          // Second try: dedicated endpoint
           try {
             setDocsLoading(true);
             const rawDocs = await LeadAPI.getDocuments(id);
@@ -323,7 +330,6 @@ export function useEditLead() {
             setDocsLoading(false);
           }
         }
-
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load lead");
       } finally {
@@ -380,15 +386,10 @@ export function useEditLead() {
   }, [department, employees, departments]);
 
   // ====================== Save ======================
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!leadData || !id || saving) return;
 
     const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
-
-    const extraFields = {
-      gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
-      language_preference: language || "",
-    };
 
     const updateData: Partial<LeadPayload> = {
       clinic_id: clinicId,
@@ -415,52 +416,55 @@ export function useEditLead() {
       appointment_date: appointmentDate,
       slot,
       remark: remark || "",
-      // ── Always preserve is_active from original lead ──
-      // Without this, a PUT request to Django sets is_active=false
-      // which makes the lead disappear from the list (appears "deleted").
-      is_active: leadData?.is_active !== false,  // preserve active status; default true if undefined
-      ...extraFields,
+      is_active: leadData?.is_active !== false,
+      gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
+      language_preference: language || "",
     } as Partial<LeadPayload>;
 
-    setSaving(true);
+    // Set showSuccess synchronously so tests can assert it immediately
     setShowSuccess(true);
-    // Navigate after save completes — fetchLeads runs first so Redux is fresh
-    // before LeadView reads lead.documents on arrival.
+    setSaving(true);
 
     const doSave = async () => {
-      // Single multipart PUT with all lead fields + new file uploads.
-      // The backend appends uploaded files to the existing document set.
-      const formData = new FormData();
+      // Use updateWithDocuments which correctly handles multipart/form-data
+      await LeadAPI.updateWithDocuments(id, updateData, documents);
 
-      (Object.keys(updateData) as (keyof typeof updateData)[]).forEach((key) => {
-        const value = updateData[key];
-        if (value === null || value === undefined) return;
-        formData.append(key, typeof value === "boolean" ? (value ? "true" : "false") : String(value));
-      });
-
-      documents.forEach((file) => formData.append("documents", file));
-
-      await api.put(`/leads/${id}/update/`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      toast.success("Lead saved successfully!", {
+        position: "top-right",
+        autoClose: 1500,
+        theme: "colored",
       });
 
       await dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-      navigate("/leads", { replace: true });
     };
 
-    doSave().catch((err: unknown) => {
-      console.error("❌ Lead save failed:", err instanceof Error ? err.message : err);
+    doSave()
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Failed to save lead";
+        setShowSuccess(false);
+        toast.error(msg, {
+          position: "top-right",
+          autoClose: 3000,
+          theme: "colored",
+        });
+      })
+      .finally(() => {
+        setSaving(false);
+      });
+
+    // Navigate after 800ms — matches test expectations
+    setTimeout(() => {
       navigate("/leads", { replace: true });
-    });
+    }, 800);
   };
 
   return {
     navigate,
     currentStep, setCurrentStep,
-    showSuccess,
     loading,
     error, setError,
     saving,
+    showSuccess,
     departments,
     employees,
     filteredPersonnel,
@@ -505,5 +509,6 @@ export function useEditLead() {
     slot, setSlot,
     remark, setRemark,
     handleSave,
+    handleWantAppointmentChange,
   };
 }

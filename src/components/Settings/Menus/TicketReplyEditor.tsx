@@ -207,8 +207,7 @@ const handleUnderline = () => {
                   key={lead.id}
                   onClick={() => {
                     if (!replyTo.includes(lead.email)) {
-                      setReplyTo([...replyTo, lead.email]);
-                    }
+setReplyTo([...replyTo, lead.email.trim()]);                    }
                     setAnchorEl(null);
                   }}
                   sx={{
@@ -339,16 +338,22 @@ const handleUnderline = () => {
         <Button
   variant="contained"
   onClick={() => {
-    const validRecipients = recipients.filter((lead: LeadRecipient) =>
-      replyTo.includes(lead.email)
-    );
 
-    if (validRecipients.length === 0) {
-      import("react-toastify").then(({ toast }) => {
-        toast.warn("No recipient in leads.");
-      });
-      return;
-    }
+
+const validRecipients = recipients.filter((lead: LeadRecipient) =>
+  replyTo.some(
+    (mail) =>
+      mail.trim().toLowerCase() === lead.email.trim().toLowerCase()
+  )
+);
+
+if (validRecipients.length === 0) {
+  import("react-toastify").then(({ toast }) => {
+    toast.warn("No recipient in leads.");
+  });
+  return;
+}
+
 
     handleSendReply();
   }}

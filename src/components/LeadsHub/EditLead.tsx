@@ -14,7 +14,6 @@ import {
   RadioGroup,
   FormControlLabel,
   Chip,
-  Fade,
   Alert,
   CircularProgress,
   IconButton,
@@ -22,7 +21,6 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CloseIcon from "@mui/icons-material/Close";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
@@ -47,7 +45,6 @@ export default function EditLead() {
   const {
     navigate,
     currentStep, setCurrentStep,
-    showSuccess,
     loading,
     error, setError,
     saving,
@@ -88,13 +85,14 @@ export default function EditLead() {
     existingDocuments,
     docsLoading,
     handleRemoveExistingDocument,
-    wantAppointment, setWantAppointment,
+    wantAppointment,
     department, setDepartment,
     selectedDate,
     handleDateChange,
     slot, setSlot,
     remark, setRemark,
     handleSave,
+    handleWantAppointmentChange,
   } = useEditLead();
 
   // ====================== Loading / Error states ======================
@@ -264,6 +262,7 @@ export default function EditLead() {
                 </TextField>
               </Box>
 
+              {/* ---- Partner Information (collapsible Yes/No toggle) ---- */}
               <Typography sx={sectionLabelStyle}>PARTNER INFORMATION</Typography>
               <Box sx={{ mb: 1.5 }}>
                 <Typography sx={{ ...labelStyle, mb: 0.5 }}>Is This Inquiry For A Couple?</Typography>
@@ -329,7 +328,9 @@ export default function EditLead() {
                     select fullWidth size="small" value={assignee}
                     onChange={(e) => setAssignee(e.target.value)}
                     sx={inputStyle} disabled={loadingEmployees}
-                    InputProps={{ endAdornment: loadingEmployees ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null }}
+                    InputProps={{
+                      endAdornment: loadingEmployees ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null,
+                    }}
                   >
                     <MenuItem value=""><em>-- Select Employee --</em></MenuItem>
                     {employees.map((emp) => (
@@ -421,7 +422,6 @@ export default function EditLead() {
               {/* ---- Documents & Reports ---- */}
               <Typography sx={sectionLabelStyle}>DOCUMENTS & REPORTS</Typography>
 
-              {/* ── Previously uploaded documents from server ── */}
               {docsLoading && (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                   <CircularProgress size={14} />
@@ -452,41 +452,26 @@ export default function EditLead() {
                           ) : (
                             <InsertDriveFileIcon sx={{ fontSize: 28, color: "#6366F1", flexShrink: 0 }} />
                           )}
-
                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography
-                              fontSize="0.82rem" fontWeight={600} color="#1E293B"
-                              noWrap title={doc.name}
-                            >
+                            <Typography fontSize="0.82rem" fontWeight={600} color="#1E293B" noWrap title={doc.name}>
                               {doc.name}
                             </Typography>
                             <Typography fontSize="0.72rem" color="#94A3B8">
                               {ext} · Saved
                             </Typography>
                           </Box>
-
-                          {/* View button */}
                           {doc.url && (
                             <IconButton
-                              size="small"
-                              component="a"
-                              href={doc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              size="small" component="a" href={doc.url}
+                              target="_blank" rel="noopener noreferrer"
                               sx={{ color: "#6366F1", flexShrink: 0, "&:hover": { bgcolor: "#EEF2FF" } }}
                             >
                               <OpenInNewIcon fontSize="small" />
                             </IconButton>
                           )}
-
-                          {/* Remove button */}
                           <IconButton
-                            size="small"
-                            onClick={() => handleRemoveExistingDocument(idx)}
-                            sx={{
-                              color: "#94A3B8", flexShrink: 0,
-                              "&:hover": { color: "#EF4444", bgcolor: "#FEF2F2" },
-                            }}
+                            size="small" onClick={() => handleRemoveExistingDocument(idx)}
+                            sx={{ color: "#94A3B8", flexShrink: 0, "&:hover": { color: "#EF4444", bgcolor: "#FEF2F2" } }}
                           >
                             <CloseIcon fontSize="small" />
                           </IconButton>
@@ -497,44 +482,20 @@ export default function EditLead() {
                 </Box>
               )}
 
-              {/* ── Upload box for new files ── */}
               <Box sx={{
-                border: "2px dashed #E2E8F0",
-                borderRadius: "10px",
-                p: 3,
-                bgcolor: "#F8FAFC",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 1.5,
-                width: 370,
+                border: "2px dashed #E2E8F0", borderRadius: "10px", p: 3, bgcolor: "#F8FAFC",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, width: 370,
               }}>
                 <Box sx={{ color: "#94A3B8", fontSize: 36, lineHeight: 1 }}>
                   <InsertDriveFileIcon sx={{ fontSize: 36 }} />
                 </Box>
-
                 <Button
-                  variant="contained"
-                  component="label"
-                  sx={{
-                    bgcolor: "#64748B",
-                    textTransform: "none",
-                    borderRadius: "8px",
-                    fontWeight: 600,
-                    px: 3,
-                    "&:hover": { bgcolor: "#475569" },
-                  }}
+                  variant="contained" component="label"
+                  sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, px: 3, "&:hover": { bgcolor: "#475569" } }}
                 >
                   Choose File
-                  <input
-                    type="file"
-                    hidden
-                    multiple
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
-                    onChange={handleFileChange}
-                  />
+                  <input type="file" hidden multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif" onChange={handleFileChange} />
                 </Button>
-
                 <Typography variant="caption" color="text.secondary">
                   {documents.length === 0
                     ? "No File Chosen"
@@ -542,7 +503,6 @@ export default function EditLead() {
                 </Typography>
               </Box>
 
-              {/* ── Newly selected files (not yet uploaded) ── */}
               {documents.length > 0 && (
                 <Stack spacing={1} sx={{ mt: 2, width: 470 }}>
                   <Typography sx={{ ...sectionLabelStyle, mb: 0.5 }}>NEW FILES TO UPLOAD</Typography>
@@ -554,10 +514,8 @@ export default function EditLead() {
                         key={`${file.name}-${idx}`}
                         sx={{
                           display: "flex", alignItems: "center", gap: 1.5,
-                          px: 2, py: 1.25,
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "10px",
-                          bgcolor: "#FFFFFF",
+                          px: 2, py: 1.25, border: "1px solid #E2E8F0",
+                          borderRadius: "10px", bgcolor: "#FFFFFF",
                         }}
                       >
                         {isPdf ? (
@@ -565,26 +523,17 @@ export default function EditLead() {
                         ) : (
                           <InsertDriveFileIcon sx={{ fontSize: 28, color: "#6366F1", flexShrink: 0 }} />
                         )}
-
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography
-                            fontSize="0.82rem" fontWeight={600} color="#1E293B"
-                            noWrap title={file.name}
-                          >
+                          <Typography fontSize="0.82rem" fontWeight={600} color="#1E293B" noWrap title={file.name}>
                             {file.name}
                           </Typography>
                           <Typography fontSize="0.72rem" color="#94A3B8">
                             {typeLabel} · {formatBytes(file.size)}
                           </Typography>
                         </Box>
-
                         <IconButton
-                          size="small"
-                          onClick={() => handleRemoveDocument(idx)}
-                          sx={{
-                            color: "#94A3B8", flexShrink: 0,
-                            "&:hover": { color: "#EF4444", bgcolor: "#FEF2F2" },
-                          }}
+                          size="small" onClick={() => handleRemoveDocument(idx)}
+                          sx={{ color: "#94A3B8", flexShrink: 0, "&:hover": { color: "#EF4444", bgcolor: "#FEF2F2" } }}
                         >
                           <CloseIcon fontSize="small" />
                         </IconButton>
@@ -599,81 +548,103 @@ export default function EditLead() {
           {/* ===== STEP 3 ===== */}
           {currentStep === 3 && (
             <Box>
+              {/* ---- Book Appointment — same collapsible Yes/No pattern as Partner Information ---- */}
               <Typography sx={sectionLabelStyle}>APPOINTMENT DETAILS</Typography>
-              <Box sx={{ mb: 2 }}>
+
+              <Box sx={{ mb: 1.5 }}>
                 <Typography sx={{ ...labelStyle, mb: 0.5 }}>Want to Book an Appointment?</Typography>
-                <RadioGroup row value={wantAppointment} onChange={(e) => setWantAppointment(e.target.value as "yes" | "no")}>
+                <RadioGroup
+                  row
+                  value={wantAppointment}
+                  onChange={(e) => handleWantAppointmentChange(e.target.value as "yes" | "no")}
+                >
                   <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
                   <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
                 </RadioGroup>
               </Box>
 
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
+              {/* Fields only mount when Yes — mirrors Partner Information pattern exactly */}
+              {wantAppointment === "yes" && (
                 <Box>
-                  <Typography sx={labelStyle}>Department *</Typography>
-                  <TextField
-                    select fullWidth size="small" value={department}
-                    onChange={(e) => { setDepartment(e.target.value); }}
-                    sx={inputStyle} disabled={loadingDepartments}
-                    InputProps={{ endAdornment: loadingDepartments ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null }}
-                  >
-                    <MenuItem value=""><em>-- Select Department --</em></MenuItem>
-                    {departments.map((dept) => (
-                      <MenuItem key={dept.id} value={dept.id.toString()}>{dept.name}</MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField
-                    select fullWidth size="small" value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                    sx={inputStyle} disabled={loadingEmployees || !department}
-                  >
-                    {!department ? (
-                      <MenuItem value="" disabled>Select department first</MenuItem>
-                    ) : filteredPersonnel.length === 0 ? (
-                      <MenuItem value="" disabled>No employees in this department</MenuItem>
-                    ) : (
-                      filteredPersonnel.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id.toString()}>
-                          {emp.emp_name} ({emp.emp_type})
-                        </MenuItem>
-                      ))
-                    )}
-                  </TextField>
-                </Box>
-              </Box>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
+                    <Box>
+                      <Typography sx={labelStyle}>Department *</Typography>
+                      <TextField
+                        select fullWidth size="small" value={department}
+                        onChange={(e) => setDepartment(e.target.value)}
+                        sx={inputStyle}
+                        disabled={loadingDepartments}
+                        InputProps={{
+                          endAdornment: loadingDepartments ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null,
+                        }}
+                      >
+                        <MenuItem value=""><em>-- Select Department --</em></MenuItem>
+                        {departments.map((dept) => (
+                          <MenuItem key={dept.id} value={dept.id.toString()}>{dept.name}</MenuItem>
+                        ))}
+                      </TextField>
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Assigned To</Typography>
+                      <TextField
+                        select fullWidth size="small" value={assignee}
+                        onChange={(e) => setAssignee(e.target.value)}
+                        sx={inputStyle}
+                        disabled={loadingEmployees || !department}
+                      >
+                        {!department ? (
+                          <MenuItem value="" disabled>Select department first</MenuItem>
+                        ) : filteredPersonnel.length === 0 ? (
+                          <MenuItem value="" disabled>No employees in this department</MenuItem>
+                        ) : (
+                          filteredPersonnel.map((emp) => (
+                            <MenuItem key={emp.id} value={emp.id.toString()}>
+                              {emp.emp_name} ({emp.emp_type})
+                            </MenuItem>
+                          ))
+                        )}
+                      </TextField>
+                    </Box>
+                  </Box>
 
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
-                <Box>
-                  <Typography sx={labelStyle}>Date *</Typography>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker
-                      value={selectedDate}
-                      onChange={(val) => handleDateChange(val as Parameters<typeof handleDateChange>[0], {} as Parameters<typeof handleDateChange>[1])}
-                      slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
+                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
+                    <Box>
+                      <Typography sx={labelStyle}>Date *</Typography>
+                      <LocalizationProvider dateAdapter={AdapterDayjs}>
+                        <DatePicker
+                          value={selectedDate}
+                          onChange={(val) => handleDateChange(val as Parameters<typeof handleDateChange>[0], {} as Parameters<typeof handleDateChange>[1])}
+                          slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
+                        />
+                      </LocalizationProvider>
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Select Slot *</Typography>
+                      <TextField
+                        select fullWidth size="small" value={slot}
+                        onChange={(e) => setSlot(e.target.value)}
+                        sx={inputStyle}
+                      >
+                        <MenuItem value=""><em>Select Time Slot</em></MenuItem>
+                        {TIME_SLOTS.map((ts) => (
+                          <MenuItem key={ts} value={ts}>{ts}</MenuItem>
+                        ))}
+                      </TextField>
+                    </Box>
+                  </Box>
+
+                  <Box>
+                    <Typography sx={labelStyle}>Remark</Typography>
+                    <TextField
+                      fullWidth size="small" multiline rows={2}
+                      placeholder="Type Here..."
+                      value={remark}
+                      onChange={(e) => setRemark(e.target.value)}
+                      sx={inputStyle}
                     />
-                  </LocalizationProvider>
+                  </Box>
                 </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Select Slot *</Typography>
-                  <TextField select fullWidth size="small" value={slot} onChange={(e) => setSlot(e.target.value)} sx={inputStyle}>
-                    <MenuItem value=""><em>Select Time Slot</em></MenuItem>
-                    {TIME_SLOTS.map((ts) => (
-                      <MenuItem key={ts} value={ts}>{ts}</MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-              </Box>
-
-              <Box>
-                <Typography sx={labelStyle}>Remark</Typography>
-                <TextField
-                  fullWidth size="small" multiline rows={2} placeholder="Type Here..."
-                  value={remark} onChange={(e) => setRemark(e.target.value)} sx={inputStyle}
-                />
-              </Box>
+              )}
             </Box>
           )}
         </Box>
@@ -704,29 +675,21 @@ export default function EditLead() {
                 Next
               </Button>
             ) : (
+              // ── Save button: no CircularProgress, plain text only ──
               <Button
                 onClick={handleSave} disabled={saving} variant="contained"
-                sx={{ bgcolor: "#1E293B", textTransform: "none", fontWeight: 600, px: 4, minWidth: 100, borderRadius: "8px", boxShadow: "none", "&:hover": { bgcolor: "#0F172A", boxShadow: "none" } }}
+                sx={{
+                  bgcolor: "#1E293B", textTransform: "none", fontWeight: 600,
+                  px: 4, minWidth: 100, borderRadius: "8px", boxShadow: "none",
+                  "&:hover": { bgcolor: "#0F172A", boxShadow: "none" },
+                }}
               >
-                {saving ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Save"}
+                Save
               </Button>
             )}
           </Box>
         </Box>
       </Paper>
-
-      {/* Success Toast */}
-      <Fade in={showSuccess}>
-        <Box sx={{
-          position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-          bgcolor: "#10B981", color: "white", px: 4, py: 2, borderRadius: "12px",
-          display: "flex", alignItems: "center", gap: 1.5, zIndex: 10000,
-          boxShadow: "0px 10px 20px rgba(16,185,129,0.3)",
-        }}>
-          <CheckCircleIcon sx={{ fontSize: 24 }} />
-          <Typography variant="body1" fontWeight={700}>Saved Successfully!</Typography>
-        </Box>
-      </Fade>
     </Box>
   );
 }

@@ -44,7 +44,14 @@ interface Props {
   assignTo: number | "";
   setAssignTo: (v: number | "") => void;
 
-  handleUpdate: () => void;
+handleUpdate: (payload: {
+  status: TicketStatus;
+  priority: TicketPriority;
+  assigned_to: number | "";
+  type: string;
+  actions: string[];
+}) => void;
+
   updating: boolean;
 
   ticketTypes: string[];
@@ -70,9 +77,47 @@ const TicketPropertiesSidebar = ({
 }: Props) => {
   if (!ticket) return null;
 
+const handleUpdateWithTimeline = () => {
+  const actions: string[] = [];
+
+  if (ticket.status !== status) {
+    actions.push(`Status changed from ${ticket.status} to ${status}`);
+  }
+
+if (ticket.type !== type) {
+  actions.push(`Type changed from ${ticket.type} to ${type}`);
+}
+  if (ticket.priority !== priority) {
+    actions.push(`Priority changed from ${ticket.priority} to ${priority}`);
+  }
+  
+if (ticket.assigned_to !== assignTo) {
+  const oldEmp = employees.find(e => e.id === ticket.assigned_to);
+  const newEmp = employees.find(e => e.id === assignTo);
+
+  actions.push(
+    `Assigned changed from ${oldEmp?.emp_name || "Unassigned"} to ${newEmp?.emp_name}`
+  );
+}
+
+  console.log("Timeline actions:", actions);
+
+handleUpdate({
+  status,
+  priority,
+  assigned_to: assignTo,
+  type, 
+  actions
+});
+
+};
+
   return (
     <Box flex={1} bgcolor="#FAFAFA" p={3} borderRadius={2} border="1px solid #E0E0E0">
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ ...ticketDetailsTabsSx, mb: 3 }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} 
+      sx={{ ...ticketDetailsTabsSx,
+       mb: 3,
+        }}>
         <Tab label="Ticket Details" />
         <Tab label="Timeline" />
       </Tabs>
@@ -192,7 +237,7 @@ const TicketPropertiesSidebar = ({
           <Button
             variant="contained"
             fullWidth
-            onClick={handleUpdate}
+            onClick={handleUpdateWithTimeline}
             disabled={updating}
             sx={{ bgcolor: "#505050", py: 1.5, borderRadius: 2, "&:hover": { bgcolor: "#232323" } }}
           >
@@ -205,7 +250,9 @@ const TicketPropertiesSidebar = ({
             const timeline = (ticket.timeline || []) as TicketTimeline[];
 
             const displayItems: (TicketTimeline & { is_injected?: boolean })[] = [...timeline];
-            const hasAssignment = displayItems.some(t => t.action?.toLowerCase().includes("assign"));
+const hasAssignment = displayItems.some(t =>
+  t.action?.toLowerCase().includes("assigned")
+);
 
             if (!hasAssignment && ticket.assigned_to) {
               const assignItem = {
@@ -260,8 +307,7 @@ const TicketPropertiesSidebar = ({
                   >
                     {isAssigned ? (
                       <Avatar
-                        src={`https://ui-avatars.com/api/?name=${ticket.requested_by}`}
-                        sx={{ width: 34, height: 34 }}
+src={`https://ui-avatars.com/api/?name=${ticket.assigned_to_name || "User"}`}                        sx={{ width: 34, height: 34 }}
                       />
                     ) : (
                       <Box
@@ -278,9 +324,7 @@ const TicketPropertiesSidebar = ({
                   {/* TEXT CONTENT */}
                   <Box ml={5}>
                     <Typography fontSize={14} fontWeight={500}>
-                      {isAssigned
-                        ? `Assigned to ${ticket.requested_by}`
-                        : item.action}
+                      {item.action}
                     </Typography>
 
                     <Typography fontSize={12} color="#8A8A8A">

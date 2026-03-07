@@ -1,10 +1,11 @@
 import { Box, CircularProgress } from "@mui/material";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
 import { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import type { Lead } from "../../services/leads.api";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
+import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import type { TimeRange } from "./TimeRangeSelector";
 import { isWithinTimeRange } from "./timeRange.utils";
 import { selectLeads, selectLeadsLoading } from "../../store/leadSlice";
@@ -120,7 +121,7 @@ const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
         >
           No. of Appointments
         </Box>
-        <ResponsiveContainer width="100%" height="100%">
+        <SafeResponsiveContainer minHeight={260}>
           <BarChart 
             data={data} 
             margin={{ top: 22, right: 30, left: 10, bottom: 16 }} 
@@ -160,7 +161,7 @@ const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
               ))}
             </Bar>
           </BarChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </Box>
     </Box>
   );

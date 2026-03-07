@@ -153,13 +153,9 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
         await ticketsApi.uploadDocument(res.id, selectedFile);
       }
       toast.success("Ticket created successfully!");
-
+handleClose();
       dispatch(fetchTickets());
       dispatch(fetchTicketDashboard());
-
-      setTimeout(() => {
-        handleClose();
-      }, 1500);
 
 } catch (err: unknown) {
   let finalError = "Submission failed. Ensure Lab and Department IDs are valid.";

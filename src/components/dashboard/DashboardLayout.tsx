@@ -42,11 +42,12 @@ const DashboardLayout = () => {
         },
         gap: 2,
         height: "100%",
+        minWidth: 0,
         alignItems: "stretch",
       }}
     >
       {/* LEFT SECTION */}
-      <Box sx={{ display: "flex", flexDirection: "column" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         {" "}
         {/* ADD */}
         <Typography variant="h6" pb={2}>
@@ -61,6 +62,8 @@ const DashboardLayout = () => {
             borderColor: "rgba(0, 0, 0, 0.05)",
             flex: 1,
             overflow: "auto",
+            minWidth: 0,
+            minHeight: 360,
           }}
         >
           {/* HEADER */}
