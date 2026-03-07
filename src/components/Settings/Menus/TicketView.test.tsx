@@ -82,7 +82,7 @@ const mockTicket: TicketDetail = {
   ticket_no: "TICKET-001",
   subject: "Test Ticket",
   description: "Test Description",
-
+type: "general", 
   priority: "low",
   status: "new",
 
