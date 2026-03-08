@@ -5,18 +5,20 @@ import Divider from "@mui/material/Divider";
 
 import StarIcon from "@mui/icons-material/Star";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
-//import MailIcon from "@mui/icons-material/Mail";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 
-const ReviewCard = () => {
+const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
+
   return (
     <Card
+      onClick={onOpen}
       sx={{
         p: 2.5,
         borderRadius: 3,
         border: "1px solid #E5E7EB",
         boxShadow: "none",
         width: "100%",
+        cursor: "pointer",
       }}
     >
       {/* Header */}

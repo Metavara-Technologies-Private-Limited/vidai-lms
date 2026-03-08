@@ -1,46 +1,58 @@
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
-import StarIcon from "@mui/icons-material/Star";
-import SendIcon from "@mui/icons-material/Send";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ForumIcon from "@mui/icons-material/Forum";
-import PercentIcon from "@mui/icons-material/Percent";
 
-const cardData = [
-  {
-    title: "Avg Rating",
-    value: "4.6",
-    icon: <StarIcon sx={{ color: "#F4B400" }} />,
-    bg: "#FFF6E5",
-  },
-  {
-    title: "Reviews Requests Sent",
-    value: "2,451",
-    icon: <SendIcon sx={{ color: "#5C9CE5" }} />,
-    bg: "#EEF4FF",
-  },
-  {
-    title: "Reviews Submitted",
-    value: "1,451",
-    icon: <CheckCircleIcon sx={{ color: "#4CAF50" }} />,
-    bg: "#EAF7EF",
-  },
-  {
-    title: "Total Reviews",
-    value: "2,015",
-    icon: <ForumIcon sx={{ color: "#F2994A" }} />,
-    bg: "#FFF3E8",
-  },
-  {
-    title: "Conversion Rate",
-    value: "31.2%",
-    icon: <PercentIcon sx={{ color: "#7E57C2" }} />,
-    bg: "#F3EEFF",
-  },
-];
+import Review_Avg_Rating from "../../assets/icons/Review_Avg_Rating.svg";
+import Reviews_Sent from "../../assets/icons/Reviews_Sent.svg";
+import Reviews_Submit from "../../assets/icons/Reviews_Submit.svg";
+import Reviews_Total from "../../assets/icons/Reviews_Total.svg";
+import Reviews_Conversion from "../../assets/icons/Reviews_Conversion.svg";
 
-const ReputationHeaderCards = () => {
+type Props = {
+  avgRating?: number;
+  reviewsSubmitted?: number;
+  reviewRequestsSent?: number;
+};
+
+const ReputationHeaderCards = ({
+  avgRating = 4.8,
+  reviewsSubmitted = 125,
+  reviewRequestsSent = 215,
+}: Props) => {
+
+  const cardData = [
+    {
+      title: "Avg Rating",
+      value: avgRating.toFixed(1),
+      icon: <img src={Review_Avg_Rating} alt="Avg Rating" />,
+      bg: "#FFF6E5",
+    },
+    {
+      title: "Reviews Requests Sent",
+      value: reviewRequestsSent,
+      icon: <img src={Reviews_Sent} alt="Reviews Requests Sent" />,
+      bg: "#EEF4FF",
+    },
+    {
+      title: "Reviews Submitted",
+      value: reviewsSubmitted,
+      icon: <img src={Reviews_Submit} alt="Reviews Submitted" />,
+      bg: "#EAF7EF",
+    },
+    {
+      title: "Total Reviews",
+      value: "2,015",
+      icon: <img src={Reviews_Total} alt="Total Reviews" />,
+      bg: "#FFF3E8",
+    },
+    {
+      title: "Conversion Rate",
+      value: "31.2%",
+      icon: <img src={Reviews_Conversion} alt="Conversion Rate" />,
+      bg: "#F3EEFF",
+    },
+  ];
+
   return (
     <Box
       sx={{
@@ -55,7 +67,7 @@ const ReputationHeaderCards = () => {
           key={card.title}
           sx={{
             p: 2.5,
-            borderRadius: 3,
+            borderRadius: 2,
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
