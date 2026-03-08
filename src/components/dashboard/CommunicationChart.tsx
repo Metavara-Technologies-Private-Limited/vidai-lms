@@ -17,7 +17,8 @@ interface PlatformRow {
   no: number;
 }
 
-// ── Fallback shape while loading or on error ────────────────────────────────
+// ── Fallback shape while loading or on error ──────────────────────────────
+// Order: Email → SMS → Call → WhatsApp → Chatbot
 const EMPTY_DATA: PlatformRow[] = [
   { platform: "Email",    high: 0, low: 0, no: 0 },
   { platform: "SMS",      high: 0, low: 0, no: 0 },
@@ -51,7 +52,7 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
   const [rawData, setRawData] = useState<PlatformRow[]>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
 
-  // ── Fetch real interaction counts from Django ──────────────────────────────
+  // ── Fetch real interaction counts from Django ─────────────────────────────
   useEffect(() => {
     const controller = new AbortController();
 
@@ -63,7 +64,16 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json: PlatformRow[] = await res.json();
-        setRawData(json);
+
+        // Ensure correct order: Email, SMS, Call, WhatsApp, Chatbot
+        const ordered: PlatformRow[] = EMPTY_DATA.map((empty) => {
+          const found = json.find(
+            (r) => r.platform.toLowerCase() === empty.platform.toLowerCase()
+          );
+          return found ?? empty;
+        });
+
+        setRawData(ordered);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           console.warn("InteractionCounts fetch failed:", err);
@@ -76,18 +86,16 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
 
     fetchCounts();
     return () => controller.abort();
-  }, [timeRange]); // re-fetch when time range changes
+  }, [timeRange]);
 
-  // ── timeRange scale factor (simple multiplier for display purposes) ────────
-  // The DB always returns total counts; we scale visually for the chart.
-  // You can replace this with a real date-filtered API query later.
+  // ── timeRange scale factor ─────────────────────────────────────────────────
   const scaleFactor = useMemo(() => {
     switch (timeRange) {
-      case "today":  return 0.1;
-      case "week":   return 0.25;
-      case "month":  return 1;
-      case "year":   return 1;
-      default:       return 1;
+      case "today": return 0.1;
+      case "week":  return 0.25;
+      case "month": return 1;
+      case "year":  return 1;
+      default:      return 1;
     }
   }, [timeRange]);
 
@@ -119,7 +127,7 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
           <Typography variant="caption">No</Typography>
         </Stack>
 
-        {/* Live data badge */}
+        {/* Live badge */}
         {!loading && (
           <Box
             sx={{
