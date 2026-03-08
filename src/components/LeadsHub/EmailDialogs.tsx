@@ -3,8 +3,9 @@ import * as React from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, FormControlLabel, IconButton,
-  Radio, RadioGroup, Snackbar, Stack, TextField, Tooltip, Typography,
+  Radio, RadioGroup, Stack, TextField, Tooltip, Typography,
 } from "@mui/material";
+import { toast } from "react-toastify";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -26,9 +27,15 @@ import { EmojiPicker, FormatMenu, MoreMenu } from "./LeadsTable.toolbarcomponent
 import { EmailTemplateAPI, LeadEmailAPI } from "../../services/leads.api";
 import type { EmailTemplate } from "../../services/leads.api";
 
+// ── Shared toast options — identical to useEditLead.ts ────────────────
+const toastOptions = {
+  position: "top-right" as const,
+  autoClose: 3000,
+  theme: "colored" as const,
+};
+
 // ── Convert plain-text body to HTML before sending ──
 const toHtml = (text: string): string => {
-  // If it already contains HTML tags, return as-is
   if (/<[a-z][\s\S]*>/i.test(text)) return text;
   return text
     .split(/\n\n+/)
@@ -129,11 +136,9 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
   const [subject, setSubject] = React.useState("");
   const [body, setBody] = React.useState("");
-  // ── Track whether the body came from an HTML template (skip toHtml on send) ──
   const [bodyIsHtml, setBodyIsHtml] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState(false);
 
   const [emailTemplates, setEmailTemplates] = React.useState<EmailTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = React.useState(false);
@@ -223,7 +228,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
         .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
       setSubject(template.subject);
       setBody(resolvedBody);
-      // ── Mark as HTML if the template body contains HTML tags ──
       setBodyIsHtml(isHtml(resolvedBody));
     }
     setStep("compose");
@@ -241,7 +245,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
     if (!lead?.email) { setError("This lead has no email address."); return; }
     setSending(true); setError(null);
     try {
-      // ── If body is already HTML, send as-is; otherwise convert plain text ──
       const emailBody = bodyIsHtml ? body.trim() : toHtml(body.trim());
       await LeadEmailAPI.sendNow({
         lead: lead.id,
@@ -249,7 +252,8 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
         email_body: emailBody,
         sender_email: lead.email ?? null,
       });
-      setSuccess(true); onClose();
+      toast.success(`Email sent to ${lead?.full_name || lead?.name || "Patient"}!`, toastOptions);
+      onClose();
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to send email. Please try again."));
     } finally {
@@ -403,7 +407,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
                     <Stack direction="row" spacing={1} alignItems="flex-start"><Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>Subject:</Typography><Typography fontSize="12px" color="#1E293B" fontWeight={700}>{previewTemplate.subject}</Typography></Stack>
                   </Stack>
                 </Box>
-                {/* Preview renders HTML correctly */}
                 <Box sx={{ bgcolor: "#FFFFFF", px: 2.5, py: 2.5, maxHeight: 260, overflowY: "auto" }}>
                   <Box
                     sx={{
@@ -435,7 +438,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
                     .replace(/\{\{lead_name\}\}/g, recipientName)
                     .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
                   setSubject(previewTemplate.subject || "");
-                  // ── Keep HTML body as-is; flag it so send skips toHtml() conversion ──
                   setBody(resolvedBody);
                   setBodyIsHtml(isHtml(resolvedBody));
                   setStep("compose");
@@ -470,7 +472,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
                   <TextField fullWidth variant="standard" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={sending} InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }} placeholder="Enter subject..." />
                 </Box>
 
-                {/* ── Body: render as HTML if from template, else plain textarea ── */}
                 <Box sx={{ py: 1.5, minHeight: 200 }}>
                   {bodyIsHtml ? (
                     <Box
@@ -534,10 +535,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
           </>
         )}
       </Dialog>
-
-      <Snackbar open={success} autoHideDuration={3000} onClose={() => setSuccess(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert onClose={() => setSuccess(false)} severity="success" sx={{ borderRadius: "10px" }}>Email sent to {recipientName}!</Alert>
-      </Snackbar>
     </>
   );
 };
