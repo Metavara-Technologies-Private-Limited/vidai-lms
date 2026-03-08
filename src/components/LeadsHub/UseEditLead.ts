@@ -238,7 +238,6 @@ export function useEditLead() {
     if (nextDate) setAppointmentDate(nextDate.format("YYYY-MM-DD"));
   };
 
-  // ── Toggle appointment — clears all fields when switching to "No" ──
   const handleWantAppointmentChange = (value: "yes" | "no") => {
     setWantAppointment(value);
     if (value === "no") {
@@ -426,19 +425,28 @@ export function useEditLead() {
     setSaving(true);
 
     const doSave = async () => {
-      // Use updateWithDocuments which correctly handles multipart/form-data
-      await LeadAPI.updateWithDocuments(id, updateData, documents);
-
-      toast.success("Lead saved successfully!", {
-        position: "top-right",
-        autoClose: 1500,
-        theme: "colored",
-      });
-
-      await dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+      // Use plain update (no extra getById round-trip) when there are no new files.
+      // Only fall back to updateWithDocuments when files are actually attached.
+      if (documents.length > 0) {
+        await LeadAPI.updateWithDocuments(id, updateData, documents);
+      } else {
+        await LeadAPI.update(id, updateData);
+      }
     };
 
     doSave()
+      .then(() => {
+        toast.success("Lead saved successfully!", {
+          position: "top-right",
+          autoClose: 1500,
+          theme: "colored",
+        });
+        // Refresh list in background AFTER navigating — does not block the user
+        setTimeout(() => {
+          navigate("/leads", { replace: true });
+          dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+        }, 800);
+      })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to save lead";
         setShowSuccess(false);
@@ -451,11 +459,6 @@ export function useEditLead() {
       .finally(() => {
         setSaving(false);
       });
-
-    // Navigate after 800ms — matches test expectations
-    setTimeout(() => {
-      navigate("/leads", { replace: true });
-    }, 800);
   };
 
   return {

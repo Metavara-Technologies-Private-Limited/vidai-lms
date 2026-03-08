@@ -4,7 +4,6 @@ import {
   Button,
   Typography,
   Paper,
-  CircularProgress,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -42,9 +41,7 @@ export default function AddNewLead() {
 
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>(
-    [],
-  );
+  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>([]);
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
   const [clinicId] = React.useState(1);
@@ -112,11 +109,7 @@ export default function AddNewLead() {
         const error = err as ApiError;
         toast.error(
           `Departments: ${error?.response?.data?.detail || error?.message || "Failed"}`,
-          {
-            position: "top-right",
-            autoClose: 3000,
-            theme: "colored",
-          },
+          { position: "top-right", autoClose: 3000, theme: "colored" },
         );
       } finally {
         setLoadingDepartments(false);
@@ -159,12 +152,7 @@ export default function AddNewLead() {
   // ── Auto-fill source from campaign ──────────────────────────────
   React.useEffect(() => {
     if (!form.campaign) {
-      setForm((prev) => ({
-        ...prev,
-        campaignName: "",
-        source: "",
-        subSource: "",
-      }));
+      setForm((prev) => ({ ...prev, campaignName: "", source: "", subSource: "" }));
       return;
     }
     const matched = campaigns.find((c) => c.id === form.campaign);
@@ -185,17 +173,10 @@ export default function AddNewLead() {
     }
     const selectedDeptId = Number(form.department);
     const selectedDept = departments.find((d) => d.id === selectedDeptId);
-    if (!selectedDept) {
-      setFilteredPersonnel([]);
-      return;
-    }
-    const normalize = (s: string) =>
-      (s ?? "").trim().toLowerCase().normalize("NFC");
+    if (!selectedDept) { setFilteredPersonnel([]); return; }
+    const normalize = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
     setFilteredPersonnel(
-      employees.filter(
-        (emp) =>
-          normalize(emp.department_name) === normalize(selectedDept.name),
-      ),
+      employees.filter((emp) => normalize(emp.department_name) === normalize(selectedDept.name)),
     );
   }, [form.department, employees, departments]);
 
@@ -208,48 +189,30 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
 
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({
-      ...prev,
-      department: e.target.value,
-      personnel: "",
-      assignee: "",
-    }));
+    setForm((prev) => ({ ...prev, department: e.target.value, personnel: "", assignee: "" }));
 
   const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newType = e.target.value;
-    setForm((prev) => ({
-      ...prev,
-      nextType: newType,
-      nextStatus: getAutoNextActionStatus(newType),
-    }));
+    setForm((prev) => ({ ...prev, nextType: newType, nextStatus: getAutoNextActionStatus(newType) }));
   };
 
   // ── File Handlers ────────────────────────────────────────────────
   const addFiles = (files: File[]) => {
     files.forEach((file) => {
       if (!ALLOWED_DOC_TYPES.includes(file.type)) {
-        toast.error(
-          `"${file.name}" — unsupported type. Use PDF, Word, JPG or PNG.`,
-          {
-            position: "top-right",
-            autoClose: 3000,
-            theme: "colored",
-          },
-        );
+        toast.error(`"${file.name}" — unsupported type. Use PDF, Word, JPG or PNG.`, {
+          position: "top-right", autoClose: 3000, theme: "colored",
+        });
         return;
       }
       if (file.size > MAX_DOC_SIZE_MB * 1024 * 1024) {
         toast.error(`"${file.name}" — exceeds ${MAX_DOC_SIZE_MB}MB limit.`, {
-          position: "top-right",
-          autoClose: 3000,
-          theme: "colored",
+          position: "top-right", autoClose: 3000, theme: "colored",
         });
         return;
       }
       setPendingFiles((prev) =>
-        prev.find((f) => f.name === file.name && f.size === file.size)
-          ? prev
-          : [...prev, file],
+        prev.find((f) => f.name === file.name && f.size === file.size) ? prev : [...prev, file],
       );
     });
   };
@@ -264,12 +227,7 @@ export default function AddNewLead() {
 
   // ── Navigation ───────────────────────────────────────────────────
   const handleNext = async () => {
-    const isValid = await validateStep(
-      currentStep,
-      form,
-      isCouple,
-      pendingFiles.length > 0,
-    );
+    const isValid = await validateStep(currentStep, form, isCouple, pendingFiles.length > 0);
     if (!isValid) return;
     if (currentStep === 3) {
       await submitForm();
@@ -277,9 +235,7 @@ export default function AddNewLead() {
     }
     setCurrentStep((prev) => prev + 1);
     toast.success("Step completed!", {
-      position: "top-right",
-      autoClose: 1000,
-      theme: "colored",
+      position: "top-right", autoClose: 1000, theme: "colored",
     });
   };
 
@@ -307,16 +263,11 @@ export default function AddNewLead() {
     partner_full_name: form.partnerName || "",
     next_action_description: form.nextDesc || "",
     next_action_type: form.nextType || undefined,
-    marital_status: form.marital
-      ? (form.marital.toLowerCase() as "single" | "married")
-      : null,
-    partner_gender: form.partnerGender
-      ? (form.partnerGender.toLowerCase() as "male" | "female")
-      : null,
+    gender: form.gender ? (form.gender.toLowerCase() as "male" | "female") : null,
+    marital_status: form.marital ? (form.marital.toLowerCase() as "single" | "married") : null,
+    partner_gender: form.partnerGender ? (form.partnerGender.toLowerCase() as "male" | "female") : null,
     next_action_status:
-      form.nextStatus === "pending" || form.nextStatus === "completed"
-        ? form.nextStatus
-        : null,
+      form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : null,
     assigned_to_id: intOrNull(form.assignee),
     personal_id: null,
     age: intOrNull(form.age),
@@ -339,9 +290,7 @@ export default function AddNewLead() {
           : await LeadAPI.create(payload);
       console.log("✅ Lead created:", response);
       toast.success("Lead saved successfully!", {
-        position: "top-right",
-        autoClose: 1500,
-        theme: "colored",
+        position: "top-right", autoClose: 1500, theme: "colored",
       });
       navigate("/leads", { replace: true });
     } catch (err) {
@@ -352,8 +301,7 @@ export default function AddNewLead() {
         if (typeof data === "string") msg = data;
         else if (data.detail) msg = data.detail;
         else if (data.message) msg = data.message;
-        else if (data.error)
-          msg = `${data.error}${data.request_id ? ` (${data.request_id})` : ""}`;
+        else if (data.error) msg = `${data.error}${data.request_id ? ` (${data.request_id})` : ""}`;
         else {
           const firstKey = Object.keys(data)[0];
           const firstVal = data[firstKey];
@@ -362,11 +310,7 @@ export default function AddNewLead() {
       } else {
         msg = error?.message || msg;
       }
-      toast.error(msg, {
-        position: "top-right",
-        autoClose: 3000,
-        theme: "colored",
-      });
+      toast.error(msg, { position: "top-right", autoClose: 3000, theme: "colored" });
     } finally {
       setIsSubmitting(false);
     }
@@ -404,10 +348,7 @@ export default function AddNewLead() {
           }}
         >
           {steps.map(({ label, step }) => (
-            <Box
-              key={step}
-              sx={{ display: "flex", alignItems: "center", gap: 1 }}
-            >
+            <Box key={step} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Box
                 sx={{
                   width: 24,
@@ -417,9 +358,7 @@ export default function AddNewLead() {
                     currentStep > step
                       ? "#10B981"
                       : currentStep === step
-                        ? step === 3
-                          ? "#3B82F6"
-                          : "#F97316"
+                        ? step === 3 ? "#3B82F6" : "#F97316"
                         : "#E2E8F0",
                   color: "white",
                   display: "flex",
@@ -440,9 +379,7 @@ export default function AddNewLead() {
                     currentStep > step
                       ? "#10B981"
                       : currentStep === step
-                        ? step === 3
-                          ? "#3B82F6"
-                          : "#F97316"
+                        ? step === 3 ? "#3B82F6" : "#F97316"
                         : "#94A3B8",
                 }}
               >
@@ -461,10 +398,7 @@ export default function AddNewLead() {
           maxHeight: "calc(100vh - 400px)",
           overflowY: "auto",
           "&::-webkit-scrollbar": { width: "8px" },
-          "&::-webkit-scrollbar-thumb": {
-            backgroundColor: "#CBD5E1",
-            borderRadius: "4px",
-          },
+          "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
         }}
       >
         {currentStep === 1 && (
@@ -480,7 +414,6 @@ export default function AddNewLead() {
             handleNextTypeChange={handleNextTypeChange}
           />
         )}
-
         {currentStep === 2 && (
           <Step2
             form={form}
@@ -494,7 +427,6 @@ export default function AddNewLead() {
             handleFileInputChange={handleFileInputChange}
           />
         )}
-
         {currentStep === 3 && (
           <Step3
             form={form}
@@ -512,23 +444,10 @@ export default function AddNewLead() {
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          bgcolor: "white",
-          p: 3,
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 2,
-        }}
-      >
+      <Box sx={{ bgcolor: "white", p: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}>
         <Button
           onClick={() => navigate("/leads")}
-          sx={{
-            textTransform: "none",
-            color: "#64748B",
-            fontWeight: 700,
-            px: 3,
-          }}
+          sx={{ textTransform: "none", color: "#64748B", fontWeight: 700, px: 3 }}
         >
           Cancel
         </Button>
@@ -577,11 +496,7 @@ export default function AddNewLead() {
               "&:hover": { bgcolor: "#1E293B" },
             }}
           >
-            {isSubmitting ? (
-              <CircularProgress size={20} sx={{ color: "white" }} />
-            ) : (
-              "Save"
-            )}
+            Save
           </Button>
         )}
       </Box>

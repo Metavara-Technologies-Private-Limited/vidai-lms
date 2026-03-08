@@ -41,6 +41,7 @@ export type LeadPayload = {
   full_name: string;
   contact_no: string;
   age: number | null;
+  gender?: "male" | "female" | null;        // ✅ ADDED
   marital_status: "single" | "married" | null;
   email: string | null;
   language_preference: string;
