@@ -5,7 +5,7 @@ import IconButton from "@mui/material/IconButton";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
 import NewLeadsIcon from "../../assets/icons/NewLeads.svg";
@@ -19,7 +19,11 @@ import { selectLeads } from "../../store/leadSlice";
 import { LEAD_STATUS } from "../../utils/constants";
 import type { KpiCardData, LiveKpiCounts } from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
-
+import type { AppDispatch } from "../../store";
+import {
+  fetchMailInsights,
+  selectMailInsights,
+} from "../../store/mailInsightsSlice";
 
 /* KPI → ICON MAP */
 const KPI_ICONS: Record<string, string> = {
@@ -29,17 +33,21 @@ const KPI_ICONS: Record<string, string> = {
   followUps: FollowUpsIcon,
   totalConverted: TotalConvertedIcon,
   lostLeads: LostLeadsIcon,
+  mailLeads: NewLeadsIcon,
+  mailAppointments: AppointmentsIcon,
 };
 
 const getCardStyle = (id: string) => {
   switch (id) {
-    case "totalLeads":      return kpiCardsStyles.totalLeads;
-    case "newLeads":        return kpiCardsStyles.newLeads;
-    case "appointments":    return kpiCardsStyles.appointments;
-    case "followUps":       return kpiCardsStyles.followUps;
-    case "totalConverted":  return kpiCardsStyles.totalConverted;
-    case "lostLeads":       return kpiCardsStyles.lostLeads;
-    default:                return {};
+    case "totalLeads":       return kpiCardsStyles.totalLeads;
+    case "newLeads":         return kpiCardsStyles.newLeads;
+    case "appointments":     return kpiCardsStyles.appointments;
+    case "followUps":        return kpiCardsStyles.followUps;
+    case "totalConverted":   return kpiCardsStyles.totalConverted;
+    case "lostLeads":        return kpiCardsStyles.lostLeads;
+    case "mailLeads":        return kpiCardsStyles.newLeads;
+    case "mailAppointments": return kpiCardsStyles.appointments;
+    default:                 return {};
   }
 };
 
@@ -68,15 +76,20 @@ const normalizeLeadStatus = (status?: string | null): string => {
 };
 
 const KpiCards = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const leads = useSelector(selectLeads);
+  const mailInsights = useSelector(selectMailInsights);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
+  // Fetch mail insights on mount
+  useEffect(() => {
+    dispatch(fetchMailInsights());
+  }, [dispatch]);
+
   // ── Live counts derived from Redux store ──
-  // Updates automatically whenever leads change in Redux
-  // (e.g. appointment booked, lead converted, new lead added)
   const counts: LiveKpiCounts = useMemo(() => {
     if (!leads || leads.length === 0) {
       return {
@@ -153,21 +166,23 @@ const KpiCards = () => {
   };
 
   const dynamicKpis: KpiCardData[] = useMemo(() => [
-    { id: "totalLeads", label: "Total Leads", value: counts.totalLeads },
-    { id: "newLeads", label: "New Leads", value: counts.newLeads },
-    { id: "appointments", label: "Appointments", value: counts.appointments },
-    { id: "followUps", label: "Follow Ups", value: counts.followUps },
+    { id: "totalLeads",    label: "Total Leads",     value: counts.totalLeads },
+    { id: "newLeads",      label: "New Leads",        value: counts.newLeads },
+    { id: "appointments",  label: "Appointments",     value: counts.appointments },
+    { id: "followUps",     label: "Follow Ups",       value: counts.followUps },
     {
       id: "totalConverted",
       label: "Total Converted",
       value: counts.totalConverted,
       breakdown: [
         { label: "Registered", value: counts.registered },
-        { label: "Treatment", value: counts.treatment },
+        { label: "Treatment",  value: counts.treatment },
       ],
     },
-    { id: "lostLeads", label: "Lost Leads", value: counts.lostLeads },
-  ], [counts]);
+    { id: "lostLeads",         label: "Lost Leads",           value: counts.lostLeads },
+    { id: "mailLeads",         label: "Leads via Mail",        value: mailInsights?.leads_created ?? 0 },
+    { id: "mailAppointments",  label: "Appointments via Mail", value: mailInsights?.appointments_booked ?? 0 },
+  ], [counts, mailInsights]);
 
   return (
     <Box sx={{ position: "relative", width: "100%", px: 1 }}>
