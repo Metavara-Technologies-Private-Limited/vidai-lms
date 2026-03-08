@@ -32,6 +32,17 @@ export default defineConfig({
         "./src/components/dashboard/DashboardLayout.tsx",
       ],
     },
+    // ── API Proxy ──────────────────────────────────────────────────────────
+    // All requests to /api/* are forwarded to Django (localhost:8000)
+    // This means you NEVER need to update a URL when Cloudflare tunnel changes.
+    // Your axios calls stay as:  axios.get("/api/mail-insights/get/")
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",   // Django dev server
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   test: {
     environment: "jsdom",
