@@ -3,9 +3,10 @@ import * as React from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, IconButton, List, ListItem,
-  ListItemButton, ListItemText, Menu, MenuItem, Snackbar, Stack,
+  ListItemButton, ListItemText, Menu, MenuItem, Stack,
   TextField, Typography,
 } from "@mui/material";
+import { toast } from "react-toastify";
 import CloseIcon from "@mui/icons-material/Close";
 
 import type { ProcessedLead, SMSTemplate } from "./LeadsTable.types";
@@ -14,6 +15,13 @@ import { extractErrorMessage, normalizePhone } from "./LeadsTable.helpers";
 import { getUseCaseChipSx, outlineBtn, darkBtn } from "./LeadsTable.styles";
 import { TwilioAPI } from "../../services/leads.api";
 import TemplateService from "../../services/templates.api";
+
+// ── Shared toast options — identical to useEditLead.ts ────────────────
+const toastOptions = {
+  position: "top-right" as const,
+  autoClose: 3000,
+  theme: "colored" as const,
+};
 
 // ====================== New SMS Template Dialog ======================
 interface NewSMSTemplateDialogProps {
@@ -175,7 +183,6 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
   const [selected, setSelected] = React.useState<SMSTemplate | null>(null);
   const [previewBody, setPreviewBody] = React.useState("");
   const [newTemplateOpen, setNewTemplateOpen] = React.useState(false);
-  const [savedSnackbar, setSavedSnackbar] = React.useState(false);
 
   const loadTemplates = React.useCallback(() => {
     setLoadingTpl(true);
@@ -192,14 +199,17 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
 
   const handlePickTemplate = (tpl: SMSTemplate) => { setSelected(tpl); setPreviewBody(tpl.body); setView("preview"); };
   const handleSave = () => { onSelect(previewBody); onClose(); };
-  const handleNewTemplateSaved = (tpl: SMSTemplate) => { setNewTemplateOpen(false); onSelect(tpl.body); setSavedSnackbar(true); onClose(); };
+
+  const handleNewTemplateSaved = (tpl: SMSTemplate) => {
+    setNewTemplateOpen(false);
+    onSelect(tpl.body);
+    toast.success("Template saved and applied to your message!", toastOptions);
+    onClose();
+  };
 
   return (
     <>
       <NewSMSTemplateDialog open={newTemplateOpen} onClose={() => setNewTemplateOpen(false)} onSaved={handleNewTemplateSaved} />
-      <Snackbar open={savedSnackbar} autoHideDuration={3000} onClose={() => setSavedSnackbar(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert onClose={() => setSavedSnackbar(false)} severity="success" sx={{ borderRadius: "10px" }}>Template saved and applied to your message!</Alert>
-      </Snackbar>
       <Dialog open={open && !newTemplateOpen} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1300 }}>
         {view === "list" && (
           <>
@@ -288,7 +298,6 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
   const [message, setMessage] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
 
   const handleClose = () => { if (sending) return; setMessage(""); setError(null); onClose(); };
@@ -301,7 +310,9 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
     setSending(true); setError(null);
     try {
       await TwilioAPI.sendSMS({ lead_uuid: lead.id, to: phone, message: message.trim() });
-      setSuccess(true); setMessage(""); onClose();
+      toast.success(`SMS sent to ${lead?.full_name || lead?.name}!`, toastOptions);
+      setMessage("");
+      onClose();
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to send SMS. Please try again."));
     } finally {
@@ -335,9 +346,6 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
           </Stack>
         </DialogActions>
       </Dialog>
-      <Snackbar open={success} autoHideDuration={3000} onClose={() => setSuccess(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert onClose={() => setSuccess(false)} severity="success" sx={{ borderRadius: "10px" }}>SMS sent to {lead?.full_name || lead?.name}!</Alert>
-      </Snackbar>
     </>
   );
 };

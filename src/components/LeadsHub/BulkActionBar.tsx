@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useState } from "react";
+import { toast } from "react-toastify";
 import {
   Box,
   Stack,
@@ -14,7 +15,6 @@ import {
   Divider,
   CircularProgress,
   Alert,
-  Snackbar,
   Chip,
   List,
   ListItem,
@@ -78,6 +78,20 @@ const getUseCaseSx = (useCase?: string) => {
   return map[(useCase ?? "").toLowerCase()] ?? { bgcolor: "#F1F5F9", color: "#64748B" };
 };
 
+// ── Shared toast options — matches the app's green/red banner style ──
+// ── Toast options — identical to useEditLead.ts ───────────────────
+const toastOptions = {
+  position: "top-right" as const,
+  autoClose: 3000,
+  theme: "colored" as const,
+};
+
+const toastErrorOptions = {
+  position: "top-right" as const,
+  autoClose: 4000,
+  theme: "colored" as const,
+};
+
 // ── Props ─────────────────────────────────────────────────────────────
 interface Props {
   selectedIds: string[];
@@ -129,10 +143,6 @@ const BulkActionBar: React.FC<Props> = ({
   const [isSendingSMS,    setIsSendingSMS]    = useState(false);
   const [smsError,        setSmsError]        = useState<string | null>(null);
 
-  // ── Snackbar ──────────────────────────────────────────────────────
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean; message: string; severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
 
   // ── Guard: must be after all hooks ────────────────────────────────
   if (selectedIds.length === 0) return null;
@@ -180,11 +190,10 @@ const BulkActionBar: React.FC<Props> = ({
           LeadEmailAPI.sendNow({ lead: leadId, subject: subject.trim(), email_body: messageBody.trim() })
         )
       );
-      setSnackbar({
-        open: true,
-        message: `Email sent to ${selectedIds.length} lead${selectedIds.length > 1 ? "s" : ""} successfully.`,
-        severity: "success",
-      });
+      toast.success(
+        `Email sent to ${selectedIds.length} lead${selectedIds.length > 1 ? "s" : ""} successfully.`,
+        toastOptions
+      );
       if (onSendEmail) onSendEmail("", subject, messageBody, String(selectedTemplate?.id ?? ""));
       setOpenComposer(false);
       setOpenEmail(false);
@@ -240,7 +249,6 @@ const BulkActionBar: React.FC<Props> = ({
     let successCount = 0;
     const errors: string[] = [];
 
-    // Fetch each lead to get contact_no, then send SMS with required `to` field
     const results = await Promise.allSettled(
       selectedIds.map(async (leadId) => {
         const lead = await LeadAPI.getById(leadId);
@@ -267,13 +275,14 @@ const BulkActionBar: React.FC<Props> = ({
     setIsSendingSMS(false);
 
     if (successCount > 0) {
-      setSnackbar({
-        open: true,
-        message: `SMS sent to ${successCount} lead${successCount > 1 ? "s" : ""} successfully.${
-          errors.length ? ` ${errors.length} failed.` : ""
-        }`,
-        severity: errors.length === selectedIds.length ? "error" : "success",
-      });
+      const msg = `SMS sent to ${successCount} lead${successCount > 1 ? "s" : ""} successfully.${
+        errors.length ? ` ${errors.length} failed.` : ""
+      }`;
+      if (errors.length === selectedIds.length) {
+        toast.error(msg, toastErrorOptions);
+      } else {
+        toast.success(msg, toastOptions);
+      }
       if (onSendSMS) onSendSMS(selectedIds, smsMessage.trim());
       setOpenSMSComposer(false);
       setSmsMessage("");
@@ -327,6 +336,7 @@ const BulkActionBar: React.FC<Props> = ({
   return (
     <Box sx={{ position: "sticky", bottom: 0, backgroundColor: "#fff", borderTop: "1px solid #E5E7EB", py: 1.5, px: 2, mt: 2, zIndex: 20 }}>
 
+
       {/* ── Action Buttons ── */}
       <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
         <Button variant="outlined"
@@ -368,7 +378,7 @@ const BulkActionBar: React.FC<Props> = ({
         </Button>
       </Stack>
 
-      {/* ── Delete Dialog (Figma-matched inline) ── */}
+      {/* ── Delete Dialog ── */}
       <Dialog
         open={openDelete}
         onClose={() => !isDeleting && setOpenDelete(false)}
@@ -537,7 +547,6 @@ const BulkActionBar: React.FC<Props> = ({
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3, pt: 1, flexDirection: "column", gap: 1, alignItems: "stretch" }}>
-          {/* Opens template picker dialog */}
           <Button fullWidth variant="outlined" onClick={handleOpenSMSPicker} disabled={isSendingSMS}
             sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>
             SMS Template
@@ -656,7 +665,6 @@ const BulkActionBar: React.FC<Props> = ({
           <Divider sx={{ mb: 2 }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}
             sx={{ textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px" }}>BODY</Typography>
-          {/* ── FIX: render template body as HTML ── */}
           <Box
             sx={{
               mt: 0.5, p: 2, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0",
@@ -710,7 +718,6 @@ const BulkActionBar: React.FC<Props> = ({
             onChange={(e) => setSubject(e.target.value)} InputProps={{ disableUnderline: true }}
             sx={{ py: 1.5, borderBottom: "1px solid #E5E7EB", mt: 1 }} disabled={isSending} />
 
-          {/* ── FIX: show HTML preview when a template is selected, plain textarea otherwise ── */}
           {selectedTemplate ? (
             <Box
               sx={{
@@ -754,15 +761,6 @@ const BulkActionBar: React.FC<Props> = ({
           </Stack>
         </Box>
       </Dialog>
-
-      {/* ── Snackbar ── */}
-      <Snackbar open={snackbar.open} autoHideDuration={4000}
-        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar((s) => ({ ...s, open: false }))} sx={{ borderRadius: "10px" }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 };

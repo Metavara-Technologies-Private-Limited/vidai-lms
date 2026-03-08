@@ -325,7 +325,9 @@ export default function AddNewLead() {
 
   // ── Render ───────────────────────────────────────────────────────
   return (
-    <Paper sx={{ overflow: "hidden", minHeight: "100vh" }}>
+    // ✅ flex column so header + form body + footer stack naturally with no dead space
+    <Paper sx={{ overflow: "hidden", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+
       {/* Header */}
       <Box sx={{ bgcolor: "white", px: 3, py: 2 }}>
         <Typography variant="h6" fontWeight={700} color="#1E293B">
@@ -390,12 +392,12 @@ export default function AddNewLead() {
         </Box>
       </Box>
 
-      {/* Form Body */}
+      {/* Form Body — flex: 1 fills all space between step indicator and footer */}
       <Box
         sx={{
           bgcolor: "white",
           p: 3,
-          maxHeight: "calc(100vh - 400px)",
+          flex: 1,          // ✅ grows to fill available space — no hardcoded calc()
           overflowY: "auto",
           "&::-webkit-scrollbar": { width: "8px" },
           "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
@@ -443,8 +445,8 @@ export default function AddNewLead() {
         )}
       </Box>
 
-      {/* Footer */}
-      <Box sx={{ bgcolor: "white", p: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}>
+      {/* Footer — always hugs the bottom of content, no floating gap */}
+      <Box sx={{ bgcolor: "white", p: 3, display: "flex", justifyContent: "flex-end", gap: 2, borderTop: "1px solid #F1F5F9" }}>
         <Button
           onClick={() => navigate("/leads")}
           sx={{ textTransform: "none", color: "#64748B", fontWeight: 700, px: 3 }}
@@ -500,6 +502,7 @@ export default function AddNewLead() {
           </Button>
         )}
       </Box>
+
     </Paper>
   );
 }
