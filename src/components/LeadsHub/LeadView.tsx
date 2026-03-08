@@ -53,7 +53,7 @@ import {
   selectLeadsLoading,
   selectLeadsError,
 } from "../../store/leadSlice";
-import { api, LeadEmailAPI, EmailTemplateAPI } from "../../services/leads.api";
+import { api, LeadAPI, LeadEmailAPI, EmailTemplateAPI } from "../../services/leads.api";
 import type { EmailTemplate, EmailTemplatePayload } from "../../services/leads.api";
 
 import {
@@ -82,8 +82,6 @@ function extractErr(err: unknown, fallback = "Something went wrong."): string {
   return e?.response?.data?.detail || e?.response?.data?.non_field_errors?.[0] || e?.message || fallback;
 }
 
-// Convert plain-text body to HTML before sending.
-// If it already contains HTML tags, returns as-is.
 function toHtml(text: string): string {
   if (/<[a-z][\s\S]*>/i.test(text)) return text;
   return text
@@ -102,7 +100,6 @@ function toHtml(text: string): string {
     .join("");
 }
 
-// Strip HTML tags for display in plain-text textarea.
 function stripHtml(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
@@ -113,6 +110,12 @@ function stripHtml(html: string): string {
     .replace(/&gt;/g, ">")
     .trim();
 }
+
+function capitalize(val: string | undefined | null): string {
+  if (!val) return "N/A";
+  return val.charAt(0).toUpperCase() + val.slice(1);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // NewEmailTemplateDialog
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,7 +264,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
       .replace(/\{\{lead_first_name\}\}/g, name.split(" ")[0]);
   };
 
-  // FIX: strip HTML for textarea display; toHtml() re-applies on send
   const handleNext = () => {
     const template = emailTemplates.find((t) => String(t.id) === selectedTemplateId);
     if (template) {
@@ -277,7 +279,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     setNewTplOpen(false);
   };
 
-  // FIX: convert body to HTML before sending
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) { setError("Subject and body are required."); return; }
     if (!lead?.id) { setError("Lead ID is missing."); return; }
@@ -295,7 +296,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     } finally { setSending(false); }
   };
 
-  // FIX: convert body to HTML before saving draft
   const handleSaveAsDraft = async () => {
     if (!subject.trim() || !body.trim() || !lead?.id) return;
     try {
@@ -476,7 +476,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                   </Stack>
                 </Box>
 
-                {/* FIX: render HTML correctly in preview */}
                 <Box sx={{ bgcolor: "#FFFFFF", px: 2.5, py: 2.5, maxHeight: 260, overflowY: "auto" }}>
                   <Box
                     sx={{
@@ -503,7 +502,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                 sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
                 Back
               </Button>
-              {/* FIX: strip HTML for textarea; toHtml() re-applies on send */}
               <Button variant="contained"
                 onClick={() => {
                   setSubject(previewTemplate.subject || "");
@@ -665,6 +663,9 @@ export default function LeadDetailView() {
   const [smsHistoryLoading, setSmsHistoryLoading] = React.useState(false);
   const [smsHistoryError, setSmsHistoryError]     = React.useState<string | null>(null);
 
+  // ── Full lead detail fetched directly from API (has all fields incl. gender) ──
+  const [fullLead, setFullLead] = React.useState<LeadRecord | null>(null);
+
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px", fontWeight: 500, fontSize: "12px", height: 22, px: 1,
     width: "fit-content", flex: "0 0 auto", alignSelf: "flex-start",
@@ -686,6 +687,20 @@ export default function LeadDetailView() {
       return leadCleanId === cleanId;
     });
   }, [leads, id]);
+
+  // ── Fetch full lead detail whenever the lead ID changes ──
+  // This ensures fields like gender, language_preference, address that may be
+  // omitted from the list endpoint are always available.
+  React.useEffect(() => {
+    if (!id) return;
+    const rawId = decodeURIComponent(id);
+    LeadAPI.getById(rawId)
+      .then((data) => setFullLead(data as unknown as LeadRecord))
+      .catch(() => setFullLead(null));
+  }, [id]);
+
+  // Merge: fullLead takes priority for detail fields; fall back to list lead
+  const activeLead: LeadRecord | undefined = fullLead ?? lead;
 
   const fetchNotes = React.useCallback(async (leadUuid: string) => {
     try {
@@ -739,18 +754,18 @@ export default function LeadDetailView() {
   }, [location.key, dispatch]);
 
   React.useEffect(() => {
-    if (lead) {
+    if (activeLead) {
       const rawId = decodeURIComponent(id || "");
       fetchNotes(rawId);
-      fetchDocuments((lead.documents ?? []) as DocumentEntry[]);
-      fetchCallHistory(lead.id);
-      fetchSMSHistory(lead.id);
+      fetchDocuments((activeLead.documents ?? []) as DocumentEntry[]);
+      fetchCallHistory(activeLead.id);
+      fetchSMSHistory(activeLead.id);
     }
-  }, [lead?.id, lead?.documents, location.key, fetchNotes, fetchDocuments, fetchCallHistory, fetchSMSHistory, id]);
+  }, [activeLead?.id, activeLead?.documents, location.key, fetchNotes, fetchDocuments, fetchCallHistory, fetchSMSHistory, id]);
 
   const handleAddNote = async () => {
     if (!newNoteTitle.trim() && !newNoteContent.trim()) return;
-    if (!lead) return;
+    if (!activeLead) return;
     try {
       setNoteSubmitting(true); setNotesError(null);
       const userId = getCurrentUserId();
@@ -776,7 +791,7 @@ export default function LeadDetailView() {
   const handleCancelEdit = () => { setEditingNoteId(null); setEditTitle(""); setEditContent(""); };
 
   const handleSaveEdit = async (noteId: string) => {
-    if (!lead) return;
+    if (!activeLead) return;
     try {
       setEditSubmitting(true); setNotesError(null);
       const userId = getCurrentUserId();
@@ -808,17 +823,17 @@ export default function LeadDetailView() {
   };
 
   const handleAddNextAction = async () => {
-    if (!actionType.trim() || !actionDescription.trim() || !lead) return;
+    if (!actionType.trim() || !actionDescription.trim() || !activeLead) return;
     try {
       setActionSubmitting(true);
       const leadUuid = decodeURIComponent(id || "");
       await api.put(`/leads/${leadUuid}/update/`, {
-        clinic_id: lead.clinic_id, department_id: lead.department_id,
-        full_name: lead.full_name || lead.name,
-        contact_no: lead.contact_no || lead.phone || lead.phone_number || "",
-        source: lead.source || "Unknown", treatment_interest: lead.treatment_interest || "N/A",
-        book_appointment: lead.book_appointment || false, appointment_date: lead.appointment_date || "",
-        slot: lead.slot || "", is_active: lead.is_active !== false, partner_inquiry: lead.partner_inquiry || false,
+        clinic_id: activeLead.clinic_id, department_id: activeLead.department_id,
+        full_name: activeLead.full_name || activeLead.name,
+        contact_no: activeLead.contact_no || activeLead.phone || activeLead.phone_number || "",
+        source: activeLead.source || "Unknown", treatment_interest: activeLead.treatment_interest || "N/A",
+        book_appointment: activeLead.book_appointment || false, appointment_date: activeLead.appointment_date || "",
+        slot: activeLead.slot || "", is_active: activeLead.is_active !== false, partner_inquiry: activeLead.partner_inquiry || false,
         next_action_type: actionType, next_action_status: actionStatus, next_action_description: actionDescription.trim(),
       });
       setOpenAddActionDialog(false);
@@ -842,7 +857,7 @@ export default function LeadDetailView() {
   const handleClosePopup = () => { setOpenConvertPopup(false); setConvertError(null); };
 
   const handleConvertLead = async () => {
-    if (!lead) return;
+    if (!activeLead) return;
     try {
       setConvertLoading(true); setConvertError(null);
       const leadUuid = decodeURIComponent(id || "");
@@ -861,11 +876,11 @@ export default function LeadDetailView() {
   };
 
   const handleEdit = () => {
-    if (!lead) return;
-    navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, { state: { lead } });
+    if (!activeLead) return;
+    navigate(`/leads/edit/${getCleanLeadId(activeLead.id)}`, { state: { lead: activeLead } });
   };
 
-  if (loading) return (
+  if (loading && !activeLead) return (
     <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
       <Stack alignItems="center" spacing={2}><CircularProgress /><Typography color="text.secondary">Loading lead details...</Typography></Stack>
     </Box>
@@ -880,7 +895,7 @@ export default function LeadDetailView() {
       </Alert>
     </Box>
   );
-  if (!lead) return (
+  if (!activeLead) return (
     <Box p={3}>
       <Alert severity="warning">
         <Typography fontWeight={600}>Lead not found</Typography>
@@ -891,54 +906,55 @@ export default function LeadDetailView() {
     </Box>
   );
 
-  const leadName          = lead.full_name || lead.name || "Unknown";
-  const leadInitials      = lead.initials || leadName.charAt(0).toUpperCase();
-  const leadPhone         = lead.phone || lead.contact_number || lead.contact_no || "N/A";
-  const leadEmail         = lead.email || "N/A";
-  const leadLocation      = lead.location || "N/A";
-  const leadGender        = lead.gender || "N/A";
-  const leadAge           = String(lead.age || "N/A");
-  const leadMaritalStatus = lead.marital_status || "N/A";
-  const leadAddress       = lead.address || "N/A";
-  const leadLanguage      = lead.language_preference || "N/A";
-  const leadAssigned      = lead.assigned_to_name || lead.assigned || "Unassigned";
-  const leadStatus        = lead.status || lead.lead_status || "New";
-  const leadQuality       = lead.quality || "N/A";
-  const leadScore         = String(lead.score || 0).includes("%") ? lead.score : `${lead.score || 0}%`;
-  const leadSource        = lead.source || "Unknown";
-  const leadSubSource     = lead.sub_source || "N/A";
-  const leadCampaignName  = lead.campaign_name || "N/A";
-  const leadCampaignDuration = lead.campaign_duration || "N/A";
-  const leadDisplayId     = formatLeadId(lead.id);
-  const partnerName       = lead.partner_name || lead.partner_full_name || "N/A";
-  const partnerAge        = String(lead.partner_age || "N/A");
-  const partnerGender     = lead.partner_gender || "N/A";
-  const appointmentDepartment = lead.department || lead.department_name || "N/A";
-  const appointmentPersonnel  = lead.personnel || lead.assigned_to_name || "N/A";
-  const appointmentDate   = lead.appointment_date ? new Date(lead.appointment_date).toLocaleDateString("en-GB") : "N/A";
-  const appointmentSlot   = lead.slot || lead.appointment_slot || "N/A";
-  const appointmentRemark = lead.remark || lead.appointment_remark || "N/A";
-  const treatmentInterest = lead.treatment_interest ? lead.treatment_interest.split(",").map((t) => t.trim()) : [];
-  const leadCreatedAt     = lead.created_at
-    ? new Date(lead.created_at).toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  // ── Derived display values — all read from activeLead (fullLead ?? lead) ──
+  const leadName          = activeLead.full_name || activeLead.name || "Unknown";
+  const leadInitials      = activeLead.initials || leadName.charAt(0).toUpperCase();
+  const leadPhone         = activeLead.phone || activeLead.contact_number || activeLead.contact_no || "N/A";
+  const leadEmail         = activeLead.email || "N/A";
+  const leadLocation      = activeLead.location || "N/A";
+  const leadGender        = capitalize(activeLead.gender);
+  const leadAge           = String(activeLead.age || "N/A");
+  const leadMaritalStatus = capitalize(activeLead.marital_status);
+  const leadAddress       = activeLead.address || "N/A";
+  const leadLanguage      = activeLead.language_preference || "N/A";
+  const leadAssigned      = activeLead.assigned_to_name || activeLead.assigned || "Unassigned";
+  const leadStatus        = activeLead.status || activeLead.lead_status || "New";
+  const leadQuality       = activeLead.quality || "N/A";
+  const leadScore         = String(activeLead.score || 0).includes("%") ? activeLead.score : `${activeLead.score || 0}%`;
+  const leadSource        = activeLead.source || "Unknown";
+  const leadSubSource     = activeLead.sub_source || "N/A";
+  const leadCampaignName  = activeLead.campaign_name || "N/A";
+  const leadCampaignDuration = activeLead.campaign_duration || "N/A";
+  const leadDisplayId     = formatLeadId(activeLead.id);
+  const partnerName       = activeLead.partner_name || activeLead.partner_full_name || "N/A";
+  const partnerAge        = String(activeLead.partner_age || "N/A");
+  const partnerGender     = capitalize(activeLead.partner_gender);
+  const appointmentDepartment = activeLead.department || activeLead.department_name || "N/A";
+  const appointmentPersonnel  = activeLead.personnel || activeLead.assigned_to_name || "N/A";
+  const appointmentDate   = activeLead.appointment_date ? new Date(activeLead.appointment_date).toLocaleDateString("en-GB") : "N/A";
+  const appointmentSlot   = activeLead.slot || activeLead.appointment_slot || "N/A";
+  const appointmentRemark = activeLead.remark || activeLead.appointment_remark || "N/A";
+  const treatmentInterest = activeLead.treatment_interest ? activeLead.treatment_interest.split(",").map((t) => t.trim()) : [];
+  const leadCreatedAt     = activeLead.created_at
+    ? new Date(activeLead.created_at).toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : "N/A";
-  const nextActionType        = lead.next_action_type || lead.task || "N/A";
-  const nextActionStatus      = lead.next_action_status || lead.taskStatus || "Pending";
-  const nextActionDescription = lead.next_action_description || "N/A";
+  const nextActionType        = activeLead.next_action_type || activeLead.task || "N/A";
+  const nextActionStatus      = activeLead.next_action_status || activeLead.taskStatus || "Pending";
+  const nextActionDescription = activeLead.next_action_description || "N/A";
 
-  const currentStatus = (lead?.status || lead?.lead_status || "new").toLowerCase();
+  const currentStatus = (activeLead?.status || activeLead?.lead_status || "new").toLowerCase();
   const isAppointment = currentStatus === "appointment";
   const isFollowUp    = currentStatus === "follow up" || currentStatus === "follow-up" || currentStatus === "follow-ups";
 
   const convertedLeadIds: string[] = JSON.parse(localStorage.getItem("converted_lead_ids") || "[]");
   const leadUuidRaw = decodeURIComponent(id || "");
-  const isConverted = convertedLeadIds.includes(leadUuidRaw) || currentStatus === "converted" || (lead?.lead_status || "").toLowerCase() === "converted";
+  const isConverted = convertedLeadIds.includes(leadUuidRaw) || currentStatus === "converted" || (activeLead?.lead_status || "").toLowerCase() === "converted";
 
   const availableActions: { value: string; label: string }[] = isFollowUp
     ? [{ value: "Appointment", label: "Appointment" }]
     : [{ value: "Follow Up", label: "Follow Up" }, { value: "Appointment", label: "Appointment" }];
 
-  const hasAppointment = lead.book_appointment || (lead.appointment_date && lead.appointment_date !== "");
+  const hasAppointment = activeLead.book_appointment || (activeLead.appointment_date && activeLead.appointment_date !== "");
 
   return (
     <Box p={1} minHeight="100vh">
@@ -1015,7 +1031,7 @@ export default function LeadDetailView() {
       {/* ── TAB CONTENT ── */}
       {activeTab === "Patient Info" && (
         <PatientInfoTab
-          lead={lead}
+          lead={activeLead}
           leadPhone={leadPhone} leadEmail={leadEmail} leadLocation={leadLocation}
           leadGender={leadGender} leadAge={leadAge} leadMaritalStatus={leadMaritalStatus}
           leadAddress={leadAddress} leadLanguage={leadLanguage} leadAssigned={leadAssigned}
@@ -1032,7 +1048,7 @@ export default function LeadDetailView() {
 
       {activeTab === "History" && (
         <HistoryTab
-          lead={lead}
+          lead={activeLead}
           historyView={historyView} setHistoryView={setHistoryView}
           onComposeEmail={() => setEmailDialogOpen(true)}
           leadName={leadName} leadPhone={leadPhone}
@@ -1042,15 +1058,15 @@ export default function LeadDetailView() {
           appointmentRemark={appointmentRemark} treatmentInterest={treatmentInterest}
           hasAppointment={!!hasAppointment}
           callHistory={callHistory} callHistoryLoading={callHistoryLoading} callHistoryError={callHistoryError}
-          onRefreshCallHistory={() => fetchCallHistory(lead.id)}
+          onRefreshCallHistory={() => fetchCallHistory(activeLead.id)}
           smsHistory={smsHistory} smsHistoryLoading={smsHistoryLoading} smsHistoryError={smsHistoryError}
-          onRefreshSmsHistory={() => fetchSMSHistory(lead.id)}
+          onRefreshSmsHistory={() => fetchSMSHistory(activeLead.id)}
         />
       )}
 
       {activeTab === "Next Action" && (
         <NextActionTab
-          lead={lead}
+          lead={activeLead}
           nextActionType={nextActionType} nextActionStatus={nextActionStatus}
           nextActionDescription={nextActionDescription}
           isAppointment={isAppointment} isFollowUp={isFollowUp}
@@ -1107,7 +1123,7 @@ export default function LeadDetailView() {
       {/* ── Email Dialog ── */}
       <EmailDialog
         open={emailDialogOpen}
-        lead={lead}
+        lead={activeLead}
         onClose={() => setEmailDialogOpen(false)}
       />
 
