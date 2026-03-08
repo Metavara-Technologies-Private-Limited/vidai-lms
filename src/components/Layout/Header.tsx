@@ -16,22 +16,16 @@ import MessageQuestionIcon from "@/assets/icons/message-question.svg";
 import UserAvatarIcon from "@/assets/icons/Ellipse_12.svg";
 import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchClinic, selectClinic, selectClinicLoading } from "../../store/clinicSlice";
+import { fetchClinic, selectClinic } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
-import { fetchCampaign, selectCampaign, selectCampaignLoading } from "../../store/campaignSlice";
-import { fetchAllTemplates, selectTemplatesByType, selectTemplateLoading } from "../../store/templateSlice";
+import { fetchCampaign } from "../../store/campaignSlice";
+import { fetchAllTemplates } from "../../store/templateSlice";
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const smsTemplates = useSelector(selectTemplatesByType("sms"));
-  const mailTemplates = useSelector(selectTemplatesByType("mail"));
-  const whatsappTemplates = useSelector(selectTemplatesByType("whatsapp"));
-  const templatesLoading = useSelector(selectTemplateLoading);
-
+  // we intentionally only need the clinic name in the header;
+  // other state is loaded by thunks but not read here.
   const clinic = useSelector(selectClinic);
-  const clinicLoading = useSelector(selectClinicLoading);
-  const campaigns = useSelector(selectCampaign);
-  const campaignLoading = useSelector(selectCampaignLoading);
   const clinicName = clinic?.name || "";
 
   /* ================= ICON MENU STATE ================= */
@@ -40,34 +34,12 @@ const Header = () => {
     "calendar" | "notification" | "help" | null
   >(null);
 
+  // fire-and-forget on mount only; avoid looping when server returns empty arrays
   useEffect(() => {
-    if (!clinic && !clinicLoading) {
-      dispatch(fetchClinic(1));
-    }
-
-    if ((!campaigns || campaigns.length === 0) && !campaignLoading) {
-      dispatch(fetchCampaign());
-    }
-
-    const hasTemplates =
-      smsTemplates.length > 0 ||
-      mailTemplates.length > 0 ||
-      whatsappTemplates.length > 0;
-
-    if (!hasTemplates && !templatesLoading) {
-      dispatch(fetchAllTemplates());
-    }
-  }, [
-    dispatch,
-    clinic,
-    clinicLoading,
-    campaigns,
-    campaignLoading,
-    smsTemplates.length,
-    mailTemplates.length,
-    whatsappTemplates.length,
-    templatesLoading,
-  ]);
+    dispatch(fetchClinic(1));
+    dispatch(fetchCampaign());
+    dispatch(fetchAllTemplates());
+  }, [dispatch]);
 
   const handleIconClick = (
     event: React.MouseEvent<HTMLElement>,

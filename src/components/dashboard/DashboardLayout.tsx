@@ -10,7 +10,11 @@ import type { TimeRange } from "./TimeRangeSelector";
 import OverviewTabs from "./OverviewTabs";
 import type { OverviewTab } from "./OverviewTabs";
 import type { AppDispatch } from "../../store";
-import { fetchLeads, selectLeads, selectLeadsLoading } from "../../store/leadSlice";
+import {
+  fetchLeads,
+  selectLeads,
+  selectLeadsLoading,
+} from "../../store/leadSlice";
 
 const SourcePerformanceChart = lazy(() => import("./SourcePerformanceChart"));
 const CommunicationChart = lazy(() => import("./CommunicationChart"));
@@ -26,11 +30,14 @@ const DashboardLayout = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
   const [activeTab, setActiveTab] = useState<OverviewTab>("source");
 
+  // load leads once when the dashboard mounts; avoid looping when the
+  // backend returns an empty array (leadsLoading toggling would otherwise
+  // retrigger the effect).
   useEffect(() => {
-    if (!leadsLoading && leads.length === 0) {
+    if (leads.length === 0) {
       dispatch(fetchLeads());
     }
-  }, [dispatch, leads.length, leadsLoading]);
+  }, [dispatch]);
 
   return (
     <Box
@@ -48,6 +55,11 @@ const DashboardLayout = () => {
     >
       {/* LEFT SECTION */}
       <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {leadsLoading && (
+    <Typography variant="caption" color="text.secondary">
+      Loading leads...
+    </Typography>
+  )}
         {" "}
         {/* ADD */}
         <Typography variant="h6" pb={2}>
@@ -84,13 +96,33 @@ const DashboardLayout = () => {
           </Box>
 
           {/* TAB CONTENT */}
-          <Suspense fallback={<Box sx={{ py: 6, textAlign: "center" }}><Typography variant="caption" color="text.secondary">Loading chart...</Typography></Box>}>
-            {activeTab === "source" && <SourcePerformanceChart timeRange={timeRange} />}
-            {activeTab === "communication" && <CommunicationChart timeRange={timeRange} />}
-            {activeTab === "conversion" && <ConversionTrendChart timeRange={timeRange} />}
-            {activeTab === "pipeline" && <LeadPipelineFunnel timeRange={timeRange} />}
-            {activeTab === "appointments" && <AppointmentsChart timeRange={timeRange} />}
-            {activeTab === "team" && <TeamPerformanceTab timeRange={timeRange} />}
+          <Suspense
+            fallback={
+              <Box sx={{ py: 6, textAlign: "center" }}>
+                <Typography variant="caption" color="text.secondary">
+                  Loading chart...
+                </Typography>
+              </Box>
+            }
+          >
+            {activeTab === "source" && (
+              <SourcePerformanceChart timeRange={timeRange} />
+            )}
+            {activeTab === "communication" && (
+              <CommunicationChart timeRange={timeRange} />
+            )}
+            {activeTab === "conversion" && (
+              <ConversionTrendChart timeRange={timeRange} />
+            )}
+            {activeTab === "pipeline" && (
+              <LeadPipelineFunnel timeRange={timeRange} />
+            )}
+            {activeTab === "appointments" && (
+              <AppointmentsChart timeRange={timeRange} />
+            )}
+            {activeTab === "team" && (
+              <TeamPerformanceTab timeRange={timeRange} />
+            )}
           </Suspense>
         </Card>
       </Box>

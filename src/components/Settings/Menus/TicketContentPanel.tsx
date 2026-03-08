@@ -60,10 +60,11 @@ const TicketContentPanel = ({
   }, [leadsFromStore]);
 
   useEffect(() => {
-    if (!leads || leads.length === 0) {
+    // dispatch one time only; guard is checked at mount so doc avoids loops
+    if (leads.length === 0) {
       dispatch(fetchLeads());
     }
-  }, [dispatch, leads]);
+  }, [dispatch]);
 
   //  Convert Leads into Email Recipients
   const recipients = (Array.isArray(leads) ? leads : [])

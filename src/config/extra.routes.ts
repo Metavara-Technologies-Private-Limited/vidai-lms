@@ -61,4 +61,10 @@ export const EXTRA_ROUTES = [
     path: "referrals/practo",
     page: lazy(() => import("../components/Referrals/Practo")),
   },
+  {
+    key: "reputation",
+    path: "reputation",
+    page: lazy(() => import("../pages/Reputation.tsx")),
+  }
+  
 ];

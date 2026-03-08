@@ -34,6 +34,12 @@ export const LEADS_MENU: MenuItem[] = [
     page: lazy(() => import("../pages/Campaigns")),
   },
   {
+  key: "reputation",
+  label: "Reputation Management",
+  path: "/reputation",
+  page: lazy(() => import("../pages/Reputation")),
+},
+  {
     key: "reports",
     label: "Reports",
     path: "/reports",
