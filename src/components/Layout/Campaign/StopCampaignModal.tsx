@@ -1,16 +1,16 @@
 import { useState } from "react";
 import "../../../../src/styles/Campaign/StopCampaignModal.css";
 import { toast } from "react-toastify";
-import instagramIcon from "./Icons/instagram.png";
-import facebookIcon from "./Icons/facebook.png";
-import linkedinIcon from "./Icons/linkedin.png";
-import emailIcon from "./Icons/Email.png";
+import {
+  platformIcons,
+  type Platform,
+} from "../../../constants/campaigns.constants";
 
 interface Props {
   campaignName: string;
-  platforms: ("facebook" | "instagram" | "linkedin" | "gmail")[];
+  platforms: Platform[];
   onClose: () => void;
-  onStop: () => void; 
+  onStop: () => void;
 }
 
 export default function StopCampaignModal({
@@ -19,38 +19,20 @@ export default function StopCampaignModal({
   onClose,
   onStop,
 }: Props) {
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const togglePlatform = (platform: string) => {
+  const togglePlatform = (platform: Platform) => {
     setSelectedPlatforms((prev) =>
       prev.includes(platform)
         ? prev.filter((p) => p !== platform)
-        : [...prev, platform]
+        : [...prev, platform],
     );
-  };
-
-  const getIcon = (platform: string) => {
-    switch (platform) {
-      case "facebook":
-        return facebookIcon;
-      case "instagram":
-        return instagramIcon;
-      case "linkedin":
-        return linkedinIcon;
-      case "gmail":
-        return emailIcon;
-      default:
-        return "";
-    }
   };
 
   return (
     <div className="stop-overlay" onClick={onClose}>
-      <div
-        className="stop-modal"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="stop-modal" onClick={(e) => e.stopPropagation()}>
         <button className="stop-close" onClick={onClose}>
           ✕
         </button>
@@ -58,13 +40,9 @@ export default function StopCampaignModal({
         {/* ===== STEP 1 : SELECT PLATFORM ===== */}
         {!showConfirm && (
           <>
-            <h2 className="stop-title">
-              Stop Campaign ({campaignName})
-            </h2>
+            <h2 className="stop-title">Stop Campaign ({campaignName})</h2>
 
-            <p className="stop-subtitle">
-              Select platform to stop campaign
-            </p>
+            <p className="stop-subtitle">Select platform to stop campaign</p>
 
             <div className="platform-list">
               {platforms.map((platform) => (
@@ -74,18 +52,15 @@ export default function StopCampaignModal({
                   onClick={() => togglePlatform(platform)}
                 >
                   <div className="platform-left">
-                    <img src={getIcon(platform)} alt={platform} />
+                    <img src={platformIcons[platform]} alt={platform} />
                     <span>
-                      {platform.charAt(0).toUpperCase() +
-                        platform.slice(1)}
+                      {platform.charAt(0).toUpperCase() + platform.slice(1)}
                     </span>
                   </div>
 
                   <div
                     className={`checkbox ${
-                      selectedPlatforms.includes(platform)
-                        ? "checked"
-                        : ""
+                      selectedPlatforms.includes(platform) ? "checked" : ""
                     }`}
                   />
                 </div>
@@ -116,8 +91,7 @@ export default function StopCampaignModal({
             <h2 className="confirm-title">Stop Campaign</h2>
 
             <p className="confirm-text">
-              Do you really want to stop the{" "}
-              <b>{campaignName}</b> campaign?
+              Do you really want to stop the <b>{campaignName}</b> campaign?
             </p>
 
             <div className="stop-actions">
@@ -131,9 +105,9 @@ export default function StopCampaignModal({
               <button
                 className="stop-btn"
                 onClick={() => {
-                  onStop(); 
+                  onStop();
                   toast.warn("Campaign stopped successfully");
-                  onClose(); 
+                  onClose();
                 }}
               >
                 Yes

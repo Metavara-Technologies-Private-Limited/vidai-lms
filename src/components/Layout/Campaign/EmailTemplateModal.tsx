@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Modal, Box, Typography, IconButton, CircularProgress } from "@mui/material";
+import {
+  Modal,
+  Box,
+  Typography,
+  IconButton,
+  CircularProgress,
+} from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useState, useRef, useEffect } from "react";
 import "../../../styles/Campaign/EmailTemplateModal.css";
@@ -14,11 +20,7 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 const API_BASE_URL = "http://127.0.0.1:8000/api/templates";
 
-export default function EmailTemplateModal({
-  open,
-  onClose,
-//   onSelect,
-}: any) {
+export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
   const [selected, setSelected] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const emailEditorRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export default function EmailTemplateModal({
     document.execCommand(
       "insertHTML",
       false,
-      `<a href="${url}" target="_blank" style="color:#2563eb; text-decoration:underline;">${url}</a>`
+      `<a href="${url}" target="_blank" style="color:#2563eb; text-decoration:underline;">${url}</a>`,
     );
   };
 
@@ -107,13 +109,13 @@ export default function EmailTemplateModal({
         document.execCommand(
           "insertHTML",
           false,
-          `<img src="${event.target.result}" style="max-width:200px; border-radius:8px;" />`
+          `<img src="${event.target.result}" style="max-width:200px; border-radius:8px;" />`,
         );
       } else {
         document.execCommand(
           "insertHTML",
           false,
-          `<div style="color:#2563eb;">📎 ${file.name}</div>`
+          `<div style="color:#2563eb;">📎 ${file.name}</div>`,
         );
       }
     };
@@ -123,12 +125,18 @@ export default function EmailTemplateModal({
 
   // Insert template body into compose editor
   const handleInsertTemplate = () => {
-    if (previewTemplate && emailEditorRef.current) {
-      emailEditorRef.current.innerHTML = previewTemplate.body || "";
-      setComposeSubject(previewTemplate.subject || "");
+    if (previewTemplate) {
+      onSelect?.({
+        id: previewTemplate.id,
+        subject: previewTemplate.subject,
+        body: previewTemplate.body,
+      });
     }
+
     setPreviewOpen(false);
-    setComposeOpen(true);
+    setTemplateConfirmOpen(false);
+    setComposeOpen(false);
+    onClose();
   };
 
   return (
@@ -148,7 +156,13 @@ export default function EmailTemplateModal({
             </IconButton>
           </div>
 
-          <div className="compose-box" onClick={() => { onClose(); setComposeOpen(true); }}>
+          <div
+            className="compose-box"
+            onClick={() => {
+              onClose();
+              setComposeOpen(true);
+            }}
+          >
             <img src={editIcon} alt="Compose" />
             <span>Compose New Email</span>
           </div>
@@ -159,11 +173,19 @@ export default function EmailTemplateModal({
             <div className="line" />
           </div>
 
-          <Typography className="select-label">Select Email Template</Typography>
+          <Typography className="select-label">
+            Select Email Template
+          </Typography>
 
           <div className="template-list">
             {loading && (
-              <div style={{ display: "flex", justifyContent: "center", padding: "24px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  padding: "24px",
+                }}
+              >
                 <CircularProgress size={28} />
               </div>
             )}
@@ -187,7 +209,7 @@ export default function EmailTemplateModal({
                     setSelected(template.id);
                     setPreviewTemplate(template);
                     setTemplateConfirmOpen(true);
-                    onClose();
+                    // onClose();
                   }}
                 >
                   <input
@@ -259,16 +281,24 @@ export default function EmailTemplateModal({
             ))}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "16px", marginTop: "24px" }}>
-            <button className="cancel" onClick={() => setTemplateConfirmOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "16px",
+              marginTop: "24px",
+            }}
+          >
+            <button
+              className="cancel"
+              onClick={() => setTemplateConfirmOpen(false)}
+            >
               Cancel
             </button>
             <button
               className="send-btn"
-              onClick={() => {
-                setTemplateConfirmOpen(false);
-                setComposeOpen(true);
-              }}
+              disabled={!selected}
+              onClick={handleInsertTemplate}
             >
               Next
             </button>
@@ -318,7 +348,14 @@ export default function EmailTemplateModal({
             )}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "16px", marginTop: "24px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "16px",
+              marginTop: "24px",
+            }}
+          >
             <button className="cancel" onClick={() => setPreviewOpen(false)}>
               Cancel
             </button>

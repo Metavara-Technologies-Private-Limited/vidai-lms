@@ -25,6 +25,30 @@ interface Props {
   activeSubTab: string;
 }
 
+// const performanceData = [
+//   { date: "1 Jan", facebook: 650, instagram: 520 },
+//   { date: "2 Jan", facebook: 630, instagram: 600 },
+//   { date: "3 Jan", facebook: 520, instagram: 480 },
+//   { date: "4 Jan", facebook: 280, instagram: 320 },
+//   { date: "5 Jan", facebook: 240, instagram: 260 },
+//   { date: "6 Jan", facebook: 620, instagram: 580 },
+//   { date: "7 Jan", facebook: 160, instagram: 220 },
+// ];
+
+// const platformData = [
+//   { name: "Instagram", value: 30, color: "#A8AEBF" },
+//   { name: "Facebook", value: 20, color: "#C5CAD8" },
+//   { name: "LinkedIn", value: 50, color: "#8D95A8" },
+// ];
+
+const PIE_COLORS: Record<string, string> = {
+  instagram: "#A8AEBF",
+  facebook: "#C5CAD8",
+  linkedin: "#8D95A8",
+  gmail: "#ECB856",
+};
+
+// Kept as fallback for social (FB insights pending app review)
 const performanceData = [
   { date: "1 Jan", facebook: 650, instagram: 520 },
   { date: "2 Jan", facebook: 630, instagram: 600 },
@@ -33,12 +57,6 @@ const performanceData = [
   { date: "5 Jan", facebook: 240, instagram: 260 },
   { date: "6 Jan", facebook: 620, instagram: 580 },
   { date: "7 Jan", facebook: 160, instagram: 220 },
-];
-
-const platformData = [
-  { name: "Instagram", value: 30, color: "#A8AEBF" },
-  { name: "Facebook", value: 20, color: "#C5CAD8" },
-  { name: "LinkedIn", value: 50, color: "#8D95A8" },
 ];
 
 const CampaignTabContent: React.FC<Props> = ({
@@ -88,14 +106,17 @@ const CampaignTabContent: React.FC<Props> = ({
 
           {/* Body paragraphs */}
           {hasText ? (
-            bodyLines.length > 0 ? (
+            platformText.trim().startsWith("<") ? (
+              <div
+                dangerouslySetInnerHTML={{ __html: platformText }}
+                style={{ lineHeight: 1.6 }}
+              />
+            ) : (
               bodyLines.map((line, i) => (
                 <p key={i} style={{ marginBottom: "10px", lineHeight: 1.6 }}>
                   {line}
                 </p>
               ))
-            ) : (
-              <p style={{ lineHeight: 1.6 }}>{platformText}</p>
             )
           ) : (
             <p style={{ color: "#aaa", fontStyle: "italic" }}>
@@ -104,9 +125,7 @@ const CampaignTabContent: React.FC<Props> = ({
           )}
 
           {/* Hashtags */}
-          {hashtagLine && (
-            <p className="cd-content-tags">{hashtagLine}</p>
-          )}
+          {hashtagLine && <p className="cd-content-tags">{hashtagLine}</p>}
         </div>
 
         {/* Image side — only render if image exists */}
@@ -141,8 +160,14 @@ const CampaignTabContent: React.FC<Props> = ({
         <div className="cd-perf-divider"></div>
         <div className="cd-perf-row">
           <div className="cd-perf-left">
-            <div className="cd-perf-number">1500</div>
-            <div className="cd-perf-sub">Total Impressions</div>
+            <div className="cd-perf-number">
+              {campaign.type === "email"
+                ? ((campaign as any).impressions ?? 0)
+                : "—"}
+            </div>
+            <div className="cd-perf-sub">
+              {campaign.type === "email" ? "Total Opens" : "Pending App Review"}
+            </div>
           </div>
 
           <div className="cd-platform-toggle">
@@ -216,6 +241,42 @@ const CampaignTabContent: React.FC<Props> = ({
 
   /* ================= PLATFORM BREAKDOWN ================= */
   if (activeTab === "Platform Breakdown") {
+    const budgetRaw: Record<string, number> =
+      (campaign as any).budget_data ?? {};
+    const selectedPlatforms: string[] = (campaign as any).platforms ?? [];
+    const totalBudget = selectedPlatforms.reduce(
+      (s, p) => s + (budgetRaw[p] ?? 0),
+      0,
+    );
+    const leadCount = (campaign as any).lead_generated ?? 0;
+
+    const platformData = selectedPlatforms
+      .filter((p) => (budgetRaw[p] ?? 0) > 0)
+      .map((p) => ({
+        name: p.charAt(0).toUpperCase() + p.slice(1),
+        value:
+          totalBudget > 0
+            ? Math.round(((budgetRaw[p] ?? 0) / totalBudget) * 100)
+            : 0,
+        color: PIE_COLORS[p] ?? "#ccc",
+      }));
+
+    // fallback: if no budget data (organic), show equal split
+    const pieData =
+      platformData.length > 0
+        ? platformData
+        : selectedPlatforms.map((p) => ({
+            name: p.charAt(0).toUpperCase() + p.slice(1),
+            value: Math.round(100 / selectedPlatforms.length),
+            color: PIE_COLORS[p] ?? "#ccc",
+          }));
+
+    const platformIconMap: Record<string, string> = {
+      instagram: instagramIcon,
+      facebook: facebookIcon,
+      linkedin: linkedinIcon,
+    };
+
     return (
       <div className="cd-platform-wrapper">
         <h3 className="cd-platform-title">
@@ -227,7 +288,7 @@ const CampaignTabContent: React.FC<Props> = ({
             <ResponsiveContainer width="100%" height={320}>
               <PieChart>
                 <Pie
-                  data={platformData}
+                  data={pieData}
                   dataKey="value"
                   nameKey="name"
                   outerRadius={130}
@@ -247,10 +308,8 @@ const CampaignTabContent: React.FC<Props> = ({
                     const RADIAN = Math.PI / 180;
                     const midRadius =
                       innerRadius + (outerRadius - innerRadius) / 2;
-                    const x =
-                      cx + midRadius * Math.cos(-midAngle * RADIAN);
-                    const y =
-                      cy + midRadius * Math.sin(-midAngle * RADIAN);
+                    const x = cx + midRadius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + midRadius * Math.sin(-midAngle * RADIAN);
 
                     return (
                       <>
@@ -329,42 +388,31 @@ const CampaignTabContent: React.FC<Props> = ({
               </PieChart>
             </ResponsiveContainer>
             <div className="cd-platform-legend">
-              <div>
-                <span className="legend-dot dot1"></span>
-                <img src={instagramIcon} alt="Instagram" />
-                Instagram
-              </div>
-              <div>
-                <span className="legend-dot dot2"></span>
-                <img src={facebookIcon} alt="Facebook" />
-                Facebook
-              </div>
-              <div>
-                <span className="legend-dot dot3"></span>
-                <img src={linkedinIcon} alt="LinkedIn" />
-                LinkedIn
-              </div>
+              {pieData.map((p, i) => (
+                <div key={p.name}>
+                  <span
+                    className={`legend-dot dot${i + 1}`}
+                    style={{ background: p.color }}
+                  />
+                  <img
+                    src={platformIconMap[p.name.toLowerCase()] ?? instagramIcon}
+                    alt={p.name}
+                  />
+                  {p.name}
+                </div>
+              ))}
             </div>
           </div>
           <div className="cd-platform-cards">
-            <PlatformCard
-              icon={instagramIcon}
-              title="Instagram"
-              spend="$1200"
-              conversion="60"
-            />
-            <PlatformCard
-              icon={facebookIcon}
-              title="Facebook"
-              spend="$1300"
-              conversion="40"
-            />
-            <PlatformCard
-              icon={linkedinIcon}
-              title="LinkedIn"
-              spend="$1500"
-              conversion="80"
-            />
+            {selectedPlatforms.map((p) => (
+              <PlatformCard
+                key={p}
+                icon={platformIconMap[p] ?? instagramIcon}
+                title={p.charAt(0).toUpperCase() + p.slice(1)}
+                spend={`$${budgetRaw[p] ?? 0}`}
+                conversion={String(leadCount)}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -372,41 +420,58 @@ const CampaignTabContent: React.FC<Props> = ({
   }
 
   if (activeTab === "AI Insights") {
+    const isEmail = campaign.type === "email";
+    const platforms: string[] = (campaign as any).platforms ?? [];
+    const budgetRaw: Record<string, number> =
+      (campaign as any).budget_data ?? {};
+    const totalBudget = platforms.reduce((s, p) => s + (budgetRaw[p] ?? 0), 0);
+    const leadCount = (campaign as any).lead_generated ?? 0;
+    const topPlatform =
+      [...platforms].sort(
+        (a, b) => (budgetRaw[b] ?? 0) - (budgetRaw[a] ?? 0),
+      )[0] ?? "facebook";
+    const cpa = leadCount > 0 ? (totalBudget / leadCount).toFixed(2) : null;
+
     return (
       <div className="cd-ai-wrapper">
         <h3 className="cd-ai-title">AI-Powered Insights</h3>
         <div className="cd-ai-divider"></div>
         <div className="cd-ai-cards">
           <div className="cd-ai-card green">
-            <div className="cd-ai-heading">High Performer</div>
+            <div className="cd-ai-heading">
+              {isEmail ? "Email Performance" : "Top Platform"}
+            </div>
             <p>
-              Your LinkedIn ads are outperforming by 35%. The B2B audience is
-              highly engaged. Consider allocating 15–20% more budget to
-              LinkedIn.
+              {isEmail
+                ? `Your email campaign achieved ${(campaign as any).impressions ?? 0} opens and ${(campaign as any).clicks ?? 0} clicks with a ${(campaign as any).conversion_rate ?? 0}% conversion rate.`
+                : `${topPlatform.charAt(0).toUpperCase() + topPlatform.slice(1)} has the highest budget allocation at $${budgetRaw[topPlatform] ?? 0}. Monitor leads closely from this platform.`}
             </p>
           </div>
 
           <div className="cd-ai-card blue">
             <div className="cd-ai-heading">Optimization Opportunity</div>
             <p>
-              Peak engagement occurs between 10 AM – 2 PM EST. Schedule posts
-              during these hours for 23% higher CTR.
+              {isEmail
+                ? `You have ${(campaign as any).bounces ?? 0} bounces and ${(campaign as any).unsubscribes ?? 0} unsubscribes. Clean your list regularly to improve deliverability.`
+                : `Campaign runs from ${campaign.start} to ${campaign.end}. Schedule posts between 10 AM – 2 PM for 23% higher engagement.`}
             </p>
           </div>
 
           <div className="cd-ai-card purple">
             <div className="cd-ai-heading">Content Recommendation</div>
             <p>
-              Video content generates 2.8x more engagement. Consider adding
-              video creatives to Instagram & Facebook.
+              {isEmail
+                ? "Use personalized subject lines and strong CTAs to improve open rates. Consider A/B testing your email content."
+                : `${platforms.includes("instagram") ? "Add high-quality images for Instagram — image posts get 38% more engagement. " : ""}Video content generates 2.8x more engagement across social platforms.`}
             </p>
           </div>
 
           <div className="cd-ai-card orange">
             <div className="cd-ai-heading">Budget Efficiency</div>
             <p>
-              Cost Per Conversion is 12% below target. Increase budget by $500
-              while maintaining profitability.
+              {cpa
+                ? `Current Cost Per Acquisition is $${cpa} based on ${leadCount} lead${leadCount !== 1 ? "s" : ""} from a $${totalBudget} budget.`
+                : `Total budget is $${totalBudget}. No conversions tracked yet — ensure your landing page captures leads correctly.`}
             </p>
           </div>
         </div>

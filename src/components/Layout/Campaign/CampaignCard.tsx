@@ -1,9 +1,5 @@
 import "../../../styles/Campaign/CampaignCard.css";
 import StopCampaignModal from "./StopCampaignModal";
-import instagramIcon from "./Icons/instagram.png";
-import facebookIcon from "./Icons/facebook.png";
-import linkedinIcon from "./Icons/linkedin.png";
-import emailIcon from "./Icons/Email.png";
 import viewIcon from "./Icons/view.png";
 import pauseIcon from "./Icons/pause.png";
 import moreIcon from "./Icons/more.png";
@@ -16,7 +12,15 @@ import mailCardIcon from "./Icons/mail-card.png";
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
-import type { Campaign, CampaignStatus } from "../../../types/campaigns.types";
+import type { Campaign } from "../../../types/campaigns.types";
+import { CAMPAIGN_STATUS, platformIcons, PLATFORMS, type CampaignStatus } from "../../../constants/campaigns.constants";
+import { formatScheduleTime } from "../../../utils/campaigns.utils";
+
+const INACTIVE_STATUSES = new Set<CampaignStatus>([
+  CAMPAIGN_STATUS.STOPPED,
+  CAMPAIGN_STATUS.COMPLETED,
+  CAMPAIGN_STATUS.FAILED,
+]);
 
 interface CampaignCardProps {
   campaign: Campaign;
@@ -28,7 +32,7 @@ interface CampaignCardProps {
   onDuplicate?: (campaign: Campaign) => void;
 }
 
-const campaignTypeIconMap = {
+const campaignTypeIconMap: Record<Campaign["type"], string> = {
   social: socialCardIcon,
   email: mailCardIcon,
 };
@@ -46,11 +50,7 @@ export default function CampaignCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const [showStopModal, setShowStopModal] = useState(false);
 
-  // Normalise platforms to a lowercase string array — guards against
-  // undefined, null, or any unexpected shape coming from the API mapper.
-  const platforms = (c.platforms ?? []).map((p) =>
-    (p ?? "").toLowerCase()
-  ) as ("facebook" | "instagram" | "linkedin" | "gmail")[];
+  const platforms = c.platforms ?? [];
 
   const toggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -100,21 +100,21 @@ export default function CampaignCard({
         <div>
           <label>Platform:</label>
           <div className="platform-icons">
-            {platforms.includes("facebook") && (
-              <img src={facebookIcon} className="platform-icon" alt="Facebook" />
-            )}
-            {platforms.includes("instagram") && (
-              <img src={instagramIcon} className="platform-icon" alt="Instagram" />
-            )}
-            {platforms.includes("linkedin") && (
-              <img src={linkedinIcon} className="platform-icon" alt="LinkedIn" />
-            )}
-            {platforms.includes("gmail") && (
-              <img src={emailIcon} className="platform-icon" alt="Email" />
-            )}
-            {/* Show email icon for email-type campaigns that have no platform set */}
+            {platforms.map((p) => (
+              <img
+                key={p}
+                src={platformIcons[p]}
+                className="platform-icon"
+                alt={p}
+              />
+            ))}
+
             {platforms.length === 0 && c.type === "email" && (
-              <img src={emailIcon} className="platform-icon" alt="Email" />
+              <img
+                src={platformIcons[PLATFORMS.GMAIL]}
+                className="platform-icon"
+                alt="Email"
+              />
             )}
           </div>
         </div>
@@ -123,10 +123,10 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-        {c.status === "Scheduled" && c.scheduledAt ? (
+        {c.status === CAMPAIGN_STATUS.SCHEDULED ? (
           <span>
             <label>SCHEDULED:</label>{" "}
-            {dayjs(c.scheduledAt).format("DD MMM [at] hh:mm A")}
+            {formatScheduleTime(c.selected_start, c.enter_time)}
           </span>
         ) : (
           <span>
@@ -150,8 +150,8 @@ export default function CampaignCard({
             className="action-btn pause-btn"
             onClick={(e) => {
               e.stopPropagation();
-              if (c.status === "Stopped") {
-                onStatusChange(c.id, "Live");
+              if (c.status === CAMPAIGN_STATUS.STOPPED) {
+                onStatusChange(c.id, CAMPAIGN_STATUS.LIVE);
                 toast.success("Campaign is Live now");
               } else {
                 setShowStopModal(true);
@@ -159,7 +159,7 @@ export default function CampaignCard({
             }}
           >
             <img
-              src={c.status === "Stopped" ? playIcon : pauseIcon}
+              src={c.status === CAMPAIGN_STATUS.STOPPED ? playIcon : pauseIcon}
               alt="Toggle"
               width={20}
               height={20}
@@ -196,10 +196,14 @@ export default function CampaignCard({
                     onDuplicate?.(c);
                   }}
                 >
-                  <img src={duplicateIcon} alt="Duplicate" className="menu-icon" />
+                  <img
+                    src={duplicateIcon}
+                    alt="Duplicate"
+                    className="menu-icon"
+                  />
                   Duplicate
                 </div>
-                {c.status !== "Stopped" && (
+                {!INACTIVE_STATUSES.has(c.status) && (
                   <div
                     className="menu-item stop-item"
                     onClick={(e) => {
@@ -224,7 +228,7 @@ export default function CampaignCard({
           platforms={platforms}
           onClose={() => setShowStopModal(false)}
           onStop={() => {
-            onStatusChange(c.id, "Stopped");
+            onStatusChange(c.id, CAMPAIGN_STATUS.STOPPED);
             setShowStopModal(false);
           }}
         />

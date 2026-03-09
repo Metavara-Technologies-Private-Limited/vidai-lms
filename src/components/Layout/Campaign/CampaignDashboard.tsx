@@ -1,11 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import "../../../../src/styles/Campaign/CampaignDashboard.css";
 import React from "react";
 import dayjs from "dayjs";
-import instagramIcon from "./Icons/instagram.png";
-import facebookIcon from "./Icons/facebook.png";
-import linkedinIcon from "./Icons/linkedin.png";
-import emailIcon from "./Icons/Email.png";
 import globeIcon from "./Images/globe.png";
 import TurnLeftIcon from "@mui/icons-material/TurnLeft";
 import impressionsIcon from "./Icons/impressions.png";
@@ -18,36 +13,16 @@ import cpcIcon from "./Icons/cpc.png";
 import cpaIcon from "./Icons/cpa.png";
 import CampaignTabContent from "./CampaignTabContent";
 import { IconButton } from "@mui/material";
-
-interface Campaign {
-  id: string;
-  name: string;
-  type: "social" | "email";
-  status: string;
-  start: string;
-  end: string;
-  platforms: string[];
-  lead_generated?: number;
-  scheduledAt?: string;
-  objective?: string;
-  total_spend?: number;
-  cpc?: number;
-  budget?: number;
-  budget_data?: Record<string, number>;
-  image_url?: string;
-  platform_data?: Record<string, string>;
-  campaign_content?: string;
-  start_date?: string;
-  end_date?: string;
-  created_at?: string;
-}
-
-const platformIconMap: Record<string, string> = {
-  facebook: facebookIcon,
-  instagram: instagramIcon,
-  linkedin: linkedinIcon,
-  gmail: emailIcon,
-};
+import { CampaignAPI } from "../../../services/campaign.api";
+import {
+  CAMPAIGN_OBJECTIVES,
+  CAMPAIGN_TYPE,
+  platformIcons,
+  PLATFORMS,
+  type Platform,
+} from "../../../constants/campaigns.constants";
+import type { Campaign } from "../../../types/campaigns.types";
+import { formatScheduleTime } from "../../../utils/campaigns.utils";
 
 /* ================= COMPONENT ================= */
 const CampaignDashboard = ({
@@ -66,11 +41,45 @@ const CampaignDashboard = ({
     campaign.end,
   ).format("DD/MM/YYYY")}`;
 
-  const scheduleTime = campaign.scheduledAt
-    ? dayjs(campaign.scheduledAt).format("DD MMM YYYY, hh:mm A")
-    : "-";
+  const scheduleTime = formatScheduleTime(
+    campaign.selected_start,
+    campaign.enter_time,
+  );
 
-  const platforms = campaign.platforms || [];
+  const platforms: Platform[] = campaign.platforms ?? [];
+
+  const [insights, setInsights] = React.useState({
+    impressions: 0,
+    clicks: 0,
+    engagement: 0,
+  });
+
+  React.useEffect(() => {
+    const fetchInsights = async () => {
+      try {
+        const res = await CampaignAPI.getFacebookInsights(campaign.id);
+        await CampaignAPI.getFacebookDebug(campaign.id);
+
+        const data = res.data?.insights || {};
+
+        setInsights({
+          impressions: data.post_impressions || 0,
+          clicks: data.post_clicks || 0,
+          engagement: data.post_engaged_users || 0,
+        });
+      } catch (err) {
+        console.error("Insights fetch failed", err);
+      }
+    };
+
+    if (campaign.platforms?.includes(PLATFORMS.FACEBOOK)) {
+      fetchInsights();
+
+      const interval = setInterval(fetchInsights, 60000);
+
+      return () => clearInterval(interval);
+    }
+  }, [campaign.id, campaign.platforms]);
 
   // ─── Resolve total budget ─────────────────────────────────────────────────
   // Priority 1: budget_data.total
@@ -79,34 +88,64 @@ const CampaignDashboard = ({
   const budgetData: Record<string, number> = campaign.budget_data ?? {};
   // Only sum budgets for platforms actually selected in this campaign
   const sumFromSelectedPlatforms = platforms
-    .filter((p) => p !== "gmail")
+    .filter((p) => p !== PLATFORMS.GMAIL)
     .reduce((sum, p) => sum + (Number(budgetData[p]) || 0), 0);
 
   const totalBudget: number =
-    sumFromSelectedPlatforms > 0 ? sumFromSelectedPlatforms : (campaign.total_spend ?? 0);
+    sumFromSelectedPlatforms > 0
+      ? sumFromSelectedPlatforms
+      : (campaign.total_spend ?? 0);
 
-  const metrics = [
-    { title: "Total Impressions", value: "0", icon: impressionsIcon },
-    { title: "Total Clicks", value: "0", icon: clicksIcon },
-    {
-      title: "Conversions",
-      value: campaign.lead_generated || "0",
-      icon: conversionsIcon,
-    },
-    {
-      title: "Total Budget",
-      value: `$${totalBudget}`,
-      icon: spendIcon,
-    },
-    { title: "CTR", value: "0%", icon: ctrIcon },
-    { title: "Conversion Rate", value: "0%", icon: conversionRateIcon },
-    {
-      title: "CPC",
-      value: `$${campaign.cpc?.toFixed(2) ?? "0.00"}`,
-      icon: cpcIcon,
-    },
-    { title: "CPA", value: "$0", icon: cpaIcon },
-  ];
+  const ctr =
+    insights.impressions > 0
+      ? ((insights.clicks / insights.impressions) * 100).toFixed(2)
+      : "0";
+      const metrics = [
+        {
+          title: "Total Impressions",
+          value: campaign.impressions ?? 0, // was hardcoded 0
+          icon: impressionsIcon,
+        },
+        {
+          title: "Total Clicks",
+          value: campaign.clicks ?? 0, // was hardcoded 0
+          icon: clicksIcon,
+        },
+        {
+          title: "Conversions",
+          value: campaign.lead_generated || "0",
+          icon: conversionsIcon,
+        },
+        {
+          title: "Total Budget",
+          value: `$${totalBudget}`,
+          icon: spendIcon,
+        },
+        // ... rest stays the same
+        {
+          title: "CTR",
+          value: `${ctr}%`,
+          icon: ctrIcon,
+        },
+        {
+          title: "Conversion Rate",
+          value:
+            campaign.type === CAMPAIGN_TYPE.EMAIL
+              ? `${campaign.conversion_rate ?? 0}%`
+              : "0%",
+          icon: conversionRateIcon,
+        },
+        {
+          title: "CPC",
+          value: `$${campaign.cpc?.toFixed(2) ?? "0.00"}`,
+          icon: cpcIcon,
+        },
+        {
+          title: "CPA",
+          value: "$0",
+          icon: cpaIcon,
+        },
+      ];
 
   return (
     <div className="cd-wrapper">
@@ -136,7 +175,7 @@ const CampaignDashboard = ({
                 <img src={globeIcon} alt="Global" />
               </div>
               <span className="cd-header-title">{campaign.name}</span>
-              <span className={`cd-live ${campaign.status.toLowerCase()}`}>
+              <span className={`status ${campaign.status.toLowerCase()}`}>
                 {campaign.status}
               </span>
             </div>
@@ -147,14 +186,20 @@ const CampaignDashboard = ({
             <Meta label="Schedule Time" value={scheduleTime} />
             <Meta
               label="Campaign Objective"
-              value={campaign.objective || "-"}
+              value={
+                campaign.objective
+                  ? CAMPAIGN_OBJECTIVES[
+                      campaign.objective as keyof typeof CAMPAIGN_OBJECTIVES
+                    ]
+                  : "-"
+              }
             />
             <Meta
               label="Platform"
               value={
                 <div className="cd-platform-icons">
                   {platforms.map((p) => (
-                    <img key={p} src={platformIconMap[p]} alt={p} />
+                    <img key={p} src={platformIcons[p]} alt={p} />
                   ))}
                 </div>
               }
@@ -209,7 +254,7 @@ const CampaignDashboard = ({
 
       {/* ================= TAB CONTENT ================= */}
       <CampaignTabContent
-        campaign={campaign as any}
+        campaign={campaign}
         activeTab={activeTab}
         activeSubTab={activeSubTab}
       />
@@ -218,7 +263,7 @@ const CampaignDashboard = ({
 };
 
 /* ================= META ================= */
-const Meta = ({ label, value }: { label: string; value: any }) => (
+const Meta = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="cd-meta-block">
     <span className="cd-meta-label">{label}</span>
     <span className="cd-meta-value">{value}</span>
@@ -226,6 +271,22 @@ const Meta = ({ label, value }: { label: string; value: any }) => (
 );
 
 /* ================= METRIC ================= */
+
+const METRIC_GRADIENTS: Record<string, string> = {
+  "Total Impressions":
+    "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
+  "Total Clicks":
+    "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
+  Conversions:
+    "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
+  "Total Budget":
+    "linear-gradient(180deg, rgba(236,189,86,0.10) 0%, rgba(236,189,86,0.05) 35%, #FFFFFF 100%)",
+  CTR: "linear-gradient(180deg, rgba(71,179,95,0.10) 0%, rgba(71,179,95,0.05) 35%, #FFFFFF 100%)",
+  "Conversion Rate":
+    "linear-gradient(180deg, rgba(242,91,91,0.10) 0%, rgba(242,91,91,0.05) 35%, #FFFFFF 100%)",
+  CPC: "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
+  CPA: "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
+};
 const Metric = ({
   title,
   value,
@@ -235,7 +296,10 @@ const Metric = ({
   value: string | number;
   icon: string;
 }) => (
-  <div className="cd-metric-card">
+  <div
+    className="cd-metric-card"
+    style={{ background: METRIC_GRADIENTS[title] }}
+  >
     <div className="cd-metric-icon">
       <img src={icon} alt={title} />
     </div>
