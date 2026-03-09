@@ -4,15 +4,18 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Montserrat:wght@700&display=swap");
 
-.leads-page,
-.leads-page * {
-  font-family: "Nunito", sans-serif !important;
+.leads-page {
+  font-family: "Nunito", sans-serif;
   font-weight: 400;
   font-style: normal;
   font-size: 14px;
   line-height: 140%;
   letter-spacing: 0%;
-  vertical-align: middle;
+}
+
+/* Apply to children but explicitly exclude fieldset/legend to protect MUI borders */
+.leads-page *:not(fieldset):not(legend):not(fieldset span):not(fieldset div) {
+  font-family: "Nunito", sans-serif;
 }
 
 /* ===============================
@@ -46,14 +49,33 @@
   margin: 0 !important;
 }
 
+/* ── Search input — use outline via box-shadow trick instead of border ── */
 .search-input {
   width: 300px;
 }
 
 .search-input .MuiOutlinedInput-root {
   background: #FFFFFF;
-  border-radius: 10px;
+  border-radius: 10px !important;
   height: 40px;
+}
+
+/* Hide the MUI notched outline entirely */
+.search-input .MuiOutlinedInput-notchedOutline {
+  border: none !important;
+}
+
+/* Draw our own border using box-shadow so fieldset/legend are irrelevant */
+.search-input .MuiOutlinedInput-root {
+  box-shadow: 0 0 0 1px #E5E7EB;
+}
+
+.search-input .MuiOutlinedInput-root:hover {
+  box-shadow: 0 0 0 1px #D1D5DB;
+}
+
+.search-input .MuiOutlinedInput-root.Mui-focused {
+  box-shadow: 0 0 0 1.5px #9CA3AF;
 }
 
 .search-input .MuiOutlinedInput-input {
@@ -450,9 +472,6 @@
 
 /* ===============================
    STICKY COLUMNS
-   ① checkbox   → sticky left
-   ② last       → sticky right 0       (3-dot menu, 52px wide)
-   ③ 2nd-last   → sticky right 52px    (Contact Option)
 ================================ */
 
 /* ① Checkbox — sticky LEFT */
