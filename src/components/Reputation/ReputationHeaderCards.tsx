@@ -2,6 +2,7 @@ import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 
+<<<<<<< Updated upstream
 import Review_Avg_Rating from "../../assets/icons/Review_Avg_Rating.svg";
 import Reviews_Sent from "../../assets/icons/Reviews_Sent.svg";
 import Reviews_Submit from "../../assets/icons/Reviews_Submit.svg";
@@ -49,6 +50,59 @@ const ReputationHeaderCards = ({
       title: "Conversion Rate",
       value: "31.2%",
       icon: <img src={Reviews_Conversion} alt="Conversion Rate" />,
+=======
+type Props = {
+  campaigns: any[];
+};
+
+const ReputationHeaderCards = ({ campaigns }: Props) => {
+  const total = campaigns.length;
+
+  const live = campaigns.filter(
+    (c) => (c.status || "").toLowerCase() === "live" || c.is_active === true
+  ).length;
+
+  const totalLeads = campaigns.reduce(
+    (sum, c) => sum + (c.lead_generated ?? c.leads_count ?? 0),
+    0
+  );
+
+  const scheduled = campaigns.filter(
+    (c) => (c.status || "").toLowerCase() === "scheduled"
+  ).length;
+
+  const liveRate = total > 0 ? ((live / total) * 100).toFixed(1) : "0.0";
+
+  const cardData = [
+    {
+      title: "Total Campaigns",
+      value: String(total),
+      icon: <ForumIcon sx={{ color: "#F2994A" }} />,
+      bg: "#FFF3E8",
+    },
+    {
+      title: "Live Campaigns",
+      value: String(live),
+      icon: <SendIcon sx={{ color: "#5C9CE5" }} />,
+      bg: "#EEF4FF",
+    },
+    {
+      title: "Leads Generated",
+      value: String(totalLeads),
+      icon: <CheckCircleIcon sx={{ color: "#4CAF50" }} />,
+      bg: "#EAF7EF",
+    },
+    {
+      title: "Scheduled",
+      value: String(scheduled),
+      icon: <StarIcon sx={{ color: "#F4B400" }} />,
+      bg: "#FFF6E5",
+    },
+    {
+      title: "Live Rate",
+      value: `${liveRate}%`,
+      icon: <PercentIcon sx={{ color: "#7E57C2" }} />,
+>>>>>>> Stashed changes
       bg: "#F3EEFF",
     },
   ];
@@ -76,7 +130,6 @@ const ReputationHeaderCards = ({
             boxShadow: "none",
           }}
         >
-          {/* Icon */}
           <Box
             sx={{
               width: 36,
@@ -91,26 +144,10 @@ const ReputationHeaderCards = ({
           >
             {card.icon}
           </Box>
-
-          {/* Title */}
-          <Typography
-            sx={{
-              fontSize: 13,
-              color: "#8A8A8A",
-              mb: 0.5,
-            }}
-          >
+          <Typography sx={{ fontSize: 13, color: "#8A8A8A", mb: 0.5 }}>
             {card.title}
           </Typography>
-
-          {/* Value */}
-          <Typography
-            sx={{
-              fontSize: 20,
-              fontWeight: 600,
-              color: "#1A1A1A",
-            }}
-          >
+          <Typography sx={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A" }}>
             {card.value}
           </Typography>
         </Card>
