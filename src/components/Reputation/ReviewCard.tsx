@@ -4,11 +4,6 @@ import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import Chip from "@mui/material/Chip";
 
-<<<<<<< Updated upstream
-import StarIcon from "@mui/icons-material/Star";
-import WhatsAppIcon from "@mui/icons-material/WhatsApp";
-=======
->>>>>>> Stashed changes
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import FacebookIcon from "@mui/icons-material/Facebook";
@@ -42,7 +37,6 @@ const ReviewCard = ({ campaign }: Props) => {
   const name = campaign.campaign_name || campaign.name || "Untitled Campaign";
   const status = campaign.status || (campaign.is_active ? "Live" : "Draft");
 
-  // Platforms from social_configs (primary) or platforms array (fallback)
   const platforms: string[] = campaign.social_configs?.length
     ? campaign.social_configs
         .filter((sc: any) => sc.is_active)
@@ -68,30 +62,20 @@ const ReviewCard = ({ campaign }: Props) => {
   const statusStyle = getStatusStyle(status, campaign.is_active);
 
   const modeLabel =
-    campaign.campaign_mode === "organic_posting"  ? "Organic"
+    campaign.campaign_mode === "organic_posting"    ? "Organic"
     : campaign.campaign_mode === "paid_advertising" ? "Paid"
     : campaign.campaign_mode || "Social";
 
-<<<<<<< Updated upstream
-const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
-
-=======
->>>>>>> Stashed changes
   return (
     <Card
-      onClick={onOpen}
       sx={{
         p: 2.5,
         borderRadius: 3,
         border: "1px solid #E5E7EB",
         boxShadow: "none",
         width: "100%",
-<<<<<<< Updated upstream
-        cursor: "pointer",
-=======
         transition: "box-shadow 0.2s",
         "&:hover": { boxShadow: "0 4px 16px rgba(0,0,0,0.08)" },
->>>>>>> Stashed changes
       }}
     >
       {/* Header */}

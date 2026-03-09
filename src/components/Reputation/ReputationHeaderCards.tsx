@@ -2,55 +2,12 @@ import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 
-<<<<<<< Updated upstream
-import Review_Avg_Rating from "../../assets/icons/Review_Avg_Rating.svg";
-import Reviews_Sent from "../../assets/icons/Reviews_Sent.svg";
-import Reviews_Submit from "../../assets/icons/Reviews_Submit.svg";
-import Reviews_Total from "../../assets/icons/Reviews_Total.svg";
-import Reviews_Conversion from "../../assets/icons/Reviews_Conversion.svg";
+import ForumIcon from "@mui/icons-material/Forum";
+import SendIcon from "@mui/icons-material/Send";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import StarIcon from "@mui/icons-material/Star";
+import PercentIcon from "@mui/icons-material/Percent";
 
-type Props = {
-  avgRating?: number;
-  reviewsSubmitted?: number;
-  reviewRequestsSent?: number;
-};
-
-const ReputationHeaderCards = ({
-  avgRating = 4.8,
-  reviewsSubmitted = 125,
-  reviewRequestsSent = 215,
-}: Props) => {
-
-  const cardData = [
-    {
-      title: "Avg Rating",
-      value: avgRating.toFixed(1),
-      icon: <img src={Review_Avg_Rating} alt="Avg Rating" />,
-      bg: "#FFF6E5",
-    },
-    {
-      title: "Reviews Requests Sent",
-      value: reviewRequestsSent,
-      icon: <img src={Reviews_Sent} alt="Reviews Requests Sent" />,
-      bg: "#EEF4FF",
-    },
-    {
-      title: "Reviews Submitted",
-      value: reviewsSubmitted,
-      icon: <img src={Reviews_Submit} alt="Reviews Submitted" />,
-      bg: "#EAF7EF",
-    },
-    {
-      title: "Total Reviews",
-      value: "2,015",
-      icon: <img src={Reviews_Total} alt="Total Reviews" />,
-      bg: "#FFF3E8",
-    },
-    {
-      title: "Conversion Rate",
-      value: "31.2%",
-      icon: <img src={Reviews_Conversion} alt="Conversion Rate" />,
-=======
 type Props = {
   campaigns: any[];
 };
@@ -102,7 +59,6 @@ const ReputationHeaderCards = ({ campaigns }: Props) => {
       title: "Live Rate",
       value: `${liveRate}%`,
       icon: <PercentIcon sx={{ color: "#7E57C2" }} />,
->>>>>>> Stashed changes
       bg: "#F3EEFF",
     },
   ];
