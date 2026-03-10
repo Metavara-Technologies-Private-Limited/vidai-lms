@@ -36,7 +36,7 @@ import TemplateService, {
 interface EditCampaignModalProps {
   campaign: Campaign;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (updated: Campaign) => void;
 }
 
 export default function EditCampaignModal({
@@ -270,8 +270,20 @@ export default function EditCampaignModal({
       };
 
       await CampaignAPI.update(campaign.id, payload);
-      onSave();
-      onClose();
+
+const updatedCampaign: Campaign = {
+  ...campaign,
+  name: campaignName,
+  description: campaignDescription,
+   objective: objective as Campaign["objective"],
+  audience: audience as Campaign["audience"],
+  start: startDate,
+  end: endDate,
+  scheduledAt: `${start}T${scheduleTime}`,
+};
+
+onSave(updatedCampaign);
+onClose();
     } catch (error) {
       console.error("Update error:", error);
     }

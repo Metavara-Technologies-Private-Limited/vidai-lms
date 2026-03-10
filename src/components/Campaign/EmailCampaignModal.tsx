@@ -43,7 +43,7 @@ interface EmailTemplate {
 }
 interface EmailCampaignModalProps {
   onClose: () => void;
-  onSave: () => void;
+  onSave: (campaign: EmailCampaignPayload) => void;
 }
 
 export default function EmailCampaignModal({
@@ -176,7 +176,7 @@ export default function EmailCampaignModal({
 
       await CampaignAPI.createEmail(payload);
 
-      onSave();
+      onSave(payload);
       toast.success("Campaign created successfully");
       onClose();
     } catch (error: unknown) {

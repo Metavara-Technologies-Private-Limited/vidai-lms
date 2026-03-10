@@ -4,7 +4,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import ImageIcon from "@mui/icons-material/Image";
-import type { Platform } from "../../types/campaigns.types";
+import type { Platform } from "../../constants/campaigns.constants";
 
 interface Props {
   platform: Platform;
