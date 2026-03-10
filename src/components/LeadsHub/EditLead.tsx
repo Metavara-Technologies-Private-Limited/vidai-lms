@@ -48,6 +48,7 @@ export default function EditLead() {
     loading,
     error, setError,
     saving,
+    campaigns,
     departments,
     employees,
     filteredPersonnel,
@@ -68,9 +69,9 @@ export default function EditLead() {
     partnerName, setPartnerName,
     partnerAge, setPartnerAge,
     partnerGender, setPartnerGender,
-    source, setSource,
-    subSource, setSubSource,
-    campaign, setCampaign,
+    source,
+    subSource,
+    campaign, handleCampaignChange,
     assignee, setAssignee,
     nextType,
     nextStatus, setNextStatus,
@@ -87,6 +88,7 @@ export default function EditLead() {
     handleRemoveExistingDocument,
     wantAppointment,
     department, setDepartment,
+    appointmentPersonnel, setAppointmentPersonnel,
     selectedDate,
     handleDateChange,
     slot, setSlot,
@@ -262,7 +264,7 @@ export default function EditLead() {
                 </TextField>
               </Box>
 
-              {/* ---- Partner Information (collapsible Yes/No toggle) ---- */}
+              {/* ---- Partner Information ---- */}
               <Typography sx={sectionLabelStyle}>PARTNER INFORMATION</Typography>
               <Box sx={{ mb: 1.5 }}>
                 <Typography sx={{ ...labelStyle, mb: 0.5 }}>Is This Inquiry For A Couple?</Typography>
@@ -292,31 +294,58 @@ export default function EditLead() {
                 </Box>
               )}
 
+              {/* ---- Source & Campaign ---- */}
               <Typography sx={sectionLabelStyle}>SOURCE & CAMPAIGN DETAILS</Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 3 }}>
                 <Box>
-                  <Typography sx={labelStyle}>Source *</Typography>
-                  <TextField select fullWidth size="small" value={source} onChange={(e) => setSource(e.target.value)} sx={inputStyle}>
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Social Media">Social Media</MenuItem>
-                    <MenuItem value="Website">Website</MenuItem>
-                    <MenuItem value="Referral">Referral</MenuItem>
-                    <MenuItem value="Direct">Direct</MenuItem>
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Sub-Source</Typography>
-                  <TextField select fullWidth size="small" value={subSource} onChange={(e) => setSubSource(e.target.value)} sx={inputStyle}>
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Facebook">Facebook</MenuItem>
-                    <MenuItem value="Instagram">Instagram</MenuItem>
-                    <MenuItem value="Google">Google</MenuItem>
-                    <MenuItem value="LinkedIn">LinkedIn</MenuItem>
-                  </TextField>
-                </Box>
-                <Box>
                   <Typography sx={labelStyle}>Campaign Name</Typography>
-                  <TextField fullWidth size="small" value={campaign} onChange={(e) => setCampaign(e.target.value)} sx={inputStyle} />
+                  <TextField
+                    select fullWidth size="small"
+                    value={campaign}
+                    onChange={handleCampaignChange}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- Select Campaign --</MenuItem>
+                    {campaigns.map((c) => (
+                      <MenuItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>
+                    Source
+                    {campaign && (
+                      <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+                        auto-filled
+                      </Typography>
+                    )}
+                  </Typography>
+                  <TextField
+                    fullWidth size="small"
+                    value={source}
+                    sx={campaign ? readOnlyStyle : inputStyle}
+                    InputProps={{ readOnly: Boolean(campaign) }}
+                    placeholder="Auto-filled from campaign"
+                  />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>
+                    Sub-Source
+                    {campaign && (
+                      <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+                        auto-filled
+                      </Typography>
+                    )}
+                  </Typography>
+                  <TextField
+                    fullWidth size="small"
+                    value={subSource}
+                    sx={campaign ? readOnlyStyle : inputStyle}
+                    InputProps={{ readOnly: Boolean(campaign) }}
+                    placeholder="Auto-filled from campaign"
+                  />
                 </Box>
               </Box>
 
@@ -419,7 +448,6 @@ export default function EditLead() {
                 </Stack>
               )}
 
-              {/* ---- Documents & Reports ---- */}
               <Typography sx={sectionLabelStyle}>DOCUMENTS & REPORTS</Typography>
 
               {docsLoading && (
@@ -548,22 +576,27 @@ export default function EditLead() {
           {/* ===== STEP 3 ===== */}
           {currentStep === 3 && (
             <Box>
-              {/* ---- Book Appointment — same collapsible Yes/No pattern as Partner Information ---- */}
               <Typography sx={sectionLabelStyle}>APPOINTMENT DETAILS</Typography>
 
               <Box sx={{ mb: 1.5 }}>
                 <Typography sx={{ ...labelStyle, mb: 0.5 }}>Want to Book an Appointment?</Typography>
+                {/* ── FIX: explicit string comparison, no type casting issues ── */}
                 <RadioGroup
                   row
                   value={wantAppointment}
-                  onChange={(e) => handleWantAppointmentChange(e.target.value as "yes" | "no")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "yes" || val === "no") {
+                      handleWantAppointmentChange(val);
+                    }
+                  }}
                 >
                   <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
                   <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
                 </RadioGroup>
               </Box>
 
-              {/* Fields only mount when Yes — mirrors Partner Information pattern exactly */}
+              {/* ── FIX: strict equality check ensures section shows/hides correctly ── */}
               {wantAppointment === "yes" && (
                 <Box>
                   <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
@@ -571,7 +604,10 @@ export default function EditLead() {
                       <Typography sx={labelStyle}>Department *</Typography>
                       <TextField
                         select fullWidth size="small" value={department}
-                        onChange={(e) => setDepartment(e.target.value)}
+                        onChange={(e) => {
+                          setDepartment(e.target.value);
+                          setAppointmentPersonnel("");
+                        }}
                         sx={inputStyle}
                         disabled={loadingDepartments}
                         InputProps={{
@@ -585,10 +621,11 @@ export default function EditLead() {
                       </TextField>
                     </Box>
                     <Box>
-                      <Typography sx={labelStyle}>Assigned To</Typography>
+                      <Typography sx={labelStyle}>Personnel</Typography>
                       <TextField
-                        select fullWidth size="small" value={assignee}
-                        onChange={(e) => setAssignee(e.target.value)}
+                        select fullWidth size="small"
+                        value={appointmentPersonnel}
+                        onChange={(e) => setAppointmentPersonnel(e.target.value)}
                         sx={inputStyle}
                         disabled={loadingEmployees || !department}
                       >
@@ -597,11 +634,14 @@ export default function EditLead() {
                         ) : filteredPersonnel.length === 0 ? (
                           <MenuItem value="" disabled>No employees in this department</MenuItem>
                         ) : (
-                          filteredPersonnel.map((emp) => (
-                            <MenuItem key={emp.id} value={emp.id.toString()}>
-                              {emp.emp_name} ({emp.emp_type})
-                            </MenuItem>
-                          ))
+                          [
+                            <MenuItem key="" value=""><em>-- Select Personnel --</em></MenuItem>,
+                            ...filteredPersonnel.map((emp) => (
+                              <MenuItem key={emp.id} value={emp.id.toString()}>
+                                {emp.emp_name} ({emp.emp_type})
+                              </MenuItem>
+                            )),
+                          ]
                         )}
                       </TextField>
                     </Box>
@@ -613,7 +653,7 @@ export default function EditLead() {
                       <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DatePicker
                           value={selectedDate}
-                          onChange={(val) => handleDateChange(val as Parameters<typeof handleDateChange>[0], {} as Parameters<typeof handleDateChange>[1])}
+                          onChange={(val) => handleDateChange(val)}
                           slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
                         />
                       </LocalizationProvider>
@@ -675,7 +715,6 @@ export default function EditLead() {
                 Next
               </Button>
             ) : (
-              // ── Save button: no CircularProgress, plain text only ──
               <Button
                 onClick={handleSave} disabled={saving} variant="contained"
                 sx={{
@@ -684,7 +723,7 @@ export default function EditLead() {
                   "&:hover": { bgcolor: "#0F172A", boxShadow: "none" },
                 }}
               >
-                Save
+                {saving ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Save"}
               </Button>
             )}
           </Box>

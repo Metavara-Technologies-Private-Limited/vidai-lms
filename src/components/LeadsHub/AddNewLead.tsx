@@ -31,6 +31,10 @@ import {
 import { validateStep } from "../LeadsHub/addNewLead.validation";
 import { Step1, Step2, Step3 } from "../LeadsHub/addNewLead.steps";
 
+// ── Capitalize first letter helper ──────────────────────────────────────────
+const capitalizeFirst = (value: string) =>
+  value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
+
 // ====================== Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
@@ -56,12 +60,12 @@ export default function AddNewLead() {
     () =>
       (rawCampaigns || []).map((api: CampaignData) => ({
         id: api.id,
-        name: api.campaign_name ?? "",
+        name: capitalizeFirst(api.campaign_name ?? ""),
         source: api.campaign_mode === 1 ? "Social Media" : "Email",
         subSource:
           api.campaign_mode === 1
-            ? (api.social_media?.[0]?.platform_name ?? "")
-            : "gmail",
+            ? capitalizeFirst(api.social_media?.[0]?.platform_name ?? "")
+            : "Gmail",
         isActive: Boolean(api.is_active),
       })),
     [rawCampaigns],
@@ -159,9 +163,9 @@ export default function AddNewLead() {
     if (!matched) return;
     setForm((prev) => ({
       ...prev,
-      campaignName: matched.name,
-      source: matched.source,
-      subSource: matched.subSource,
+      campaignName: capitalizeFirst(matched.name),
+      source: capitalizeFirst(matched.source),
+      subSource: capitalizeFirst(matched.subSource),
     }));
   }, [form.campaign, campaigns]);
 
@@ -183,7 +187,7 @@ export default function AddNewLead() {
   // ── Handlers ────────────────────────────────────────────────────
   const handleChange =
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+      setForm((prev) => ({ ...prev, [field]: capitalizeFirst(e.target.value) }));
 
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
