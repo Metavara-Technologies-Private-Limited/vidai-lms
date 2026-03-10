@@ -492,7 +492,7 @@ describe("useEditLead — handleDateChange", () => {
     const newDate = dayjs("2025-01-20");
 
     act(() => {
-      result.current.handleDateChange(newDate, {} as never);
+      result.current.handleDateChange(newDate);
     });
 
     expect(result.current.selectedDate?.format("YYYY-MM-DD")).toBe("2025-01-20");
@@ -503,7 +503,7 @@ describe("useEditLead — handleDateChange", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     act(() => {
-      result.current.handleDateChange(null, {} as never);
+      result.current.handleDateChange(null);
     });
 
     expect(result.current.selectedDate).toBeNull();
@@ -645,7 +645,7 @@ describe("useEditLead — setters (state updates)", () => {
   it("updates wantAppointment to 'no'", async () => {
     const { result } = renderHook(() => useEditLead());
     await waitFor(() => expect(result.current.loading).toBe(false));
-    act(() => result.current.setWantAppointment("no"));
+    act(() => result.current.handleWantAppointmentChange("no"));
     expect(result.current.wantAppointment).toBe("no");
   });
 
