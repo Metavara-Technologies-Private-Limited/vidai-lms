@@ -1,6 +1,6 @@
 import { useMemo, useState, lazy, Suspense } from "react";
 import "../styles/Campaign/campaigns.css";
-import searchIcon from "../components/Layout/Campaign/Icons/search.png";
+import searchIcon from "../components/Campaign/Icons/search.png";
 import CampaignHeader from "../components/Campaign/CampaignHeader";
 import CampaignCard from "../components/Campaign/CampaignCard";
 import { useSelector, useDispatch } from "react-redux";

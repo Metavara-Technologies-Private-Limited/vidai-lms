@@ -1,7 +1,7 @@
-import instagramIcon from "../components/Layout/Campaign/Icons/instagram.png";
-import facebookIcon from "../components/Layout/Campaign/Icons/facebook.png";
-import linkedinIcon from "../components/Layout/Campaign/Icons/linkedin.png";
-import emailIcon from "../components/Layout/Campaign/Icons/Email.png";
+import instagramIcon from "../components/Campaign/Icons/instagram.png";
+import facebookIcon from "../components/Campaign/Icons/facebook.png";
+import linkedinIcon from "../components/Campaign/Icons/linkedin.png";
+import emailIcon from "../components/Campaign/Icons/Email.png";
 
 export const PLATFORMS = {
   INSTAGRAM: "instagram",
