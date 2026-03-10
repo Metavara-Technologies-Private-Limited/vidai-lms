@@ -73,6 +73,8 @@ export interface LeadRecord {
   department_id?: number;
   clinic_id?: number;
   personnel?: string;
+  // ✅ Added: API returns the appointment personnel's name as personal_name
+  personal_name?: string;
   appointment_date?: string;
   slot?: string;
   appointment_slot?: string;
