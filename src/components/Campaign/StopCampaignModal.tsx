@@ -1,10 +1,10 @@
 import { useState } from "react";
-import "../../../../src/styles/Campaign/StopCampaignModal.css";
+import "../../styles/Campaign/StopCampaignModal.css";
 import { toast } from "react-toastify";
 import {
   platformIcons,
   type Platform,
-} from "../../../constants/campaigns.constants";
+} from "../../constants/campaigns.constants";
 
 interface Props {
   campaignName: string;

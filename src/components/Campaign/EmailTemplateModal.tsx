@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useState, useRef, useEffect } from "react";
-import "../../../styles/Campaign/EmailTemplateModal.css";
+import "../../styles/Campaign/EmailTemplateModal.css";
 import viewIcon from "./Icons/view.png";
 import editIcon from "./Icons/edit.png";
 import TextFieldsIcon from "@mui/icons-material/TextFields";

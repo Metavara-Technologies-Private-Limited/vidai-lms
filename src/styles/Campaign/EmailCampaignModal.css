@@ -488,10 +488,10 @@ select:invalid {
   font-size: 10px !important;
 }
 
-.schedule-row {
+/* .schedule-row {
   display: flex;
   gap: 20px;
-}
+} */
 
 .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
 .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
@@ -559,11 +559,11 @@ select:invalid {
   white-space: nowrap;
 }
 
-.schedule-row {
+/* .schedule-row {
   display: flex;
   gap: 20px;
   align-items: flex-start;
-}
+} */
 
 .schedule-field {
   flex: 1;
@@ -586,6 +586,18 @@ select:invalid {
   color: #9CA3AF;
   z-index: 2;
   pointer-events: none;
+} 
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+}
+
+.schedule-field {
+  position: relative;
+  width: 100%;
 }
 
 .schedule-input {

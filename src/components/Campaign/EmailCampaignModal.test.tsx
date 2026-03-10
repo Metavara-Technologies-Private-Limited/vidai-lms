@@ -3,9 +3,18 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
 import dayjs from "dayjs";
-import SocialCampaignModal from "../../../components/Layout/Campaign/SocialCampaignModal";
+import EmailCampaignModal from "../../components/Campaign/EmailCampaignModal";
 
-/* ================= MOCK MUI ================= */
+/* ---------------- MOCK TEMPLATE MODAL ---------------- */
+
+vi.mock(
+  "../../../components/Layout/Campaign/EmailTemplateModal",
+  () => ({
+    default: () => null,
+  })
+);
+
+/* ---------------- MOCK MUI ---------------- */
 
 vi.mock("@mui/material", async () => {
   const actual = await vi.importActual<any>("@mui/material");
@@ -20,13 +29,13 @@ vi.mock("@mui/material", async () => {
       >
         <option value="">Select</option>
         <option value="leads">Lead Generation</option>
-        <option value="all">All Users</option>
+        <option value="all">All Subscribers</option>
       </select>
     ),
   };
 });
 
-/* ================= MOCK DATE PICKERS ================= */
+/* ---------------- MOCK DATE PICKER ---------------- */
 
 vi.mock("@mui/x-date-pickers/LocalizationProvider", () => ({
   LocalizationProvider: ({ children }: any) => <div>{children}</div>,
@@ -43,21 +52,20 @@ vi.mock("@mui/x-date-pickers/DatePicker", () => ({
   ),
 }));
 
-vi.mock("@mui/x-date-pickers/TimePicker", () => ({
-  TimePicker: ({ onChange, label }: any) => (
-    <input
-      data-testid="mock-time"
-      placeholder={label || "time"}
-      onClick={() => onChange(dayjs("2024-01-01 10:00"))}
-      onChange={() => onChange(dayjs("2024-01-01 10:00"))}
-    />
-  ),
-}));
-
-/* ================= MOCK API ================= */
+/* ---------------- MOCK API ---------------- */
 
 const mockCreate = vi.fn(() =>
-  Promise.resolve({ data: { id: 1 } })
+  Promise.resolve({
+    data: {
+      id: 1,
+      campaign_name: "Email Test",
+      campaign_mode: 2,
+      is_active: false,
+      start_date: "2024-01-01",
+      end_date: "2024-01-10",
+      selected_start: "2024-01-01T10:00:00",
+    },
+  })
 );
 
 vi.mock("../../../../src/services/campaign.api", () => ({
@@ -66,7 +74,7 @@ vi.mock("../../../../src/services/campaign.api", () => ({
   },
 }));
 
-/* ================= MOCK TOAST ================= */
+/* ---------------- MOCK TOAST ---------------- */
 
 vi.mock("react-toastify", () => ({
   toast: {
@@ -79,12 +87,12 @@ vi.mock("react-toastify", () => ({
 
 async function fillStep1() {
   fireEvent.change(
-    screen.getByPlaceholderText(/New Product Launch/i),
+    screen.getByPlaceholderText("e.g. New Product Launch"),
     { target: { value: "Test Campaign" } }
   );
 
   fireEvent.change(
-    screen.getByPlaceholderText(/Contains records/i),
+    screen.getByPlaceholderText("Short description of campaign"),
     { target: { value: "Description" } }
   );
 
@@ -98,19 +106,18 @@ async function fillStep1() {
     fireEvent.click(dates[1]);
   });
 
-  fireEvent.click(screen.getByText(/Next/i));
+  fireEvent.click(screen.getByText("Next"));
 
-  // Target the <h6> heading specifically to avoid matching the stepper <span>
   await waitFor(() =>
     expect(
-      screen.getByRole("heading", { name: /Content & Configuration/i })
+      screen.getByRole("heading", { name: /Email Setup/i, level: 2 })
     ).toBeInTheDocument()
   );
 }
 
 /* ================================================= */
 
-describe("SocialCampaignModal - Buttons Flow", () => {
+describe("EmailCampaignModal Buttons", () => {
   beforeEach(() => {
     mockCreate.mockClear();
   });
@@ -118,17 +125,17 @@ describe("SocialCampaignModal - Buttons Flow", () => {
   /* ---------------------------------------------- */
   test("Cancel button should call onClose", () => {
     const onClose = vi.fn();
-    render(<SocialCampaignModal onClose={onClose} onSave={vi.fn()} />);
-    fireEvent.click(screen.getByText(/Cancel/i));
+    render(<EmailCampaignModal onClose={onClose} onSave={vi.fn()} />);
+    fireEvent.click(screen.getAllByText("Cancel")[0]);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   /* ---------------------------------------------- */
-  test("Next button should move to next step (after valid inputs)", async () => {
-    render(<SocialCampaignModal onClose={vi.fn()} onSave={vi.fn()} />);
+  test("Next button moves Step 1 → Step 2", async () => {
+    render(<EmailCampaignModal onClose={vi.fn()} onSave={vi.fn()} />);
     await fillStep1();
     expect(
-      screen.getByRole("heading", { name: /Content & Configuration/i })
+      screen.getByRole("heading", { name: /Email Setup/i, level: 2 })
     ).toBeInTheDocument();
   });
 });

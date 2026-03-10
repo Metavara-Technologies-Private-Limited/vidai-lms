@@ -1,8 +1,8 @@
 import { useMemo, useState, lazy, Suspense } from "react";
 import "../styles/Campaign/campaigns.css";
 import searchIcon from "../components/Layout/Campaign/Icons/search.png";
-import CampaignHeader from "../components/Layout/Campaign/CampaignHeader";
-import CampaignCard from "../components/Layout/Campaign/CampaignCard";
+import CampaignHeader from "../components/Campaign/CampaignHeader";
+import CampaignCard from "../components/Campaign/CampaignCard";
 import { useSelector, useDispatch } from "react-redux";
 import {
   fetchCampaign,
@@ -26,22 +26,22 @@ import {
 import type { Campaign, CampaignAPIType } from "../types/campaigns.types";
 
 const AddNewCampaign = lazy(
-  () => import("../components/Layout/Campaign/AddNewCampaign"),
+  () => import("../components/Campaign/AddNewCampaign"),
 );
 const SocialCampaignModal = lazy(
-  () => import("../components/Layout/Campaign/SocialCampaignModal"),
+  () => import("../components/Campaign/SocialCampaignModal"),
 );
 const CampaignDashboard = lazy(
-  () => import("../components/Layout/Campaign/CampaignDashboard"),
+  () => import("../components/Campaign/CampaignDashboard"),
 );
 const EmailCampaignModal = lazy(
-  () => import("../components/Layout/Campaign/EmailCampaignModal"),
+  () => import("../components/Campaign/EmailCampaignModal"),
 );
 const EditCampaignModal = lazy(
-  () => import("../components/Layout/Campaign/EditCampaignModal"),
+  () => import("../components/Campaign/EditCampaignModal"),
 );
 const DuplicateCampaignModal = lazy(
-  () => import("../components/Layout/Campaign/DuplicateCampaignModal"),
+  () => import("../components/Campaign/DuplicateCampaignModal"),
 );
 
 export default function CampaignsScreen() {
