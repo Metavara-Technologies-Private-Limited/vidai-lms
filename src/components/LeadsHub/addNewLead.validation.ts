@@ -125,8 +125,9 @@ export const validateStep = async (
       await showSequentialToasts(errors);
       return false;
     }
-    if (!form.assignee)
-      warnings.push({ type: "warning", text: "Lead is not assigned to any personnel!" });
+    // ✅ FIX: warn about personnel (appointment doctor) not assignee (lead owner)
+    if (!form.personnel)
+      warnings.push({ type: "warning", text: "No appointment personnel selected!" });
     if (!form.remark.trim())
       warnings.push({ type: "info", text: "No remark added for appointment" });
     if (warnings.length > 0) showWarningsNonBlocking(warnings);

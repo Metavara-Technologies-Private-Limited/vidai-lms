@@ -192,8 +192,11 @@ export default function AddNewLead() {
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
 
+  // ✅ FIX: Don't clear assignee here — it belongs to Step 1 and is unrelated
+  // to appointment department. Only reset personnel so user re-picks from
+  // the newly filtered list.
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, department: e.target.value, personnel: "", assignee: "" }));
+    setForm((prev) => ({ ...prev, department: e.target.value, personnel: "" }));
 
   const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newType = e.target.value;
@@ -273,7 +276,8 @@ export default function AddNewLead() {
     next_action_status:
       form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : null,
     assigned_to_id: intOrNull(form.assignee),
-    personal_id: null,
+    // ✅ FIX: was hardcoded to null — now correctly reads form.personnel
+    personal_id: intOrNull(form.personnel),
     age: intOrNull(form.age),
     partner_age: intOrNull(form.partnerAge),
     partner_inquiry: isCouple === "yes",
@@ -329,7 +333,6 @@ export default function AddNewLead() {
 
   // ── Render ───────────────────────────────────────────────────────
   return (
-    // ✅ flex column so header + form body + footer stack naturally with no dead space
     <Paper sx={{ overflow: "hidden", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
 
       {/* Header */}
@@ -396,12 +399,12 @@ export default function AddNewLead() {
         </Box>
       </Box>
 
-      {/* Form Body — flex: 1 fills all space between step indicator and footer */}
+      {/* Form Body */}
       <Box
         sx={{
           bgcolor: "white",
           p: 3,
-          flex: 1,          // ✅ grows to fill available space — no hardcoded calc()
+          flex: 1,
           overflowY: "auto",
           "&::-webkit-scrollbar": { width: "8px" },
           "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
@@ -449,7 +452,7 @@ export default function AddNewLead() {
         )}
       </Box>
 
-      {/* Footer — always hugs the bottom of content, no floating gap */}
+      {/* Footer */}
       <Box sx={{ bgcolor: "white", p: 3, display: "flex", justifyContent: "flex-end", gap: 2, borderTop: "1px solid #F1F5F9" }}>
         <Button
           onClick={() => navigate("/leads")}
