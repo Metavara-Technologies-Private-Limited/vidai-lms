@@ -19,19 +19,19 @@ import viewIcon from "./Icons/view.png";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
-import { CampaignAPI } from "../../../../src/services/campaign.api";
-import "../../../../src/styles/Campaign/EmailCampaignModal.css";
-import EmailTemplateModal from "../../../../src/components/Layout/Campaign/EmailTemplateModal";
-import type { Campaign, CampaignAPIType } from "../../../types/campaigns.types";
+import { CampaignAPI } from "../../services/campaign.api";
+import "../../styles/Campaign/EmailCampaignModal.css";
+import EmailTemplateModal from "../../components/Campaign/EmailTemplateModal";
+import type { Campaign, CampaignAPIType } from "../../types/campaigns.types";
 import {
   CAMPAIGN_AUDIENCE,
   CAMPAIGN_MODE,
   CAMPAIGN_OBJECTIVES,
   SENDER_EMAIL,
-} from "../../../constants/campaigns.constants";
+} from "../../constants/campaigns.constants";
 import TemplateService, {
   type TemplateDocument,
-} from "../../../services/templates.api";
+} from "../../services/templates.api";
 
 interface EditCampaignModalProps {
   campaign: Campaign;
@@ -293,7 +293,7 @@ export default function EditCampaignModal({
               Edit {campaign.type === "email" ? "Email" : "Social Media"}{" "}
               Campaign
             </Typography>
-            <IconButton onClick={onClose} className="close-btn">
+            <IconButton onClick={onClose} className="modal-close">
               <CloseIcon fontSize="small" />
             </IconButton>
           </div>

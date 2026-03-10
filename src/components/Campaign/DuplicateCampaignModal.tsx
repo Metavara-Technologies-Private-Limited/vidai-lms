@@ -20,9 +20,9 @@ import viewIcon from "./Icons/view.png";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
-import { CampaignAPI } from "../../../../src/services/campaign.api";
-import "../../../../src/styles/Campaign/EmailCampaignModal.css";
-import EmailTemplateModal from "../../../../src/components/Layout/Campaign/EmailTemplateModal";
+import { CampaignAPI } from "../../services/campaign.api";
+import "../../styles/Campaign/EmailCampaignModal.css";
+import EmailTemplateModal from "../../components/Campaign/EmailTemplateModal";
 interface DuplicateCampaignModalProps { 
   campaign: any;
   onClose: () => void;
@@ -89,8 +89,8 @@ useEffect(() => {
       setAudience(data.target_audience || "");
       setStartDate(data.start_date || "");
       setEndDate(data.end_date || "");
-      setMode(data.posting_mode || data.mode || "");
-      setMode(data.posting_mode || "");
+      // setMode(data.posting_mode || data.mode || "");
+      // setMode(data.posting_mode || "");
 
       // Email
       if (data.email?.length > 0) {
@@ -104,8 +104,8 @@ useEffect(() => {
           data.social_media.map((sm: any) => sm.platform_name)
         );
       }
-      if (data.posting_mode === 1) setMode("organic");
-      if (data.posting_mode === 2) setMode("paid");
+      if (data.campaign_mode === 1) setMode("organic");
+if (data.campaign_mode === 2) setMode("paid");
 
     } catch (error) {
       console.error("Failed to fetch campaign:", error);
@@ -220,7 +220,7 @@ useEffect(() => {
           <Typography variant="h6">
             Duplicate {campaign.type === "email" ? "Email" : "Social Media"} Campaign
           </Typography>
-          <IconButton onClick={onClose} className="close-btn">
+          <IconButton onClick={onClose} className="modal-close">
             <CloseIcon fontSize="small" />
           </IconButton>
         </div>
