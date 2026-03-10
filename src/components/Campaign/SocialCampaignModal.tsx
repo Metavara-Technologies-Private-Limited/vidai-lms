@@ -34,7 +34,7 @@ import {
 
 type Props = {
   onClose: () => void;
-  onSave: () => void;
+  onSave: (campaign: SocialCampaignPayload) => void;
 };
 
 const PLATFORM_LIST: { id: Platform; label: string; cpc: number }[] = [
@@ -376,8 +376,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       };
 
       await CampaignAPI.createSocial(payload);
-
-      onSave();
+      onSave(payload);
       toast.success("Campaign created successfully");
       onClose();
     } catch {

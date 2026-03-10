@@ -28,20 +28,15 @@ import {
   CAMPAIGN_MODE,
   CAMPAIGN_OBJECTIVES,
   SENDER_EMAIL,
-<<<<<<< Updated upstream:src/components/Campaign/EditCampaignModal.tsx
 } from "../../constants/campaigns.constants";
 import TemplateService, {
   type TemplateDocument,
 } from "../../services/templates.api";
-=======
-} from "../../../constants/campaigns.constants";
-import TemplateService, { type TemplateDocument } from "../../../services/templates.api";
->>>>>>> Stashed changes:src/components/Layout/Campaign/EditCampaignModal.tsx
 
 interface EditCampaignModalProps {
   campaign: Campaign;
   onClose: () => void;
-  onSave: (campaign: Campaign) => void; // ← FIXED
+  onSave: (updated: Campaign) => void;
 }
 
 export default function EditCampaignModal({ campaign, onClose, onSave }: EditCampaignModalProps) {
@@ -185,19 +180,19 @@ export default function EditCampaignModal({ campaign, onClose, onSave }: EditCam
 
       await CampaignAPI.update(campaign.id, payload);
 
-      const updated: Campaign = {
-        ...campaign,
-        name: campaignName,
-        description: campaignDescription,
-        objective: objective as Campaign["objective"],
-        audience: audience as Campaign["audience"],
-        start: startDate,
-        end: endDate,
-        scheduledAt: scheduledDateTime,
-      };
+const updatedCampaign: Campaign = {
+  ...campaign,
+  name: campaignName,
+  description: campaignDescription,
+   objective: objective as Campaign["objective"],
+  audience: audience as Campaign["audience"],
+  start: startDate,
+  end: endDate,
+  scheduledAt: `${start}T${scheduleTime}`,
+};
 
-      onSave(updated);
-      onClose();
+onSave(updatedCampaign);
+onClose();
     } catch (error) {
       console.error("Update error:", error);
     }
@@ -210,7 +205,6 @@ export default function EditCampaignModal({ campaign, onClose, onSave }: EditCam
       <Modal open={true} onClose={onClose}>
         <Box className="email-campaign-modal">
           <div className="add-modal-header">
-<<<<<<< Updated upstream:src/components/Campaign/EditCampaignModal.tsx
             <Typography variant="h6">
               Edit {campaign.type === "email" ? "Email" : "Social Media"}{" "}
               Campaign
@@ -218,10 +212,6 @@ export default function EditCampaignModal({ campaign, onClose, onSave }: EditCam
             <IconButton onClick={onClose} className="modal-close">
               <CloseIcon fontSize="small" />
             </IconButton>
-=======
-            <Typography variant="h6">Edit {campaign.type === "email" ? "Email" : "Social Media"} Campaign</Typography>
-            <IconButton onClick={onClose} className="close-btn"><CloseIcon fontSize="small" /></IconButton>
->>>>>>> Stashed changes:src/components/Layout/Campaign/EditCampaignModal.tsx
           </div>
           <div className="modal-divider" />
 
