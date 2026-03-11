@@ -3,8 +3,6 @@ import {
   Box,
   Stack,
   Typography,
-  TextField,
-  InputAdornment,
   IconButton,
   Button,
 } from "@mui/material";
@@ -266,26 +264,62 @@ const Leads: React.FC = () => {
         direction="row"
         justifyContent="space-between"
         alignItems="center"
-        sx={{ mb: 3 }}
+        sx={{
+          mb: 3,
+          flexWrap: "nowrap",
+          minWidth: 0,
+          width: "100%",
+          gap: 2,
+        }}
       >
-        <Typography className="leads-title">Leads Hub</Typography>
+        <Typography className="leads-title" sx={{ flexShrink: 0 }}>
+          Leads Hub
+        </Typography>
 
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        {/* Right side actions — never shrink, never wrap */}
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1.5}
+          sx={{ flexShrink: 0, flexWrap: "nowrap" }}
+        >
           {/* Search Input */}
-          <TextField
-            size="small"
-            placeholder="Search by Lead name / Lead No"
-            className="search-input"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" sx={{ color: "#9CA3AF" }} />
-                </InputAdornment>
-              ),
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              width: 300,
+              minWidth: 140,
+              height: 40,
+              borderRadius: "10px",
+              border: "1px solid #E5E7EB",
+              backgroundColor: "#FFFFFF",
+              paddingLeft: "10px",
+              paddingRight: "10px",
+              gap: "6px",
+              flexShrink: 1,
+              "&:hover": { border: "1px solid #D1D5DB" },
+              "&:focus-within": { border: "1px solid #9CA3AF" },
             }}
-          />
+          >
+            <SearchIcon sx={{ color: "#9CA3AF", width: 18, height: 18, flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search by Lead name / Lead No"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: "13px",
+                fontFamily: "Nunito, sans-serif",
+                color: "#111827",
+                width: "100%",
+                height: "100%",
+              }}
+            />
+          </Box>
 
           {/* View Mode Buttons */}
           <div className="header-icon-container">
@@ -314,8 +348,8 @@ const Leads: React.FC = () => {
             </IconButton>
           </div>
 
-          {/* Filter Button - Standalone Icon (No Box) */}
-          <Box sx={{ position: "relative" }}>
+          {/* Filter Button */}
+          <Box sx={{ position: "relative", flexShrink: 0 }}>
             <IconButton
               className="filter-icon-btn"
               onClick={() => setFilterOpen(true)}
@@ -335,6 +369,7 @@ const Leads: React.FC = () => {
           <Button
             className="add-lead-btn"
             onClick={() => navigate("/leads/add")}
+            sx={{ flexShrink: 0 }}
           >
             + Add New Lead
           </Button>
@@ -356,7 +391,15 @@ const Leads: React.FC = () => {
       </Stack>
 
       {/* ================= CONTENT SWITCH ================= */}
-      <React.Suspense fallback={<Box sx={{ py: 4, textAlign: "center" }}><Typography variant="caption" color="text.secondary">Loading...</Typography></Box>}>
+      <React.Suspense
+        fallback={
+          <Box sx={{ py: 4, textAlign: "center" }}>
+            <Typography variant="caption" color="text.secondary">
+              Loading...
+            </Typography>
+          </Box>
+        }
+      >
         {tab === 1 && <LeadsFollowUp search={search} filters={activeFilters} />}
         {tab === 3 && <LeadsConversation />}
         {tab === 4 && <Activity />}
