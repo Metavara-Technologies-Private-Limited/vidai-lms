@@ -2,7 +2,7 @@ import "../../styles/Campaign/CampaignDashboard.css";
 import React from "react";
 import dayjs from "dayjs";
 import globeIcon from "./Images/globe.png";
-import mailIcon from "./Icons/mail-card.png"; 
+import mailIcon from "./Icons/mail-card.png";
 import TurnLeftIcon from "@mui/icons-material/TurnLeft";
 import impressionsIcon from "./Icons/impressions.png";
 import clicksIcon from "./Icons/clicks.png";
@@ -101,52 +101,102 @@ const CampaignDashboard = ({
     insights.impressions > 0
       ? ((insights.clicks / insights.impressions) * 100).toFixed(2)
       : "0";
-      const metrics = [
-        {
-          title: "Total Impressions",
-          value: campaign.impressions ?? 0, // was hardcoded 0
-          icon: impressionsIcon,
-        },
-        {
-          title: "Total Clicks",
-          value: campaign.clicks ?? 0, // was hardcoded 0
-          icon: clicksIcon,
-        },
-        {
-          title: "Conversions",
-          value: campaign.lead_generated || "0",
-          icon: conversionsIcon,
-        },
-        {
-          title: "Total Budget",
-          value: `$${totalBudget}`,
-          icon: spendIcon,
-        },
-        // ... rest stays the same
-        {
-          title: "CTR",
-          value: `${ctr}%`,
-          icon: ctrIcon,
-        },
-        {
-          title: "Conversion Rate",
-          value:
-            campaign.type === CAMPAIGN_TYPE.EMAIL
-              ? `${campaign.conversion_rate ?? 0}%`
-              : "0%",
-          icon: conversionRateIcon,
-        },
-        {
-          title: "CPC",
-          value: `$${campaign.cpc?.toFixed(2) ?? "0.00"}`,
-          icon: cpcIcon,
-        },
-        {
-          title: "CPA",
-          value: "$0",
-          icon: cpaIcon,
-        },
-      ];
+
+  // ─── EMAIL CAMPAIGN METRICS (from Mailchimp insights JSON) ───────────────
+  // These come from campaign.insights JSONField saved by
+  // GET /api/campaigns/<id>/mailchimp-insights/
+  // Fields: emails_sent, opens, open_rate, clicks, click_rate,
+  //         bounces, unsubscribes, last_open, last_click, synced_at
+  const emailMetrics = [
+    {
+      title: "Emails Sent",
+      value: campaign.emails_sent ?? 0,
+      icon: impressionsIcon,
+    },
+    {
+      title: "Total Opens",
+      value: campaign.impressions ?? 0, // impressions = opens from backend
+      icon: clicksIcon,
+    },
+    {
+      title: "Open Rate",
+      value: campaign.open_rate != null ? `${campaign.open_rate}%` : "0%",
+      icon: ctrIcon,
+    },
+    {
+      title: "Total Clicks",
+      value: campaign.clicks ?? 0,
+      icon: cpcIcon,
+    },
+    {
+      title: "Click Rate",
+      value: campaign.click_rate != null ? `${campaign.click_rate}%` : "0%",
+      icon: conversionRateIcon,
+    },
+    {
+      title: "Bounces",
+      value: campaign.bounces ?? 0,
+      icon: spendIcon,
+    },
+    {
+      title: "Unsubscribes",
+      value: campaign.unsubscribes ?? 0,
+      icon: cpaIcon,
+    },
+    {
+      title: "Leads Generated",
+      value: campaign.lead_generated || 0,
+      icon: conversionsIcon,
+    },
+  ];
+
+  // ─── SOCIAL CAMPAIGN METRICS (Facebook/Instagram/LinkedIn) ───────────────
+  const socialMetrics = [
+    {
+      title: "Total Impressions",
+      value: campaign.impressions ?? 0,
+      icon: impressionsIcon,
+    },
+    {
+      title: "Total Clicks",
+      value: campaign.clicks ?? 0,
+      icon: clicksIcon,
+    },
+    {
+      title: "Conversions",
+      value: campaign.lead_generated || "0",
+      icon: conversionsIcon,
+    },
+    {
+      title: "Total Budget",
+      value: `$${totalBudget}`,
+      icon: spendIcon,
+    },
+    {
+      title: "CTR",
+      value: `${ctr}%`,
+      icon: ctrIcon,
+    },
+    {
+      title: "Conversion Rate",
+      value: `${campaign.conversion_rate ?? 0}%`,
+      icon: conversionRateIcon,
+    },
+    {
+      title: "CPC",
+      value: `$${campaign.cpc?.toFixed(2) ?? "0.00"}`,
+      icon: cpcIcon,
+    },
+    {
+      title: "CPA",
+      value: "$0",
+      icon: cpaIcon,
+    },
+  ];
+
+  // ─── Pick correct metrics based on campaign type ──────────────────────────
+  const metrics =
+    campaign.type === CAMPAIGN_TYPE.EMAIL ? emailMetrics : socialMetrics;
 
   return (
     <div className="cd-wrapper">
@@ -173,12 +223,12 @@ const CampaignDashboard = ({
           <div className="cd-header-top">
             <div className="cd-header-left">
               <div
-                  className={
-                    campaign.type === CAMPAIGN_TYPE.EMAIL
-                      ? "cd-mail-icon"
-                      : "cd-globe-icon"
-                  }
-                >
+                className={
+                  campaign.type === CAMPAIGN_TYPE.EMAIL
+                    ? "cd-mail-icon"
+                    : "cd-globe-icon"
+                }
+              >
                 <img
                   src={campaign.type === CAMPAIGN_TYPE.EMAIL ? mailIcon : globeIcon}
                   alt={campaign.type}
@@ -283,6 +333,7 @@ const Meta = ({ label, value }: { label: string; value: React.ReactNode }) => (
 /* ================= METRIC ================= */
 
 const METRIC_GRADIENTS: Record<string, string> = {
+  // ── Social metrics ──
   "Total Impressions":
     "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
   "Total Clicks":
@@ -296,7 +347,24 @@ const METRIC_GRADIENTS: Record<string, string> = {
     "linear-gradient(180deg, rgba(242,91,91,0.10) 0%, rgba(242,91,91,0.05) 35%, #FFFFFF 100%)",
   CPC: "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
   CPA: "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
+
+  // ── Email / Mailchimp metrics ──
+  "Emails Sent":
+    "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
+  "Total Opens":
+    "linear-gradient(180deg, rgba(71,179,95,0.10) 0%, rgba(71,179,95,0.05) 35%, #FFFFFF 100%)",
+  "Open Rate":
+    "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
+  "Click Rate":
+    "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
+  Bounces:
+    "linear-gradient(180deg, rgba(242,91,91,0.10) 0%, rgba(242,91,91,0.05) 35%, #FFFFFF 100%)",
+  Unsubscribes:
+    "linear-gradient(180deg, rgba(236,189,86,0.10) 0%, rgba(236,189,86,0.05) 35%, #FFFFFF 100%)",
+  "Leads Generated":
+    "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
 };
+
 const Metric = ({
   title,
   value,
