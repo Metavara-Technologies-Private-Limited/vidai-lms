@@ -817,11 +817,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                   <Typography fontSize="12px" color="#64748B" fontWeight={500}>
                     Template:
                   </Typography>
-                  <Typography
-                    fontSize="13px"
-                    fontWeight={700}
-                    color="#1E293B"
-                  >
+                  <Typography fontSize="13px" fontWeight={700} color="#1E293B">
                     {previewTemplate.name}
                   </Typography>
                   {previewTemplate.use_case && (
@@ -890,12 +886,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                 >
                   <Stack spacing={0.75}>
                     <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography
-                        fontSize="11px"
-                        color="#94A3B8"
-                        fontWeight={500}
-                        minWidth={52}
-                      >
+                      <Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>
                         From:
                       </Typography>
                       <Typography fontSize="12px" color="#374151">
@@ -903,12 +894,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                       </Typography>
                     </Stack>
                     <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography
-                        fontSize="11px"
-                        color="#94A3B8"
-                        fontWeight={500}
-                        minWidth={52}
-                      >
+                      <Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>
                         To:
                       </Typography>
                       <Typography fontSize="12px" color="#374151">
@@ -916,24 +902,11 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                         {lead?.email ? ` <${lead.email}>` : ""}
                       </Typography>
                     </Stack>
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      alignItems="flex-start"
-                    >
-                      <Typography
-                        fontSize="11px"
-                        color="#94A3B8"
-                        fontWeight={500}
-                        minWidth={52}
-                      >
+                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                      <Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>
                         Subject:
                       </Typography>
-                      <Typography
-                        fontSize="12px"
-                        color="#1E293B"
-                        fontWeight={700}
-                      >
+                      <Typography fontSize="12px" color="#1E293B" fontWeight={700}>
                         {previewTemplate.subject}
                       </Typography>
                     </Stack>
@@ -974,10 +947,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                 >
                   <Typography fontSize="11px" color="#94A3B8">
                     Variables in{" "}
-                    <Box
-                      component="span"
-                      sx={{ color: "#7C3AED", fontWeight: 600 }}
-                    >
+                    <Box component="span" sx={{ color: "#7C3AED", fontWeight: 600 }}>
                       purple
                     </Box>{" "}
                     will be auto-filled when sent
@@ -1008,9 +978,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                 variant="contained"
                 onClick={() => {
                   setSubject(previewTemplate.subject || "");
-                  setBody(
-                    stripHtml(resolveBody(previewTemplate.body || ""))
-                  );
+                  setBody(stripHtml(resolveBody(previewTemplate.body || "")));
                   setStep("compose");
                 }}
                 sx={{
@@ -1050,19 +1018,8 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
             </DialogTitle>
             <DialogContent sx={{ pt: 0, pb: 0 }}>
               <Stack spacing={0} divider={<Divider />}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    py: 1,
-                  }}
-                >
-                  <Typography
-                    fontSize="13px"
-                    color="text.secondary"
-                    minWidth={55}
-                  >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
+                  <Typography fontSize="13px" color="text.secondary" minWidth={55}>
                     To:
                   </Typography>
                   <Chip
@@ -1084,19 +1041,8 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                     Cc | Bcc
                   </Typography>
                 </Box>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    py: 1,
-                  }}
-                >
-                  <Typography
-                    fontSize="13px"
-                    color="text.secondary"
-                    minWidth={55}
-                  >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
+                  <Typography fontSize="13px" color="text.secondary" minWidth={55}>
                     Subject:
                   </Typography>
                   <TextField
@@ -1117,11 +1063,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                     <Alert
                       severity="error"
                       onClose={() => setError(null)}
-                      sx={{
-                        borderRadius: "8px",
-                        mb: 1.5,
-                        fontSize: "13px",
-                      }}
+                      sx={{ borderRadius: "8px", mb: 1.5, fontSize: "13px" }}
                     >
                       {error}
                     </Alert>
@@ -1166,11 +1108,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                 [
                   {
                     icon: (
-                      <Typography
-                        fontWeight={700}
-                        fontSize="14px"
-                        sx={{ lineHeight: 1, fontFamily: "serif" }}
-                      >
+                      <Typography fontWeight={700} fontSize="14px" sx={{ lineHeight: 1, fontFamily: "serif" }}>
                         T
                       </Typography>
                     ),
@@ -1178,21 +1116,10 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                     action: () => {
                       saveCursor();
                       const { start, end } = cursorPos.current;
-                      setBody(
-                        (p) =>
-                          p.substring(0, start) +
-                          "**" +
-                          (p.substring(start, end) || "text") +
-                          "**" +
-                          p.substring(end)
-                      );
+                      setBody((p) => p.substring(0, start) + "**" + (p.substring(start, end) || "text") + "**" + p.substring(end));
                     },
                   },
-                  {
-                    icon: <AttachFileIcon sx={{ fontSize: 18 }} />,
-                    title: "Attach",
-                    action: () => fileInputRef.current?.click(),
-                  },
+                  { icon: <AttachFileIcon sx={{ fontSize: 18 }} />, title: "Attach", action: () => fileInputRef.current?.click() },
                   {
                     icon: <LinkIcon sx={{ fontSize: 18 }} />,
                     title: "Link",
@@ -1203,9 +1130,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                     },
                   },
                   {
-                    icon: (
-                      <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />
-                    ),
+                    icon: <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />,
                     title: "Emoji",
                     action: () => {
                       saveCursor();
@@ -1213,57 +1138,27 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                       if (e) insertAtCursor(e);
                     },
                   },
-                  {
-                    icon: <MoreHorizIcon sx={{ fontSize: 18 }} />,
-                    title: "More",
-                    action: () => {
-                      saveCursor();
-                      insertAtCursor("\n\n");
-                    },
-                  },
-                  {
-                    icon: <ImageOutlinedIcon sx={{ fontSize: 18 }} />,
-                    title: "Image",
-                    action: () => imageInputRef.current?.click(),
-                  },
+                  { icon: <MoreHorizIcon sx={{ fontSize: 18 }} />, title: "More", action: () => { saveCursor(); insertAtCursor("\n\n"); } },
+                  { icon: <ImageOutlinedIcon sx={{ fontSize: 18 }} />, title: "Image", action: () => imageInputRef.current?.click() },
                   {
                     icon: <DataObjectIcon sx={{ fontSize: 18 }} />,
                     title: "Variable",
                     action: () => {
                       saveCursor();
-                      const v = window.prompt(
-                        "Variable:",
-                        "lead_first_name"
-                      );
+                      const v = window.prompt("Variable:", "lead_first_name");
                       if (v) insertAtCursor(`{{${v}}}`);
                     },
                   },
                   {
-                    icon: (
-                      <DriveFileRenameOutlineIcon sx={{ fontSize: 18 }} />
-                    ),
+                    icon: <DriveFileRenameOutlineIcon sx={{ fontSize: 18 }} />,
                     title: "Highlight",
                     action: () => {
                       saveCursor();
                       const { start, end } = cursorPos.current;
-                      setBody(
-                        (p) =>
-                          p.substring(0, start) +
-                          "==" +
-                          (p.substring(start, end) || "text") +
-                          "==" +
-                          p.substring(end)
-                      );
+                      setBody((p) => p.substring(0, start) + "==" + (p.substring(start, end) || "text") + "==" + p.substring(end));
                     },
                   },
-                  {
-                    icon: <AddCircleOutlineIcon sx={{ fontSize: 18 }} />,
-                    title: "Block",
-                    action: () => {
-                      saveCursor();
-                      insertAtCursor("\n\n");
-                    },
-                  },
+                  { icon: <AddCircleOutlineIcon sx={{ fontSize: 18 }} />, title: "Block", action: () => { saveCursor(); insertAtCursor("\n\n"); } },
                 ] as { icon: React.ReactNode; title: string; action: () => void }[]
               ).map(({ icon, title, action }) => (
                 <IconButton
@@ -1282,15 +1177,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                 </IconButton>
               ))}
             </Box>
-            <DialogActions
-              sx={{
-                px: 3,
-                pb: 3,
-                pt: 1.5,
-                borderTop: "1px solid #E5E7EB",
-                gap: 1,
-              }}
-            >
+            <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, borderTop: "1px solid #E5E7EB", gap: 1 }}>
               <Button
                 onClick={handleClose}
                 disabled={sending}
@@ -1309,9 +1196,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
               </Button>
               <Button
                 onClick={handleSaveAsDraft}
-                disabled={
-                  sending || !subject.trim() || !body.trim()
-                }
+                disabled={sending || !subject.trim() || !body.trim()}
                 sx={{
                   height: 40,
                   color: "#374151",
@@ -1327,9 +1212,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
               </Button>
               <Button
                 onClick={handleSend}
-                disabled={
-                  sending || !subject.trim() || !body.trim()
-                }
+                disabled={sending || !subject.trim() || !body.trim()}
                 variant="contained"
                 startIcon={
                   sending ? (
@@ -1347,10 +1230,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                   borderRadius: "8px",
                   px: 3,
                   "&:hover": { backgroundColor: "#111827" },
-                  "&:disabled": {
-                    backgroundColor: "#E5E7EB",
-                    color: "#9CA3AF",
-                  },
+                  "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" },
                 }}
               >
                 {sending ? "Sending…" : "Send"}
@@ -1400,27 +1280,19 @@ export default function LeadDetailView() {
   const [actionDescription, setActionDescription] = React.useState("");
   const [actionSubmitting, setActionSubmitting] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
-  const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(
-    null
-  );
+  const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(null);
 
-  const [documents, setDocuments] = React.useState<
-    { url: string; name: string }[]
-  >([]);
+  const [documents, setDocuments] = React.useState<{ url: string; name: string }[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
   const [docsError, setDocsError] = React.useState<string | null>(null);
 
   const [callHistory, setCallHistory] = React.useState<TwilioCall[]>([]);
   const [callHistoryLoading, setCallHistoryLoading] = React.useState(false);
-  const [callHistoryError, setCallHistoryError] = React.useState<string | null>(
-    null
-  );
+  const [callHistoryError, setCallHistoryError] = React.useState<string | null>(null);
 
   const [smsHistory, setSmsHistory] = React.useState<TwilioSMS[]>([]);
   const [smsHistoryLoading, setSmsHistoryLoading] = React.useState(false);
-  const [smsHistoryError, setSmsHistoryError] = React.useState<string | null>(
-    null
-  );
+  const [smsHistoryError, setSmsHistoryError] = React.useState<string | null>(null);
 
   const [fullLead, setFullLead] = React.useState<LeadRecord | null>(null);
 
@@ -1461,7 +1333,6 @@ export default function LeadDetailView() {
     });
   }, [leads, id]);
 
-  // Fetch full lead detail on mount / navigation — fullLead has personal_name etc.
   React.useEffect(() => {
     if (!id) return;
     const rawId = decodeURIComponent(id);
@@ -1470,7 +1341,6 @@ export default function LeadDetailView() {
       .catch(() => setFullLead(null));
   }, [id]);
 
-  // Prefer fullLead (has all fields) over list-level lead
   const activeLead: LeadRecord | undefined = fullLead ?? lead;
 
   const fetchNotes = React.useCallback(async (leadUuid: string) => {
@@ -1478,9 +1348,7 @@ export default function LeadDetailView() {
       setNotesLoading(true);
       setNotesError(null);
       const { data } = await api.get(`/leads/${leadUuid}/notes/`);
-      const results: RawNote[] = Array.isArray(data)
-        ? data
-        : data.results ?? [];
+      const results: RawNote[] = Array.isArray(data) ? data : data.results ?? [];
       setNotes(
         results
           .filter((n) => !n.is_deleted)
@@ -1496,11 +1364,7 @@ export default function LeadDetailView() {
       setNotesError(
         err instanceof Error
           ? err.message
-          : (
-              err as {
-                response?: { data?: { detail?: string } };
-              }
-            )?.response?.data?.detail ?? "Failed to load notes"
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to load notes"
       );
     } finally {
       setNotesLoading(false);
@@ -1511,13 +1375,9 @@ export default function LeadDetailView() {
     setDocsLoading(true);
     setDocsError(null);
     try {
-      setDocuments(
-        Array.isArray(leadDocs) ? leadDocs.map(normalizeDocument) : []
-      );
+      setDocuments(Array.isArray(leadDocs) ? leadDocs.map(normalizeDocument) : []);
     } catch (err: unknown) {
-      setDocsError(
-        err instanceof Error ? err.message : "Failed to load documents"
-      );
+      setDocsError(err instanceof Error ? err.message : "Failed to load documents");
     } finally {
       setDocsLoading(false);
     }
@@ -1527,19 +1387,13 @@ export default function LeadDetailView() {
     try {
       setCallHistoryLoading(true);
       setCallHistoryError(null);
-      const { data } = await api.get(
-        `/twilio/calls/?lead_uuid=${leadUuid}`
-      );
+      const { data } = await api.get(`/twilio/calls/?lead_uuid=${leadUuid}`);
       setCallHistory(Array.isArray(data) ? data : data.results ?? []);
     } catch (err: unknown) {
       setCallHistoryError(
         err instanceof Error
           ? err.message
-          : (
-              err as {
-                response?: { data?: { detail?: string } };
-              }
-            )?.response?.data?.detail ?? "Failed to load call history"
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to load call history"
       );
     } finally {
       setCallHistoryLoading(false);
@@ -1550,19 +1404,13 @@ export default function LeadDetailView() {
     try {
       setSmsHistoryLoading(true);
       setSmsHistoryError(null);
-      const { data } = await api.get(
-        `/twilio/sms/?lead_uuid=${leadUuid}`
-      );
+      const { data } = await api.get(`/twilio/sms/?lead_uuid=${leadUuid}`);
       setSmsHistory(Array.isArray(data) ? data : data.results ?? []);
     } catch (err: unknown) {
       setSmsHistoryError(
         err instanceof Error
           ? err.message
-          : (
-              err as {
-                response?: { data?: { detail?: string } };
-              }
-            )?.response?.data?.detail ?? "Failed to load SMS history"
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to load SMS history"
       );
     } finally {
       setSmsHistoryLoading(false);
@@ -1578,9 +1426,7 @@ export default function LeadDetailView() {
     if (activeLead) {
       const rawId = decodeURIComponent(id || "");
       fetchNotes(rawId);
-      fetchDocuments(
-        (activeLead.documents ?? []) as DocumentEntry[]
-      );
+      fetchDocuments((activeLead.documents ?? []) as DocumentEntry[]);
       fetchCallHistory(activeLead.id);
       fetchSMSHistory(activeLead.id);
     }
@@ -1618,9 +1464,7 @@ export default function LeadDetailView() {
           uuid: createdNote.id,
           title: createdNote.title ?? newNoteTitle,
           content: createdNote.note ?? newNoteContent,
-          time: createdNote.created_at
-            ? formatNoteTime(createdNote.created_at)
-            : "",
+          time: createdNote.created_at ? formatNoteTime(createdNote.created_at) : "",
         },
       ]);
       setNewNoteTitle("");
@@ -1629,11 +1473,7 @@ export default function LeadDetailView() {
       setNotesError(
         err instanceof Error
           ? err.message
-          : (
-              err as {
-                response?: { data?: { detail?: string } };
-              }
-            )?.response?.data?.detail ?? "Failed to save note"
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to save note"
       );
     } finally {
       setNoteSubmitting(false);
@@ -1658,15 +1498,12 @@ export default function LeadDetailView() {
       setEditSubmitting(true);
       setNotesError(null);
       const userId = getCurrentUserId();
-      const { data: updated } = await api.put(
-        `/leads/notes/${noteId}/update/`,
-        {
-          title: editTitle.trim(),
-          note: editContent.trim(),
-          lead: decodeURIComponent(id || ""),
-          ...(userId !== null && { created_by: userId }),
-        }
-      );
+      const { data: updated } = await api.put(`/leads/notes/${noteId}/update/`, {
+        title: editTitle.trim(),
+        note: editContent.trim(),
+        lead: decodeURIComponent(id || ""),
+        ...(userId !== null && { created_by: userId }),
+      });
       const updatedNote = updated as RawNote;
       setNotes((prev) =>
         prev.map((n) =>
@@ -1686,11 +1523,7 @@ export default function LeadDetailView() {
       setNotesError(
         err instanceof Error
           ? err.message
-          : (
-              err as {
-                response?: { data?: { detail?: string } };
-              }
-            )?.response?.data?.detail ?? "Failed to update note"
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to update note"
       );
     } finally {
       setEditSubmitting(false);
@@ -1706,11 +1539,7 @@ export default function LeadDetailView() {
       setNotesError(
         err instanceof Error
           ? err.message
-          : (
-              err as {
-                response?: { data?: { detail?: string } };
-              }
-            )?.response?.data?.detail ?? "Failed to delete note"
+          : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to delete note"
       );
     }
   };
@@ -1736,7 +1565,7 @@ export default function LeadDetailView() {
         slot: activeLead.slot || "",
         is_active: activeLead.is_active !== false,
         partner_inquiry: activeLead.partner_inquiry || false,
-        next_action_type: actionType,
+        next_action_type: actionType,        // ✅ now sends e.g. "Book Appointment"
         next_action_status: actionStatus,
         next_action_description: actionDescription.trim(),
       });
@@ -1791,10 +1620,7 @@ export default function LeadDetailView() {
       const leadUuid = decodeURIComponent(id || "");
       const result = (await dispatch(
         convertLead(leadUuid) as unknown as Parameters<typeof dispatch>[0]
-      )) as {
-        error?: unknown;
-        payload?: unknown;
-      };
+      )) as { error?: unknown; payload?: unknown };
       if (
         convertLead.rejected.match(
           result as Parameters<typeof convertLead.rejected.match>[0]
@@ -1802,12 +1628,7 @@ export default function LeadDetailView() {
       ) {
         setConvertError(
           String(
-            (
-              result as {
-                payload?: string;
-                error?: { message?: string };
-              }
-            )?.payload ||
+            (result as { payload?: string; error?: { message?: string } })?.payload ||
               (result as { error?: { message?: string } })?.error?.message ||
               "Failed to convert lead."
           )
@@ -1816,9 +1637,7 @@ export default function LeadDetailView() {
       }
       setOpenConvertPopup(false);
     } catch (err: unknown) {
-      setConvertError(
-        err instanceof Error ? err.message : "Failed to convert lead."
-      );
+      setConvertError(err instanceof Error ? err.message : "Failed to convert lead.");
     } finally {
       setConvertLoading(false);
     }
@@ -1833,19 +1652,10 @@ export default function LeadDetailView() {
 
   if (loading && !activeLead)
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
-          <Typography color="text.secondary">
-            Loading lead details...
-          </Typography>
+          <Typography color="text.secondary">Loading lead details...</Typography>
         </Stack>
       </Box>
     );
@@ -1858,17 +1668,8 @@ export default function LeadDetailView() {
           <Typography variant="body2">{error}</Typography>
           <Typography
             variant="body2"
-            sx={{
-              mt: 1,
-              color: "primary.main",
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
-            onClick={() =>
-              dispatch(
-                fetchLeads() as unknown as Parameters<typeof dispatch>[0]
-              )
-            }
+            sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
+            onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}
           >
             Try again
           </Typography>
@@ -1886,12 +1687,7 @@ export default function LeadDetailView() {
           </Typography>
           <Typography
             variant="body2"
-            sx={{
-              mt: 1,
-              color: "primary.main",
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
+            sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
             onClick={() => navigate("/leads")}
           >
             Go back to Leads Hub
@@ -1901,22 +1697,20 @@ export default function LeadDetailView() {
     );
 
   // ── Derived display values ──────────────────────────────────────────────────
-  const leadName      = activeLead.full_name || activeLead.name || "Unknown";
-  const leadInitials  = activeLead.initials || leadName.charAt(0).toUpperCase();
-  const leadPhone     = activeLead.phone || activeLead.contact_number || activeLead.contact_no || "N/A";
-  const leadEmail     = activeLead.email || "N/A";
-  const leadLocation  = activeLead.location || "N/A";
-  const leadGender    = capitalize(activeLead.gender);
-  const leadAge       = String(activeLead.age || "N/A");
+  const leadName          = activeLead.full_name || activeLead.name || "Unknown";
+  const leadInitials      = activeLead.initials || leadName.charAt(0).toUpperCase();
+  const leadPhone         = activeLead.phone || activeLead.contact_number || activeLead.contact_no || "N/A";
+  const leadEmail         = activeLead.email || "N/A";
+  const leadLocation      = activeLead.location || "N/A";
+  const leadGender        = capitalize(activeLead.gender);
+  const leadAge           = String(activeLead.age || "N/A");
   const leadMaritalStatus = capitalize(activeLead.marital_status);
-  const leadAddress   = activeLead.address || "N/A";
-  const leadLanguage  = activeLead.language_preference || "N/A";
-  const leadAssigned  = activeLead.assigned_to_name || activeLead.assigned || "Unassigned";
-  const leadStatus    = activeLead.status || activeLead.lead_status || "New";
-  const leadQuality   = activeLead.quality || "N/A";
-  const leadScore     = String(activeLead.score || 0).includes("%")
-    ? activeLead.score
-    : `${activeLead.score || 0}%`;
+  const leadAddress       = activeLead.address || "N/A";
+  const leadLanguage      = activeLead.language_preference || "N/A";
+  const leadAssigned      = activeLead.assigned_to_name || activeLead.assigned || "Unassigned";
+  const leadStatus        = activeLead.status || activeLead.lead_status || "New";
+  const leadQuality       = activeLead.quality || "N/A";
+  const leadScore         = String(activeLead.score || 0).includes("%") ? activeLead.score : `${activeLead.score || 0}%`;
   const leadSource        = activeLead.source || "Unknown";
   const leadSubSource     = activeLead.sub_source || "N/A";
   const leadCampaignName  = activeLead.campaign_name || "N/A";
@@ -1927,11 +1721,8 @@ export default function LeadDetailView() {
   const partnerGender     = capitalize(activeLead.partner_gender);
   const leadCreatedAt     = activeLead.created_at
     ? new Date(activeLead.created_at).toLocaleString("en-IN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
       })
     : "N/A";
   const nextActionType        = activeLead.next_action_type || activeLead.task || "N/A";
@@ -1941,56 +1732,46 @@ export default function LeadDetailView() {
     ? activeLead.treatment_interest.split(",").map((t) => t.trim())
     : [];
 
-  // ── Appointment — single source of truth ───────────────────────────────────
-  // API returns book_appointment as a real boolean (confirmed from response JSON)
   const hasAppointment = activeLead.book_appointment === true;
 
-  // ✅ FIXED: use correct API field names from the actual response:
-  //   • department_name  (not "department")
-  //   • personal_name    (not "personnel" or "assigned_to_name")
-  //   • slot / remark    (direct fields, no aliases needed)
   const appointmentDepartment = hasAppointment
     ? activeLead.department_name || activeLead.department || "N/A"
     : "N/A";
-
   const appointmentPersonnel = hasAppointment
     ? activeLead.personal_name || activeLead.personnel || "N/A"
     : "N/A";
-
   const appointmentDate =
     hasAppointment && activeLead.appointment_date
       ? new Date(activeLead.appointment_date).toLocaleDateString("en-GB")
       : "N/A";
-
   const appointmentSlot   = hasAppointment ? activeLead.slot   || "N/A" : "N/A";
   const appointmentRemark = hasAppointment ? activeLead.remark || "N/A" : "N/A";
 
-  // ── Status helpers ──────────────────────────────────────────────────────────
-  const currentStatus = (
-    activeLead?.status ||
-    activeLead?.lead_status ||
-    "new"
-  ).toLowerCase();
+  const currentStatus = (activeLead?.status || activeLead?.lead_status || "new").toLowerCase();
   const isAppointment = currentStatus === "appointment";
   const isFollowUp    =
     currentStatus === "follow up" ||
     currentStatus === "follow-up" ||
     currentStatus === "follow-ups";
 
-  const convertedLeadIds: string[] = JSON.parse(
-    localStorage.getItem("converted_lead_ids") || "[]"
-  );
+  const convertedLeadIds: string[] = JSON.parse(localStorage.getItem("converted_lead_ids") || "[]");
   const leadUuidRaw = decodeURIComponent(id || "");
   const isConverted =
     convertedLeadIds.includes(leadUuidRaw) ||
     currentStatus === "converted" ||
     (activeLead?.lead_status || "").toLowerCase() === "converted";
 
+  // ✅ FIXED: values now match Django's NEXT_ACTION_TYPE choices exactly
   const availableActions: { value: string; label: string }[] = isFollowUp
-    ? [{ value: "Appointment", label: "Appointment" }]
+    ? [{ value: "Book Appointment", label: "Book Appointment" }]
     : [
-        { value: "Follow Up", label: "Follow Up" },
-        { value: "Appointment", label: "Appointment" },
+        { value: "Follow Up",       label: "Follow Up" },
+        { value: "Book Appointment", label: "Book Appointment" },
+        { value: "Call Patient",    label: "Call Patient" },
+        { value: "Send Message",    label: "Send Message" },
+        { value: "Send Email",      label: "Send Email" },
+        { value: "Review Details",  label: "Review Details" },
+        { value: "No Action",       label: "No Action" },
       ];
 
   return (
@@ -2051,57 +1832,30 @@ export default function LeadDetailView() {
               {leadInitials}
             </Avatar>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Lead Name
-              </Typography>
-              <Typography fontWeight={700} variant="body1" fontSize="12px">
-                {leadName}
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Lead Name</Typography>
+              <Typography fontWeight={700} variant="body1" fontSize="12px">{leadName}</Typography>
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Lead ID
-              </Typography>
-              <Typography fontWeight={600} variant="body1" fontSize="12px">
-                {leadDisplayId}
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Lead ID</Typography>
+              <Typography fontWeight={600} variant="body1" fontSize="12px">{leadDisplayId}</Typography>
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Source
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Source</Typography>
               <Stack direction="row" alignItems="center" spacing={0.5}>
-                <Box
-                  sx={{
-                    width: 16,
-                    height: 16,
-                    bgcolor: "#FFB800",
-                    borderRadius: "50%",
-                  }}
-                />
-                <Typography fontWeight={600} variant="body1" fontSize="12px">
-                  {leadSource}
-                </Typography>
+                <Box sx={{ width: 16, height: 16, bgcolor: "#FFB800", borderRadius: "50%" }} />
+                <Typography fontWeight={600} variant="body1" fontSize="12px">{leadSource}</Typography>
               </Stack>
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Lead Status
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Lead Status</Typography>
               <Chip
                 label={isConverted ? "Converted" : leadStatus}
                 size="small"
-                sx={
-                  isConverted
-                    ? pillChipSx("#16A34A", "rgba(22,163,74,0.10)")
-                    : pillChipSx("#5B8FF9", "rgba(91,143,249,0.10)")
-                }
+                sx={isConverted ? pillChipSx("#16A34A", "rgba(22,163,74,0.10)") : pillChipSx("#5B8FF9", "rgba(91,143,249,0.10)")}
               />
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                Lead Quality
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">Lead Quality</Typography>
               <Chip
                 label={leadQuality}
                 size="small"
@@ -2115,24 +1869,15 @@ export default function LeadDetailView() {
               />
             </Stack>
             <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
-                AI Lead Score
-              </Typography>
-              <Typography fontWeight={700} color="#EC4899" fontSize="12px">
-                {leadScore}
-              </Typography>
+              <Typography variant="caption" color="text.secondary" fontSize="10px">AI Lead Score</Typography>
+              <Typography fontWeight={700} color="#EC4899" fontSize="12px">{leadScore}</Typography>
             </Stack>
           </Stack>
         </Stack>
       </Card>
 
       {/* ── TABS & ACTION BUTTONS ── */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      >
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Box
           sx={{
             bgcolor: "#FAFAFA",
@@ -2163,11 +1908,7 @@ export default function LeadDetailView() {
                     alignItems: "center",
                   }}
                 >
-                  <Typography
-                    fontWeight={600}
-                    fontSize="14px"
-                    color="inherit"
-                  >
+                  <Typography fontWeight={600} fontSize="14px" color="inherit">
                     {tab}
                   </Typography>
                 </Box>
@@ -2187,12 +1928,7 @@ export default function LeadDetailView() {
               color: "#505050",
               border: "none",
               boxShadow: "none",
-              "&:hover": {
-                bgcolor: "#f3f3f3",
-                color: "#232323",
-                border: "none",
-                boxShadow: "none",
-              },
+              "&:hover": { bgcolor: "#f3f3f3", color: "#232323", border: "none", boxShadow: "none" },
             }}
           >
             Edit
@@ -2209,10 +1945,7 @@ export default function LeadDetailView() {
               color: isConverted ? "#94A3B8" : "#FFFFFF",
               px: 2,
               boxShadow: "none",
-              "&:hover": {
-                bgcolor: isConverted ? "#E2E8F0" : "#232323",
-                boxShadow: "none",
-              },
+              "&:hover": { bgcolor: isConverted ? "#E2E8F0" : "#232323", boxShadow: "none" },
               "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
             }}
           >
@@ -2364,32 +2097,17 @@ export default function LeadDetailView() {
               <Typography variant="h6" fontWeight={700} gutterBottom>
                 Convert Lead
               </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ px: 2, lineHeight: 1.6 }}
-              >
+              <Typography variant="body2" color="text.secondary" sx={{ px: 2, lineHeight: 1.6 }}>
                 Are you sure you want to Convert{" "}
                 <b>"{leadName}"</b> lead into a patient &amp; register it?
               </Typography>
             </Box>
             {convertError && (
-              <Alert
-                severity="error"
-                sx={{
-                  width: "100%",
-                  borderRadius: "10px",
-                  textAlign: "left",
-                }}
-              >
+              <Alert severity="error" sx={{ width: "100%", borderRadius: "10px", textAlign: "left" }}>
                 {convertError}
               </Alert>
             )}
-            <Stack
-              direction="row"
-              spacing={2}
-              sx={{ width: "100%", mt: 2 }}
-            >
+            <Stack direction="row" spacing={2} sx={{ width: "100%", mt: 2 }}>
               <Button
                 fullWidth
                 onClick={handleClosePopup}
@@ -2422,11 +2140,7 @@ export default function LeadDetailView() {
                   "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
                 }}
               >
-                {convertLoading ? (
-                  <CircularProgress size={20} sx={{ color: "white" }} />
-                ) : (
-                  "Convert"
-                )}
+                {convertLoading ? <CircularProgress size={20} sx={{ color: "white" }} /> : "Convert"}
               </Button>
             </Stack>
           </Stack>
