@@ -727,7 +727,11 @@ if (data.campaign_mode === 2) setMode("paid");
                       {accounts.includes("instagram") && (
                         <div className="budget-card">
                           <div className="budget-title">
-                            <img src={instagramIcon} alt="Instagram" />
+                            <img
+                              src={instagramIcon}
+                              alt="Instagram"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            />
                             <span>Instagram (Estimate CPC : $3.5)</span>
                           </div>
                           <div className="budget-input-wrapper">
@@ -749,7 +753,11 @@ if (data.campaign_mode === 2) setMode("paid");
                       {accounts.includes("facebook") && (
                         <div className="budget-card">
                           <div className="budget-title">
-                            <img src={facebookIcon} alt="Facebook" />
+                            <img
+                              src={facebookIcon}
+                              alt="Facebook"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            />
                             <span>Facebook (Estimate CPC : $2.5)</span>
                           </div>
                           <div className="budget-input-wrapper">
@@ -771,7 +779,11 @@ if (data.campaign_mode === 2) setMode("paid");
                       {accounts.includes("linkedin") && (
                         <div className="budget-card">
                           <div className="budget-title">
-                            <img src={linkedinIcon} alt="LinkedIn" />
+                            <img
+                              src={linkedinIcon}
+                              alt="LinkedIn"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            />
                             <span>LinkedIn (Estimate CPC : $1.5)</span>
                           </div>
                           <div className="budget-input-wrapper">

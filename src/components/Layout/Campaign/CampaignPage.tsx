@@ -1,194 +1,194 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from "react";
-import CampaignCard from "./CampaignCard";
-import SocialCampaignModal from "./SocialCampaignModal";
-import EmailCampaignModal from "./EmailCampaignModal";
-import EditCampaignModal from "./EditCampaignModal";
-import { CampaignAPI } from "../../../services/campaign.api";
+// /* eslint-disable @typescript-eslint/no-explicit-any */
+// import { useEffect, useState } from "react";
+// import CampaignCard from "./CampaignCard";
+// import SocialCampaignModal from "./SocialCampaignModal";
+// import EmailCampaignModal from "./EmailCampaignModal";
+// import EditCampaignModal from "./EditCampaignModal";
+// import { CampaignAPI } from "../../../services/campaign.api";
 
-import "../../../styles/Campaign/CampaignPage.css";
-import type { Campaign, CampaignAPIType } from "../../../types/campaigns.types";
-import type { CampaignStatus, Platform } from "../../../constants/campaigns.constants";
+// import "../../../styles/Campaign/CampaignPage.css";
+// import type { Campaign, CampaignAPIType } from "../../../types/campaigns.types";
+// import type { CampaignStatus, Platform } from "../../../constants/campaigns.constants";
 
-// ─── Map raw API response → Campaign ────────────────────────────────────────
-function mapApiCampaign(raw: CampaignAPIType): Campaign {
-  // ── Resolve platforms ────────────────────────────────────────────────────
-  let platforms: Platform[] = [];
+// // ─── Map raw API response → Campaign ────────────────────────────────────────
+// function mapApiCampaign(raw: CampaignAPIType): Campaign {
+//   // ── Resolve platforms ────────────────────────────────────────────────────
+//   let platforms: Platform[] = [];
 
-  // Priority 1: social_media array from serializer (the correct key)
-  if (Array.isArray(raw.social_media) && raw.social_media.length > 0) {
-    platforms = raw.social_media
-      .filter((sc) => sc.is_active !== false)
-      .map((sc) => sc.platform_name)
-      .filter(Boolean);
-  }
+//   // Priority 1: social_media array from serializer (the correct key)
+//   if (Array.isArray(raw.social_media) && raw.social_media.length > 0) {
+//     platforms = raw.social_media
+//       .filter((sc) => sc.is_active !== false)
+//       .map((sc) => sc.platform_name)
+//       .filter(Boolean);
+//   }
 
-  // Priority 2: select_ad_accounts array (present on some create responses)
-  if (platforms.length === 0 && Array.isArray(raw.select_ad_accounts)) {
-    platforms = raw.select_ad_accounts;
-  }
+//   // Priority 2: select_ad_accounts array (present on some create responses)
+//   if (platforms.length === 0 && Array.isArray(raw.select_ad_accounts)) {
+//     platforms = raw.select_ad_accounts;
+//   }
 
-  // ── Resolve type ─────────────────────────────────────────────────────────
-  const hasEmail = Array.isArray(raw.email) && raw.email.length > 0;
-  const type: "social" | "email" = hasEmail ? "email" : "social";
+//   // ── Resolve type ─────────────────────────────────────────────────────────
+//   const hasEmail = Array.isArray(raw.email) && raw.email.length > 0;
+//   const type: "social" | "email" = hasEmail ? "email" : "social";
 
-  // For email campaigns with no platform set, show gmail icon
-  if (platforms.length === 0 && hasEmail) {
-    platforms = ["gmail" as Platform];
-  }
+//   // For email campaigns with no platform set, show gmail icon
+//   if (platforms.length === 0 && hasEmail) {
+//     platforms = ["gmail" as Platform];
+//   }
 
-  // ── Resolve status ───────────────────────────────────────────────────────
-  const statusMap: Record<string, CampaignStatus> = {
-    live: "Live",
-    draft: "Draft",
-    scheduled: "Scheduled",
-    stopped: "Stopped",
-  };
+//   // ── Resolve status ───────────────────────────────────────────────────────
+//   const statusMap: Record<string, CampaignStatus> = {
+//     live: "Live",
+//     draft: "Draft",
+//     scheduled: "Scheduled",
+//     stopped: "Stopped",
+//   };
 
-  return {
-    id: raw.id,
-    name: raw.campaign_name ?? "",
-    description: raw.campaign_description ?? "",
-    objective: raw.campaign_objective,
-    audience: raw.target_audience as any,
-    type,
-    status: statusMap[(raw.status ?? "").toLowerCase()] ?? "Draft",
-    start: raw.start_date ?? "",
-    end: raw.end_date ?? "",
-    platforms,
-    leads: 0,
-    lead_generated: raw.lead_generated ?? 0,
-    scheduledAt: raw.selected_start ?? "",
-    selected_start: raw.selected_start ?? null,
-    enter_time: raw.enter_time ?? null,
-    budget_data: raw.budget_data ?? {},
-    platform_data: raw.platform_data,
-    campaign_content: raw.campaign_content ?? "",
-    image_url: raw.image_url ?? null,
-    total_spend: raw.total_spend ?? 0,
-    cpc: raw.cpc ?? 0,
-    impressions: raw.impressions,
-    clicks: raw.clicks,
-    emails_sent: raw.emails_sent,
-    bounces: raw.bounces,
-    unsubscribes: raw.unsubscribes,
-    conversion_rate: raw.conversion_rate,
-  };
-}
+//   return {
+//     id: raw.id,
+//     name: raw.campaign_name ?? "",
+//     description: raw.campaign_description ?? "",
+//     objective: raw.campaign_objective,
+//     audience: raw.target_audience as any,
+//     type,
+//     status: statusMap[(raw.status ?? "").toLowerCase()] ?? "Draft",
+//     start: raw.start_date ?? "",
+//     end: raw.end_date ?? "",
+//     platforms,
+//     leads: 0,
+//     lead_generated: raw.lead_generated ?? 0,
+//     scheduledAt: raw.selected_start ?? "",
+//     selected_start: raw.selected_start ?? null,
+//     enter_time: raw.enter_time ?? null,
+//     budget_data: raw.budget_data ?? {},
+//     platform_data: raw.platform_data,
+//     campaign_content: raw.campaign_content ?? "",
+//     image_url: raw.image_url ?? null,
+//     total_spend: raw.total_spend ?? 0,
+//     cpc: raw.cpc ?? 0,
+//     impressions: raw.impressions,
+//     clicks: raw.clicks,
+//     emails_sent: raw.emails_sent,
+//     bounces: raw.bounces,
+//     unsubscribes: raw.unsubscribes,
+//     conversion_rate: raw.conversion_rate,
+//   };
+// }
 
-export type CampaignType = "social" | "email";
+// export type CampaignType = "social" | "email";
 
-export default function CampaignPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+// export default function CampaignPage() {
+//   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+//   const [loading, setLoading] = useState(true);
+//   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const [showSocialModal, setShowSocialModal] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+//   const [showSocialModal, setShowSocialModal] = useState(false);
+//   const [showEmailModal, setShowEmailModal] = useState(false);
+//   const [showEditModal, setShowEditModal] = useState(false);
+//   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
 
-  // ─── Fetch campaigns from backend on mount ───────────────────────────────
-  useEffect(() => {
-    const fetchCampaigns = async () => {
-      try {
-        const res = await CampaignAPI.list();
-        const raw: CampaignAPIType[] = Array.isArray(res.data) ? res.data : [];
-        setCampaigns(raw.map(mapApiCampaign));
-      } catch (err) {
-        console.error("Failed to load campaigns:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCampaigns();
-  }, []);
+//   // ─── Fetch campaigns from backend on mount ───────────────────────────────
+//   useEffect(() => {
+//     const fetchCampaigns = async () => {
+//       try {
+//         const res = await CampaignAPI.list();
+//         const raw: CampaignAPIType[] = Array.isArray(res.data) ? res.data : [];
+//         setCampaigns(raw.map(mapApiCampaign));
+//       } catch (err) {
+//         console.error("Failed to load campaigns:", err);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+//     fetchCampaigns();
+//   }, []);
 
-  // ─── After creating a campaign, prepend it to list ───────────────────────
-  const handleSaveCampaign = (campaign: Campaign) => {
-    setCampaigns((prev) => [campaign, ...prev]);
-    setShowSocialModal(false);
-    setShowEmailModal(false);
-  };
+//   // ─── After creating a campaign, prepend it to list ───────────────────────
+//   const handleSaveCampaign = (campaign: Campaign) => {
+//     setCampaigns((prev) => [campaign, ...prev]);
+//     setShowSocialModal(false);
+//     setShowEmailModal(false);
+//   };
 
-  const handleEdit = (campaign: Campaign) => {
-    setEditingCampaign(campaign);
-    setShowEditModal(true);
-  };
+//   const handleEdit = (campaign: Campaign) => {
+//     setEditingCampaign(campaign);
+//     setShowEditModal(true);
+//   };
 
-  const handleUpdateCampaign = (updated: Campaign) => {
-    setCampaigns((prev) =>
-      prev.map((c) => (c.id === updated.id ? updated : c))
-    );
-    setShowEditModal(false);
-  };
+//   const handleUpdateCampaign = (updated: Campaign) => {
+//     setCampaigns((prev) =>
+//       prev.map((c) => (c.id === updated.id ? updated : c))
+//     );
+//     setShowEditModal(false);
+//   };
 
-  const handleStatusChange = (id: string, status: CampaignStatus) => {
-    setCampaigns((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status } : c))
-    );
-  };
+//   const handleStatusChange = (id: string, status: CampaignStatus) => {
+//     setCampaigns((prev) =>
+//       prev.map((c) => (c.id === id ? { ...c, status } : c))
+//     );
+//   };
 
-  return (
-    <div className="campaign-page">
-      {/* ================= HEADER ACTIONS ================= */}
-      <div className="campaign-actions">
-        <button
-          className="add-campaign-btn"
-          onClick={() => setShowSocialModal(true)}
-        >
-          + Add Social Campaign
-        </button>
+//   return (
+//     <div className="campaign-page">
+//       {/* ================= HEADER ACTIONS ================= */}
+//       <div className="campaign-actions">
+//         <button
+//           className="add-campaign-btn"
+//           onClick={() => setShowSocialModal(true)}
+//         >
+//           + Add Social Campaign
+//         </button>
 
-        <button
-          className="add-campaign-btn secondary"
-          onClick={() => setShowEmailModal(true)}
-        >
-          + Add Email Campaign
-        </button>
-      </div>
+//         <button
+//           className="add-campaign-btn secondary"
+//           onClick={() => setShowEmailModal(true)}
+//         >
+//           + Add Email Campaign
+//         </button>
+//       </div>
 
-      {/* ================= MODALS ================= */}
-      {showSocialModal && (
-        <SocialCampaignModal
-          onClose={() => setShowSocialModal(false)}
-          onSave={handleSaveCampaign}
-        />
-      )}
+//       {/* ================= MODALS ================= */}
+//       {showSocialModal && (
+//         <SocialCampaignModal
+//           onClose={() => setShowSocialModal(false)}
+//           onSave={handleSaveCampaign}
+//         />
+//       )}
 
-      {showEmailModal && (
-        <EmailCampaignModal
-          onClose={() => setShowEmailModal(false)}
-          onSave={handleSaveCampaign}
-        />
-      )}
+//       {showEmailModal && (
+//         <EmailCampaignModal
+//           onClose={() => setShowEmailModal(false)}
+//           onSave={handleSaveCampaign}
+//         />
+//       )}
 
-      {showEditModal && editingCampaign && (
-        <EditCampaignModal
-          campaign={editingCampaign}
-          onClose={() => setShowEditModal(false)}
-          onSave={handleUpdateCampaign}
-        />
-      )}
+//       {showEditModal && editingCampaign && (
+//         <EditCampaignModal
+//           campaign={editingCampaign}
+//           onClose={() => setShowEditModal(false)}
+//           onSave={handleUpdateCampaign}
+//         />
+//       )}
 
-      {/* ================= CAMPAIGN CARDS ================= */}
-      {loading ? (
-        <div className="campaign-loading">Loading campaigns...</div>
-      ) : (
-        <div className="campaign-grid">
-          {campaigns.map((c) => (
-            <CampaignCard
-              key={c.id}
-              campaign={c}
-              openMenuId={openMenuId}
-              setOpenMenuId={setOpenMenuId}
-              onViewDetail={(campaign) => console.log(campaign)}
-              onEdit={handleEdit}
-              onStatusChange={handleStatusChange}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+//       {/* ================= CAMPAIGN CARDS ================= */}
+//       {loading ? (
+//         <div className="campaign-loading">Loading campaigns...</div>
+//       ) : (
+//         <div className="campaign-grid">
+//           {campaigns.map((c) => (
+//             <CampaignCard
+//               key={c.id}
+//               campaign={c}
+//               openMenuId={openMenuId}
+//               setOpenMenuId={setOpenMenuId}
+//               onViewDetail={(campaign) => console.log(campaign)}
+//               onEdit={handleEdit}
+//               onStatusChange={handleStatusChange}
+//             />
+//           ))}
+//         </div>
+//       )}
+//     </div>
+//   );
+// }

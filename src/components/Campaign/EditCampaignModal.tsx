@@ -464,9 +464,21 @@ onClose();
                     <div className="budget-section">
                       <h3>Budget Allocation</h3>
                       <div className="budget-row">
-                        {accounts.includes("instagram") && <div className="budget-card"><div className="budget-title"><img src={instagramIcon} alt="Instagram" /><span>Instagram (Estimate CPC : $3.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={instagramBudget} onChange={(e) => setInstagramBudget(Number(e.target.value))} className="budget-input" /></div></div>}
-                        {accounts.includes("facebook") && <div className="budget-card"><div className="budget-title"><img src={facebookIcon} alt="Facebook" /><span>Facebook (Estimate CPC : $2.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={facebookBudget} onChange={(e) => setFacebookBudget(Number(e.target.value))} className="budget-input" /></div></div>}
-                        {accounts.includes("linkedin") && <div className="budget-card"><div className="budget-title"><img src={linkedinIcon} alt="LinkedIn" /><span>LinkedIn (Estimate CPC : $1.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={linkedinBudget} onChange={(e) => setLinkedinBudget(Number(e.target.value))} className="budget-input" /></div></div>}
+                        {accounts.includes("instagram") && <div className="budget-card"><div className="budget-title"> <img
+                              src={instagramIcon}
+                              alt="Instagram"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            /><span>Instagram (Estimate CPC : $3.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={instagramBudget} onChange={(e) => setInstagramBudget(Number(e.target.value))} className="budget-input" /></div></div>}
+                        {accounts.includes("facebook") && <div className="budget-card"><div className="budget-title"><img
+                              src={facebookIcon}
+                              alt="Facebook"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            /><span>Facebook (Estimate CPC : $2.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={facebookBudget} onChange={(e) => setFacebookBudget(Number(e.target.value))} className="budget-input" /></div></div>}
+                        {accounts.includes("linkedin") && <div className="budget-card"><div className="budget-title"><img
+                              src={linkedinIcon}
+                              alt="LinkedIn"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            /><span>LinkedIn (Estimate CPC : $1.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={linkedinBudget} onChange={(e) => setLinkedinBudget(Number(e.target.value))} className="budget-input" /></div></div>}
                       </div>
                       <div className="total-budget"><div><h4>Total Budget: ${(accounts.includes("instagram") ? instagramBudget : 0) + (accounts.includes("facebook") ? facebookBudget : 0) + (accounts.includes("linkedin") ? linkedinBudget : 0)}</h4><p>Ad spend is charged directly by each connected social media platform. We don't handle payments.</p></div></div>
                     </div>
