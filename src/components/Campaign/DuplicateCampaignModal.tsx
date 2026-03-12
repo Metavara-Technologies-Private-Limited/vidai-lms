@@ -15,13 +15,14 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import viewIcon from "./Icons/view.png";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
 import { CampaignAPI } from "../../services/campaign.api";
 import "../../styles/Campaign/EmailCampaignModal.css";
+import "../../styles/Campaign/SocialCampaignModal.css"; 
 import EmailTemplateModal from "../../components/Campaign/EmailTemplateModal";
 interface DuplicateCampaignModalProps { 
   campaign: any;
@@ -64,6 +65,10 @@ export default function DuplicateCampaignModal({
       ? dayjs(campaign.scheduledAt).format("YYYY-MM-DD")
       : "",
   );
+  const [scheduleRange, setScheduleRange] = useState<[Dayjs | null, Dayjs | null]>([
+  campaign.scheduledAt ? dayjs(campaign.scheduledAt) : null,
+  campaign.scheduledAt ? dayjs(campaign.scheduledAt) : null,
+]);
   const [scheduleTime, setScheduleTime] = useState(
     campaign.scheduledAt ? dayjs(campaign.scheduledAt).format("HH:mm") : "",
   );
@@ -128,7 +133,10 @@ if (data.campaign_mode === 2) setMode("paid");
       ? audience && subject.trim() && emailBody.trim()
       : accounts.length > 0 && mode;
 
-  const step3Valid = scheduleDate && scheduleTime;
+  const step3Valid =
+  campaign.type === "email"
+    ? scheduleRange[0] && scheduleRange[1] && scheduleTime
+    : scheduleDate && scheduleTime;
 
   const handleNext = () => {
     setSubmitted(true);
@@ -617,45 +625,56 @@ if (data.campaign_mode === 2) setMode("paid");
         {/* STEP 3 - EMAIL */}
         {step === 3 && campaign.type === "email" && (
           <div className="step-content">
-            <h2>Schedule Email</h2>
-            <div className="schedule-card">
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Schedule Email
+            </Typography>
+
+            <div className="section-card">
               <div className="schedule-header">
                 <div className="schedule-title">
                   <h3>Schedule</h3>
-                  <p>Select date and time to send the email</p>
+                  <p className="section-subtitle">Select date and time to send the email</p>
                 </div>
-                <button className="ai-opt-btn">
-                  ✨ AI-Optimization Timing
-                </button>
+                <button className="ai-btn">✨ AI-Optimization Timing</button>
               </div>
 
               <div className="schedule-row">
-                <div
-                  className={`schedule-field ${submitted && !scheduleDate ? "error" : ""}`}
-                >
+                <div className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}>
                   <label>Select Date</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker
-                      format="DD/MM/YYYY"
-                      value={scheduleDate ? dayjs(scheduleDate) : null}
-                      onChange={(v) =>
-                        setScheduleDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")
-                      }
-                      slots={{ openPickerIcon: CalendarTodayIcon }}
-                    />
+                    <div style={{ display: "flex", gap: "12px" }}>
+                      <DatePicker
+                        label="From"
+                        value={scheduleRange[0]}
+                        minDate={dayjs()}
+                        maxDate={scheduleRange[1] ?? (endDate ? dayjs(endDate) : undefined)}
+                        onChange={(v) => setScheduleRange([v ? dayjs(v) : null, scheduleRange[1]])}
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                      <DatePicker
+                        label="To"
+                        value={scheduleRange[1]}
+                        minDate={scheduleRange[0] ?? dayjs()}
+                        maxDate={endDate ? dayjs(endDate) : undefined}
+                        onChange={(v) => setScheduleRange([scheduleRange[0], v ? dayjs(v) : null])}
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                    </div>
                   </LocalizationProvider>
                 </div>
 
-                <div
-                  className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}
-                >
+                <div className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}>
                   <label>Enter Time</label>
-                  <input
-                    className="schedule-input"
-                    type="time"
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                  />
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <TimePicker
+                      format="hh:mm A"
+                      value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null}
+                      onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }}
+                      ampm
+                      minTime={scheduleRange[0] && scheduleRange[0].isSame(dayjs(), "day") ? dayjs() : undefined}
+                      slotProps={{ textField: { fullWidth: true } }}
+                    />
+                  </LocalizationProvider>
                 </div>
               </div>
             </div>
