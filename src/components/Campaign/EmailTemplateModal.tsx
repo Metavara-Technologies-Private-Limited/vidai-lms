@@ -17,8 +17,7 @@ import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import PermMediaIcon from "@mui/icons-material/PermMedia";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-
-const API_BASE_URL = "http://127.0.0.1:8000/api/templates";
+import { http } from "../../services/http"; // ✅ ONLY CHANGE: replaces hardcoded localhost
 
 export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -49,10 +48,9 @@ export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/mail/`);
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
-      setTemplates(data);
+      // ✅ ONLY CHANGE: was fetch("http://127.0.0.1:8000/api/templates/mail/")
+      const res = await http.get("/templates/mail/");
+      setTemplates(Array.isArray(res.data) ? res.data : []);
     } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {
@@ -209,7 +207,6 @@ export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
                     setSelected(template.id);
                     setPreviewTemplate(template);
                     setTemplateConfirmOpen(true);
-                    // onClose();
                   }}
                 >
                   <input
