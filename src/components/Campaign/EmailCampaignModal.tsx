@@ -43,7 +43,7 @@ interface EmailTemplate {
 }
 interface EmailCampaignModalProps {
   onClose: () => void;
-  onSave: () => void;
+  onSave: (...args: unknown[]) => void; // ✅ FIXED: accepts any args (including campaign param from CampaignPage)
 }
 
 export default function EmailCampaignModal({
