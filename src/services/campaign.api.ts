@@ -28,4 +28,9 @@ export const CampaignAPI = {
   getFacebookDebug: (campaignId: string) =>
     http.get(`/campaigns/${campaignId}/facebook-debug/`),
 
+  // ✅ Fetches latest Mailchimp insights from Mailchimp API
+  // and saves them to CampaignEmailConfig.insights JSONField in DB.
+  // Called automatically when CampaignDashboard opens for email campaigns.
+  getMailchimpInsights: (campaignId: string) =>
+    http.get(`/campaigns/${campaignId}/mailchimp-insights/`),
 };

@@ -38,133 +38,183 @@ const CampaignDashboard = ({
     campaign.platforms?.[0] || "",
   );
 
-  const duration = `${dayjs(campaign.start).format("DD/MM/YYYY")} - ${dayjs(
-    campaign.end,
+  // ─── Full campaign data with fresh insights ───────────────────────────────
+  const [fullCampaign, setFullCampaign] = React.useState<Campaign>(campaign);
+  const [loadingInsights, setLoadingInsights] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        setLoadingInsights(true);
+
+        // ── Step 1: For email campaigns, trigger Mailchimp insights sync ──────
+        // This fetches latest data from Mailchimp and saves to
+        // CampaignEmailConfig.insights JSONField in DB.
+        // Silently ignore errors — campaign may not be sent yet.
+        if (campaign.type === CAMPAIGN_TYPE.EMAIL) {
+          try {
+            await CampaignAPI.getMailchimpInsights(campaign.id);
+          } catch {
+            // Not sent to Mailchimp yet, or Mailchimp API down — that is fine.
+            // Step 2 below will still return whatever is cached in DB.
+          }
+        }
+
+        // ── Step 2: Fetch full campaign data (includes latest insights) ───────
+        const res = await CampaignAPI.get(campaign.id);
+        const d = res.data;
+
+        setFullCampaign((prev) => ({
+          ...prev,
+          emails_sent:        d.emails_sent        ?? 0,
+          impressions:        d.impressions         ?? 0,  // opens
+          open_rate:          d.open_rate           ?? 0,
+          clicks:             d.clicks              ?? 0,
+          click_rate:         d.click_rate          ?? 0,
+          bounces:            d.bounces             ?? 0,
+          unsubscribes:       d.unsubscribes        ?? 0,
+          lead_generated:     d.lead_generated      ?? 0,
+          conversion_rate:    d.conversion_rate     ?? 0,
+          last_open:          d.last_open           ?? null,
+          last_click:         d.last_click          ?? null,
+          insights_synced_at: d.insights_synced_at  ?? null,
+        }));
+      } catch (err) {
+        console.error("Failed to fetch campaign data:", err);
+      } finally {
+        setLoadingInsights(false);
+      }
+    };
+
+    fetchAll();
+  }, [campaign.id, campaign.type]);
+
+  const duration = `${dayjs(fullCampaign.start).format("DD/MM/YYYY")} - ${dayjs(
+    fullCampaign.end,
   ).format("DD/MM/YYYY")}`;
 
   const scheduleTime = formatScheduleTime(
-    campaign.selected_start,
-    campaign.enter_time,
+    fullCampaign.selected_start,
+    fullCampaign.enter_time,
   );
 
-  const platforms: Platform[] = campaign.platforms ?? [];
+  const platforms: Platform[] = fullCampaign.platforms ?? [];
 
-  const [insights, setInsights] = React.useState({
+  // ─── Facebook insights (social campaigns only) ────────────────────────────
+  const [fbInsights, setFbInsights] = React.useState({
     impressions: 0,
     clicks: 0,
     engagement: 0,
   });
 
   React.useEffect(() => {
-    const fetchInsights = async () => {
+    const fetchFbInsights = async () => {
       try {
         const res = await CampaignAPI.getFacebookInsights(campaign.id);
         await CampaignAPI.getFacebookDebug(campaign.id);
-
         const data = res.data?.insights || {};
-
-        setInsights({
+        setFbInsights({
           impressions: data.post_impressions || 0,
           clicks: data.post_clicks || 0,
           engagement: data.post_engaged_users || 0,
         });
       } catch (err) {
-        console.error("Insights fetch failed", err);
+        console.error("FB Insights fetch failed", err);
       }
     };
 
     if (campaign.platforms?.includes(PLATFORMS.FACEBOOK)) {
-      fetchInsights();
-
-      const interval = setInterval(fetchInsights, 60000);
-
+      fetchFbInsights();
+      const interval = setInterval(fetchFbInsights, 60000);
       return () => clearInterval(interval);
     }
   }, [campaign.id, campaign.platforms]);
 
-  // ─── Resolve total budget ─────────────────────────────────────────────────
-  // Priority 1: budget_data.total
-  // Priority 2: sum of all platform budgets in budget_data
-  // Priority 3: total_spend flat field
-  const budgetData: Record<string, number> = campaign.budget_data ?? {};
-  // Only sum budgets for platforms actually selected in this campaign
+  // ─── Budget ───────────────────────────────────────────────────────────────
+  const budgetData: Record<string, number> = fullCampaign.budget_data ?? {};
   const sumFromSelectedPlatforms = platforms
     .filter((p) => p !== PLATFORMS.GMAIL)
     .reduce((sum, p) => sum + (Number(budgetData[p]) || 0), 0);
-
   const totalBudget: number =
     sumFromSelectedPlatforms > 0
       ? sumFromSelectedPlatforms
-      : (campaign.total_spend ?? 0);
+      : (fullCampaign.total_spend ?? 0);
 
   const ctr =
-    insights.impressions > 0
-      ? ((insights.clicks / insights.impressions) * 100).toFixed(2)
+    fbInsights.impressions > 0
+      ? ((fbInsights.clicks / fbInsights.impressions) * 100).toFixed(2)
       : "0";
 
-  // ─── EMAIL CAMPAIGN METRICS (from Mailchimp insights JSON) ───────────────
-  // These come from campaign.insights JSONField saved by
-  // GET /api/campaigns/<id>/mailchimp-insights/
-  // Fields: emails_sent, opens, open_rate, clicks, click_rate,
-  //         bounces, unsubscribes, last_open, last_click, synced_at
+  // ─── Helper: normalise open_rate / click_rate ─────────────────────────────
+  // Backend may return "25.0%" (string) or 25.0 (number).
+  const formatRate = (val: string | number | null | undefined): string => {
+    if (val == null) return "0%";
+    const str = String(val).trim();
+    if (str.endsWith("%")) return str;
+    const num = parseFloat(str);
+    if (isNaN(num)) return "0%";
+    return `${num}%`;
+  };
+
+  // ─── EMAIL CAMPAIGN METRICS ───────────────────────────────────────────────
   const emailMetrics = [
     {
       title: "Emails Sent",
-      value: campaign.emails_sent ?? 0,
+      value: loadingInsights ? "…" : (fullCampaign.emails_sent ?? 0),
       icon: impressionsIcon,
     },
     {
       title: "Total Opens",
-      value: campaign.impressions ?? 0, // impressions = opens from backend
+      value: loadingInsights ? "…" : (fullCampaign.impressions ?? 0),
       icon: clicksIcon,
     },
     {
       title: "Open Rate",
-      value: campaign.open_rate != null ? `${campaign.open_rate}%` : "0%",
+      value: loadingInsights ? "…" : formatRate(fullCampaign.open_rate),
       icon: ctrIcon,
     },
     {
       title: "Total Clicks",
-      value: campaign.clicks ?? 0,
+      value: loadingInsights ? "…" : (fullCampaign.clicks ?? 0),
       icon: cpcIcon,
     },
     {
       title: "Click Rate",
-      value: campaign.click_rate != null ? `${campaign.click_rate}%` : "0%",
+      value: loadingInsights ? "…" : formatRate(fullCampaign.click_rate),
       icon: conversionRateIcon,
     },
     {
       title: "Bounces",
-      value: campaign.bounces ?? 0,
+      value: loadingInsights ? "…" : (fullCampaign.bounces ?? 0),
       icon: spendIcon,
     },
     {
       title: "Unsubscribes",
-      value: campaign.unsubscribes ?? 0,
+      value: loadingInsights ? "…" : (fullCampaign.unsubscribes ?? 0),
       icon: cpaIcon,
     },
     {
       title: "Leads Generated",
-      value: campaign.lead_generated || 0,
+      value: loadingInsights ? "…" : (fullCampaign.lead_generated || 0),
       icon: conversionsIcon,
     },
   ];
 
-  // ─── SOCIAL CAMPAIGN METRICS (Facebook/Instagram/LinkedIn) ───────────────
+  // ─── SOCIAL CAMPAIGN METRICS ──────────────────────────────────────────────
   const socialMetrics = [
     {
       title: "Total Impressions",
-      value: campaign.impressions ?? 0,
+      value: fullCampaign.impressions ?? 0,
       icon: impressionsIcon,
     },
     {
       title: "Total Clicks",
-      value: campaign.clicks ?? 0,
+      value: fullCampaign.clicks ?? 0,
       icon: clicksIcon,
     },
     {
       title: "Conversions",
-      value: campaign.lead_generated || "0",
+      value: fullCampaign.lead_generated || "0",
       icon: conversionsIcon,
     },
     {
@@ -179,12 +229,12 @@ const CampaignDashboard = ({
     },
     {
       title: "Conversion Rate",
-      value: `${campaign.conversion_rate ?? 0}%`,
+      value: `${fullCampaign.conversion_rate ?? 0}%`,
       icon: conversionRateIcon,
     },
     {
       title: "CPC",
-      value: `$${campaign.cpc?.toFixed(2) ?? "0.00"}`,
+      value: `$${fullCampaign.cpc?.toFixed(2) ?? "0.00"}`,
       icon: cpcIcon,
     },
     {
@@ -194,9 +244,8 @@ const CampaignDashboard = ({
     },
   ];
 
-  // ─── Pick correct metrics based on campaign type ──────────────────────────
   const metrics =
-    campaign.type === CAMPAIGN_TYPE.EMAIL ? emailMetrics : socialMetrics;
+    fullCampaign.type === CAMPAIGN_TYPE.EMAIL ? emailMetrics : socialMetrics;
 
   return (
     <div className="cd-wrapper">
@@ -224,19 +273,23 @@ const CampaignDashboard = ({
             <div className="cd-header-left">
               <div
                 className={
-                  campaign.type === CAMPAIGN_TYPE.EMAIL
+                  fullCampaign.type === CAMPAIGN_TYPE.EMAIL
                     ? "cd-mail-icon"
                     : "cd-globe-icon"
                 }
               >
                 <img
-                  src={campaign.type === CAMPAIGN_TYPE.EMAIL ? mailIcon : globeIcon}
-                  alt={campaign.type}
+                  src={
+                    fullCampaign.type === CAMPAIGN_TYPE.EMAIL
+                      ? mailIcon
+                      : globeIcon
+                  }
+                  alt={fullCampaign.type}
                 />
               </div>
-              <span className="cd-header-title">{campaign.name}</span>
-              <span className={`status ${campaign.status.toLowerCase()}`}>
-                {campaign.status}
+              <span className="cd-header-title">{fullCampaign.name}</span>
+              <span className={`status ${fullCampaign.status.toLowerCase()}`}>
+                {fullCampaign.status}
               </span>
             </div>
           </div>
@@ -247,9 +300,9 @@ const CampaignDashboard = ({
             <Meta
               label="Campaign Objective"
               value={
-                campaign.objective
+                fullCampaign.objective
                   ? CAMPAIGN_OBJECTIVES[
-                      campaign.objective as keyof typeof CAMPAIGN_OBJECTIVES
+                      fullCampaign.objective as keyof typeof CAMPAIGN_OBJECTIVES
                     ]
                   : "-"
               }
@@ -264,10 +317,13 @@ const CampaignDashboard = ({
                 </div>
               }
             />
-            <Meta label="Campaign Type" value={campaign.type.toUpperCase()} />
+            <Meta
+              label="Campaign Type"
+              value={fullCampaign.type.toUpperCase()}
+            />
             <Meta
               label="Leads Generated"
-              value={campaign.lead_generated || 0}
+              value={fullCampaign.lead_generated || 0}
             />
           </div>
         </div>
@@ -295,7 +351,7 @@ const CampaignDashboard = ({
         )}
       </div>
 
-      {/* ================= SUB TABS (Dynamic Platforms) ================= */}
+      {/* ================= SUB TABS ================= */}
       {platforms.length > 1 && (
         <div className="cd-subtabs-container">
           {platforms.map((p) => (
@@ -314,7 +370,7 @@ const CampaignDashboard = ({
 
       {/* ================= TAB CONTENT ================= */}
       <CampaignTabContent
-        campaign={campaign}
+        campaign={fullCampaign}
         activeTab={activeTab}
         activeSubTab={activeSubTab}
       />
@@ -331,9 +387,7 @@ const Meta = ({ label, value }: { label: string; value: React.ReactNode }) => (
 );
 
 /* ================= METRIC ================= */
-
 const METRIC_GRADIENTS: Record<string, string> = {
-  // ── Social metrics ──
   "Total Impressions":
     "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
   "Total Clicks":
@@ -347,8 +401,6 @@ const METRIC_GRADIENTS: Record<string, string> = {
     "linear-gradient(180deg, rgba(242,91,91,0.10) 0%, rgba(242,91,91,0.05) 35%, #FFFFFF 100%)",
   CPC: "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
   CPA: "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
-
-  // ── Email / Mailchimp metrics ──
   "Emails Sent":
     "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
   "Total Opens":
