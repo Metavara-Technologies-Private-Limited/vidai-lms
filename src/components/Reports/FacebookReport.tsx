@@ -31,7 +31,8 @@ const tableStyles = {
     mt: 2,
     border: "none",
     borderRadius: "12px",
-    overflow: "hidden",
+    overflowX: "auto",
+    overflowY: "hidden",
     boxShadow: "none",
   },
   headRow: {
@@ -191,7 +192,7 @@ const FacebookReport = ({ data, searchQuery }: FacebookReportProps) => {
       </Box>
 
       <TableContainer sx={tableStyles.container}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 1200 }}>
           <TableHead>
             <TableRow sx={tableStyles.headRow}>
               <TableCell sx={tableStyles.headCell}>Campaign Name</TableCell>

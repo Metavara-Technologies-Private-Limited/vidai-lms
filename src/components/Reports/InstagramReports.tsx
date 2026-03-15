@@ -1,12 +1,13 @@
 import FacebookReport from "./FacebookReport";
-import { REPORTS_MOCK_DATA } from "./reports.mockData";
+import type { ReportChannelData } from "../../types/reports.types";
 
 type InstagramReportsProps = {
-	searchQuery: string;
+  data: ReportChannelData;
+  searchQuery: string;
 };
 
-const InstagramReports = ({ searchQuery }: InstagramReportsProps) => {
-	return <FacebookReport data={REPORTS_MOCK_DATA.instagram} searchQuery={searchQuery} />;
+const InstagramReports = ({ data, searchQuery }: InstagramReportsProps) => {
+  return <FacebookReport data={data} searchQuery={searchQuery} />;
 };
 
 export default InstagramReports;

@@ -1,12 +1,13 @@
 import FacebookReport from "./FacebookReport";
-import { REPORTS_MOCK_DATA } from "./reports.mockData";
+import type { ReportChannelData } from "../../types/reports.types";
 
 type EmailReportsProps = {
+  data: ReportChannelData;
   searchQuery: string;
 };
 
-const EmailReports = ({ searchQuery }: EmailReportsProps) => {
-  return <FacebookReport data={REPORTS_MOCK_DATA.email} searchQuery={searchQuery} />;
+const EmailReports = ({ data, searchQuery }: EmailReportsProps) => {
+  return <FacebookReport data={data} searchQuery={searchQuery} />;
 };
 
 export default EmailReports;
