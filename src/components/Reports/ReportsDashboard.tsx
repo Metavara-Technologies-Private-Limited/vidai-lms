@@ -16,13 +16,183 @@ import GoogleAdsReports from "./GoogleAdsReports";
 import LinkedinReports from "./LinkedinReports";
 import EmailReports from "./EmailReports";
 import CallReports from "./CallReports";
-import { REPORTS_MOCK_DATA, REPORTS_TABS } from "./reports.mockData";
-import type { ReportTabKey } from "../../types/reports.types";
+import { REPORTS_TABS } from "./reports.mockData";
+import { CAMPAIGN_MODE, PLATFORMS } from "../../constants/campaigns.constants";
+import { CampaignAPI } from "../../services/campaign.api";
+import { LeadAPI, type Lead } from "../../services/leads.api";
+import type { CampaignAPIType } from "../../types/campaigns.types";
+import type { ReportChannelData, ReportTabKey, ReportTableRow } from "../../types/reports.types";
+
+type CampaignReportTab = Exclude<ReportTabKey, "call">;
+
+const CAMPAIGN_REPORT_TABS: CampaignReportTab[] = [
+	"facebook",
+	"gmail",
+	"instagram",
+	"google-ads",
+	"linkedin",
+	"email",
+];
+
+const createEmptyReportData = (): ReportChannelData => ({
+	cards: [
+		{ id: "impressions", label: "Total Impressions", value: "0" },
+		{ id: "clicks", label: "Total Clicks", value: "0" },
+		{ id: "conversions", label: "Conversions", value: "0" },
+		{ id: "spent", label: "Total Spend", value: "$0.00" },
+		{ id: "ctr", label: "CTR (Click-Through Rate)", value: "0.0%" },
+		{ id: "convRate", label: "Conversion Rate", value: "0.0%" },
+		{ id: "cpc", label: "CPC (Cost per Click)", value: "$0.00" },
+		{ id: "cpa", label: "CPA (Cost per Lead)", value: "$0.00" },
+	],
+	rows: [],
+});
+
+const createInitialReportsData = (): Record<CampaignReportTab, ReportChannelData> => {
+	return CAMPAIGN_REPORT_TABS.reduce(
+		(acc, tabKey) => {
+			acc[tabKey] = createEmptyReportData();
+			return acc;
+		},
+		{} as Record<CampaignReportTab, ReportChannelData>,
+	);
+};
+
+const toNumber = (value: unknown): number => {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatCurrency = (value: number): string => `$${value.toFixed(2)}`;
+
+const formatPercent = (value: number): string => `${value.toFixed(1)}%`;
+
+const isEmailCampaign = (campaign: CampaignAPIType): boolean => {
+	return campaign.campaign_mode === CAMPAIGN_MODE.EMAIL || (campaign.email?.length ?? 0) > 0;
+};
+
+const hasPlatform = (campaign: CampaignAPIType, platform: string): boolean => {
+	return (campaign.social_media ?? []).some(
+		(social) => social.is_active !== false && (social.platform_name ?? "").toLowerCase() === platform,
+	);
+};
+
+const resolveSpend = (campaign: CampaignAPIType): number => {
+	const budgetData = campaign.budget_data ?? {};
+	const totalBudget = toNumber(budgetData.total);
+	const summedBudget = Object.values(budgetData).reduce((sum, value) => sum + toNumber(value), 0);
+	return toNumber(campaign.total_spend) || totalBudget || summedBudget;
+};
+
+const toLeadCampaignId = (lead: Lead): string => {
+	const raw = (lead as Lead & { campaign_id?: string | number | null }).campaign_id;
+	if (raw === null || raw === undefined) return "";
+	return String(raw);
+};
+
+const toLeadCampaignName = (lead: Lead): string => {
+	const raw = (lead as Lead & { campaign_name?: string | null }).campaign_name;
+	return String(raw ?? "").trim().toLowerCase();
+};
+
+const campaignMatchesTab = (campaign: CampaignAPIType, tabKey: CampaignReportTab): boolean => {
+	if (tabKey === "gmail" || tabKey === "email") return isEmailCampaign(campaign);
+	if (tabKey === "facebook") return hasPlatform(campaign, PLATFORMS.FACEBOOK);
+	if (tabKey === "instagram") return hasPlatform(campaign, PLATFORMS.INSTAGRAM);
+	if (tabKey === "linkedin") return hasPlatform(campaign, PLATFORMS.LINKEDIN);
+	if (tabKey === "google-ads") return !isEmailCampaign(campaign);
+	return false;
+};
+
+const mapCampaignToRow = (campaign: CampaignAPIType, leads: Lead[]): ReportTableRow => {
+	const campaignId = String(campaign.id);
+	const campaignName = String(campaign.campaign_name ?? "Untitled Campaign");
+	const normalizedCampaignName = campaignName.trim().toLowerCase();
+
+	const linkedLeads = leads.filter((lead) => {
+		const leadCampaignId = toLeadCampaignId(lead);
+		const leadCampaignName = toLeadCampaignName(lead);
+		return leadCampaignId === campaignId || (leadCampaignName && leadCampaignName === normalizedCampaignName);
+	});
+
+	const totalImpressions = toNumber(campaign.impressions) || toNumber(campaign.fb_impressions);
+	const totalClicks = toNumber(campaign.clicks) || toNumber(campaign.fb_clicks);
+	const conversions = linkedLeads.length || toNumber(campaign.lead_generated);
+	const spend = resolveSpend(campaign);
+
+	const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+	const conversionRate = toNumber(campaign.conversion_rate) || (totalClicks > 0 ? (conversions / totalClicks) * 100 : 0);
+	const cpc = toNumber(campaign.cpc) || (totalClicks > 0 ? spend / totalClicks : 0);
+	const cpa = conversions > 0 ? spend / conversions : 0;
+
+	return {
+		id: campaignId,
+		campaignName,
+		totalImpressions,
+		totalClicks,
+		conversions,
+		totalSpend: formatCurrency(spend),
+		ctr: formatPercent(ctr),
+		conversionRate: formatPercent(conversionRate),
+		cpc: formatCurrency(cpc),
+		cpa: formatCurrency(cpa),
+	};
+};
+
+const buildReportDataByTab = (
+	campaigns: CampaignAPIType[],
+	leads: Lead[],
+): Record<CampaignReportTab, ReportChannelData> => {
+	return CAMPAIGN_REPORT_TABS.reduce(
+		(acc, tabKey) => {
+			const rows = campaigns
+				.filter((campaign) => campaignMatchesTab(campaign, tabKey))
+				.map((campaign) => mapCampaignToRow(campaign, leads));
+
+			const totals = rows.reduce(
+				(sum, row) => {
+					sum.impressions += row.totalImpressions;
+					sum.clicks += row.totalClicks;
+					sum.conversions += row.conversions;
+					sum.spend += toNumber(row.totalSpend.replace(/[^0-9.-]+/g, ""));
+					return sum;
+				},
+				{ impressions: 0, clicks: 0, conversions: 0, spend: 0 },
+			);
+
+			const totalCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+			const totalConversionRate = totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
+			const totalCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+			const totalCpa = totals.conversions > 0 ? totals.spend / totals.conversions : 0;
+
+			acc[tabKey] = {
+				cards: [
+					{ id: "impressions", label: "Total Impressions", value: totals.impressions.toLocaleString() },
+					{ id: "clicks", label: "Total Clicks", value: totals.clicks.toLocaleString() },
+					{ id: "conversions", label: "Conversions", value: totals.conversions.toLocaleString() },
+					{ id: "spent", label: "Total Spend", value: formatCurrency(totals.spend) },
+					{ id: "ctr", label: "CTR (Click-Through Rate)", value: formatPercent(totalCtr) },
+					{ id: "convRate", label: "Conversion Rate", value: formatPercent(totalConversionRate) },
+					{ id: "cpc", label: "CPC (Cost per Click)", value: formatCurrency(totalCpc) },
+					{ id: "cpa", label: "CPA (Cost per Lead)", value: formatCurrency(totalCpa) },
+				],
+				rows,
+			};
+
+			return acc;
+		},
+		{} as Record<CampaignReportTab, ReportChannelData>,
+	);
+};
 
 const ReportsDashboard = () => {
 	const navigate = useNavigate();
 	const { tab } = useParams<{ tab?: string }>();
 	const [searchQuery, setSearchQuery] = useState("");
+	const [reportsData, setReportsData] = useState<Record<CampaignReportTab, ReportChannelData>>(
+		createInitialReportsData,
+	);
+	const [reportsLoading, setReportsLoading] = useState(false);
 
 	const activeTab = useMemo<ReportTabKey>(() => {
 		return REPORTS_TABS.find((item) => item.key === tab)?.key || "facebook";
@@ -37,6 +207,39 @@ const ReportsDashboard = () => {
 			navigate("/reports/facebook", { replace: true });
 		}
 	}, [navigate, tab]);
+
+	useEffect(() => {
+		let isMounted = true;
+
+		const fetchData = async () => {
+			try {
+				setReportsLoading(true);
+				const [campaignResponse, leadsResponse] = await Promise.all([
+					CampaignAPI.list(),
+					LeadAPI.list(),
+				]);
+
+				if (!isMounted) return;
+				const campaigns = Array.isArray(campaignResponse.data) ? campaignResponse.data : [];
+				const leads = Array.isArray(leadsResponse) ? leadsResponse : [];
+				setReportsData(buildReportDataByTab(campaigns, leads));
+			} catch (error) {
+				console.error("Failed to fetch reports data:", error);
+				if (!isMounted) return;
+				setReportsData(createInitialReportsData());
+			} finally {
+				if (isMounted) {
+					setReportsLoading(false);
+				}
+			}
+		};
+
+		void fetchData();
+
+		return () => {
+			isMounted = false;
+		};
+	}, []);
 
 	const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
 		const nextTab = REPORTS_TABS[newValue];
@@ -110,7 +313,7 @@ const ReportsDashboard = () => {
 
 					<TextField
 						size="small"
-						placeholder="Search by report name"
+						placeholder="Search by campaign name"
 						value={searchQuery}
 						onChange={(event) => setSearchQuery(event.target.value)}
 						sx={{ minWidth: { xs: "100%", md: 260 } }}
@@ -124,14 +327,54 @@ const ReportsDashboard = () => {
 					/>
 				</Box>
 
-				{activeTab === "facebook" && (
-					<FacebookReport key={activeTab} data={REPORTS_MOCK_DATA.facebook} searchQuery={searchQuery} />
+				{reportsLoading && activeTab !== "call" && (
+					<Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+						Loading reports...
+					</Typography>
 				)}
-				{activeTab === "gmail" && <GmailReports searchQuery={searchQuery} />}
-				{activeTab === "instagram" && <InstagramReports searchQuery={searchQuery} />}
-				{activeTab === "google-ads" && <GoogleAdsReports searchQuery={searchQuery} />}
-				{activeTab === "linkedin" && <LinkedinReports searchQuery={searchQuery} />}
-				{activeTab === "email" && <EmailReports searchQuery={searchQuery} />}
+
+				{activeTab === "facebook" && (
+					<FacebookReport
+						key={activeTab}
+						data={reportsData.facebook ?? createEmptyReportData()}
+						searchQuery={searchQuery}
+					/>
+				)}
+				{activeTab === "gmail" && (
+					<GmailReports
+						key={activeTab}
+						data={reportsData.gmail ?? createEmptyReportData()}
+						searchQuery={searchQuery}
+					/>
+				)}
+				{activeTab === "instagram" && (
+					<InstagramReports
+						key={activeTab}
+						data={reportsData.instagram ?? createEmptyReportData()}
+						searchQuery={searchQuery}
+					/>
+				)}
+				{activeTab === "google-ads" && (
+					<GoogleAdsReports
+						key={activeTab}
+						data={reportsData["google-ads"] ?? createEmptyReportData()}
+						searchQuery={searchQuery}
+					/>
+				)}
+				{activeTab === "linkedin" && (
+					<LinkedinReports
+						key={activeTab}
+						data={reportsData.linkedin ?? createEmptyReportData()}
+						searchQuery={searchQuery}
+					/>
+				)}
+				{activeTab === "email" && (
+					<EmailReports
+						key={activeTab}
+						data={reportsData.email ?? createEmptyReportData()}
+						searchQuery={searchQuery}
+					/>
+				)}
 				{activeTab === "call" && <CallReports searchQuery={searchQuery} />}
 			</Box>
 		</Box>

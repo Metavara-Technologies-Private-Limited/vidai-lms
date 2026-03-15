@@ -1,12 +1,13 @@
 import FacebookReport from "./FacebookReport";
-import { REPORTS_MOCK_DATA } from "./reports.mockData";
+import type { ReportChannelData } from "../../types/reports.types";
 
 type GoogleAdsReportsProps = {
+  data: ReportChannelData;
   searchQuery: string;
 };
 
-const GoogleAdsReports = ({ searchQuery }: GoogleAdsReportsProps) => {
-  return <FacebookReport data={REPORTS_MOCK_DATA["google-ads"]} searchQuery={searchQuery} />;
+const GoogleAdsReports = ({ data, searchQuery }: GoogleAdsReportsProps) => {
+  return <FacebookReport data={data} searchQuery={searchQuery} />;
 };
 
 export default GoogleAdsReports;
