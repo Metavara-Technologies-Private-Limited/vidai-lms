@@ -10,11 +10,16 @@ import RemoveIcon from "@mui/icons-material/Remove";
 import {
 	Box,
 	Button,
+	Dialog,
+	DialogActions,
+	DialogContent,
+	DialogTitle,
 	IconButton,
 	ListItemIcon,
 	Menu,
 	MenuItem,
 	Paper,
+	TextField,
 	Stack,
 	Typography,
 } from "@mui/material";
@@ -29,33 +34,7 @@ type PipelineCard = {
 	stages: string[];
 };
 
-const INITIAL_PIPELINES: PipelineCard[] = [
-	{
-		id: "ivf-patient-acquisition",
-		title: "IVF Patient Acquisition",
-		category: "Healthcare",
-		stages: ["1. Lead", "2. Follow-Up", "3. Appointment", "4. Registered"],
-	},
-	{
-		id: "genetic-lab-b2b-sales",
-		title: "Genetic Lab B2B Sales",
-		category: "Diagnostics",
-		stages: [
-			"1. New Lead",
-			"2. Follow-Up",
-			"3. Demo",
-			"4. Proposal",
-			"5. Negotiation",
-			"6. Final",
-		],
-	},
-	{
-		id: "enterprise-saas-sales",
-		title: "Enterprise SaaS Sales",
-		category: "Corporate",
-		stages: ["1. Inquiry", "2. Qualified", "3. Presentation", "4. Closed Won"],
-	},
-];
+const INITIAL_PIPELINES: PipelineCard[] = [];
 
 const INDUSTRY_LABEL_MAP: Record<string, string> = {
 	healthcare: "HEALTHCARE",
@@ -78,6 +57,8 @@ const SalesPipelineDashboard = () => {
 	const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(
 		null,
 	);
+	const [isAddStageOpen, setIsAddStageOpen] = useState(false);
+	const [newStageName, setNewStageName] = useState("");
 	const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(
 		null,
 	);
@@ -124,6 +105,67 @@ const SalesPipelineDashboard = () => {
 
 	const handleCloseActionMenu = () => {
 		setActionMenuAnchor(null);
+	};
+
+	const handleOpenAddStage = () => {
+		if (!selectedPipelineId) return;
+		setNewStageName("");
+		setIsAddStageOpen(true);
+	};
+
+	const handleCloseAddStage = () => {
+		setIsAddStageOpen(false);
+		setNewStageName("");
+	};
+
+	const handleSaveStage = () => {
+		const trimmedStage = newStageName.trim();
+		if (!trimmedStage || !selectedPipelineId) return;
+
+		setPipelines((prevPipelines) =>
+			prevPipelines.map((pipeline) => {
+				if (pipeline.id !== selectedPipelineId) return pipeline;
+
+				const exists = pipeline.stages.some(
+					(stage) => stage.toLowerCase() === trimmedStage.toLowerCase(),
+				);
+				if (exists) return pipeline;
+
+				return {
+					...pipeline,
+					stages: [...pipeline.stages, trimmedStage],
+				};
+			}),
+		);
+
+		handleCloseAddStage();
+	};
+
+	const handleReorderStages = (fromIndex: number, toIndex: number) => {
+		if (!selectedPipelineId || fromIndex === toIndex) return;
+
+		setPipelines((prevPipelines) =>
+			prevPipelines.map((pipeline) => {
+				if (pipeline.id !== selectedPipelineId) return pipeline;
+				if (
+					fromIndex < 0 ||
+					toIndex < 0 ||
+					fromIndex >= pipeline.stages.length ||
+					toIndex >= pipeline.stages.length
+				) {
+					return pipeline;
+				}
+
+				const nextStages = [...pipeline.stages];
+				const [movedStage] = nextStages.splice(fromIndex, 1);
+				nextStages.splice(toIndex, 0, movedStage);
+
+				return {
+					...pipeline,
+					stages: nextStages,
+				};
+			}),
+		);
 	};
 
 	return (
@@ -374,9 +416,14 @@ const SalesPipelineDashboard = () => {
 						}}
 					>
 						{selectedPipeline && selectedPipeline.stages.length > 0 ? (
-							<SalesPipeLineData stages={selectedPipeline.stages} />
+							<SalesPipeLineData
+								stages={selectedPipeline.stages}
+								onAddStage={handleOpenAddStage}
+								onReorderStages={handleReorderStages}
+							/>
 						) : selectedPipeline && selectedPipeline.stages.length === 0 ? (
 							<Box
+								onClick={handleOpenAddStage}
 								sx={{
 									width: 146,
 									height: 172,
@@ -387,6 +434,7 @@ const SalesPipelineDashboard = () => {
 									alignItems: "center",
 									justifyContent: "center",
 									gap: 1,
+									cursor: "pointer",
 									backgroundColor: alpha(theme.palette.background.paper, 0.65),
 								}}
 							>
@@ -469,6 +517,33 @@ const SalesPipelineDashboard = () => {
 					</Box>
 				</Paper>
 			</Stack>
+
+			<Dialog open={isAddStageOpen} onClose={handleCloseAddStage} maxWidth="xs" fullWidth>
+				<DialogTitle>Add Stage</DialogTitle>
+				<DialogContent>
+					<TextField
+						autoFocus
+						fullWidth
+						margin="dense"
+						label="Stage Name"
+						placeholder="e.g. Registered, Counselling, Application Submitted"
+						value={newStageName}
+						onChange={(event) => setNewStageName(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Enter") {
+								event.preventDefault();
+								handleSaveStage();
+							}
+						}}
+					/>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={handleCloseAddStage}>Cancel</Button>
+					<Button onClick={handleSaveStage} variant="contained" disabled={!newStageName.trim()}>
+						Add Stage
+					</Button>
+				</DialogActions>
+			</Dialog>
 
 			<CreateNewPipeline
 				open={isCreateModalOpen}
