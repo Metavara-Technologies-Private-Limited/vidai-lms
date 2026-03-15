@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import EastRoundedIcon from "@mui/icons-material/EastRounded";
 import Groups2OutlinedIcon from "@mui/icons-material/Groups2Outlined";
 import PublishedWithChangesOutlinedIcon from "@mui/icons-material/PublishedWithChangesOutlined";
+import WestRoundedIcon from "@mui/icons-material/WestRounded";
 import { Box, CircularProgress, IconButton, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useDispatch, useSelector } from "react-redux";
@@ -19,9 +20,9 @@ import StageConfiguration from "./StageConfiguration";
 
 type SalesPipeLineDataProps = {
   stages: string[];
+  onAddStage: () => void;
+  onReorderStages: (fromIndex: number, toIndex: number) => void;
 };
-
-const STAGE_SUB_LABELS = ["Lead", "Engage", "Conversion", "Closure"];
 
 const normalizeLeadStatus = (lead: ApiLead): string => {
   const raw = (
@@ -67,7 +68,11 @@ const stageToStatusCandidates = (stageName: string): string[] => {
   return ["new"];
 };
 
-const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
+const SalesPipeLineData = ({
+  stages,
+  onAddStage,
+  onReorderStages,
+}: SalesPipeLineDataProps) => {
   const theme = useTheme();
   const dispatch = useDispatch<AppDispatch>();
   const leads = useSelector(selectLeads) as ApiLead[];
@@ -76,9 +81,13 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
   const [selectedStageName, setSelectedStageName] = useState<string | null>(
     null,
   );
+  const [draggedStageIndex, setDraggedStageIndex] = useState<number | null>(
+    null,
+  );
   const [isDragging, setIsDragging] = useState(false);
 
   const cardsContainerRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Using a ref for drag info to avoid unnecessary re-renders during mouse moves
   const dragInfo = useRef({
@@ -102,7 +111,7 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
     if (leads.length === 0) {
       dispatch(fetchLeads());
     }
-  }, [dispatch]);
+  }, [dispatch, leads.length]);
 
   const stageMetrics = useMemo(() => {
     const activeLeads = leads.filter((lead) => lead.is_active !== false);
@@ -131,12 +140,8 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
     });
   }, [leads, stages]);
 
-  const isRegisteredSelected = selectedStageName
-    ? selectedStageName.toLowerCase().includes("register")
-    : false;
-
   // --- Drag Logic ---
-  const handleMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (!cardsContainerRef.current) return;
 
     dragInfo.current = {
@@ -147,7 +152,7 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
     setIsDragging(false); // Reset dragging state until movement occurs
   };
 
-  const handleMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (!dragInfo.current.isDown || !cardsContainerRef.current) return;
 
     // Threshold to differentiate between a click and a drag
@@ -174,8 +179,48 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
     }
   };
 
+  const handleMoveAllLeft = () => {
+    if (!cardsContainerRef.current) return;
+    cardsContainerRef.current.scrollBy({ left: -260, behavior: "smooth" });
+  };
+
+  const handleMoveAllRight = () => {
+    if (!cardsContainerRef.current) return;
+    cardsContainerRef.current.scrollBy({ left: 260, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!selectedStageName) return;
+      const targetNode = event.target as Node;
+      if (rootRef.current?.contains(targetNode)) return;
+      setSelectedStageName(null);
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [selectedStageName]);
+
+  const handleStageDragStart = (index: number) => {
+    setDraggedStageIndex(index);
+  };
+
+  const handleStageDrop = (dropIndex: number) => {
+    if (draggedStageIndex === null) return;
+    onReorderStages(draggedStageIndex, dropIndex);
+    setDraggedStageIndex(null);
+  };
+
   return (
     <Box
+      ref={rootRef}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          setSelectedStageName(null);
+        }
+      }}
       sx={{
         width: "100%",
         minHeight: "74vh",
@@ -217,6 +262,11 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
             return (
               <Box
                 key={`${rawStage}-${index}`}
+                draggable
+                onDragStart={() => handleStageDragStart(index)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => handleStageDrop(index)}
+                onDragEnd={() => setDraggedStageIndex(null)}
                 sx={{
                   display: "flex",
                   alignItems: "center",
@@ -256,7 +306,7 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.2 }}
                       >
-                        {STAGE_SUB_LABELS[index] ?? `Stage ${index + 1}`}
+                        {`Stage ${index + 1}`}
                       </Typography>
                     </Box>
 
@@ -403,6 +453,7 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
         )}
 
         <Box
+          onClick={onAddStage}
           sx={{
             flexShrink: 0,
             width: 176,
@@ -458,9 +509,58 @@ const SalesPipeLineData = ({ stages }: SalesPipeLineDataProps) => {
         </Box>
       )}
 
+      <Box
+        sx={{
+          position: "absolute",
+          right: 18,
+          bottom: 18,
+          display: "flex",
+          alignItems: "center",
+          gap: 0.8,
+          zIndex: 3,
+        }}
+      >
+        <IconButton
+          size="small"
+          onClick={handleMoveAllLeft}
+          sx={{
+            width: 30,
+            height: 30,
+            border: `1px solid ${theme.palette.grey[300]}`,
+            backgroundColor: theme.palette.background.paper,
+          }}
+        >
+          <WestRoundedIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={handleMoveAllRight}
+          sx={{
+            width: 30,
+            height: 30,
+            border: `1px solid ${theme.palette.grey[300]}`,
+            backgroundColor: theme.palette.background.paper,
+          }}
+        >
+          <EastRoundedIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={onAddStage}
+          sx={{
+            width: 30,
+            height: 30,
+            border: `1px solid ${theme.palette.grey[300]}`,
+            backgroundColor: theme.palette.background.paper,
+          }}
+        >
+          <AddBoxOutlinedIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+      </Box>
+
       <StageConfiguration
-        open={isRegisteredSelected}
-        stageName={selectedStageName ?? "Registered"}
+        open={Boolean(selectedStageName)}
+        stageName={selectedStageName ?? ""}
         onClose={() => setSelectedStageName(null)}
       />
     </Box>
