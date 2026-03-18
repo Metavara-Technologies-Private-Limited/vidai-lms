@@ -24,6 +24,7 @@ import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Underline } from '@tiptap/extension-underline';
@@ -77,6 +78,32 @@ const normalizeEditorHtml = (html: string): string => {
     return `<img${pre}src="${absoluteSrc}"${post}>`;
   });
 };
+
+const BlockStyleExtension = Extension.create({
+  name: 'blockStyle',
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['paragraph', 'heading', 'blockquote', 'listItem'],
+        attributes: {
+          style: {
+            default: null,
+            parseHTML: (element) => element.getAttribute('style'),
+            renderHTML: (attributes) => {
+              if (!attributes.style) {
+                return {};
+              }
+
+              return {
+                style: attributes.style,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
 
 export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
   const clinic = useSelector(selectClinic);
@@ -212,6 +239,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       TiptapImage,
       TextStyle,
       Color,
+      BlockStyleExtension,
     ],
     content: initialEditorContent,
     editable: !isViewOnly,
@@ -331,6 +359,22 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     const next = Math.max(0, curr + delta);
     const cleaned = style.replace(/margin-left:\s*\d+px;?/g, '').trim();
     const newStyle = (cleaned ? cleaned + '; ' : '') + `margin-left: ${next}px`;
+
+    if (editor.isActive('listItem')) {
+      editor.chain().focus().updateAttributes('listItem', { style: newStyle }).run();
+      return;
+    }
+
+    if (editor.isActive('blockquote')) {
+      editor.chain().focus().updateAttributes('blockquote', { style: newStyle }).run();
+      return;
+    }
+
+    if (editor.isActive('heading')) {
+      editor.chain().focus().updateAttributes('heading', { style: newStyle }).run();
+      return;
+    }
+
     editor.chain().focus().updateAttributes('paragraph', { style: newStyle }).run();
   };
 
@@ -615,6 +659,12 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                 '& ol': { listStyleType: 'decimal', paddingLeft: '20px', margin: '4px 0' },
                 '& li': { display: 'list-item' },
                 '& li p': { margin: 0 },
+                '& blockquote': {
+                  borderLeft: '3px solid #D1D5DB',
+                  margin: '8px 0',
+                  paddingLeft: '12px',
+                  color: '#4B5563',
+                },
                 '& a': { color: '#6366F1', textDecoration: 'underline' },
                 '& img': { maxWidth: '100%', height: 'auto', borderRadius: '4px' },
               }
