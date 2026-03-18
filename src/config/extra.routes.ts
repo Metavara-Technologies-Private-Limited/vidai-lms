@@ -34,7 +34,7 @@ export const EXTRA_ROUTES = [
   {
     key: "referral-doctor-detail",
     path: "referrals/doctors/:doctorId",
-    page: lazy(() => import("../components/Referrals/Doctorreferrals.tsx")),
+    page: lazy(() => import("../components/Referrals/DoctorReferrals.tsx")),
   },
   {
     key: "referral-corporate",
@@ -70,6 +70,5 @@ export const EXTRA_ROUTES = [
     key: "review-form",
     path: "review/:requestId/:leadId",
     page: lazy(() => import("../pages/Reputation/ReviewForm.tsx")),
-  } 
-  
+  },
 ];
