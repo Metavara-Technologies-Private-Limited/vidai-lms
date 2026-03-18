@@ -31,6 +31,10 @@ import {
 import { validateStep } from "../LeadsHub/addNewLead.validation";
 import { Step1, Step2, Step3 } from "../LeadsHub/addNewLead.steps";
 
+// ── Capitalize first letter helper ──────────────────────────────────────────
+const capitalizeFirst = (value: string) =>
+  value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
+
 // ====================== Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
@@ -56,12 +60,12 @@ export default function AddNewLead() {
     () =>
       (rawCampaigns || []).map((api: CampaignData) => ({
         id: api.id,
-        name: api.campaign_name ?? "",
+        name: capitalizeFirst(api.campaign_name ?? ""),
         source: api.campaign_mode === 1 ? "Social Media" : "Email",
         subSource:
           api.campaign_mode === 1
-            ? (api.social_media?.[0]?.platform_name ?? "")
-            : "gmail",
+            ? capitalizeFirst(api.social_media?.[0]?.platform_name ?? "")
+            : "Gmail",
         isActive: Boolean(api.is_active),
       })),
     [rawCampaigns],
@@ -159,9 +163,9 @@ export default function AddNewLead() {
     if (!matched) return;
     setForm((prev) => ({
       ...prev,
-      campaignName: matched.name,
-      source: matched.source,
-      subSource: matched.subSource,
+      campaignName: capitalizeFirst(matched.name),
+      source: capitalizeFirst(matched.source),
+      subSource: capitalizeFirst(matched.subSource),
     }));
   }, [form.campaign, campaigns]);
 
@@ -183,13 +187,16 @@ export default function AddNewLead() {
   // ── Handlers ────────────────────────────────────────────────────
   const handleChange =
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+      setForm((prev) => ({ ...prev, [field]: capitalizeFirst(e.target.value) }));
 
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
 
+  // ✅ FIX: Don't clear assignee here — it belongs to Step 1 and is unrelated
+  // to appointment department. Only reset personnel so user re-picks from
+  // the newly filtered list.
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, department: e.target.value, personnel: "", assignee: "" }));
+    setForm((prev) => ({ ...prev, department: e.target.value, personnel: "" }));
 
   const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newType = e.target.value;
@@ -269,7 +276,8 @@ export default function AddNewLead() {
     next_action_status:
       form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : null,
     assigned_to_id: intOrNull(form.assignee),
-    personal_id: null,
+    // ✅ FIX: was hardcoded to null — now correctly reads form.personnel
+    personal_id: intOrNull(form.personnel),
     age: intOrNull(form.age),
     partner_age: intOrNull(form.partnerAge),
     partner_inquiry: isCouple === "yes",
@@ -325,7 +333,8 @@ export default function AddNewLead() {
 
   // ── Render ───────────────────────────────────────────────────────
   return (
-    <Paper sx={{ overflow: "hidden", minHeight: "100vh" }}>
+    <Paper sx={{ overflow: "hidden", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+
       {/* Header */}
       <Box sx={{ bgcolor: "white", px: 3, py: 2 }}>
         <Typography variant="h6" fontWeight={700} color="#1E293B">
@@ -395,7 +404,7 @@ export default function AddNewLead() {
         sx={{
           bgcolor: "white",
           p: 3,
-          maxHeight: "calc(100vh - 400px)",
+          flex: 1,
           overflowY: "auto",
           "&::-webkit-scrollbar": { width: "8px" },
           "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
@@ -444,7 +453,7 @@ export default function AddNewLead() {
       </Box>
 
       {/* Footer */}
-      <Box sx={{ bgcolor: "white", p: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}>
+      <Box sx={{ bgcolor: "white", p: 3, display: "flex", justifyContent: "flex-end", gap: 2, borderTop: "1px solid #F1F5F9" }}>
         <Button
           onClick={() => navigate("/leads")}
           sx={{ textTransform: "none", color: "#64748B", fontWeight: 700, px: 3 }}
@@ -500,6 +509,7 @@ export default function AddNewLead() {
           </Button>
         )}
       </Box>
+
     </Paper>
   );
 }

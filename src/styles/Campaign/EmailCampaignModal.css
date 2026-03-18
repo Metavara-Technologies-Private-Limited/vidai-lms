@@ -44,7 +44,7 @@
   padding: 18px 28px;
   border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
   display: flex;
   border: 1px solid lightgrey;
   align-items: center;
@@ -105,9 +105,10 @@
 /* ================= CONTENT ================= */
 
 .step-content {
-  flex: 1;              
-  overflow-y: auto;      
-  padding-bottom: 20px; 
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 20px;
 }
 
 .form-group {
@@ -121,10 +122,10 @@
 }
 
 .form-group.half {
-  flex: 0 0 calc(50% - 10px); 
+  flex: 0 0 calc(50% - 10px);
 }
 
-.form-group > label {
+.form-group>label {
   position: absolute;
   top: -10px;
   left: 16px;
@@ -158,7 +159,7 @@ select:invalid {
   border-color: #E11D48;
 }
 
-.form-group.error > label {
+.form-group.error>label {
   color: #E11D48;
 }
 
@@ -178,6 +179,7 @@ select:invalid {
   z-index: 10;
   align-items: center;
 }
+
 .modal-actions button {
   width: 160px !important;
   min-width: 160px !important;
@@ -279,9 +281,9 @@ select:invalid {
 }
 
 .account-checkbox.checked {
-  
-  background:#F26A3E;
-  border-color:#F26A3E;
+
+  background: #F26A3E;
+  border-color: #F26A3E;
 }
 
 /* ================= CAMPAIGN MODE – FIGMA EXACT ================= */
@@ -295,12 +297,12 @@ select:invalid {
 .mode-card {
   flex: 0 0 calc(50% - 10px);
   max-width: 430px;
-  height: 76px;                  
+  height: 76px;
   border: 1.5px solid #CBD5E1;
   border-radius: 12px;
-  padding: 14px 16px;           
+  padding: 14px 16px;
   display: flex;
-  align-items: flex-start;       
+  align-items: flex-start;
   justify-content: space-between;
   background: #ffffff;
   cursor: pointer;
@@ -320,6 +322,18 @@ select:invalid {
   gap: 12px;
   flex: 1;
   min-width: 0;
+} 
+.email-editor {
+  min-height: 180px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  outline: none;
+}
+
+.email-editor:empty:before {
+  content: "Enter email content";
+  color: #9ca3af;
 }
 
 
@@ -365,9 +379,9 @@ select:invalid {
   margin: 0;
   line-height: 18px;
 
-  white-space: nowrap;       
-  overflow: hidden;          
-  text-overflow: ellipsis;    
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mode-card .badge {
@@ -382,7 +396,7 @@ select:invalid {
 
   background: #F1F5F9;
   color: #111827;
-  border: 1px solid ;               
+  border: 1px solid;
 
   display: flex;
   align-items: center;
@@ -390,9 +404,9 @@ select:invalid {
 }
 
 .mode-card .badge.outlined {
-  background: #F1F5F9;       
-  color: #111827;            
-  border: 1px solid ;              
+  background: #F1F5F9;
+  color: #111827;
+  border: 1px solid;
 }
 
 .content-row {
@@ -443,6 +457,7 @@ select:invalid {
   padding-bottom: 20px;
   border-bottom: 1px solid #F1F5F9;
 }
+
 .MuiOutlinedInput-notchedOutline {
   border: 1px solid #E2E3E5 !important;
 }
@@ -452,7 +467,7 @@ select:invalid {
 }
 
 .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-  border:0.5px solid #E2E3E5 !important;
+  border: 0.5px solid #E2E3E5 !important;
 }
 
 .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
@@ -473,10 +488,10 @@ select:invalid {
   font-size: 10px !important;
 }
 
-.schedule-row {
+/* .schedule-row {
   display: flex;
   gap: 20px;
-}
+} */
 
 .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
 .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
@@ -544,16 +559,18 @@ select:invalid {
   white-space: nowrap;
 }
 
-.schedule-row {
+/* .schedule-row {
   display: flex;
   gap: 20px;
   align-items: flex-start;
-}
+} */
 
 .schedule-field {
   flex: 1;
   position: relative;
+  flex: 0 0 calc(50% - 10px);
 }
+
 .schedule-field .MuiInputBase-root {
   height: 56px;
   border-radius: 16px;
@@ -569,6 +586,18 @@ select:invalid {
   color: #9CA3AF;
   z-index: 2;
   pointer-events: none;
+} 
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+}
+
+.schedule-field {
+  position: relative;
+  width: 100%;
 }
 
 .schedule-input {
@@ -619,7 +648,7 @@ select:invalid {
   padding: 0 16px;
   font-size: 16px;
 }
- 
+
 .form-group textarea {
   width: 100%;
   min-height: 40px;
@@ -650,6 +679,7 @@ select:invalid {
 .form-group.error textarea {
   border-color: #E11D48;
 }
+
 /* ===== EMAIL CONTENT HEADER ===== */
 
 .email-content-header {
@@ -691,7 +721,8 @@ select:invalid {
   gap: 8px;
   padding: 8px 14px;
   border-radius: 12px;
-  border: 1.5px solid #6B6B6B;;
+  border: 1.5px solid #6B6B6B;
+  ;
   background: #F3F4F6;
   font-size: 14px;
   font-weight: 600;
@@ -705,9 +736,10 @@ select:invalid {
 .light-btn:hover {
   background: #E5E7EB;
 }
+
 .form-group input,
 .form-group textarea {
-  padding-right: 120px; 
+  padding-right: 120px;
 }
 
 .ai-suggest {
@@ -722,7 +754,7 @@ select:invalid {
   white-space: nowrap;
 }
 
-.form-group textarea + .ai-suggest {
+.form-group textarea+.ai-suggest {
   top: 20px;
   transform: none;
 }
@@ -730,7 +762,7 @@ select:invalid {
 .ai-suggest:hover {
   color: #F26A3E;
 }
-  
+
 /* Overlay */
 .preview-overlay {
   position: fixed;
@@ -766,11 +798,12 @@ select:invalid {
 
 .email-preview {
   width: 300px;
-  min-height: 320px;   /* 👈 increased height */
+  min-height: 320px;
+  /* 👈 increased height */
   background: #fff;
-  border: 1px  grey;
+  border: 1px grey;
   border-radius: 16px;
-  box-shadow: 0 6px 25px rgba(0,0,0,0.08);
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.08);
   padding: 20px;
   animation: slideInside 0.3s ease;
 }
@@ -780,11 +813,13 @@ select:invalid {
     opacity: 0;
     transform: translateX(15px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
   }
 }
+
 .chip {
   background: #f3f4f6;
   padding: 5px 12px;
@@ -811,13 +846,15 @@ select:invalid {
 }
 
 .label {
-  color: #6b7280;  /* grey */
+  color: #6b7280;
+  /* grey */
   font-weight: 400;
 }
 
 .preview-to,
 .preview-subject {
-  border-bottom: 0.5px  #f1f3f5;  /* lighter + thinner */
+  border-bottom: 0.5px #f1f3f5;
+  /* lighter + thinner */
   padding-bottom: 6px;
 }
 
@@ -825,9 +862,21 @@ select:invalid {
   margin-top: 15px;
   line-height: 1.6;
 }
+
 .preview-divider {
   height: 1px;
-  background-color: #eceff1;  /* very light grey */
+  background-color: #eceff1;
+  /* very light grey */
   margin: 14px 0;
   width: 100%;
+}
+
+.form-group>label,
+.schedule-field label {
+  z-index: 5;
+}
+
+.MuiOutlinedInput-root {
+  position: relative;
+  z-index: 1;
 }

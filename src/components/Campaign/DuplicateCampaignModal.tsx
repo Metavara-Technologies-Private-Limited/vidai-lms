@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from "react";
+import {useEffect,useState } from "react";
 import {
   Modal,
   Box,
@@ -15,46 +15,49 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import viewIcon from "./Icons/view.png";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
-import { CampaignAPI } from "../../../../src/services/campaign.api";
-import "../../../../src/styles/Campaign/EmailCampaignModal.css";
-import EmailTemplateModal from "../../../../src/components/Layout/Campaign/EmailTemplateModal";
-
-interface EditCampaignModalProps {
+import { CampaignAPI } from "../../services/campaign.api";
+import "../../styles/Campaign/EmailCampaignModal.css";
+import "../../styles/Campaign/SocialCampaignModal.css"; 
+import EmailTemplateModal from "../../components/Campaign/EmailTemplateModal";
+interface DuplicateCampaignModalProps { 
   campaign: any;
   onClose: () => void;
   onSave: (updatedCampaign: any) => void;
 }
 
-export default function EditCampaignModal({
+export default function DuplicateCampaignModal({
   campaign,
   onClose,
   onSave,
-}: EditCampaignModalProps) {
+}: DuplicateCampaignModalProps) {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
-  const [fullCampaignData, setFullCampaignData] = useState<any>(null);
+//   const [fullCampaignData, setFullCampaignData] = useState<any>(null);
 
-  const [campaignName, setCampaignName] = useState(campaign.name);
+  const [campaignName, setCampaignName] = useState(
+  campaign.name + " (Copy)"
+);
   const [campaignDescription, setCampaignDescription] = useState(
-    campaign.description || "",
-  );
+  campaign.campaign_description || "",
+);
   const [objective, setObjective] = useState(campaign.objective || "");
   const [audience, setAudience] = useState(campaign.audience || "");
   const [startDate, setStartDate] = useState(campaign.start);
   const [endDate, setEndDate] = useState(campaign.end);
 
-  const [subject, setSubject] = useState("");
-  const [emailBody, setEmailBody] = useState("");
-  
-  const [templateOpen, setTemplateOpen] = useState(false);
+  const [subject, setSubject] = useState(campaign.subject || "");
+  const [emailBody, setEmailBody] = useState(campaign.email_body || "");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
 
-  const [accounts, setAccounts] = useState<string[]>([]);
+ const [accounts, setAccounts] = useState<string[]>(
+  campaign.platforms || []
+);
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
   const [scheduleDate, setScheduleDate] = useState(
@@ -62,6 +65,10 @@ export default function EditCampaignModal({
       ? dayjs(campaign.scheduledAt).format("YYYY-MM-DD")
       : "",
   );
+  const [scheduleRange, setScheduleRange] = useState<[Dayjs | null, Dayjs | null]>([
+  campaign.scheduledAt ? dayjs(campaign.scheduledAt) : null,
+  campaign.scheduledAt ? dayjs(campaign.scheduledAt) : null,
+]);
   const [scheduleTime, setScheduleTime] = useState(
     campaign.scheduledAt ? dayjs(campaign.scheduledAt).format("HH:mm") : "",
   );
@@ -75,42 +82,35 @@ export default function EditCampaignModal({
     );
   };
 
-  useEffect(() => {
+useEffect(() => {
   const fetchCampaign = async () => {
     try {
       const response = await CampaignAPI.get(campaign.id);
       const data = response.data;
 
-      setFullCampaignData(data);
-
-      // ✅ STEP 1 BASIC DETAILS
-      setCampaignName(data.campaign_name || "");
-      setCampaignDescription(data.campaign_description || "");
+      // Basic
       setObjective(data.campaign_objective || "");
+      setCampaignDescription(data.campaign_description || "");
       setAudience(data.target_audience || "");
       setStartDate(data.start_date || "");
       setEndDate(data.end_date || "");
+      // setMode(data.posting_mode || data.mode || "");
+      // setMode(data.posting_mode || "");
 
-      // ✅ EMAIL DATA
+      // Email
       if (data.email?.length > 0) {
         setSubject(data.email[0].subject || "");
         setEmailBody(data.email[0].email_body || "");
       }
 
-      // ✅ SOCIAL ACCOUNTS
+      // Social
       if (data.social_media?.length > 0) {
-        const platforms = data.social_media.map(
-          (sm: any) => sm.platform_name
+        setAccounts(
+          data.social_media.map((sm: any) => sm.platform_name)
         );
-        setAccounts(platforms);
       }
-
-      //  MODE POPULATION
-      if (data.posting_mode === 1) setMode("organic");
-      if (data.posting_mode === 2) setMode("paid");
-
-      // If backend returns string instead:
-      // setMode(data.posting_mode || "");
+      if (data.campaign_mode === 1) setMode("organic");
+if (data.campaign_mode === 2) setMode("paid");
 
     } catch (error) {
       console.error("Failed to fetch campaign:", error);
@@ -133,7 +133,10 @@ export default function EditCampaignModal({
       ? audience && subject.trim() && emailBody.trim()
       : accounts.length > 0 && mode;
 
-  const step3Valid = scheduleDate && scheduleTime;
+  const step3Valid =
+  campaign.type === "email"
+    ? scheduleRange[0] && scheduleRange[1] && scheduleTime
+    : scheduleDate && scheduleTime;
 
   const handleNext = () => {
     setSubmitted(true);
@@ -146,9 +149,9 @@ export default function EditCampaignModal({
     }
   };
 
-  const handleUpdate = async () => {
+  const handleSubmit = async () => {
     setSubmitted(true);
-    if (!step3Valid || !fullCampaignData) return;
+    if (!step3Valid) return;
 
     try {
       const scheduledDateTime = dayjs(
@@ -172,7 +175,7 @@ export default function EditCampaignModal({
           campaign.type === "email"
             ? [
                 {
-                  id: fullCampaignData.email?.[0]?.id,
+                //   id: fullCampaignData.email?.[0]?.id,
                   audience_name: audience,
                   subject: subject,
                   email_body: emailBody,
@@ -184,21 +187,25 @@ export default function EditCampaignModal({
               ]
             : [],
         social_media:
-          campaign.type === "social"
-            ? accounts.map((platform) => {
-                const existing = fullCampaignData.social_media?.find(
-                  (sm: any) => sm.platform_name === platform,
-                );
-                return {
-                  id: existing?.id,
-                  platform_name: platform,
-                  is_active: true,
-                };
-              })
-            : [],
+  campaign.type === "social"
+    ? accounts.map((platform) => ({
+        platform_name: platform,
+        is_active: true,
+      }))
+    : [],
+                // const existing = fullCampaignData.social_media?.find(
+                //   (sm: any) => sm.platform_name === platform,
+                // );
+                // return {
+                //   id: existing?.id,
+                //   platform_name: platform,
+                //   is_active: true,
+                // };
+    //           })
+    //         : [],
       };
 
-      const response = await CampaignAPI.update(campaign.id, payload);
+      const response = await CampaignAPI.create(payload);
       onSave(response.data);
       onClose();
     } catch (error) {
@@ -219,9 +226,9 @@ export default function EditCampaignModal({
       <Box className="email-campaign-modal">
         <div className="add-modal-header">
           <Typography variant="h6">
-            Edit {campaign.type === "email" ? "Email" : "Social Media"} Campaign
+            Duplicate {campaign.type === "email" ? "Email" : "Social Media"} Campaign
           </Typography>
-          <IconButton onClick={onClose} className="close-btn">
+          <IconButton onClick={onClose} className="modal-close">
             <CloseIcon fontSize="small" />
           </IconButton>
         </div>
@@ -385,99 +392,96 @@ export default function EditCampaignModal({
             </div>
 
             <div
-              className={`section-card ${
-                submitted && (!subject || !emailBody) ? "error" : ""
-              }`}
-            >
-              <div className="email-content-header">
-                <div>
-                  <h3>Email Content</h3>
-                  <p className="section-subtitle">
-                    Design your email with AI assistance
-                  </p>
-                </div>
+  className={`section-card ${
+    submitted && (!subject || !emailBody) ? "error" : ""
+  }`}
+>
+  <div className="email-content-header">
+    <div>
+      <h3>Email Content</h3>
+      <p className="section-subtitle">
+        Design your email with AI assistance
+      </p>
+    </div>
 
-                <div className="email-actions">
-                  <button
-                    className="outline-btn"
-                    onClick={() => setPreviewOpen(!previewOpen)}
-                  >
-                    <img src={viewIcon} alt="View" width={20} height={20} />
-                    Preview Email
-                  </button>
+    <div className="email-actions">
+      <button
+        className="outline-btn"
+        onClick={() => setPreviewOpen(!previewOpen)}
+      >
+        <img src={viewIcon} alt="View" width={20} height={20} />
+        Preview Email
+      </button>
 
-                  <button
-                    className="light-btn"
-                    onClick={() => setTemplateOpen(true)}
-                  >
-                    + Email Template
-                  </button>
-                </div>
-              </div>
+      <button className="light-btn" onClick={() => setTemplateOpen(true)}>
+        + Email Template
+      </button>
+    </div>
+  </div>
 
-              {/* ⭐ IMPORTANT FLEX WRAPPER */}
-              <div className="email-body-row">
+  {/* ⭐ FLEX WRAPPER — THIS IS THE KEY */}
+  <div className="email-body-row">
 
-                {/* LEFT SIDE */}
-                <div className="email-left">
+    {/* LEFT SIDE */}
+    <div className="email-left">
 
-                  <div
-                    className={`form-group ${submitted && !subject ? "error" : ""}`}
-                  >
-                    <label>Subject Line *</label>
-                    <input
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      placeholder="New Product Launch"
-                    />
-                    <span className="ai-suggest">✨ AI Suggest</span>
-                  </div>
+      <div
+        className={`form-group ${submitted && !subject ? "error" : ""}`}
+      >
+        <label>Subject Line *</label>
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="New Product Launch"
+        />
+        <span className="ai-suggest">✨ AI Suggest</span>
+      </div>
 
-                  <div
-                    className={`form-group ${submitted && !emailBody ? "error" : ""}`}
-                  >
-                    <label>Email *</label>
-                    <textarea
-                      value={emailBody}
-                      onChange={(e) => setEmailBody(e.target.value)}
-                      placeholder="Enter email content"
-                      rows={8}
-                    />
-                    <span className="ai-suggest">✨ AI Suggest</span>
-                  </div>
+      <div
+        className={`form-group ${submitted && !emailBody ? "error" : ""}`}
+      >
+        <label>Email *</label>
+        <textarea
+          value={emailBody}
+          onChange={(e) => setEmailBody(e.target.value)}
+          placeholder="Enter email content"
+          rows={8}
+        />
+        <span className="ai-suggest">✨ AI Suggest</span>
+      </div>
 
-                </div>
+    </div>
 
-                {/* RIGHT SIDE */}
-                {previewOpen && (
-                  <div className="email-preview">
-                    <div className="preview-header">
-                      <h3>Preview Email</h3>
-                      <button onClick={() => setPreviewOpen(false)}>✕</button>
-                    </div>
+    {/* RIGHT SIDE PREVIEW */}
+    {previewOpen && (
+      <div className="email-preview">
+        <div className="preview-header">
+          <h3>Preview Email</h3>
+          <button onClick={() => setPreviewOpen(false)}>✕</button>
+        </div>
 
-                    <div className="preview-body">
-                      <p>
-                        To: <span className="chip">{audienceLabel}</span>
-                      </p>
+        <div className="preview-body">
+          <p>
+            To: <span className="chip">{audienceLabel}</span>
+          </p>
 
-                      <div className="preview-divider"></div>
+          <div className="preview-divider"></div>
 
-                      <p className="preview-subject">
-                        <span className="label">Subject:</span> {subject}
-                      </p>
+          <p className="preview-subject">
+            <span className="label">Subject:</span> {subject}
+          </p>
 
-                      <div className="preview-divider"></div>
+          <div className="preview-divider"></div>
 
-                      <div className="preview-email-content">
-                        <p>{emailBody}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+          <div className="preview-email-content">
+            <p>{emailBody}</p>
+          </div>
+        </div>
+      </div>
+    )}
 
-              </div>
-            </div>
+  </div>
+</div>
           </div>
         )}
 
@@ -621,45 +625,56 @@ export default function EditCampaignModal({
         {/* STEP 3 - EMAIL */}
         {step === 3 && campaign.type === "email" && (
           <div className="step-content">
-            <h2>Schedule Email</h2>
-            <div className="schedule-card">
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Schedule Email
+            </Typography>
+
+            <div className="section-card">
               <div className="schedule-header">
                 <div className="schedule-title">
                   <h3>Schedule</h3>
-                  <p>Select date and time to send the email</p>
+                  <p className="section-subtitle">Select date and time to send the email</p>
                 </div>
-                <button className="ai-opt-btn">
-                  ✨ AI-Optimization Timing
-                </button>
+                <button className="ai-btn">✨ AI-Optimization Timing</button>
               </div>
 
               <div className="schedule-row">
-                <div
-                  className={`schedule-field ${submitted && !scheduleDate ? "error" : ""}`}
-                >
+                <div className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}>
                   <label>Select Date</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker
-                      format="DD/MM/YYYY"
-                      value={scheduleDate ? dayjs(scheduleDate) : null}
-                      onChange={(v) =>
-                        setScheduleDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")
-                      }
-                      slots={{ openPickerIcon: CalendarTodayIcon }}
-                    />
+                    <div style={{ display: "flex", gap: "12px" }}>
+                      <DatePicker
+                        label="From"
+                        value={scheduleRange[0]}
+                        minDate={dayjs()}
+                        maxDate={scheduleRange[1] ?? (endDate ? dayjs(endDate) : undefined)}
+                        onChange={(v) => setScheduleRange([v ? dayjs(v) : null, scheduleRange[1]])}
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                      <DatePicker
+                        label="To"
+                        value={scheduleRange[1]}
+                        minDate={scheduleRange[0] ?? dayjs()}
+                        maxDate={endDate ? dayjs(endDate) : undefined}
+                        onChange={(v) => setScheduleRange([scheduleRange[0], v ? dayjs(v) : null])}
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                    </div>
                   </LocalizationProvider>
                 </div>
 
-                <div
-                  className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}
-                >
+                <div className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}>
                   <label>Enter Time</label>
-                  <input
-                    className="schedule-input"
-                    type="time"
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                  />
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <TimePicker
+                      format="hh:mm A"
+                      value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null}
+                      onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }}
+                      ampm
+                      minTime={scheduleRange[0] && scheduleRange[0].isSame(dayjs(), "day") ? dayjs() : undefined}
+                      slotProps={{ textField: { fullWidth: true } }}
+                    />
+                  </LocalizationProvider>
                 </div>
               </div>
             </div>
@@ -731,7 +746,11 @@ export default function EditCampaignModal({
                       {accounts.includes("instagram") && (
                         <div className="budget-card">
                           <div className="budget-title">
-                            <img src={instagramIcon} alt="Instagram" />
+                            <img
+                              src={instagramIcon}
+                              alt="Instagram"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            />
                             <span>Instagram (Estimate CPC : $3.5)</span>
                           </div>
                           <div className="budget-input-wrapper">
@@ -753,7 +772,11 @@ export default function EditCampaignModal({
                       {accounts.includes("facebook") && (
                         <div className="budget-card">
                           <div className="budget-title">
-                            <img src={facebookIcon} alt="Facebook" />
+                            <img
+                              src={facebookIcon}
+                              alt="Facebook"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            />
                             <span>Facebook (Estimate CPC : $2.5)</span>
                           </div>
                           <div className="budget-input-wrapper">
@@ -775,7 +798,11 @@ export default function EditCampaignModal({
                       {accounts.includes("linkedin") && (
                         <div className="budget-card">
                           <div className="budget-title">
-                            <img src={linkedinIcon} alt="LinkedIn" />
+                            <img
+                              src={linkedinIcon}
+                              alt="LinkedIn"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            />
                             <span>LinkedIn (Estimate CPC : $1.5)</span>
                           </div>
                           <div className="budget-input-wrapper">
@@ -828,8 +855,8 @@ export default function EditCampaignModal({
             Cancel
           </button>
           {step === 3 ? (
-            <button className="next-btn" onClick={handleUpdate}>
-              Update Campaign
+            <button className="next-btn" onClick={handleSubmit}>
+            Submit Campaign
             </button>
           ) : (
             <button className="next-btn" onClick={handleNext}>
@@ -839,14 +866,14 @@ export default function EditCampaignModal({
         </div>
       </Box>
     </Modal>
-     <EmailTemplateModal
-      open={templateOpen}
-      onClose={() => setTemplateOpen(false)}
-      onSelect={(template: any) => {
-        setSubject(template.title);
-        setEmailBody(template.subtitle);
-      }}
-    />
-  </>
+    <EmailTemplateModal
+  open={templateOpen}
+  onClose={() => setTemplateOpen(false)}
+  onSelect={(template: any) => {
+    setSubject(template.title);
+    setEmailBody(template.subtitle);
+  }}
+/>
+</>
   );
 }

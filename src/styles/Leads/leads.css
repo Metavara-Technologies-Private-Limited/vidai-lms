@@ -4,15 +4,17 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Montserrat:wght@700&display=swap");
 
-.leads-page,
-.leads-page * {
-  font-family: "Nunito", sans-serif !important;
+.leads-page {
+  font-family: "Nunito", sans-serif;
   font-weight: 400;
   font-style: normal;
   font-size: 14px;
   line-height: 140%;
   letter-spacing: 0%;
-  vertical-align: middle;
+}
+
+.leads-page *:not(fieldset):not(legend):not(fieldset span):not(fieldset div) {
+  font-family: "Nunito", sans-serif;
 }
 
 /* ===============================
@@ -26,7 +28,8 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 /* ===============================
@@ -35,6 +38,9 @@
 
 .leads-header {
   margin-bottom: 20px !important;
+  flex-wrap: nowrap !important;
+  min-width: 0;
+  width: 100%;
 }
 
 .leads-title {
@@ -44,26 +50,24 @@
   line-height: 1.6 !important;
   color: #1F2937 !important;
   margin: 0 !important;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
+.leads-header-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+/* ── Search input ── */
 .search-input {
   width: 300px;
-}
-
-.search-input .MuiOutlinedInput-root {
-  background: #FFFFFF;
-  border-radius: 10px;
-  height: 40px;
-}
-
-.search-input .MuiOutlinedInput-input {
-  padding: 10px 14px;
-  font-size: 13px;
-}
-
-.search-input .MuiOutlinedInput-input::placeholder {
-  color: #9CA3AF;
-  opacity: 1;
+  min-width: 140px;
+  flex-shrink: 1;
 }
 
 .header-icon-container {
@@ -75,6 +79,7 @@
   padding: 4px;
   gap: 2px;
   height: 40px;
+  flex-shrink: 0;
 }
 
 .header-icon-btn {
@@ -100,6 +105,7 @@
   border: none !important;
   border-radius: 8px !important;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .filter-icon-btn:hover {
@@ -138,7 +144,9 @@
   font-weight: 700 !important;
   font-size: 14px !important;
   height: 40px !important;
-  white-space: nowrap;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  min-width: fit-content !important;
 }
 
 .add-lead-btn:hover {
@@ -227,7 +235,6 @@
   min-width: 1600px;
 }
 
-/* TABLE HEADER */
 .leads-table thead th {
   font-size: 13px !important;
   font-weight: 600 !important;
@@ -243,14 +250,12 @@
   white-space: nowrap;
 }
 
-/* REMOVE VERTICAL LINES */
 .leads-table thead th,
 .leads-table tbody td {
   border-right: none !important;
   border-left: none !important;
 }
 
-/* ROWS */
 .leads-table tbody tr {
   background: #FFFFFF;
   transition: none;
@@ -260,7 +265,6 @@
   background: #FFFFFF !important;
 }
 
-/* SELECTED ROW */
 .leads-table tbody tr.row-selected td {
   background: #FFFFFF !important;
 }
@@ -450,12 +454,8 @@
 
 /* ===============================
    STICKY COLUMNS
-   ① checkbox   → sticky left
-   ② last       → sticky right 0       (3-dot menu, 52px wide)
-   ③ 2nd-last   → sticky right 52px    (Contact Option)
 ================================ */
 
-/* ① Checkbox — sticky LEFT */
 .leads-table table th:first-child,
 .leads-table table td:first-child {
   position: sticky;
@@ -468,7 +468,6 @@
   z-index: 7;
 }
 
-/* ② 3-dot menu — sticky RIGHT: 0 */
 .leads-table table th:last-child,
 .leads-table table td:last-child {
   position: sticky;
@@ -484,7 +483,6 @@
   z-index: 7;
 }
 
-/* ③ Contact Option — sticky RIGHT: 52px */
 .leads-table table th:nth-last-child(2),
 .leads-table table td:nth-last-child(2) {
   position: sticky;

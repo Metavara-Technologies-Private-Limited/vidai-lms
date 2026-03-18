@@ -1,5 +1,6 @@
 import {
   Box,
+  CircularProgress,
   Pagination,
   Table,
   TableBody,
@@ -9,10 +10,14 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EyePng from "../../assets/icons/eye.png";
+import MouseCircleGreenIcon from "../../assets/icons/mouse-circle-green.svg";
+import ProfileTwoUserIcon from "../../assets/icons/profile-2user.svg";
+import MouseCircleIcon from "../../assets/icons/mouse-circle.svg";
+import DollarCircleIcon from "../../assets/icons/dollar-circle.svg";
 import CallTranscriptPopup from "./CallTranscriptPopup";
-import { CALL_REPORT_CARDS, CALL_REPORT_ROWS } from "./reports.mockData";
+import { LeadAPI, api, type Lead } from "../../services/leads.api";
 import type { CallReportRow, CallViewMode } from "../../types/reports.types";
 
 interface CallReportsProps {
@@ -21,13 +26,27 @@ interface CallReportsProps {
 
 const PAGE_SIZE = 8;
 
+type TwilioCallRecord = {
+  id?: number | string;
+  sid?: string;
+  lead_uuid?: string;
+  from_number?: string;
+  to_number?: string;
+  status?: string;
+  created_at?: string;
+  direction?: string;
+  duration?: number | string;
+  duration_sec?: number | string;
+  duration_seconds?: number | string;
+};
 
 const tableStyles = {
   container: {
     mt: 2,
     border: "none",
     borderRadius: "12px",
-    overflow: "hidden",
+    overflowX: "auto",
+    overflowY: "hidden",
     boxShadow: "none",
   },
   headRow: {
@@ -61,15 +80,174 @@ const firstInitial = (fullName: string) => {
   return (fullName.trim()[0] || "").toUpperCase();
 };
 
+const toNumber = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getDurationSeconds = (call: TwilioCallRecord): number => {
+  return (
+    toNumber(call.duration_seconds) ||
+    toNumber(call.duration_sec) ||
+    toNumber(call.duration) ||
+    0
+  );
+};
+
+const formatDuration = (seconds: number): string => {
+  if (!seconds || seconds < 0) return "0:00 Min";
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${String(secs).padStart(2, "0")} Min`;
+};
+
+const formatDateTime = (value?: string): string => {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "N/A";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  const hour12 = date.getHours() % 12 || 12;
+  const mins = String(date.getMinutes()).padStart(2, "0");
+  const ampm = date.getHours() >= 12 ? "PM" : "AM";
+  return `${day}/${month}/${year} | ${String(hour12).padStart(2, "0")}:${mins} ${ampm}`;
+};
+
+const normalizeStatus = (status?: string): CallReportRow["status"] => {
+  const normalized = (status ?? "").toLowerCase().trim();
+  const connectedStatuses = ["completed", "in-progress", "in_progress", "answered", "connected"];
+  return connectedStatuses.includes(normalized) ? "Connected" : "Not-Connected";
+};
+
+const getCallMode = (call: TwilioCallRecord): CallViewMode => {
+  const direction = (call.direction ?? "").toLowerCase().trim();
+  if (["inbound", "incoming", "received"].includes(direction)) {
+    return "received";
+  }
+  return "attempted";
+};
+
 const CallReports = ({ searchQuery }: CallReportsProps) => {
   const [viewMode, setViewMode] = useState<CallViewMode>("attempted");
   const [page, setPage] = useState(1);
   const [isTranscriptOpen, setTranscriptOpen] = useState(false);
   const [selectedCallerName, setSelectedCallerName] = useState("");
+  const [callRows, setCallRows] = useState<CallReportRow[]>([]);
+  const [loadingCalls, setLoadingCalls] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchCallRows = async () => {
+      try {
+        setLoadingCalls(true);
+
+        const leads = await LeadAPI.list();
+        const leadById = new Map<string, Lead>();
+        leads.forEach((lead) => {
+          if (lead?.id) {
+            leadById.set(String(lead.id), lead);
+          }
+        });
+
+        let allCalls: TwilioCallRecord[] = [];
+
+        try {
+          const response = await api.get<TwilioCallRecord[] | { results?: TwilioCallRecord[] }>("/twilio/calls/");
+          const payload = response.data;
+          allCalls = Array.isArray(payload) ? payload : payload?.results ?? [];
+        } catch {
+          const perLeadCalls = await Promise.allSettled(
+            leads.map(async (lead) => {
+              const response = await api.get<TwilioCallRecord[] | { results?: TwilioCallRecord[] }>(`/twilio/calls/?lead_uuid=${lead.id}`);
+              const payload = response.data;
+              return Array.isArray(payload) ? payload : payload?.results ?? [];
+            }),
+          );
+
+          allCalls = perLeadCalls
+            .filter((result): result is PromiseFulfilledResult<TwilioCallRecord[]> => result.status === "fulfilled")
+            .flatMap((result) => result.value);
+        }
+
+        const uniqueCalls = new Map<string, TwilioCallRecord>();
+        allCalls.forEach((call, index) => {
+          const key = String(call.id ?? call.sid ?? index);
+          if (!uniqueCalls.has(key)) {
+            uniqueCalls.set(key, call);
+          }
+        });
+
+        const mappedRows: CallReportRow[] = Array.from(uniqueCalls.values()).map((call, index) => {
+          const lead = leadById.get(String(call.lead_uuid ?? ""));
+          const durationInSeconds = getDurationSeconds(call);
+
+          return {
+            id: index + 1,
+            name: lead?.full_name || "Unknown Lead",
+            dateTime: formatDateTime(call.created_at),
+            phoneNumber: call.to_number || lead?.contact_no || "N/A",
+            callDuration: formatDuration(durationInSeconds),
+            callsReceivedBy: lead?.assigned_to_name || "System",
+            status: normalizeStatus(call.status),
+            mode: getCallMode(call),
+          };
+        });
+
+        mappedRows.sort((a, b) => {
+          const first = new Date(a.dateTime.replace(" | ", " ")).getTime();
+          const second = new Date(b.dateTime.replace(" | ", " ")).getTime();
+          return Number.isNaN(second - first) ? 0 : second - first;
+        });
+
+        if (!isMounted) return;
+        setCallRows(mappedRows);
+      } catch (error) {
+        console.error("Failed to fetch call history:", error);
+        if (!isMounted) return;
+        setCallRows([]);
+      } finally {
+        if (isMounted) {
+          setLoadingCalls(false);
+        }
+      }
+    };
+
+    void fetchCallRows();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const modeRows = useMemo(() => {
-    return CALL_REPORT_ROWS.filter((item) => item.mode === viewMode);
-  }, [viewMode]);
+    return callRows.filter((item) => item.mode === viewMode);
+  }, [callRows, viewMode]);
+
+  const callCards = useMemo(() => {
+    const totalReceived = callRows.filter((row) => row.mode === "received").length;
+    const totalAttempted = callRows.filter((row) => row.mode === "attempted").length;
+    const connectedCount = callRows.filter((row) => row.status === "Connected").length;
+    const notConnectedCount = callRows.filter((row) => row.status === "Not-Connected").length;
+    const notConnectedPercentage = totalAttempted > 0 ? (notConnectedCount / totalAttempted) * 100 : 0;
+
+    const totalDurationSeconds = callRows.reduce((sum, row) => {
+      const durationText = row.callDuration.replace(" Min", "");
+      const [minsPart, secsPart] = durationText.split(":");
+      return sum + (toNumber(minsPart) * 60 + toNumber(secsPart));
+    }, 0);
+
+    const averageDuration = callRows.length > 0 ? Math.floor(totalDurationSeconds / callRows.length) : 0;
+
+    return [
+      { label: "Total Calls Received", value: String(totalReceived), icon: EyePng, bg: "#F8FAFF", border: "#EEF3FF" },
+      { label: "Total Calls Attempted", value: String(totalAttempted), icon: MouseCircleGreenIcon, bg: "#F7FCF9", border: "#EAF7EE" },
+      { label: "Connected", value: String(connectedCount), icon: ProfileTwoUserIcon, bg: "#FFF9F9", border: "#FDEEEF" },
+      { label: "Not Connected", value: `${notConnectedPercentage.toFixed(1)}%`, icon: MouseCircleIcon, bg: "#F8FAFF", border: "#EEF3FF" },
+      { label: "Avg. Call Duration", value: formatDuration(averageDuration).replace(" Min", " min"), icon: DollarCircleIcon, bg: "#FFFCF7", border: "#FDF3E4" },
+    ];
+  }, [callRows]);
 
   const showStatusColumn = viewMode === "attempted";
 
@@ -119,7 +297,7 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
           },
         }}
       >
-        {CALL_REPORT_CARDS.map((card) => (
+        {callCards.map((card) => (
           <Box
             key={card.label}
             sx={{
@@ -190,8 +368,15 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
         </Box>
       </Box>
 
+      {loadingCalls && (
+        <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1.25 }}>
+          <CircularProgress size={18} />
+          <Typography variant="body2" color="text.secondary">Loading call history...</Typography>
+        </Box>
+      )}
+
       <TableContainer sx={tableStyles.container}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 900 }}>
           <TableHead>
             <TableRow sx={tableStyles.headRow}>
               <TableCell sx={tableStyles.headCell}>Name</TableCell>

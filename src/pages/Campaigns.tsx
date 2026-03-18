@@ -1,104 +1,123 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState, lazy, Suspense } from "react";
 import "../styles/Campaign/campaigns.css";
-import searchIcon from "../components/Layout/Campaign/Icons/search.png";
-import CampaignHeader from "../components/Layout/Campaign/CampaignHeader";
-import CampaignCard from "../components/Layout/Campaign/CampaignCard";
+import searchIcon from "../components/Campaign/Icons/search.png";
+import CampaignHeader from "../components/Campaign/CampaignHeader";
+import CampaignCard from "../components/Campaign/CampaignCard";
 import { useSelector, useDispatch } from "react-redux";
 import {
+  fetchCampaign,
   selectCampaign,
+  selectCampaignLoading,
   updateCampaignStatus,
 } from "../store/campaignSlice";
 import type { AppDispatch } from "../store";
-const AddNewCampaign = lazy(() => import("../components/Layout/Campaign/AddNewCampaign"));
-const SocialCampaignModal = lazy(() => import("../components/Layout/Campaign/SocialCampaignModal"));
-const CampaignDashboard = lazy(() => import("../components/Layout/Campaign/CampaignDashboard"));
-const EmailCampaignModal = lazy(() => import("../components/Layout/Campaign/EmailCampaignModal"));
-const EditCampaignModal = lazy(() => import("../components/Layout/Campaign/EditCampaignModal"));
-const DuplicateCampaignModal = lazy(() => import("../components/Layout/Campaign/DuplicateCampaignModal"));
-type CampaignStatus =
-  | "Live"
-  | "Draft"
-  | "Schedule"
-  | "Scheduled"
-  | "Paused"
-  | "Stopped"
-  | "Completed"
-  | "Failed";
+import {
+  CAMPAIGN_MODE,
+  CAMPAIGN_STATUS,
+  CAMPAIGN_TABS,
+  CAMPAIGN_TYPE,
+  PLATFORMS,
+  STATUS_MAP,
+  type CampaignStatus,
+  type CampaignType,
+  type Platform,
+  type Tab,
+} from "../constants/campaigns.constants";
+import type { Campaign, CampaignAPIType } from "../types/campaigns.types";
 
-type Tab = "all" | "social" | "email";
+const AddNewCampaign = lazy(
+  () => import("../components/Campaign/AddNewCampaign"),
+);
+const SocialCampaignModal = lazy(
+  () => import("../components/Campaign/SocialCampaignModal"),
+);
+const CampaignDashboard = lazy(
+  () => import("../components/Campaign/CampaignDashboard"),
+);
+const EmailCampaignModal = lazy(
+  () => import("../components/Campaign/EmailCampaignModal"),
+);
+const EditCampaignModal = lazy(
+  () => import("../components/Campaign/EditCampaignModal"),
+);
+const DuplicateCampaignModal = lazy(
+  () => import("../components/Campaign/DuplicateCampaignModal"),
+);
 
 export default function CampaignsScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const rawCampaigns = useSelector(selectCampaign);
+  const campaignLoading = useSelector(selectCampaignLoading);
 
-  const campaigns = (rawCampaigns || []).map((api: any) => {
-    let status: CampaignStatus;
+  const campaigns = useMemo<Campaign[]>(() => {
+    return (rawCampaigns || []).map((api: CampaignAPIType) => {
+      const backendStatus = (api.status ?? "").toLowerCase();
 
-    if (api.status === "live" || api.is_active === true) {
-      status = "Live";
-    } else if (api.status === "schedule" || api.status === "scheduled") {
-      status = "Schedule";
-    } else if (api.status === "draft") {
-      status = "Draft";
-    } else {
-      status = "Stopped";
-    }
+      const status =
+        STATUS_MAP[backendStatus] ??
+        (api.is_active ? CAMPAIGN_STATUS.LIVE : CAMPAIGN_STATUS.DRAFT);
 
-    // ─── Resolve platforms ────────────────────────────────────────────────
-    // campaign_mode: 1 = organic (social), 2 = paid (social), 3 = email
-    // NEVER use campaign_mode === 2 as "email" — 2 is PAID ADVERTISING (social)
-    let platforms: ("instagram" | "facebook" | "linkedin" | "gmail")[] = [];
-    let type: "social" | "email";
+      let platforms: Platform[] = [];
+      let type: CampaignType;
 
-    const isEmailCampaign =
-      api.campaign_mode === 3 ||
-      (Array.isArray(api.email) && api.email.length > 0);
+      const isEmailCampaign = api.campaign_mode === CAMPAIGN_MODE.EMAIL;
 
-    if (isEmailCampaign) {
-      type = "email";
-      platforms = ["gmail"] as ("instagram" | "facebook" | "linkedin" | "gmail")[];
-    } else {
-      // Social campaign (organic=1 or paid=2)
-      type = "social";
-
-      // Get platforms from social_media array (CampaignReadSerializer key)
-      if (Array.isArray(api.social_media) && api.social_media.length > 0) {
-        platforms = (api.social_media
-          .filter((s: any) => s.is_active !== false)
-          .map((s: any) => (s.platform_name ?? "").toLowerCase())
-          .filter(Boolean)) as ("instagram" | "facebook" | "linkedin" | "gmail")[];
+      if (isEmailCampaign) {
+        type = CAMPAIGN_TYPE.EMAIL;
+        platforms = [PLATFORMS.GMAIL];
+      } else {
+        type = CAMPAIGN_TYPE.SOCIAL;
+        if (Array.isArray(api.social_media) && api.social_media.length > 0) {
+          platforms = api.social_media
+            .filter((s) => s.is_active !== false)
+            .map((s) => (s.platform_name ?? ""))
+            .filter(Boolean) as Platform[];
+        }
       }
 
-      // Fallback: select_ad_accounts
-      if (platforms.length === 0 && Array.isArray(api.select_ad_accounts)) {
-        platforms = api.select_ad_accounts.map((p: string) => p.toLowerCase()) as ("instagram" | "facebook" | "linkedin" | "gmail")[];
-      }
-    }
+      return {
+        id: api.id,
+        name: api.campaign_name ?? "",
+        description: api.campaign_description ?? "",
+        type,
+        status,
+        start: api.start_date,
+        end: api.end_date,
+        platforms,
+        leads: api.lead_generated ?? 0,
+        lead_generated: api.lead_generated ?? 0,
+        scheduledAt: api.email?.[0]?.scheduled_at ?? api.selected_start,
+        selected_start: api.selected_start,
+        enter_time: api.enter_time,
+        objective: api.campaign_objective,
+        budget_data: api.budget_data,
+        image_url: api.image_url ?? null,
+        platform_data: api.platform_data ?? {},
+        campaign_content:
+          api.campaign_content || api.email?.[0]?.email_body || "",
 
-    return {
-      id: api.id,
-      name: api.campaign_name ?? "",
-      type,
-      status,
-      start: api.start_date,
-      end: api.end_date,
-      platforms,
-      leads: 0,
-      lead_generated: api.lead_generated ?? 0,
-      scheduledAt: api.selected_start,
-      objective: api.campaign_objective,
-      budget_data: api.budget_data ?? {},
-      image_url: api.image_url ?? "",
-      platform_data: api.platform_data ?? {},
-      campaign_content: api.campaign_content ?? "",
-      total_spend: api.total_spend ?? 0,
-      cpc: api.cpc ?? 0,
-    };
-  });
+        total_spend: api.total_spend ?? 0,
+        cpc: api.cpc ?? 0,
+        // Mailchimp metrics
+        impressions: api.impressions ?? 0,
+        clicks: api.clicks ?? 0,
+        emails_sent: api.emails_sent ?? 0,
+        bounces: api.bounces ?? 0,
+        unsubscribes: api.unsubscribes ?? 0,
+        conversion_rate: api.conversion_rate ?? 0,
+        // FB Insights
+        fb_likes: api.fb_likes ?? 0,
+        fb_comments: api.fb_comments ?? 0,
+        fb_shares: api.fb_shares ?? 0,
+        fb_impressions: api.fb_impressions ?? 0,
+        fb_reach: api.fb_reach ?? 0,
+        fb_clicks: api.fb_clicks ?? 0,
+      };
+    });
+  }, [rawCampaigns]);
 
-  /* ================= LOCAL UI STATE ================= */
-  const [tab, setTab] = useState<Tab>("all");
+  // UI States
+  const [tab, setTab] = useState<Tab>(CAMPAIGN_TABS.ALL);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CampaignStatus | "all">("all");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -106,27 +125,30 @@ export default function CampaignsScreen() {
   const [showAddCampaign, setShowAddCampaign] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<any>(null);
-  const [duplicatingCampaign, setDuplicatingCampaign] = useState<any>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(
+    null,
+  );
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [duplicatingCampaign, setDuplicatingCampaign] =
+    useState<Campaign | null>(null);
 
   const handleStatusChange = (id: string, status: CampaignStatus) => {
     dispatch(updateCampaignStatus({ id, status }));
   };
 
-  const handleEdit = (campaign: any) => {
+  const handleEdit = (campaign: Campaign) => {
     setEditingCampaign(campaign);
     setShowEditModal(true);
   };
 
-  const handleDuplicate = (campaign: any) => {
+  const handleDuplicate = (campaign: Campaign) => {
     setDuplicatingCampaign(campaign);
   };
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
-      const tabOk = tab === "all" || c.type === tab;
+      const tabOk = tab === CAMPAIGN_TABS.ALL || c.type === tab;
       const searchOk = (c.name ?? "")
         .toLowerCase()
         .includes(search.toLowerCase());
@@ -136,12 +158,19 @@ export default function CampaignsScreen() {
   }, [campaigns, tab, search, status]);
 
   const allCount = campaigns.length;
-  const socialCount = campaigns.filter((c) => c.type === "social").length;
-  const emailCount = campaigns.filter((c) => c.type === "email").length;
+  const socialCount = campaigns.filter(
+    (c) => c.type === CAMPAIGN_TYPE.SOCIAL,
+  ).length;
+
+  const emailCount = campaigns.filter(
+    (c) => c.type === CAMPAIGN_TYPE.EMAIL,
+  ).length;
 
   if (selectedCampaign) {
     return (
-      <Suspense fallback={<div className="empty-state">Loading campaign...</div>}>
+      <Suspense
+        fallback={<div className="empty-state">Loading campaign...</div>}
+      >
         <CampaignDashboard
           campaign={selectedCampaign}
           onBack={() => setSelectedCampaign(null)}
@@ -154,29 +183,33 @@ export default function CampaignsScreen() {
     <div className="campaigns-page">
       <CampaignHeader onAddNew={() => setShowAddCampaign(true)} />
       <div className="filters-row">
+        {/* Header Filter */}
         <div className="tabs">
           <button
-            className={`tab-btn ${tab === "all" ? "active" : ""}`}
-            onClick={() => setTab("all")}
+            className={`tab-btn ${tab === CAMPAIGN_TABS.ALL ? "active" : ""}`}
+            onClick={() => setTab(CAMPAIGN_TABS.ALL)}
           >
             All Campaigns ({allCount})
           </button>
 
           <button
-            className={`tab-btn ${tab === "social" ? "active" : ""}`}
-            onClick={() => setTab("social")}
+            className={`tab-btn ${
+              tab === CAMPAIGN_TABS.SOCIAL ? "active" : ""
+            }`}
+            onClick={() => setTab(CAMPAIGN_TABS.SOCIAL)}
           >
             Social Media Campaigns ({socialCount})
           </button>
 
           <button
-            className={`tab-btn ${tab === "email" ? "active" : ""}`}
-            onClick={() => setTab("email")}
+            className={`tab-btn ${tab === CAMPAIGN_TABS.EMAIL ? "active" : ""}`}
+            onClick={() => setTab(CAMPAIGN_TABS.EMAIL)}
           >
             Email Campaigns ({emailCount})
           </button>
         </div>
 
+        {/* Header Search */}
         <div className="right-filters">
           <div className="search-input">
             <img src={searchIcon} alt="Search" className="search-icon" />
@@ -187,6 +220,7 @@ export default function CampaignsScreen() {
             />
           </div>
 
+          {/* Header Status Filter */}
           <div className="status-dropdown">
             <div
               className={`status-btn ${openStatus ? "active" : ""}`}
@@ -198,13 +232,10 @@ export default function CampaignsScreen() {
             {openStatus && (
               <div className="status-menu">
                 {(
-                  [
-                    "all",
-                    "Live",
-                    "Stopped",
-                    "Draft",
-                    "Schedule",
-                  ] as (CampaignStatus | "all")[]
+                  ["all", ...Object.values(CAMPAIGN_STATUS)] as (
+                    | CampaignStatus
+                    | "all"
+                  )[]
                 ).map((item) => (
                   <div
                     key={item}
@@ -226,13 +257,15 @@ export default function CampaignsScreen() {
       </div>
 
       <div className="campaign-grid">
-        {filteredCampaigns.length === 0 ? (
+        {campaignLoading ? (
+          <div className="empty-state">Loading campaigns...</div>
+        ) : filteredCampaigns.length === 0 ? (
           <div className="empty-state">No campaigns found</div>
         ) : (
           filteredCampaigns.map((campaign) => (
             <CampaignCard
               key={campaign.id}
-              campaign={campaign as any}
+              campaign={campaign}
               openMenuId={openMenuId}
               setOpenMenuId={setOpenMenuId}
               onViewDetail={setSelectedCampaign}
@@ -264,7 +297,10 @@ export default function CampaignsScreen() {
         <Suspense fallback={null}>
           <SocialCampaignModal
             onClose={() => setShowSocialModal(false)}
-            onSave={() => setShowSocialModal(false)}
+            onSave={() => {
+              setShowSocialModal(false);
+              dispatch(fetchCampaign());
+            }}
           />
         </Suspense>
       )}
@@ -272,7 +308,10 @@ export default function CampaignsScreen() {
         <Suspense fallback={null}>
           <EmailCampaignModal
             onClose={() => setShowEmailModal(false)}
-            onSave={() => setShowEmailModal(false)}
+            onSave={() => {
+              setShowEmailModal(false);
+              dispatch(fetchCampaign());
+            }}
           />
         </Suspense>
       )}
@@ -283,6 +322,7 @@ export default function CampaignsScreen() {
             onClose={() => setShowEditModal(false)}
             onSave={() => {
               setShowEditModal(false);
+              dispatch(fetchCampaign());
             }}
           />
         </Suspense>
@@ -292,7 +332,10 @@ export default function CampaignsScreen() {
           <DuplicateCampaignModal
             campaign={duplicatingCampaign}
             onClose={() => setDuplicatingCampaign(null)}
-            onSave={() => setDuplicatingCampaign(null)}
+            onSave={() => {
+              setDuplicatingCampaign(null);
+              dispatch(fetchCampaign());
+            }}
           />
         </Suspense>
       )}

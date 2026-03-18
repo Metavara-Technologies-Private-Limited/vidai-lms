@@ -2,9 +2,10 @@
 import * as React from "react";
 import {
   Alert, Avatar, Box, Checkbox, Chip, CircularProgress, IconButton,
-  Paper, Snackbar, Stack, Table, TableBody, TableCell, TableContainer,
+  Paper, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Tooltip, Typography,
 } from "@mui/material";
+import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import PhoneIcon from "@mui/icons-material/Phone";
@@ -29,6 +30,13 @@ import { getStatusChipSx, getTaskStatusChipSx } from "./LeadsTable.styles";
 import { SMSDialog } from "./SmsDialogs";
 import { EmailDialog } from "./EmailDialogs";
 
+// ── Shared toast options — identical to useEditLead.ts ────────────────
+const toastOptions = {
+  position: "top-right" as const,
+  autoClose: 3000,
+  theme: "colored" as const,
+};
+
 const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -44,7 +52,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const [callLead, setCallLead] = React.useState<ProcessedLead | null>(null);
   const [smsLead, setSmsLead] = React.useState<ProcessedLead | null>(null);
   const [emailLead, setEmailLead] = React.useState<ProcessedLead | null>(null);
-  const [callSnackbar, setCallSnackbar] = React.useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
   React.useEffect(() => {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
@@ -61,14 +68,14 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
   const handleCallOpen = async (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
     const phone = normalizePhone(lead.contact_no);
-    if (!phone) { setCallSnackbar({ open: true, message: "No contact number for this lead." }); return; }
-    if (!lead.id) { setCallSnackbar({ open: true, message: "Lead ID is missing. Cannot initiate call." }); return; }
+    if (!phone) { toast.error("No contact number for this lead.", toastOptions); return; }
+    if (!lead.id) { toast.error("Lead ID is missing. Cannot initiate call.", toastOptions); return; }
     setCallLead(lead);
     try {
       await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
     } catch (err: unknown) {
       setCallLead(null);
-      setCallSnackbar({ open: true, message: extractErrorMessage(err, "Failed to initiate call.") });
+      toast.error(extractErrorMessage(err, "Failed to initiate call."), toastOptions);
     }
   };
 
@@ -291,12 +298,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters }) => {
       <CallDialog open={Boolean(callLead)} name={callLead?.full_name || callLead?.name || "Unknown"} onClose={() => setCallLead(null)} />
       <SMSDialog   open={Boolean(smsLead)}   lead={smsLead}   onClose={() => setSmsLead(null)} />
       <EmailDialog open={Boolean(emailLead)} lead={emailLead} onClose={() => setEmailLead(null)} />
-
-      <Snackbar open={callSnackbar.open} autoHideDuration={4000} onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))} severity="error" sx={{ borderRadius: "10px" }}>
-          {callSnackbar.message}
-        </Alert>
-      </Snackbar>
     </>
   );
 };

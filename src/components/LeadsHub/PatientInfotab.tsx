@@ -22,6 +22,7 @@ import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 
 import { Info } from "./LeadDetailSubComponents";
 import type { LeadRecord } from "./LeadDetailTypes";
@@ -83,10 +84,67 @@ function DocTypeIcon({ url, size = 22 }: { url: string; size?: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// InfoCell
+// ─────────────────────────────────────────────────────────────────────────────
+interface InfoCellProps {
+  label: string;
+  value: string;
+  isAvatar?: boolean;
+  truncate?: boolean;
+}
+
+const InfoCell: React.FC<InfoCellProps> = ({ label, value, isAvatar, truncate = true }) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography
+      variant="caption"
+      sx={{ color: "#9E9E9E", fontSize: "11px", fontWeight: 500, display: "block", mb: 0.5, whiteSpace: "nowrap" }}
+    >
+      {label}
+    </Typography>
+
+    {isAvatar ? (
+      <Info label="" value={value} isAvatar />
+    ) : truncate ? (
+      <Typography
+        sx={{
+          color: "#232323", fontSize: "13px", fontWeight: 600,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}
+        title={value}
+      >
+        {value}
+      </Typography>
+    ) : (
+      <Typography
+        sx={{
+          color: "#232323", fontSize: "13px", fontWeight: 600,
+          wordBreak: "break-all", overflowWrap: "anywhere", lineHeight: 1.5,
+        }}
+      >
+        {value}
+      </Typography>
+    )}
+  </Box>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// InfoGrid
+// ─────────────────────────────────────────────────────────────────────────────
+const InfoGrid: React.FC<{ children: React.ReactNode; sx?: object }> = ({ children, sx }) => (
+  <Box
+    sx={{
+      display: "grid",
+      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+      gap: "16px 24px",
+      ...sx,
+    }}
+  >
+    {children}
+  </Box>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // useBlobUrl
-// Fetches the remote file and creates a local blob:// URL.
-// This completely bypasses the browser's cross-origin iframe restriction
-// because the iframe src becomes blob://localhost/... (same origin).
 // ─────────────────────────────────────────────────────────────────────────────
 function useBlobUrl(remoteUrl: string, enabled: boolean) {
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
@@ -95,29 +153,14 @@ function useBlobUrl(remoteUrl: string, enabled: boolean) {
 
   React.useEffect(() => {
     if (!enabled || !remoteUrl) return;
-
     let objectUrl: string | null = null;
-    setLoading(true);
-    setError(null);
-    setBlobUrl(null);
-
+    setLoading(true); setError(null); setBlobUrl(null);
     fetch(remoteUrl)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status} — file not found`);
-        return res.blob();
-      })
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
-        setBlobUrl(objectUrl);
-      })
-      .catch((err: unknown) => {
-        setError((err as Error).message || "Failed to load file");
-      })
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status} — file not found`); return res.blob(); })
+      .then((blob) => { objectUrl = URL.createObjectURL(blob); setBlobUrl(objectUrl); })
+      .catch((err: unknown) => setError((err as Error).message || "Failed to load file"))
       .finally(() => setLoading(false));
-
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [remoteUrl, enabled]);
 
   return { blobUrl, loading, error };
@@ -127,120 +170,69 @@ function useBlobUrl(remoteUrl: string, enabled: boolean) {
 // DocumentViewer Dialog
 // ─────────────────────────────────────────────────────────────────────────────
 interface DocumentViewerProps {
-  open: boolean;
-  url: string;
-  name: string;
-  onClose: () => void;
+  open: boolean; url: string; name: string; onClose: () => void;
 }
 
 const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClose }) => {
   const resolvedUrl = resolveDocUrl(url);
   const type        = getDocType(resolvedUrl);
   const displayName = getFileName(resolvedUrl, name);
-
   const { blobUrl, loading, error } = useBlobUrl(resolvedUrl, open);
 
   const handleDownload = () => {
     const src = blobUrl || resolvedUrl;
-    const a   = document.createElement("a");
-    a.href     = src;
-    a.download = displayName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const a = document.createElement("a");
+    a.href = src; a.download = displayName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth
       PaperProps={{ sx: { borderRadius: "16px", maxHeight: "92vh", overflow: "hidden", display: "flex", flexDirection: "column" } }}>
-
-      {/* Header */}
       <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1.5, px: 2.5, borderBottom: "1px solid #F1F5F9", flexShrink: 0 }}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <DocTypeIcon url={resolvedUrl} size={20} />
           <Typography fontWeight={600} fontSize="14px" color="#1E293B" noWrap maxWidth={400}>{displayName}</Typography>
         </Stack>
         <Stack direction="row" spacing={0.5}>
-          <Tooltip title="Download">
-            <IconButton size="small" onClick={handleDownload} sx={{ color: "#475569", "&:hover": { bgcolor: "#F1F5F9" } }}>
-              <DownloadOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Open in new tab">
-            <IconButton size="small" onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")} sx={{ color: "#475569", "&:hover": { bgcolor: "#F1F5F9" } }}>
-              <OpenInNewOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <IconButton size="small" onClick={onClose} sx={{ color: "#475569", "&:hover": { bgcolor: "#F1F5F9" } }}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
+          <Tooltip title="Download"><IconButton size="small" onClick={handleDownload} sx={{ color: "#475569", "&:hover": { bgcolor: "#F1F5F9" } }}><DownloadOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+          <Tooltip title="Open in new tab"><IconButton size="small" onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")} sx={{ color: "#475569", "&:hover": { bgcolor: "#F1F5F9" } }}><OpenInNewOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+          <IconButton size="small" onClick={onClose} sx={{ color: "#475569", "&:hover": { bgcolor: "#F1F5F9" } }}><CloseIcon fontSize="small" /></IconButton>
         </Stack>
       </DialogTitle>
-
-      {/* Body */}
       <DialogContent sx={{ p: 0, flex: 1, overflow: "hidden", bgcolor: "#F8FAFC" }}>
-
-        {/* Loading */}
         {loading && (
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
-            <Stack alignItems="center" spacing={1.5}>
-              <CircularProgress size={36} />
-              <Typography fontSize="13px" color="text.secondary">Loading file…</Typography>
-            </Stack>
+            <Stack alignItems="center" spacing={1.5}><CircularProgress size={36} /><Typography fontSize="13px" color="text.secondary">Loading file…</Typography></Stack>
           </Box>
         )}
-
-        {/* Error */}
         {!loading && error && (
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 2, p: 4 }}>
             <PictureAsPdfOutlinedIcon sx={{ fontSize: 56, color: "#CBD5E1" }} />
             <Typography fontWeight={600} color="#475569">Could not load file</Typography>
             <Typography fontSize="13px" color="text.secondary" textAlign="center">{error}</Typography>
             <Stack direction="row" spacing={1.5} mt={1}>
-              <Box component="button" onClick={handleDownload}
-                sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25, borderRadius: "8px", border: "none", cursor: "pointer", bgcolor: "#1F2937", color: "white", fontWeight: 600, fontSize: "14px", "&:hover": { bgcolor: "#111827" } }}>
-                <DownloadOutlinedIcon sx={{ fontSize: 18 }} /> Download
-              </Box>
-              <Box component="button" onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")}
-                sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25, borderRadius: "8px", cursor: "pointer", border: "1px solid #E5E7EB", bgcolor: "white", color: "#374151", fontWeight: 600, fontSize: "14px", "&:hover": { bgcolor: "#F9FAFB" } }}>
-                <OpenInNewOutlinedIcon sx={{ fontSize: 18 }} /> Open in Tab
-              </Box>
+              <Box component="button" onClick={handleDownload} sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25, borderRadius: "8px", border: "none", cursor: "pointer", bgcolor: "#1F2937", color: "white", fontWeight: 600, fontSize: "14px", "&:hover": { bgcolor: "#111827" } }}><DownloadOutlinedIcon sx={{ fontSize: 18 }} /> Download</Box>
+              <Box component="button" onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")} sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25, borderRadius: "8px", cursor: "pointer", border: "1px solid #E5E7EB", bgcolor: "white", color: "#374151", fontWeight: 600, fontSize: "14px", "&:hover": { bgcolor: "#F9FAFB" } }}><OpenInNewOutlinedIcon sx={{ fontSize: 18 }} /> Open in Tab</Box>
             </Stack>
           </Box>
         )}
-
-        {/* PDF — blob URL = same origin = no cross-origin block */}
         {!loading && !error && blobUrl && type === "pdf" && (
-          <iframe
-            src={blobUrl}
-            title={displayName}
-            style={{ width: "100%", height: "78vh", border: "none", display: "block" }}
-          />
+          <iframe src={blobUrl} title={displayName} style={{ width: "100%", height: "78vh", border: "none", display: "block" }} />
         )}
-
-        {/* Image */}
         {!loading && !error && blobUrl && type === "image" && (
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", p: 3, minHeight: 300 }}>
-            <Box component="img" src={blobUrl} alt={displayName}
-              sx={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain", borderRadius: "8px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+            <Box component="img" src={blobUrl} alt={displayName} sx={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain", borderRadius: "8px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
           </Box>
         )}
-
-        {/* Word / Other */}
         {!loading && !error && (type === "word" || type === "other") && (
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 2.5 }}>
             <DocTypeIcon url={resolvedUrl} size={56} />
             <Typography fontWeight={600} color="#1E293B" fontSize="15px">{displayName}</Typography>
             <Typography fontSize="13px" color="text.secondary">This file type cannot be previewed in the browser.</Typography>
             <Stack direction="row" spacing={1.5} mt={1}>
-              <Box component="button" onClick={handleDownload}
-                sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25, borderRadius: "8px", border: "none", cursor: "pointer", bgcolor: "#1F2937", color: "white", fontWeight: 600, fontSize: "14px", "&:hover": { bgcolor: "#111827" } }}>
-                <DownloadOutlinedIcon sx={{ fontSize: 18 }} /> Download File
-              </Box>
-              <Box component="button" onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")}
-                sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25, borderRadius: "8px", cursor: "pointer", border: "1px solid #E5E7EB", bgcolor: "white", color: "#374151", fontWeight: 600, fontSize: "14px", "&:hover": { bgcolor: "#F9FAFB" } }}>
-                <OpenInNewOutlinedIcon sx={{ fontSize: 18 }} /> Open in New Tab
-              </Box>
+              <Box component="button" onClick={handleDownload} sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25, borderRadius: "8px", border: "none", cursor: "pointer", bgcolor: "#1F2937", color: "white", fontWeight: 600, fontSize: "14px", "&:hover": { bgcolor: "#111827" } }}><DownloadOutlinedIcon sx={{ fontSize: 18 }} /> Download File</Box>
+              <Box component="button" onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")} sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25, borderRadius: "8px", cursor: "pointer", border: "1px solid #E5E7EB", bgcolor: "white", color: "#374151", fontWeight: 600, fontSize: "14px", "&:hover": { bgcolor: "#F9FAFB" } }}><OpenInNewOutlinedIcon sx={{ fontSize: 18 }} /> Open in New Tab</Box>
             </Stack>
           </Box>
         )}
@@ -290,14 +282,23 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
 
   return (
     <>
-      <Box onClick={() => setViewerOpen(true)}
-        sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 1.5, borderRadius: "10px", border: "1px solid #F1F5F9", bgcolor: "#FFFFFF", cursor: "pointer", transition: "all 0.15s ease", "&:hover": { borderColor: "#E2E8F0", bgcolor: "#F8FAFC", "& .doc-actions": { opacity: 1 } } }}>
+      <Box
+        onClick={() => setViewerOpen(true)}
+        sx={{
+          display: "flex", alignItems: "center", gap: 1.5, p: 1.5,
+          borderRadius: "10px", border: "1px solid #F1F5F9", bgcolor: "#FFFFFF",
+          cursor: "pointer", transition: "all 0.15s ease",
+          "&:hover": { borderColor: "#E2E8F0", bgcolor: "#F8FAFC", "& .doc-actions": { opacity: 1 } },
+        }}
+      >
         <Box sx={{ width: 40, height: 40, borderRadius: "8px", bgcolor: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <DocTypeIcon url={resolvedUrl} size={20} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography fontWeight={600} fontSize="13px" color="#1E293B" noWrap title={displayName}>{displayName}</Typography>
-          {ext && <Chip label={ext} size="small" sx={{ height: 18, fontSize: "10px", fontWeight: 700, bgcolor: bg, color, borderRadius: "4px", mt: 0.3, "& .MuiChip-label": { px: 0.75 } }} />}
+          {ext && (
+            <Chip label={ext} size="small" sx={{ height: 18, fontSize: "10px", fontWeight: 700, bgcolor: bg, color, borderRadius: "4px", mt: 0.3, "& .MuiChip-label": { px: 0.75 } }} />
+          )}
         </Box>
         <Stack className="doc-actions" direction="row" spacing={0.25} sx={{ opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
           <Tooltip title="Preview">
@@ -317,11 +318,26 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
           </Tooltip>
         </Stack>
       </Box>
-
       <DocumentViewer open={viewerOpen} url={resolvedUrl} name={displayName} onClose={() => setViewerOpen(false)} />
     </>
   );
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section label
+// ─────────────────────────────────────────────────────────────────────────────
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Typography
+    variant="caption"
+    fontWeight={600}
+    color="#232323"
+    display="block"
+    mb={2}
+    sx={{ textTransform: "uppercase", letterSpacing: "1px", fontSize: "11px" }}
+  >
+    {children}
+  </Typography>
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PatientInfoTab
@@ -338,8 +354,11 @@ interface PatientInfoTabProps {
   treatmentInterest: string[];
   documents: { url: string; name: string }[];
   docsLoading: boolean; docsError: string | null; onClearDocsError: () => void;
+  hasAppointment: boolean;
 }
 
+// ✅ FIX: removed `lead` from destructuring — it is declared in the interface
+//         (so the parent can still pass it) but the component body never reads it.
 const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
   leadPhone, leadEmail, leadLocation, leadGender, leadAge, leadMaritalStatus,
   leadAddress, leadLanguage, leadAssigned, leadCreatedAt,
@@ -348,75 +367,119 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
   appointmentDepartment, appointmentPersonnel, appointmentDate,
   appointmentSlot, appointmentRemark, treatmentInterest,
   documents, docsLoading, docsError, onClearDocsError,
+  hasAppointment,
 }) => (
-  <Stack direction="row" spacing={3}>
-    {/* LEFT */}
-    <Box sx={{ flex: 2 }}>
-      <Card sx={{ p: 3, borderRadius: "16px", mb: 1, bgcolor: "#fcfcfc", boxShadow: "none", border: "none", mt: -1 }}>
-        <Typography variant="subtitle1" fontWeight={600} mb={3}>Basic Information</Typography>
-        <Divider sx={{ mb: 1, mt: -2, mx: -3 }} />
+  <Stack direction="row" spacing={3} alignItems="flex-start">
 
-        <Typography variant="caption" fontWeight={500} color="#232323" display="block" mb={2} sx={{ textTransform: "uppercase", letterSpacing: "1px" }}>Lead Information</Typography>
-        <Stack spacing={3}>
-          <Stack direction="row" spacing={6}><Info label="CONTACT NO" value={leadPhone} /><Info label="EMAIL" value={leadEmail} /><Info label="LOCATION" value={leadLocation} /></Stack>
-          <Stack direction="row" spacing={6}><Info label="GENDER" value={leadGender} /><Info label="AGE" value={leadAge} /><Info label="MARITAL STATUS" value={leadMaritalStatus} /></Stack>
-          <Stack direction="row" spacing={6}><Info label="ADDRESS" value={leadAddress} /><Info label="LANGUAGE PREFERENCE" value={leadLanguage} /><Info label="ASSIGNED TO" value={leadAssigned} isAvatar /></Stack>
-          <Info label="CREATED DATE & TIME" value={leadCreatedAt} />
+    {/* ── LEFT PANEL ── */}
+    <Box sx={{ flex: 2, minWidth: 0 }}>
+      <Card sx={{ p: 3, borderRadius: "16px", mb: 1, bgcolor: "#fcfcfc", boxShadow: "none", border: "none", mt: -1 }}>
+        <Typography variant="subtitle1" fontWeight={700} mb={2}>Basic Information</Typography>
+        <Divider sx={{ mb: 2, mx: -3 }} />
+
+        <SectionLabel>Lead Information</SectionLabel>
+        <Stack spacing={2.5} mb={2}>
+          <InfoGrid>
+            <InfoCell label="CONTACT NO" value={leadPhone} />
+            <InfoCell label="EMAIL" value={leadEmail} truncate={false} />
+            <InfoCell label="LOCATION" value={leadLocation} />
+          </InfoGrid>
+          <InfoGrid>
+            <InfoCell label="GENDER" value={leadGender} />
+            <InfoCell label="AGE" value={leadAge} />
+            <InfoCell label="MARITAL STATUS" value={leadMaritalStatus} />
+          </InfoGrid>
+          <InfoGrid>
+            <InfoCell label="ADDRESS" value={leadAddress} />
+            <InfoCell label="LANGUAGE PREFERENCE" value={leadLanguage} />
+            <InfoCell label="ASSIGNED TO" value={leadAssigned} isAvatar />
+          </InfoGrid>
+          <InfoCell label="CREATED DATE & TIME" value={leadCreatedAt} />
         </Stack>
 
-        <Divider sx={{ mb: 2, mt: 2, mx: -3 }} />
-        <Typography variant="caption" fontWeight={500} color="#232323" display="block" mb={2} sx={{ textTransform: "uppercase", letterSpacing: "1px" }}>Partner Information</Typography>
-        <Stack direction="row" spacing={6}><Info label="FULL NAME" value={partnerName} /><Info label="AGE" value={partnerAge} /><Info label="GENDER" value={partnerGender} /></Stack>
+        <Divider sx={{ mb: 2, mx: -3 }} />
 
-        <Divider sx={{ mb: 2, mt: 2, mx: -3 }} />
-        <Typography variant="caption" fontWeight={500} color="#232323" display="block" mb={2} sx={{ textTransform: "uppercase", letterSpacing: "1px" }}>Source & Campaign Details</Typography>
-        <Stack direction="row" spacing={6}><Info label="SUB-SOURCE" value={leadSubSource} /><Info label="CAMPAIGN NAME" value={leadCampaignName} /><Info label="CAMPAIGN DURATION" value={leadCampaignDuration} /></Stack>
+        <SectionLabel>Partner Information</SectionLabel>
+        <InfoGrid sx={{ mb: 2 }}>
+          <InfoCell label="FULL NAME" value={partnerName} />
+          <InfoCell label="AGE" value={partnerAge} />
+          <InfoCell label="GENDER" value={partnerGender} />
+        </InfoGrid>
+
+        <Divider sx={{ mb: 2, mx: -3 }} />
+
+        <SectionLabel>Source & Campaign Details</SectionLabel>
+        <InfoGrid>
+          <Box sx={{ minWidth: 0 }}>
+            <Info label="SUB-SOURCE" value={leadSubSource} />
+          </Box>
+          <InfoCell label="CAMPAIGN NAME" value={leadCampaignName} />
+          <InfoCell label="CAMPAIGN DURATION" value={leadCampaignDuration} />
+        </InfoGrid>
       </Card>
     </Box>
 
-    {/* RIGHT */}
-    <Stack spacing={3} sx={{ flex: 1 }}>
-      {/* Appointment */}
-      <Card sx={{ p: 3, bgcolor: "#fcfffa", borderRadius: "10px", border: "none", mt: -1 }}>
-        <Typography color="#16A34A" fontWeight={700} variant="subtitle2" mb={2}>Appointment</Typography>
-        <Divider sx={{ mb: 1, mt: 1, mx: -3 }} />
-        <Stack direction="row" mb={2}>
-          <Box sx={{ flex: 1 }}><Typography variant="caption" color="text.secondary">DEPARTMENT</Typography><Typography fontWeight={600} variant="body2">{appointmentDepartment}</Typography></Box>
-          <Box sx={{ flex: 1 }}><Typography variant="caption" color="text.secondary">PERSONNEL</Typography><Typography fontWeight={600} variant="body2">{appointmentPersonnel}</Typography></Box>
-        </Stack>
-        <Stack direction="row" mb={2}>
-          <Box sx={{ flex: 1 }}><Typography variant="caption" color="text.secondary">DATE</Typography><Typography fontWeight={600} variant="body2">{appointmentDate}</Typography></Box>
-          <Box sx={{ flex: 1 }}><Typography variant="caption" color="text.secondary">SLOT</Typography><Typography fontWeight={600} variant="body2">{appointmentSlot}</Typography></Box>
-        </Stack>
-        <Typography variant="caption" color="text.secondary">REMARK</Typography>
-        <Typography fontWeight={600} variant="body2">{appointmentRemark}</Typography>
-      </Card>
+    {/* ── RIGHT PANEL ── */}
+    <Stack spacing={3} sx={{ flex: 1, minWidth: 0 }}>
 
-      {/* Treatment */}
+      {hasAppointment ? (
+        <Card sx={{ p: 3, bgcolor: "#fcfffa", borderRadius: "10px", border: "none", boxShadow: "none", mt: -1 }}>
+          <Typography color="#16A34A" fontWeight={700} variant="subtitle2" mb={1.5}>Appointment</Typography>
+          <Divider sx={{ mb: 2, mx: -3 }} />
+          <Stack spacing={2}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px 16px" }}>
+              <InfoCell label="DEPARTMENT" value={appointmentDepartment} />
+              <InfoCell label="PERSONNEL" value={appointmentPersonnel} />
+            </Box>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px 16px" }}>
+              <InfoCell label="DATE" value={appointmentDate} />
+              <InfoCell label="SLOT" value={appointmentSlot} />
+            </Box>
+            <InfoCell label="REMARK" value={appointmentRemark} truncate={false} />
+          </Stack>
+        </Card>
+      ) : (
+        <Card sx={{ p: 3, bgcolor: "#FAFAFA", borderRadius: "10px", border: "1px dashed #E2E8F0", boxShadow: "none", mt: -1 }}>
+          <Typography color="#94A3B8" fontWeight={700} variant="subtitle2" mb={1.5}>Appointment</Typography>
+          <Divider sx={{ mb: 2, mx: -3, borderStyle: "dashed" }} />
+          <Stack alignItems="center" spacing={1} py={1.5}>
+            <CalendarTodayOutlinedIcon sx={{ fontSize: 32, color: "#CBD5E1" }} />
+            <Typography fontSize="13px" color="#94A3B8" fontWeight={500}>No appointment booked</Typography>
+          </Stack>
+        </Card>
+      )}
+
       <Card sx={{ p: 3, borderRadius: "10px", backgroundColor: "#fcfcfc", border: "none", boxShadow: "none" }}>
-        <Typography fontWeight={700} variant="subtitle2" mb={2}>Treatment Interest</Typography>
+        <Typography fontWeight={700} variant="subtitle2" mb={1.5}>Treatment Interest</Typography>
         <Divider sx={{ mb: 2, mx: -3 }} />
-        <Stack direction="row" spacing={1} flexWrap="wrap">
-          {treatmentInterest.length > 0 ? treatmentInterest.map((t, i) => (
-            <Chip key={i} label={t} size="small" sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", fontWeight: 500, mb: 1 }} />
-          )) : <Typography variant="body2" color="text.secondary">No treatments selected</Typography>}
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {treatmentInterest.length > 0
+            ? treatmentInterest.map((t, i) => (
+                <Chip key={i} label={t} size="small" sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", fontWeight: 500 }} />
+              ))
+            : <Typography variant="body2" color="text.secondary">No treatments selected</Typography>
+          }
         </Stack>
       </Card>
 
-      {/* Documents */}
       <Card sx={{ p: 2, borderRadius: "10px", mb: 2, backgroundColor: "#fcfcfc", border: "none", boxShadow: "none" }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
           <Typography fontWeight={700} variant="subtitle2">Documents</Typography>
           {documents.length > 0 && (
-            <Chip label={`${documents.length} file${documents.length > 1 ? "s" : ""}`} size="small"
-              sx={{ height: 20, fontSize: "11px", fontWeight: 600, bgcolor: "#F1F5F9", color: "#475569", "& .MuiChip-label": { px: 1 } }} />
+            <Chip
+              label={`${documents.length} file${documents.length > 1 ? "s" : ""}`}
+              size="small"
+              sx={{ height: 20, fontSize: "11px", fontWeight: 600, bgcolor: "#F1F5F9", color: "#475569", "& .MuiChip-label": { px: 1 } }}
+            />
           )}
         </Stack>
         <Divider sx={{ mb: 2, mx: -2 }} />
-
         {docsLoading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-            <Stack alignItems="center" spacing={1}><CircularProgress size={22} /><Typography variant="caption" color="text.secondary">Loading documents…</Typography></Stack>
+            <Stack alignItems="center" spacing={1}>
+              <CircularProgress size={22} />
+              <Typography variant="caption" color="text.secondary">Loading documents…</Typography>
+            </Stack>
           </Box>
         ) : docsError ? (
           <Alert severity="error" onClose={onClearDocsError} sx={{ borderRadius: "8px", fontSize: "12px" }}>{docsError}</Alert>
@@ -432,6 +495,7 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
         )}
       </Card>
     </Stack>
+
   </Stack>
 );
 

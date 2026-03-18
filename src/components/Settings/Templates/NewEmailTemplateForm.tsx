@@ -39,6 +39,8 @@ import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import { PreviewTemplateModal } from './PreviewEmailTemplateModal';
 import type { NewEmailTemplateFormProps, TemplateDocument } from '../../../types/templates.types';
 import type { EmailTemplate } from '../../../types/tickets.types';
+import { useSelector } from 'react-redux';
+import { selectClinic } from '../../../store/clinicSlice';
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
   const candidate = doc.file_url || doc.file || doc.url || '';
@@ -62,8 +64,6 @@ const extractDocuments = (payload: unknown): TemplateDocument[] => {
   return Array.isArray(match) ? (match as TemplateDocument[]) : [];
 };
 
-const DEFAULT_EDITOR_CONTENT = `<p>Hi {lead_first_name},</p><p><br></p><p>Thank you for choosing {clinic_name}.</p><p>Your fertility consultation has been successfully scheduled!</p><p><br></p><ul><li><p>Date : {appointment_date}</p></li><li><p>Time : {appointment_time}</p></li><li><p>Location : {clinic_name} {clinic_address}</p></li></ul><p><br></p><p>Please arrive 10 minutes early and bring any relevant medical reports.</p><p><br></p><p>If you need to reschedule, please let us know.</p><p><br></p><p>Warm regards,</p><p>The Vidal Team</p>`;
-
 const normalizeEditorHtml = (html: string): string => {
   if (!html) return html;
 
@@ -79,34 +79,37 @@ const normalizeEditorHtml = (html: string): string => {
 };
 
 export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
+  const clinic = useSelector(selectClinic);
+  const clinicName = clinic?.name || "";
+  const clinicId = clinic?.id || 1;
   const isViewOnly = mode === 'view';
 
   // Get clinic ID from various possible sources
-  const getClinicId = (): number => {
-    // Try localStorage first
-    const storedClinicId = localStorage.getItem("clinic_id");
-    if (storedClinicId) return parseInt(storedClinicId, 10);
+  // const getClinicId = (): number => {
+  //   // Try localStorage first
+  //   const storedClinicId = localStorage.getItem("clinic_id");
+  //   if (storedClinicId) return parseInt(storedClinicId, 10);
     
-    // Try from user data
-    const userData = localStorage.getItem("user");
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        if (user.clinic_id) return user.clinic_id;
-      } catch (err) {
-        console.error("Failed to parse user data", err);
-      }
-    }
+  //   // Try from user data
+  //   const userData = localStorage.getItem("user");
+  //   if (userData) {
+  //     try {
+  //       const user = JSON.parse(userData);
+  //       if (user.clinic_id) return user.clinic_id;
+  //     } catch (err) {
+  //       console.error("Failed to parse user data", err);
+  //     }
+  //   }
     
-    // Try from initial data
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const formData = initialData as any;
-    if (formData?.clinic) return formData.clinic;
+  //   // Try from initial data
+  //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  //   const formData = initialData as any;
+  //   if (formData?.clinic) return formData.clinic;
     
-    // Default fallback - you should replace this with actual clinic ID
-    console.warn("No clinic ID found, using default. Please set clinic_id in localStorage or context.");
-    return 1;
-  };
+  //   // Default fallback - you should replace this with actual clinic ID
+  //   console.warn("No clinic ID found, using default. Please set clinic_id in localStorage or context.");
+  //   return 1;
+  // };
 
   // Normalize useCase to match MenuItem values (capitalize first letter)
   // Also handles API responses that might come in different formats
@@ -149,6 +152,8 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
+
+  const DEFAULT_EDITOR_CONTENT = `<p>Hi {lead_first_name},</p><p><br></p><p>Thank you for choosing ${clinicName}.</p><p>Your fertility consultation has been successfully scheduled!</p><p><br></p><ul><li><p>Date : {appointment_date}</p></li><li><p>Time : {appointment_time}</p></li><li><p>Location : ${clinicName}</p></li></ul><p><br></p><p>Please arrive 10 minutes early and bring any relevant medical reports.</p><p><br></p><p>If you need to reschedule, please let us know.</p><p><br></p><p>Warm regards,</p><p>The Vidal Team</p>`;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const initialEditorContent = normalizeEditorHtml(((initialData as any)?.body || (initialData as any)?.email_body || DEFAULT_EDITOR_CONTENT));
@@ -401,7 +406,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   // saves the template first (gets id back), then POSTs each file to
   // POST /api/templates/mail/{id}/documents/ → inserts into restapi_template_mail_document
   const handleSave = async () => {
-    const clinicId = getClinicId();
+    // const clinicId = getClinicId();
 
     const apiPayload = {
       name: formData.name,

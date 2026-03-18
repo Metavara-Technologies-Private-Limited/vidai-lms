@@ -12,7 +12,7 @@
   transition: 0.2s ease;
 }
 .campaign-card:hover {
-  transform: translateY(-2px);
+  /* transform: translateY(-2px); */
   box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
@@ -84,6 +84,10 @@
   color: #7c4dff;
 }
 
+.status.scheduled {
+  background: #efe7ff;
+  color: #7c4dff;
+}
 .status.paused {
   background: #fff3cd;
   color: #e67e22;

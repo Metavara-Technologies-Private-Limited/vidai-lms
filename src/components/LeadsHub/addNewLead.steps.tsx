@@ -452,7 +452,8 @@ export function Step3({
       wantAppointment: value,
       ...(value === "no" && {
         department: "",
-        assignee: "",
+        // ✅ Clear personnel (appointment doctor), NOT assignee (lead owner from Step 1)
+        personnel: "",
         appointmentDate: "",
         slot: "",
         remark: "",
@@ -505,11 +506,13 @@ export function Step3({
               </TextField>
             </Box>
             <Box>
-              <Typography sx={labelStyle}>Assigned To</Typography>
+              {/* ✅ FIX: This is the appointment doctor/personnel, not the lead assignee.
+                  Bind to form.personnel so it maps to personal_id in the payload. */}
+              <Typography sx={labelStyle}>Appointment Personnel</Typography>
               <TextField
                 select fullWidth size="small"
-                value={form.assignee}
-                onChange={handleChange("assignee")}
+                value={form.personnel}
+                onChange={handleChange("personnel")}
                 sx={inputStyle}
                 disabled={loadingEmployees || !form.department}
               >

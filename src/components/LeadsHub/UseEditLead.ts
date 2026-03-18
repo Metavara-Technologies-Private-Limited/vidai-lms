@@ -4,13 +4,13 @@
 // ============================================================
 import * as React from "react";
 import dayjs, { Dayjs } from "dayjs";
-import type { DateValidationError, PickerChangeHandlerContext } from "@mui/x-date-pickers";
 import { useNavigate, useParams } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
 import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import { fetchLeads } from "../../store/leadSlice";
+import { selectCampaign } from "../../store/campaignSlice";
 import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import type { NextActionStatus } from "../../types/leads.types";
@@ -28,6 +28,23 @@ export interface ExistingDocument {
   url: string;
   name: string;
   id?: number | string;
+}
+
+// ====================== Campaign shape ======================
+interface RawCampaign {
+  id: string | number;
+  campaign_name?: string;
+  campaign_mode?: number;
+  social_media?: { platform_name?: string }[];
+  is_active?: boolean;
+}
+
+export interface CampaignOption {
+  id: string | number;
+  name: string;
+  source: string;
+  subSource: string;
+  isActive: boolean;
 }
 
 // ====================== Helpers ======================
@@ -57,14 +74,12 @@ export const formatLeadId = (id: string): string => {
   return `#LN-${(hash % 900) + 100}`;
 };
 
-// ====================== File size formatter ======================
 export const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-// ====================== File type label ======================
 export const getFileTypeLabel = (file: File): string => {
   if (file.type === "application/pdf") return "PDF";
   if (file.type.startsWith("image/")) return file.type.split("/")[1].toUpperCase();
@@ -72,7 +87,6 @@ export const getFileTypeLabel = (file: File): string => {
   return file.name.split(".").pop()?.toUpperCase() ?? "FILE";
 };
 
-// ====================== Normalize document from API ======================
 export const normalizeDocument = (doc: {
   url?: string;
   file?: string;
@@ -92,7 +106,7 @@ export const normalizeDocument = (doc: {
   return { url, name: rawName, id: doc.id };
 };
 
-// ====================== Time Slots (shared with Step 3 JSX) ======================
+// ====================== Time Slots ======================
 export const TIME_SLOTS = [
   "09:00 AM - 09:30 AM", "09:30 AM - 10:00 AM", "10:00 AM - 10:30 AM",
   "10:30 AM - 11:00 AM", "11:00 AM - 11:30 AM", "11:30 AM - 12:00 PM",
@@ -144,11 +158,33 @@ export const sectionLabelStyle = {
   mb: 1.5,
 } as const;
 
+// ====================== Helper: normalize truthy API value ======================
+// Handles true, 1, "1", "true" from various backends
+const isTruthy = (val: unknown): boolean =>
+  val === true || val === 1 || val === "1" || val === "true";
+
 // ====================== Hook ======================
 export function useEditLead() {
   const navigate = useNavigate();
   const { id } = useParams();
   const dispatch = useDispatch<AppDispatch>();
+
+  // ── Campaigns from Redux store ──
+  const rawCampaigns = useSelector(selectCampaign);
+  const campaigns = React.useMemo<CampaignOption[]>(
+    () =>
+      (rawCampaigns || []).map((api: RawCampaign) => ({
+        id: api.id,
+        name: api.campaign_name ?? "",
+        source: api.campaign_mode === 1 ? "Social Media" : "Email",
+        subSource:
+          api.campaign_mode === 1
+            ? (api.social_media?.[0]?.platform_name ?? "")
+            : "gmail",
+        isActive: Boolean(api.is_active),
+      })),
+    [rawCampaigns],
+  );
 
   // UI state
   const [currentStep, setCurrentStep] = React.useState(1);
@@ -169,6 +205,9 @@ export function useEditLead() {
   const [leadData, setLeadData] = React.useState<Lead | null>(null);
   const [clinicId, setClinicId] = React.useState<number>(1);
 
+  // Track the lead's original department_id so we never overwrite it
+  const [leadDepartmentId, setLeadDepartmentId] = React.useState<number | null>(null);
+
   // Step 1
   const [fullName, setFullName] = React.useState("");
   const [contactNo, setContactNo] = React.useState("");
@@ -185,7 +224,7 @@ export function useEditLead() {
   const [partnerGender, setPartnerGender] = React.useState("");
   const [source, setSource] = React.useState("");
   const [subSource, setSubSource] = React.useState("");
-  const [campaign, setCampaign] = React.useState("");
+  const [campaign, setCampaignId] = React.useState<string | number>("");
   const [assignee, setAssignee] = React.useState("");
   const [nextType, setNextType] = React.useState("");
   const [nextStatus, setNextStatus] = React.useState("");
@@ -199,13 +238,23 @@ export function useEditLead() {
   const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
 
-  // Step 3
-  const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("yes");
+  // Step 3 — appointment fields (completely separate from Step 1 assignee)
+  const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("no");
   const [department, setDepartment] = React.useState("");
+  const [appointmentPersonnel, setAppointmentPersonnel] = React.useState("");
   const [appointmentDate, setAppointmentDate] = React.useState("");
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
   const [slot, setSlot] = React.useState("");
   const [remark, setRemark] = React.useState("");
+
+  // ── Auto-fill source & subSource when campaign selection changes ──
+  React.useEffect(() => {
+    if (!campaign) return;
+    const matched = campaigns.find((c) => String(c.id) === String(campaign));
+    if (!matched) return;
+    setSource(matched.source);
+    setSubSource(matched.subSource);
+  }, [campaign, campaigns]);
 
   // ====================== Derived ======================
   const availableTaskStatuses = React.useMemo<{ label: string; value: string }[]>(() => {
@@ -228,26 +277,33 @@ export function useEditLead() {
     setNextStatus(getAutoNextActionStatus(newType));
   };
 
-  const handleDateChange = (
-    d: Date | Dayjs | null,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _context: PickerChangeHandlerContext<DateValidationError>
-  ) => {
+  const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCampaignId(e.target.value);
+  };
+
+  const handleDateChange = (d: Date | Dayjs | null) => {
     const nextDate = d ? dayjs(d) : null;
     setSelectedDate(nextDate);
     if (nextDate) setAppointmentDate(nextDate.format("YYYY-MM-DD"));
   };
 
-  const handleWantAppointmentChange = (value: "yes" | "no") => {
+  // ── FIX: Reliable Yes/No toggle for book appointment ──
+  const handleWantAppointmentChange = React.useCallback((value: "yes" | "no") => {
+    // Guard: only accept valid values
+    if (value !== "yes" && value !== "no") return;
+
     setWantAppointment(value);
+
     if (value === "no") {
+      // Clear all appointment-specific fields when user selects "No"
       setDepartment("");
+      setAppointmentPersonnel("");
       setAppointmentDate("");
       setSelectedDate(null);
       setSlot("");
       setRemark("");
     }
-  };
+  }, []);
 
   // ====================== File Handlers ======================
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -278,6 +334,10 @@ export function useEditLead() {
         setLeadData(lead as unknown as Lead);
         setClinicId(lead.clinic_id ?? 1);
 
+        // Save original department_id so we never lose it
+        const origDeptId = lead.department_id ?? null;
+        setLeadDepartmentId(typeof origDeptId === "number" ? origDeptId : null);
+
         setFullName(lead.full_name ?? "");
         setContactNo(lead.contact_no ?? "");
         setEmail(lead.email ?? "");
@@ -293,6 +353,10 @@ export function useEditLead() {
         setPartnerGender(lead.partner_gender === "male" ? "Male" : lead.partner_gender === "female" ? "Female" : "");
         setSource(lead.source ?? "");
         setSubSource(lead.sub_source ?? "");
+
+        const campaignId = (lead as unknown as { campaign_id?: string | number }).campaign_id;
+        if (campaignId) setCampaignId(String(campaignId));
+
         setAssignee(lead.assigned_to_id?.toString() ?? "");
         setNextType(lead.next_action_type ?? "");
         setNextStatus(lead.next_action_status ?? "");
@@ -303,12 +367,19 @@ export function useEditLead() {
           setTreatments(lead.treatment_interest.split(",").map((t) => t.trim()));
         }
 
-        setWantAppointment(lead.book_appointment ? "yes" : "no");
-        setDepartment(lead.department_id?.toString() ?? "");
-        setAppointmentDate(lead.appointment_date ?? "");
-        if (lead.appointment_date) setSelectedDate(dayjs(lead.appointment_date));
-        setSlot(lead.slot ?? "");
-        setRemark(lead.remark ?? "");
+        // ── FIX: Normalize book_appointment regardless of type (bool / number / string) ──
+        const hasBooking = isTruthy(lead.book_appointment);
+        setWantAppointment(hasBooking ? "yes" : "no");
+
+        if (hasBooking) {
+          setDepartment(lead.department_id?.toString() ?? "");
+          const personnelId = (lead as unknown as { personal_id?: number }).personal_id;
+          setAppointmentPersonnel(personnelId?.toString() ?? "");
+          setAppointmentDate(lead.appointment_date ?? "");
+          if (lead.appointment_date) setSelectedDate(dayjs(lead.appointment_date));
+          setSlot(lead.slot ?? "");
+          setRemark(lead.remark ?? "");
+        }
 
         // ── Fetch existing documents ──
         const embeddedDocs = (lead as unknown as { documents?: unknown[] }).documents;
@@ -324,7 +395,7 @@ export function useEditLead() {
               setExistingDocuments(rawDocs.map((d) => normalizeDocument(d as Parameters<typeof normalizeDocument>[0])));
             }
           } catch {
-            // silently ignore — not critical for edit flow
+            // silently ignore — not critical
           } finally {
             setDocsLoading(false);
           }
@@ -373,7 +444,7 @@ export function useEditLead() {
     load();
   }, [clinicId]);
 
-  // ====================== Filter Personnel by Department ======================
+  // ====================== Filter Personnel by Appointment Department ======================
   React.useEffect(() => {
     if (!department || employees.length === 0) { setFilteredPersonnel([]); return; }
     const selectedDept = departments.find((d) => d.id === Number(department));
@@ -388,11 +459,41 @@ export function useEditLead() {
   const handleSave = () => {
     if (!leadData || !id || saving) return;
 
+    const bookingActive = wantAppointment === "yes";
+
+    // ── Validate appointment fields before hitting the API ──
+    if (bookingActive) {
+      if (!department) {
+        setError("Please select a department for the appointment.");
+        return;
+      }
+      if (!appointmentDate) {
+        setError("Please select a date for the appointment.");
+        return;
+      }
+      if (!slot) {
+        setError("Please select a time slot for the appointment.");
+        return;
+      }
+    }
+
     const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
 
-    const updateData: Partial<LeadPayload> = {
+    const resolvedDepartmentId: number | null =
+      bookingActive && department
+        ? intOrNull(department)
+        : leadDepartmentId;
+
+    const resolvedDeptId: number =
+      bookingActive && department
+        ? (intOrNull(department) ?? resolvedDepartmentId ?? clinicId)
+        : (resolvedDepartmentId ?? clinicId);
+
+    const coupleActive = isCouple === "yes";
+
+    const updateData = {
       clinic_id: clinicId,
-      department_id: intOrFallback(department, 1),
+      department_id: resolvedDeptId,
       full_name: fullName.trim(),
       contact_no: contactNo.trim(),
       email: strOrNull(email),
@@ -400,37 +501,60 @@ export function useEditLead() {
       marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
       location: location || "",
       address: address || "",
-      partner_inquiry: isCouple === "yes",
-      partner_full_name: partnerName || "",
-      partner_age: intOrNull(partnerAge),
-      partner_gender: partnerGender ? (partnerGender.toLowerCase() as "male" | "female") : null,
+
+      // ── Partner: only send partner fields when couple is active ──
+      partner_inquiry: coupleActive,
+      partner_full_name: coupleActive ? (partnerName || "") : "",
+      partner_age: coupleActive ? intOrNull(partnerAge) : null,
+      partner_gender: coupleActive && partnerGender
+        ? (partnerGender.toLowerCase() as "male" | "female")
+        : null,
+
       source,
       sub_source: subSource || "",
+
+      // ── campaign_id: preserve original type — send null when empty ──
+      campaign_id: campaign ? String(campaign) : null,
+
       assigned_to_id: intOrNull(assignee),
       next_action_type: nextType || undefined,
       next_action_status: resolvedStatus,
       next_action_description: nextDesc || "",
-      treatment_interest: treatments.length > 0 ? treatments.join(",") : treatmentInterest,
-      book_appointment: wantAppointment === "yes",
-      appointment_date: appointmentDate,
-      slot,
-      remark: remark || "",
+      treatment_interest: treatments.length > 0 ? treatments.join(",") : (treatmentInterest || ""),
       is_active: leadData?.is_active !== false,
       gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
       language_preference: language || "",
-    } as Partial<LeadPayload>;
 
-    // Set showSuccess synchronously so tests can assert it immediately
+      book_appointment: bookingActive,
+
+      // ── appointment fields: omit entirely when not booking ──
+      // API rejects null AND "" for appointment_date — must not send the key at all
+      ...(bookingActive
+        ? {
+            appointment_date: appointmentDate,
+            slot: slot,
+            remark: remark || "",
+            personal_id: appointmentPersonnel ? intOrNull(appointmentPersonnel) : null,
+          }
+        : {
+            appointment_date: undefined,
+            slot: undefined,
+            remark: "",
+            personal_id: null,
+          }),
+    };
+
+    // Debug: log exact payload so you can compare with what API expects
+    console.log("Saving lead payload:", JSON.stringify(updateData, null, 2));
+
     setShowSuccess(true);
     setSaving(true);
 
     const doSave = async () => {
-      // Use plain update (no extra getById round-trip) when there are no new files.
-      // Only fall back to updateWithDocuments when files are actually attached.
       if (documents.length > 0) {
-        await LeadAPI.updateWithDocuments(id, updateData, documents);
+        await LeadAPI.updateWithDocuments(id, updateData as LeadPayload, documents);
       } else {
-        await LeadAPI.update(id, updateData);
+        await LeadAPI.update(id, updateData as LeadPayload);
       }
     };
 
@@ -441,18 +565,24 @@ export function useEditLead() {
           autoClose: 1500,
           theme: "colored",
         });
-        // Refresh list in background AFTER navigating — does not block the user
         setTimeout(() => {
           navigate("/leads", { replace: true });
           dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
         }, 800);
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Failed to save lead";
+        let msg = "Failed to save lead";
+        if (err instanceof Error) msg = err.message;
+        const anyErr = err as { response?: { data?: { detail?: string; message?: string } }; detail?: string };
+        if (anyErr?.response?.data?.detail) msg = anyErr.response.data.detail;
+        else if (anyErr?.response?.data?.message) msg = anyErr.response.data.message;
+
+        console.error("Save failed:", err);
+        setError(msg);
         setShowSuccess(false);
         toast.error(msg, {
           position: "top-right",
-          autoClose: 3000,
+          autoClose: 5000,
           theme: "colored",
         });
       })
@@ -468,6 +598,7 @@ export function useEditLead() {
     error, setError,
     saving,
     showSuccess,
+    campaigns,
     departments,
     employees,
     filteredPersonnel,
@@ -490,7 +621,7 @@ export function useEditLead() {
     partnerGender, setPartnerGender,
     source, setSource,
     subSource, setSubSource,
-    campaign, setCampaign,
+    campaign, handleCampaignChange,
     assignee, setAssignee,
     nextType,
     nextStatus, setNextStatus,
@@ -505,8 +636,9 @@ export function useEditLead() {
     existingDocuments,
     docsLoading,
     handleRemoveExistingDocument,
-    wantAppointment, setWantAppointment,
+    wantAppointment,
     department, setDepartment,
+    appointmentPersonnel, setAppointmentPersonnel,
     selectedDate,
     handleDateChange,
     slot, setSlot,
