@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import { useState, useEffect } from "react";
 
@@ -15,12 +16,11 @@ import {
 import Backward_icon from "../../assets/icons/Backward_icon.svg";
 
 import ReputationHeaderCards from "./ReputationHeaderCards";
-import ReputationFilter from "./ReputationFilter";
-import ReviewRequest from "./ReviewRequest";
+import ReviewRequestDialog from "./ReviewRequest";
 import ReviewCard from "./ReviewCard";
 import ReviewCardDetailedView from "./ReviewCardDetailedView";
 
-type ReviewRequest = {
+type ReviewRequestItem = {
   id: string;
   request_name: string;
   status: string;
@@ -32,7 +32,6 @@ type ReviewRequest = {
 };
 
 const ReputationDashboard = () => {
-
   const dispatch = useDispatch<AppDispatch>();
 
   const requests = useSelector(selectReputationRequests) || [];
@@ -40,8 +39,10 @@ const ReputationDashboard = () => {
 
   const [openReviewDialog, setOpenReviewDialog] = useState(false);
   const [openReviewDetails, setOpenReviewDetails] = useState(false);
-  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
-const [selectedRequestName, setSelectedRequestName] = useState<string>("");
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
+    null,
+  );
+  const [selectedRequestName, setSelectedRequestName] = useState<string>("");
   useEffect(() => {
     dispatch(fetchReviewRequests());
     dispatch(fetchReputationDashboard());
@@ -49,7 +50,6 @@ const [selectedRequestName, setSelectedRequestName] = useState<string>("");
 
   return (
     <Box sx={{ p: 0.5 }}>
-
       {/* Page Title */}
       {!openReviewDetails && (
         <Typography variant="h5" sx={{ mb: 3 }}>
@@ -69,11 +69,19 @@ const [selectedRequestName, setSelectedRequestName] = useState<string>("");
             conversionRate={dashboard?.conversion_rate || 0}
           />
 
-          {/* Filter + New Review Request */}
-          <ReputationFilter onOpen={() => setOpenReviewDialog(true)} />
+          {/* New Review Request action */}
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+            <Button
+              variant="contained"
+              onClick={() => setOpenReviewDialog(true)}
+              sx={{ textTransform: "none" }}
+            >
+              New Review Request
+            </Button>
+          </Box>
 
           {/* Review Request Dialog */}
-          <ReviewRequest
+          <ReviewRequestDialog
             open={openReviewDialog}
             onClose={() => setOpenReviewDialog(false)}
           />
@@ -86,15 +94,15 @@ const [selectedRequestName, setSelectedRequestName] = useState<string>("");
               gap: 2,
             }}
           >
-            {requests.map((req: ReviewRequest) => (
+            {requests.map((req: ReviewRequestItem) => (
               <ReviewCard
                 key={req.id}
                 request={req}
-onOpen={() => {
-  setSelectedRequestId(req.id);
-  setSelectedRequestName(req.request_name);
-  setOpenReviewDetails(true);
-}}
+                onOpen={() => {
+                  setSelectedRequestId(req.id);
+                  setSelectedRequestName(req.request_name);
+                  setOpenReviewDetails(true);
+                }}
               />
             ))}
           </Box>
@@ -147,7 +155,6 @@ onOpen={() => {
           )}
         </>
       )}
-
     </Box>
   );
 };
