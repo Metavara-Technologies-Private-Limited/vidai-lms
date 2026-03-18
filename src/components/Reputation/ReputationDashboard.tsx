@@ -16,7 +16,7 @@ import {
 import Backward_icon from "../../assets/icons/Backward_icon.svg";
 
 import ReputationHeaderCards from "./ReputationHeaderCards";
-import ReviewRequestDialog from "./ReviewRequest";
+import ReviewRequestDialog from "./ReviewRequest.tsx";
 import ReviewCard from "./ReviewCard";
 import ReviewCardDetailedView from "./ReviewCardDetailedView";
 
