@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import ReputationDashboard from "../components/Reputation/ReputationDashboard";
 
 const Reputation = () => {
   return (
@@ -10,7 +11,7 @@ const Reputation = () => {
         pb: 2,
       }}
     >
-     
+      <ReputationDashboard />
     </Box>
   );
 };
