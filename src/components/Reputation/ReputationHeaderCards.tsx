@@ -12,24 +12,35 @@ type Props = {
   avgRating?: number;
   reviewsSubmitted?: number;
   reviewRequestsSent?: number;
+  totalReviews?: number;
+  conversionRate?: number;
 };
 
 const ReputationHeaderCards = ({
-  avgRating = 4.8,
-  reviewsSubmitted = 125,
-  reviewRequestsSent = 215,
+  avgRating = 0,
+  reviewsSubmitted = 0,
+  reviewRequestsSent = 0,
+  totalReviews = 0,
+  conversionRate = 0,
 }: Props) => {
 
-  const cardData = [
+type CardItem = {
+  title: string;
+  value: string | number;
+  icon: React.ReactNode;
+  bg: string;
+};
+
+  const cardData: CardItem[] = [
     {
       title: "Avg Rating",
-      value: avgRating.toFixed(1),
+value: Number(avgRating).toFixed(1),
       icon: <img src={Review_Avg_Rating} alt="Avg Rating" />,
       bg: "#FFF6E5",
     },
     {
       title: "Reviews Requests Sent",
-      value: reviewRequestsSent,
+      value: Number(reviewRequestsSent).toFixed(0),
       icon: <img src={Reviews_Sent} alt="Reviews Requests Sent" />,
       bg: "#EEF4FF",
     },
@@ -39,15 +50,15 @@ const ReputationHeaderCards = ({
       icon: <img src={Reviews_Submit} alt="Reviews Submitted" />,
       bg: "#EAF7EF",
     },
-    {
-      title: "Total Reviews",
-      value: "2,015",
+{
+  title: "Total Reviews",
+  value: totalReviews,
       icon: <img src={Reviews_Total} alt="Total Reviews" />,
       bg: "#FFF3E8",
     },
-    {
-      title: "Conversion Rate",
-      value: "31.2%",
+{
+  title: "Conversion Rate",
+  value: `${conversionRate}%`,
       icon: <img src={Reviews_Conversion} alt="Conversion Rate" />,
       bg: "#F3EEFF",
     },

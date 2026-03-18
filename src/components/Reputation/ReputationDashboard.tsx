@@ -1,6 +1,16 @@
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch } from "../../store";
+
+import {
+  fetchReviewRequests,
+  fetchReputationDashboard,
+  selectReputationRequests,
+  selectReputationDashboard,
+} from "../../store/reputationSlice";
 
 import Backward_icon from "../../assets/icons/Backward_icon.svg";
 
@@ -10,25 +20,54 @@ import ReviewRequest from "./ReviewRequest";
 import ReviewCard from "./ReviewCard";
 import ReviewCardDetailedView from "./ReviewCardDetailedView";
 
+type ReviewRequest = {
+  id: string;
+  request_name: string;
+  status: string;
+  requests_sent?: number;
+  reviews_submitted?: number;
+  avg_rating?: number;
+  mode?: string;
+  created_at?: string;
+};
+
 const ReputationDashboard = () => {
+
+  const dispatch = useDispatch<AppDispatch>();
+
+  const requests = useSelector(selectReputationRequests) || [];
+  const dashboard = useSelector(selectReputationDashboard);
 
   const [openReviewDialog, setOpenReviewDialog] = useState(false);
   const [openReviewDetails, setOpenReviewDetails] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+const [selectedRequestName, setSelectedRequestName] = useState<string>("");
+  useEffect(() => {
+    dispatch(fetchReviewRequests());
+    dispatch(fetchReputationDashboard());
+  }, [dispatch]);
 
   return (
     <Box sx={{ p: 0.5 }}>
 
-{!openReviewDetails && (
-  <Typography variant="h5" sx={{ mb: 3 }}>
-    Reputation Management
-  </Typography>
-)}
+      {/* Page Title */}
+      {!openReviewDetails && (
+        <Typography variant="h5" sx={{ mb: 3 }}>
+          Reputation Management
+        </Typography>
+      )}
 
       {/* ================= NORMAL PAGE ================= */}
       {!openReviewDetails && (
         <>
           {/* Header Cards */}
-          <ReputationHeaderCards />
+          <ReputationHeaderCards
+            avgRating={dashboard?.avg_rating || 0}
+            reviewsSubmitted={dashboard?.reviews_submitted || 0}
+            reviewRequestsSent={dashboard?.requests_sent || 0}
+            totalReviews={dashboard?.total_reviews || 0}
+            conversionRate={dashboard?.conversion_rate || 0}
+          />
 
           {/* Filter + New Review Request */}
           <ReputationFilter onOpen={() => setOpenReviewDialog(true)} />
@@ -47,11 +86,17 @@ const ReputationDashboard = () => {
               gap: 2,
             }}
           >
-            <ReviewCard onOpen={() => setOpenReviewDetails(true)} />
-            <ReviewCard onOpen={() => setOpenReviewDetails(true)} />
-            <ReviewCard onOpen={() => setOpenReviewDetails(true)} />
-            <ReviewCard onOpen={() => setOpenReviewDetails(true)} />
-            <ReviewCard onOpen={() => setOpenReviewDetails(true)} />
+            {requests.map((req: ReviewRequest) => (
+              <ReviewCard
+                key={req.id}
+                request={req}
+onOpen={() => {
+  setSelectedRequestId(req.id);
+  setSelectedRequestName(req.request_name);
+  setOpenReviewDetails(true);
+}}
+              />
+            ))}
           </Box>
         </>
       )}
@@ -69,30 +114,37 @@ const ReputationDashboard = () => {
               cursor: "pointer",
               width: "fit-content",
             }}
-            onClick={() => setOpenReviewDetails(false)}
+            onClick={() => {
+              setOpenReviewDetails(false);
+              setSelectedRequestId(null);
+            }}
           >
             <img src={Backward_icon} alt="Back" width={40} height={40} />
 
-  <Typography
-    sx={{
-      fontSize: 18,
-      fontWeight: 600,
-      color: "#232323",
-    }}
-  >
-    Post-Consultation Feedback
-  </Typography>
+            <Typography
+              sx={{
+                fontSize: 18,
+                fontWeight: 600,
+                color: "#232323",
+              }}
+            >
+              {selectedRequestName}
+            </Typography>
           </Box>
 
-          {/* Header Cards with row related values */}
+          {/* Header Cards */}
           <ReputationHeaderCards
-            avgRating={4.7}
-            reviewsSubmitted={5}
-            reviewRequestsSent={10}
+            avgRating={dashboard?.avg_rating || 0}
+            reviewsSubmitted={dashboard?.reviews_submitted || 0}
+            reviewRequestsSent={dashboard?.requests_sent || 0}
+            totalReviews={dashboard?.total_reviews || 0}
+            conversionRate={dashboard?.conversion_rate || 0}
           />
 
-          {/* Detailed Table */}
-          <ReviewCardDetailedView />
+          {/* Reviews Table */}
+          {selectedRequestId && (
+            <ReviewCardDetailedView requestId={selectedRequestId} />
+          )}
         </>
       )}
 

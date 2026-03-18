@@ -4,10 +4,25 @@ import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 
 import StarIcon from "@mui/icons-material/Star";
-import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 
-const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
+type ReviewRequest = {
+  id: string;
+  request_name: string;
+  status: string;
+  requests_sent?: number;
+  reviews_submitted?: number;
+  avg_rating?: number;
+  mode?: string;
+  created_at?: string;
+};
+
+type ReviewCardProps = {
+  request: ReviewRequest;
+  onOpen: () => void;
+};
+
+const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
 
   return (
     <Card
@@ -46,7 +61,7 @@ const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
           </Box>
 
           <Typography sx={{ fontWeight: 600 }}>
-            Post-Consultation Feedback
+            {request.request_name}
           </Typography>
         </Box>
 
@@ -62,7 +77,7 @@ const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
             fontWeight: 500,
           }}
         >
-          Sent
+          {request.status}
         </Box>
       </Box>
 
@@ -78,14 +93,14 @@ const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
           <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>
             REQUEST SENT :
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>215</Typography>
+          <Typography sx={{ fontWeight: 500 }}>{request.requests_sent || 0}</Typography>
         </Box>
 
         <Box>
           <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>
             REVIEW SUBMITTED :
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>125</Typography>
+          <Typography sx={{ fontWeight: 500 }}>{request.reviews_submitted || 0}</Typography>
         </Box>
 
         <Box>
@@ -95,7 +110,7 @@ const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <StarIcon sx={{ color: "#F4B400", fontSize: 16 }} />
-            <Typography sx={{ fontWeight: 500 }}>4.8</Typography>
+            <Typography sx={{ fontWeight: 500 }}>{request.avg_rating || 0}</Typography>
           </Box>
         </Box>
       </Box>
@@ -115,8 +130,9 @@ const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
           </Typography>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <WhatsAppIcon sx={{ color: "#25D366", fontSize: 18 }} />
-            <Typography sx={{ fontSize: 14 }}>WhatsApp</Typography>
+<Typography sx={{ fontSize: 14 }}>
+  {request.mode || "Email"}
+</Typography>
           </Box>
         </Box>
 
@@ -126,7 +142,9 @@ const ReviewCard = ({ onOpen }: { onOpen: () => void }) => {
           </Typography>
 
           <Typography sx={{ fontSize: 14 }}>
-            19/01/2025, 11:40 AM
+            {request.created_at
+  ? new Date(request.created_at).toLocaleString()
+  : "-"}
           </Typography>
         </Box>
       </Box>

@@ -15,50 +15,49 @@ import SearchIcon from "@mui/icons-material/Search";
 import StarIcon from "@mui/icons-material/Star";
 import FilterListIcon from "@mui/icons-material/FilterList";
 
-const rows = [
-  {
-    name: "Emily Carter",
-    initials: "EC",
-    rating: 4.6,
-    date: "19/01/2025, 11:40 AM",
-    review:
-      "The consultation was very smooth and informative. The doctor explained all treatment options clearly and patiently answered my questions.",
-  },
-  {
-    name: "Sophia Davis",
-    initials: "SD",
-    rating: 4.7,
-    date: "01/04/2024, 9:15 AM",
-    review:
-      "Overall a good experience. The consultation went well and the doctor was helpful. Waiting time was slightly longer than expected.",
-  },
-  {
-    name: "Olivia Martinez",
-    initials: "OM",
-    rating: 4.8,
-    date: "25/12/2024, 3:00 PM",
-    review:
-      "Very professional consultation. I felt comfortable discussing my concerns and received clear guidance.",
-  },
-  {
-    name: "Alex Johnson",
-    initials: "AJ",
-    rating: 4.9,
-    date: "30/11/2024, 12:45 PM",
-    review:
-      "The doctor explained the process clearly and addressed all my doubts. Would recommend to others.",
-  },
-  {
-    name: "John Smith",
-    initials: "JS",
-    rating: 4.5,
-    date: "10/10/2024, 8:00 AM",
-    review:
-      "Excellent experience. Staff members were polite and supportive.",
-  },
-];
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
-const ReviewCardDetailedView = () => {
+import {
+  fetchReviews,
+  selectReputationReviews,
+} from "../../store/reputationSlice";
+
+import type { AppDispatch } from "../../store";
+
+type Props = {
+  requestId: string;
+};
+
+type Review = {
+  id: string;
+  lead_name: string;
+  rating: number;
+  review_text: string;
+  submitted_at: string;
+};
+
+const ReviewCardDetailedView = ({ requestId }: Props) => {
+
+  const dispatch = useDispatch<AppDispatch>();
+const reviews = useSelector(selectReputationReviews) as Review[];
+
+  useEffect(() => {
+    if (requestId) {
+      dispatch(fetchReviews(requestId));
+    }
+  }, [dispatch, requestId]);
+
+  const getInitials = (name: string) => {
+    if (!name) return "";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  };
+
   return (
     <Card
       sx={{
@@ -68,7 +67,7 @@ const ReviewCardDetailedView = () => {
         boxShadow: "none",
       }}
     >
-
+      {/* Header */}
       <Box
         sx={{
           display: "flex",
@@ -126,8 +125,7 @@ const ReviewCardDetailedView = () => {
         </TableHead>
 
         <TableBody>
-          {rows.map((row, index) => (
-            <TableRow key={index}>
+{reviews.map((row: Review, index: number) => (            <TableRow key={index}>
               <TableCell>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Avatar
@@ -139,11 +137,11 @@ const ReviewCardDetailedView = () => {
                       color: "#6D28D9",
                     }}
                   >
-                    {row.initials}
+                    {getInitials(row.lead_name)}
                   </Avatar>
 
                   <Typography sx={{ fontSize: 14 }}>
-                    {row.name}
+                    {row.lead_name}
                   </Typography>
                 </Box>
               </TableCell>
@@ -156,7 +154,7 @@ const ReviewCardDetailedView = () => {
               </TableCell>
 
               <TableCell sx={{ fontSize: 13 }}>
-                {row.date}
+                {new Date(row.submitted_at).toLocaleString()}
               </TableCell>
 
               <TableCell
@@ -166,7 +164,7 @@ const ReviewCardDetailedView = () => {
                   maxWidth: 500,
                 }}
               >
-                {row.review}
+                {row.review_text}
               </TableCell>
             </TableRow>
           ))}
@@ -183,22 +181,7 @@ const ReviewCardDetailedView = () => {
           color: "#9CA3AF",
         }}
       >
-        <Typography>Showing 1 to 8 of 100 entries</Typography>
-
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Typography
-            sx={{
-              background: "#111827",
-              color: "#fff",
-              px: 1,
-              borderRadius: 1,
-            }}
-          >
-            1
-          </Typography>
-          <Typography>2</Typography>
-          <Typography>3</Typography>
-        </Box>
+        <Typography>Showing {reviews.length} reviews</Typography>
       </Box>
     </Card>
   );
