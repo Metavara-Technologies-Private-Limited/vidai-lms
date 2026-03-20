@@ -285,21 +285,25 @@ export default function AddNewLead() {
     const fallbackDepartmentId = departments[0]?.id ?? 1;
     const departmentId = selectedDepartmentId ?? fallbackDepartmentId;
 
-    const normalizedGender = form.gender.toLowerCase().trim();
+    const genderRaw = form.gender ?? "";
+    const maritalRaw = form.marital ?? "";
+    const partnerGenderRaw = form.partnerGender ?? "";
+
+    const normalizedGender = genderRaw.toLowerCase().trim();
     const genderValue =
       normalizedGender === "male" || normalizedGender === "female"
         ? (normalizedGender as "male" | "female")
-        : undefined;
+        : null;
 
     const maritalValue =
-      form.marital.trim() !== ""
-        ? (form.marital.toLowerCase() as "single" | "married")
-        : undefined;
+      maritalRaw.trim() !== ""
+        ? (maritalRaw.toLowerCase() as "single" | "married")
+        : null;
 
     const partnerGenderValue =
-      form.partnerGender.trim() !== ""
-        ? (form.partnerGender.toLowerCase() as "male" | "female")
-        : undefined;
+      partnerGenderRaw.trim() !== ""
+        ? (partnerGenderRaw.toLowerCase() as "male" | "female")
+        : null;
 
     return {
     clinic_id: clinicId,
@@ -307,29 +311,29 @@ export default function AddNewLead() {
     full_name: form.full_name.trim() || "Unknown Lead",
     contact_no: form.contact.trim() || "0000000000",
     source: form.source || "Direct",
-    sub_source: form.subSource || undefined,
+    sub_source: form.subSource || "",
     treatment_interest: form.treatments.join(",") || form.treatmentInterest || "General",
-    appointment_date: shouldBookAppointment ? form.appointmentDate : undefined,
-    slot: shouldBookAppointment ? form.slot : undefined,
+    appointment_date: shouldBookAppointment ? (form.appointmentDate ?? "") : "",
+    slot: shouldBookAppointment ? (form.slot ?? "") : "",
     campaign_id: strOrNull(form.campaign),
-    email: strOrNull(form.email) ?? undefined,
-    language_preference: form.language || undefined,
-    location: form.location || undefined,
-    address: form.address || undefined,
-    remark: form.remark || undefined,
-    partner_full_name: form.partnerName || undefined,
-    next_action_description: form.nextDesc || undefined,
+    email: strOrNull(form.email) ?? null,
+    language_preference: form.language ?? "",
+    location: form.location ?? "",
+    address: form.address ?? "",
+    remark: form.remark ?? "",
+    partner_full_name: form.partnerName ?? "",
+    next_action_description: form.nextDesc ?? "",
     next_action_type: form.nextType || undefined,
     gender: genderValue,
     marital_status: maritalValue,
     partner_gender: partnerGenderValue,
     next_action_status:
-      form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : undefined,
-    assigned_to_id: intOrNull(form.assignee) ?? undefined,
+      form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : null,
+    assigned_to_id: intOrNull(form.assignee) ?? null,
     // ✅ FIX: was hardcoded to null — now correctly reads form.personnel
-    personal_id: intOrNull(form.personnel) ?? undefined,
-    age: intOrNull(form.age) ?? undefined,
-    partner_age: intOrNull(form.partnerAge) ?? undefined,
+    personal_id: intOrNull(form.personnel) ?? null,
+    age: intOrNull(form.age) ?? null,
+    partner_age: intOrNull(form.partnerAge) ?? null,
     partner_inquiry: isCouple === "yes",
     book_appointment: shouldBookAppointment,
     is_active: true,
