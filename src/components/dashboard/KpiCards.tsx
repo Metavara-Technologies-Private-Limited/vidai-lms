@@ -5,7 +5,7 @@ import IconButton from "@mui/material/IconButton";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
 import NewLeadsIcon from "../../assets/icons/NewLeads.svg";
@@ -19,11 +19,6 @@ import { selectLeads } from "../../store/leadSlice";
 import { LEAD_STATUS } from "../../utils/constants";
 import type { KpiCardData, LiveKpiCounts } from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
-import type { AppDispatch } from "../../store";
-import {
-  fetchMailInsights,
-  selectMailInsights,
-} from "../../store/mailInsightsSlice";
 
 /* KPI → ICON MAP */
 const KPI_ICONS: Record<string, string> = {
@@ -33,8 +28,6 @@ const KPI_ICONS: Record<string, string> = {
   followUps: FollowUpsIcon,
   totalConverted: TotalConvertedIcon,
   lostLeads: LostLeadsIcon,
-  mailLeads: NewLeadsIcon,
-  mailAppointments: AppointmentsIcon,
 };
 
 const getCardStyle = (id: string) => {
@@ -45,8 +38,6 @@ const getCardStyle = (id: string) => {
     case "followUps":        return kpiCardsStyles.followUps;
     case "totalConverted":   return kpiCardsStyles.totalConverted;
     case "lostLeads":        return kpiCardsStyles.lostLeads;
-    case "mailLeads":        return kpiCardsStyles.newLeads;
-    case "mailAppointments": return kpiCardsStyles.appointments;
     default:                 return {};
   }
 };
@@ -76,21 +67,16 @@ const normalizeLeadStatus = (status?: string | null): string => {
 };
 
 const KpiCards = () => {
-  const dispatch = useDispatch<AppDispatch>();
   const leads = useSelector(selectLeads);
-  const mailInsights = useSelector(selectMailInsights);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  // Fetch mail insights on mount
-  useEffect(() => {
-    dispatch(fetchMailInsights());
-  }, [dispatch]);
-
   // ── Live counts derived from Redux store ──
   const counts: LiveKpiCounts = useMemo(() => {
+    const followUpStatuses = new Set(["new", "lost", "cycle-conversion"]);
+
     if (!leads || leads.length === 0) {
       return {
         totalLeads: 0,
@@ -116,11 +102,16 @@ const KpiCards = () => {
       if (lead.is_active === false) continue;
 
       totalLeads += 1;
-      const status = normalizeLeadStatus(lead.lead_status);
+      const status = normalizeLeadStatus(
+        lead.lead_status || (lead as unknown as { status?: string }).status,
+      );
+
+      if (followUpStatuses.has(status)) {
+        followUps += 1;
+      }
 
       if (status === LEAD_STATUS.NEW.toLowerCase()) newLeads += 1;
       else if (status === LEAD_STATUS.APPOINTMENT.toLowerCase()) appointments += 1;
-      else if (status === LEAD_STATUS.FOLLOW_UPS.toLowerCase()) followUps += 1;
       else if (status === LEAD_STATUS.CONVERTED.toLowerCase()) converted += 1;
       else if (status === LEAD_STATUS.CYCLE_CONVERSION.toLowerCase()) cycleConversion += 1;
       else if (status === LEAD_STATUS.LOST.toLowerCase()) lostLeads += 1;
@@ -180,9 +171,7 @@ const KpiCards = () => {
       ],
     },
     { id: "lostLeads",         label: "Lost Leads",           value: counts.lostLeads },
-    { id: "mailLeads",         label: "Leads via Mail",        value: mailInsights?.leads_created ?? 0 },
-    { id: "mailAppointments",  label: "Appointments via Mail", value: mailInsights?.appointments_booked ?? 0 },
-  ], [counts, mailInsights]);
+  ], [counts]);
 
   return (
     <Box sx={{ position: "relative", width: "100%", px: 1 }}>

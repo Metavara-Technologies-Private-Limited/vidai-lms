@@ -94,7 +94,7 @@ export default function AddNewLead() {
     nextDesc: "",
     treatmentInterest: "",
     treatments: [],
-    wantAppointment: "yes",
+    wantAppointment: "no",
     department: "",
     personnel: "",
     appointmentDate: "",
@@ -251,16 +251,21 @@ export default function AddNewLead() {
   };
 
   // ── Build Payload ────────────────────────────────────────────────
-  const buildPayload = (): LeadPayload => ({
+  const buildPayload = (): LeadPayload => {
+    const shouldBookAppointment =
+      form.wantAppointment === "yes" &&
+      Boolean(form.department && form.appointmentDate && form.slot);
+
+    return {
     clinic_id: clinicId,
     department_id: intOrFallback(form.department, 1),
-    full_name: form.full_name.trim(),
-    contact_no: form.contact.trim(),
-    source: form.source,
+    full_name: form.full_name.trim() || "Unknown Lead",
+    contact_no: form.contact.trim() || "0000000000",
+    source: form.source || "Direct",
     sub_source: form.subSource || "",
-    treatment_interest: form.treatments.join(","),
-    appointment_date: form.appointmentDate,
-    slot: form.slot,
+    treatment_interest: form.treatments.join(",") || form.treatmentInterest || "General",
+    appointment_date: shouldBookAppointment ? form.appointmentDate : "",
+    slot: shouldBookAppointment ? form.slot : "",
     campaign_id: strOrNull(form.campaign),
     email: strOrNull(form.email),
     language_preference: form.language || "",
@@ -281,10 +286,11 @@ export default function AddNewLead() {
     age: intOrNull(form.age),
     partner_age: intOrNull(form.partnerAge),
     partner_inquiry: isCouple === "yes",
-    book_appointment: form.wantAppointment === "yes",
+    book_appointment: shouldBookAppointment,
     is_active: true,
     lead_status: "new",
-  });
+  };
+  };
 
   // ── Submit ───────────────────────────────────────────────────────
   const submitForm = async () => {
