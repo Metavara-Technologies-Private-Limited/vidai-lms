@@ -15,6 +15,7 @@ import {
   selectLeads,
   selectLeadsLoading,
 } from "../../store/leadSlice";
+import { fetchCampaign, selectCampaign } from "../../store/campaignSlice";
 
 const SourcePerformanceChart = lazy(() => import("./SourcePerformanceChart"));
 const CommunicationChart = lazy(() => import("./CommunicationChart"));
@@ -26,17 +27,20 @@ const TeamPerformanceTab = lazy(() => import("./TeamPerformanceTab"));
 const DashboardLayout = () => {
   const dispatch = useDispatch<AppDispatch>();
   const leads = useSelector(selectLeads);
+  const campaigns = useSelector(selectCampaign);
   const leadsLoading = useSelector(selectLeadsLoading);
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
   const [activeTab, setActiveTab] = useState<OverviewTab>("source");
 
-  // load leads once when the dashboard mounts; avoid looping when the
-  // backend returns an empty array (leadsLoading toggling would otherwise
-  // retrigger the effect).
+  // load leads and campaigns once when the dashboard mounts
   useEffect(() => {
     if (leads.length === 0) {
       dispatch(fetchLeads());
     }
+    if (campaigns.length === 0) {
+      dispatch(fetchCampaign());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   return (

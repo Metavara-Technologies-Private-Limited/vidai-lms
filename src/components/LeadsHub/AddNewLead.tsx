@@ -22,7 +22,6 @@ import {
   MAX_DOC_SIZE_MB,
   strOrNull,
   intOrNull,
-  intOrFallback,
   type LeadPayload,
   type CampaignData,
   type ApiError,
@@ -34,6 +33,32 @@ import { Step1, Step2, Step3 } from "../LeadsHub/addNewLead.steps";
 // ── Capitalize first letter helper ──────────────────────────────────────────
 const capitalizeFirst = (value: string) =>
   value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
+
+const toReadableError = (value: unknown): string => {
+  if (value == null) return "Unknown error";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return first == null ? "Unknown error" : toReadableError(first);
+  }
+
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+
+    if (typeof obj.detail === "string") return obj.detail;
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.error === "string") return obj.error;
+
+    const firstKey = Object.keys(obj)[0];
+    if (!firstKey) return "Unknown error";
+    const firstValue = obj[firstKey];
+    return `${firstKey}: ${toReadableError(firstValue)}`;
+  }
+
+  return "Unknown error";
+};
 
 // ====================== Component ======================
 export default function AddNewLead() {
@@ -112,7 +137,7 @@ export default function AddNewLead() {
       } catch (err) {
         const error = err as ApiError;
         toast.error(
-          `Departments: ${error?.response?.data?.detail || error?.message || "Failed"}`,
+          `Departments: ${toReadableError(error?.response?.data) || error?.message || "Failed"}`,
           { position: "top-right", autoClose: 3000, theme: "colored" },
         );
       } finally {
@@ -137,7 +162,7 @@ export default function AddNewLead() {
             ? "Unauthorized — please log in again"
             : status === 404
               ? `Employees endpoint not found (clinic ${clinicId})`
-              : error?.response?.data?.detail ||
+              : toReadableError(error?.response?.data) ||
                 error?.message ||
                 "Failed to load employees";
         toast.warning(`Employees: ${msg}`, {
@@ -256,35 +281,55 @@ export default function AddNewLead() {
       form.wantAppointment === "yes" &&
       Boolean(form.department && form.appointmentDate && form.slot);
 
+    const selectedDepartmentId = intOrNull(form.department);
+    const fallbackDepartmentId = departments[0]?.id ?? 1;
+    const departmentId = selectedDepartmentId ?? fallbackDepartmentId;
+
+    const normalizedGender = form.gender.toLowerCase().trim();
+    const genderValue =
+      normalizedGender === "male" || normalizedGender === "female"
+        ? (normalizedGender as "male" | "female")
+        : undefined;
+
+    const maritalValue =
+      form.marital.trim() !== ""
+        ? (form.marital.toLowerCase() as "single" | "married")
+        : undefined;
+
+    const partnerGenderValue =
+      form.partnerGender.trim() !== ""
+        ? (form.partnerGender.toLowerCase() as "male" | "female")
+        : undefined;
+
     return {
     clinic_id: clinicId,
-    department_id: intOrFallback(form.department, 1),
+    department_id: departmentId,
     full_name: form.full_name.trim() || "Unknown Lead",
     contact_no: form.contact.trim() || "0000000000",
     source: form.source || "Direct",
-    sub_source: form.subSource || "",
+    sub_source: form.subSource || undefined,
     treatment_interest: form.treatments.join(",") || form.treatmentInterest || "General",
-    appointment_date: shouldBookAppointment ? form.appointmentDate : "",
-    slot: shouldBookAppointment ? form.slot : "",
+    appointment_date: shouldBookAppointment ? form.appointmentDate : undefined,
+    slot: shouldBookAppointment ? form.slot : undefined,
     campaign_id: strOrNull(form.campaign),
-    email: strOrNull(form.email),
-    language_preference: form.language || "",
-    location: form.location || "",
-    address: form.address || "",
-    remark: form.remark || "",
-    partner_full_name: form.partnerName || "",
-    next_action_description: form.nextDesc || "",
+    email: strOrNull(form.email) ?? undefined,
+    language_preference: form.language || undefined,
+    location: form.location || undefined,
+    address: form.address || undefined,
+    remark: form.remark || undefined,
+    partner_full_name: form.partnerName || undefined,
+    next_action_description: form.nextDesc || undefined,
     next_action_type: form.nextType || undefined,
-    gender: form.gender ? (form.gender.toLowerCase() as "male" | "female") : null,
-    marital_status: form.marital ? (form.marital.toLowerCase() as "single" | "married") : null,
-    partner_gender: form.partnerGender ? (form.partnerGender.toLowerCase() as "male" | "female") : null,
+    gender: genderValue,
+    marital_status: maritalValue,
+    partner_gender: partnerGenderValue,
     next_action_status:
-      form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : null,
-    assigned_to_id: intOrNull(form.assignee),
+      form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : undefined,
+    assigned_to_id: intOrNull(form.assignee) ?? undefined,
     // ✅ FIX: was hardcoded to null — now correctly reads form.personnel
-    personal_id: intOrNull(form.personnel),
-    age: intOrNull(form.age),
-    partner_age: intOrNull(form.partnerAge),
+    personal_id: intOrNull(form.personnel) ?? undefined,
+    age: intOrNull(form.age) ?? undefined,
+    partner_age: intOrNull(form.partnerAge) ?? undefined,
     partner_inquiry: isCouple === "yes",
     book_appointment: shouldBookAppointment,
     is_active: true,
@@ -312,15 +357,7 @@ export default function AddNewLead() {
       const data = error?.response?.data;
       let msg = "Failed to save lead";
       if (data) {
-        if (typeof data === "string") msg = data;
-        else if (data.detail) msg = data.detail;
-        else if (data.message) msg = data.message;
-        else if (data.error) msg = `${data.error}${data.request_id ? ` (${data.request_id})` : ""}`;
-        else {
-          const firstKey = Object.keys(data)[0];
-          const firstVal = data[firstKey];
-          msg = `${firstKey}: ${Array.isArray(firstVal) ? firstVal[0] : firstVal}`;
-        }
+        msg = toReadableError(data);
       } else {
         msg = error?.message || msg;
       }
