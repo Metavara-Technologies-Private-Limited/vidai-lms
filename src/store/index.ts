@@ -8,6 +8,7 @@ import templateReducer from "./templateSlice";
 import emailHistoryReducer from "./emailHistorySlice";
 import mailInsightsReducer from "./mailInsightsSlice";
 import reputationReducer from "./reputationSlice";
+import pipelineReducer from "./pipelineSlice";
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     emailHistory:  emailHistoryReducer,
     mailInsights:  mailInsightsReducer,   // ✅ mail insights KPI
     reputation:     reputationReducer,    
+    pipeline:      pipelineReducer,
   },
 });
 
