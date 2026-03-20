@@ -73,9 +73,9 @@ export function Step1({
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
         {(
           [
-            ["Full Name *", "full_name"],
-            ["Contact No. *", "contact"],
-            ["Email *", "email"],
+            ["Full Name", "full_name"],
+            ["Contact No.", "contact"],
+            ["Email", "email"],
             ["Location", "location"],
           ] as [string, keyof FormState][]
         ).map(([lbl, field]) => (
@@ -88,7 +88,7 @@ export function Step1({
 
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 4 }}>
         <Box>
-          <Typography sx={labelStyle}>Gender *</Typography>
+          <Typography sx={labelStyle}>Gender</Typography>
           <TextField select fullWidth size="small" value={form.gender} onChange={handleChange("gender")} sx={inputStyle}>
             <MenuItem value="Male">Male</MenuItem>
             <MenuItem value="Female">Female</MenuItem>
@@ -96,7 +96,7 @@ export function Step1({
           </TextField>
         </Box>
         <Box>
-          <Typography sx={labelStyle}>Age *</Typography>
+          <Typography sx={labelStyle}>Age</Typography>
           <TextField fullWidth size="small" type="number" value={form.age} onChange={handleChange("age")} sx={inputStyle} />
         </Box>
         <Box>
@@ -174,7 +174,7 @@ export function Step1({
         </Box>
         <Box>
           <Typography sx={labelStyle}>
-            Source *
+            Source
             {campaignSelected && (
               <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
                 auto-filled from campaign
@@ -311,7 +311,7 @@ export function Step2({
         TREATMENT INFORMATION
       </Typography>
       <Box sx={{ mb: 3 }}>
-        <Typography sx={labelStyle}>Treatment Interest *</Typography>
+        <Typography sx={labelStyle}>Treatment Interest</Typography>
         <TextField
           select fullWidth size="small" value={form.treatmentInterest}
           onChange={(e) => {
@@ -485,7 +485,7 @@ export function Step3({
         <>
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
             <Box>
-              <Typography sx={labelStyle}>Department *</Typography>
+              <Typography sx={labelStyle}>Department</Typography>
               <TextField
                 select fullWidth size="small"
                 value={form.department}
@@ -533,7 +533,7 @@ export function Step3({
 
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 3 }}>
             <Box>
-              <Typography sx={labelStyle}>Date *</Typography>
+              <Typography sx={labelStyle}>Date</Typography>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DatePicker
                   value={selectedDate}
@@ -551,7 +551,7 @@ export function Step3({
               </LocalizationProvider>
             </Box>
             <Box>
-              <Typography sx={labelStyle}>Select Slot *</Typography>
+              <Typography sx={labelStyle}>Select Slot</Typography>
               <TextField
                 select fullWidth size="small"
                 value={form.slot}
