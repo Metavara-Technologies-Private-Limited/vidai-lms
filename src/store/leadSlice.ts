@@ -47,6 +47,37 @@ const normalizeStatus = (raw: string): string => {
   return map[raw?.toLowerCase()?.trim()] ?? "New";
 };
 
+const formatDateForApi = (value: unknown): string => {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+
+  const isoPrefixMatch = raw.match(/^(\d{4}-\d{2}-\d{2})T/);
+  if (isoPrefixMatch) {
+    return isoPrefixMatch[1];
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, dd, mm, yyyy] = slashMatch;
+    return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  }
+
+  return "";
+};
+
 // ====================== Async Thunks ======================
 
 /** Fetch all leads */
@@ -79,6 +110,11 @@ export const bookAppointment = createAsyncThunk<
   const lead = getState().leads.leads.find((l) => l.id === leadId);
   if (!lead) return rejectWithValue("Lead not found in state");
 
+  const normalizedAppointmentDate = formatDateForApi(payload.appointment_date);
+  if (!normalizedAppointmentDate) {
+    return rejectWithValue("Invalid appointment date. Please select a valid date.");
+  }
+
   const apiPayload: any = {
     clinic_id: lead.clinic_id,
     department_id: lead.department_id,
@@ -87,7 +123,7 @@ export const bookAppointment = createAsyncThunk<
     source: lead.source || "Unknown",
     treatment_interest: lead.treatment_interest || "N/A",
     book_appointment: true,
-    appointment_date: payload.appointment_date,
+    appointment_date: normalizedAppointmentDate,
     slot: payload.slot,
     is_active: lead.is_active !== false,
     partner_inquiry: lead.partner_inquiry || false,
@@ -122,6 +158,9 @@ export const convertLead = createAsyncThunk<
     const lead = getState().leads.leads.find((l) => l.id === leadUuid);
     if (!lead) throw new Error("Lead not found in state");
 
+    const normalizedAppointmentDate = formatDateForApi(lead.appointment_date);
+    const shouldKeepAppointment = Boolean(lead.book_appointment && normalizedAppointmentDate);
+
     await api.put(`/leads/${leadUuid}/update/`, {
       clinic_id: lead.clinic_id,
       department_id: lead.department_id,
@@ -129,9 +168,9 @@ export const convertLead = createAsyncThunk<
       contact_no: lead.contact_no,
       source: lead.source || "Unknown",
       treatment_interest: lead.treatment_interest || "N/A",
-      book_appointment: lead.book_appointment || false,
-      appointment_date: lead.appointment_date || "",
-      slot: lead.slot || "",
+      book_appointment: shouldKeepAppointment,
+      appointment_date: shouldKeepAppointment ? normalizedAppointmentDate : null,
+      slot: shouldKeepAppointment ? (lead.slot || "") : "",
       is_active: lead.is_active !== false,
       partner_inquiry: lead.partner_inquiry || false,
       lead_status: "converted",
