@@ -539,10 +539,12 @@ export function Step3({
                   value={selectedDate}
                   onChange={(newDate) => {
                     const asDayjs = newDate ? dayjs(newDate as Dayjs | Date) : null;
-                    setSelectedDate(asDayjs);
-                    if (asDayjs && asDayjs.isValid()) {
-                      setForm((prev) => ({ ...prev, appointmentDate: asDayjs.format("YYYY-MM-DD") }));
-                    }
+                    const validDate = asDayjs && asDayjs.isValid() ? asDayjs : null;
+                    setSelectedDate(validDate);
+                    setForm((prev) => ({
+                      ...prev,
+                      appointmentDate: validDate ? validDate.format("YYYY-MM-DD") : "",
+                    }));
                   }}
                   slotProps={{
                     textField: { size: "small", fullWidth: true, sx: inputStyle },

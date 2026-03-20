@@ -6,6 +6,9 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import styles from "../../../styles/Template/NewTemplateModal.module.css";
 import { PreviewWhatsAppTemplateModal } from './PreviewWhatsAppTemplateModal';
 import type { NewWhatsAppTemplateFormProps, TemplateDocument } from '../../../types/templates.types';
+import { toast } from 'react-toastify';
+
+const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
   const candidate = doc.file_url || doc.file || doc.url || '';
@@ -112,6 +115,10 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
   }, [initialData]); // Re-sync when initialData changes
 
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'name' && !TEMPLATE_NAME_REGEX.test(value)) {
+      toast.error('Template name contain only alphbets', { toastId: 'template-name-alpha' });
+      return;
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -132,6 +139,21 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
   // saves the template first (gets id back), then POSTs the file to
   // POST /api/templates/whatsapp/{id}/documents/ → inserts into restapi_template_whatsapp_document
   const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Name filed is mandtory', { toastId: 'template-name-required' });
+      return;
+    }
+
+    if (!formData.useCase) {
+      toast.error('Use case is mandatory', { toastId: 'template-usecase-required' });
+      return;
+    }
+
+    if (!formData.body.trim()) {
+      toast.error('Body is required', { toastId: 'template-body-required' });
+      return;
+    }
+
     const clinicId = getClinicId();
 
     const apiPayload = {
@@ -246,7 +268,7 @@ export const NewWhatsAppTemplateForm: React.FC<NewWhatsAppTemplateFormProps> = (
             disabled={isViewOnly}
             onChange={(e) => handleInputChange('body', e.target.value)}
             style={{ 
-              width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', 
+              width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB',
               fontFamily: 'inherit', resize: 'vertical', backgroundColor: isViewOnly ? '#F9FAFB' : '#fff'
             }}
           />
