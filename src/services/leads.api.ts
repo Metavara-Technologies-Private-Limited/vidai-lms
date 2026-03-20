@@ -156,8 +156,38 @@ api.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url;
-    const detail = error?.response?.data?.detail || error?.response?.data || error?.message;
-    console.error(`❌ API Error [${status}] ${url}:`, detail);
+    const raw = error?.response?.data;
+    const normalizeError = (value: unknown): string => {
+      if (value == null) return "Unknown error";
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+
+      if (Array.isArray(value)) {
+        const first = value[0];
+        return first == null ? "Unknown error" : normalizeError(first);
+      }
+
+      if (typeof value === "object") {
+        const obj = value as Record<string, unknown>;
+
+        if (typeof obj.detail === "string") return obj.detail;
+        if (typeof obj.message === "string") return obj.message;
+        if (typeof obj.error === "string") return obj.error;
+
+        const entries = Object.entries(obj);
+        if (entries.length === 0) return "Unknown error";
+
+        return entries
+          .slice(0, 4)
+          .map(([k, v]) => `${k}: ${normalizeError(v)}`)
+          .join(" | ");
+      }
+
+      return "Unknown error";
+    };
+
+    const detail = normalizeError(raw ?? error?.message);
+    console.error(`❌ API Error [${status}] ${url}: ${detail}`);
     return Promise.reject(error);
   }
 );

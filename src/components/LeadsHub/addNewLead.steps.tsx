@@ -349,7 +349,7 @@ export function Step2({
       )}
 
       <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
-        DOCUMENTS & REPORTS
+        DOCUMENTS & REPORTS (Optional)
       </Typography>
 
       <Box
