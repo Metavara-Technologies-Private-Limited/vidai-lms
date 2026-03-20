@@ -1419,7 +1419,6 @@ export default function LeadDetailView() {
 
   React.useEffect(() => {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key, dispatch]);
 
   React.useEffect(() => {
@@ -1431,6 +1430,7 @@ export default function LeadDetailView() {
       fetchSMSHistory(activeLead.id);
     }
   }, [
+    activeLead,
     activeLead?.id,
     activeLead?.documents,
     location.key,
@@ -1635,6 +1635,25 @@ export default function LeadDetailView() {
         );
         return;
       }
+
+      setFullLead((prev) => {
+        const base = prev ?? activeLead;
+        return {
+          ...base,
+          lead_status: "converted",
+          status: "converted",
+        } as LeadRecord;
+      });
+
+      try {
+        const convertedLeadIds: string[] = JSON.parse(localStorage.getItem("converted_lead_ids") || "[]");
+        if (!convertedLeadIds.includes(leadUuid)) {
+          localStorage.setItem("converted_lead_ids", JSON.stringify([...convertedLeadIds, leadUuid]));
+        }
+      } catch {
+        // no-op
+      }
+
       setOpenConvertPopup(false);
     } catch (err: unknown) {
       setConvertError(err instanceof Error ? err.message : "Failed to convert lead.");
