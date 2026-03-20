@@ -1,7 +1,5 @@
 import axios from "axios";
 
-
-
 type CreateReviewRequestPayload = {
   clinic: number;
   request_name: string;
@@ -12,7 +10,7 @@ type CreateReviewRequestPayload = {
   message?: string;
   schedule_date?: string;
   schedule_time?: string;
-  status?: string;
+  status?: "draft" | "sent" | "scheduled";
   lead_ids: string[];
 };
 
@@ -23,7 +21,6 @@ type SubmitReviewPayload = {
   review_text: string;
 };
 
-
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -33,13 +30,13 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("authToken");
+  const token =
+    localStorage.getItem("auth_token") || localStorage.getItem("authToken");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
 export const reputationApi = {
-
   // Dashboard cards
   getDashboard: async () => {
     const response = await apiClient.get("/reputation/dashboard/");
@@ -67,7 +64,7 @@ export const reputationApi = {
   // Get reviews for request
   getReviews: async (requestId: string) => {
     const response = await apiClient.get(
-      `/reputation/requests/${requestId}/reviews/`
+      `/reputation/requests/${requestId}/reviews/`,
     );
     return response.data?.data || [];
   },
@@ -77,5 +74,4 @@ export const reputationApi = {
     const response = await apiClient.post("/reputation/reviews/create/", data);
     return response.data;
   },
-
 };

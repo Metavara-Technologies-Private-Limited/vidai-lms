@@ -16,7 +16,11 @@ import DeleteLeadDialog from "../../components/LeadsHub/DeleteLeadDialog";
 import ReassignAssigneeDialog from "../../components/LeadsHub/ReassignAssigneeDialog";
 import CallDialog from "../../components/LeadsHub/CallDialog";
 
-import { deleteLead, selectIsLeadDeleting, fetchLeads } from "../../store/leadSlice";
+import {
+  deleteLead,
+  selectIsLeadDeleting,
+  fetchLeads,
+} from "../../store/leadSlice";
 import { LeadAPI } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 
@@ -48,12 +52,18 @@ interface MenuProps<T extends Lead> {
 let openCallSetter: ((name: string) => void) | null = null;
 
 export const CallButton = ({ lead }: { lead: Lead }) => (
-  <IconButton onClick={() => openCallSetter?.(lead.full_name || lead.name || "")}>
+  <IconButton
+    onClick={() => openCallSetter?.(lead.full_name || lead.name || "")}
+  >
     <CallIcon fontSize="small" />
   </IconButton>
 );
 
-export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>) {
+export function MenuButton<T extends Lead>({
+  lead,
+  setLeads,
+  tab,
+}: MenuProps<T>) {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
 
@@ -81,9 +91,14 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
         setLeads((prev) => prev.filter((l) => l.id !== lead.id));
         setOpenDelete(false);
         await dispatch(fetchLeads());
-        window.dispatchEvent(new CustomEvent("lead-deleted", { detail: { id: lead.id } }));
+        window.dispatchEvent(
+          new CustomEvent("lead-deleted", { detail: { id: lead.id } }),
+        );
       } else {
-        const errMsg = typeof result.payload === "string" ? result.payload : "Failed to delete lead";
+        const errMsg =
+          typeof result.payload === "string"
+            ? result.payload
+            : "Failed to delete lead";
         setDeleteError(errMsg);
       }
     } catch (err: unknown) {
@@ -97,7 +112,9 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
       setArchiveError(null);
       await LeadAPI.inactivate(lead.id);
       await dispatch(fetchLeads());
-      setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, is_active: false } : l)));
+      setLeads((prev) =>
+        prev.map((l) => (l.id === lead.id ? { ...l, is_active: false } : l)),
+      );
       setOpenArchive(false);
     } catch (err: unknown) {
       setArchiveError(getErrorMessage(err, "Failed to archive lead"));
@@ -112,7 +129,9 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
       setArchiveError(null);
       await LeadAPI.activate(lead.id);
       await dispatch(fetchLeads());
-      setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, is_active: true } : l)));
+      setLeads((prev) =>
+        prev.map((l) => (l.id === lead.id ? { ...l, is_active: true } : l)),
+      );
       setAnchorEl(null);
     } catch (err: unknown) {
       setArchiveError(getErrorMessage(err, "Failed to unarchive lead"));
@@ -127,61 +146,108 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
         <MoreVertIcon fontSize="small" />
       </IconButton>
 
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-        {tab === "active" && (
-          <>
-            <MenuItem
-              onClick={() => { navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, { state: { lead } }); setAnchorEl(null); }}
-              disabled={isDeleting || isArchiving}
-            >
-              <ListItemIcon><EditOutlinedIcon fontSize="small" /></ListItemIcon>
-              Edit
-            </MenuItem>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+      >
+        {tab === "active"
+          ? [
+              <MenuItem
+                key="lead-edit"
+                onClick={() => {
+                  navigate(`/leads/edit/${getCleanLeadId(lead.id)}`, {
+                    state: { lead },
+                  });
+                  setAnchorEl(null);
+                }}
+                disabled={isDeleting || isArchiving}
+              >
+                <ListItemIcon>
+                  <EditOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                Edit
+              </MenuItem>,
+              <MenuItem
+                key="lead-reassign"
+                onClick={() => {
+                  setOpenReassign(true);
+                  setAnchorEl(null);
+                }}
+                disabled={isDeleting || isArchiving}
+              >
+                <ListItemIcon>
+                  <PersonAddAltOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                Reassign
+              </MenuItem>,
+              <MenuItem
+                key="lead-archive"
+                onClick={() => {
+                  setOpenArchive(true);
+                  setArchiveError(null);
+                  setAnchorEl(null);
+                }}
+                disabled={isDeleting || isArchiving}
+              >
+                <ListItemIcon>
+                  <ArchiveOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                {isArchiving ? "Archiving..." : "Archive"}
+              </MenuItem>,
+              <MenuItem
+                key="lead-delete-active"
+                sx={{ color: "error.main" }}
+                onClick={() => {
+                  setOpenDelete(true);
+                  setDeleteError(null);
+                  setAnchorEl(null);
+                }}
+                disabled={isDeleting || isArchiving}
+              >
+                <ListItemIcon>
+                  <DeleteOutlineOutlinedIcon
+                    fontSize="small"
+                    sx={{ color: "error.main" }}
+                  />
+                </ListItemIcon>
+                {isDeleting ? "Deleting..." : "Delete"}
+              </MenuItem>,
+            ]
+          : null}
 
-            <MenuItem
-              onClick={() => { setOpenReassign(true); setAnchorEl(null); }}
-              disabled={isDeleting || isArchiving}
-            >
-              <ListItemIcon><PersonAddAltOutlinedIcon fontSize="small" /></ListItemIcon>
-              Reassign
-            </MenuItem>
-
-            <MenuItem
-              onClick={() => { setOpenArchive(true); setArchiveError(null); setAnchorEl(null); }}
-              disabled={isDeleting || isArchiving}
-            >
-              <ListItemIcon><ArchiveOutlinedIcon fontSize="small" /></ListItemIcon>
-              {isArchiving ? "Archiving..." : "Archive"}
-            </MenuItem>
-
-            <MenuItem
-              sx={{ color: "error.main" }}
-              onClick={() => { setOpenDelete(true); setDeleteError(null); setAnchorEl(null); }}
-              disabled={isDeleting || isArchiving}
-            >
-              <ListItemIcon><DeleteOutlineOutlinedIcon fontSize="small" sx={{ color: "error.main" }} /></ListItemIcon>
-              {isDeleting ? "Deleting..." : "Delete"}
-            </MenuItem>
-          </>
-        )}
-
-        {tab === "archived" && (
-          <>
-            <MenuItem onClick={handleUnarchiveConfirm} disabled={isDeleting || isArchiving}>
-              <ListItemIcon><UnarchiveOutlinedIcon fontSize="small" /></ListItemIcon>
-              {isArchiving ? "Restoring..." : "Unarchive"}
-            </MenuItem>
-
-            <MenuItem
-              sx={{ color: "error.main" }}
-              onClick={() => { setOpenDelete(true); setDeleteError(null); setAnchorEl(null); }}
-              disabled={isDeleting || isArchiving}
-            >
-              <ListItemIcon><DeleteOutlineOutlinedIcon fontSize="small" sx={{ color: "error.main" }} /></ListItemIcon>
-              {isDeleting ? "Deleting..." : "Delete"}
-            </MenuItem>
-          </>
-        )}
+        {tab === "archived"
+          ? [
+              <MenuItem
+                key="lead-unarchive"
+                onClick={handleUnarchiveConfirm}
+                disabled={isDeleting || isArchiving}
+              >
+                <ListItemIcon>
+                  <UnarchiveOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                {isArchiving ? "Restoring..." : "Unarchive"}
+              </MenuItem>,
+              <MenuItem
+                key="lead-delete-archived"
+                sx={{ color: "error.main" }}
+                onClick={() => {
+                  setOpenDelete(true);
+                  setDeleteError(null);
+                  setAnchorEl(null);
+                }}
+                disabled={isDeleting || isArchiving}
+              >
+                <ListItemIcon>
+                  <DeleteOutlineOutlinedIcon
+                    fontSize="small"
+                    sx={{ color: "error.main" }}
+                  />
+                </ListItemIcon>
+                {isDeleting ? "Deleting..." : "Delete"}
+              </MenuItem>,
+            ]
+          : null}
       </Menu>
 
       <ArchiveLeadDialog
@@ -200,7 +266,10 @@ export function MenuButton<T extends Lead>({ lead, setLeads, tab }: MenuProps<T>
         leadName={leadName}
         isDeleting={isDeleting}
         error={deleteError}
-        onClose={() => { setOpenDelete(false); setDeleteError(null); }}
+        onClose={() => {
+          setOpenDelete(false);
+          setDeleteError(null);
+        }}
         onConfirm={handleDeleteConfirm}
       />
 
@@ -224,5 +293,11 @@ export const Dialogs = () => {
     };
   }, []);
 
-  return <CallDialog open={openCall} name={name} onClose={() => setOpenCall(false)} />;
+  return (
+    <CallDialog
+      open={openCall}
+      name={name}
+      onClose={() => setOpenCall(false)}
+    />
+  );
 };

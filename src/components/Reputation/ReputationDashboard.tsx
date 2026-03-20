@@ -12,11 +12,12 @@ import {
   selectReputationRequests,
   selectReputationDashboard,
 } from "../../store/reputationSlice";
+import { fetchLeads } from "../../store/leadSlice";
 
-import Backward_icon from "../../assets/icons/Backward_icon.svg";
+import BackwardIcon from "../../assets/icons/Backward_icon.svg";
 
 import ReputationHeaderCards from "./ReputationHeaderCards";
-import ReviewRequestDialog from "./ReviewRequest.tsx";
+import ReviewRequestDialog from "./ReviewRequest";
 import ReviewCard from "./ReviewCard";
 import ReviewCardDetailedView from "./ReviewCardDetailedView";
 
@@ -44,6 +45,7 @@ const ReputationDashboard = () => {
   );
   const [selectedRequestName, setSelectedRequestName] = useState<string>("");
   useEffect(() => {
+    dispatch(fetchLeads());
     dispatch(fetchReviewRequests());
     dispatch(fetchReputationDashboard());
   }, [dispatch]);
@@ -84,6 +86,7 @@ const ReputationDashboard = () => {
           <ReviewRequestDialog
             open={openReviewDialog}
             onClose={() => setOpenReviewDialog(false)}
+            onOpenChange={setOpenReviewDialog}
           />
 
           {/* Review Cards Grid */}
@@ -127,7 +130,7 @@ const ReputationDashboard = () => {
               setSelectedRequestId(null);
             }}
           >
-            <img src={Backward_icon} alt="Back" width={40} height={40} />
+            <img src={BackwardIcon} alt="Back" width={40} height={40} />
 
             <Typography
               sx={{

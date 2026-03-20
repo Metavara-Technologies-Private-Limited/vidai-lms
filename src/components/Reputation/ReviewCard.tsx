@@ -23,6 +23,16 @@ type ReviewCardProps = {
 };
 
 const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
+  const normalizedStatus = (request.status || "draft").toLowerCase();
+  const statusLabel =
+    normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+
+  const statusStyles =
+    normalizedStatus === "draft"
+      ? { background: "#F3F4F6", color: "#4B5563" }
+      : normalizedStatus === "scheduled"
+        ? { background: "#FEF3C7", color: "#92400E" }
+        : { background: "#EAF7EF", color: "#2E7D32" };
 
   return (
     <Card
@@ -72,12 +82,11 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
             py: 0.4,
             borderRadius: 10,
             fontSize: 12,
-            background: "#EAF7EF",
-            color: "#2E7D32",
+            ...statusStyles,
             fontWeight: 500,
           }}
         >
-          {request.status}
+          {statusLabel}
         </Box>
       </Box>
 
@@ -93,14 +102,18 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
           <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>
             REQUEST SENT :
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{request.requests_sent || 0}</Typography>
+          <Typography sx={{ fontWeight: 500 }}>
+            {request.requests_sent || 0}
+          </Typography>
         </Box>
 
         <Box>
           <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>
             REVIEW SUBMITTED :
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{request.reviews_submitted || 0}</Typography>
+          <Typography sx={{ fontWeight: 500 }}>
+            {request.reviews_submitted || 0}
+          </Typography>
         </Box>
 
         <Box>
@@ -110,7 +123,9 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <StarIcon sx={{ color: "#F4B400", fontSize: 16 }} />
-            <Typography sx={{ fontWeight: 500 }}>{request.avg_rating || 0}</Typography>
+            <Typography sx={{ fontWeight: 500 }}>
+              {request.avg_rating || 0}
+            </Typography>
           </Box>
         </Box>
       </Box>
@@ -125,14 +140,12 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
         }}
       >
         <Box>
-          <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>
-            MODE:
-          </Typography>
+          <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>MODE:</Typography>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-<Typography sx={{ fontSize: 14 }}>
-  {request.mode || "Email"}
-</Typography>
+            <Typography sx={{ fontSize: 14 }}>
+              {request.mode || "Email"}
+            </Typography>
           </Box>
         </Box>
 
@@ -143,8 +156,8 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
 
           <Typography sx={{ fontSize: 14 }}>
             {request.created_at
-  ? new Date(request.created_at).toLocaleString()
-  : "-"}
+              ? new Date(request.created_at).toLocaleString()
+              : "-"}
           </Typography>
         </Box>
       </Box>

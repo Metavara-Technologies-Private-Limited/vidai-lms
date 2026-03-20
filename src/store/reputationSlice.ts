@@ -23,7 +23,7 @@ export const fetchReviewRequests = createAsyncThunk(
   "reputation/fetchRequests",
   async () => {
     return await reputationApi.getRequests();
-  }
+  },
 );
 
 // Fetch dashboard
@@ -31,7 +31,7 @@ export const fetchReputationDashboard = createAsyncThunk(
   "reputation/fetchDashboard",
   async () => {
     return await reputationApi.getDashboard();
-  }
+  },
 );
 
 // Fetch reviews for a request
@@ -39,13 +39,28 @@ export const fetchReviews = createAsyncThunk(
   "reputation/fetchReviews",
   async (requestId: string) => {
     return await reputationApi.getReviews(requestId);
-  }
+  },
 );
 
 const reputationSlice = createSlice({
   name: "reputation",
   initialState,
-  reducers: {},
+  reducers: {
+    prependReviewRequest: (state, action) => {
+      const request = action.payload;
+
+      if (!request || request.id == null) {
+        return;
+      }
+
+      state.requests = [
+        request,
+        ...state.requests.filter(
+          (item) => String(item.id) !== String(request.id),
+        ),
+      ];
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchReviewRequests.pending, (state) => {
@@ -71,6 +86,8 @@ const reputationSlice = createSlice({
 });
 
 export default reputationSlice.reducer;
+
+export const { prependReviewRequest } = reputationSlice.actions;
 
 export const selectReputationRequests = (state: RootState) =>
   state.reputation.requests;
