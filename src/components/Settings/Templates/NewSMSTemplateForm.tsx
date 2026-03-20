@@ -6,6 +6,9 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import styles from "../../../styles/Template/NewTemplateModal.module.css";
 import { PreviewSMSTemplateModal } from './PreviewSMSTemplateModal';
 import type { NewSMSTemplateFormProps, TemplateDocument } from '../../../types/templates.types';
+import { toast } from 'react-toastify';
+
+const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
   const candidate = doc.file_url || doc.file || doc.url || '';
@@ -101,6 +104,10 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
   }, [initialData]); // Re-sync when initialData changes
 
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'name' && !TEMPLATE_NAME_REGEX.test(value)) {
+      toast.error('Template name contain only alphbets', { toastId: 'template-name-alpha' });
+      return;
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -123,6 +130,21 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
   // saves the template first (gets id back), then POSTs the file to
   // POST /api/templates/sms/{id}/documents/ → inserts into restapi_template_sms_document
   const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Name filed is mandtory', { toastId: 'template-name-required' });
+      return;
+    }
+
+    if (!formData.useCase) {
+      toast.error('Use case is mandatory', { toastId: 'template-usecase-required' });
+      return;
+    }
+
+    if (!formData.body.trim()) {
+      toast.error('Body is required', { toastId: 'template-body-required' });
+      return;
+    }
+
     const clinicId = getClinicId();
     
     const apiPayload = {

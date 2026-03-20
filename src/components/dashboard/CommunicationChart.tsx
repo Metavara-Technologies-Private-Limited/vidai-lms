@@ -5,6 +5,7 @@ import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style
 import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import type { TimeRange } from "./TimeRangeSelector";
 import type { CustomTooltipProps } from "../../types/dashboard.types";
+import { api } from "../../services/leads.api";
 
 interface CommunicationChartProps {
   timeRange: TimeRange;
@@ -59,11 +60,11 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
     const fetchCounts = async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/interactions/counts/", {
+        const res = await api.get<PlatformRow[]>("/interactions/counts/", {
+          params: { time_range: timeRange },
           signal: controller.signal,
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json: PlatformRow[] = await res.json();
+        const json = res.data;
 
         // Ensure correct order: Email, SMS, Call, WhatsApp, Chatbot
         const ordered: PlatformRow[] = EMPTY_DATA.map((empty) => {
@@ -88,27 +89,7 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
     return () => controller.abort();
   }, [timeRange]);
 
-  // ── timeRange scale factor ─────────────────────────────────────────────────
-  const scaleFactor = useMemo(() => {
-    switch (timeRange) {
-      case "today": return 0.1;
-      case "week":  return 0.25;
-      case "month": return 1;
-      case "year":  return 1;
-      default:      return 1;
-    }
-  }, [timeRange]);
-
-  const data: PlatformRow[] = useMemo(
-    () =>
-      rawData.map((row) => ({
-        ...row,
-        high: Math.round(row.high * scaleFactor),
-        low:  Math.round(row.low  * scaleFactor),
-        no:   Math.round(row.no   * scaleFactor),
-      })),
-    [rawData, scaleFactor]
-  );
+  const data: PlatformRow[] = useMemo(() => rawData, [rawData]);
 
   return (
     <Box sx={chartStyles.container}>

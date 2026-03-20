@@ -41,7 +41,10 @@ import { PreviewTemplateModal } from './PreviewEmailTemplateModal';
 import type { NewEmailTemplateFormProps, TemplateDocument } from '../../../types/templates.types';
 import type { EmailTemplate } from '../../../types/tickets.types';
 import { useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
 import { selectClinic } from '../../../store/clinicSlice';
+
+const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
   const candidate = doc.file_url || doc.file || doc.url || '';
@@ -107,7 +110,6 @@ const BlockStyleExtension = Extension.create({
 
 export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
   const clinic = useSelector(selectClinic);
-  const clinicName = clinic?.name || "";
   const clinicId = clinic?.id || 1;
   const isViewOnly = mode === 'view';
 
@@ -141,7 +143,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   // Normalize useCase to match MenuItem values (capitalize first letter)
   // Also handles API responses that might come in different formats
   const normalizeUseCase = (value: string | undefined) => {
-    if (!value) return "Appointment";
+    if (!value) return "";
     const trimmed = value.trim().toLowerCase();
     
     // Map common API variations to canonical form
@@ -160,10 +162,10 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
   const [formData, setFormData] = useState({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    name: ((initialData as any)?.name || 'Appointment Confirmation'),
+    name: ((initialData as any)?.name || ''),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useCase: normalizeUseCase((initialData as any)?.use_case || (initialData as any)?.useCase || 'Appointment'),
-    subject: ((initialData as EmailTemplate)?.subject || 'Your Consultation is Confirmed - {appointment_date}'),
+    useCase: normalizeUseCase((initialData as any)?.use_case || (initialData as any)?.useCase || ''),
+    subject: ((initialData as EmailTemplate)?.subject || ''),
   });
 
   const [showPreview, setShowPreview] = useState(false);
@@ -180,10 +182,8 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   const imageInputRef = useRef<HTMLInputElement>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
-  const DEFAULT_EDITOR_CONTENT = `<p>Hi {lead_first_name},</p><p><br></p><p>Thank you for choosing ${clinicName}.</p><p>Your fertility consultation has been successfully scheduled!</p><p><br></p><ul><li><p>Date : {appointment_date}</p></li><li><p>Time : {appointment_time}</p></li><li><p>Location : ${clinicName}</p></li></ul><p><br></p><p>Please arrive 10 minutes early and bring any relevant medical reports.</p><p><br></p><p>If you need to reschedule, please let us know.</p><p><br></p><p>Warm regards,</p><p>The Vidal Team</p>`;
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const initialEditorContent = normalizeEditorHtml(((initialData as any)?.body || (initialData as any)?.email_body || DEFAULT_EDITOR_CONTENT));
+  const initialEditorContent = normalizeEditorHtml(((initialData as any)?.body || (initialData as any)?.email_body || ''));
 
   // Sync formData when initialData changes (for edit/view mode)
   React.useEffect(() => {
@@ -450,6 +450,29 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   // saves the template first (gets id back), then POSTs each file to
   // POST /api/templates/mail/{id}/documents/ → inserts into restapi_template_mail_document
   const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Name filed is mandtory', { toastId: 'template-name-required' });
+      return;
+    }
+
+    if (!formData.subject.trim()) {
+      toast.error('Subject is mandatory', { toastId: 'template-subject-required' });
+      return;
+    }
+
+    if (!formData.useCase) {
+      toast.error('Use case is mandatory', { toastId: 'template-usecase-required' });
+      return;
+    }
+
+    const bodyHtml = editor?.getHTML() || '';
+    const bodyIsEmpty = !bodyHtml || bodyHtml === '<p></p>' || bodyHtml.replace(/<[^>]*>/g, '').trim() === '';
+
+    if (bodyIsEmpty) {
+      toast.error('Body is required', { toastId: 'template-body-required' });
+      return;
+    }
+
     // const clinicId = getClinicId();
 
     const apiPayload = {
@@ -537,7 +560,14 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
             size="small" 
             value={formData.name}
             disabled={isViewOnly}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (!TEMPLATE_NAME_REGEX.test(value)) {
+                toast.error('Template name contain only alphbets', { toastId: 'template-name-alpha' });
+                return;
+              }
+              setFormData({ ...formData, name: value });
+            }}
             sx={{ 
               '& .MuiOutlinedInput-root': {
                 fontSize: '14px',
@@ -557,8 +587,9 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
             fullWidth 
             size="small" 
             value={formData.useCase}
+            displayEmpty
             disabled={isViewOnly}
-            onChange={(e) => setFormData({ ...formData, useCase: e.target.value })}
+            onChange={(e) => { setFormData({ ...formData, useCase: e.target.value }); }}
             IconComponent={KeyboardArrowDownIcon}
             sx={{ 
               fontSize: '14px',
@@ -567,6 +598,9 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
               '& fieldset': { borderColor: '#E5E7EB' }
             }}
           >
+            <MenuItem value="" disabled>
+              <Box component="span" sx={{ color: '#9CA3AF', fontSize: '14px' }}>Select Use Case</Box>
+            </MenuItem>
             <MenuItem value="Appointment">
                <Box component="span" sx={{ 
                  color: '#16A34A', 
@@ -619,7 +653,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
             size="small" 
             value={formData.subject}
             disabled={isViewOnly}
-            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+            onChange={(e) => { setFormData({ ...formData, subject: e.target.value }); }}
             sx={{ 
               '& .MuiOutlinedInput-root': {
                 fontSize: '14px',
@@ -635,12 +669,12 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
           <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
             Body
           </Typography>
-          
-          <Box sx={{ 
-            border: '1px solid #E5E7EB', 
-            borderRadius: '8px',
-            bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
-          }}>
+          <Box
+            sx={{ 
+              border: '1px solid #E5E7EB', 
+              borderRadius: '8px',
+              bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+            }}>
             {/* Editor Content */}
             <Box sx={{
               '& .ProseMirror': {

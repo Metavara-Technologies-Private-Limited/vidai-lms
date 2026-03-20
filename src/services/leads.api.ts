@@ -91,7 +91,7 @@ export type LeadPayload = {
   next_action_type?: string;
   treatment_interest: string;
   book_appointment: boolean;
-  appointment_date: string;
+  appointment_date: string | null;
   slot: string;
   remark?: string;
   is_active: boolean;

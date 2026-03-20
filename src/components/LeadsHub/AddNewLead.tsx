@@ -266,9 +266,6 @@ export default function AddNewLead() {
       return;
     }
     setCurrentStep((prev) => prev + 1);
-    toast.success("Step completed!", {
-      position: "top-right", autoClose: 1000, theme: "colored",
-    });
   };
 
   const handleBack = () => {
@@ -313,7 +310,7 @@ export default function AddNewLead() {
     source: form.source || "Direct",
     sub_source: form.subSource || "",
     treatment_interest: form.treatments.join(",") || form.treatmentInterest || "General",
-    appointment_date: shouldBookAppointment ? (form.appointmentDate ?? "") : "",
+    appointment_date: shouldBookAppointment ? (form.appointmentDate ?? null) : null,
     slot: shouldBookAppointment ? (form.slot ?? "") : "",
     campaign_id: strOrNull(form.campaign),
     email: strOrNull(form.email) ?? null,
