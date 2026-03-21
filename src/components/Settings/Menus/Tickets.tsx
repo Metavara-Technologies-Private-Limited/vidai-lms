@@ -118,6 +118,16 @@ const ticketsFromDb = useMemo((): TicketListItem[] => {
   return [];
 }, [rawTickets]);
 
+const getTicketSortTime = (ticket: TicketListItem): number => {
+  const raw =
+    ticket.created_at ||
+    ticket.due_date;
+
+  if (!raw) return 0;
+  const ts = new Date(String(raw)).getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+};
+
 const getCount = (status: string): number => {
   const key = status.toLowerCase() as keyof typeof dashboardCounts;
 
@@ -132,7 +142,7 @@ const getCount = (status: string): number => {
 
   // 3. Filtering and Search Logic
   const filteredTickets = useMemo(() => {
-    return ticketsFromDb.filter((t) => {
+    const filtered = ticketsFromDb.filter((t) => {
       // Tab Filter (Backend "new" vs Frontend "New")
       if (t.status?.toLowerCase() !== tab.toLowerCase()) return false;
 
@@ -150,6 +160,8 @@ const getCount = (status: string): number => {
       }
       return true;
     });
+
+    return filtered.sort((a, b) => getTicketSortTime(b) - getTicketSortTime(a));
   }, [ticketsFromDb, tab, search, filters]);
 
   // Pagination Logic
