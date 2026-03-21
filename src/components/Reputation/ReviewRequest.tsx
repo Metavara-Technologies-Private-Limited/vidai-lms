@@ -103,8 +103,90 @@ const getBackendErrorMessage = (error: unknown): string => {
 const normalizeReviewLinkPlaceholder = (message: string) => {
   const brokenGoogleReviewUrlPattern =
     /https?:\/\/g\.page\/review\/your-clinic/gi;
+  const flexibleReviewLinkTokenPattern =
+    /(\{\{\s*review[_\s-]*link\s*\}\}|\{\s*review[_\s-]*link\s*\}|\[\s*review[_\s-]*link\s*\]|<\s*review[_\s-]*link\s*>)/gi;
 
-  return message.replace(brokenGoogleReviewUrlPattern, "{review_link}");
+  const normalized = message
+    .replace(brokenGoogleReviewUrlPattern, "{review_link}")
+    .replace(flexibleReviewLinkTokenPattern, "{review_link}");
+
+  if (normalized.includes("{review_link}")) {
+    return normalized;
+  }
+
+  return `${normalized.trim()}\n\n{review_link}`;
+};
+
+const GOOGLE_REVIEW_PLACEHOLDER_URL = "https://g.page/review/your-clinic";
+
+const getConfiguredGoogleReviewUrl = () =>
+  (import.meta.env.VITE_GOOGLE_REVIEW_URL ?? "").trim();
+
+const isValidWebUrl = (value: string) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const isValidEmailAddress = (value?: string) => {
+  const email = (value ?? "").trim();
+  if (!email) {
+    return false;
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+const isValidPhoneNumber = (value?: string) => {
+  const phone = (value ?? "").trim();
+  if (!phone) {
+    return false;
+  }
+
+  const normalized = phone.replace(/[\s().-]/g, "");
+  return /^\+?[1-9]\d{7,14}$/.test(normalized);
+};
+
+const toPositiveNumber = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  }
+
+  return 0;
+};
+
+const unwrapCreateRequestRecord = (
+  response: unknown,
+): Record<string, unknown> => {
+  let current: unknown = response;
+
+  for (let i = 0; i < 4; i += 1) {
+    if (typeof current !== "object" || current === null) {
+      return {};
+    }
+
+    const record = current as Record<string, unknown>;
+    if (typeof record.id === "string" || typeof record.id === "number") {
+      return record;
+    }
+
+    if (typeof record.data === "object" && record.data !== null) {
+      current = record.data;
+      continue;
+    }
+
+    return record;
+  }
+
+  return {};
 };
 
 const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
@@ -217,28 +299,31 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       request_name: string;
       mode: "email" | "sms" | "whatsapp";
       status: "draft" | "sent" | "scheduled";
+      lead_ids: string[];
     },
   ) => {
-    const resolvedResponse =
-      typeof response === "object" && response !== null
-        ? ((response as { data?: unknown }).data ?? response)
-        : null;
+    const record = unwrapCreateRequestRecord(response);
+    const resolvedId =
+      record.id ?? record.request_id ?? record.uuid ?? `temp-${Date.now()}`;
 
-    const record =
-      typeof resolvedResponse === "object" && resolvedResponse !== null
-        ? (resolvedResponse as Record<string, unknown>)
-        : {};
+    const resolvedRequestSent =
+      toPositiveNumber(record.requests_sent) ||
+      toPositiveNumber(record.request_sent) ||
+      toPositiveNumber(record.selected_leads_count) ||
+      toPositiveNumber(record.leads_count) ||
+      payload.lead_ids.length;
 
     return {
-      id: String(record.id ?? `temp-${Date.now()}`),
+      id: String(resolvedId),
       request_name:
         typeof record.request_name === "string"
           ? record.request_name
           : payload.request_name,
       status:
         typeof record.status === "string" ? record.status : payload.status,
-      requests_sent:
-        typeof record.requests_sent === "number" ? record.requests_sent : 0,
+      requests_sent: resolvedRequestSent,
+      selected_leads_count: payload.lead_ids.length,
+      lead_ids: payload.lead_ids,
       reviews_submitted:
         typeof record.reviews_submitted === "number"
           ? record.reviews_submitted
@@ -382,10 +467,34 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     }
 
     try {
-      const leadIds =
-        leadSelectionType === "all"
-          ? filteredLeads.map((lead) => String(lead.id))
-          : selectedLeads.map((lead) => String(lead.id));
+      const targetLeads =
+        leadSelectionType === "all" ? filteredLeads : selectedLeads;
+
+      const invalidLeads = targetLeads.filter((lead) => {
+        if (formData.mode === "email") {
+          return !isValidEmailAddress(lead.email);
+        }
+
+        return !isValidPhoneNumber(lead.contact_no);
+      });
+
+      if (invalidLeads.length > 0) {
+        const recipientType = formData.mode === "email" ? "email" : "phone";
+        const sampleNames = invalidLeads
+          .slice(0, 3)
+          .map((lead) => lead.full_name)
+          .join(", ");
+        showErrorToast(
+          `Cannot send via ${formData.mode.toUpperCase()}: ${invalidLeads.length} lead(s) have invalid ${recipientType} details (${sampleNames}${invalidLeads.length > 3 ? ", ..." : ""}).`,
+        );
+        toast.dismiss(savingToastId);
+        isSubmittingRef.current = false;
+        setIsSubmitting(false);
+        onOpenChange?.(true);
+        return;
+      }
+
+      const leadIds = targetLeads.map((lead) => String(lead.id));
 
       if (leadIds.length === 0) {
         showErrorToast(
@@ -403,6 +512,37 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
           ? selectedLeads[0]?.clinic_id
           : filteredLeads[0]?.clinic_id) ?? 1;
 
+      const normalizedMessage = normalizeReviewLinkPlaceholder(
+        formData.message.trim(),
+      );
+
+      const configuredGoogleReviewUrl = getConfiguredGoogleReviewUrl();
+
+      if (formData.collect_on === "google") {
+        if (
+          !isValidWebUrl(configuredGoogleReviewUrl) ||
+          configuredGoogleReviewUrl.toLowerCase() ===
+            GOOGLE_REVIEW_PLACEHOLDER_URL.toLowerCase()
+        ) {
+          showErrorToast(
+            "Google review URL is not configured. Set VITE_GOOGLE_REVIEW_URL to your real Google review link or choose Feedback Form.",
+          );
+          toast.dismiss(savingToastId);
+          isSubmittingRef.current = false;
+          setIsSubmitting(false);
+          onOpenChange?.(true);
+          return;
+        }
+      }
+
+      const resolvedMessage =
+        formData.collect_on === "google"
+          ? normalizedMessage.replace(
+              /\{review_link\}/gi,
+              configuredGoogleReviewUrl,
+            )
+          : normalizedMessage;
+
       const payload = {
         clinic: clinicId,
         request_name: formData.request_name.trim(),
@@ -410,7 +550,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
         collect_on: formData.collect_on,
         mode: formData.mode,
         subject: formData.subject.trim(),
-        message: normalizeReviewLinkPlaceholder(formData.message.trim()),
+        message: resolvedMessage,
         status,
         lead_ids: leadIds,
         ...(formData.is_scheduled === "yes" && {

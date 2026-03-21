@@ -9,6 +9,7 @@ import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
+const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
 
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
@@ -24,12 +25,39 @@ export default function AppRoutes() {
     <>
       <Routes>
         <Route
+          path="/review/:requestId/:leadId"
+          element={<LoadedComponent Comp={ReviewFormPage} />}
+        />
+        <Route
+          path="/review/:requestId/:leadId/:channel"
+          element={<LoadedComponent Comp={ReviewFormPage} />}
+        />
+        <Route
+          path="/review/*"
+          element={<LoadedComponent Comp={ReviewFormPage} />}
+        />
+        <Route
+          path="/settings/integration/review/:requestId/:leadId"
+          element={<LoadedComponent Comp={ReviewFormPage} />}
+        />
+        <Route
+          path="/settings/integration/review/:requestId/:leadId/:channel"
+          element={<LoadedComponent Comp={ReviewFormPage} />}
+        />
+        <Route
+          path="/settings/integration/review/*"
+          element={<LoadedComponent Comp={ReviewFormPage} />}
+        />
+
+        <Route
           path="/"
-          element={(
-            <Suspense fallback={<div style={{ padding: 12 }}>Loading app...</div>}>
+          element={
+            <Suspense
+              fallback={<div style={{ padding: 12 }}>Loading app...</div>}
+            >
               <MainLayout />
             </Suspense>
-          )}
+          }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
 

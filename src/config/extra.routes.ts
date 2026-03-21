@@ -66,9 +66,4 @@ export const EXTRA_ROUTES = [
     path: "reputation",
     page: lazy(() => import("../pages/Reputation.tsx")),
   },
-  {
-    key: "review-form",
-    path: "review/:requestId/:leadId",
-    page: lazy(() => import("../pages/Reputation/ReviewForm.tsx")),
-  },
 ];
