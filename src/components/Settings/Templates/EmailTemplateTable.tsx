@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, Chip, IconButton, Box, Stack, Typography
@@ -19,8 +19,20 @@ interface Props {
 export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => {
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
-  const totalPages = data.length === 0 ? 0 : Math.ceil(data.length / rowsPerPage);
-  const visibleRows = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const sortedData = useMemo(() => {
+    const getTime = (row: Record<string, unknown>) => {
+      const raw = row.modified_at || row.lastUpdatedAt || row.created_at || row.createdAt;
+      if (!raw) return 0;
+      const ts = new Date(String(raw)).getTime();
+      return Number.isNaN(ts) ? 0 : ts;
+    };
+
+    return [...data].sort((a, b) => getTime(b) - getTime(a));
+  }, [data]);
+
+  const totalPages = sortedData.length === 0 ? 0 : Math.ceil(sortedData.length / rowsPerPage);
+  const visibleRows = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   useEffect(() => {
     if (page > 0 && totalPages > 0 && page > totalPages - 1) {
@@ -31,8 +43,8 @@ export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => 
     }
   }, [totalPages, page]);
 
-  const start = data.length === 0 ? 0 : page * rowsPerPage + 1;
-  const end = Math.min((page + 1) * rowsPerPage, data.length);
+  const start = sortedData.length === 0 ? 0 : page * rowsPerPage + 1;
+  const end = Math.min((page + 1) * rowsPerPage, sortedData.length);
 
   const handlePrev = () => setPage((p) => Math.max(0, p - 1));
   const handleNext = () => setPage((p) => Math.min(Math.max(0, totalPages - 1), p + 1));
@@ -114,7 +126,7 @@ export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => 
 
       <Box className={styles.paginationWrapper} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2 }}>
         <Typography variant="caption" sx={{ color: '#6B7280', whiteSpace: 'nowrap' }}>
-          Showing {start} to {end} of {data.length} entries
+          Showing {start} to {end} of {sortedData.length} entries
         </Typography>
 
         <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto' }}>

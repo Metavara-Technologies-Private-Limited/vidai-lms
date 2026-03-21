@@ -370,7 +370,7 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
                 '&:hover': { bgcolor: '#000' }
               }}
             >
-              Save
+              Save 
             </Button>
           </Box>
         )}
