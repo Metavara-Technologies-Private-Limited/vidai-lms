@@ -21,6 +21,16 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], onAction }) 
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
 
+  const formatDisplayDate = (value: unknown): string => {
+    if (!value) return 'N/A';
+    const parsed = new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const sortedData = useMemo(() => {
     const getTime = (row: FormTemplate) => {
       const raw = row.modified_at || row.lastUpdatedAt || row.updated_at || row.created_at;
@@ -93,10 +103,8 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], onAction }) 
                 const templateName = record.audience_name || record.name || 'Untitled WhatsApp';
                 const bodyContent = record.email_body || record.subject || record.body || '--';
                 
-                const rawDate = record.modified_at || record.lastUpdatedAt || 'N/A';
-                const formattedDate = (rawDate && rawDate !== 'N/A' && rawDate.includes('T')) 
-                  ? new Date(rawDate).toLocaleDateString('en-GB') 
-                  : rawDate;
+                const rawDate = record.modified_at || record.lastUpdatedAt || record.updated_at || record.created_at || 'N/A';
+                const formattedDate = formatDisplayDate(rawDate);
 
                 return (
                   <TableRow key={String(record.id ?? templateName)} className={styles.bodyRow}>

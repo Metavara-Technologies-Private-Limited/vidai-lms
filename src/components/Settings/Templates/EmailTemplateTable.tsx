@@ -20,6 +20,16 @@ export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => 
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
 
+  const formatDisplayDate = (value: unknown): string => {
+    if (!value) return 'N/A';
+    const parsed = new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const sortedData = useMemo(() => {
     const getTime = (row: Record<string, unknown>) => {
       const raw = row.modified_at || row.lastUpdatedAt || row.created_at || row.createdAt;
@@ -75,7 +85,7 @@ export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => 
                 const templateName = row.audience_name || row.name || 'Untitled Template';
                 const subject = row.subject || '--';
                 const useCase = row.use_case || row.useCase || 'General';
-                const date = row.modified_at || row.lastUpdatedAt || 'N/A';
+                const date = row.modified_at || row.lastUpdatedAt || row.created_at || row.createdAt || 'N/A';
                 const author = row.created_by_name || row.createdBy || 'System';
 
                 const ui = getUseCaseStyles(useCase);
@@ -103,7 +113,7 @@ export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => 
                       />
                     </TableCell>
                     <TableCell className={styles.dateCell}>
-                      {date.includes('T') ? new Date(date).toLocaleDateString() : date}
+                      {formatDisplayDate(date)}
                     </TableCell>
                     <TableCell className={styles.authorCell}>{author}</TableCell>
                     <TableCell align="right">
