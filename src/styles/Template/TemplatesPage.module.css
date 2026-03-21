@@ -1,7 +1,7 @@
 /* Page Container */
 .pageContainer {
   padding: 24px;
-  background-color: #FAFAFA;
+  background-color: #FFFFFF;
   min-height: 100vh;
 }
 
@@ -135,6 +135,11 @@
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #E5E7EB;
+}
+
+/* Table Wrapper */
+.tableWrapper {
+  background-color: #FFFFFF;
 }
 
 /* Table Header */
