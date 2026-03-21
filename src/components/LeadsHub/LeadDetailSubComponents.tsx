@@ -20,7 +20,6 @@ import { getDocColor } from "./LeadDetailHelpers";
 import type {
   CallMessageProps,
   TimelineItemProps,
-  ChatBubbleProps,
   InfoProps,
   DocumentRowProps,
 } from "./LeadDetailTypes";
@@ -92,35 +91,6 @@ export const TimelineItem: React.FC<TimelineItemProps> = ({
       </Typography>
     </Box>
   </Stack>
-);
-
-// ====================== ChatBubble ======================
-export const ChatBubble: React.FC<ChatBubbleProps> = ({ side, text, time }) => (
-  <Box sx={{ alignSelf: side === "left" ? "flex-start" : "flex-end", maxWidth: "70%" }}>
-    <Box
-      sx={{
-        p: 1.5,
-        borderRadius:
-          side === "left" ? "0 12px 12px 12px" : "12px 0 12px 12px",
-        bgcolor: side === "left" ? "#FFF" : "#1E293B",
-        color: side === "left" ? "text.primary" : "#FFF",
-        boxShadow: "0px 1px 2px rgba(0,0,0,0.05)",
-      }}
-    >
-      <Typography variant="body2">{text}</Typography>
-    </Box>
-    <Typography
-      variant="caption"
-      color="text.secondary"
-      sx={{
-        mt: 0.5,
-        display: "block",
-        textAlign: side === "right" ? "right" : "left",
-      }}
-    >
-      {time}
-    </Typography>
-  </Box>
 );
 
 // ====================== Sub-source Icon ======================

@@ -120,6 +120,16 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// Capitalizes the first letter of every word in a string
+function capitalizeWords(val: string | undefined | null): string {
+  if (!val) return "N/A";
+  return val
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+// Capitalizes only the first letter of the whole string
 function capitalize(val: string | undefined | null): string {
   if (!val) return "N/A";
   return val.charAt(0).toUpperCase() + val.slice(1);
@@ -1565,7 +1575,7 @@ export default function LeadDetailView() {
         slot: activeLead.slot || "",
         is_active: activeLead.is_active !== false,
         partner_inquiry: activeLead.partner_inquiry || false,
-        next_action_type: actionType,        // ✅ now sends e.g. "Book Appointment"
+        next_action_type: actionType,
         next_action_status: actionStatus,
         next_action_description: actionDescription.trim(),
       });
@@ -1715,27 +1725,27 @@ export default function LeadDetailView() {
       </Box>
     );
 
-  // ── Derived display values ──────────────────────────────────────────────────
-  const leadName          = activeLead.full_name || activeLead.name || "Unknown";
+  // ── Derived display values — all run through capitalizeWords / capitalize ──
+  const leadName          = capitalizeWords(activeLead.full_name || activeLead.name || "Unknown");
   const leadInitials      = activeLead.initials || leadName.charAt(0).toUpperCase();
   const leadPhone         = activeLead.phone || activeLead.contact_number || activeLead.contact_no || "N/A";
   const leadEmail         = activeLead.email || "N/A";
-  const leadLocation      = activeLead.location || "N/A";
+  const leadLocation      = capitalizeWords(activeLead.location || "N/A");
   const leadGender        = capitalize(activeLead.gender);
   const leadAge           = String(activeLead.age || "N/A");
   const leadMaritalStatus = capitalize(activeLead.marital_status);
-  const leadAddress       = activeLead.address || "N/A";
-  const leadLanguage      = activeLead.language_preference || "N/A";
-  const leadAssigned      = activeLead.assigned_to_name || activeLead.assigned || "Unassigned";
-  const leadStatus        = activeLead.status || activeLead.lead_status || "New";
-  const leadQuality       = activeLead.quality || "N/A";
+  const leadAddress       = capitalizeWords(activeLead.address || "N/A");
+  const leadLanguage      = capitalize(activeLead.language_preference || "N/A");
+  const leadAssigned      = capitalizeWords(activeLead.assigned_to_name || activeLead.assigned || "Unassigned");
+  const leadStatus        = capitalize(activeLead.status || activeLead.lead_status || "New");
+  const leadQuality       = capitalize(activeLead.quality || "N/A");
   const leadScore         = String(activeLead.score || 0).includes("%") ? activeLead.score : `${activeLead.score || 0}%`;
-  const leadSource        = activeLead.source || "Unknown";
-  const leadSubSource     = activeLead.sub_source || "N/A";
-  const leadCampaignName  = activeLead.campaign_name || "N/A";
-  const leadCampaignDuration = activeLead.campaign_duration || "N/A";
+  const leadSource        = capitalizeWords(activeLead.source || "Unknown");
+  const leadSubSource     = capitalizeWords(activeLead.sub_source || "N/A");
+  const leadCampaignName  = capitalizeWords(activeLead.campaign_name || "N/A");
+  const leadCampaignDuration = capitalize(activeLead.campaign_duration || "N/A");
   const leadDisplayId     = formatLeadId(activeLead.id);
-  const partnerName       = activeLead.partner_name || activeLead.partner_full_name || "N/A";
+  const partnerName       = capitalizeWords(activeLead.partner_name || activeLead.partner_full_name || "N/A");
   const partnerAge        = String(activeLead.partner_age || "N/A");
   const partnerGender     = capitalize(activeLead.partner_gender);
   const leadCreatedAt     = activeLead.created_at
@@ -1744,27 +1754,27 @@ export default function LeadDetailView() {
         hour: "2-digit", minute: "2-digit",
       })
     : "N/A";
-  const nextActionType        = activeLead.next_action_type || activeLead.task || "N/A";
-  const nextActionStatus      = activeLead.next_action_status || activeLead.taskStatus || "Pending";
-  const nextActionDescription = activeLead.next_action_description || "N/A";
+  const nextActionType        = capitalizeWords(activeLead.next_action_type || activeLead.task || "N/A");
+  const nextActionStatus      = capitalize(activeLead.next_action_status || activeLead.taskStatus || "Pending");
+  const nextActionDescription = capitalize(activeLead.next_action_description || "N/A");
   const treatmentInterest     = activeLead.treatment_interest
-    ? activeLead.treatment_interest.split(",").map((t) => t.trim())
+    ? activeLead.treatment_interest.split(",").map((t) => capitalizeWords(t.trim()))
     : [];
 
   const hasAppointment = activeLead.book_appointment === true;
 
   const appointmentDepartment = hasAppointment
-    ? activeLead.department_name || activeLead.department || "N/A"
+    ? capitalizeWords(activeLead.department_name || activeLead.department || "N/A")
     : "N/A";
   const appointmentPersonnel = hasAppointment
-    ? activeLead.personal_name || activeLead.personnel || "N/A"
+    ? capitalizeWords(activeLead.personal_name || activeLead.personnel || "N/A")
     : "N/A";
   const appointmentDate =
     hasAppointment && activeLead.appointment_date
       ? new Date(activeLead.appointment_date).toLocaleDateString("en-GB")
       : "N/A";
-  const appointmentSlot   = hasAppointment ? activeLead.slot   || "N/A" : "N/A";
-  const appointmentRemark = hasAppointment ? activeLead.remark || "N/A" : "N/A";
+  const appointmentSlot   = hasAppointment ? capitalize(activeLead.slot   || "N/A") : "N/A";
+  const appointmentRemark = hasAppointment ? capitalize(activeLead.remark || "N/A") : "N/A";
 
   const currentStatus = (activeLead?.status || activeLead?.lead_status || "new").toLowerCase();
   const isAppointment = currentStatus === "appointment";
@@ -1780,17 +1790,16 @@ export default function LeadDetailView() {
     currentStatus === "converted" ||
     (activeLead?.lead_status || "").toLowerCase() === "converted";
 
-  // ✅ FIXED: values now match Django's NEXT_ACTION_TYPE choices exactly
   const availableActions: { value: string; label: string }[] = isFollowUp
     ? [{ value: "Book Appointment", label: "Book Appointment" }]
     : [
-        { value: "Follow Up",       label: "Follow Up" },
+        { value: "Follow Up",        label: "Follow Up" },
         { value: "Book Appointment", label: "Book Appointment" },
-        { value: "Call Patient",    label: "Call Patient" },
-        { value: "Send Message",    label: "Send Message" },
-        { value: "Send Email",      label: "Send Email" },
-        { value: "Review Details",  label: "Review Details" },
-        { value: "No Action",       label: "No Action" },
+        { value: "Call Patient",     label: "Call Patient" },
+        { value: "Send Message",     label: "Send Message" },
+        { value: "Send Email",       label: "Send Email" },
+        { value: "Review Details",   label: "Review Details" },
+        { value: "No Action",        label: "No Action" },
       ];
 
   return (
