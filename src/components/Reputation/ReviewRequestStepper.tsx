@@ -16,12 +16,13 @@ const ReviewRequestStepper = ({ step }: ReviewRequestStepperProps) => {
     <Paper
       elevation={0}
       sx={{
-        p: 2,
-        mb: 3,
+        p: 1.25,
+        mb: 2,
         borderRadius: "12px",
         border: "1px solid #F3F4F6",
         display: "flex",
         alignItems: "center",
+        justifyContent: "center",
       }}
     >
       {stepItems.map((item, idx) => (
@@ -30,24 +31,24 @@ const ReviewRequestStepper = ({ step }: ReviewRequestStepperProps) => {
           sx={{
             display: "flex",
             alignItems: "center",
-            flex: idx === 2 ? 0 : 1,
+            flex: "0 0 auto",
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
             {step > item.num ? (
               <CheckCircleIcon sx={{ color: "#22C55E", fontSize: 22 }} />
             ) : (
               <Box
                 sx={{
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   borderRadius: "50%",
                   backgroundColor: step === item.num ? "#E86A4A" : "#E5E7EB",
                   color: "#FFF",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "11px",
+                  fontSize: "10px",
                   fontWeight: 700,
                 }}
               >
@@ -57,6 +58,8 @@ const ReviewRequestStepper = ({ step }: ReviewRequestStepperProps) => {
             <Typography
               variant="caption"
               fontWeight={600}
+              noWrap
+              sx={{ fontSize: 11, lineHeight: 1.2 }}
               color={
                 step >= item.num
                   ? step === item.num
@@ -69,7 +72,14 @@ const ReviewRequestStepper = ({ step }: ReviewRequestStepperProps) => {
             </Typography>
           </Box>
           {idx < 2 && (
-            <Box sx={{ flex: 1, height: "1px", bgcolor: "#E5E7EB", mx: 2 }} />
+            <Box
+              sx={{
+                width: { xs: 46, sm: 68 },
+                height: "1px",
+                bgcolor: "#E5E7EB",
+                mx: 1.25,
+              }}
+            />
           )}
         </Box>
       ))}

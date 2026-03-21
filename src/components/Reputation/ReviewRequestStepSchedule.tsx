@@ -1,15 +1,24 @@
 import {
   Box,
   FormControlLabel,
-  InputAdornment,
   Radio,
   RadioGroup,
-  TextField,
   Typography,
 } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import type { ReviewRequestFormData } from "./reviewRequest.utils";
+import dayjs from "dayjs";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import {
+  formatDisplayDate,
+  formatDisplayTime,
+  getScheduledDateTime,
+  parseDisplayDate,
+  type ReviewRequestFormData,
+} from "./reviewRequest.utils";
 
 type ReviewRequestStepScheduleProps = {
   formData: ReviewRequestFormData;
@@ -31,79 +40,89 @@ const ReviewRequestStepSchedule = ({
   onTimeBlur,
 }: ReviewRequestStepScheduleProps) => {
   const isDisabled = formData.is_scheduled === "no";
+  const now = dayjs();
+  const selectedDate = parseDisplayDate(formData.schedule_date);
+  const selectedTime = getScheduledDateTime(
+    formData.schedule_date,
+    formData.schedule_time,
+  );
+  const minTime = selectedDate?.isSame(now, "day")
+    ? now.startOf("minute")
+    : undefined;
 
   return (
-    <Box>
-      <Typography
-        fontWeight={600}
-        fontSize={13}
-        sx={{ mb: 1, textTransform: "capitalize" }}
-      >
-        Want to schedule this {formData.mode}
-      </Typography>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box>
+        <Typography
+          fontWeight={600}
+          fontSize={13}
+          sx={{ mb: 1, textTransform: "capitalize" }}
+        >
+          Want to schedule this {formData.mode}
+        </Typography>
 
-      <RadioGroup
-        row
-        value={formData.is_scheduled}
-        onChange={(e) => onScheduleToggle(e.target.value as "yes" | "no")}
-        sx={{ mb: 3 }}
-      >
-        <FormControlLabel
-          value="yes"
-          control={<Radio sx={coralRadio} size="small" />}
-          label={<Typography variant="body2">Yes</Typography>}
-        />
-        <FormControlLabel
-          value="no"
-          control={<Radio sx={coralRadio} size="small" />}
-          label={<Typography variant="body2">No</Typography>}
-        />
-      </RadioGroup>
+        <RadioGroup
+          row
+          value={formData.is_scheduled}
+          onChange={(e) => onScheduleToggle(e.target.value as "yes" | "no")}
+          sx={{ mb: 1.75 }}
+        >
+          <FormControlLabel
+            value="yes"
+            control={<Radio sx={coralRadio} size="small" />}
+            label={<Typography variant="body2">Yes</Typography>}
+          />
+          <FormControlLabel
+            value="no"
+            control={<Radio sx={coralRadio} size="small" />}
+            label={<Typography variant="body2">No</Typography>}
+          />
+        </RadioGroup>
 
-      <Box sx={{ display: "flex", gap: 2 }}>
-        <TextField
-          fullWidth
-          label="Select Date"
-          disabled={isDisabled}
-          value={isDisabled ? "00/00/0000" : formData.schedule_date}
-          onChange={(e) => onDateChange(e.target.value)}
-          onBlur={onDateBlur}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <CalendarTodayIcon
-                  sx={{
-                    fontSize: 18,
-                    color: isDisabled ? "text.disabled" : "inherit",
-                  }}
-                />
-              </InputAdornment>
-            ),
-          }}
-        />
+        <Box sx={{ display: "flex", gap: 1.5 }}>
+          <DatePicker
+            label="Select Date"
+            disabled={isDisabled}
+            format="DD/MM/YYYY"
+            value={isDisabled ? null : selectedDate}
+            minDate={now.startOf("day")}
+            onChange={(value) => {
+              onDateChange(value ? formatDisplayDate(dayjs(value)) : "");
+            }}
+            onClose={onDateBlur}
+            slots={{ openPickerIcon: CalendarTodayIcon }}
+            slotProps={{
+              textField: {
+                size: "small",
+                fullWidth: true,
+                onBlur: onDateBlur,
+              },
+            }}
+          />
 
-        <TextField
-          fullWidth
-          label="Enter Time"
-          disabled={isDisabled}
-          value={isDisabled ? "00:00 PM" : formData.schedule_time}
-          onChange={(e) => onTimeChange(e.target.value)}
-          onBlur={onTimeBlur}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <AccessTimeIcon
-                  sx={{
-                    fontSize: 18,
-                    color: isDisabled ? "text.disabled" : "inherit",
-                  }}
-                />
-              </InputAdornment>
-            ),
-          }}
-        />
+          <TimePicker
+            label="Enter Time"
+            disabled={isDisabled}
+            format="hh:mm A"
+            ampm
+            value={isDisabled ? null : selectedTime}
+            minTime={minTime}
+            onChange={(value) => {
+              onTimeChange(value ? formatDisplayTime(dayjs(value)) : "");
+            }}
+            onClose={onTimeBlur}
+            slots={{ openPickerIcon: AccessTimeIcon }}
+            slotProps={{
+              textField: {
+                size: "small",
+                fullWidth: true,
+                onBlur: onTimeBlur,
+              },
+            }}
+          />
+        </Box>
       </Box>
-    </Box>
+    </LocalizationProvider>
   );
 };
 

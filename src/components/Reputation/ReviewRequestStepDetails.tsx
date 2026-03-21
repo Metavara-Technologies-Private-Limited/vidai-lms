@@ -4,15 +4,16 @@ import {
   Chip,
   FormControlLabel,
   IconButton,
-  InputAdornment,
+  Menu,
+  MenuItem,
   Radio,
   RadioGroup,
   TextField,
   Typography,
 } from "@mui/material";
 import { Autocomplete } from "@mui/material";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import { useState } from "react";
+import FilterLeadsIcon from "../../assets/icons/Filter_Leads.svg";
 import type { Lead } from "../../services/leads.api";
 import type { ReviewRequestFormData } from "./reviewRequest.utils";
 
@@ -28,8 +29,20 @@ type ReviewRequestStepDetailsProps = {
   onDescriptionBlur: () => void;
   onLeadSelectionTypeChange: (value: "all" | "manual") => void;
   onSelectedLeadsChange: (leads: Lead[]) => void;
+  leadActionFilter: string;
+  onLeadActionFilterChange: (value: string) => void;
   onCollectOnChange: (value: "google" | "form" | "both") => void;
 };
+
+const ACTION_FILTER_OPTIONS = [
+  "Follow Up",
+  "Call Patient",
+  "Book Appointment",
+  "Send Message",
+  "Send Email",
+  "Review Details",
+  "No Action",
+] as const;
 
 const ReviewRequestStepDetails = ({
   formData,
@@ -43,14 +56,20 @@ const ReviewRequestStepDetails = ({
   onDescriptionBlur,
   onLeadSelectionTypeChange,
   onSelectedLeadsChange,
+  leadActionFilter,
+  onLeadActionFilterChange,
   onCollectOnChange,
 }: ReviewRequestStepDetailsProps) => {
   const leadList = leadSelectionType === "all" ? allLeads : selectedLeads;
+  const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(
+    null,
+  );
 
   return (
     <Box>
-      <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+      <Box sx={{ display: "flex", gap: 1.5, mb: 1.5 }}>
         <TextField
+          size="small"
           fullWidth
           label="Request Name"
           value={formData.request_name}
@@ -58,6 +77,7 @@ const ReviewRequestStepDetails = ({
           onBlur={onRequestNameBlur}
         />
         <TextField
+          size="small"
           fullWidth
           label="Description"
           value={formData.description}
@@ -75,7 +95,7 @@ const ReviewRequestStepDetails = ({
         onChange={(e) =>
           onLeadSelectionTypeChange(e.target.value as "all" | "manual")
         }
-        sx={{ mb: 2 }}
+        sx={{ mb: 1.5 }}
       >
         <FormControlLabel
           value="all"
@@ -89,44 +109,104 @@ const ReviewRequestStepDetails = ({
         />
       </RadioGroup>
 
-      <Autocomplete<Lead, true, false, false>
-        multiple
-        options={allLeads}
-        disabled={leadSelectionType === "all"}
-        getOptionLabel={(option) => option.full_name || ""}
-        value={selectedLeads}
-        onChange={(_, newValue) => onSelectedLeadsChange(newValue)}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="Assignee"
-            placeholder={
-              leadSelectionType === "all"
-                ? "All leads selected"
-                : "Search & Select"
-            }
-            InputProps={{
-              ...params.InputProps,
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton size="small">
-                    <FilterListIcon fontSize="small" />
-                  </IconButton>
-                  <KeyboardArrowDownIcon />
-                </InputAdornment>
-              ),
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+        <Autocomplete<Lead, true, false, false>
+          multiple
+          options={allLeads}
+          disabled={leadSelectionType === "all"}
+          getOptionLabel={(option) => option.full_name || ""}
+          value={selectedLeads}
+          onChange={(_, newValue) => onSelectedLeadsChange(newValue)}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              size="small"
+              label="Assignee"
+              placeholder={
+                leadSelectionType === "all"
+                  ? "All leads selected"
+                  : "Search & Select"
+              }
+            />
+          )}
+          sx={{ flex: 1 }}
+        />
+
+        <IconButton
+          sx={{ p: 0 }}
+          onClick={(event) => setFilterAnchorEl(event.currentTarget)}
+        >
+          <img
+            src={FilterLeadsIcon}
+            alt="Filter"
+            style={{ width: 36, height: 36 }}
+          />
+        </IconButton>
+
+        {leadActionFilter && (
+          <Chip
+            label={leadActionFilter}
+            size="small"
+            onDelete={() => onLeadActionFilterChange("")}
+            sx={{
+              borderRadius: "999px",
+              fontWeight: 600,
+              color: "#6D28D9",
+              backgroundColor: "#F5F3FF",
+              border: "1px solid #DDD6FE",
             }}
           />
         )}
-        sx={{ mb: 2 }}
-      />
+
+        <Menu
+          anchorEl={filterAnchorEl}
+          open={Boolean(filterAnchorEl)}
+          onClose={() => setFilterAnchorEl(null)}
+          PaperProps={{
+            sx: {
+              width: 300,
+              borderRadius: "12px",
+              mt: 1,
+            },
+          }}
+        >
+          <MenuItem
+            selected={leadActionFilter === ""}
+            onClick={() => {
+              onLeadActionFilterChange("");
+              setFilterAnchorEl(null);
+            }}
+            sx={{
+              m: 1,
+              borderRadius: "8px",
+              backgroundColor:
+                leadActionFilter === "" ? "#F3ECEC" : "transparent",
+            }}
+          >
+            <Typography>-- Select --</Typography>
+          </MenuItem>
+
+          {ACTION_FILTER_OPTIONS.map((option) => (
+            <MenuItem
+              key={option}
+              selected={leadActionFilter === option}
+              onClick={() => {
+                onLeadActionFilterChange(option);
+                setFilterAnchorEl(null);
+              }}
+            >
+              <Typography>{option}</Typography>
+            </MenuItem>
+          ))}
+        </Menu>
+      </Box>
 
       <Box
         sx={{
           display: "flex",
           flexWrap: "wrap",
           gap: 1,
-          mb: 3,
+          mb: 2,
           minHeight: "32px",
         }}
       >

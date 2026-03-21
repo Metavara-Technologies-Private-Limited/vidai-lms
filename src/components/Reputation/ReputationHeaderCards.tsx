@@ -23,46 +23,46 @@ const ReputationHeaderCards = ({
   totalReviews = 0,
   conversionRate = 0,
 }: Props) => {
+  type CardItem = {
+    title: string;
+    value: string | number;
+    icon: React.ReactNode;
+    bg: string;
+  };
 
-type CardItem = {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  bg: string;
-};
+const cardData: CardItem[] = [
+  {
+    title: "Avg Rating",
+    value: Number(avgRating).toFixed(1),
+    icon: <img src={Review_Avg_Rating} alt="Avg Rating" />,
+    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(236,189,86,0.18) 140%)",
+  },
+  {
+    title: "Reviews Requests Sent",
+    value: Number(reviewRequestsSent).toFixed(0),
+    icon: <img src={Reviews_Sent} alt="Reviews Requests Sent" />,
+    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(83,146,242,0.18) 140%)",
+  },
+  {
+    title: "Reviews Submitted",
+    value: reviewsSubmitted,
+    icon: <img src={Reviews_Submit} alt="Reviews Submitted" />,
+    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(71,179,95,0.18) 140%)",
+  },
+  {
+    title: "Total Reviews",
+    value: totalReviews,
+    icon: <img src={Reviews_Total} alt="Total Reviews" />,
+    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(236,189,86,0.18) 140%)",
+  },
+  {
+    title: "Conversion Rate",
+    value: `${conversionRate}%`,
+    icon: <img src={Reviews_Conversion} alt="Conversion Rate" />,
+    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(131,93,239,0.18) 140%)",
+  },
+];
 
-  const cardData: CardItem[] = [
-    {
-      title: "Avg Rating",
-value: Number(avgRating).toFixed(1),
-      icon: <img src={Review_Avg_Rating} alt="Avg Rating" />,
-      bg: "#FFF6E5",
-    },
-    {
-      title: "Reviews Requests Sent",
-      value: Number(reviewRequestsSent).toFixed(0),
-      icon: <img src={Reviews_Sent} alt="Reviews Requests Sent" />,
-      bg: "#EEF4FF",
-    },
-    {
-      title: "Reviews Submitted",
-      value: reviewsSubmitted,
-      icon: <img src={Reviews_Submit} alt="Reviews Submitted" />,
-      bg: "#EAF7EF",
-    },
-{
-  title: "Total Reviews",
-  value: totalReviews,
-      icon: <img src={Reviews_Total} alt="Total Reviews" />,
-      bg: "#FFF3E8",
-    },
-{
-  title: "Conversion Rate",
-  value: `${conversionRate}%`,
-      icon: <img src={Reviews_Conversion} alt="Conversion Rate" />,
-      bg: "#F3EEFF",
-    },
-  ];
 
   return (
     <Box
@@ -82,7 +82,7 @@ value: Number(avgRating).toFixed(1),
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            backgroundColor: "#fff",
+            background: card.bg,
             border: "1px solid #eee",
             boxShadow: "none",
           }}
@@ -96,7 +96,7 @@ value: Number(avgRating).toFixed(1),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: card.bg,
+              backgroundColor: "#FFFFFF",
               mb: 1.5,
             }}
           >
