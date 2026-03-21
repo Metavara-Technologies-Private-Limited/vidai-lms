@@ -14,6 +14,7 @@ type Props = {
   reviewRequestsSent?: number;
   totalReviews?: number;
   conversionRate?: number;
+  showTotalReviews?: boolean;
 };
 
 const ReputationHeaderCards = ({
@@ -22,6 +23,7 @@ const ReputationHeaderCards = ({
   reviewRequestsSent = 0,
   totalReviews = 0,
   conversionRate = 0,
+  showTotalReviews = true,
 }: Props) => {
   type CardItem = {
     title: string;
@@ -30,45 +32,48 @@ const ReputationHeaderCards = ({
     bg: string;
   };
 
-const cardData: CardItem[] = [
-  {
-    title: "Avg Rating",
-    value: Number(avgRating).toFixed(1),
-    icon: <img src={Review_Avg_Rating} alt="Avg Rating" />,
-    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(236,189,86,0.18) 140%)",
-  },
-  {
-    title: "Reviews Requests Sent",
-    value: Number(reviewRequestsSent).toFixed(0),
-    icon: <img src={Reviews_Sent} alt="Reviews Requests Sent" />,
-    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(83,146,242,0.18) 140%)",
-  },
-  {
-    title: "Reviews Submitted",
-    value: reviewsSubmitted,
-    icon: <img src={Reviews_Submit} alt="Reviews Submitted" />,
-    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(71,179,95,0.18) 140%)",
-  },
-  {
-    title: "Total Reviews",
-    value: totalReviews,
-    icon: <img src={Reviews_Total} alt="Total Reviews" />,
-    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(236,189,86,0.18) 140%)",
-  },
-  {
-    title: "Conversion Rate",
-    value: `${conversionRate}%`,
-    icon: <img src={Reviews_Conversion} alt="Conversion Rate" />,
-    bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(131,93,239,0.18) 140%)",
-  },
-];
-
+  const cardData: CardItem[] = [
+    {
+      title: "Avg Rating",
+      value: Number(avgRating).toFixed(1),
+      icon: <img src={Review_Avg_Rating} alt="Avg Rating" />,
+      bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(236,189,86,0.18) 140%)",
+    },
+    {
+      title: "Reviews Requests Sent",
+      value: Number(reviewRequestsSent).toFixed(0),
+      icon: <img src={Reviews_Sent} alt="Reviews Requests Sent" />,
+      bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(83,146,242,0.18) 140%)",
+    },
+    {
+      title: "Reviews Submitted",
+      value: reviewsSubmitted,
+      icon: <img src={Reviews_Submit} alt="Reviews Submitted" />,
+      bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(71,179,95,0.18) 140%)",
+    },
+    ...(showTotalReviews
+      ? [
+          {
+            title: "Total Reviews",
+            value: totalReviews,
+            icon: <img src={Reviews_Total} alt="Total Reviews" />,
+            bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(236,189,86,0.18) 140%)",
+          },
+        ]
+      : []),
+    {
+      title: "Conversion Rate",
+      value: `${Number(conversionRate).toFixed(1).replace(/\.0$/, "")}%`,
+      icon: <img src={Reviews_Conversion} alt="Conversion Rate" />,
+      bg: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 55%, rgba(131,93,239,0.18) 140%)",
+    },
+  ];
 
   return (
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: "repeat(5, 1fr)",
+        gridTemplateColumns: `repeat(${cardData.length}, 1fr)`,
         gap: 2,
         mb: 3,
       }}

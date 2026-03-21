@@ -14,11 +14,10 @@ import type { AppDispatch } from "../../store";
 
 import {
   fetchReviewRequests,
-  fetchReputationDashboard,
   selectReputationRequests,
-  selectReputationDashboard,
 } from "../../store/reputationSlice";
 import { fetchLeads } from "../../store/leadSlice";
+import { reputationApi } from "../../services/reputation.api";
 
 import BackwardIcon from "../../assets/icons/Backward_icon.svg";
 import FilterLeadsIcon from "../../assets/icons/Filter_Leads.svg";
@@ -36,17 +35,220 @@ type ReviewRequestItem = {
   request_name: string;
   status: string;
   requests_sent?: number;
+  request_sent?: number;
   reviews_submitted?: number;
+  review_submitted?: number;
+  total_reviews?: number;
   avg_rating?: number;
+  lead_ids?: string[];
+  leads?: unknown[];
   mode?: string;
   created_at?: string;
+};
+
+type DashboardMetrics = {
+  avgRating: number;
+  reviewRequestsSent: number;
+  reviewsSubmitted: number;
+  totalReviews: number;
+  conversionRate: number;
+};
+
+type RequestMetrics = {
+  sent: number;
+  submitted: number;
+  totalReviews: number;
+  avgRating: number;
+  conversionRate: number;
+};
+
+type RequestRecord = Record<string, unknown>;
+
+type RequestMetricOverrides = {
+  sent?: number;
+  submitted?: number;
+  avgRating?: number;
+};
+
+type PersistedRequestMetric = RequestMetricOverrides & {
+  requestId?: string;
+  requestName?: string;
+  updatedAt?: number;
+};
+
+const REQUEST_METRICS_CACHE_KEY = "reputation_request_metrics_cache_v1";
+
+const toNumber = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+};
+
+const asRecord = (value: unknown): RequestRecord => {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  return value as RequestRecord;
+};
+
+const pickNumber = (source: RequestRecord, keys: string[]): number => {
+  for (const key of keys) {
+    const value = toNumber(source[key]);
+    if (value > 0) {
+      return value;
+    }
+  }
+
+  return 0;
+};
+
+const pickArrayLength = (source: RequestRecord, keys: string[]): number => {
+  for (const key of keys) {
+    const value = source[key];
+    if (Array.isArray(value) && value.length > 0) {
+      return value.length;
+    }
+  }
+
+  return 0;
+};
+
+const resolveSentCount = (record: RequestRecord): number => {
+  const explicitSent = pickNumber(record, [
+    "requests_sent",
+    "request_sent",
+    "requestsSent",
+    "requestSent",
+    "sent_count",
+    "sentCount",
+    "leads_count",
+    "lead_count",
+    "selected_leads_count",
+    "total_recipients",
+  ]);
+
+  if (explicitSent > 0) {
+    return explicitSent;
+  }
+
+  return pickArrayLength(record, ["lead_ids", "leads", "selected_leads"]);
+};
+
+const resolveSubmittedCount = (record: RequestRecord): number => {
+  return pickNumber(record, [
+    "reviews_submitted",
+    "review_submitted",
+    "reviewsSubmitted",
+    "reviewSubmitted",
+    "submitted_count",
+    "submittedCount",
+    "reviews_count",
+    "review_count",
+    "total_submitted",
+  ]);
+};
+
+const resolveAvgRating = (record: RequestRecord): number => {
+  return pickNumber(record, [
+    "avg_rating",
+    "average_rating",
+    "avgRating",
+    "rating_avg",
+  ]);
+};
+
+const resolveTotalReviews = (record: RequestRecord): number => {
+  return pickNumber(record, [
+    "total_reviews",
+    "reviews_count",
+    "review_count",
+    "total_submitted",
+  ]);
+};
+
+const readPersistedRequestMetrics = (): PersistedRequestMetric[] => {
+  try {
+    const raw = localStorage.getItem(REQUEST_METRICS_CACHE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item) => typeof item === "object" && item !== null)
+      .map((item) => item as PersistedRequestMetric);
+  } catch {
+    return [];
+  }
+};
+
+const writePersistedRequestMetrics = (entries: PersistedRequestMetric[]) => {
+  try {
+    localStorage.setItem(REQUEST_METRICS_CACHE_KEY, JSON.stringify(entries));
+  } catch {
+    // Ignore storage write failures.
+  }
+};
+
+const resolveRequestMetrics = (
+  req: ReviewRequestItem,
+  overrides?: RequestMetricOverrides,
+): RequestMetrics => {
+  const reqRecord = asRecord(req);
+
+  // Always take the MAX of live backend value and cached override so that
+  // a fresh poll result is never blocked by a stale cached number, while
+  // still using the cached value as fallback when backend returns 0/missing.
+  const backendSent = resolveSentCount(reqRecord);
+  const backendSubmitted = resolveSubmittedCount(reqRecord);
+  const backendAvgRating = resolveAvgRating(reqRecord);
+
+  const sent = Math.max(
+    0,
+    Math.round(Math.max(backendSent, overrides?.sent ?? 0)),
+  );
+  const submitted = Math.max(
+    0,
+    Math.round(Math.max(backendSubmitted, overrides?.submitted ?? 0)),
+  );
+
+  const totalReviews = Math.max(
+    submitted,
+    Math.round(resolveTotalReviews(reqRecord)),
+  );
+
+  const avgRatingFromOverride = overrides?.avgRating ?? 0;
+  const resolvedAvgRating =
+    backendAvgRating > 0 ? backendAvgRating : avgRatingFromOverride;
+
+  const avgRating = Math.max(0, Math.min(5, resolvedAvgRating));
+  const conversionRate = sent > 0 ? (submitted / sent) * 100 : 0;
+
+  return {
+    sent,
+    submitted,
+    totalReviews,
+    avgRating,
+    conversionRate,
+  };
 };
 
 const ReputationDashboard = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  const requests = useSelector(selectReputationRequests) || [];
-  const dashboard = useSelector(selectReputationDashboard);
+  const requests = useSelector(selectReputationRequests) as ReviewRequestItem[];
 
   const [openReviewDialog, setOpenReviewDialog] = useState(false);
   const [openReviewDetails, setOpenReviewDetails] = useState(false);
@@ -62,6 +264,249 @@ const ReputationDashboard = () => {
     null,
   );
   const [selectedRequestName, setSelectedRequestName] = useState<string>("");
+  const [requestMetricOverrides, setRequestMetricOverrides] = useState<
+    Record<string, RequestMetricOverrides>
+  >({});
+
+  const cachedRequestMetricOverrides = useMemo(() => {
+    const persisted = readPersistedRequestMetrics();
+    const byId = new Map<string, PersistedRequestMetric>();
+    const byName = new Map<string, PersistedRequestMetric>();
+
+    persisted.forEach((entry) => {
+      const idKey = String(entry.requestId || "").trim();
+      const nameKey = String(entry.requestName || "")
+        .trim()
+        .toLowerCase();
+
+      if (idKey) {
+        byId.set(idKey, entry);
+      }
+
+      if (nameKey) {
+        byName.set(nameKey, entry);
+      }
+    });
+
+    const resolved: Record<string, RequestMetricOverrides> = {};
+
+    requests.forEach((request) => {
+      const requestId = String(request.id);
+      const requestNameKey = String(request.request_name || "")
+        .trim()
+        .toLowerCase();
+
+      const fromId = byId.get(requestId);
+      const fromName = requestNameKey ? byName.get(requestNameKey) : undefined;
+      const entry = fromId || fromName;
+
+      if (!entry) {
+        return;
+      }
+
+      resolved[requestId] = {
+        sent: entry.sent,
+        submitted: entry.submitted,
+        avgRating: entry.avgRating,
+      };
+    });
+
+    return resolved;
+  }, [requests]);
+
+  useEffect(() => {
+    if (!requests.length) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const enrichRequestMetrics = async () => {
+      const entries = await Promise.all(
+        requests.map(async (request) => {
+          const requestId = String(request.id);
+          let sent = resolveSentCount(asRecord(request));
+          let submitted = resolveSubmittedCount(asRecord(request));
+          let avgRating = resolveAvgRating(asRecord(request));
+
+          try {
+            const detailResponse =
+              await reputationApi.getRequestById(requestId);
+            const detailRoot = asRecord(detailResponse);
+            const detailData = asRecord(detailRoot.data ?? detailRoot);
+            sent = Math.max(sent, resolveSentCount(detailData));
+            submitted = Math.max(submitted, resolveSubmittedCount(detailData));
+            avgRating = Math.max(avgRating, resolveAvgRating(detailData));
+          } catch {
+            // Keep best effort from list payload.
+          }
+
+          try {
+            const reviewRows = await reputationApi.getReviews(requestId);
+            if (Array.isArray(reviewRows)) {
+              const validRatings = reviewRows
+                .map((row) => toNumber(asRecord(row).rating))
+                .filter((value) => value > 0);
+
+              submitted = Math.max(submitted, reviewRows.length);
+
+              if (validRatings.length > 0) {
+                const ratingSum = validRatings.reduce(
+                  (sum, value) => sum + value,
+                  0,
+                );
+                avgRating = Math.max(
+                  avgRating,
+                  ratingSum / validRatings.length,
+                );
+              }
+            }
+          } catch {
+            // Keep best effort from request payload/detail.
+          }
+
+          return [
+            requestId,
+            {
+              sent,
+              submitted,
+              avgRating,
+            } satisfies RequestMetricOverrides,
+          ] as const;
+        }),
+      );
+
+      if (!isMounted) {
+        return;
+      }
+
+      const overrides = Object.fromEntries(entries);
+      setRequestMetricOverrides(overrides);
+
+      const persisted = readPersistedRequestMetrics();
+      const nextById = new Map<string, PersistedRequestMetric>();
+
+      persisted.forEach((entry) => {
+        const idKey = String(entry.requestId || "").trim();
+        if (idKey) {
+          nextById.set(idKey, entry);
+        }
+      });
+
+      requests.forEach((request) => {
+        const requestId = String(request.id);
+        const override = overrides[requestId];
+        if (!override) {
+          return;
+        }
+
+        const current = nextById.get(requestId);
+        nextById.set(requestId, {
+          ...current,
+          requestId,
+          requestName: request.request_name,
+          sent: override.sent,
+          submitted: override.submitted,
+          avgRating: override.avgRating,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const mergedEntries = Array.from(nextById.values())
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+        .slice(0, 300);
+
+      writePersistedRequestMetrics(mergedEntries);
+    };
+
+    void enrichRequestMetrics();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [requests]);
+
+  const requestMetricsById = useMemo(() => {
+    const metrics = new Map<string, RequestMetrics>();
+
+    requests.forEach((request: ReviewRequestItem) => {
+      const requestId = String(request.id);
+      const mergedOverride: RequestMetricOverrides = {
+        ...cachedRequestMetricOverrides[requestId],
+        ...requestMetricOverrides[requestId],
+      };
+
+      metrics.set(requestId, resolveRequestMetrics(request, mergedOverride));
+    });
+
+    return metrics;
+  }, [requests, requestMetricOverrides, cachedRequestMetricOverrides]);
+
+  const dashboardMetrics = useMemo<DashboardMetrics>(() => {
+    if (!requests.length) {
+      return {
+        avgRating: 0,
+        reviewRequestsSent: 0,
+        reviewsSubmitted: 0,
+        totalReviews: 0,
+        conversionRate: 0,
+      };
+    }
+
+    let reviewRequestsSent = 0;
+    let reviewsSubmitted = 0;
+    let totalReviews = 0;
+    let weightedRatingTotal = 0;
+
+    requests.forEach((request: ReviewRequestItem) => {
+      const metrics = requestMetricsById.get(String(request.id));
+      if (!metrics) {
+        return;
+      }
+
+      reviewRequestsSent += metrics.sent;
+      reviewsSubmitted += metrics.submitted;
+      totalReviews += metrics.totalReviews;
+      weightedRatingTotal += metrics.avgRating * metrics.submitted;
+    });
+
+    const avgRating =
+      reviewsSubmitted > 0 ? weightedRatingTotal / reviewsSubmitted : 0;
+    const conversionRate =
+      reviewRequestsSent > 0
+        ? (reviewsSubmitted / reviewRequestsSent) * 100
+        : 0;
+
+    return {
+      avgRating,
+      reviewRequestsSent,
+      reviewsSubmitted,
+      totalReviews,
+      conversionRate,
+    };
+  }, [requests, requestMetricsById]);
+
+  const selectedRequestMetrics = useMemo<RequestMetrics>(() => {
+    if (!selectedRequestId) {
+      return {
+        sent: 0,
+        submitted: 0,
+        totalReviews: 0,
+        avgRating: 0,
+        conversionRate: 0,
+      };
+    }
+
+    return (
+      requestMetricsById.get(String(selectedRequestId)) || {
+        sent: 0,
+        submitted: 0,
+        totalReviews: 0,
+        avgRating: 0,
+        conversionRate: 0,
+      }
+    );
+  }, [requestMetricsById, selectedRequestId]);
 
   const filteredRequests = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -107,7 +552,13 @@ const ReputationDashboard = () => {
   useEffect(() => {
     dispatch(fetchLeads());
     dispatch(fetchReviewRequests());
-    dispatch(fetchReputationDashboard());
+
+    const POLL_INTERVAL_MS = 5_000; // 5 seconds
+    const intervalId = setInterval(() => {
+      void dispatch(fetchReviewRequests());
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
   }, [dispatch]);
 
   return (
@@ -124,11 +575,11 @@ const ReputationDashboard = () => {
         <>
           {/* Header Cards */}
           <ReputationHeaderCards
-            avgRating={dashboard?.avg_rating || 0}
-            reviewsSubmitted={dashboard?.reviews_submitted || 0}
-            reviewRequestsSent={dashboard?.requests_sent || 0}
-            totalReviews={dashboard?.total_reviews || 0}
-            conversionRate={dashboard?.conversion_rate || 0}
+            avgRating={dashboardMetrics.avgRating}
+            reviewsSubmitted={dashboardMetrics.reviewsSubmitted}
+            reviewRequestsSent={dashboardMetrics.reviewRequestsSent}
+            totalReviews={dashboardMetrics.totalReviews}
+            conversionRate={dashboardMetrics.conversionRate}
           />
 
           <Box
@@ -250,7 +701,21 @@ const ReputationDashboard = () => {
             {filteredRequests.map((req: ReviewRequestItem) => (
               <ReviewCard
                 key={req.id}
-                request={req}
+                request={{
+                  ...req,
+                  requests_sent:
+                    requestMetricsById.get(String(req.id))?.sent ??
+                    req.requests_sent ??
+                    0,
+                  reviews_submitted:
+                    requestMetricsById.get(String(req.id))?.submitted ??
+                    req.reviews_submitted ??
+                    0,
+                  avg_rating:
+                    requestMetricsById.get(String(req.id))?.avgRating ??
+                    req.avg_rating ??
+                    0,
+                }}
                 onOpen={() => {
                   setSelectedRequestId(req.id);
                   setSelectedRequestName(req.request_name);
@@ -295,11 +760,12 @@ const ReputationDashboard = () => {
 
           {/* Header Cards */}
           <ReputationHeaderCards
-            avgRating={dashboard?.avg_rating || 0}
-            reviewsSubmitted={dashboard?.reviews_submitted || 0}
-            reviewRequestsSent={dashboard?.requests_sent || 0}
-            totalReviews={dashboard?.total_reviews || 0}
-            conversionRate={dashboard?.conversion_rate || 0}
+            avgRating={selectedRequestMetrics.avgRating}
+            reviewsSubmitted={selectedRequestMetrics.submitted}
+            reviewRequestsSent={selectedRequestMetrics.sent}
+            totalReviews={selectedRequestMetrics.totalReviews}
+            conversionRate={selectedRequestMetrics.conversionRate}
+            showTotalReviews={false}
           />
 
           {/* Reviews Table */}
