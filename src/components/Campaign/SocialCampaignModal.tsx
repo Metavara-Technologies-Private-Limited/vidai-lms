@@ -34,7 +34,7 @@ import {
 
 type Props = {
   onClose: () => void;
-  onSave: (campaign: SocialCampaignPayload) => void;
+  onSave: (campaign?: unknown) => void;
 };
 
 const PLATFORM_LIST: { id: Platform; label: string; cpc: number }[] = [
@@ -375,11 +375,34 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         is_active: type === "live",
       };
 
-      await CampaignAPI.createSocial(payload);
-      onSave(payload);
+      const createdRes = await CampaignAPI.createSocial(payload);
+      onSave(createdRes?.data ?? payload);
       toast.success("Campaign created successfully");
       onClose();
     } catch {
+      try {
+        const listRes = await CampaignAPI.list();
+        const list = Array.isArray(listRes.data) ? listRes.data : [];
+        const found = list
+          .filter((item) =>
+            String(item?.campaign_name ?? "").trim().toLowerCase() === campaignName.trim().toLowerCase()
+          )
+          .sort((a, b) => {
+            const at = new Date(String(a?.modified_at ?? a?.created_at ?? 0)).getTime();
+            const bt = new Date(String(b?.modified_at ?? b?.created_at ?? 0)).getTime();
+            return bt - at;
+          })[0];
+
+        if (found) {
+          onSave(found);
+          toast.success("Campaign created successfully");
+          onClose();
+          return;
+        }
+      } catch {
+        // ignore fallback failure
+      }
+
       toast.error("Failed to create campaign");
     }
   };

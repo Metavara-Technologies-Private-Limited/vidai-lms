@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Table, TableBody, TableCell, TableContainer, TableHead, 
   TableRow, Paper, Chip, IconButton, Box, Stack, Typography 
@@ -20,12 +20,24 @@ interface Props {
 export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], onAction }) => {
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
-  const totalPages = data.length === 0 ? 0 : Math.ceil(data.length / rowsPerPage);
-  const safePage = Math.min(page, Math.max(0, totalPages - 1));
-  const visibleRows = data.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
-  const start = data.length === 0 ? 0 : safePage * rowsPerPage + 1;
-  const end = Math.min((safePage + 1) * rowsPerPage, data.length);
+  const sortedData = useMemo(() => {
+    const getTime = (row: FormTemplate) => {
+      const raw = row.modified_at || row.lastUpdatedAt || row.updated_at || row.created_at;
+      if (!raw) return 0;
+      const ts = new Date(String(raw)).getTime();
+      return Number.isNaN(ts) ? 0 : ts;
+    };
+
+    return [...data].sort((a, b) => getTime(b as FormTemplate) - getTime(a as FormTemplate));
+  }, [data]);
+
+  const totalPages = sortedData.length === 0 ? 0 : Math.ceil(sortedData.length / rowsPerPage);
+  const safePage = Math.min(page, Math.max(0, totalPages - 1));
+  const visibleRows = sortedData.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
+
+  const start = sortedData.length === 0 ? 0 : safePage * rowsPerPage + 1;
+  const end = Math.min((safePage + 1) * rowsPerPage, sortedData.length);
 
   // Pagination Handlers
   const handlePrev = () => setPage((p) => Math.max(0, p - 1));
@@ -145,7 +157,7 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({ data = [], onAction }) 
         px: 1 
       }}>
         <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '13px' }}>
-          Showing <strong>{start}</strong> to <strong>{end}</strong> of <strong>{data.length}</strong> entries
+          Showing <strong>{start}</strong> to <strong>{end}</strong> of <strong>{sortedData.length}</strong> entries
         </Typography>
 
         <Stack direction="row" spacing={1} alignItems="center">

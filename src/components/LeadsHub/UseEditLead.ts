@@ -479,15 +479,11 @@ export function useEditLead() {
 
     const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
 
-    const resolvedDepartmentId: number | null =
-      bookingActive && department
-        ? intOrNull(department)
-        : leadDepartmentId;
-
+    // Backend does not allow changing lead department on update.
+    // Keep original lead department immutable; appointment department is only
+    // used to filter personnel/slots in UI.
     const resolvedDeptId: number =
-      bookingActive && department
-        ? (intOrNull(department) ?? resolvedDepartmentId ?? clinicId)
-        : (resolvedDepartmentId ?? clinicId);
+      leadDepartmentId ?? leadData.department_id ?? clinicId;
 
     const coupleActive = isCouple === "yes";
 

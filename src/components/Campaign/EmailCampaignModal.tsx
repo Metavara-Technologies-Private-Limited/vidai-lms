@@ -174,12 +174,35 @@ export default function EmailCampaignModal({
         ],
       };
 
-      await CampaignAPI.createEmail(payload);
+      const createdRes = await CampaignAPI.createEmail(payload);
 
-      onSave();
+      onSave(createdRes?.data ?? payload);
       toast.success("Campaign created successfully");
       onClose();
     } catch (error: unknown) {
+      try {
+        const listRes = await CampaignAPI.list();
+        const list = Array.isArray(listRes.data) ? listRes.data : [];
+        const found = list
+          .filter((item) =>
+            String(item?.campaign_name ?? "").trim().toLowerCase() === campaignName.trim().toLowerCase()
+          )
+          .sort((a, b) => {
+            const at = new Date(String(a?.modified_at ?? a?.created_at ?? 0)).getTime();
+            const bt = new Date(String(b?.modified_at ?? b?.created_at ?? 0)).getTime();
+            return bt - at;
+          })[0];
+
+        if (found) {
+          onSave(found);
+          toast.success("Campaign created successfully");
+          onClose();
+          return;
+        }
+      } catch {
+        // ignore fallback failure
+      }
+
       if (error instanceof Error) {
         toast.error(error.message);
       } else {

@@ -130,6 +130,7 @@ export type LeadMailListItem = {
   sender_email?: string | null;
   email_body: string;
   status: LeadEmailStatus;
+  failed_reason?: string | null;
   scheduled_at?: string | null;
   sent_at?: string | null;
   created_at: string;
