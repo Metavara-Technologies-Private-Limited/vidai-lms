@@ -71,7 +71,7 @@ const ReviewRequestStepContent = ({
         onChange={(e) =>
           onModeChange(e.target.value as "email" | "sms" | "whatsapp")
         }
-        sx={{ mb: 2 }}
+        sx={{ mb: 1.5 }}
       >
         <FormControlLabel
           value="email"
@@ -91,6 +91,7 @@ const ReviewRequestStepContent = ({
       </RadioGroup>
 
       <TextField
+        size="small"
         fullWidth
         label="Subject"
         placeholder="Type Here"
@@ -123,7 +124,7 @@ const ReviewRequestStepContent = ({
               }
             : undefined
         }
-        sx={{ mb: 3 }}
+        sx={{ mb: 1.75 }}
       />
 
       <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
@@ -134,7 +135,7 @@ const ReviewRequestStepContent = ({
           border: "1px solid #E5E7EB",
           borderRadius: "12px",
           overflow: "hidden",
-          mb: 2,
+          mb: 1.5,
         }}
       >
         <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
@@ -148,12 +149,12 @@ const ReviewRequestStepContent = ({
         <TextField
           fullWidth
           multiline
-          rows={formData.mode === "email" ? 10 : 6}
+          rows={formData.mode === "email" ? 7 : 5}
           placeholder="Type your message here..."
           variant="standard"
           InputProps={{
             disableUnderline: true,
-            sx: { px: 2, pb: 2, fontSize: 14 },
+            sx: { px: 1.75, pb: 1.5, fontSize: 14 },
           }}
           value={formData.message}
           onChange={(e) => onMessageChange(e.target.value)}

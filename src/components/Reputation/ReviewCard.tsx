@@ -4,7 +4,10 @@ import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 
 import StarIcon from "@mui/icons-material/Star";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import ReputationRatingStar from "../../assets/icons/Reputation_Rating_Star.svg";
+import ReputationEmailMode from "../../assets/icons/Reputation_Email_Mode.svg";
+import ReputationWhatsappMode from "../../assets/icons/Reputation_Whatsapp_Mode.svg";
+import ReputationSmsMode from "../../assets/icons/Reputation_Sms_Mode.svg";
 
 type ReviewRequest = {
   id: string;
@@ -24,14 +27,33 @@ type ReviewCardProps = {
 
 const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
   const normalizedStatus = (request.status || "draft").toLowerCase();
+  const normalizedMode = (request.mode || "email").toLowerCase();
   const statusLabel =
     normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+
+  const modeDisplayLabel =
+    normalizedMode === "sms"
+      ? "SMS"
+      : normalizedMode === "whatsapp"
+        ? "Whatsapp"
+        : "Email";
+
+  const modeIcon =
+    normalizedMode === "sms"
+      ? ReputationSmsMode
+      : normalizedMode === "whatsapp"
+        ? ReputationWhatsappMode
+        : ReputationEmailMode;
 
   const statusStyles =
     normalizedStatus === "draft"
       ? { background: "#F3F4F6", color: "#4B5563" }
       : normalizedStatus === "scheduled"
-        ? { background: "#FEF3C7", color: "#92400E" }
+        ? {
+            background: "#F3EEFF",
+            color: "#7C3AED",
+            border: "1px solid #C4B5FD",
+          }
         : { background: "#EAF7EF", color: "#2E7D32" };
 
   return (
@@ -39,7 +61,7 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
       onClick={onOpen}
       sx={{
         p: 2.5,
-        borderRadius: 3,
+        borderRadius: 2,
         border: "1px solid #E5E7EB",
         boxShadow: "none",
         width: "100%",
@@ -67,7 +89,7 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
               justifyContent: "center",
             }}
           >
-            <AutoAwesomeIcon sx={{ color: "#5C9CE5", fontSize: 18 }} />
+            <img src={ReputationRatingStar} alt="Review Request" />
           </Box>
 
           <Typography sx={{ fontWeight: 600 }}>
@@ -80,7 +102,7 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
           sx={{
             px: 1.5,
             py: 0.4,
-            borderRadius: 10,
+            borderRadius: 20,
             fontSize: 12,
             ...statusStyles,
             fontWeight: 500,
@@ -130,7 +152,7 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
         </Box>
       </Box>
 
-      <Divider sx={{ mb: 2 }} />
+      <Divider sx={{ mb: 2, mx: -3 }} />
 
       {/* Bottom */}
       <Box
@@ -143,8 +165,9 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
           <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>MODE:</Typography>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <Typography sx={{ fontSize: 14 }}>
-              {request.mode || "Email"}
+            <img src={modeIcon} alt={modeDisplayLabel} />
+            <Typography sx={{ fontSize: 14, fontWeight: 500 }}>
+              {modeDisplayLabel}
             </Typography>
           </Box>
         </Box>
@@ -154,7 +177,7 @@ const ReviewCard = ({ request, onOpen }: ReviewCardProps) => {
             DATE & TIME :
           </Typography>
 
-          <Typography sx={{ fontSize: 14 }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 500 }}>
             {request.created_at
               ? new Date(request.created_at).toLocaleString()
               : "-"}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -24,9 +24,10 @@ import ReviewRequestStepDetails from "./ReviewRequestStepDetails";
 import ReviewRequestStepContent from "./ReviewRequestStepContent";
 import ReviewRequestStepSchedule from "./ReviewRequestStepSchedule";
 import {
+  createInitialReviewRequestFormData,
   formatDate,
   formatTime,
-  initialReviewRequestFormData,
+  getScheduledDateTime,
   isFieldFilled,
   isRequestNameValid,
   sanitizeRequestNameInput,
@@ -99,11 +100,19 @@ const getBackendErrorMessage = (error: unknown): string => {
   return "Failed to create review request";
 };
 
+const normalizeReviewLinkPlaceholder = (message: string) => {
+  const brokenGoogleReviewUrlPattern =
+    /https?:\/\/g\.page\/review\/your-clinic/gi;
+
+  return message.replace(brokenGoogleReviewUrlPattern, "{review_link}");
+};
+
 const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
   const dispatch = useDispatch<AppDispatch>();
-  const allLeads = useSelector(selectLeads) || [];
+  const allLeads = useSelector(selectLeads);
 
   const [step, setStep] = useState(1);
+  const [leadActionFilter, setLeadActionFilter] = useState("");
   const [leadSelectionType, setLeadSelectionType] = useState<"all" | "manual">(
     "all",
   );
@@ -111,15 +120,56 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
   const [fileName, setFileName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
-  const [formData, setFormData] = useState<ReviewRequestFormData>({
-    ...initialReviewRequestFormData,
-  });
+  const [formData, setFormData] = useState<ReviewRequestFormData>(() =>
+    createInitialReviewRequestFormData(),
+  );
 
   useEffect(() => {
     if (open && allLeads.length === 0) {
       dispatch(fetchLeads());
     }
   }, [open, allLeads.length, dispatch]);
+
+  const filteredLeads = useMemo(() => {
+    if (!leadActionFilter) {
+      return allLeads;
+    }
+
+    const normalizedFilter = leadActionFilter.trim().toLowerCase();
+
+    return allLeads.filter((lead) => {
+      const actionType = (lead.next_action_type || "").trim().toLowerCase();
+      return actionType === normalizedFilter;
+    });
+  }, [allLeads, leadActionFilter]);
+
+  const handleLeadSelectionTypeChange = (value: "all" | "manual") => {
+    setLeadSelectionType(value);
+
+    if (value === "manual") {
+      // Manual mode should start with no preselected leads.
+      setSelectedLeads([]);
+    }
+  };
+
+  const handleLeadActionFilterChange = (value: string) => {
+    setLeadActionFilter(value);
+
+    if (leadSelectionType === "manual") {
+      if (!value) {
+        return;
+      }
+
+      const normalizedFilter = value.trim().toLowerCase();
+      setSelectedLeads((prev) =>
+        prev.filter(
+          (lead) =>
+            (lead.next_action_type || "").trim().toLowerCase() ===
+            normalizedFilter,
+        ),
+      );
+    }
+  };
 
   const showErrorToast = (message: string) => {
     toast.error(message, { toastId: `review-request-error-${message}` });
@@ -144,12 +194,13 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
 
   const resetLocalState = () => {
     setStep(1);
+    setLeadActionFilter("");
     setLeadSelectionType("all");
     setSelectedLeads([]);
     setFileName("");
     setIsSubmitting(false);
     isSubmittingRef.current = false;
-    setFormData({ ...initialReviewRequestFormData });
+    setFormData(createInitialReviewRequestFormData());
   };
 
   const handleClose = () => {
@@ -294,6 +345,21 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       return false;
     }
 
+    const scheduledAt = getScheduledDateTime(
+      formData.schedule_date,
+      formData.schedule_time,
+    );
+
+    if (!scheduledAt || !scheduledAt.isValid()) {
+      showErrorToast("Please select a valid schedule date and time");
+      return false;
+    }
+
+    if (!scheduledAt.isAfter(new Date())) {
+      showErrorToast("Schedule time must be in the future");
+      return false;
+    }
+
     return true;
   };
 
@@ -318,7 +384,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     try {
       const leadIds =
         leadSelectionType === "all"
-          ? allLeads.map((lead) => String(lead.id))
+          ? filteredLeads.map((lead) => String(lead.id))
           : selectedLeads.map((lead) => String(lead.id));
 
       if (leadIds.length === 0) {
@@ -335,7 +401,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       const clinicId =
         (leadSelectionType === "manual"
           ? selectedLeads[0]?.clinic_id
-          : allLeads[0]?.clinic_id) ?? 1;
+          : filteredLeads[0]?.clinic_id) ?? 1;
 
       const payload = {
         clinic: clinicId,
@@ -344,7 +410,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
         collect_on: formData.collect_on,
         mode: formData.mode,
         subject: formData.subject.trim(),
-        message: formData.message.trim(),
+        message: normalizeReviewLinkPlaceholder(formData.message.trim()),
         status,
         lead_ids: leadIds,
         ...(formData.is_scheduled === "yes" && {
@@ -444,12 +510,13 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
 
         handleClose();
       }}
-      maxWidth="md"
-      fullWidth
+      maxWidth={false}
       PaperProps={{
         sx: {
+          width: "100%",
+          maxWidth: { xs: "calc(100% - 24px)", sm: 660, md: 740 },
           borderRadius: "16px",
-          maxHeight: "95vh",
+          maxHeight: "92vh",
           display: "flex",
           flexDirection: "column",
         },
@@ -457,7 +524,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     >
       <Box
         sx={{
-          p: "16px 24px",
+          p: "14px 20px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -471,13 +538,13 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
         </IconButton>
       </Box>
 
-      <DialogContent sx={{ p: "0 24px", overflowY: "auto" }}>
+      <DialogContent sx={{ p: "0 20px", overflowY: "auto" }}>
         <ReviewRequestStepper step={step} />
 
         {step === 1 && (
           <ReviewRequestStepDetails
             formData={formData}
-            allLeads={allLeads}
+            allLeads={filteredLeads}
             leadSelectionType={leadSelectionType}
             selectedLeads={selectedLeads}
             coralRadio={coralRadio}
@@ -493,8 +560,10 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
                 showErrorToast("Description needed");
               }
             }}
-            onLeadSelectionTypeChange={setLeadSelectionType}
+            onLeadSelectionTypeChange={handleLeadSelectionTypeChange}
             onSelectedLeadsChange={setSelectedLeads}
+            leadActionFilter={leadActionFilter}
+            onLeadActionFilterChange={handleLeadActionFilterChange}
             onCollectOnChange={(value) => {
               setFormData((prev) => ({ ...prev, collect_on: value }));
             }}
@@ -530,7 +599,29 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
             formData={formData}
             coralRadio={coralRadio}
             onScheduleToggle={(value) => {
-              setFormData((prev) => ({ ...prev, is_scheduled: value }));
+              setFormData((prev) => {
+                if (value === "no") {
+                  return { ...prev, is_scheduled: value };
+                }
+
+                const scheduledAt = getScheduledDateTime(
+                  prev.schedule_date,
+                  prev.schedule_time,
+                );
+
+                if (scheduledAt && scheduledAt.isAfter(new Date())) {
+                  return { ...prev, is_scheduled: value };
+                }
+
+                const defaultSchedule = createInitialReviewRequestFormData();
+
+                return {
+                  ...prev,
+                  is_scheduled: value,
+                  schedule_date: defaultSchedule.schedule_date,
+                  schedule_time: defaultSchedule.schedule_time,
+                };
+              });
             }}
             onDateChange={(value) => {
               setFormData((prev) => ({ ...prev, schedule_date: value }));
@@ -554,7 +645,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
 
       <Box
         sx={{
-          p: "24px",
+          p: "16px 20px",
           display: "flex",
           gap: 2,
           borderTop: "1px solid #F3F4F6",
@@ -568,6 +659,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
             flex: 1,
             borderRadius: "8px",
             textTransform: "none",
+            height: 44,
             fontWeight: 700,
             color: "#4B5563",
             borderColor: "#D1D5DB",
@@ -586,6 +678,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
             color: "#4B5563",
             borderRadius: "8px",
             textTransform: "none",
+            height: 44,
             fontWeight: 700,
             boxShadow: "none",
             opacity: isSubmitting ? 0.7 : 1,
@@ -604,6 +697,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
             background: "#4D4D4D",
             borderRadius: "8px",
             textTransform: "none",
+            height: 44,
             fontWeight: 700,
             opacity: isSubmitting ? 0.8 : 1,
             "&:hover": { background: "#333" },

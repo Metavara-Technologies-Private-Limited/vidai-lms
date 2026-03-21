@@ -46,13 +46,13 @@ const Referrals = () => {
   const referralData = [
     {
       title: "Doctors",
-      count: doctorCount,           // ← real count from API
+      count: doctorCount,           
       icon: Referral_Doctor,
       bg: "linear-gradient(to top, #ffffff 0%, #ffffff 55%, rgba(83,146,242,0.18) 140%)",
     },
     {
       title: "Corporate HR",
-      count: corporateMock.length,  // ← mock for now
+      count: corporateMock.length,  
       icon: Referral_HR,
       bg: "linear-gradient(to top, #ffffff 0%, #ffffff 55%, rgba(71,179,95,0.18) 140%)",
     },
