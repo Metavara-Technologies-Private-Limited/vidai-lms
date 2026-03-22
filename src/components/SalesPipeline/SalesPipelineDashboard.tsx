@@ -169,7 +169,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	return (
-		<Box sx={{ px: 3, pb: 2 }}>
+		<Box sx={{ p: 0.5 }}>
 			<Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
 				Sales Pipeline Configuration
 			</Typography>

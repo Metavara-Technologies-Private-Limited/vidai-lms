@@ -249,7 +249,7 @@ const ReportsDashboard = () => {
 	};
 
 	return (
-		<Box sx={{ px: 2, pt: 1 }}>
+		<Box sx={{ p: 0.5 }}>
 			<Typography variant="h6" pb={2}>
 				Reports
 			</Typography>
@@ -258,7 +258,7 @@ const ReportsDashboard = () => {
 				sx={{
 					backgroundColor: "background.paper",
 					borderRadius: 3,
-					p: 2,
+					p: 0,
 					border: "none",
 				}}
 			>
