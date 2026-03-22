@@ -6,7 +6,12 @@ import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style
 import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import { selectLeads } from "../../store/leadSlice";
 import type { TimeRange } from "./TimeRangeSelector";
-import { isWithinTimeRange } from "./timeRange.utils";
+import {
+  findBucketIndex,
+  getTimeRangeBuckets,
+  getTimeRangeBounds,
+  isDateWithinBounds,
+} from "./timeRange.utils";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
 
@@ -38,12 +43,12 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
   const leads = useSelector(selectLeads) as LeadWithTemplateMeta[];
 
   const data = useMemo(() => {
-    const monthKeys = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const totals = new Array<number>(12).fill(0);
-    const converted = new Array<number>(12).fill(0);
+    const buckets = getTimeRangeBuckets(timeRange);
+    const totals = new Array<number>(buckets.length).fill(0);
+    const converted = new Array<number>(buckets.length).fill(0);
 
     if (!Array.isArray(leads) || leads.length === 0) {
-      return monthKeys.map((month) => ({ month, rate: 0 }));
+      return buckets.map((bucket) => ({ label: bucket.label, rate: 0 }));
     }
 
     const getLeadDate = (lead: LeadWithTemplateMeta): Date | null => {
@@ -53,27 +58,36 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     };
 
+    const bounds = getTimeRangeBounds(timeRange);
+
     const filteredByRange = leads.filter((lead) => {
       if (lead.is_active === false) return false;
       const date = getLeadDate(lead);
-      return date ? isWithinTimeRange(date, timeRange) : false;
+      if (!date) return false;
+
+      return isDateWithinBounds(date, bounds);
     });
 
     filteredByRange.forEach((lead) => {
       const date = getLeadDate(lead);
       if (!date) return;
 
-      const monthIndex = date.getMonth();
-      totals[monthIndex] += 1;
+      const bucketIndex = findBucketIndex(date, buckets);
+
+      if (bucketIndex < 0) {
+        return;
+      }
+
+      totals[bucketIndex] += 1;
 
       const status = (lead.lead_status || "").toString().trim().toLowerCase();
       if (status === "converted" || status === "cycle_conversion" || status === "cycle conversion") {
-        converted[monthIndex] += 1;
+        converted[bucketIndex] += 1;
       }
     });
 
-    return monthKeys.map((month, index) => ({
-      month,
+    return buckets.map((bucket, index) => ({
+      label: bucket.label,
       rate: totals[index] > 0 ? Number(((converted[index] / totals[index]) * 100).toFixed(1)) : 0,
     }));
 
@@ -88,10 +102,10 @@ const ConversionTrendChart = ({ timeRange }: ConversionTrendChartProps) => {
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
             
             <XAxis 
-              dataKey="month" 
+              dataKey="label" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 11, fill: "#666" }} 
+              tick={{ fontSize: 10, fill: "#666" }} 
               dy={10}
             />
             
