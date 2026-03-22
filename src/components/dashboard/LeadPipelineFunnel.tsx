@@ -5,7 +5,7 @@ import type { Lead as ApiLead } from "../../services/leads.api";
 import type { Status } from "../../types/leads.types";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 import type { TimeRange } from "./TimeRangeSelector";
-import { isWithinTimeRange } from "./timeRange.utils";
+import { getTimeRangeBounds, isDateWithinBounds } from "./timeRange.utils";
 import { selectLeads, selectLeadsLoading } from "../../store/leadSlice";
 
 interface LeadPipelineFunnelProps {
@@ -53,10 +53,14 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
   // ✅ Process leads into the specific SVG stages matching your Status types
   const data = useMemo(() => {
     const countsByStage: Partial<Record<Status, number>> = {};
+    const bounds = getTimeRangeBounds(timeRange);
 
     for (const lead of leads) {
       if (lead.is_active === false) continue;
-      if (!isWithinTimeRange(lead.modified_at || lead.created_at, timeRange)) continue;
+
+      const leadDate = new Date(lead.modified_at || lead.created_at);
+      if (Number.isNaN(leadDate.getTime())) continue;
+      if (!isDateWithinBounds(leadDate, bounds)) continue;
 
       const normalized = normalizeLeadStatus(
         (lead.lead_status as string | undefined) || (lead as { status?: string }).status

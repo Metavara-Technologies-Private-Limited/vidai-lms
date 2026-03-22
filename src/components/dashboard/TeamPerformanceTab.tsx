@@ -17,7 +17,7 @@ import { selectCampaign } from "../../store/campaignSlice";
 import type { Lead } from "../../services/leads.api";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 import SafeResponsiveContainer from "./SafeResponsiveContainer";
-import { isWithinTimeRange } from "./timeRange.utils";
+import { findBucketIndex, getTimeRangeBuckets, isWithinTimeRange } from "./timeRange.utils";
 import type{
   TeamMember,
   MedalType,
@@ -55,15 +55,7 @@ const normalizeLeadStatus = (status?: string | null): string => {
   return value;
 };
 
-const monthKeys = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 const formatInteger = (value: number): string => value.toLocaleString("en-US");
-
-const fallbackPerformanceData: PerformanceChartPoint[] =
-  mockData.overview.conversionTrendPerformance.map((point) => ({
-    month: point.month,
-    value: Math.round(point.rate),
-  }));
 
 const conversionLineColor = "#7d859d";
 const conversionGridColor = "#f5f5f5";
@@ -162,6 +154,11 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
   const leads = useSelector(selectLeads) as Lead[];
   const campaigns = useSelector(selectCampaign) as CampaignItem[];
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const performanceBuckets = useMemo(() => getTimeRangeBuckets(timeRange), [timeRange]);
+  const fallbackPerformanceData = useMemo<PerformanceChartPoint[]>(
+    () => performanceBuckets.map((bucket) => ({ label: bucket.label, value: 0 })),
+    [performanceBuckets],
+  );
 
   const { members, overview, memberStatsMap, memberPerformanceMap } = useMemo(() => {
     const activeLeads = (leads || []).filter(
@@ -317,28 +314,30 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
     const memberPerformance: Record<string, PerformanceChartPoint[]> = {};
     membersWithStats.forEach((member) => {
-      const monthlyTotals = new Array<number>(12).fill(0);
-      const monthlyConverted = new Array<number>(12).fill(0);
+      const totalsByBucket = new Array<number>(performanceBuckets.length).fill(0);
+      const convertedByBucket = new Array<number>(performanceBuckets.length).fill(0);
 
       activeLeads
         .filter((lead) => ((lead.assigned_to_name || "Unassigned").trim() || "Unassigned") === member.name)
         .forEach((lead) => {
           const date = new Date(lead.modified_at || lead.created_at);
           if (Number.isNaN(date.getTime())) return;
-          const month = date.getMonth();
-          monthlyTotals[month] += 1;
+          const bucketIndex = findBucketIndex(date, performanceBuckets);
+          if (bucketIndex < 0) return;
+
+          totalsByBucket[bucketIndex] += 1;
 
           const status = normalizeLeadStatus(lead.lead_status);
           if (status === "converted" || status === "cycle-conversion") {
-            monthlyConverted[month] += 1;
+            convertedByBucket[bucketIndex] += 1;
           }
         });
 
-      memberPerformance[member.name] = monthKeys.map((month, monthIndex) => {
-        const total = monthlyTotals[monthIndex];
-        const converted = monthlyConverted[monthIndex];
+      memberPerformance[member.name] = performanceBuckets.map((bucket, bucketIndex) => {
+        const total = totalsByBucket[bucketIndex];
+        const converted = convertedByBucket[bucketIndex];
         const value = total > 0 ? Math.round((converted / total) * 100) : 0;
-        return { month, value };
+        return { label: bucket.label, value };
       });
     });
 
@@ -348,7 +347,7 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
       memberStatsMap: derivedMemberStatsMap,
       memberPerformanceMap: memberPerformance,
     };
-  }, [leads, campaigns, timeRange]);
+  }, [campaigns, leads, performanceBuckets, timeRange]);
 
   const topPerformer = members.find((m) => m.rank === "1st (Top)");
   const otherTops = members.filter((m) => m.rank === "2nd" || m.rank === "3rd");
@@ -520,10 +519,10 @@ const stats = memberStats!;
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={conversionGridColor} />
 
                     <XAxis
-                      dataKey="month"
+                      dataKey="label"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 11, fill: conversionAxisColor }}
+                      tick={{ fontSize: 10, fill: conversionAxisColor }}
                       dy={10}
                     />
 

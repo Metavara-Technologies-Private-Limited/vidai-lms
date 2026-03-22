@@ -24,6 +24,7 @@ import type { TimeRange } from "./TimeRangeSelector";
 import { isWithinTimeRange } from "./timeRange.utils";
 import { selectLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
+import type { CampaignAPIType } from "../../types/campaigns.types";
 
 type Metric = "volume" | "rate" | "revenue" | "cost";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
@@ -79,14 +80,14 @@ const CustomTooltip = ({
 const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
   const [metric, setMetric] = useState<Metric>("volume");
   const leads = useSelector(selectLeads);
-  const campaigns = useSelector(selectCampaign);
+  const campaigns = useSelector(selectCampaign) as CampaignAPIType[];
   const sourceBaseRows = mockData.overview.sourcePerformance.map((row) => row.name);
   const campaignBaseRows = mockData.overview.sourcePerformance.map((row) => row.campaign);
 
   // Source-based data: Lead Volume, Conversion Rate, Revenue (by lead source)
   const sourceData = useMemo(() => {
     const filtered = (Array.isArray(leads) ? leads : []).filter(
-      (l) => l.is_active !== false && isWithinTimeRange(l.modified_at, timeRange),
+      (l) => l.is_active !== false && isWithinTimeRange(l.modified_at || l.created_at, timeRange),
     );
 
     const normalizeSourceKey = (value: string): string =>
@@ -161,7 +162,7 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
   // Campaign-based data: Revenue (total budget) and Cost per Lead (budget / leads)
   const campaignData = useMemo(() => {
     const active = (Array.isArray(campaigns) ? campaigns : []).filter(
-      (c) => !c.is_deleted,
+      (c) => !c.is_deleted && isWithinTimeRange(c.modified_at || c.created_at || c.start_date, timeRange),
     );
 
     const liveCampaigns = active.map((c) => {
@@ -202,7 +203,7 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
         cost: liveCampaign?.cost ?? 0,
       };
     });
-  }, [campaignBaseRows, campaigns]);
+  }, [campaignBaseRows, campaigns, timeRange]);
 
   const data =
     metric === "cost" || metric === "revenue" ? campaignData : sourceData;

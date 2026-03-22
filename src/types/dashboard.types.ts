@@ -145,7 +145,7 @@ export interface MemberStats {
 }
 
 export interface PerformanceChartPoint {
-  month: string;
+  label: string;
   value: number;
 }
 

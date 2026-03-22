@@ -6,6 +6,7 @@ import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import type { TimeRange } from "./TimeRangeSelector";
 import type { CustomTooltipProps } from "../../types/dashboard.types";
 import { api } from "../../services/leads.api";
+import { formatDateForApi, getTimeRangeBounds } from "./timeRange.utils";
 
 interface CommunicationChartProps {
   timeRange: TimeRange;
@@ -60,8 +61,13 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
     const fetchCounts = async () => {
       try {
         setLoading(true);
+        const bounds = getTimeRangeBounds(timeRange);
         const res = await api.get<PlatformRow[]>("/interactions/counts/", {
-          params: { time_range: timeRange },
+          params: {
+            time_range: timeRange,
+            start_date: formatDateForApi(bounds.start),
+            end_date: formatDateForApi(bounds.end),
+          },
           signal: controller.signal,
         });
         const json = res.data;
