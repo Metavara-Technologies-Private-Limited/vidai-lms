@@ -16,8 +16,8 @@ import SendIcon from "@mui/icons-material/Send";
 import { TimelineItem } from "./LeadDetailSubComponents";
 import { getCallStatusColor, getSMSStatusColor, formatDateTime } from "./LeadDetailHelpers";
 import type { LeadRecord, TwilioCall, TwilioSMS, HistoryView } from "./LeadDetailTypes";
-import { LeadEmailAPI, TwilioAPI } from "../../services/leads.api";
 import type { LeadMailListItem } from "../../services/leads.api";
+import { TwilioAPI } from "../../services/leads.api";
 import CallDialog from "./CallDialog";
 
 interface ChatMessage {
@@ -52,7 +52,10 @@ interface HistoryTabProps {
   smsHistoryLoading: boolean;
   smsHistoryError: string | null;
   onRefreshSmsHistory: () => void;
-  onEmailSent?: (fn: () => void) => void;
+  // ── Email history owned by parent so it survives dialog open/close ──
+  emailHistory: LeadMailListItem[];
+  emailHistoryLoading: boolean;
+  onRefreshEmailHistory: () => void;
 }
 
 const decodeEntities = (str: string): string => {
@@ -128,7 +131,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   appointmentRemark, treatmentInterest, hasAppointment,
   callHistory, callHistoryLoading, callHistoryError, onRefreshCallHistory,
   smsHistory, smsHistoryLoading, smsHistoryError, onRefreshSmsHistory,
-  onEmailSent,
+  emailHistory, emailHistoryLoading, onRefreshEmailHistory,
 }) => {
 
   const [callDialogOpen, setCallDialogOpen] = React.useState(false);
@@ -146,34 +149,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       setCallSnackbar({ open: true, message: extractErrorMessage(err, "Failed to initiate call.") });
     }
   };
-
-  const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>([]);
-  const [emailLoading, setEmailLoading] = React.useState(false);
-  const [emailError, setEmailError] = React.useState<string | null>(null);
-
-  const fetchEmailHistory = React.useCallback(async () => {
-    if (!lead?.id) return;
-    setEmailLoading(true); setEmailError(null);
-    try {
-      const data = await LeadEmailAPI.listByLead(lead.id);
-      setEmailHistory(Array.isArray(data) ? data : []);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      setEmailError(e?.response?.data?.detail || e?.message || "Failed to load email history.");
-    } finally { setEmailLoading(false); }
-  }, [lead?.id]);
-
-  React.useEffect(() => {
-    if (historyView === "email") fetchEmailHistory();
-  }, [historyView, fetchEmailHistory]);
-
-  // Register fetchEmailHistory with parent so it can trigger refresh after send
-  React.useEffect(() => {
-    onEmailSent?.(() => {
-      setHistoryView("email");
-      fetchEmailHistory();
-    });
-  }, [onEmailSent, fetchEmailHistory]);
 
   // ── Chatbot state ──
   const [chatMessages, setChatMessages] = React.useState<ChatMessage[]>([
@@ -201,7 +176,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendChat(); }
   };
 
-  // Group by date for separators
   const groupedMessages = React.useMemo(() => {
     const groups: { dateLabel: string; messages: ChatMessage[] }[] = [];
     let currentDate = "";
@@ -306,9 +280,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                         <Box>
                           <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform:"uppercase", fontSize:"0.65rem", letterSpacing:"0.5px" }}>TREATMENT INTEREST</Typography>
                           <Stack direction="row" spacing={1} flexWrap="wrap" mt={0.5}>
-                            {treatmentInterest.map((t, i) => (
-                              <Chip key={i} label={t} size="small" sx={{ bgcolor:"#F5F3FF", color:"#7C3AED", fontWeight:500, mb:0.5 }} />
-                            ))}
+                            {treatmentInterest.map((t, i) => <Chip key={i} label={t} size="small" sx={{ bgcolor:"#F5F3FF", color:"#7C3AED", fontWeight:500, mb:0.5 }} />)}
                           </Stack>
                         </Box>
                       )}
@@ -451,124 +423,59 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
             </>
           )}
 
-          {/* ── CHATBOT VIEW ── */}
+          {/* CHATBOT VIEW */}
           {historyView === "chatbot" && (
             <>
-              {/* Header */}
               <Box p={2} borderBottom="1px solid #E2E8F0" bgcolor="#FFFFFF">
                 <Stack direction="row" alignItems="center" spacing={1.5}>
-                  <Box sx={{ p:0.8, bgcolor:"#F5F3FF", borderRadius:"8px" }}>
-                    <ChatBubbleOutlineIcon sx={{ color:"#8B5CF6", fontSize:18 }} />
-                  </Box>
+                  <Box sx={{ p:0.8, bgcolor:"#F5F3FF", borderRadius:"8px" }}><ChatBubbleOutlineIcon sx={{ color:"#8B5CF6", fontSize:18 }} /></Box>
                   <Typography variant="subtitle1" fontWeight={700}>Chatbot</Typography>
                 </Stack>
               </Box>
-
-              {/* Messages — white bg, clean like screenshot */}
               <Box sx={{ flexGrow:1, px:3, py:2, overflowY:"auto", bgcolor:"#FFFFFF", display:"flex", flexDirection:"column" }}>
                 {groupedMessages.map((group) => (
                   <Box key={group.dateLabel}>
-                    {/* Date separator */}
                     <Box sx={{ display:"flex", justifyContent:"center", my:2 }}>
-                      <Typography fontSize="11px" fontWeight={600} color="#94A3B8" sx={{ letterSpacing:"0.05em" }}>
-                        {group.dateLabel}
-                      </Typography>
+                      <Typography fontSize="11px" fontWeight={600} color="#94A3B8" sx={{ letterSpacing:"0.05em" }}>{group.dateLabel}</Typography>
                     </Box>
-
                     <Stack spacing={1.5}>
                       {group.messages.map((msg) => (
                         <Box key={msg.id} sx={{ display:"flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
                           <Box sx={{ maxWidth:"70%" }}>
-                            <Box sx={{
-                              px:2, py:1.25,
-                              borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                              // User bubble: soft lavender (right side in screenshot)
-                              // Bot bubble:  very light grey-white (left side in screenshot)
-                              bgcolor: msg.role === "user" ? "#EDE9FE" : "#F8FAFC",
-                              border: "1px solid",
-                              borderColor: msg.role === "user" ? "#DDD6FE" : "#E2E8F0",
-                            }}>
-                              <Typography fontSize="13.5px" sx={{ color:"#1E293B", lineHeight:1.65 }}>
-                                {msg.text}
-                              </Typography>
+                            <Box sx={{ px:2, py:1.25, borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", bgcolor: msg.role === "user" ? "#EDE9FE" : "#F8FAFC", border:"1px solid", borderColor: msg.role === "user" ? "#DDD6FE" : "#E2E8F0" }}>
+                              <Typography fontSize="13.5px" sx={{ color:"#1E293B", lineHeight:1.65 }}>{msg.text}</Typography>
                             </Box>
-                            <Typography variant="caption" sx={{
-                              display:"block", fontSize:"11px", color:"#94A3B8", mt:0.4,
-                              textAlign: msg.role === "user" ? "right" : "left",
-                            }}>
-                              {formatChatTime(msg.timestamp)}
-                            </Typography>
+                            <Typography variant="caption" sx={{ display:"block", fontSize:"11px", color:"#94A3B8", mt:0.4, textAlign: msg.role === "user" ? "right" : "left" }}>{formatChatTime(msg.timestamp)}</Typography>
                           </Box>
                         </Box>
                       ))}
                     </Stack>
                   </Box>
                 ))}
-
-                {/* Typing indicator */}
                 {botTyping && (
                   <Box sx={{ display:"flex", mt:1.5 }}>
                     <Box sx={{ px:2, py:1.25, bgcolor:"#F8FAFC", borderRadius:"18px 18px 18px 4px", border:"1px solid #E2E8F0", display:"flex", alignItems:"center", gap:0.5 }}>
-                      {[0,1,2].map((i) => (
-                        <Box key={i} sx={{
-                          width:6, height:6, bgcolor:"#94A3B8", borderRadius:"50%",
-                          animation:"bounce 1.2s ease-in-out infinite",
-                          animationDelay:`${i*0.2}s`,
-                          "@keyframes bounce": {
-                            "0%,80%,100%": { transform:"scale(0.8)", opacity:0.5 },
-                            "40%": { transform:"scale(1.2)", opacity:1 },
-                          },
-                        }} />
-                      ))}
+                      {[0,1,2].map((i) => <Box key={i} sx={{ width:6, height:6, bgcolor:"#94A3B8", borderRadius:"50%", animation:"bounce 1.2s ease-in-out infinite", animationDelay:`${i*0.2}s`, "@keyframes bounce": { "0%,80%,100%": { transform:"scale(0.8)", opacity:0.5 }, "40%": { transform:"scale(1.2)", opacity:1 } } }} />)}
                     </Box>
                   </Box>
                 )}
                 <div ref={chatEndRef} />
               </Box>
-
-              {/* Input footer */}
               <Box sx={{ p:1.5, borderTop:"1px solid #E2E8F0", bgcolor:"#FFFFFF", borderRadius:"0 0 16px 16px" }}>
                 <Stack direction="row" spacing={1} alignItems="flex-end">
-                  <TextField
-                    fullWidth multiline maxRows={3} size="small"
-                    placeholder="Type a message..."
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={handleChatKeyDown}
-                    disabled={botTyping}
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius:"10px", fontSize:"13px", bgcolor:"#F8FAFC",
-                        "& fieldset": { borderColor:"#E2E8F0" },
-                        "&:hover fieldset": { borderColor:"#CBD5E1" },
-                        "&.Mui-focused fieldset": { borderColor:"#94A3B8", borderWidth:"1.5px" },
-                      },
-                    }}
-                  />
-                  {/* ── Black send button ── */}
-                  <IconButton
-                    onClick={handleSendChat}
-                    disabled={!chatInput.trim() || botTyping}
-                    sx={{
-                      width:40, height:40, borderRadius:"10px", flexShrink:0,
-                      bgcolor: chatInput.trim() && !botTyping ? "#1E293B" : "#E2E8F0",
-                      color: chatInput.trim() && !botTyping ? "#FFFFFF" : "#94A3B8",
-                      transition:"all 0.15s",
-                      "&:hover": { bgcolor: chatInput.trim() && !botTyping ? "#0F172A" : "#E2E8F0" },
-                      "&.Mui-disabled": { bgcolor:"#E2E8F0", color:"#94A3B8" },
-                    }}
-                  >
+                  <TextField fullWidth multiline maxRows={3} size="small" placeholder="Type a message..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={handleChatKeyDown} disabled={botTyping}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius:"10px", fontSize:"13px", bgcolor:"#F8FAFC", "& fieldset": { borderColor:"#E2E8F0" }, "&:hover fieldset": { borderColor:"#CBD5E1" }, "&.Mui-focused fieldset": { borderColor:"#94A3B8", borderWidth:"1.5px" } } }} />
+                  <IconButton onClick={handleSendChat} disabled={!chatInput.trim() || botTyping}
+                    sx={{ width:40, height:40, borderRadius:"10px", flexShrink:0, bgcolor: chatInput.trim() && !botTyping ? "#1E293B" : "#E2E8F0", color: chatInput.trim() && !botTyping ? "#FFFFFF" : "#94A3B8", transition:"all 0.15s", "&:hover": { bgcolor: chatInput.trim() && !botTyping ? "#0F172A" : "#E2E8F0" }, "&.Mui-disabled": { bgcolor:"#E2E8F0", color:"#94A3B8" } }}>
                     <SendIcon sx={{ fontSize:17 }} />
                   </IconButton>
                 </Stack>
-                <Typography variant="caption" color="text.secondary" fontSize="10px" sx={{ mt:0.5, display:"block" }}>
-                  Press Enter to send · Shift+Enter for new line
-                </Typography>
+                <Typography variant="caption" color="text.secondary" fontSize="10px" sx={{ mt:0.5, display:"block" }}>Press Enter to send · Shift+Enter for new line</Typography>
               </Box>
             </>
           )}
 
-          {/* EMAIL VIEW */}
+          {/* EMAIL VIEW — data comes from parent, always fresh after send */}
           {historyView === "email" && (
             <>
               <Box p={2} borderBottom="1px solid #E2E8F0">
@@ -576,15 +483,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <EmailOutlinedIcon sx={{ color:"#3B82F6", fontSize:20 }} />
                     <Typography variant="subtitle1" fontWeight={700}>Email History</Typography>
-                    {!emailLoading && (
-                      <Chip label={`${emailHistory.length} email${emailHistory.length !== 1 ? "s" : ""}`} size="small"
-                        sx={{ bgcolor:"#EFF6FF", color:"#3B82F6", fontWeight:600, fontSize:"11px", height:20 }} />
+                    {!emailHistoryLoading && (
+                      <Chip label={`${emailHistory.length} email${emailHistory.length !== 1 ? "s" : ""}`} size="small" sx={{ bgcolor:"#EFF6FF", color:"#3B82F6", fontWeight:600, fontSize:"11px", height:20 }} />
                     )}
                   </Stack>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <IconButton size="small" onClick={fetchEmailHistory} disabled={emailLoading}
-                      sx={{ bgcolor:"#F8FAFC", "&:hover":{ bgcolor:"#E2E8F0" }, width:30, height:30 }}>
-                      {emailLoading ? <CircularProgress size={14} /> : <RefreshIcon sx={{ fontSize:16, color:"#64748B" }} />}
+                    <IconButton size="small" onClick={onRefreshEmailHistory} disabled={emailHistoryLoading} sx={{ bgcolor:"#F8FAFC", "&:hover":{ bgcolor:"#E2E8F0" }, width:30, height:30 }}>
+                      {emailHistoryLoading ? <CircularProgress size={14} /> : <RefreshIcon sx={{ fontSize:16, color:"#64748B" }} />}
                     </IconButton>
                     <Button onClick={onComposeEmail} size="small" variant="outlined" startIcon={<AddIcon sx={{ fontSize:15 }} />}
                       sx={{ textTransform:"none", fontSize:"12px", fontWeight:600, borderRadius:"8px", borderColor:"#BFDBFE", color:"#3B82F6", bgcolor:"#EFF6FF", px:1.5, py:0.5, "&:hover":{ bgcolor:"#DBEAFE", borderColor:"#93C5FD" } }}>
@@ -593,19 +498,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   </Stack>
                 </Stack>
               </Box>
-
               <Box sx={{ flexGrow:1, p:3, overflowY:"auto", bgcolor:"#F8FAFC" }}>
-                {emailLoading && (
+                {emailHistoryLoading && (
                   <Box sx={{ display:"flex", justifyContent:"center", py:4 }}>
                     <Stack alignItems="center" spacing={1}><CircularProgress size={24} /><Typography variant="caption" color="text.secondary">Loading email history...</Typography></Stack>
                   </Box>
                 )}
-                {!emailLoading && emailError && (
-                  <Alert severity="error" sx={{ borderRadius:"10px", mb:2 }} action={<Button size="small" onClick={fetchEmailHistory} sx={{ textTransform:"none" }}>Retry</Button>}>
-                    {emailError}
-                  </Alert>
-                )}
-                {!emailLoading && !emailError && emailHistory.length === 0 && (
+                {!emailHistoryLoading && emailHistory.length === 0 && (
                   <Box sx={{ textAlign:"center", py:6 }}>
                     <EmailOutlinedIcon sx={{ fontSize:48, color:"#CBD5E1", mb:1 }} />
                     <Typography color="text.secondary" fontWeight={600}>No Emails Sent Yet</Typography>
@@ -616,7 +515,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     </Button>
                   </Box>
                 )}
-                {!emailLoading && !emailError && emailHistory.length > 0 && (
+                {!emailHistoryLoading && emailHistory.length > 0 && (
                   <Stack spacing={2}>
                     {emailHistory.map((mail) => (
                       <Card key={mail.id} sx={{ p:2.5, borderRadius:"12px", border:"1px solid #E2E8F0", bgcolor:"#FFFFFF" }}>
