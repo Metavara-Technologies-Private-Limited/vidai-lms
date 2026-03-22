@@ -273,7 +273,24 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
                     {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                   </Typography>
                 </Box>
-                <TextField label="Edit message before sending" multiline rows={4} value={previewBody} onChange={(e) => setPreviewBody(e.target.value)} inputProps={{ maxLength: 1600 }} helperText={`${previewBody.length}/1600`} sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }} />
+
+                {/* ── Variable hint ── */}
+                {previewBody.match(/\{[^}]+\}/g) && (
+                  <Alert severity="info" sx={{ borderRadius: "8px", py: 0.5, fontSize: "12px" }}>
+                    Replace the <strong>highlighted variables</strong> in the message box below before sending.
+                  </Alert>
+                )}
+
+                <TextField
+                  label="Edit message before sending"
+                  multiline
+                  rows={4}
+                  value={previewBody}
+                  onChange={(e) => setPreviewBody(e.target.value)}
+                  inputProps={{ maxLength: 1600 }}
+                  helperText={`${previewBody.length}/1600`}
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+                />
               </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
@@ -302,8 +319,21 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
 
   const handleClose = () => { if (sending) return; setMessage(""); setError(null); onClose(); };
 
+  // ── Check for unfilled variables like {name}, {date} etc ──────────────
+  const unfilledVars = React.useMemo(() => {
+    const matches = message.match(/\{[^}]+\}/g);
+    return matches ? [...new Set(matches)] : [];
+  }, [message]);
+
   const handleSend = async () => {
     if (!message.trim()) { setError("Message cannot be empty."); return; }
+
+    // ── Block send if variables are still unfilled ─────────────────────
+    if (unfilledVars.length > 0) {
+      setError(`Please fill in these variables before sending: ${unfilledVars.join(", ")}`);
+      return;
+    }
+
     const phone = normalizePhone(lead?.contact_no);
     if (!phone) { setError("This lead has no contact number."); return; }
     if (!lead?.id) { setError("Lead ID is missing. Cannot send SMS."); return; }
@@ -332,7 +362,27 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
               <Typography fontWeight={600} fontSize="14px">{lead?.full_name || lead?.name || "Unknown"}</Typography>
               <Typography color="text.secondary" fontSize="13px">{lead?.contact_no || "No number"}</Typography>
             </Box>
-            <TextField label="Message" multiline rows={4} value={message} onChange={(e) => setMessage(e.target.value)} disabled={sending} placeholder="Type your message here..." inputProps={{ maxLength: 1600 }} helperText={`${message.length}/1600`} sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }} />
+
+            <TextField
+              label="Message"
+              multiline
+              rows={4}
+              value={message}
+              onChange={(e) => { setMessage(e.target.value); setError(null); }}
+              disabled={sending}
+              placeholder="Type your message here..."
+              inputProps={{ maxLength: 1600 }}
+              helperText={`${message.length}/1600`}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+            />
+
+            {/* ── Show unfilled variable warning inline ── */}
+            {unfilledVars.length > 0 && !error && (
+              <Alert severity="warning" sx={{ borderRadius: "8px", py: 0.5, fontSize: "12px" }}>
+                Replace before sending: <strong>{unfilledVars.join(", ")}</strong>
+              </Alert>
+            )}
+
             {error && <Alert severity="error" sx={{ borderRadius: "8px" }}>{error}</Alert>}
           </Stack>
         </DialogContent>
@@ -340,7 +390,13 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
           <Button fullWidth variant="outlined" onClick={() => setTemplatePickerOpen(true)} disabled={sending} sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>SMS Template</Button>
           <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
             <Button fullWidth onClick={handleClose} disabled={sending} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Cancel</Button>
-            <Button fullWidth onClick={handleSend} disabled={sending || !message.trim()} startIcon={sending ? <CircularProgress size={16} sx={{ color: "white" }} /> : null} sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>
+            <Button
+              fullWidth
+              onClick={handleSend}
+              disabled={sending || !message.trim() || unfilledVars.length > 0}
+              startIcon={sending ? <CircularProgress size={16} sx={{ color: "white" }} /> : null}
+              sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}
+            >
               {sending ? "Sending..." : "Send SMS"}
             </Button>
           </Stack>

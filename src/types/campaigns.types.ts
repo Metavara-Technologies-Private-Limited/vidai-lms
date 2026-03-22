@@ -42,18 +42,20 @@ export interface Campaign {
   total_spend?: number;
   cpc?: number;
 
-  // Mailchimp insights (from insights JSONField in CampaignEmailConfig)
-  // Populated when GET /api/campaigns/<id>/mailchimp-insights/ is called
-  impressions?: number;      // = opens count from Mailchimp
-  clicks?: number;           // unique clicks count
-  emails_sent?: number;      // total emails sent
-  bounces?: number;          // hard + soft bounces
-  unsubscribes?: number;     // unsubscribe count
-  open_rate?: number;        // open rate percentage e.g. 25.0 means 25%
-  click_rate?: number;       // click rate percentage e.g. 12.3 means 12.3%
-  last_open?: string | null; // ISO datetime string of last open
-  last_click?: string | null;// ISO datetime string of last click
-  insights_synced_at?: string | null; // when insights were last synced
+  // ✅ Facebook Ad Campaign ID
+  fb_campaign_id?: string | null;
+
+  // Mailchimp insights
+  impressions?: number;
+  clicks?: number;
+  emails_sent?: number;
+  bounces?: number;
+  unsubscribes?: number;
+  open_rate?: number;
+  click_rate?: number;
+  last_open?: string | null;
+  last_click?: string | null;
+  insights_synced_at?: string | null;
   conversion_rate?: number;
 }
 
@@ -114,20 +116,22 @@ export interface CampaignAPIType {
   total_spend?: number;
   cpc?: number;
 
+  // ✅ Facebook Ad Campaign ID
+  fb_campaign_id?: string | null;
+
   clinic: number;
 
-  // Mailchimp insights (from insights JSONField in CampaignEmailConfig)
-  // Populated when GET /api/campaigns/<id>/mailchimp-insights/ is called
-  impressions?: number;      // = opens count from Mailchimp
-  clicks?: number;           // unique clicks count
-  emails_sent?: number;      // total emails sent
-  bounces?: number;          // hard + soft bounces
-  unsubscribes?: number;     // unsubscribe count
-  open_rate?: number;        // open rate percentage e.g. 25.0 means 25%
-  click_rate?: number;       // click rate percentage e.g. 12.3 means 12.3%
-  last_open?: string | null; // ISO datetime string of last open
-  last_click?: string | null;// ISO datetime string of last click
-  insights_synced_at?: string | null; // when insights were last synced
+  // Mailchimp insights
+  impressions?: number;
+  clicks?: number;
+  emails_sent?: number;
+  bounces?: number;
+  unsubscribes?: number;
+  open_rate?: number;
+  click_rate?: number;
+  last_open?: string | null;
+  last_click?: string | null;
+  insights_synced_at?: string | null;
   conversion_rate?: number;
 
   // FB Insights

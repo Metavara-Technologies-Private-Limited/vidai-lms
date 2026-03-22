@@ -11,15 +11,10 @@ import type { Campaign} from "../../types/campaigns.types"
 import type { CampaignStatus, Platform } from "../../constants/campaigns.constants";
 
 // ─── Map raw API response → Campaign ────────────────────────────────────────
-// CampaignReadSerializer returns:
-//   social_media: [{ id, platform_name, is_active }]  (source="social_configs")
-//   email:        [{ id, audience_name, ... }]
-//   campaign_mode: 1 (organic) | 2 (paid) | 3 (email)  — it's a NUMBER not string
 function mapApiCampaign(raw: any): Campaign {
   // ── Resolve platforms ────────────────────────────────────────────────────
   let platforms: Platform[] = [];
 
-  // Priority 1: social_media array from serializer (the correct key)
   if (Array.isArray(raw.social_media) && raw.social_media.length > 0) {
     platforms = raw.social_media
       .filter((sc: any) => sc.is_active !== false)
@@ -27,17 +22,14 @@ function mapApiCampaign(raw: any): Campaign {
       .filter(Boolean);
   }
 
-  // Priority 2: platforms array (present on some create responses)
   if (platforms.length === 0 && Array.isArray(raw.platforms)) {
     platforms = raw.platforms.map((p: string) => p.toLowerCase());
   }
 
   // ── Resolve type ─────────────────────────────────────────────────────────
-  // Use populated arrays to determine type — campaign_mode is numeric so unreliable
   const hasEmail = Array.isArray(raw.email) && raw.email.length > 0;
   const type: "social" | "email" = hasEmail ? "email" : "social";
 
-  // For email campaigns with no platform set, show gmail icon
   if (platforms.length === 0 && hasEmail) {
     platforms = ["gmail"];
   }
@@ -51,29 +43,32 @@ function mapApiCampaign(raw: any): Campaign {
   };
 
   return {
-  id: raw.id ?? raw.campaign_id,
-  name: raw.campaign_name ?? raw.name ?? "",
-  description: raw.campaign_description ?? "",
+    id: raw.id ?? raw.campaign_id,
+    name: raw.campaign_name ?? raw.name ?? "",
+    description: raw.campaign_description ?? "",
 
-  type,
-  status: statusMap[(raw.status ?? "").toLowerCase()] ?? "Draft",
+    type,
+    status: statusMap[(raw.status ?? "").toLowerCase()] ?? "Draft",
 
-  start: raw.start_date ?? raw.start ?? "",
-  end: raw.end_date ?? raw.end ?? "",
+    start: raw.start_date ?? raw.start ?? "",
+    end: raw.end_date ?? raw.end ?? "",
 
-  platforms,
+    platforms,
 
-  leads: raw.leads ?? 0,
-  lead_generated: raw.lead_generated ?? 0,
+    leads: raw.leads ?? 0,
+    lead_generated: raw.lead_generated ?? 0,
 
-  scheduledAt: raw.scheduled_at ?? raw.scheduledAt ?? null,
+    scheduledAt: raw.scheduled_at ?? raw.scheduledAt ?? null,
 
-  budget_data: raw.budget_data ?? {},
-  campaign_content: raw.campaign_content ?? "",
+    budget_data: raw.budget_data ?? {},
+    campaign_content: raw.campaign_content ?? "",
 
-  total_spend: raw.total_spend ?? 0,
-  cpc: raw.cpc ?? 0,
-};
+    total_spend: raw.total_spend ?? 0,
+    cpc: raw.cpc ?? 0,
+
+    // ✅ Map fb_campaign_id from API response
+    fb_campaign_id: raw.fb_campaign_id ?? raw.campaigns?.[0]?.fb_campaign_id ?? null,
+  };
 }
 
 export type CampaignType = "social" | "email";
@@ -106,12 +101,12 @@ export default function CampaignPage() {
 
   // ─── After creating a campaign, prepend it to list ───────────────────────
   const handleSaveCampaign = (campaign: any) => {
-  const mapped = mapApiCampaign(campaign);
-  setCampaigns((prev) => [mapped, ...prev]);
+    const mapped = mapApiCampaign(campaign);
+    setCampaigns((prev) => [mapped, ...prev]);
 
-  setShowSocialModal(false);
-  setShowEmailModal(false);
-};
+    setShowSocialModal(false);
+    setShowEmailModal(false);
+  };
 
   const handleEdit = (campaign: Campaign) => {
     setEditingCampaign(campaign);

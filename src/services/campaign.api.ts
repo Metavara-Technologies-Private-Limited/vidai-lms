@@ -25,6 +25,10 @@ export const CampaignAPI = {
   getFacebookInsights: (campaignId: string) =>
     http.get(`/campaigns/${campaignId}/facebook-insights/`),
 
+  // Add this after getFacebookInsights:
+  getFBAdInsights: (fbCampaignId: string) =>
+  http.get(`/fb/campaigns/${fbCampaignId}/insights/?date_preset=maximum`),
+
   getFacebookDebug: (campaignId: string) =>
     http.get(`/campaigns/${campaignId}/facebook-debug/`),
 
