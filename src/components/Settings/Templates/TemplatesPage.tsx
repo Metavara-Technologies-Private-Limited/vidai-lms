@@ -168,7 +168,17 @@ const TemplatesPage: React.FC = () => {
   };
 
   return (
-    <Box className={styles.pageContainer} sx={{ overflow: 'hidden', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box
+      className={styles.pageContainer}
+      sx={{
+        width: "auto",
+        height: "100%",
+        overflowY: "auto",
+        pb: 2,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <Suspense fallback={<Box sx={{ p: 2 }} />}>
         <TemplateHeader
           onTabChange={(tab) => { setActiveTab(tab); }}
@@ -184,7 +194,7 @@ const TemplatesPage: React.FC = () => {
         />
       </Suspense>
 
-      <Box className={styles.tableWrapper} sx={{ flexGrow: 1, overflowY: 'auto', p: 2, position: 'relative' }}>
+      <Box className={styles.tableWrapper} sx={{ flexGrow: 1, overflowY: 'auto', p: 0, position: 'relative' }}>
         {loading && templates.mail.length === 0 ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>
         ) : (

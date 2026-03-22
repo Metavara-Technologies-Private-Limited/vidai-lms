@@ -8,7 +8,7 @@ const Reports = () => {
         width: "auto",
         height: "100%",
         overflowY: "auto",
-        paddingBottom: 4,
+        pb: 2,
       }}
     >
       <ReportsDashboard />
