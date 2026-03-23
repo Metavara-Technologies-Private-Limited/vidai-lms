@@ -20,6 +20,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useSelector } from "react-redux";
 import { selectLeads } from "../../store/leadSlice";
 import type { Lead } from "../../services/leads.api";
+import { formatLeadId } from "./LeadDetailHelpers";
 
 const ROWS_PER_PAGE = 10;
 
@@ -141,13 +142,13 @@ const Activity = () => {
                       </Stack>
                     </TableCell>
 
-                    {/* Lead Info */}
+                    {/* Lead Info — FIXED: formatLeadId same as LeadsTable */}
                     <TableCell>
                       <Typography fontWeight={600} fontSize={13}>
                         {lead.full_name}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {lead.id}
+                        {formatLeadId(lead.id)}
                       </Typography>
                     </TableCell>
 
@@ -173,9 +174,7 @@ const Activity = () => {
                       </Typography>
                       <Typography
                         variant="caption"
-                        sx={{
-                          color: hasActivity ? "#6B7280" : "#E5484D",
-                        }}
+                        sx={{ color: hasActivity ? "#6B7280" : "#E5484D" }}
                       >
                         {relativeTime(lead.modified_at)}
                       </Typography>
@@ -203,7 +202,7 @@ const Activity = () => {
                       )}
                     </TableCell>
 
-                    {/* Task Status — always "To Do" since next_action_status === "pending" */}
+                    {/* Task Status */}
                     <TableCell>
                       <Chip
                         label="To Do"
@@ -237,11 +236,7 @@ const Activity = () => {
         </Typography>
 
         <Stack direction="row" spacing={1} alignItems="center">
-          <IconButton
-            size="small"
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
+          <IconButton size="small" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
             <ChevronLeftIcon />
           </IconButton>
 
@@ -250,25 +245,17 @@ const Activity = () => {
               key={p}
               onClick={() => setPage(p)}
               sx={{
-                px: 1.2,
-                py: 0.4,
-                borderRadius: "6px",
-                cursor: "pointer",
+                px: 1.2, py: 0.4, borderRadius: "6px", cursor: "pointer",
                 bgcolor: page === p ? "#111" : "transparent",
                 color: page === p ? "#FFF" : "#6B7280",
-                fontSize: "13px",
-                userSelect: "none",
+                fontSize: "13px", userSelect: "none",
               }}
             >
               {p}
             </Box>
           ))}
 
-          <IconButton
-            size="small"
-            disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
+          <IconButton size="small" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
             <ChevronRightIcon />
           </IconButton>
         </Stack>

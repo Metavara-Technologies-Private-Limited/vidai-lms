@@ -19,15 +19,13 @@ import {
 } from "../../store/leadSlice";
 
 import "../../styles/Leads/leads.css";
-// FIX: removed unused `Lead` import (ESLint no-unused-vars + TS 6196)
 import type { FilterValues } from "../../types/leads.types";
 import { MenuButton, CallButton, Dialogs } from "./LeadsMenuDialogs";
+import { formatLeadId } from "./LeadDetailHelpers";
 import BulkActionBar from "./BulkActionBar";
 
 // ====================== Types ======================
-// FIX: replaced all `any` with concrete interfaces
 
-/** Shape of a lead as it arrives from Redux (raw API response). */
 interface RawFollowUpLead {
   id: string;
   full_name?: string;
@@ -57,12 +55,12 @@ interface RawFollowUpLead {
   department_id?: number;
 }
 
-/** Shape after mapping — all display fields guaranteed present. */
 interface MappedFollowUpLead extends RawFollowUpLead {
   assigned: string;
   quality: "Hot" | "Warm" | "Cold";
   task: string;
   taskStatus: string;
+  displayId: string; // ← ADDED: formatted ID like LeadsTable
 }
 
 interface Props {
@@ -73,7 +71,6 @@ interface Props {
 const rowsPerPage = 10;
 
 // ====================== Quality Derivation ======================
-// FIX: replaced `lead: any` with `lead: RawFollowUpLead`
 const deriveQuality = (lead: RawFollowUpLead): "Hot" | "Warm" | "Cold" => {
   const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
   const hasNextAction = Boolean(lead.next_action_description?.trim());
@@ -94,19 +91,14 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
 
-  // FIX: typed state — was `any[]`
   const [leads, setLeads] = React.useState<MappedFollowUpLead[]>([]);
 
-  // ====================== Fetch on Mount ======================
   React.useEffect(() => {
-    // FIX: was `fetchLeads() as any` — use the same unknown cast pattern
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
   }, [dispatch]);
 
-  // ====================== Sync Redux → Local ======================
   React.useEffect(() => {
     if (reduxLeads && reduxLeads.length > 0) {
-      // FIX: was `reduxLeads.map((lead: any)` — now typed
       const mappedLeads: MappedFollowUpLead[] = reduxLeads.map(
         (lead: RawFollowUpLead): MappedFollowUpLead => ({
           ...lead,
@@ -124,137 +116,83 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
           taskStatus: lead.next_action_status || lead.task_status || "Pending",
           activity: lead.last_activity || lead.activity || "View Activity",
           score: lead.score || lead.ai_score || 0,
-          initials:
-            lead.initials ||
-            (lead.full_name || lead.name || "?").charAt(0).toUpperCase(),
+          initials: lead.initials || (lead.full_name || lead.name || "?").charAt(0).toUpperCase(),
+          displayId: formatLeadId(lead.id), // ← ADDED
         }),
       );
       setLeads(mappedLeads);
-      console.log("✅ Follow-up leads mapped:", mappedLeads.length);
     }
   }, [reduxLeads]);
 
   // ====================== Filter ======================
   const filteredLeads = React.useMemo<MappedFollowUpLead[]>(() => {
     const followUpStatuses = ["new", "lost", "cycle conversion"];
-
-    // FIX: was `leads.filter((lead)` — implicit any; now typed via state
     return leads.filter((lead: MappedFollowUpLead) => {
       const leadStatus = (lead.lead_status || lead.status || "").toLowerCase().trim();
       const matchesStatus = followUpStatuses.includes(leadStatus);
       const isActive = lead.is_active !== false;
-      const searchStr = `${lead.full_name || lead.name || ""} ${lead.id || ""}`.toLowerCase();
+      const searchStr = `${lead.full_name || lead.name || ""} ${lead.displayId || lead.id || ""}`.toLowerCase();
       const matchesSearch = searchStr.includes(search.toLowerCase());
 
       if (filters) {
-        if (filters.department && lead.department_id !== Number(filters.department))
-          return false;
-        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee))
-          return false;
-        if (filters.status) {
-          if (leadStatus !== filters.status.toLowerCase()) return false;
-        }
+        if (filters.department && lead.department_id !== Number(filters.department)) return false;
+        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) return false;
+        if (filters.status) { if (leadStatus !== filters.status.toLowerCase()) return false; }
         if (filters.quality && lead.quality !== filters.quality) return false;
         if (filters.source && lead.source !== filters.source) return false;
         if (filters.dateFrom || filters.dateTo) {
           const leadDate = lead.created_at ? new Date(lead.created_at) : null;
           if (!leadDate) return false;
-          if (filters.dateFrom) {
-            const fromDate = new Date(filters.dateFrom);
-            fromDate.setHours(0, 0, 0, 0);
-            if (leadDate < fromDate) return false;
-          }
-          if (filters.dateTo) {
-            const toDate = new Date(filters.dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            if (leadDate > toDate) return false;
-          }
+          if (filters.dateFrom) { const fromDate = new Date(filters.dateFrom); fromDate.setHours(0,0,0,0); if (leadDate < fromDate) return false; }
+          if (filters.dateTo)   { const toDate = new Date(filters.dateTo);     toDate.setHours(23,59,59,999); if (leadDate > toDate) return false; }
         }
       }
-
       return matchesStatus && matchesSearch && isActive;
     });
   }, [leads, search, filters]);
 
-  // ====================== Pagination reset ======================
-  React.useEffect(() => {
-    setPage(1);
-    setSelectedIds([]);
-  }, [search, filters]);
+  React.useEffect(() => { setPage(1); setSelectedIds([]); }, [search, filters]);
 
   const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
-  React.useEffect(() => {
-    if (page > totalPages && totalPages > 0) setPage(totalPages);
-  }, [totalPages, page]);
+  React.useEffect(() => { if (page > totalPages && totalPages > 0) setPage(totalPages); }, [totalPages, page]);
 
-  const currentLeads = filteredLeads.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage,
-  );
+  const currentLeads = filteredLeads.slice((page - 1) * rowsPerPage, page * rowsPerPage);
   const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
-  // ====================== Selection ======================
   const toggleSelect = (id: string) =>
-    setSelectedIds((prev: string[]) =>
-      prev.includes(id) ? prev.filter((x: string) => x !== id) : [...prev, id],
-    );
+    setSelectedIds((prev: string[]) => prev.includes(id) ? prev.filter((x: string) => x !== id) : [...prev, id]);
   const isSelected = (id: string) => selectedIds.includes(id);
 
-  // ====================== Bulk actions ======================
-  const handleBulkDelete = () => {
-    setLeads((prev: MappedFollowUpLead[]) =>
-      prev.filter((l: MappedFollowUpLead) => !selectedIds.includes(l.id)),
-    );
-    setSelectedIds([]);
-  };
-  const handleBulkArchive = (archive: boolean) => {
-    setLeads((prev: MappedFollowUpLead[]) =>
-      prev.map((l: MappedFollowUpLead) =>
-        selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l,
-      ),
-    );
-    setSelectedIds([]);
-  };
+  const handleBulkDelete = () => { setLeads((prev) => prev.filter((l) => !selectedIds.includes(l.id))); setSelectedIds([]); };
+  const handleBulkArchive = (archive: boolean) => { setLeads((prev) => prev.map((l) => selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l)); setSelectedIds([]); };
 
-  // ====================== Loading ======================
   if (loading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
-        <Stack alignItems="center" spacing={2}>
-          <CircularProgress />
-          <Typography color="text.secondary">Loading follow-ups...</Typography>
-        </Stack>
+        <Stack alignItems="center" spacing={2}><CircularProgress /><Typography color="text.secondary">Loading follow-ups...</Typography></Stack>
       </Box>
     );
 
-  // ====================== Error ======================
   if (error)
     return (
       <Alert severity="error" sx={{ mb: 3 }}>
         <Typography fontWeight={600}>Failed to load follow-ups</Typography>
         <Typography variant="body2">{error}</Typography>
-        <Typography
-          variant="body2"
-          sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
-          // FIX: was `fetchLeads() as any` → same unknown cast
-          onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}
-        >
+        <Typography variant="body2" sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
+          onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}>
           Try again
         </Typography>
       </Alert>
     );
 
-  // ====================== Empty ======================
   if (leads.length === 0)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
           <Typography variant="h6" color="text.secondary">No follow-ups found</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Follow-ups will appear here when leads require attention
-          </Typography>
+          <Typography variant="body2" color="text.secondary">Follow-ups will appear here when leads require attention</Typography>
         </Stack>
       </Box>
     );
@@ -265,17 +203,12 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
         <Stack alignItems="center" spacing={2}>
           <Typography variant="h6" color="text.secondary">No follow-ups found</Typography>
           <Typography variant="body2" color="text.secondary">
-            {search
-              ? `No results for "${search}"`
-              : filters && Object.values(filters).some((v) => v !== "" && v !== null)
-                ? "No follow-ups match the selected filters"
-                : "No active follow-ups requiring attention"}
+            {search ? `No results for "${search}"` : filters && Object.values(filters).some((v) => v !== "" && v !== null) ? "No follow-ups match the selected filters" : "No active follow-ups requiring attention"}
           </Typography>
         </Stack>
       </Box>
     );
 
-  // ====================== Table ======================
   return (
     <>
       <TableContainer component={Paper} elevation={0} className="leads-table">
@@ -284,18 +217,9 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
             <TableRow>
               <TableCell padding="checkbox">
                 <Checkbox
-                  indeterminate={
-                    currentLeads.some((l) => selectedIds.includes(l.id)) &&
-                    !currentLeads.every((l) => selectedIds.includes(l.id))
-                  }
-                  checked={
-                    currentLeads.length > 0 &&
-                    currentLeads.every((l) => selectedIds.includes(l.id))
-                  }
-                  onChange={(e) => {
-                    if (e.target.checked) setSelectedIds(currentLeads.map((l) => l.id));
-                    else setSelectedIds([]);
-                  }}
+                  indeterminate={currentLeads.some((l) => selectedIds.includes(l.id)) && !currentLeads.every((l) => selectedIds.includes(l.id))}
+                  checked={currentLeads.length > 0 && currentLeads.every((l) => selectedIds.includes(l.id))}
+                  onChange={(e) => { if (e.target.checked) setSelectedIds(currentLeads.map((l) => l.id)); else setSelectedIds([]); }}
                 />
               </TableCell>
               <TableCell>Lead Name | No</TableCell>
@@ -315,22 +239,20 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
           </TableHead>
 
           <TableBody>
-            {/* FIX: was `currentLeads.map((lead: any)` — now typed */}
             {currentLeads.map((lead: MappedFollowUpLead) => (
               <TableRow
                 key={lead.id}
                 hover
                 sx={{ cursor: "pointer" }}
-                onClick={() =>
-                  navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)
-                }
+                className={isSelected(lead.id) ? "row-selected" : ""}
+                onClick={() => navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)}
               >
                 <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
                   <Checkbox checked={isSelected(lead.id)} onChange={() => toggleSelect(lead.id)} />
                 </TableCell>
 
                 <TableCell>
-                  <Stack direction="row" spacing={2}>
+                  <Stack direction="row" spacing={2} alignItems="center">
                     <Avatar className="lead-avatar">
                       {lead.initials || lead.full_name?.charAt(0)?.toUpperCase() || "?"}
                     </Avatar>
@@ -338,24 +260,18 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                       <Typography className="lead-name-text">
                         {lead.full_name || "Unnamed Lead"}
                       </Typography>
-                      <Typography className="lead-id-text">{lead.id}</Typography>
+                      {/* ── FIXED: use displayId instead of raw lead.id ── */}
+                      <Typography className="lead-id-text">{lead.displayId}</Typography>
                     </Box>
                   </Stack>
                 </TableCell>
 
                 <TableCell>
                   <Typography className="lead-date">
-                    {lead.created_at
-                      ? new Date(lead.created_at).toLocaleDateString("en-GB")
-                      : "N/A"}
+                    {lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-GB") : "N/A"}
                   </Typography>
                   <Typography className="lead-time">
-                    {lead.created_at
-                      ? new Date(lead.created_at).toLocaleTimeString("en-IN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "N/A"}
+                    {lead.created_at ? new Date(lead.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "N/A"}
                   </Typography>
                 </TableCell>
 
@@ -363,52 +279,35 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                 <TableCell>{lead.source || "N/A"}</TableCell>
 
                 <TableCell>
-                  <Chip
-                    label={lead.status}
-                    size="small"
+                  <Chip label={lead.status} size="small"
                     className={`lead-chip status-${(lead.status ?? "").toLowerCase().replace(/\s+/g, "-")}`}
                   />
                 </TableCell>
 
                 <TableCell>
-                  <Chip
-                    label={lead.quality}
-                    size="small"
+                  <Chip label={lead.quality} size="small"
                     className={`lead-chip quality-${lead.quality?.toLowerCase()}`}
                   />
                 </TableCell>
 
                 <TableCell className="score">
-                  {String(lead.score || 0).includes("%")
-                    ? lead.score
-                    : `${lead.score || 0}%`}
+                  {String(lead.score || 0).includes("%") ? lead.score : `${lead.score || 0}%`}
                 </TableCell>
 
                 <TableCell>{lead.assigned}</TableCell>
                 <TableCell>{lead.task || "N/A"}</TableCell>
 
                 <TableCell>
-                  {/* FIX: was `(opt: any)` — Chip takes string label, no map needed */}
                   <Chip label={lead.taskStatus || "Pending"} size="small" className="lead-chip" />
                 </TableCell>
 
-                <TableCell
-                  sx={{ color: "primary.main", fontWeight: 700 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate("/leads/activity", { state: { lead } });
-                  }}
-                >
+                <TableCell sx={{ color: "primary.main", fontWeight: 700 }}
+                  onClick={(e) => { e.stopPropagation(); navigate("/leads/activity", { state: { lead } }); }}>
                   {lead.activity || "View Activity"}
                 </TableCell>
 
-                <TableCell align="center">
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    justifyContent="center"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                  <Stack direction="row" spacing={1} justifyContent="center">
                     <CallButton lead={lead} />
                     <IconButton className="action-btn">
                       <ChatBubbleOutlineIcon fontSize="small" />
@@ -429,38 +328,20 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
       </TableContainer>
 
       {/* Pagination */}
-      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
+      <Stack direction="row" justifyContent="space-between" sx={{ mt: 1, px: 2 }}>
         <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries} Follow-Ups
         </Typography>
         <Stack direction="row" spacing={1}>
-          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-            <ChevronLeftIcon />
-          </IconButton>
+          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeftIcon /></IconButton>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Box
-              key={p}
-              onClick={() => setPage(p)}
-              className={`page-number ${page === p ? "active" : ""}`}
-            >
-              {p}
-            </Box>
+            <Box key={p} onClick={() => setPage(p)} className={`page-number ${page === p ? "active" : ""}`}>{p}</Box>
           ))}
-          <IconButton
-            disabled={page === totalPages || totalPages === 0}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            <ChevronRightIcon />
-          </IconButton>
+          <IconButton disabled={page === totalPages || totalPages === 0} onClick={() => setPage((p) => p + 1)}><ChevronRightIcon /></IconButton>
         </Stack>
       </Stack>
 
-      <BulkActionBar
-        selectedIds={selectedIds}
-        tab="active"
-        onDelete={handleBulkDelete}
-        onArchive={handleBulkArchive}
-      />
+      <BulkActionBar selectedIds={selectedIds} tab="active" onDelete={handleBulkDelete} onArchive={handleBulkArchive} />
       <Dialogs />
     </>
   );
