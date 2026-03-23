@@ -50,6 +50,34 @@ import type { EmailTemplate } from "../../services/leads.api";
 import TemplateService from "../../services/templates.api";
 import ArchiveLeadDialog from "./ArchiveLeadDialog";
 
+// ── Strip HTML to plain text ──────────────────────────────────────────
+const decodeEntities = (str: string): string => {
+  try {
+    const el = document.createElement("textarea");
+    el.innerHTML = str;
+    return el.value;
+  } catch {
+    return str
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  }
+};
+
+const stripHtml = (html: string): string => {
+  if (!html) return "";
+  let text = decodeEntities(html);
+  text = decodeEntities(text);
+  text = text
+    .replace(/<\/p\s*>/gi, "\n").replace(/<\/div\s*>/gi, "\n")
+    .replace(/<\/li\s*>/gi, "\n").replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/h[1-6]\s*>/gi, "\n").replace(/<\/tr\s*>/gi, "\n");
+  text = text.replace(/<[^>]*>/g, "");
+  text = text
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  return text.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").trim();
+};
+
 // ── Types ─────────────────────────────────────────────────────────────
 type ApiError = {
   response?: { data?: { detail?: string; message?: string } };
@@ -63,7 +91,7 @@ interface SMSTemplate {
   body: string;
 }
 
-// ── Use case options (matching screenshots) ───────────────────────────
+// ── Use case options ───────────────────────────────────────────────────
 const USE_CASE_OPTIONS = ["Appointment", "Feedback", "Reminder", "Follow-Up", "Re-engagement", "No-Show", "General"];
 
 const USE_CASE_BODY_SUGGESTIONS: Record<string, string> = {
@@ -78,16 +106,16 @@ const USE_CASE_BODY_SUGGESTIONS: Record<string, string> = {
 
 const getUseCaseSx = (useCase?: string) => {
   const map: Record<string, { bgcolor: string; color: string }> = {
-    appointment:    { bgcolor: "#ECFDF5", color: "#10B981" },
-    feedback:       { bgcolor: "#FEF2F2", color: "#EF4444" },
-    reminder:       { bgcolor: "#EFF6FF", color: "#3B82F6" },
-    "follow-up":    { bgcolor: "#FFF7ED", color: "#F59E0B" },
-    followup:       { bgcolor: "#FFF7ED", color: "#F59E0B" },
-    "re-engagement":{ bgcolor: "#F5F3FF", color: "#7C3AED" },
-    "no-show":      { bgcolor: "#FFF1F2", color: "#F43F5E" },
-    general:        { bgcolor: "#F1F5F9", color: "#64748B" },
-    promotional:    { bgcolor: "#F5F3FF", color: "#7C3AED" },
-    welcome:        { bgcolor: "#ECFDF5", color: "#10B981" },
+    appointment:     { bgcolor: "#ECFDF5", color: "#10B981" },
+    feedback:        { bgcolor: "#FEF2F2", color: "#EF4444" },
+    reminder:        { bgcolor: "#EFF6FF", color: "#3B82F6" },
+    "follow-up":     { bgcolor: "#FFF7ED", color: "#F59E0B" },
+    followup:        { bgcolor: "#FFF7ED", color: "#F59E0B" },
+    "re-engagement": { bgcolor: "#F5F3FF", color: "#7C3AED" },
+    "no-show":       { bgcolor: "#FFF1F2", color: "#F43F5E" },
+    general:         { bgcolor: "#F1F5F9", color: "#64748B" },
+    promotional:     { bgcolor: "#F5F3FF", color: "#7C3AED" },
+    welcome:         { bgcolor: "#ECFDF5", color: "#10B981" },
   };
   return map[(useCase ?? "").toLowerCase()] ?? { bgcolor: "#F1F5F9", color: "#64748B" };
 };
@@ -136,7 +164,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
   const [isSending,        setIsSending]        = useState(false);
   const [sendError,        setSendError]        = useState<string | null>(null);
 
-  // ── SMS state ─────────────────────────────────────────────────────
+  // ── SMS ───────────────────────────────────────────────────────────
   const [smsDialog,      setSmsDialog]      = useState<"compose" | "templates" | "preview" | "newTemplate" | null>(null);
   const [smsMessage,     setSmsMessage]     = useState("");
   const [isSendingSMS,   setIsSendingSMS]   = useState(false);
@@ -146,7 +174,6 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
   const [selectedSMSTpl, setSelectedSMSTpl] = useState<SMSTemplate | null>(null);
   const [previewBody,    setPreviewBody]    = useState("");
 
-  // New template form state
   const [newTplName,    setNewTplName]    = useState("");
   const [newTplUseCase, setNewTplUseCase] = useState("");
   const [newTplBody,    setNewTplBody]    = useState("");
@@ -155,11 +182,11 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
   const [newTplView,    setNewTplView]    = useState<"form" | "preview">("form");
   const [useCaseAnchor, setUseCaseAnchor] = useState<null | HTMLElement>(null);
 
-  // ── Guard ─────────────────────────────────────────────────────────
   if (selectedIds.length === 0) return null;
 
   const someDeleting  = selectedIds.some((id) => deletingIds.includes(id));
   const anyProcessing = someDeleting || isDeleting || isArchiving;
+  const useCaseMenuOpen = useCaseAnchor !== null;
 
   // ── Email handlers ────────────────────────────────────────────────
   const fetchEmailTemplates = async () => {
@@ -179,7 +206,10 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
   };
 
   const handleSelectEmailTemplate = (t: EmailTemplate) => {
-    setSelectedTemplate(t); setSubject(t.subject); setMessageBody(t.body);
+    setSelectedTemplate(t);
+    setSubject(t.subject);
+    // Store plain text so compose textarea shows clean text
+    setMessageBody(stripHtml(t.body || ""));
   };
 
   const handleSendEmail = async () => {
@@ -199,9 +229,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
   };
 
   // ── SMS handlers ──────────────────────────────────────────────────
-  const openSMSCompose = () => {
-    setSmsMessage(""); setSmsError(null); setSmsDialog("compose");
-  };
+  const openSMSCompose = () => { setSmsMessage(""); setSmsError(null); setSmsDialog("compose"); };
 
   const closeSMS = () => {
     if (isSendingSMS) return;
@@ -246,11 +274,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
     if (!newTplBody.trim()) { setNewTplError("Body is required."); return; }
     setNewTplSaving(true); setNewTplError(null);
     try {
-      const payload = {
-        clinic: 1, name: newTplName.trim(),
-        use_case: newTplUseCase.toLowerCase() || "general",
-        body: newTplBody.trim(), created_by: 1, is_active: true,
-      };
+      const payload = { clinic: 1, name: newTplName.trim(), use_case: newTplUseCase.toLowerCase() || "general", body: newTplBody.trim(), created_by: 1, is_active: true };
       let saved: SMSTemplate | null = null;
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -259,9 +283,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
         saved = { id: `local-${Date.now()}`, name: newTplName.trim(), use_case: newTplUseCase, body: newTplBody.trim() };
       }
       toast.success("Template saved and applied!", toastOptions);
-      setSmsMessage(saved!.body);
-      setSmsError(null);
-      setSmsDialog("compose");
+      setSmsMessage(saved!.body); setSmsError(null); setSmsDialog("compose");
     } catch (err: unknown) {
       setNewTplError(getErrorMessage(err, "Failed to save template."));
     } finally { setNewTplSaving(false); }
@@ -287,12 +309,8 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
     setIsSendingSMS(false);
     if (successCount > 0) {
       const msg = `SMS sent to ${successCount} lead${successCount > 1 ? "s" : ""} successfully.${errors.length ? ` ${errors.length} failed.` : ""}`;
-      // FIX (line 291): was a ternary expression used as statement — changed to if/else
-      if (errors.length === selectedIds.length) {
-        toast.error(msg, toastErrorOptions);
-      } else {
-        toast.success(msg, toastOptions);
-      }
+      if (errors.length === selectedIds.length) { toast.error(msg, toastErrorOptions); }
+      else { toast.success(msg, toastOptions); }
       if (onSendSMS) onSendSMS(selectedIds, smsMessage.trim());
       closeSMS();
     } else {
@@ -300,7 +318,6 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
     }
   };
 
-  // ── Delete / Archive handlers ─────────────────────────────────────
   const handleDelete = async () => {
     try {
       setIsDeleting(true); setDeleteError(null);
@@ -322,11 +339,6 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
     } finally { setIsArchiving(false); }
   };
 
-  // Derived boolean — avoids redundant Boolean() casts in JSX
-  // FIX (lines 553, 557): replaced Boolean(useCaseAnchor) with useCaseMenuOpen
-  const useCaseMenuOpen = useCaseAnchor !== null;
-
-  // ─────────────────────────────────────────────────────────────────
   return (
     <Box sx={{ position: "sticky", bottom: 0, backgroundColor: "#fff", borderTop: "1px solid #E5E7EB", py: 1.5, px: 2, mt: 2, zIndex: 20 }}>
 
@@ -383,19 +395,14 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
         isArchiving={isArchiving} error={archiveError}
       />
 
-      {/* ══════════════════════════════════════════════════════════
-          SMS — STEP 1: COMPOSE
-      ══════════════════════════════════════════════════════════ */}
-      <Dialog open={smsDialog === "compose"} onClose={closeSMS} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: "16px" } }}>
+      {/* SMS — STEP 1: COMPOSE */}
+      <Dialog open={smsDialog === "compose"} onClose={closeSMS} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
         <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1 }}>Send SMS</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
           <Stack spacing={2}>
             <Box sx={{ backgroundColor: "#F8FAFC", borderRadius: "10px", px: 2, py: 1.5, border: "1px solid #E2E8F0" }}>
               <Typography variant="body2" color="text.secondary" fontSize="12px">Sending to</Typography>
-              <Typography fontWeight={600} fontSize="14px">
-                {selectedIds.length} selected lead{selectedIds.length > 1 ? "s" : ""}
-              </Typography>
+              <Typography fontWeight={600} fontSize="14px">{selectedIds.length} selected lead{selectedIds.length > 1 ? "s" : ""}</Typography>
             </Box>
             <TextField label="Message" multiline rows={4} value={smsMessage}
               onChange={(e) => { setSmsMessage(e.target.value); setSmsError(null); }}
@@ -424,11 +431,8 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
         </DialogActions>
       </Dialog>
 
-      {/* ══════════════════════════════════════════════════════════
-          SMS — STEP 2: SELECT TEMPLATE
-      ══════════════════════════════════════════════════════════ */}
-      <Dialog open={smsDialog === "templates"} onClose={() => setSmsDialog("compose")} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: "16px" } }}>
+      {/* SMS — STEP 2: SELECT TEMPLATE */}
+      <Dialog open={smsDialog === "templates"} onClose={() => setSmsDialog("compose")} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
         <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Typography fontWeight={600}>Select SMS Template</Typography>
           <IconButton size="small" onClick={() => setSmsDialog("compose")}><CloseIcon fontSize="small" /></IconButton>
@@ -446,21 +450,10 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
               {smsTemplates.map((tpl, idx) => (
                 <React.Fragment key={tpl.id}>
                   <ListItem disablePadding>
-                    <ListItemButton onClick={() => handlePickTemplate(tpl)}
-                      sx={{ borderRadius: "8px", px: 1.5, py: 1.25, "&:hover": { bgcolor: "#F8FAFC" } }}>
+                    <ListItemButton onClick={() => handlePickTemplate(tpl)} sx={{ borderRadius: "8px", px: 1.5, py: 1.25, "&:hover": { bgcolor: "#F8FAFC" } }}>
                       <ListItemText
-                        primary={
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography fontSize="14px" fontWeight={600} color="#1E293B">{tpl.name}</Typography>
-                            {tpl.use_case && <Chip label={tpl.use_case} size="small" sx={{ ...getUseCaseSx(tpl.use_case), fontSize: "11px", height: 20, textTransform: "capitalize" }} />}
-                          </Stack>
-                        }
-                        secondary={
-                          <Typography fontSize="12px" color="#64748B"
-                            sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                            {tpl.body}
-                          </Typography>
-                        }
+                        primary={<Stack direction="row" spacing={1} alignItems="center"><Typography fontSize="14px" fontWeight={600} color="#1E293B">{tpl.name}</Typography>{tpl.use_case && <Chip label={tpl.use_case} size="small" sx={{ ...getUseCaseSx(tpl.use_case), fontSize: "11px", height: 20, textTransform: "capitalize" }} />}</Stack>}
+                        secondary={<Typography fontSize="12px" color="#64748B" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{tpl.body}</Typography>}
                       />
                     </ListItemButton>
                   </ListItem>
@@ -471,22 +464,13 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 2, flexDirection: "column", gap: 1, alignItems: "stretch" }}>
-          <Button fullWidth variant="outlined" onClick={openNewTemplate}
-            sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>
-            + New Template
-          </Button>
-          <Button fullWidth onClick={() => setSmsDialog("compose")}
-            sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>
-            Cancel
-          </Button>
+          <Button fullWidth variant="outlined" onClick={openNewTemplate} sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>+ New Template</Button>
+          <Button fullWidth onClick={() => setSmsDialog("compose")} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Cancel</Button>
         </DialogActions>
       </Dialog>
 
-      {/* ══════════════════════════════════════════════════════════
-          SMS — STEP 3: PREVIEW TEMPLATE
-      ══════════════════════════════════════════════════════════ */}
-      <Dialog open={smsDialog === "preview"} onClose={() => setSmsDialog("templates")} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: "16px" } }}>
+      {/* SMS — STEP 3: PREVIEW TEMPLATE */}
+      <Dialog open={smsDialog === "preview"} onClose={() => setSmsDialog("templates")} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
         <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Typography fontWeight={600}>Preview Template</Typography>
           <IconButton size="small" onClick={() => setSmsDialog("templates")}><CloseIcon fontSize="small" /></IconButton>
@@ -500,7 +484,6 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
                 {selectedSMSTpl.use_case && <Chip label={selectedSMSTpl.use_case} size="small" sx={{ ...getUseCaseSx(selectedSMSTpl.use_case), fontSize: "11px", height: 20, textTransform: "capitalize" }} />}
               </Stack>
             )}
-            {/* Chat bubble preview */}
             <Box sx={{ bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", p: 2, minHeight: 120, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
               <Box sx={{ alignSelf: "flex-start", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "0px 12px 12px 12px", px: 2, py: 1.25, maxWidth: "90%", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
                 <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
@@ -520,23 +503,13 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-          <Button fullWidth onClick={() => setSmsDialog("templates")}
-            sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>
-            Back
-          </Button>
-          <Button fullWidth onClick={handleUseTemplate} disabled={!previewBody.trim()}
-            sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>
-            Use Template
-          </Button>
+          <Button fullWidth onClick={() => setSmsDialog("templates")} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Back</Button>
+          <Button fullWidth onClick={handleUseTemplate} disabled={!previewBody.trim()} sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>Use Template</Button>
         </DialogActions>
       </Dialog>
 
-      {/* ══════════════════════════════════════════════════════════
-          SMS — STEP 4: NEW TEMPLATE
-      ══════════════════════════════════════════════════════════ */}
-      <Dialog open={smsDialog === "newTemplate"} onClose={() => setSmsDialog("templates")} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: "16px" } }}>
-
+      {/* SMS — STEP 4: NEW TEMPLATE */}
+      <Dialog open={smsDialog === "newTemplate"} onClose={() => setSmsDialog("templates")} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
         {newTplView === "form" && (
           <>
             <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -545,90 +518,42 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
             </Box>
             <DialogContent sx={{ pt: 2 }}>
               <Stack spacing={2.5}>
-                {/* Name */}
-                <TextField
-                  placeholder="Name" value={newTplName}
-                  onChange={(e) => { setNewTplName(e.target.value); setNewTplError(null); }}
-                  fullWidth size="small"
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
-                />
-
-                {/* Use Case dropdown */}
-                {/* FIX (lines 553, 557): replaced Boolean(useCaseAnchor) with useCaseMenuOpen */}
+                <TextField placeholder="Name" value={newTplName} onChange={(e) => { setNewTplName(e.target.value); setNewTplError(null); }} fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
                 <Box>
                   <Typography fontSize="13px" fontWeight={500} color="#374151" mb={0.75}>Use Case</Typography>
-                  <Box
-                    onClick={(e) => setUseCaseAnchor(e.currentTarget as HTMLElement)}
-                    sx={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      border: "1px solid",
-                      borderColor: useCaseMenuOpen ? "#1976d2" : "#D1D5DB",
-                      borderRadius: "8px", px: 1.5, cursor: "pointer", minHeight: 42, bgcolor: "#fff",
-                      boxShadow: useCaseMenuOpen ? "0 0 0 2px rgba(25,118,210,0.15)" : "none",
-                      "&:hover": { borderColor: "#9CA3AF" },
-                      transition: "all 0.15s",
-                    }}>
-                    {newTplUseCase
-                      ? <Chip label={newTplUseCase} size="small" sx={getUseCaseSx(newTplUseCase)} />
-                      : <Typography fontSize="14px" color="#9CA3AF">Select use case</Typography>}
+                  <Box onClick={(e) => setUseCaseAnchor(e.currentTarget as HTMLElement)}
+                    sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid", borderColor: useCaseMenuOpen ? "#1976d2" : "#D1D5DB", borderRadius: "8px", px: 1.5, cursor: "pointer", minHeight: 42, bgcolor: "#fff", boxShadow: useCaseMenuOpen ? "0 0 0 2px rgba(25,118,210,0.15)" : "none", "&:hover": { borderColor: "#9CA3AF" }, transition: "all 0.15s" }}>
+                    {newTplUseCase ? <Chip label={newTplUseCase} size="small" sx={getUseCaseSx(newTplUseCase)} /> : <Typography fontSize="14px" color="#9CA3AF">Select use case</Typography>}
                     <Typography sx={{ fontSize: "12px", color: "#6B7280", transform: useCaseMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</Typography>
                   </Box>
-                  <Menu
-                    anchorEl={useCaseAnchor}
-                    open={useCaseMenuOpen}
-                    onClose={() => setUseCaseAnchor(null)}
-                    anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-                    transformOrigin={{ vertical: "top", horizontal: "left" }}
-                    PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", mt: 0.5, minWidth: 220 } }}>
+                  <Menu anchorEl={useCaseAnchor} open={useCaseMenuOpen} onClose={() => setUseCaseAnchor(null)} anchorOrigin={{ vertical: "bottom", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }} PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", mt: 0.5, minWidth: 220 } }}>
                     {USE_CASE_OPTIONS.map((uc) => (
-                      <MenuItem key={uc} selected={newTplUseCase === uc} onClick={() => handleSelectUseCase(uc)}
-                        sx={{ py: 1, px: 1.5, "&.Mui-selected": { bgcolor: "#F1F5F9" }, "&:hover": { bgcolor: "#F8FAFC" } }}>
+                      <MenuItem key={uc} selected={newTplUseCase === uc} onClick={() => handleSelectUseCase(uc)} sx={{ py: 1, px: 1.5, "&.Mui-selected": { bgcolor: "#F1F5F9" }, "&:hover": { bgcolor: "#F8FAFC" } }}>
                         <Chip label={uc} size="small" sx={getUseCaseSx(uc)} />
                       </MenuItem>
                     ))}
                   </Menu>
                 </Box>
-
-                {/* Body */}
                 <Box>
                   <Typography fontSize="13px" fontWeight={500} color="#374151" mb={0.75}>Body</Typography>
-                  <textarea
-                    value={newTplBody}
-                    onChange={(e) => { setNewTplBody(e.target.value); setNewTplError(null); }}
-                    placeholder="Type your message here..."
-                    maxLength={1600} rows={7}
+                  <textarea value={newTplBody} onChange={(e) => { setNewTplBody(e.target.value); setNewTplError(null); }} placeholder="Type your message here..." maxLength={1600} rows={7}
                     style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: "14px", fontFamily: "inherit", color: "#1E293B", lineHeight: "1.6", border: "1px solid #D1D5DB", borderRadius: "8px", resize: "vertical", outline: "none", background: "#fff" }}
                     onFocus={(e) => { e.target.style.borderColor = "#1976d2"; e.target.style.boxShadow = "0 0 0 2px rgba(25,118,210,0.15)"; }}
-                    onBlur={(e) => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }}
-                  />
-                  <Typography fontSize="11px" color="#94A3B8" mt={0.5}>
-                    {newTplBody.length}/1600 — Use {"{variable_name}"} for dynamic fields
-                  </Typography>
+                    onBlur={(e) => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }} />
+                  <Typography fontSize="11px" color="#94A3B8" mt={0.5}>{newTplBody.length}/1600 — Use {"{variable_name}"} for dynamic fields</Typography>
                 </Box>
-
                 {newTplError && <Alert severity="error" sx={{ borderRadius: "8px", py: 0.5 }}>{newTplError}</Alert>}
               </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
-              <Button onClick={() => setSmsDialog("templates")}
-                sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>
-                Cancel
-              </Button>
-              <Button onClick={() => {
-                if (!newTplName.trim()) { setNewTplError("Template name is required."); return; }
-                if (!newTplBody.trim()) { setNewTplError("Body is required."); return; }
-                setNewTplError(null); setNewTplView("preview");
-              }} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>
-                Preview
-              </Button>
-              <Button onClick={handleSaveNewTemplate} disabled={newTplSaving || !newTplName.trim() || !newTplBody.trim()}
-                sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", bgcolor: "#1F2937", color: "white", fontWeight: 600, "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } }}>
+              <Button onClick={() => setSmsDialog("templates")} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>Cancel</Button>
+              <Button onClick={() => { if (!newTplName.trim()) { setNewTplError("Template name is required."); return; } if (!newTplBody.trim()) { setNewTplError("Body is required."); return; } setNewTplError(null); setNewTplView("preview"); }} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>Preview</Button>
+              <Button onClick={handleSaveNewTemplate} disabled={newTplSaving || !newTplName.trim() || !newTplBody.trim()} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", bgcolor: "#1F2937", color: "white", fontWeight: 600, "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } }}>
                 {newTplSaving ? "Saving..." : "Save"}
               </Button>
             </DialogActions>
           </>
         )}
-
         {newTplView === "preview" && (
           <>
             <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -655,12 +580,8 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
               </Box>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
-              <Button onClick={() => setNewTplView("form")}
-                sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>
-                Back to Edit
-              </Button>
-              <Button onClick={handleSaveNewTemplate} disabled={newTplSaving}
-                sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", bgcolor: "#1F2937", color: "white", fontWeight: 600, "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } }}>
+              <Button onClick={() => setNewTplView("form")} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>Back to Edit</Button>
+              <Button onClick={handleSaveNewTemplate} disabled={newTplSaving} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", bgcolor: "#1F2937", color: "white", fontWeight: 600, "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } }}>
                 {newTplSaving ? "Saving..." : "Save"}
               </Button>
             </DialogActions>
@@ -668,9 +589,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
         )}
       </Dialog>
 
-      {/* ══════════════════════════════════════════════════════════
-          EMAIL SELECTOR DIALOG
-      ══════════════════════════════════════════════════════════ */}
+      {/* EMAIL SELECTOR DIALOG */}
       <Dialog open={openEmail} onClose={() => setOpenEmail(false)} maxWidth="md" fullWidth>
         <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box>
@@ -689,8 +608,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
           <Divider sx={{ mb: 2 }}>OR USE A TEMPLATE</Divider>
           {templatesLoading && <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}><CircularProgress size={22} /></Box>}
           {!templatesLoading && templatesError && (
-            <Alert severity="error" sx={{ borderRadius: "10px", mb: 2 }}
-              action={<Button size="small" onClick={fetchEmailTemplates}>Retry</Button>}>{templatesError}</Alert>
+            <Alert severity="error" sx={{ borderRadius: "10px", mb: 2 }} action={<Button size="small" onClick={fetchEmailTemplates}>Retry</Button>}>{templatesError}</Alert>
           )}
           {!templatesLoading && !templatesError && templates.length === 0 && (
             <Box sx={{ textAlign: "center", py: 5 }}>
@@ -723,7 +641,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
         </DialogActions>
       </Dialog>
 
-      {/* ── Email Preview Dialog ── */}
+      {/* ── Email Preview Dialog — plain text, no dangerouslySetInnerHTML ── */}
       <Dialog open={!!previewTemplate} onClose={() => setPreviewTemplate(null)} maxWidth="sm" fullWidth>
         <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box>
@@ -737,8 +655,13 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
           <Typography fontWeight={600} fontSize="14px" mb={2} mt={0.5}>{previewTemplate?.subject}</Typography>
           <Divider sx={{ mb: 2 }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px" }}>BODY</Typography>
-          <Box sx={{ mt: 0.5, p: 2, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "13px", lineHeight: 1.75, "& p": { margin: "0 0 8px 0" }, "& a": { color: "#3B82F6" } }}
-            dangerouslySetInnerHTML={{ __html: previewTemplate?.body ?? "" }} />
+          {/* ── FIX 1: was dangerouslySetInnerHTML — now plain text ── */}
+          <Typography
+            component="pre"
+            sx={{ mt: 0.5, p: 2, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "13px", lineHeight: 1.75, fontFamily: "inherit", whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}
+          >
+            {stripHtml(previewTemplate?.body ?? "")}
+          </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setPreviewTemplate(null)} variant="outlined" sx={{ borderColor: "#D1D5DB", color: "#374151" }}>Close</Button>
@@ -747,7 +670,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
         </DialogActions>
       </Dialog>
 
-      {/* ── Compose Email Dialog ── */}
+      {/* ── Compose Email Dialog — plain text textarea, no HTML rendering ── */}
       <Dialog open={openComposer} onClose={() => !isSending && setOpenComposer(false)} maxWidth="md" fullWidth>
         <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box>
@@ -764,14 +687,15 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
           </Box>
           <TextField fullWidth variant="standard" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)}
             InputProps={{ disableUnderline: true }} sx={{ py: 1.5, borderBottom: "1px solid #E5E7EB", mt: 1 }} disabled={isSending} />
-          {selectedTemplate ? (
-            <Box sx={{ mt: 2, p: 2, minHeight: 220, border: "1px solid #E5E7EB", borderRadius: 2, bgcolor: "#FAFAFA", fontSize: "13px", lineHeight: 1.75, overflowY: "auto" }}
-              dangerouslySetInnerHTML={{ __html: messageBody }} />
-          ) : (
-            <TextField fullWidth multiline rows={10} variant="outlined" placeholder="Type your message here..."
-              value={messageBody} onChange={(e) => setMessageBody(e.target.value)}
-              sx={{ mt: 2, "& .MuiOutlinedInput-root": { borderRadius: 2 } }} disabled={isSending} />
-          )}
+          {/* ── FIX 2 & 3: was dangerouslySetInnerHTML for template OR plain textarea — now always plain textarea ── */}
+          <TextField
+            fullWidth multiline rows={10} variant="outlined"
+            placeholder="Type your message here..."
+            value={messageBody}
+            onChange={(e) => setMessageBody(e.target.value)}
+            sx={{ mt: 2, "& .MuiOutlinedInput-root": { borderRadius: 2, fontFamily: "inherit", fontSize: "13px", lineHeight: 1.75 } }}
+            disabled={isSending}
+          />
         </DialogContent>
         <Box sx={{ px: 3, py: 2, borderTop: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, border: "1px solid #E5E7EB", borderRadius: 2, px: 1, py: 0.5 }}>
@@ -785,8 +709,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
             <IconButton size="small" disabled={isSending}><CreateOutlinedIcon fontSize="small" /></IconButton>
           </Box>
           <Stack direction="row" spacing={1}>
-            <Button onClick={() => { setOpenComposer(false); setOpenEmail(true); fetchEmailTemplates(); }}
-              variant="outlined" disabled={isSending} sx={{ borderColor: "#D1D5DB", color: "#374151" }}>Back</Button>
+            <Button onClick={() => { setOpenComposer(false); setOpenEmail(true); fetchEmailTemplates(); }} variant="outlined" disabled={isSending} sx={{ borderColor: "#D1D5DB", color: "#374151" }}>Back</Button>
             <Button variant="contained" disabled sx={{ backgroundColor: "#F3F4F6", color: "#9CA3AF" }}>Save as Template</Button>
             <Button variant="contained"
               endIcon={isSending ? <CircularProgress size={16} sx={{ color: "white" }} /> : <SendOutlinedIcon />}
