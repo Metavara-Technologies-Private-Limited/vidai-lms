@@ -170,7 +170,7 @@ const Leads: React.FC = () => {
         direction="row"
         justifyContent="space-between"
         alignItems="center"
-        sx={{ mb: 3, flexWrap: "nowrap", minWidth: 0, width: "100%", gap: 2 }}
+        sx={{ mb: 3, mt:-2, flexWrap: "nowrap", minWidth: 0, width: "100%", gap: 2 }}
       >
         <Typography className="leads-title" sx={{ flexShrink: 0 }}>
           Leads Hub
