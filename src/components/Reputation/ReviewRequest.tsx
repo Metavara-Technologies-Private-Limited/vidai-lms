@@ -147,7 +147,18 @@ const isValidPhoneNumber = (value?: string) => {
   }
 
   const normalized = phone.replace(/[\s().-]/g, "");
-  return /^\+?[1-9]\d{7,14}$/.test(normalized);
+
+  // Accept formats: 7702376913 (10 digits), +917702376913, 917702376913, +1234567890, etc.
+  // Pattern: optional +, then 7-15 digits (supports 10-digit Indian, 11-digit with country code, etc.)
+  const isValid = /^\+?\d{7,15}$/.test(normalized);
+
+  if (!isValid) {
+    console.warn(
+      `[Phone Validation] Invalid phone: "${phone}" (normalized: "${normalized}")`,
+    );
+  }
+
+  return isValid;
 };
 
 const toPositiveNumber = (value: unknown): number => {
@@ -187,6 +198,94 @@ const unwrapCreateRequestRecord = (
   }
 
   return {};
+};
+
+type FailedLead = {
+  lead_id: string | number;
+  lead?: string;
+  category: string;
+  user_message: string;
+  recipient?: string;
+  detail?: string;
+  provider_code?: string;
+};
+
+type DeliveryReport = {
+  total_leads: number;
+  success_count: number;
+  failed_count: number;
+  failed_leads: FailedLead[];
+};
+
+type CreateRequestResponse = {
+  status: "success" | "partial_success" | "error";
+  message: string;
+  data?: Record<string, unknown>;
+  delivery_report?: DeliveryReport;
+};
+
+const getCategoryToastMessage = (category: string): string => {
+  const categoryMap: Record<string, string> = {
+    invalid_number: "Invalid phone number",
+    number_unreachable:
+      "Phone number does not exist or cannot receive messages",
+    missing_phone: "Phone number is missing",
+    missing_email: "Email address is missing",
+    provider_error:
+      "Failed to send message. Please verify the number and try again.",
+    configuration_error: "Review link configuration is missing",
+  };
+
+  return categoryMap[category] || category;
+};
+
+const handleDeliveryReport = (
+  responseStatus: string,
+  deliveryReport: DeliveryReport | undefined,
+  showToast: (msg: string, type: "success" | "error" | "warning") => void,
+) => {
+  if (responseStatus === "success") {
+    showToast("Review request created successfully", "success");
+    return;
+  }
+
+  if (responseStatus === "partial_success" && deliveryReport) {
+    const { failed_count, failed_leads } = deliveryReport;
+
+    showToast(
+      `${failed_count} ${failed_count === 1 ? "number" : "numbers"} failed`,
+      "warning",
+    );
+
+    failed_leads.slice(0, 3).forEach((failedLead) => {
+      const message =
+        failedLead.user_message || getCategoryToastMessage(failedLead.category);
+      showToast(message, "error");
+    });
+
+    return;
+  }
+
+  if (responseStatus === "error" && deliveryReport) {
+    const { failed_leads } = deliveryReport;
+    const firstFailure = failed_leads[0];
+
+    if (firstFailure) {
+      const message =
+        firstFailure.user_message ||
+        getCategoryToastMessage(firstFailure.category);
+      showToast(message, "error");
+    } else {
+      showToast(
+        "Review request created but no messages were delivered",
+        "error",
+      );
+    }
+
+    return;
+  }
+
+  showToast("Review request created successfully", "success");
 };
 
 const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
@@ -261,6 +360,10 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     toast.success(message, { toastId: `review-request-success-${message}` });
   };
 
+  const showWarningToast = (message: string) => {
+    toast.warning(message, { toastId: `review-request-warning-${message}` });
+  };
+
   const showSavingToast = () =>
     toast.loading("Saving review request...", {
       toastId: "review-request-saving",
@@ -301,17 +404,21 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       status: "draft" | "sent" | "scheduled";
       lead_ids: string[];
     },
+    deliveryReport?: DeliveryReport,
   ) => {
     const record = unwrapCreateRequestRecord(response);
     const resolvedId =
       record.id ?? record.request_id ?? record.uuid ?? `temp-${Date.now()}`;
 
-    const resolvedRequestSent =
-      toPositiveNumber(record.requests_sent) ||
-      toPositiveNumber(record.request_sent) ||
-      toPositiveNumber(record.selected_leads_count) ||
-      toPositiveNumber(record.leads_count) ||
-      payload.lead_ids.length;
+    // For SMS/WhatsApp with delivery report, use actual success count
+    // Otherwise fallback to backend requests_sent or lead_ids.length
+    const resolvedRequestSent = deliveryReport
+      ? deliveryReport.success_count
+      : toPositiveNumber(record.requests_sent) ||
+        toPositiveNumber(record.request_sent) ||
+        toPositiveNumber(record.selected_leads_count) ||
+        toPositiveNumber(record.leads_count) ||
+        payload.lead_ids.length;
 
     return {
       id: String(resolvedId),
@@ -470,13 +577,36 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       const targetLeads =
         leadSelectionType === "all" ? filteredLeads : selectedLeads;
 
-      const invalidLeads = targetLeads.filter((lead) => {
-        if (formData.mode === "email") {
-          return !isValidEmailAddress(lead.email);
-        }
+      const shouldValidateRecipients = status !== "draft";
+      const invalidLeads = shouldValidateRecipients
+        ? targetLeads.filter((lead) => {
+            if (formData.mode === "email") {
+              return !isValidEmailAddress(lead.email);
+            }
 
-        return !isValidPhoneNumber(lead.contact_no);
-      });
+            return !isValidPhoneNumber(lead.contact_no);
+          })
+        : [];
+
+      // Debug logging
+      if (invalidLeads.length > 0) {
+        console.warn(
+          `[Validation] ${invalidLeads.length} invalid lead(s)`,
+          invalidLeads.map((lead) => ({
+            id: lead.id,
+            name: lead.full_name,
+            contact: formData.mode === "email" ? lead.email : lead.contact_no,
+          })),
+        );
+      }
+
+      const invalidLeadIdSet = new Set(
+        invalidLeads.map((lead) => String(lead.id)),
+      );
+
+      const validLeads = shouldValidateRecipients
+        ? targetLeads.filter((lead) => !invalidLeadIdSet.has(String(lead.id)))
+        : targetLeads;
 
       if (invalidLeads.length > 0) {
         const recipientType = formData.mode === "email" ? "email" : "phone";
@@ -484,21 +614,20 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
           .slice(0, 3)
           .map((lead) => lead.full_name)
           .join(", ");
-        showErrorToast(
-          `Cannot send via ${formData.mode.toUpperCase()}: ${invalidLeads.length} lead(s) have invalid ${recipientType} details (${sampleNames}${invalidLeads.length > 3 ? ", ..." : ""}).`,
+
+        showWarningToast(
+          `Skipped ${invalidLeads.length} lead(s) with invalid ${recipientType} details (${sampleNames}${invalidLeads.length > 3 ? ", ..." : ""}). Sending to valid leads only.`,
         );
-        toast.dismiss(savingToastId);
-        isSubmittingRef.current = false;
-        setIsSubmitting(false);
-        onOpenChange?.(true);
-        return;
       }
 
-      const leadIds = targetLeads.map((lead) => String(lead.id));
+      const leadIds = validLeads.map((lead) => String(lead.id));
 
       if (leadIds.length === 0) {
+        const recipientType = formData.mode === "email" ? "email" : "phone";
         showErrorToast(
-          "No leads available. Please refresh leads and try again.",
+          invalidLeads.length > 0
+            ? `No valid ${recipientType} recipients available. Update lead contact details and try again.`
+            : "No leads available. Please refresh leads and try again.",
         );
         toast.dismiss(savingToastId);
         isSubmittingRef.current = false;
@@ -508,9 +637,11 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       }
 
       const clinicId =
+        validLeads[0]?.clinic_id ??
         (leadSelectionType === "manual"
           ? selectedLeads[0]?.clinic_id
-          : filteredLeads[0]?.clinic_id) ?? 1;
+          : filteredLeads[0]?.clinic_id) ??
+        1;
 
       const normalizedMessage = normalizeReviewLinkPlaceholder(
         formData.message.trim(),
@@ -559,15 +690,52 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
         }),
       };
 
-      const response = await reputationApi.createRequest(payload);
+      const response = (await reputationApi.createRequest(
+        payload,
+      )) as CreateRequestResponse;
 
-      dispatch(prependReviewRequest(buildOptimisticRequest(response, payload)));
+      // Only prepend the request card if:
+      // 1. Status is draft (no delivery check), OR
+      // 2. No delivery_report present (email mode), OR
+      // 3. delivery_report.success_count > 0 (SMS/WhatsApp actually sent)
+      const shouldPrependRequest =
+        status === "draft" ||
+        !response.delivery_report ||
+        (response.delivery_report &&
+          response.delivery_report.success_count > 0);
+
+      if (shouldPrependRequest) {
+        dispatch(
+          prependReviewRequest(
+            buildOptimisticRequest(response, payload, response.delivery_report),
+          ),
+        );
+      }
 
       toast.dismiss(savingToastId);
       isSubmittingRef.current = false;
       setIsSubmitting(false);
       closeDialog();
-      showSuccessToast(successMessage);
+
+      // Handle delivery report if present (for SMS/WhatsApp modes)
+      if (response.delivery_report) {
+        handleDeliveryReport(
+          response.status,
+          response.delivery_report,
+          (msg: string, type: "success" | "error" | "warning") => {
+            if (type === "success") {
+              showSuccessToast(msg);
+            } else if (type === "warning") {
+              showWarningToast(msg);
+            } else {
+              showErrorToast(msg);
+            }
+          },
+        );
+      } else {
+        showSuccessToast(successMessage);
+      }
+
       void dispatch(fetchReviewRequests());
       void dispatch(fetchReputationDashboard());
     } catch (error: unknown) {

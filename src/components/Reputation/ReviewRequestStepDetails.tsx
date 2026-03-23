@@ -1,6 +1,7 @@
 import {
   Avatar,
   Box,
+  Checkbox,
   Chip,
   FormControlLabel,
   IconButton,
@@ -43,6 +44,28 @@ const ACTION_FILTER_OPTIONS = [
   "Review Details",
   "No Action",
 ] as const;
+
+const AVATAR_BG_COLORS = [
+  "#F97316",
+  "#2563EB",
+  "#059669",
+  "#E11D48",
+  "#7C3AED",
+  "#0EA5E9",
+  "#CA8A04",
+  "#0891B2",
+] as const;
+
+const getLeadAvatarColor = (lead: Lead) => {
+  const seed = `${lead.id ?? ""}-${lead.full_name ?? ""}`;
+
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = seed.charCodeAt(index) + ((hash << 5) - hash);
+  }
+
+  return AVATAR_BG_COLORS[Math.abs(hash) % AVATAR_BG_COLORS.length];
+};
 
 const ReviewRequestStepDetails = ({
   formData,
@@ -112,11 +135,88 @@ const ReviewRequestStepDetails = ({
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
         <Autocomplete<Lead, true, false, false>
           multiple
+          disableCloseOnSelect
           options={allLeads}
           disabled={leadSelectionType === "all"}
+          isOptionEqualToValue={(option, value) =>
+            String(option.id) === String(value.id)
+          }
           getOptionLabel={(option) => option.full_name || ""}
           value={selectedLeads}
           onChange={(_, newValue) => onSelectedLeadsChange(newValue)}
+          renderOption={(props, option, { selected }) => {
+            // Extract key from props to pass it separately, avoiding React warning
+            const { key, ...restProps } = props;
+            const firstLetter = (option.full_name || "U")
+              .charAt(0)
+              .toUpperCase();
+
+            return (
+              <Box
+                key={key}
+                component="li"
+                {...restProps}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <Checkbox
+                  size="small"
+                  checked={selected}
+                  sx={{
+                    color: "#9CA3AF",
+                    "&.Mui-checked": { color: "#E86A4A" },
+                  }}
+                />
+                <Avatar
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    fontSize: 11,
+                    bgcolor: getLeadAvatarColor(option),
+                    color: "#FFFFFF",
+                  }}
+                >
+                  {firstLetter}
+                </Avatar>
+                <Typography variant="body2" sx={{ color: "#1F2937" }}>
+                  {option.full_name}
+                </Typography>
+              </Box>
+            );
+          }}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => {
+              const tagProps = getTagProps({ index });
+              const firstLetter = (option.full_name || "U")
+                .charAt(0)
+                .toUpperCase();
+
+              return (
+                <Chip
+                  {...tagProps}
+                  key={String(option.id)}
+                  avatar={
+                    <Avatar
+                      sx={{
+                        width: 20,
+                        height: 20,
+                        fontSize: 10,
+                        bgcolor: getLeadAvatarColor(option),
+                        color: "#FFF",
+                      }}
+                    >
+                      {firstLetter}
+                    </Avatar>
+                  }
+                  label={option.full_name}
+                  size="small"
+                />
+              );
+            })
+          }
           renderInput={(params) => (
             <TextField
               {...params}
@@ -215,7 +315,11 @@ const ReviewRequestStepDetails = ({
             key={lead.id}
             avatar={
               <Avatar
-                sx={{ bgcolor: "#E86A4A", color: "#FFF", fontSize: "10px" }}
+                sx={{
+                  bgcolor: getLeadAvatarColor(lead),
+                  color: "#FFF",
+                  fontSize: "10px",
+                }}
               >
                 {(lead.full_name || "U").charAt(0).toUpperCase()}
               </Avatar>
