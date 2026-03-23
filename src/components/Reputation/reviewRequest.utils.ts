@@ -28,13 +28,13 @@ export const createInitialReviewRequestFormData = (): ReviewRequestFormData => {
   return {
     request_name: "",
     description: "",
-    collect_on: "google",
+    collect_on: "form",
     mode: "email",
     subject: "",
     message: "",
     schedule_date: formatDisplayDate(defaultScheduledAt),
     schedule_time: formatDisplayTime(defaultScheduledAt),
-    is_scheduled: "yes",
+    is_scheduled: "no",
     status: "draft",
   };
 };
