@@ -20,7 +20,6 @@ import {
   Select,
   FormControl,
   InputLabel,
-  Snackbar,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
@@ -38,6 +37,11 @@ import { LeadEmailAPI, EmailTemplateAPI, TwilioAPI } from "../../services/leads.
 import type { LeadMailListItem, EmailTemplate } from "../../services/leads.api";
 import type { TwilioCall, TwilioSMS } from "./LeadDetailTypes";
 import { formatDateTime, getCallStatusColor, getSMSStatusColor } from "./LeadDetailHelpers";
+import { toast } from "react-toastify";
+
+// ── Shared toast options (matches EmailDialogs.tsx) ───────────────────────────
+const toastOptions      = { position: "top-right"  as const, autoClose: 3000, theme: "colored" as const };
+const toastErrorOptions = { position: "top-right"  as const, autoClose: 4000, theme: "colored" as const };
 
 /* ── Strip HTML to plain text ─────────────────────────────────────── */
 const decodeEntities = (str: string): string => {
@@ -110,8 +114,6 @@ const ComposeDialog: React.FC<ComposeDialogProps> = ({ open, onClose, lead, onSe
   const [templates, setTemplates] = React.useState<EmailTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = React.useState(false);
   const [selectedTemplate, setSelectedTemplate] = React.useState<string>("");
-  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" as "success" | "error" });
-
   React.useEffect(() => {
     if (!open) return;
     setTemplatesLoading(true);
@@ -141,10 +143,10 @@ const ComposeDialog: React.FC<ComposeDialogProps> = ({ open, onClose, lead, onSe
         sender_email: null,
         scheduled_at: null,
       });
-      setSnackbar({ open: true, message: "Email sent successfully!", severity: "success" });
+      toast.success(`Email sent to ${lead.full_name || "Patient"}!`, toastOptions);
       setTimeout(() => { onSent(); onClose(); setSubject(""); setBody(""); setSelectedTemplate(""); }, 800);
     } catch {
-      setSnackbar({ open: true, message: "Failed to send email. Please try again.", severity: "error" });
+      toast.error("Failed to send email. Please try again.", toastErrorOptions);
     } finally { setSending(false); }
   };
 
@@ -198,9 +200,6 @@ const ComposeDialog: React.FC<ComposeDialogProps> = ({ open, onClose, lead, onSe
           </Stack>
         </DialogContent>
       </Dialog>
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert severity={snackbar.severity} sx={{ borderRadius: "10px" }}>{snackbar.message}</Alert>
-      </Snackbar>
     </>
   );
 };
@@ -217,8 +216,6 @@ interface SMSDialogProps {
 const SMSDialog: React.FC<SMSDialogProps> = ({ open, onClose, lead, onSent }) => {
   const [message, setMessage] = React.useState("");
   const [sending, setSending] = React.useState(false);
-  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" as "success" | "error" });
-
   const handleClose = () => { if (sending) return; setMessage(""); onClose(); };
 
   const handleSend = async () => {
@@ -226,11 +223,11 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, onClose, lead, onSent }) =>
     setSending(true);
     try {
       await TwilioAPI.sendSMS({ lead_uuid: lead.id, to: lead.contact_no, message: message.trim() });
-      setSnackbar({ open: true, message: "SMS sent successfully!", severity: "success" });
+      toast.success(`SMS sent to ${lead.full_name || "Patient"}!`, toastOptions);
       setTimeout(() => { onSent(); onClose(); setMessage(""); }, 800);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to send SMS. Please try again.";
-      setSnackbar({ open: true, message: msg, severity: "error" });
+      toast.error(msg, toastErrorOptions);
     } finally { setSending(false); }
   };
 
@@ -267,9 +264,6 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, onClose, lead, onSent }) =>
           </Stack>
         </DialogContent>
       </Dialog>
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert severity={snackbar.severity} sx={{ borderRadius: "10px" }}>{snackbar.message}</Alert>
-      </Snackbar>
     </>
   );
 };
