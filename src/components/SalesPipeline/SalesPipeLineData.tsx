@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
-import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import EastRoundedIcon from "@mui/icons-material/EastRounded";
 import Groups2OutlinedIcon from "@mui/icons-material/Groups2Outlined";
 import PublishedWithChangesOutlinedIcon from "@mui/icons-material/PublishedWithChangesOutlined";
@@ -20,7 +18,8 @@ import StageConfiguration from "./StageConfiguration";
 
 type SalesPipeLineDataProps = {
   stages: string[];
-  onAddStage: () => void;
+  onAddStage: (stageName?: string) => Promise<boolean> | boolean;
+  onEditStage: (stageIndex: number, stageName: string) => Promise<boolean> | boolean;
   onReorderStages: (fromIndex: number, toIndex: number) => void;
 };
 
@@ -71,6 +70,7 @@ const stageToStatusCandidates = (stageName: string): string[] => {
 const SalesPipeLineData = ({
   stages,
   onAddStage,
+  onEditStage,
   onReorderStages,
 }: SalesPipeLineDataProps) => {
   const theme = useTheme();
@@ -78,9 +78,9 @@ const SalesPipeLineData = ({
   const leads = useSelector(selectLeads) as ApiLead[];
   const leadsLoading = useSelector(selectLeadsLoading);
 
-  const [selectedStageName, setSelectedStageName] = useState<string | null>(
-    null,
-  );
+  const [selectedStageName, setSelectedStageName] = useState<string | null>(null);
+  const [selectedStageIndex, setSelectedStageIndex] = useState<number | null>(null);
+  const [configurationMode, setConfigurationMode] = useState<"create" | "edit">("create");
   const [draggedStageIndex, setDraggedStageIndex] = useState<number | null>(
     null,
   );
@@ -172,10 +172,28 @@ const SalesPipeLineData = ({
     setTimeout(() => setIsDragging(false), 50);
   };
 
-  const handleCardClick = (name: string) => {
-    // Only open the configuration if we weren't just dragging
-    if (!isDragging) {
-      setSelectedStageName(name.trim());
+  const handleAddStageClick = () => {
+    setConfigurationMode("create");
+    setSelectedStageIndex(null);
+    setSelectedStageName("New Stage");
+  };
+
+  const handleStageCardClick = (stageName: string, stageIndex: number) => {
+    if (isDragging) return;
+    setConfigurationMode("edit");
+    setSelectedStageIndex(stageIndex);
+    setSelectedStageName(stageName);
+  };
+
+  const handleSaveStageConfiguration = async (stageName: string) => {
+    const isEditMode = configurationMode === "edit" && selectedStageIndex !== null;
+    const saved = isEditMode
+      ? await Promise.resolve(onEditStage(selectedStageIndex, stageName))
+      : await Promise.resolve(onAddStage(stageName));
+
+    if (saved !== false) {
+      setSelectedStageIndex(null);
+      setSelectedStageName(null);
     }
   };
 
@@ -218,17 +236,20 @@ const SalesPipeLineData = ({
       ref={rootRef}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
+          setSelectedStageIndex(null);
           setSelectedStageName(null);
         }
       }}
       sx={{
         width: "100%",
-        minHeight: "74vh",
+        height: "100%",
+        minHeight: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         px: 2.5,
         position: "relative",
+        overflow: "hidden",
       }}
     >
       <Box
@@ -240,6 +261,7 @@ const SalesPipeLineData = ({
         sx={{
           display: "flex",
           alignItems: "center",
+          justifyContent: stageMetrics.length === 0 ? "center" : "flex-start",
           flexWrap: "nowrap",
           gap: 0.9,
           width: "100%",
@@ -257,8 +279,6 @@ const SalesPipeLineData = ({
       >
         {stageMetrics.map(
           ({ rawStage, stageName, leadCount, conversionValue }, index) => {
-            const isSelectedStage = selectedStageName === stageName;
-
             return (
               <Box
                 key={`${rawStage}-${index}`}
@@ -274,17 +294,13 @@ const SalesPipeLineData = ({
                   flexShrink: 0,
                 }}
               >
-                <Box sx={{ position: "relative", pb: isSelectedStage ? 4 : 0 }}>
+                <Box sx={{ position: "relative" }}>
                   <Box
-                    onClick={() => handleCardClick(stageName)}
+                    onClick={() => handleStageCardClick(stageName, index)}
                     sx={{
                       width: 176,
                       borderRadius: 2,
-                      border: `1px solid ${
-                        isSelectedStage
-                          ? alpha(theme.palette.primary.main, 0.45)
-                          : theme.palette.grey[200]
-                      }`,
+                      border: `1px solid ${theme.palette.grey[200]}`,
                       backgroundColor: theme.palette.background.paper,
                       overflow: "hidden",
                       cursor: isDragging ? "grabbing" : "pointer",
@@ -401,48 +417,6 @@ const SalesPipeLineData = ({
                       )}
                     </Box>
                   </Box>
-
-                  {isSelectedStage && (
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        left: "50%",
-                        bottom: 0,
-                        transform: "translate(-50%, 50%)",
-                        display: "flex",
-                        gap: 1,
-                        zIndex: 2,
-                      }}
-                    >
-                      <IconButton
-                        size="small"
-                        sx={{
-                          width: 28,
-                          height: 28,
-                          backgroundColor: alpha(theme.palette.info.main, 0.15),
-                          color: theme.palette.info.main,
-                          border: `1px solid ${alpha(theme.palette.info.main, 0.25)}`,
-                        }}
-                      >
-                        <ContentCopyOutlinedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        sx={{
-                          width: 28,
-                          height: 28,
-                          backgroundColor: alpha(
-                            theme.palette.error.main,
-                            0.12,
-                          ),
-                          color: theme.palette.error.main,
-                          border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-                        }}
-                      >
-                        <DeleteOutlineOutlinedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Box>
-                  )}
                 </Box>
                 <EastRoundedIcon
                   sx={{ color: theme.palette.grey[400], fontSize: 18 }}
@@ -453,7 +427,7 @@ const SalesPipeLineData = ({
         )}
 
         <Box
-          onClick={onAddStage}
+          onClick={handleAddStageClick}
           sx={{
             flexShrink: 0,
             width: 176,
@@ -546,7 +520,7 @@ const SalesPipeLineData = ({
         </IconButton>
         <IconButton
           size="small"
-          onClick={onAddStage}
+          onClick={handleAddStageClick}
           sx={{
             width: 30,
             height: 30,
@@ -561,7 +535,13 @@ const SalesPipeLineData = ({
       <StageConfiguration
         open={Boolean(selectedStageName)}
         stageName={selectedStageName ?? ""}
-        onClose={() => setSelectedStageName(null)}
+        onStageNameChange={(stageName) => setSelectedStageName(stageName)}
+        onClose={() => {
+          setSelectedStageIndex(null);
+          setSelectedStageName(null);
+        }}
+        onSave={handleSaveStageConfiguration}
+        mode={configurationMode}
       />
     </Box>
   );

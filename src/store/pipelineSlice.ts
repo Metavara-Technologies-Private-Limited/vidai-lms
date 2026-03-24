@@ -66,11 +66,15 @@ const mergeStage = (pipeline: Pipeline, stage: PipelineStage): Pipeline => {
   return { ...pipeline, stages: nextStages };
 };
 
-export const fetchPipelines = createAsyncThunk<Pipeline[], void, { rejectValue: string }>(
+export const fetchPipelines = createAsyncThunk<
+  Pipeline[],
+  number,
+  { rejectValue: string }
+>(
   "pipeline/fetchAll",
-  async (_, { rejectWithValue }) => {
+  async (clinicId, { rejectWithValue }) => {
     try {
-      return await pipelineApi.list();
+      return await pipelineApi.list(clinicId);
     } catch (error) {
       return rejectWithValue(getErrorMessage(error, "Failed to load pipelines"));
     }
@@ -150,6 +154,8 @@ const pipelineSlice = createSlice({
           );
           if (refreshed) {
             state.selectedPipeline = refreshed;
+          } else {
+            state.selectedPipeline = null;
           }
         }
       })
