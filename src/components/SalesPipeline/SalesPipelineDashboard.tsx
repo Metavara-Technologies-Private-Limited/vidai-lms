@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
-import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
@@ -11,57 +10,81 @@ import {
 	Box,
 	Button,
 	Dialog,
-	DialogActions,
-	DialogContent,
-	DialogTitle,
 	IconButton,
 	ListItemIcon,
 	Menu,
 	MenuItem,
 	Paper,
-	TextField,
 	Stack,
 	Typography,
+	CircularProgress,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import {
+	pipelineApi,
+	type PipelineIndustryType,
+	type PipelineStageType,
+} from "../../services/pipeline.api";
+import type { AppDispatch } from "../../store";
+import { selectClinic } from "../../store/clinicSlice";
+import {
+	createPipeline,
+	createPipelineStage,
+	fetchPipelineDetail,
+	fetchPipelines,
+	selectPipelineError,
+	selectPipelineLoading,
+	selectPipelines,
+	selectSelectedPipeline,
+	updatePipelineStage,
+} from "../../store/pipelineSlice";
 import CreateNewPipeline from "./CreateNewPipeline";
 import SalesPipeLineData from "./SalesPipeLineData";
 
-type PipelineCard = {
-	id: string;
-	title: string;
-	category: string;
-	stages: string[];
-};
-
-const INITIAL_PIPELINES: PipelineCard[] = [];
-
 const INDUSTRY_LABEL_MAP: Record<string, string> = {
 	healthcare: "HEALTHCARE",
-	"ivf-fertility": "IVF & FERTILITY",
-	"pharma-biotech": "PHARMA / BIOTECH",
-	"diagnostics-lab": "DIAGNOSTICS LAB",
-	"corporate-sales": "CORPORATE SALES",
-	"education-training": "EDUCATION / TRAINING",
-	"saas-technology": "SAAS / TECHNOLOGY",
+	ivf: "IVF & FERTILITY",
+	pharma: "PHARMA / BIOTECH",
+	diagnostics: "DIAGNOSTICS LAB",
+	corporate: "CORPORATE SALES",
+	education: "EDUCATION / TRAINING",
+	saas: "SAAS / TECHNOLOGY",
 	manufacturing: "MANUFACTURING",
 	research: "RESEARCH",
 	government: "GOVERNMENT",
 	other: "OTHER",
 };
 
+const STAGE_TYPE_SEQUENCE: PipelineStageType[] = [
+	"lead",
+	"engagement",
+	"conversion",
+	"closure",
+];
+
 const SalesPipelineDashboard = () => {
 	const theme = useTheme();
+	const dispatch = useDispatch<AppDispatch>();
+	const clinic = useSelector(selectClinic);
+	const pipelines = useSelector(selectPipelines);
+	const selectedPipeline = useSelector(selectSelectedPipeline);
+	const pipelineLoading = useSelector(selectPipelineLoading);
+	const pipelineError = useSelector(selectPipelineError);
+	const selectedPipelineId = selectedPipeline?.id ?? null;
+
 	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-	const [pipelines, setPipelines] = useState<PipelineCard[]>(INITIAL_PIPELINES);
-	const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(
-		null,
-	);
-	const [isAddStageOpen, setIsAddStageOpen] = useState(false);
-	const [newStageName, setNewStageName] = useState("");
+	const [editPipelineData, setEditPipelineData] = useState<{ id: string; pipelineName: string; industry: string } | null>(null);
 	const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(
 		null,
 	);
+	const [actionMenuPipelineId, setActionMenuPipelineId] = useState<string | null>(
+		null,
+	);
+	const [confirmAction, setConfirmAction] = useState<"archive" | "delete" | null>(null);
+	const [confirmPipelineId, setConfirmPipelineId] = useState<string | null>(null);
+	const [actionInProgress, setActionInProgress] = useState(false);
 
 	const chipBackgrounds = [
 		alpha(theme.palette.primary.main, 0.14),
@@ -72,26 +95,63 @@ const SalesPipelineDashboard = () => {
 		alpha(theme.palette.grey[500], 0.2),
 	];
 
-	const selectedPipeline = pipelines.find(
-		(pipeline) => pipeline.id === selectedPipelineId,
-	);
+	useEffect(() => {
+		if (!clinic?.id) return;
+		dispatch(fetchPipelines(clinic.id));
+	}, [clinic?.id, dispatch]);
 
-	const handleCreatePipelineSave = ({
+	useEffect(() => {
+		if (pipelineLoading || selectedPipeline || pipelines.length === 0) return;
+		dispatch(fetchPipelineDetail(pipelines[0].id));
+	}, [dispatch, pipelineLoading, pipelines, selectedPipeline]);
+
+	useEffect(() => {
+		if (!actionMenuAnchor) return;
+		if (!actionMenuAnchor.isConnected || !document.body.contains(actionMenuAnchor)) {
+			setActionMenuAnchor(null);
+			setActionMenuPipelineId(null);
+		}
+	}, [actionMenuAnchor, pipelines]);
+
+	const handleCreatePipelineSave = async ({
 		pipelineName,
 		industry,
 	}: {
 		pipelineName: string;
 		industry: string;
 	}) => {
-		const newPipeline: PipelineCard = {
-			id: `pipeline-${Date.now()}`,
-			title: pipelineName,
-			category: INDUSTRY_LABEL_MAP[industry] ?? industry.toUpperCase(),
-			stages: [],
-		};
+		if (!clinic?.id) return;
 
-		setPipelines((prevPipelines) => [newPipeline, ...prevPipelines]);
-		setSelectedPipelineId(newPipeline.id);
+		if (editPipelineData) {
+			try {
+				setActionInProgress(true);
+				await pipelineApi.update(editPipelineData.id, {
+					pipeline_name: pipelineName,
+					industry_type: industry as PipelineIndustryType,
+					is_active: true,
+				});
+				await refreshPipelines();
+				if (selectedPipelineId === editPipelineData.id) {
+					await dispatch(fetchPipelineDetail(editPipelineData.id));
+				}
+			} finally {
+				setActionInProgress(false);
+				setEditPipelineData(null);
+			}
+		} else {
+			dispatch(
+				createPipeline({
+					clinic_id: clinic.id,
+					pipeline_name: pipelineName,
+					industry_type: industry as PipelineIndustryType,
+				}),
+			);
+		}
+	};
+
+	const handleOpenCreatePipeline = () => {
+		setEditPipelineData(null);
+		setIsCreateModalOpen(true);
 	};
 
 	const handleOpenActionMenu = (
@@ -99,77 +159,217 @@ const SalesPipelineDashboard = () => {
 		pipelineId: string,
 	) => {
 		event.stopPropagation();
-		setSelectedPipelineId(pipelineId);
+		setActionMenuPipelineId(pipelineId);
 		setActionMenuAnchor(event.currentTarget);
 	};
 
 	const handleCloseActionMenu = () => {
+		if (actionInProgress) return;
 		setActionMenuAnchor(null);
+		setActionMenuPipelineId(null);
 	};
 
-	const handleOpenAddStage = () => {
-		if (!selectedPipelineId) return;
-		setNewStageName("");
-		setIsAddStageOpen(true);
+	const refreshPipelines = async () => {
+		if (!clinic?.id) return;
+		await dispatch(fetchPipelines(clinic.id));
 	};
 
-	const handleCloseAddStage = () => {
-		setIsAddStageOpen(false);
-		setNewStageName("");
+	const getActionPipeline = () => {
+		if (!actionMenuPipelineId) return null;
+		return pipelines.find((pipeline) => pipeline.id === actionMenuPipelineId) ?? null;
 	};
 
-	const handleSaveStage = () => {
-		const trimmedStage = newStageName.trim();
-		if (!trimmedStage || !selectedPipelineId) return;
+	const handleEditPipeline = () => {
+		const pipeline = getActionPipeline();
+		if (!pipeline) return;
+		handleCloseActionMenu();
+		setEditPipelineData({
+			id: pipeline.id,
+			pipelineName: pipeline.pipeline_name,
+			industry: pipeline.industry_type,
+		});
+		window.setTimeout(() => {
+			setIsCreateModalOpen(true);
+		}, 0);
+	};
 
-		setPipelines((prevPipelines) =>
-			prevPipelines.map((pipeline) => {
-				if (pipeline.id !== selectedPipelineId) return pipeline;
+	const handleDuplicatePipeline = async () => {
+		if (!actionMenuPipelineId) return;
+		try {
+			setActionInProgress(true);
+			const duplicated = await pipelineApi.duplicate(actionMenuPipelineId);
+			await refreshPipelines();
+			await dispatch(fetchPipelineDetail(duplicated.id));
+		} finally {
+			setActionInProgress(false);
+			handleCloseActionMenu();
+		}
+	};
 
-				const exists = pipeline.stages.some(
-					(stage) => stage.toLowerCase() === trimmedStage.toLowerCase(),
-				);
-				if (exists) return pipeline;
+	const handleArchivePipeline = () => {
+		if (!actionMenuPipelineId) return;
+		handleCloseActionMenu();
+		setConfirmPipelineId(actionMenuPipelineId);
+		window.setTimeout(() => {
+			setConfirmAction("archive");
+		}, 0);
+	};
 
-				return {
-					...pipeline,
-					stages: [...pipeline.stages, trimmedStage],
-				};
-			}),
+	const handleDeletePipeline = () => {
+		if (!actionMenuPipelineId) return;
+		handleCloseActionMenu();
+		setConfirmPipelineId(actionMenuPipelineId);
+		window.setTimeout(() => {
+			setConfirmAction("delete");
+		}, 0);
+	};
+
+	const handleCloseConfirmAction = () => {
+		if (actionInProgress) return;
+		setConfirmAction(null);
+		setConfirmPipelineId(null);
+	};
+
+	const handleConfirmPipelineAction = async () => {
+		if (!confirmAction || !confirmPipelineId) return;
+		try {
+			setActionInProgress(true);
+			if (confirmAction === "archive") {
+				await pipelineApi.archive(confirmPipelineId);
+				toast.success("Pipeline archived successfully.");
+			} else {
+				await pipelineApi.remove(confirmPipelineId);
+				toast.success("Pipeline deleted successfully.");
+			}
+			await refreshPipelines();
+			if (selectedPipelineId === confirmPipelineId) {
+				setConfirmPipelineId(null);
+			}
+		} catch {
+			toast.error(
+				confirmAction === "archive"
+					? "Failed to archive pipeline."
+					: "Failed to delete pipeline.",
+			);
+		} finally {
+			setActionInProgress(false);
+			handleCloseConfirmAction();
+		}
+	};
+
+	const createStageByName = async (stageName: string): Promise<boolean> => {
+		if (!selectedPipelineId) return false;
+		const trimmedStage = stageName.trim();
+		if (!trimmedStage) return false;
+
+		const nextStageType =
+			STAGE_TYPE_SEQUENCE[
+				Math.min(selectedPipeline?.stages.length ?? 0, STAGE_TYPE_SEQUENCE.length - 1)
+			] ?? "lead";
+
+		const stageExists = selectedPipeline?.stages.some(
+			(stage) => stage.stage_name.toLowerCase() === trimmedStage.toLowerCase(),
 		);
+		if (stageExists) return false;
 
-		handleCloseAddStage();
+		try {
+			await dispatch(
+				createPipelineStage({
+					pipeline_id: selectedPipelineId,
+					stage_name: trimmedStage,
+					stage_type: nextStageType,
+					stage_status: "open",
+					stage_order: (selectedPipeline?.stages.length ?? 0) + 1,
+					entry_rule: "manual",
+				}),
+			).unwrap();
+			return true;
+		} catch {
+			return false;
+		}
 	};
 
-	const handleReorderStages = (fromIndex: number, toIndex: number) => {
-		if (!selectedPipelineId || fromIndex === toIndex) return;
+	const handleOpenAddStage = async (stageName?: string): Promise<boolean> => {
+		if (!selectedPipelineId) return false;
+		if (stageName && stageName.trim()) {
+			return createStageByName(stageName);
+		}
+		return false;
+	};
 
-		setPipelines((prevPipelines) =>
-			prevPipelines.map((pipeline) => {
-				if (pipeline.id !== selectedPipelineId) return pipeline;
-				if (
-					fromIndex < 0 ||
-					toIndex < 0 ||
-					fromIndex >= pipeline.stages.length ||
-					toIndex >= pipeline.stages.length
-				) {
-					return pipeline;
-				}
+	const handleReorderStages = async (fromIndex: number, toIndex: number) => {
+		if (!selectedPipelineId || !selectedPipeline || fromIndex === toIndex) return;
+		if (
+			fromIndex < 0 ||
+			toIndex < 0 ||
+			fromIndex >= selectedPipeline.stages.length ||
+			toIndex >= selectedPipeline.stages.length
+		) {
+			return;
+		}
 
-				const nextStages = [...pipeline.stages];
-				const [movedStage] = nextStages.splice(fromIndex, 1);
-				nextStages.splice(toIndex, 0, movedStage);
+		const nextStages = [...selectedPipeline.stages];
+		const [movedStage] = nextStages.splice(fromIndex, 1);
+		nextStages.splice(toIndex, 0, movedStage);
 
-				return {
-					...pipeline,
-					stages: nextStages,
-				};
-			}),
+		for (const [index, stage] of nextStages.entries()) {
+			const nextOrder = index + 1;
+			if (stage.stage_order === nextOrder) continue;
+
+			await dispatch(
+				updatePipelineStage({
+					pipelineId: selectedPipelineId,
+					stageId: stage.id,
+					payload: {
+						stage_name: stage.stage_name,
+						stage_type: stage.stage_type,
+						stage_status: stage.stage_status,
+						stage_order: nextOrder,
+					},
+				}),
+			);
+		}
+	};
+
+	const handleEditStage = async (
+		stageIndex: number,
+		updatedStageName: string,
+	): Promise<boolean> => {
+		if (!selectedPipelineId || !selectedPipeline) return false;
+		if (stageIndex < 0 || stageIndex >= selectedPipeline.stages.length) return false;
+
+		const trimmedStageName = updatedStageName.trim();
+		if (!trimmedStageName) return false;
+
+		const currentStage = selectedPipeline.stages[stageIndex];
+		const duplicateName = selectedPipeline.stages.some(
+			(stage, index) =>
+				index !== stageIndex &&
+				stage.stage_name.toLowerCase() === trimmedStageName.toLowerCase(),
 		);
+		if (duplicateName) return false;
+
+		try {
+			await dispatch(
+				updatePipelineStage({
+					pipelineId: selectedPipelineId,
+					stageId: currentStage.id,
+					payload: {
+						stage_name: trimmedStageName,
+						stage_type: currentStage.stage_type,
+						stage_status: currentStage.stage_status,
+						stage_order: currentStage.stage_order,
+					},
+				}),
+			).unwrap();
+			return true;
+		} catch {
+			return false;
+		}
 	};
 
 	return (
-		<Box sx={{ p: 0.5 }}>
+		<Box sx={{ p: 0.5, overflow: "hidden" }}>
 			<Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
 				Sales Pipeline Configuration
 			</Typography>
@@ -178,7 +378,7 @@ const SalesPipelineDashboard = () => {
 				business
 			</Typography>
 
-			<Stack direction={{ xs: "column", lg: "row" }} spacing={1.5}>
+			<Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ overflow: "hidden" }}>
 				<Paper
 					elevation={0}
 					sx={{
@@ -188,7 +388,10 @@ const SalesPipelineDashboard = () => {
 						borderRadius: 2,
 						border: `1px solid ${theme.palette.grey[200]}`,
 						backgroundColor: alpha(theme.palette.background.paper, 0.95),
-						minHeight: "74vh",
+						height: "74vh",
+						display: "flex",
+						flexDirection: "column",
+						overflow: "hidden",
 					}}
 				>
 					<Typography
@@ -202,7 +405,7 @@ const SalesPipelineDashboard = () => {
 						fullWidth
 						startIcon={<AddIcon fontSize="small" />}
 						variant="outlined"
-						onClick={() => setIsCreateModalOpen(true)}
+						onClick={handleOpenCreatePipeline}
 						sx={{
 							justifyContent: "center",
 							color: "text.primary",
@@ -221,14 +424,37 @@ const SalesPipelineDashboard = () => {
 						Create New Pipeline
 					</Button>
 
-					<Stack spacing={1.5}>
+					<Stack
+						spacing={1.5}
+						sx={{
+							flex: 1,
+							overflowY: "auto",
+							overflowX: "hidden",
+							pr: 0.3,
+							msOverflowStyle: "none",
+							scrollbarWidth: "none",
+							"&::-webkit-scrollbar": { display: "none" },
+						}}
+					>
+						{pipelineError ? (
+							<Typography sx={{ fontSize: 13, color: theme.palette.error.main }}>
+								{pipelineError}
+							</Typography>
+						) : null}
+
+						{pipelineLoading && pipelines.length === 0 ? (
+							<Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+								<CircularProgress size={26} />
+							</Box>
+						) : null}
+
 						{pipelines.map((pipeline) => {
 							const isSelected = selectedPipelineId === pipeline.id;
 
 							return (
 								<Box
 									key={pipeline.id}
-									onClick={() => setSelectedPipelineId(pipeline.id)}
+									onClick={() => dispatch(fetchPipelineDetail(pipeline.id))}
 									sx={{
 										border: `1px solid ${
 											isSelected
@@ -266,7 +492,7 @@ const SalesPipelineDashboard = () => {
 												variant="body2"
 												sx={{ fontWeight: 700, color: "text.primary" }}
 											>
-												{pipeline.title}
+												{pipeline.pipeline_name}
 											</Typography>
 											<Typography
 												variant="caption"
@@ -276,7 +502,7 @@ const SalesPipelineDashboard = () => {
 													letterSpacing: 0.6,
 												}}
 											>
-												{pipeline.category}
+												{INDUSTRY_LABEL_MAP[pipeline.industry_type] ?? pipeline.industry_type}
 											</Typography>
 										</Box>
 
@@ -297,7 +523,7 @@ const SalesPipelineDashboard = () => {
 										>
 											{pipeline.stages.map((stage, index) => (
 												<Box
-													key={stage}
+													key={stage.id}
 													sx={{
 														px: 1.15,
 														py: 0.5,
@@ -309,7 +535,7 @@ const SalesPipelineDashboard = () => {
 															chipBackgrounds[index % chipBackgrounds.length],
 													}}
 												>
-													{stage}
+													{stage.stage_name}
 												</Box>
 											))}
 										</Box>
@@ -334,54 +560,101 @@ const SalesPipelineDashboard = () => {
 					</Stack>
 
 					<Menu
-						anchorEl={actionMenuAnchor}
-						open={Boolean(actionMenuAnchor)}
+						anchorEl={
+							actionMenuAnchor && actionMenuAnchor.isConnected
+								? actionMenuAnchor
+								: null
+						}
+						open={Boolean(
+							actionMenuPipelineId && actionMenuAnchor && actionMenuAnchor.isConnected,
+						)}
 						onClose={handleCloseActionMenu}
 						anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
 						transformOrigin={{ vertical: "top", horizontal: "right" }}
+						MenuListProps={{
+							sx: {
+								px: 0.5,
+								py: 0.5,
+							},
+						}}
 						PaperProps={{
 							sx: {
-								mt: 0.6,
-								minWidth: 130,
-								borderRadius: 2,
-								border: `1px solid ${theme.palette.grey[200]}`,
-								boxShadow: "0 12px 24px rgba(31, 41, 55, 0.12)",
+								mt: 0.9,
+								width: 130,
+								height: 174.94541931152344,
+								borderRadius: "12px",
+								border: "1px solid #ECECEC",
+								boxShadow: "0 16px 34px rgba(25, 35, 58, 0.14)",
+								overflow: "hidden",
+								opacity: 1,
 							},
 						}}
 					>
 						<MenuItem
-							onClick={handleCloseActionMenu}
-							sx={{ minHeight: 34, fontSize: 13.5, fontWeight: 500 }}
+							onClick={handleEditPipeline}
+							disabled={actionInProgress}
+							sx={{
+								minHeight: 42,
+								px: 0.8,
+								borderRadius: 1.5,
+								fontSize: 12.5,
+								fontWeight: 600,
+								color: "#252525",
+							}}
 						>
-							<ListItemIcon sx={{ minWidth: 30, color: "#4E83F1" }}>
-								<EditOutlinedIcon fontSize="small" />
+							<ListItemIcon sx={{ minWidth: 28, color: "#5A88E8" }}>
+								<EditOutlinedIcon sx={{ fontSize: 20 }} />
 							</ListItemIcon>
 							Edit
 						</MenuItem>
 						<MenuItem
-							onClick={handleCloseActionMenu}
-							sx={{ minHeight: 34, fontSize: 13.5, fontWeight: 500 }}
+							onClick={handleDuplicatePipeline}
+							disabled={actionInProgress}
+							sx={{
+								minHeight: 42,
+								px: 0.8,
+								borderRadius: 1.5,
+								fontSize: 12.5,
+								fontWeight: 600,
+								color: "#252525",
+							}}
 						>
-							<ListItemIcon sx={{ minWidth: 30, color: "#4E83F1" }}>
-								<ContentCopyOutlinedIcon fontSize="small" />
+							<ListItemIcon sx={{ minWidth: 28, color: "#5A88E8" }}>
+								<ContentCopyOutlinedIcon sx={{ fontSize: 20 }} />
 							</ListItemIcon>
 							Duplicate
 						</MenuItem>
 						<MenuItem
-							onClick={handleCloseActionMenu}
-							sx={{ minHeight: 34, fontSize: 13.5, fontWeight: 500 }}
+							onClick={handleArchivePipeline}
+							disabled={actionInProgress}
+							sx={{
+								minHeight: 42,
+								px: 0.8,
+								borderRadius: 1.5,
+								fontSize: 12.5,
+								fontWeight: 600,
+								color: "#252525",
+							}}
 						>
-							<ListItemIcon sx={{ minWidth: 30, color: "#4E83F1" }}>
-								<ArchiveOutlinedIcon fontSize="small" />
+							<ListItemIcon sx={{ minWidth: 28, color: "#5A88E8" }}>
+								<ArchiveOutlinedIcon sx={{ fontSize: 20 }} />
 							</ListItemIcon>
 							Archive
 						</MenuItem>
 						<MenuItem
-							onClick={handleCloseActionMenu}
-							sx={{ minHeight: 34, fontSize: 13.5, fontWeight: 500, color: "#EF4444" }}
+							onClick={handleDeletePipeline}
+							disabled={actionInProgress}
+							sx={{
+								minHeight: 42,
+								px: 0.8,
+								borderRadius: 1.5,
+								fontSize: 12.5,
+								fontWeight: 600,
+								color: "#CC4343",
+							}}
 						>
-							<ListItemIcon sx={{ minWidth: 30, color: "#EF4444" }}>
-								<DeleteOutlineOutlinedIcon fontSize="small" />
+							<ListItemIcon sx={{ minWidth: 28, color: "#CC4343" }}>
+								<DeleteOutlineOutlinedIcon sx={{ fontSize: 20 }} />
 							</ListItemIcon>
 							Delete
 						</MenuItem>
@@ -393,7 +666,7 @@ const SalesPipelineDashboard = () => {
 					sx={{
 						position: "relative",
 						flex: 1,
-						minHeight: "74vh",
+						height: "74vh",
 						borderRadius: 2,
 						border: `1px solid ${theme.palette.grey[200]}`,
 						backgroundColor: theme.palette.background.paper,
@@ -402,60 +675,29 @@ const SalesPipelineDashboard = () => {
 							0.28,
 						)} 0.8px, transparent 0.8px)`,
 						backgroundSize: "16px 16px",
+						overflow: "hidden",
 					}}
 				>
 					<Box
 						sx={{
 							height: "100%",
-							minHeight: "74vh",
 							display: "flex",
 							alignItems: "center",
 							justifyContent: "center",
 							textAlign: "center",
 							px: 2,
+							overflow: "hidden",
 						}}
 					>
-						{selectedPipeline && selectedPipeline.stages.length > 0 ? (
+						{selectedPipeline ? (
 							<SalesPipeLineData
-								stages={selectedPipeline.stages}
+								stages={selectedPipeline.stages.map((stage) => stage.stage_name)}
 								onAddStage={handleOpenAddStage}
+								onEditStage={handleEditStage}
 								onReorderStages={handleReorderStages}
 							/>
-						) : selectedPipeline && selectedPipeline.stages.length === 0 ? (
-							<Box
-								onClick={handleOpenAddStage}
-								sx={{
-									width: 146,
-									height: 172,
-									borderRadius: 2,
-									border: `1px dashed ${theme.palette.grey[300]}`,
-									display: "flex",
-									flexDirection: "column",
-									alignItems: "center",
-									justifyContent: "center",
-									gap: 1,
-									cursor: "pointer",
-									backgroundColor: alpha(theme.palette.background.paper, 0.65),
-								}}
-							>
-								<Box
-									sx={{
-										width: 30,
-										height: 30,
-										borderRadius: 1,
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "center",
-										backgroundColor: "#2F2F2F",
-										color: "#FFFFFF",
-									}}
-								>
-									<AddBoxOutlinedIcon sx={{ fontSize: 17 }} />
-								</Box>
-								<Typography sx={{ fontSize: 26, fontWeight: 700 }}>
-									Add Stage
-								</Typography>
-							</Box>
+						) : pipelineLoading ? (
+							<CircularProgress size={28} />
 						) : (
 							<Box>
 								<Typography variant="h6" sx={{ fontWeight: 700, mb: 0.65 }}>
@@ -465,6 +707,18 @@ const SalesPipelineDashboard = () => {
 									Create a new pipeline or Select a pipeline to see the stages
 									from left sidebar.
 								</Typography>
+								<Button
+									startIcon={<AddIcon fontSize="small" />}
+									variant="outlined"
+									onClick={handleOpenCreatePipeline}
+									sx={{
+										mt: 1.5,
+										borderRadius: 2,
+										fontWeight: 700,
+									}}
+								>
+									Create New Pipeline
+								</Button>
 							</Box>
 						)}
 					</Box>
@@ -518,38 +772,116 @@ const SalesPipelineDashboard = () => {
 				</Paper>
 			</Stack>
 
-			<Dialog open={isAddStageOpen} onClose={handleCloseAddStage} maxWidth="xs" fullWidth>
-				<DialogTitle>Add Stage</DialogTitle>
-				<DialogContent>
-					<TextField
-						autoFocus
-						fullWidth
-						margin="dense"
-						label="Stage Name"
-						placeholder="e.g. Registered, Counselling, Application Submitted"
-						value={newStageName}
-						onChange={(event) => setNewStageName(event.target.value)}
-						onKeyDown={(event) => {
-							if (event.key === "Enter") {
-								event.preventDefault();
-								handleSaveStage();
-							}
-						}}
-					/>
-				</DialogContent>
-				<DialogActions>
-					<Button onClick={handleCloseAddStage}>Cancel</Button>
-					<Button onClick={handleSaveStage} variant="contained" disabled={!newStageName.trim()}>
-						Add Stage
-					</Button>
-				</DialogActions>
-			</Dialog>
-
 			<CreateNewPipeline
+				key={editPipelineData?.id ?? "create"}
 				open={isCreateModalOpen}
-				onClose={() => setIsCreateModalOpen(false)}
+				onClose={() => {
+					setIsCreateModalOpen(false);
+					setEditPipelineData(null);
+				}}
 				onSave={handleCreatePipelineSave}
+				mode={editPipelineData ? "edit" : "create"}
+				initialPipelineName={editPipelineData?.pipelineName}
+				initialIndustry={editPipelineData?.industry}
 			/>
+
+			<Dialog
+				open={confirmAction !== null}
+				onClose={handleCloseConfirmAction}
+				maxWidth="xs"
+				fullWidth
+			>
+				<Box sx={{ p: 2.5, borderRadius: 3, textAlign: "center" }}>
+					<Box
+						sx={{
+							mx: "auto",
+							mb: 1.6,
+							width: 92,
+							height: 92,
+							borderRadius: "50%",
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "center",
+							backgroundColor:
+								confirmAction === "delete"
+									? alpha("#CF3D3D", 0.08)
+									: alpha(theme.palette.warning.main, 0.12),
+						}}
+					>
+						{confirmAction === "delete" ? (
+							<DeleteOutlineOutlinedIcon sx={{ fontSize: 40, color: "#CF3D3D" }} />
+						) : (
+							<ArchiveOutlinedIcon
+								sx={{ fontSize: 40, color: theme.palette.warning.dark }}
+							/>
+						)}
+					</Box>
+
+					<Typography
+						sx={{
+							fontFamily: "Montserrat",
+							fontWeight: 700,
+							fontSize: "20px",
+							lineHeight: "100%",
+							textAlign: "center",
+							mb: 1.2,
+						}}
+					>
+						{confirmAction === "delete" ? "Delete Stage" : "Archive Stage"}
+					</Typography>
+					<Typography
+						sx={{
+							fontFamily: "Montserrat",
+							fontWeight: 700,
+							fontSize: "14px",
+							lineHeight: "22px",
+							color: "#393939",
+							mb: 2.5,
+						}}
+					>
+						{confirmAction === "delete"
+							? "This pipeline and its configuration will be permanently removed."
+							: "This pipeline will be hidden but existing data will be preserved."}
+					</Typography>
+
+					<Stack direction="row" spacing={1.5}>
+						<Button
+							fullWidth
+							variant="outlined"
+							onClick={handleCloseConfirmAction}
+							disabled={actionInProgress}
+							sx={{
+								borderRadius: 2,
+								py: 1.2,
+								fontWeight: 700,
+								fontSize: 20,
+								borderColor: "#E0E0E0",
+								color: "#2D2D2D",
+								backgroundColor: "#F0F0F0",
+								"&:hover": { backgroundColor: "#EBEBEB", borderColor: "#D8D8D8" },
+							}}
+						>
+							Cancel
+						</Button>
+						<Button
+							fullWidth
+							variant="contained"
+							onClick={handleConfirmPipelineAction}
+							disabled={actionInProgress}
+							sx={{
+								borderRadius: 2,
+								py: 1.2,
+								fontWeight: 700,
+								fontSize: 20,
+								backgroundColor: "#5A5A5A",
+								"&:hover": { backgroundColor: "#4A4A4A" },
+							}}
+						>
+							{confirmAction === "delete" ? "Delete" : "Archive"}
+						</Button>
+					</Stack>
+				</Box>
+			</Dialog>
 		</Box>
 	);
 };

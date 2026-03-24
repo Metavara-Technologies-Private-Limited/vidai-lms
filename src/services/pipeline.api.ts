@@ -67,10 +67,19 @@ export interface CreatePipelinePayload {
   is_active?: boolean;
 }
 
+export interface UpdatePipelinePayload {
+  pipeline_name?: string;
+  industry_type?: PipelineIndustryType;
+  is_active?: boolean;
+}
+
 export interface CreatePipelineStagePayload {
   pipeline_id: string;
   stage_name: string;
   stage_type: PipelineStageType;
+  stage_status?: PipelineStageStatus;
+  stage_order?: number;
+  entry_rule?: "manual" | "auto";
 }
 
 export interface UpdatePipelineStagePayload {
@@ -130,8 +139,10 @@ const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
 };
 
 export const pipelineApi = {
-  async list(): Promise<Pipeline[]> {
-    const response = await http.get<PipelineApiResponse[]>("/pipelines/");
+  async list(clinicId: number): Promise<Pipeline[]> {
+    const response = await http.get<PipelineApiResponse[]>("/pipelines/", {
+      params: { clinic_id: clinicId },
+    });
     return Array.isArray(response.data)
       ? response.data.map(normalizePipeline)
       : [];
@@ -147,12 +158,59 @@ export const pipelineApi = {
     return normalizePipeline(response.data);
   },
 
-  async createStage(payload: CreatePipelineStagePayload): Promise<PipelineStage> {
-    const response = await http.post<PipelineStageApiResponse>(
-      "/pipelines/stages/create/",
-      payload,
+  async update(pipelineId: string, payload: UpdatePipelinePayload): Promise<Pipeline> {
+    const response = await http.put<PipelineApiResponse>(`/pipelines/${pipelineId}/`, payload);
+    return normalizePipeline(response.data);
+  },
+
+  async duplicate(pipelineId: string): Promise<Pipeline> {
+    const response = await http.post<PipelineApiResponse>(
+      `/pipelines/${pipelineId}/duplicate/`,
+      {},
     );
-    return normalizeStage(response.data, 0);
+    return normalizePipeline(response.data);
+  },
+
+  async archive(pipelineId: string): Promise<Pipeline> {
+    const response = await http.post<PipelineApiResponse>(
+      `/pipelines/${pipelineId}/archive/`,
+      {},
+    );
+    return normalizePipeline(response.data);
+  },
+
+  async remove(pipelineId: string): Promise<void> {
+    await http.delete(`/pipelines/${pipelineId}/delete/`);
+  },
+
+  async createStage(payload: CreatePipelineStagePayload): Promise<PipelineStage> {
+    try {
+      const response = await http.post<PipelineStageApiResponse>(
+        "/pipelines/stages/create/",
+        payload,
+      );
+      return normalizeStage(response.data, 0);
+    } catch (error) {
+      const candidate = error as {
+        response?: { status?: number };
+      };
+
+      if (candidate?.response?.status !== 400) {
+        throw error;
+      }
+
+      const fallbackPayload: Record<string, unknown> = {
+        ...payload,
+        pipeline: payload.pipeline_id,
+        stage_status: payload.stage_status ?? "open",
+      };
+
+      const response = await http.post<PipelineStageApiResponse>(
+        "/pipelines/stages/create/",
+        fallbackPayload,
+      );
+      return normalizeStage(response.data, 0);
+    }
   },
 
   async updateStage(
