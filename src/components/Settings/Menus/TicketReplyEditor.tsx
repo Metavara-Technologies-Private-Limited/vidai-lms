@@ -119,6 +119,7 @@ const TicketReplyEditor = ({
   const bccPickerPaperRef = useRef<HTMLDivElement | null>(null);
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
+  const [toInput, setToInput] = useState("");
   const [ccInput, setCcInput] = useState("");
   const [bccInput, setBccInput] = useState("");
   const [ccAnchorEl, setCcAnchorEl] = useState<HTMLElement | null>(null);
@@ -250,6 +251,7 @@ const TicketReplyEditor = ({
     });
   };
 
+  const filteredToRecipients = getFilteredRecipients(toInput);
   const filteredCcRecipients = getFilteredRecipients(ccInput);
   const filteredBccRecipients = getFilteredRecipients(bccInput);
 
@@ -312,20 +314,11 @@ const TicketReplyEditor = ({
         gap={1}
         pb={1.5}
         borderBottom="1px solid #E6E6E6"
-        onClick={() => {
-          if (openPicker) {
-            setAnchorEl(null);
-            return;
-          }
-          if (recipients.length > 0 && toRowRef.current) {
-            setAnchorEl(toRowRef.current);
-          }
-        }}
         sx={{
           display: "flex",
           gap: 1,
           flexWrap: "wrap",
-          cursor: "pointer",
+          cursor: "default",
         }}
       >
         <Typography fontSize={14} color="#7A7A7A">
@@ -372,6 +365,31 @@ const TicketReplyEditor = ({
               </Box>
             </Box>
           ))}
+          <InputBase
+            value={toInput}
+            placeholder="Add TO recipients"
+            onClick={(e) => e.stopPropagation()}
+            onFocus={() => {
+              if (recipients.length > 0 && toRowRef.current) {
+                setAnchorEl(toRowRef.current);
+              }
+            }}
+            onChange={(e) => {
+              setToInput(e.target.value);
+            }}
+            onBlur={() => {
+              addEmailsFromInput(toInput, replyTo, setReplyTo);
+              setToInput("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                e.preventDefault();
+                addEmailsFromInput(toInput, replyTo, setReplyTo);
+                setToInput("");
+              }
+            }}
+            sx={{ minWidth: 180, fontSize: 14, flex: 1 }}
+          />
         </Box>
 
         <Box display="flex" gap={1} ml="auto" pt={0.5}>
@@ -389,7 +407,9 @@ const TicketReplyEditor = ({
           >
             Cc
           </Typography>
-<Typography sx={{ fontSize: 13, color: "#9E9E9E", fontWeight:600 }}>|</Typography>
+          <Typography sx={{ fontSize: 13, color: "#9E9E9E", fontWeight: 600 }}>
+            |
+          </Typography>
           <Typography
             onClick={(e) => {
               e.stopPropagation();
@@ -424,12 +444,12 @@ const TicketReplyEditor = ({
           }}
         >
           <Box sx={{ width: 320, maxHeight: 260, overflowY: "auto", p: 1 }}>
-            {recipients.length === 0 ? (
+            {filteredToRecipients.length === 0 ? (
               <Typography fontSize={13} color="text.secondary" p={1}>
                 No recipients available
               </Typography>
             ) : (
-              recipients.map((lead) => (
+              filteredToRecipients.map((lead) => (
                 <Box
                   key={lead.id}
                   onClick={(e) => {
@@ -465,20 +485,6 @@ const TicketReplyEditor = ({
                 </Box>
               ))
             )}
-            <Box display="flex" justifyContent="flex-end" pt={0.8}>
-              <Button
-                size="small"
-                variant="contained"
-                onClick={() => setAnchorEl(null)}
-                sx={{
-                  textTransform: "none",
-                  bgcolor: "#505050",
-                  "&:hover": { bgcolor: "#232323" },
-                }}
-              >
-                Done
-              </Button>
-            </Box>
           </Box>
         </Popover>
       </Box>
@@ -526,10 +532,9 @@ const TicketReplyEditor = ({
             <InputBase
               value={ccInput}
               placeholder="Add CC recipients"
-              onFocus={(e) => setCcAnchorEl(e.currentTarget)}
+              onFocus={() => setCcAnchorEl(ccFieldRef.current)}
               onChange={(e) => {
                 setCcInput(e.target.value);
-                setCcAnchorEl(e.currentTarget);
               }}
               onBlur={() => {
                 addEmailsFromInput(ccInput, replyCc, setReplyCc);
@@ -607,20 +612,6 @@ const TicketReplyEditor = ({
                   </Box>
                 ))
               )}
-              <Box display="flex" justifyContent="flex-end" pt={0.8}>
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={() => setCcAnchorEl(null)}
-                  sx={{
-                    textTransform: "none",
-                    bgcolor: "#505050",
-                    "&:hover": { bgcolor: "#232323" },
-                  }}
-                >
-                  Done
-                </Button>
-              </Box>
             </Box>
           </Popover>
         </Box>
@@ -670,10 +661,9 @@ const TicketReplyEditor = ({
             <InputBase
               value={bccInput}
               placeholder="Add BCC recipients"
-              onFocus={(e) => setBccAnchorEl(e.currentTarget)}
+              onFocus={() => setBccAnchorEl(bccFieldRef.current)}
               onChange={(e) => {
                 setBccInput(e.target.value);
-                setBccAnchorEl(e.currentTarget);
               }}
               onBlur={() => {
                 addEmailsFromInput(bccInput, replyBcc, setReplyBcc);
@@ -751,20 +741,6 @@ const TicketReplyEditor = ({
                   </Box>
                 ))
               )}
-              <Box display="flex" justifyContent="flex-end" pt={0.8}>
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={() => setBccAnchorEl(null)}
-                  sx={{
-                    textTransform: "none",
-                    bgcolor: "#505050",
-                    "&:hover": { bgcolor: "#232323" },
-                  }}
-                >
-                  Done
-                </Button>
-              </Box>
             </Box>
           </Popover>
         </Box>
