@@ -31,7 +31,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build --no-cache \
-          --build-arg VITE_API_BASE_URL=https://app.metavaratechnologies.com/api \
+          --build-arg VITE_API_BASE_URL=https://lms-vidaisolutions.metavaratechnologies.com/api \
             -f devops/Dockerfile \
             -t ${{ secrets.DOCKER_USERNAME }}/lms-frontend:latest \
             .
