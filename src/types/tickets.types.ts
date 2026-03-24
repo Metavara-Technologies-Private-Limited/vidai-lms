@@ -93,7 +93,7 @@ export interface TicketDetail {
   department: number;
   department_name: string;
   requested_by: string;
-   type: string;
+  type: string;
   assigned_to?: number | null;
   assigned_to_name?: string;
   priority: TicketPriority;
@@ -121,7 +121,6 @@ export interface TicketFilters {
   page_size?: number;
   ordering?: string;
 }
-
 
 // Assign Ticket Request
 export interface AssignTicketRequest {
@@ -170,6 +169,10 @@ export interface Employee {
   emp_name: string;
   emp_type: string;
   department_name?: string;
+  email?: string;
+  emp_email?: string;
+  user_email?: string;
+  official_email?: string;
   created_at?: string;
   modified_at?: string;
   clinic_id?: number;
@@ -193,4 +196,25 @@ export interface EmailTemplate {
   subject: string;
   body?: string;
   type?: string;
+}
+
+export interface TicketReplyRequest {
+  subject: string;
+  message: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+}
+
+export interface TicketReplyResponse {
+  id: string;
+  ticket: string;
+  subject: string;
+  message: string;
+  to_emails: string[];
+  cc_emails: string[];
+  bcc_emails: string[];
+  status: string;
+  failed_reason?: string | null;
+  created_at?: string;
 }

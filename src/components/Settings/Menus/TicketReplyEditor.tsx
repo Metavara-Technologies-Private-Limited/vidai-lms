@@ -7,8 +7,11 @@ import {
   InputBase,
   Divider,
   Button,
+  Checkbox,
+  TextField,
+  MenuItem,
 } from "@mui/material";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import LinkIcon from "@mui/icons-material/Link";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
@@ -25,8 +28,18 @@ export interface TicketReplyEditorProps {
   openReply: boolean;
   setOpenReply: (v: boolean) => void;
 
+  fromEmail: string;
+  setFromEmail: (v: string) => void;
+  fromOptions: string[];
+
   replyTo: string[];
   setReplyTo: (v: string[]) => void;
+
+  replyCc: string[];
+  setReplyCc: (v: string[]) => void;
+
+  replyBcc: string[];
+  setReplyBcc: (v: string[]) => void;
 
   replySubject: string;
   setReplySubject: (v: string) => void;
@@ -62,10 +75,22 @@ interface LeadRecipient {
   email: string;
 }
 
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const isValidEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
 const TicketReplyEditor = ({
   openReply,
+  fromEmail,
+  setFromEmail,
+  fromOptions,
   replyTo,
   setReplyTo,
+  replyCc,
+  setReplyCc,
+  replyBcc,
+  setReplyBcc,
   replySubject,
   setReplySubject,
   replyMessage,
@@ -85,55 +110,217 @@ const TicketReplyEditor = ({
   setOpenTemplateDialog,
   iconSx,
 }: TicketReplyEditorProps) => {
-
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const toRowRef = useRef<HTMLDivElement | null>(null);
+  const pickerPaperRef = useRef<HTMLDivElement | null>(null);
+  const ccFieldRef = useRef<HTMLDivElement | null>(null);
+  const bccFieldRef = useRef<HTMLDivElement | null>(null);
+  const ccPickerPaperRef = useRef<HTMLDivElement | null>(null);
+  const bccPickerPaperRef = useRef<HTMLDivElement | null>(null);
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
+  const [ccInput, setCcInput] = useState("");
+  const [bccInput, setBccInput] = useState("");
+  const [ccAnchorEl, setCcAnchorEl] = useState<HTMLElement | null>(null);
+  const [bccAnchorEl, setBccAnchorEl] = useState<HTMLElement | null>(null);
 
-useEffect(() => {
-  if (!editorRef.current) return;
+  useEffect(() => {
+    if (!editorRef.current) return;
 
-  if (replyMessage && editorRef.current.innerHTML !== replyMessage) {
-    editorRef.current.innerHTML = replyMessage;
-  }
-}, [replyMessage]);
+    if (replyMessage && editorRef.current.innerHTML !== replyMessage) {
+      editorRef.current.innerHTML = replyMessage;
+    }
+  }, [replyMessage]);
+
+  const openPicker = Boolean(anchorEl);
+  const openCcPicker = Boolean(ccAnchorEl);
+  const openBccPicker = Boolean(bccAnchorEl);
+
+  useEffect(() => {
+    if (!openPicker && !openCcPicker && !openBccPicker) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+
+      const clickedInToPicker = pickerPaperRef.current?.contains(target);
+      const clickedInCcField = ccFieldRef.current?.contains(target);
+      const clickedInCcPicker = ccPickerPaperRef.current?.contains(target);
+      const clickedInBccField = bccFieldRef.current?.contains(target);
+      const clickedInBccPicker = bccPickerPaperRef.current?.contains(target);
+
+      if (!clickedInToPicker) {
+        setAnchorEl(null);
+      }
+      if (!clickedInCcField && !clickedInCcPicker) {
+        setCcAnchorEl(null);
+      }
+      if (!clickedInBccField && !clickedInBccPicker) {
+        setBccAnchorEl(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () =>
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [openPicker, openCcPicker, openBccPicker, setAnchorEl]);
 
   if (!openReply) return null;
 
-  const openPicker = Boolean(anchorEl);
+  const addUniqueEmail = (
+    list: string[],
+    setList: (value: string[]) => void,
+    email: string,
+  ) => {
+    const cleaned = email.trim();
+    if (!cleaned || !isValidEmail(cleaned)) return;
 
+    const exists = list.some(
+      (item) => normalizeEmail(item) === normalizeEmail(cleaned),
+    );
+    if (exists) return;
 
+    setList([...list, cleaned]);
+  };
 
-const handleBold = () => {
-  editorRef.current?.focus();
-  document.execCommand("bold");
-};
+  const addEmailsFromInput = (
+    value: string,
+    list: string[],
+    setList: (value: string[]) => void,
+  ) => {
+    const chunks = value
+      .split(/[;,\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
 
-const handleItalic = () => {
-  editorRef.current?.focus();
-  document.execCommand("italic");
-};
+    if (chunks.length === 0) return;
 
-const handleUnderline = () => {
-  editorRef.current?.focus();
-  document.execCommand("underline");
-};
+    const next = [...list];
+    chunks.forEach((mail) => {
+      if (!isValidEmail(mail)) return;
+      const exists = next.some(
+        (item) => normalizeEmail(item) === normalizeEmail(mail),
+      );
+      if (!exists) {
+        next.push(mail);
+      }
+    });
+    setList(next);
+  };
+
+  const toggleToRecipient = (email: string) => {
+    const exists = replyTo.some(
+      (mail) => normalizeEmail(mail) === normalizeEmail(email),
+    );
+    if (exists) {
+      setReplyTo(
+        replyTo.filter(
+          (mail) => normalizeEmail(mail) !== normalizeEmail(email),
+        ),
+      );
+      return;
+    }
+    addUniqueEmail(replyTo, setReplyTo, email);
+  };
+
+  const toggleRecipient = (
+    email: string,
+    list: string[],
+    setList: (value: string[]) => void,
+  ) => {
+    const exists = list.some(
+      (mail) => normalizeEmail(mail) === normalizeEmail(email),
+    );
+    if (exists) {
+      setList(
+        list.filter((mail) => normalizeEmail(mail) !== normalizeEmail(email)),
+      );
+      return;
+    }
+    addUniqueEmail(list, setList, email);
+  };
+
+  const getFilteredRecipients = (query: string) => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return recipients;
+
+    return recipients.filter((lead) => {
+      const name = (lead.name || "").toLowerCase();
+      const email = (lead.email || "").toLowerCase();
+      return name.includes(normalized) || email.includes(normalized);
+    });
+  };
+
+  const filteredCcRecipients = getFilteredRecipients(ccInput);
+  const filteredBccRecipients = getFilteredRecipients(bccInput);
+
+  const handleBold = () => {
+    editorRef.current?.focus();
+    document.execCommand("bold");
+  };
+
+  const handleItalic = () => {
+    editorRef.current?.focus();
+    document.execCommand("italic");
+  };
+
+  const handleUnderline = () => {
+    editorRef.current?.focus();
+    document.execCommand("underline");
+  };
 
   return (
     <Box mt={3} p={3} borderRadius={2} bgcolor="#FFFFFF">
-      {/* TO ROW */}
-<Box
-  display="flex"
-  alignItems="center"
-  gap={1}
-  pb={1.5}
-  borderBottom="1px solid #E6E6E6"
-  onClick={(e) => {
-    if ((e.target as HTMLElement).closest('[contenteditable="true"]')) return;
+      {/* FROM ROW */}
+      <Box
+        display="flex"
+        alignItems="center"
+        gap={1}
+        pb={1.2}
+        borderBottom="1px solid #E6E6E6"
+      >
+        <Typography fontSize={14} color="#7A7A7A" minWidth={48}>
+          From :
+        </Typography>
 
-    e.stopPropagation();
-    if (recipients.length > 0) {
-      setAnchorEl(e.currentTarget);
-    }
-  }}
+        <TextField
+          select
+          value={fromEmail}
+          onChange={(e) => setFromEmail(e.target.value)}
+          variant="standard"
+          sx={{ minWidth: 260, "& .MuiInputBase-input": { fontSize: 14 } }}
+          InputProps={{ disableUnderline: true }}
+        >
+          {fromOptions.length > 0 ? (
+            fromOptions.map((mail) => (
+              <MenuItem key={mail} value={mail} sx={{ fontSize: 14 }}>
+                {mail}
+              </MenuItem>
+            ))
+          ) : (
+            <MenuItem value="" disabled sx={{ fontSize: 14 }}>
+              No clinic email configured
+            </MenuItem>
+          )}
+        </TextField>
+      </Box>
+
+      {/* TO ROW */}
+      <Box
+        ref={toRowRef}
+        display="flex"
+        alignItems="flex-start"
+        gap={1}
+        pb={1.5}
+        borderBottom="1px solid #E6E6E6"
+        onClick={() => {
+          if (openPicker) {
+            setAnchorEl(null);
+            return;
+          }
+          if (recipients.length > 0 && toRowRef.current) {
+            setAnchorEl(toRowRef.current);
+          }
+        }}
         sx={{
           display: "flex",
           gap: 1,
@@ -144,43 +331,80 @@ const handleUnderline = () => {
         <Typography fontSize={14} color="#7A7A7A">
           To :
         </Typography>
-
-        {replyTo.map((mail) => (
-          <Box
-            key={mail}
-            display="flex"
-            alignItems="center"
-            gap={1}
-            px={1.2}
-            py={0.5}
-            borderRadius="16px"
-            bgcolor="#F1F3F5"
-          >
-            <Avatar sx={{ width: 22, height: 22, fontSize: 11 }}>
-              {mail.charAt(0).toUpperCase()}
-            </Avatar>
-
-            <Typography fontSize={13} fontWeight={500}>
-              {mail}
-            </Typography>
-
+        <Box display="flex" gap={1} flexWrap="wrap" flex={1} minWidth={180}>
+          {replyTo.map((mail) => (
             <Box
-              component="span"
-              onClick={(e) => {
-                e.stopPropagation();
-                setReplyTo(replyTo.filter((m) => m !== mail));
-              }}
-              sx={{
-                cursor: "pointer",
-                fontSize: 16,
-                color: "#7A7A7A",
-                "&:hover": { color: "#000" },
-              }}
+              key={mail}
+              display="flex"
+              alignItems="center"
+              gap={1}
+              px={1.2}
+              py={0.5}
+              borderRadius="16px"
+              bgcolor="#F1F3F5"
             >
-              ×
+              <Avatar sx={{ width: 22, height: 22, fontSize: 11 }}>
+                {mail.charAt(0).toUpperCase()}
+              </Avatar>
+
+              <Typography fontSize={13} fontWeight={500}>
+                {mail}
+              </Typography>
+
+              <Box
+                component="span"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReplyTo(
+                    replyTo.filter(
+                      (m) => normalizeEmail(m) !== normalizeEmail(mail),
+                    ),
+                  );
+                }}
+                sx={{
+                  cursor: "pointer",
+                  fontSize: 16,
+                  color: "#7A7A7A",
+                  "&:hover": { color: "#000" },
+                }}
+              >
+                ×
+              </Box>
             </Box>
-          </Box>
-        ))}
+          ))}
+        </Box>
+
+        <Box display="flex" gap={1} ml="auto" pt={0.5}>
+          <Typography
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowCc(!showCc);
+            }}
+            sx={{
+              fontSize: 13,
+              cursor: "pointer",
+              color: showCc || replyCc.length > 0 ? "#232323" : "#9E9E9E",
+              fontWeight: showCc || replyCc.length > 0 ? 600 : 400,
+            }}
+          >
+            Cc
+          </Typography>
+<Typography sx={{ fontSize: 13, color: "#9E9E9E", fontWeight:600 }}>|</Typography>
+          <Typography
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowBcc(!showBcc);
+            }}
+            sx={{
+              fontSize: 13,
+              cursor: "pointer",
+              color: showBcc || replyBcc.length > 0 ? "#232323" : "#9E9E9E",
+              fontWeight: showBcc || replyBcc.length > 0 ? 600 : 400,
+            }}
+          >
+            Bcc
+          </Typography>
+        </Box>
 
         <Popover
           open={openPicker}
@@ -192,11 +416,14 @@ const handleUnderline = () => {
           disableEnforceFocus
           disableRestoreFocus
           PaperProps={{
+            ref: (node: HTMLDivElement) => {
+              pickerPaperRef.current = node;
+            },
             onClick: (e: React.MouseEvent<HTMLDivElement>) =>
               e.stopPropagation(),
           }}
         >
-          <Box sx={{ width: 260, maxHeight: 250, overflowY: "auto", p: 1 }}>
+          <Box sx={{ width: 320, maxHeight: 260, overflowY: "auto", p: 1 }}>
             {recipients.length === 0 ? (
               <Typography fontSize={13} color="text.secondary" p={1}>
                 No recipients available
@@ -205,31 +432,343 @@ const handleUnderline = () => {
               recipients.map((lead) => (
                 <Box
                   key={lead.id}
-                  onClick={() => {
-                    if (!replyTo.includes(lead.email)) {
-setReplyTo([...replyTo, lead.email.trim()]);                    }
-                    setAnchorEl(null);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleToRecipient(lead.email);
                   }}
                   sx={{
-                    p: 1,
+                    p: 0.8,
                     borderRadius: 1,
                     cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
                     "&:hover": { backgroundColor: "#F5F5F5" },
                   }}
                 >
-                  <Typography fontSize={13} fontWeight={500}>
-                    {lead.name}
-                  </Typography>
-
-                  <Typography fontSize={12} color="text.secondary">
-                    {lead.email}
-                  </Typography>
+                  <Checkbox
+                    size="small"
+                    checked={replyTo.some(
+                      (mail) =>
+                        normalizeEmail(mail) === normalizeEmail(lead.email),
+                    )}
+                    onChange={() => toggleToRecipient(lead.email)}
+                  />
+                  <Box>
+                    <Typography fontSize={13} fontWeight={500}>
+                      {lead.name}
+                    </Typography>
+                    <Typography fontSize={12} color="text.secondary">
+                      {lead.email}
+                    </Typography>
+                  </Box>
                 </Box>
               ))
             )}
+            <Box display="flex" justifyContent="flex-end" pt={0.8}>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => setAnchorEl(null)}
+                sx={{
+                  textTransform: "none",
+                  bgcolor: "#505050",
+                  "&:hover": { bgcolor: "#232323" },
+                }}
+              >
+                Done
+              </Button>
+            </Box>
           </Box>
         </Popover>
       </Box>
+      {/* CC ROW */}
+      {(showCc || replyCc.length > 0) && (
+        <Box
+          ref={ccFieldRef}
+          display="flex"
+          alignItems="center"
+          gap={1}
+          py={1}
+          borderBottom="1px solid #E6E6E6"
+        >
+          <Typography fontSize={14} color="#7A7A7A" minWidth={35}>
+            Cc :
+          </Typography>
+          <Box display="flex" gap={1} flexWrap="wrap" flex={1}>
+            {replyCc.map((mail) => (
+              <Box
+                key={mail}
+                display="flex"
+                alignItems="center"
+                gap={1}
+                px={1.2}
+                py={0.4}
+                borderRadius="16px"
+                bgcolor="#F1F3F5"
+              >
+                <Typography fontSize={13}>{mail}</Typography>
+                <Box
+                  component="span"
+                  sx={{ cursor: "pointer", fontSize: 15, color: "#666" }}
+                  onClick={() =>
+                    setReplyCc(
+                      replyCc.filter(
+                        (item) => normalizeEmail(item) !== normalizeEmail(mail),
+                      ),
+                    )
+                  }
+                >
+                  ×
+                </Box>
+              </Box>
+            ))}
+            <InputBase
+              value={ccInput}
+              placeholder="Add CC recipients"
+              onFocus={(e) => setCcAnchorEl(e.currentTarget)}
+              onChange={(e) => {
+                setCcInput(e.target.value);
+                setCcAnchorEl(e.currentTarget);
+              }}
+              onBlur={() => {
+                addEmailsFromInput(ccInput, replyCc, setReplyCc);
+                setCcInput("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                  e.preventDefault();
+                  addEmailsFromInput(ccInput, replyCc, setReplyCc);
+                  setCcInput("");
+                }
+              }}
+              sx={{ minWidth: 180, fontSize: 14, flex: 1 }}
+            />
+          </Box>
+
+          <Popover
+            open={openCcPicker}
+            anchorEl={ccAnchorEl}
+            onClose={() => setCcAnchorEl(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+            transformOrigin={{ vertical: "top", horizontal: "left" }}
+            disableAutoFocus
+            disableEnforceFocus
+            disableRestoreFocus
+            PaperProps={{
+              ref: (node: HTMLDivElement) => {
+                ccPickerPaperRef.current = node;
+              },
+              onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => {
+                e.preventDefault();
+              },
+            }}
+          >
+            <Box sx={{ width: 320, maxHeight: 240, overflowY: "auto", p: 1 }}>
+              {filteredCcRecipients.length === 0 ? (
+                <Typography fontSize={12} color="text.secondary" p={1}>
+                  No matching recipients
+                </Typography>
+              ) : (
+                filteredCcRecipients.map((lead) => (
+                  <Box
+                    key={`cc-${lead.id}`}
+                    onClick={() =>
+                      toggleRecipient(lead.email, replyCc, setReplyCc)
+                    }
+                    sx={{
+                      p: 0.8,
+                      borderRadius: 1,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      "&:hover": { backgroundColor: "#F5F5F5" },
+                    }}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={replyCc.some(
+                        (mail) =>
+                          normalizeEmail(mail) === normalizeEmail(lead.email),
+                      )}
+                      onChange={() =>
+                        toggleRecipient(lead.email, replyCc, setReplyCc)
+                      }
+                    />
+                    <Box>
+                      <Typography fontSize={13} fontWeight={500}>
+                        {lead.name}
+                      </Typography>
+                      <Typography fontSize={12} color="text.secondary">
+                        {lead.email}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))
+              )}
+              <Box display="flex" justifyContent="flex-end" pt={0.8}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => setCcAnchorEl(null)}
+                  sx={{
+                    textTransform: "none",
+                    bgcolor: "#505050",
+                    "&:hover": { bgcolor: "#232323" },
+                  }}
+                >
+                  Done
+                </Button>
+              </Box>
+            </Box>
+          </Popover>
+        </Box>
+      )}
+
+      {/* BCC ROW */}
+      {(showBcc || replyBcc.length > 0) && (
+        <Box
+          ref={bccFieldRef}
+          display="flex"
+          alignItems="center"
+          gap={1}
+          py={1}
+          borderBottom="1px solid #E6E6E6"
+        >
+          <Typography fontSize={14} color="#7A7A7A" minWidth={40}>
+            Bcc :
+          </Typography>
+          <Box display="flex" gap={1} flexWrap="wrap" flex={1}>
+            {replyBcc.map((mail) => (
+              <Box
+                key={mail}
+                display="flex"
+                alignItems="center"
+                gap={1}
+                px={1.2}
+                py={0.4}
+                borderRadius="16px"
+                bgcolor="#F1F3F5"
+              >
+                <Typography fontSize={13}>{mail}</Typography>
+                <Box
+                  component="span"
+                  sx={{ cursor: "pointer", fontSize: 15, color: "#666" }}
+                  onClick={() =>
+                    setReplyBcc(
+                      replyBcc.filter(
+                        (item) => normalizeEmail(item) !== normalizeEmail(mail),
+                      ),
+                    )
+                  }
+                >
+                  ×
+                </Box>
+              </Box>
+            ))}
+            <InputBase
+              value={bccInput}
+              placeholder="Add BCC recipients"
+              onFocus={(e) => setBccAnchorEl(e.currentTarget)}
+              onChange={(e) => {
+                setBccInput(e.target.value);
+                setBccAnchorEl(e.currentTarget);
+              }}
+              onBlur={() => {
+                addEmailsFromInput(bccInput, replyBcc, setReplyBcc);
+                setBccInput("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                  e.preventDefault();
+                  addEmailsFromInput(bccInput, replyBcc, setReplyBcc);
+                  setBccInput("");
+                }
+              }}
+              sx={{ minWidth: 180, fontSize: 14, flex: 1 }}
+            />
+          </Box>
+
+          <Popover
+            open={openBccPicker}
+            anchorEl={bccAnchorEl}
+            onClose={() => setBccAnchorEl(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+            transformOrigin={{ vertical: "top", horizontal: "left" }}
+            disableAutoFocus
+            disableEnforceFocus
+            disableRestoreFocus
+            PaperProps={{
+              ref: (node: HTMLDivElement) => {
+                bccPickerPaperRef.current = node;
+              },
+              onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => {
+                e.preventDefault();
+              },
+            }}
+          >
+            <Box sx={{ width: 320, maxHeight: 240, overflowY: "auto", p: 1 }}>
+              {filteredBccRecipients.length === 0 ? (
+                <Typography fontSize={12} color="text.secondary" p={1}>
+                  No matching recipients
+                </Typography>
+              ) : (
+                filteredBccRecipients.map((lead) => (
+                  <Box
+                    key={`bcc-${lead.id}`}
+                    onClick={() =>
+                      toggleRecipient(lead.email, replyBcc, setReplyBcc)
+                    }
+                    sx={{
+                      p: 0.8,
+                      borderRadius: 1,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      "&:hover": { backgroundColor: "#F5F5F5" },
+                    }}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={replyBcc.some(
+                        (mail) =>
+                          normalizeEmail(mail) === normalizeEmail(lead.email),
+                      )}
+                      onChange={() =>
+                        toggleRecipient(lead.email, replyBcc, setReplyBcc)
+                      }
+                    />
+                    <Box>
+                      <Typography fontSize={13} fontWeight={500}>
+                        {lead.name}
+                      </Typography>
+                      <Typography fontSize={12} color="text.secondary">
+                        {lead.email}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))
+              )}
+              <Box display="flex" justifyContent="flex-end" pt={0.8}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => setBccAnchorEl(null)}
+                  sx={{
+                    textTransform: "none",
+                    bgcolor: "#505050",
+                    "&:hover": { bgcolor: "#232323" },
+                  }}
+                >
+                  Done
+                </Button>
+              </Box>
+            </Box>
+          </Popover>
+        </Box>
+      )}
 
       {/* SUBJECT */}
       <Box
@@ -252,39 +791,39 @@ setReplyTo([...replyTo, lead.email.trim()]);                    }
       </Box>
 
       {/* MESSAGE */}
-<Box
-  ref={editorRef}
-  contentEditable
-  suppressContentEditableWarning
-  onInput={(e) =>
-    setReplyMessage((e.target as HTMLDivElement).innerHTML)
-  }
-  sx={{
-    mt: 1,
-    width: "100%",
-    minHeight: 150,
-    fontSize: 14,
-    lineHeight: 1.6,
-    padding: 0,
-    outline: "none",
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
-    "&:empty:before": {
-  content: '"Write your reply..."',
-  color: "#9E9E9E",
-},
-  }}
-  data-placeholder="Write your reply..."
-/>
+      <Box
+        ref={editorRef}
+        contentEditable
+        role="textbox"
+        aria-label="Write your reply..."
+        suppressContentEditableWarning
+        onInput={(e) => setReplyMessage((e.target as HTMLDivElement).innerHTML)}
+        sx={{
+          mt: 1,
+          width: "100%",
+          minHeight: 150,
+          fontSize: 14,
+          lineHeight: 1.6,
+          padding: 0,
+          outline: "none",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          "&:empty:before": {
+            content: '"Write your reply..."',
+            color: "#9E9E9E",
+          },
+        }}
+        data-placeholder="Write your reply..."
+      />
 
       <Divider sx={{ my: 1.5 }} />
 
       {/* TOOLBAR */}
       <Stack direction="row" alignItems="center" spacing={1.5}>
-  <FormatBoldIcon sx={iconSx} onClick={handleBold} />
-  <FormatItalicIcon sx={iconSx} onClick={handleItalic} />
-  <FormatUnderlinedIcon sx={iconSx} onClick={handleUnderline} />
-          <AttachFileIcon sx={iconSx} onClick={handleAttachClick} />
+        <FormatBoldIcon sx={iconSx} onClick={handleBold} />
+        <FormatItalicIcon sx={iconSx} onClick={handleItalic} />
+        <FormatUnderlinedIcon sx={iconSx} onClick={handleUnderline} />
+        <AttachFileIcon sx={iconSx} onClick={handleAttachClick} />
         <LinkIcon sx={iconSx} onClick={handleInsertLink} />
         <InsertEmoticonIcon
           sx={iconSx}
@@ -336,40 +875,20 @@ setReplyTo([...replyTo, lead.email.trim()]);                    }
         </Button>
 
         <Button
-  variant="contained"
-  onClick={() => {
-
-
-const validRecipients = recipients.filter((lead: LeadRecipient) =>
-  replyTo.some(
-    (mail) =>
-      mail.trim().toLowerCase() === lead.email.trim().toLowerCase()
-  )
-);
-
-if (validRecipients.length === 0) {
-  import("react-toastify").then(({ toast }) => {
-    toast.warn("No recipient in leads.");
-  });
-  return;
-}
-
-
-    handleSendReply();
-  }}
-  sx={{
-    height: 32,
-    px: 2.2,
-    fontSize: "13px",
-    textTransform: "none",
-    bgcolor: "#505050",
-    borderRadius: "6px",
-    "&:hover": { bgcolor: "#232323" },
-  }}
->
-  Send
-</Button>
-
+          variant="contained"
+          onClick={handleSendReply}
+          sx={{
+            height: 32,
+            px: 2.2,
+            fontSize: "13px",
+            textTransform: "none",
+            bgcolor: "#505050",
+            borderRadius: "6px",
+            "&:hover": { bgcolor: "#232323" },
+          }}
+        >
+          Send
+        </Button>
       </Stack>
     </Box>
   );

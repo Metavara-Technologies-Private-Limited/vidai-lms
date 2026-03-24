@@ -15,8 +15,18 @@ const createProps = (): TicketReplyEditorProps => ({
   openReply: true,
   setOpenReply: vi.fn(),
 
+  fromEmail: "clinic@example.com",
+  setFromEmail: vi.fn(),
+  fromOptions: ["clinic@example.com"],
+
   replyTo: [],
   setReplyTo: vi.fn(),
+
+  replyCc: [],
+  setReplyCc: vi.fn(),
+
+  replyBcc: [],
+  setReplyBcc: vi.fn(),
 
   replySubject: "",
   setReplySubject: vi.fn(),
@@ -56,16 +66,14 @@ describe("TicketReplyEditor", () => {
     render(<TicketReplyEditor {...props} />);
 
     expect(
-      screen.queryByPlaceholderText("Write your reply...")
+      screen.queryByLabelText("Write your reply..."),
     ).not.toBeInTheDocument();
   });
 
   test("renders editor when openReply is true", () => {
     render(<TicketReplyEditor {...createProps()} />);
 
-    expect(
-      screen.getByPlaceholderText("Write your reply...")
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Write your reply...")).toBeInTheDocument();
   });
 
   test("updates subject field", () => {
@@ -85,9 +93,11 @@ describe("TicketReplyEditor", () => {
 
     render(<TicketReplyEditor {...props} />);
 
-    const messageInput = screen.getByPlaceholderText("Write your reply...");
+    const messageInput = screen.getByLabelText("Write your reply...");
 
-    fireEvent.change(messageInput, { target: { value: "Hello" } });
+    fireEvent.input(messageInput, {
+      target: { innerHTML: "Hello" },
+    });
 
     expect(props.setReplyMessage).toHaveBeenCalled();
   });
