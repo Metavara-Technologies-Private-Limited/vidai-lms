@@ -1,0 +1,229 @@
+.loginPage {
+  min-height: 100dvh;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.85fr 1fr;
+  background: #e8e8ea;
+}
+
+.heroPanel {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid #d8d8da;
+  background: #e8e8ea;
+}
+
+.heroFullImage {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+}
+
+.formPanel {
+  position: relative;
+  background: #e8e8ea;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.topSection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.languageWrap {
+  align-self: flex-end;
+  width: min(175px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.languageLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+}
+
+.languageSelect {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #dd876f;
+  border-radius: 8px;
+  background: #ececee;
+  color: #5d5d5d;
+  font-size: 14px;
+  padding: 0 8px;
+  outline: none;
+}
+
+.formContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 14px;
+  padding-top: 70px;
+}
+
+.logo {
+  width: min(160px, 70%);
+  align-self: center;
+}
+
+.loginForm {
+  width: min(320px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.inputGroup {
+  display: flex;
+  align-items: center;
+  border-bottom: 1.5px solid #b6b7ba;
+  gap: 8px;
+  padding-bottom: 3px;
+}
+
+.inputGroup + .inputGroup {
+  margin-top: 8px;
+}
+
+.inputIcon {
+  color: #1f2734;
+  flex-shrink: 0;
+}
+
+.inputField {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  color: #8a8c91;
+  outline: none;
+  line-height: 1.1;
+}
+
+.inputField::placeholder {
+  color: #8a8c91;
+}
+
+.eyeButton {
+  border: 0;
+  background: transparent;
+  color: #6d7075;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.errorText {
+  color: #b00020;
+  font-size: 13px;
+  margin-top: -6px;
+}
+
+.loginButton {
+  margin-top: 10px;
+  height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: #595a5f;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16);
+}
+
+.loginButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.forgotButton {
+  margin-top: 2px;
+  border: 0;
+  background: transparent;
+  color: #1f2d45;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+@media (max-width: 1200px) {
+  .loginPage {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .heroPanel {
+    min-height: 44vh;
+    border-right: 0;
+    border-bottom: 1px solid #d8d8da;
+  }
+
+  .formPanel {
+    min-height: 56vh;
+    padding: 24px;
+  }
+
+  .topSection {
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .languageWrap {
+    align-self: stretch;
+    max-width: none;
+  }
+
+  .languageLabel {
+    font-size: 18px;
+  }
+
+  .languageSelect {
+    font-size: 20px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .formContent {
+    gap: 26px;
+    justify-content: flex-start;
+    padding-top: 36px;
+  }
+
+  .logo {
+    width: 180px;
+  }
+
+  .loginForm {
+    gap: 16px;
+  }
+
+  .inputField {
+    font-size: 20px;
+  }
+
+  .errorText {
+    font-size: 14px;
+  }
+
+  .loginButton {
+    margin-top: 20px;
+    height: 48px;
+    border-radius: 12px;
+    font-size: 20px;
+  }
+
+  .forgotButton {
+    font-size: 18px;
+  }
+}

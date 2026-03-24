@@ -10,6 +10,11 @@ import { EXTRA_ROUTES } from "./config/extra.routes";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
+const VidaiLogin = lazy(() => import("./pages/VidaiLogin"));
+
+const UI_AUTH_KEY = "vidai_ui_logged_in";
+
+const isAuthenticated = () => localStorage.getItem(UI_AUTH_KEY) === "1";
 
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
@@ -24,6 +29,17 @@ export default function AppRoutes() {
   return (
     <>
       <Routes>
+        <Route
+          path="/login"
+          element={
+            isAuthenticated() ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <LoadedComponent Comp={VidaiLogin} />
+            )
+          }
+        />
+
         <Route
           path="/review/:requestId/:leadId"
           element={<LoadedComponent Comp={ReviewFormPage} />}
@@ -52,11 +68,15 @@ export default function AppRoutes() {
         <Route
           path="/"
           element={
-            <Suspense
-              fallback={<div style={{ padding: 12 }}>Loading app...</div>}
-            >
-              <MainLayout />
-            </Suspense>
+            isAuthenticated() ? (
+              <Suspense
+                fallback={<div style={{ padding: 12 }}>Loading app...</div>}
+              >
+                <MainLayout />
+              </Suspense>
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />

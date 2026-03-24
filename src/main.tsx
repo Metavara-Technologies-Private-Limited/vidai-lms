@@ -11,6 +11,11 @@ import "./index.css";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+localStorage.removeItem("vidai_ui_logged_in");
+sessionStorage.removeItem("vidai_ui_logged_in");
+localStorage.removeItem("auth_token");
+localStorage.removeItem("authToken");
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
