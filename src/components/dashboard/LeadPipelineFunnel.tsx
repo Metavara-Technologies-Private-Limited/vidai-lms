@@ -21,6 +21,8 @@ const stages = [
   { stage: "Lost Leads", key: "Lost" as Status, color: "#eceef4" },
 ];
 
+const FOLLOW_UP_SOURCE_STAGES: Status[] = ["New", "Lost", "Cycle Conversion"];
+
 const normalizeLeadStatus = (status?: string | null): Status | null => {
   if (!status) return null;
 
@@ -69,6 +71,11 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
       if (!normalized) continue;
       countsByStage[normalized] = (countsByStage[normalized] || 0) + 1;
     }
+
+    countsByStage["Follow-Ups"] = FOLLOW_UP_SOURCE_STAGES.reduce(
+      (total, stage) => total + (countsByStage[stage] || 0),
+      0,
+    );
 
     const stageCounts = stages.map((item, order) => ({
       ...item,
