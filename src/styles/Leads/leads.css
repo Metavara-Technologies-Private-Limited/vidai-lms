@@ -226,7 +226,7 @@
   background: #FFFFFF;
   border-radius: 12px;
   border: 1px solid #E5E7EB;
-  max-height: calc(100vh - 260px);
+  max-height: calc(100vh - 200px);
 }
 
 .leads-table table {
