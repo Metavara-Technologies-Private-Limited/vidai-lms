@@ -15,9 +15,11 @@ vi.mock("../../../services/tickets.api", () => ({
     updateTicketStatus: vi.fn(),
     assignTicket: vi.fn(),
     updateTicket: vi.fn(),
+    sendTicketReply: vi.fn(),
   },
   clinicsApi: {
     getClinicEmployees: vi.fn(),
+    getClinicDetail: vi.fn(),
   },
 }));
 
@@ -41,10 +43,7 @@ vi.mock("../Menus/TicketPropertiesSidebar", () => ({
     setStatus: (value: string) => void;
   }) => (
     <div>
-      <button
-        data-testid="change-status"
-        onClick={() => setStatus("closed")}
-      >
+      <button data-testid="change-status" onClick={() => setStatus("closed")}>
         Change Status
       </button>
 
@@ -54,7 +53,6 @@ vi.mock("../Menus/TicketPropertiesSidebar", () => ({
     </div>
   ),
 }));
-
 
 vi.mock("../Menus/TicketDailogs", () => ({
   default: () => <div data-testid="ticket-dialogs" />,
@@ -67,6 +65,8 @@ vi.mock("react-toastify", () => ({
     error: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
+    loading: vi.fn(() => "toast-id"),
+    update: vi.fn(),
   },
 }));
 
@@ -82,7 +82,7 @@ const mockTicket: TicketDetail = {
   ticket_no: "TICKET-001",
   subject: "Test Ticket",
   description: "Test Description",
-type: "general", 
+  type: "general",
   priority: "low",
   status: "new",
 
@@ -114,7 +114,7 @@ const renderComponent = () =>
       <Routes>
         <Route path="/tickets/:id" element={<TicketView />} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 
 describe("TicketView", () => {
@@ -123,6 +123,9 @@ describe("TicketView", () => {
 
     mockedTicketsApi.getTicketById.mockResolvedValue(mockTicket);
     mockedClinicsApi.getClinicEmployees.mockResolvedValue(mockEmployees);
+    mockedClinicsApi.getClinicDetail.mockResolvedValue({
+      email: "clinic@example.com",
+    });
     mockedTemplateService.getTemplates.mockResolvedValue([]);
   });
 
@@ -159,19 +162,19 @@ describe("TicketView", () => {
       expect(screen.getByTestId("update-btn")).toBeInTheDocument();
     });
 
-fireEvent.click(screen.getByTestId("change-status"));
+    fireEvent.click(screen.getByTestId("change-status"));
 
-// ✅ wait for React state update to flush
-await waitFor(() => {
-  // nothing to check — just allow re-render
-  expect(true).toBe(true);
-});
+    // ✅ wait for React state update to flush
+    await waitFor(() => {
+      // nothing to check — just allow re-render
+      expect(true).toBe(true);
+    });
 
-fireEvent.click(screen.getByTestId("update-btn"));
+    fireEvent.click(screen.getByTestId("update-btn"));
 
-await waitFor(() => {
-  expect(mockedTicketsApi.updateTicketStatus).toHaveBeenCalled();
-});
+    await waitFor(() => {
+      expect(mockedTicketsApi.updateTicketStatus).toHaveBeenCalled();
+    });
   });
 
   it("handles API error", async () => {
@@ -181,15 +184,8 @@ await waitFor(() => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Failed to load ticket details from server.")
+        screen.getByText("Failed to load ticket details from server."),
       ).toBeInTheDocument();
     });
   });
 });
-
-
-
-
-
-
-

@@ -1,5 +1,5 @@
 // services/leads.api.ts
-import axios from 'axios';
+import axios from "axios";
 
 // ====================== Types ======================
 export type Department = {
@@ -19,12 +19,16 @@ export type Employee = {
   emp_name: string;
   emp_type: string;
   department_name: string;
+  email?: string;
+  emp_email?: string;
+  user_email?: string;
+  official_email?: string;
 };
 
 // ── Document object shape returned by the API ──
 export type LeadDocument = {
   id: string;
-  file: string;          // relative path e.g. /media/lead_documents/file.pdf
+  file: string; // relative path e.g. /media/lead_documents/file.pdf
   uploaded_at: string;
 };
 
@@ -47,7 +51,14 @@ export type Lead = {
   partner_gender?: "male" | "female";
   source: string;
   sub_source?: string;
-  lead_status?: "New" | "Contacted" | "Follow-Ups" | "Converted" | "Lost" | "Cycle Conversion" | "Appointment";
+  lead_status?:
+    | "New"
+    | "Contacted"
+    | "Follow-Ups"
+    | "Converted"
+    | "Lost"
+    | "Cycle Conversion"
+    | "Appointment";
   next_action_type?: string;
   next_action_status?: string;
   next_action_description?: string;
@@ -58,7 +69,7 @@ export type Lead = {
   appointment_date: string;
   slot: string;
   remark?: string;
-  documents?: LeadDocument[];   // ← FIXED: was string[], now object[]
+  documents?: LeadDocument[]; // ← FIXED: was string[], now object[]
   is_active: boolean;
   created_at: string;
   modified_at: string;
@@ -107,7 +118,12 @@ export type LeadEmailPayload = {
   send_now?: boolean;
 };
 
-export type LeadEmailStatus = "DRAFT" | "SCHEDULED" | "SENT" | "FAILED" | "CANCELLED";
+export type LeadEmailStatus =
+  | "DRAFT"
+  | "SCHEDULED"
+  | "SENT"
+  | "FAILED"
+  | "CANCELLED";
 
 export type LeadEmailResponse = {
   id: number;
@@ -138,16 +154,16 @@ export type LeadMailListItem = {
 
 // ====================== Axios Instance ======================
 const API_BASE_URL: string =
-  (import.meta as unknown as { env: Record<string, string> }).env?.VITE_API_BASE_URL ??
-  'http://127.0.0.1:8000/api';
+  (import.meta as unknown as { env: Record<string, string> }).env
+    ?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { "Content-Type": "application/json" },
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem("auth_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -161,7 +177,8 @@ api.interceptors.response.use(
     const normalizeError = (value: unknown): string => {
       if (value == null) return "Unknown error";
       if (typeof value === "string") return value;
-      if (typeof value === "number" || typeof value === "boolean") return String(value);
+      if (typeof value === "number" || typeof value === "boolean")
+        return String(value);
 
       if (Array.isArray(value)) {
         const first = value[0];
@@ -190,23 +207,26 @@ api.interceptors.response.use(
     const detail = normalizeError(raw ?? error?.message);
     console.error(`❌ API Error [${status}] ${url}: ${detail}`);
     return Promise.reject(error);
-  }
+  },
 );
 
 // ====================== Lead API ======================
 export const LeadAPI = {
   list: async (): Promise<Lead[]> => {
-    const response = await api.get<Lead[]>('/leads/list/');
+    const response = await api.get<Lead[]>("/leads/list/");
     return response.data;
   },
 
   create: async (data: LeadPayload): Promise<Lead> => {
-    const response = await api.post<Lead>('/leads/', data);
+    const response = await api.post<Lead>("/leads/", data);
     console.log("✅ Lead created:", response.data);
     return response.data;
   },
 
-  createWithDocuments: async (data: LeadPayload, files: File[]): Promise<Lead> => {
+  createWithDocuments: async (
+    data: LeadPayload,
+    files: File[],
+  ): Promise<Lead> => {
     const formData = new FormData();
     (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
       const value = data[key];
@@ -215,10 +235,10 @@ export const LeadAPI = {
       }
     });
     files.forEach((file) => {
-      formData.append('documents', file);
+      formData.append("documents", file);
     });
-    const response = await api.post<Lead>('/leads/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    const response = await api.post<Lead>("/leads/", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
     console.log("✅ Lead + documents created:", response.data);
     return response.data;
@@ -241,7 +261,7 @@ export const LeadAPI = {
   updateWithDocuments: async (
     leadId: string,
     data: Partial<LeadPayload>,
-    files: File[]
+    files: File[],
   ): Promise<Lead> => {
     const formData = new FormData();
     (Object.keys(data) as (keyof Partial<LeadPayload>)[]).forEach((key) => {
@@ -254,9 +274,9 @@ export const LeadAPI = {
         formData.append(key, String(value));
       }
     });
-    files.forEach((file) => formData.append('documents', file));
+    files.forEach((file) => formData.append("documents", file));
     const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { "Content-Type": "multipart/form-data" },
     });
     console.log("✅ Lead + documents updated:", response.data);
     return response.data;
@@ -282,9 +302,9 @@ export const LeadAPI = {
 
   uploadDocument: async (leadId: string, file: File): Promise<Lead> => {
     const formData = new FormData();
-    formData.append('documents', file);
+    formData.append("documents", file);
     const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   },
@@ -298,25 +318,25 @@ export const LeadAPI = {
 
     // Re-send all required lead fields so nothing gets wiped
     const safeFields: Record<string, string> = {
-      clinic_id:          String(current.clinic_id ?? 1),
-      department_id:      String(current.department_id ?? 1),
-      full_name:          current.full_name ?? "",
-      contact_no:         current.contact_no ?? "",
-      source:             current.source ?? "",
+      clinic_id: String(current.clinic_id ?? 1),
+      department_id: String(current.department_id ?? 1),
+      full_name: current.full_name ?? "",
+      contact_no: current.contact_no ?? "",
+      source: current.source ?? "",
       treatment_interest: current.treatment_interest ?? "",
-      book_appointment:   current.book_appointment ? "true" : "false",
-      appointment_date:   current.appointment_date ?? "",
-      slot:               current.slot ?? "",
-      partner_inquiry:    current.partner_inquiry ? "true" : "false",
-      is_active:          current.is_active ? "true" : "false",
+      book_appointment: current.book_appointment ? "true" : "false",
+      appointment_date: current.appointment_date ?? "",
+      slot: current.slot ?? "",
+      partner_inquiry: current.partner_inquiry ? "true" : "false",
+      is_active: current.is_active ? "true" : "false",
     };
     Object.entries(safeFields).forEach(([k, v]) => formData.append(k, v));
 
     // Append new files
-    files.forEach((file) => formData.append('documents', file));
+    files.forEach((file) => formData.append("documents", file));
 
     const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   },
@@ -325,22 +345,28 @@ export const LeadAPI = {
 // ====================== Lead Email API ======================
 export const LeadEmailAPI = {
   create: async (data: LeadEmailPayload): Promise<LeadEmailResponse> => {
-    const response = await api.post<LeadEmailResponse>('/lead-email/', data);
+    const response = await api.post<LeadEmailResponse>("/lead-email/", data);
     console.log("✅ Lead email created:", response.data);
     return response.data;
   },
 
-  sendNow: async (data: Omit<LeadEmailPayload, 'send_now'>): Promise<LeadEmailResponse> => {
+  sendNow: async (
+    data: Omit<LeadEmailPayload, "send_now">,
+  ): Promise<LeadEmailResponse> => {
     return LeadEmailAPI.create({ ...data, send_now: true });
   },
 
-  saveAsDraft: async (data: Omit<LeadEmailPayload, 'send_now'>): Promise<LeadEmailResponse> => {
+  saveAsDraft: async (
+    data: Omit<LeadEmailPayload, "send_now">,
+  ): Promise<LeadEmailResponse> => {
     return LeadEmailAPI.create({ ...data, send_now: false });
   },
 
   list: async (leadUuid?: string): Promise<LeadMailListItem[]> => {
     const params = leadUuid ? { lead_uuid: leadUuid } : {};
-    const response = await api.get<LeadMailListItem[]>('/lead-mail/', { params });
+    const response = await api.get<LeadMailListItem[]>("/lead-mail/", {
+      params,
+    });
     return response.data;
   },
 
@@ -375,23 +401,28 @@ export type EmailTemplatePayload = {
 // ====================== Email Template API ======================
 export const EmailTemplateAPI = {
   list: async (): Promise<EmailTemplate[]> => {
-    const response = await api.get<EmailTemplate[]>('/templates/mail/');
+    const response = await api.get<EmailTemplate[]>("/templates/mail/");
     const data = response.data;
     if (Array.isArray(data)) return data;
-    if (data && typeof data === 'object' && 'results' in (data as object)) {
+    if (data && typeof data === "object" && "results" in (data as object)) {
       return (data as { results: EmailTemplate[] }).results ?? [];
     }
     return [];
   },
 
   create: async (payload: EmailTemplatePayload): Promise<EmailTemplate> => {
-    const response = await api.post<EmailTemplate>('/templates/mail/create/', payload);
+    const response = await api.post<EmailTemplate>(
+      "/templates/mail/create/",
+      payload,
+    );
     console.log("✅ Email template created:", response.data);
     return response.data;
   },
 
   getById: async (templateId: string | number): Promise<EmailTemplate> => {
-    const response = await api.get<EmailTemplate>(`/templates/mail/${templateId}/`);
+    const response = await api.get<EmailTemplate>(
+      `/templates/mail/${templateId}/`,
+    );
     return response.data;
   },
 
@@ -402,14 +433,21 @@ export const EmailTemplateAPI = {
 
 // ====================== Twilio API ======================
 export const TwilioAPI = {
-  makeCall: async (payload: { lead_uuid: string; to: string }): Promise<unknown> => {
-    const response = await api.post('/twilio/make-call/', payload);
+  makeCall: async (payload: {
+    lead_uuid: string;
+    to: string;
+  }): Promise<unknown> => {
+    const response = await api.post("/twilio/make-call/", payload);
     console.log("📞 Call initiated:", response.data);
     return response.data;
   },
 
-  sendSMS: async (payload: { lead_uuid: string; to: string; message: string }): Promise<unknown> => {
-    const response = await api.post('/twilio/send-sms/', payload);
+  sendSMS: async (payload: {
+    lead_uuid: string;
+    to: string;
+    message: string;
+  }): Promise<unknown> => {
+    const response = await api.post("/twilio/send-sms/", payload);
     console.log("💬 SMS sent:", response.data);
     return response.data;
   },
@@ -427,21 +465,34 @@ export const ClinicAPI = {
     }
   },
 
-  create: async (data: { name: string; department: string[] }): Promise<Clinic> => {
+  create: async (data: {
+    name: string;
+    department: string[];
+  }): Promise<Clinic> => {
     const response = await api.post<Clinic>("/clinics", data);
     return response.data;
   },
 
-  update: async (clinicId: number, data: { name: string; department: string[] }): Promise<Clinic> => {
+  update: async (
+    clinicId: number,
+    data: { name: string; department: string[] },
+  ): Promise<Clinic> => {
     const response = await api.put<Clinic>(`/clinics/${clinicId}/`, data);
     return response.data;
   },
 
   getEmployees: async (clinicId: number): Promise<Employee[]> => {
-    const response = await api.get<Employee[] | { results: Employee[] }>(`/clinics/${clinicId}/employees/`);
+    const response = await api.get<Employee[] | { results: Employee[] }>(
+      `/clinics/${clinicId}/employees/`,
+    );
     const data = response.data;
     if (!Array.isArray(data)) {
-      if (data && typeof data === 'object' && 'results' in data && Array.isArray(data.results)) {
+      if (
+        data &&
+        typeof data === "object" &&
+        "results" in data &&
+        Array.isArray(data.results)
+      ) {
         return data.results;
       }
       return [];

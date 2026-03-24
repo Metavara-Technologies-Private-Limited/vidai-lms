@@ -13,7 +13,13 @@ import {
   CircularProgress,
 } from "@mui/material";
 import dayjs from "dayjs";
-import type { TicketDetail, Employee, TicketPriority, TicketStatus, TicketTimeline } from "../../../types/tickets.types";
+import type {
+  TicketDetail,
+  Employee,
+  TicketPriority,
+  TicketStatus,
+  TicketTimeline,
+} from "../../../types/tickets.types";
 
 import {
   propertyContainerSx,
@@ -28,6 +34,7 @@ import {
 interface Props {
   ticket: TicketDetail | null;
   employees: Employee[];
+  selectedAssigneeEmail?: string;
 
   tab: number;
   setTab: (v: number) => void;
@@ -44,23 +51,17 @@ interface Props {
   assignTo: number | "";
   setAssignTo: (v: number | "") => void;
 
-handleUpdate: (payload: {
-  status: TicketStatus;
-  priority: TicketPriority;
-  assigned_to: number | "";
-  type: string;
-  actions: string[];
-}) => void;
+  handleUpdate: () => void;
 
   updating: boolean;
 
   ticketTypes: string[];
 }
 
-
 const TicketPropertiesSidebar = ({
   ticket,
   employees,
+  selectedAssigneeEmail,
   tab,
   setTab,
   type,
@@ -77,47 +78,47 @@ const TicketPropertiesSidebar = ({
 }: Props) => {
   if (!ticket) return null;
 
-const handleUpdateWithTimeline = () => {
-  const actions: string[] = [];
+  const handleUpdateWithTimeline = () => {
+    const actions: string[] = [];
 
-  if (ticket.status !== status) {
-    actions.push(`Status changed from ${ticket.status} to ${status}`);
-  }
+    if (ticket.status !== status) {
+      actions.push(`Status changed from ${ticket.status} to ${status}`);
+    }
 
-if (ticket.type !== type) {
-  actions.push(`Type changed from ${ticket.type} to ${type}`);
-}
-  if (ticket.priority !== priority) {
-    actions.push(`Priority changed from ${ticket.priority} to ${priority}`);
-  }
-  
-if (ticket.assigned_to !== assignTo) {
-  const oldEmp = employees.find(e => e.id === ticket.assigned_to);
-  const newEmp = employees.find(e => e.id === assignTo);
+    if (ticket.type !== type) {
+      actions.push(`Type changed from ${ticket.type} to ${type}`);
+    }
+    if (ticket.priority !== priority) {
+      actions.push(`Priority changed from ${ticket.priority} to ${priority}`);
+    }
 
-  actions.push(
-    `Assigned changed from ${oldEmp?.emp_name || "Unassigned"} to ${newEmp?.emp_name}`
-  );
-}
+    if (ticket.assigned_to !== assignTo) {
+      const oldEmp = employees.find((e) => e.id === ticket.assigned_to);
+      const newEmp = employees.find((e) => e.id === assignTo);
 
-  console.log("Timeline actions:", actions);
+      actions.push(
+        `Assigned changed from ${oldEmp?.emp_name || "Unassigned"} to ${newEmp?.emp_name}`,
+      );
+    }
 
-handleUpdate({
-  status,
-  priority,
-  assigned_to: assignTo,
-  type, 
-  actions
-});
+    console.log("Timeline actions:", actions);
 
-};
+    handleUpdate();
+  };
 
   return (
-    <Box flex={1} bgcolor="#FAFAFA" p={3} borderRadius={2} border="1px solid #E0E0E0">
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} 
-      sx={{ ...ticketDetailsTabsSx,
-       mb: 3,
-        }}>
+    <Box
+      flex={1}
+      bgcolor="#FAFAFA"
+      p={3}
+      borderRadius={2}
+      border="1px solid #E0E0E0"
+    >
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        sx={{ ...ticketDetailsTabsSx, mb: 3 }}
+      >
         <Tab label="Ticket Details" />
         <Tab label="Timeline" />
       </Tabs>
@@ -133,7 +134,10 @@ handleUpdate({
             <DetailRow label="Ticket ID" value={ticket.ticket_no} />
             <DetailRow label="Lab Name" value={ticket.lab_name} />
             <DetailRow label="Subject" value={ticket.subject} />
-            <DetailRow label="Created Date" value={dayjs(ticket.created_at).format("DD/MM/YYYY")} />
+            <DetailRow
+              label="Created Date"
+              value={dayjs(ticket.created_at).format("DD/MM/YYYY")}
+            />
             <DetailRow label="Requested By" value={ticket.requested_by} />
             <DetailRow label="Department" value={ticket.department_name} />
           </Box>
@@ -149,7 +153,7 @@ handleUpdate({
             <Box sx={propertyContainerSx}>
               {/* TYPE */}
               <TextField
-              key={type}
+                key={type}
                 select
                 label="Type"
                 value={type}
@@ -169,7 +173,7 @@ handleUpdate({
 
               {/* STATUS */}
               <TextField
-              key={status}
+                key={status}
                 select
                 label="Status"
                 value={status}
@@ -179,7 +183,6 @@ handleUpdate({
                 sx={propertyFieldSx}
                 InputLabelProps={{ sx: floatingLabelSx }}
               >
-
                 {["new", "pending", "resolved", "closed"].map((s) => (
                   <MenuItem key={s} value={s}>
                     <Chip label={s.toUpperCase()} sx={statusChipSx(s)} />
@@ -189,7 +192,7 @@ handleUpdate({
 
               {/* PRIORITY */}
               <TextField
-              key={priority}
+                key={priority}
                 select
                 label="Priority"
                 value={priority}
@@ -199,7 +202,6 @@ handleUpdate({
                 sx={propertyFieldSx}
                 InputLabelProps={{ sx: floatingLabelSx }}
               >
-
                 {["low", "medium", "high"].map((p) => (
                   <MenuItem key={p} value={p}>
                     <Chip label={p.toUpperCase()} sx={priorityChipSx(p)} />
@@ -213,7 +215,9 @@ handleUpdate({
                 label="Assign To"
                 value={assignTo}
                 onChange={(e) =>
-                  setAssignTo(e.target.value === "" ? "" : Number(e.target.value))
+                  setAssignTo(
+                    e.target.value === "" ? "" : Number(e.target.value),
+                  )
                 }
                 fullWidth
                 size="small"
@@ -239,9 +243,18 @@ handleUpdate({
             fullWidth
             onClick={handleUpdateWithTimeline}
             disabled={updating}
-            sx={{ bgcolor: "#505050", py: 1.5, borderRadius: 2, "&:hover": { bgcolor: "#232323" } }}
+            sx={{
+              bgcolor: "#505050",
+              py: 1.5,
+              borderRadius: 2,
+              "&:hover": { bgcolor: "#232323" },
+            }}
           >
-            {updating ? <CircularProgress size={24} color="inherit" /> : "Update"}
+            {updating ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : (
+              "Update"
+            )}
           </Button>
         </Stack>
       ) : (
@@ -249,17 +262,18 @@ handleUpdate({
           {(() => {
             const timeline = (ticket.timeline || []) as TicketTimeline[];
 
-            const displayItems: (TicketTimeline & { is_injected?: boolean })[] = [...timeline];
-const hasAssignment = displayItems.some(t =>
-  t.action?.toLowerCase().includes("assigned")
-);
+            const displayItems: (TicketTimeline & { is_injected?: boolean })[] =
+              [...timeline];
+            const hasAssignment = displayItems.some((t) =>
+              t.action?.toLowerCase().includes("assigned"),
+            );
 
             if (!hasAssignment && ticket.assigned_to) {
               const assignItem = {
                 id: "auto-assign",
-                action: `Assigned to ${ticket.requested_by}`,
+                action: `Assigned to ${ticket.assigned_to_name || "Assignee"}`,
                 created_at: ticket.created_at,
-                is_injected: true
+                is_injected: true,
               };
               if (displayItems.length > 0) {
                 displayItems.splice(1, 0, assignItem);
@@ -269,7 +283,9 @@ const hasAssignment = displayItems.some(t =>
             }
 
             return displayItems.map((item, index) => {
-              const isAssigned = item.action?.toLowerCase().includes("assign") || item.is_injected;
+              const isAssigned =
+                item.action?.toLowerCase().includes("assign") ||
+                item.is_injected;
               const isLast = index === displayItems.length - 1;
 
               return (
@@ -307,7 +323,8 @@ const hasAssignment = displayItems.some(t =>
                   >
                     {isAssigned ? (
                       <Avatar
-src={`https://ui-avatars.com/api/?name=${ticket.assigned_to_name || "User"}`}                        sx={{ width: 34, height: 34 }}
+                        src={`https://ui-avatars.com/api/?name=${ticket.assigned_to_name || "User"}`}
+                        sx={{ width: 34, height: 34 }}
                       />
                     ) : (
                       <Box
@@ -327,6 +344,16 @@ src={`https://ui-avatars.com/api/?name=${ticket.assigned_to_name || "User"}`}   
                       {item.action}
                     </Typography>
 
+                    {isAssigned && selectedAssigneeEmail ? (
+                      <Typography
+                        fontSize={12}
+                        color="#8A8A8A"
+                        sx={{ mt: 0.25 }}
+                      >
+                        {selectedAssigneeEmail}
+                      </Typography>
+                    ) : null}
+
                     <Typography fontSize={12} color="#8A8A8A">
                       {dayjs(item.created_at).format("DD/MM/YYYY | hh:mm A")}
                     </Typography>
@@ -335,7 +362,6 @@ src={`https://ui-avatars.com/api/?name=${ticket.assigned_to_name || "User"}`}   
               );
             });
           })()}
-
         </Box>
       )}
     </Box>

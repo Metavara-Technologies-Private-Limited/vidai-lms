@@ -34,6 +34,8 @@ interface Props {
   ticket: TicketDetail | null;
   description: string;
   replyProps?: TicketReplyEditorProps | null;
+  assigneeName?: string;
+  assigneeEmail?: string;
 
   setDescription: (v: string) => void;
 
@@ -51,6 +53,8 @@ const TicketContentPanel = ({
   openReply,
   setOpenReply,
   replyProps,
+  assigneeName,
+  assigneeEmail,
 }: Props) => {
   const dispatch = useDispatch<AppDispatch>();
   const leadsFromStore = useSelector(selectLeads);
@@ -76,6 +80,16 @@ const TicketContentPanel = ({
     }));
 
   if (!ticket) return null;
+
+  const displayName = assigneeName?.trim() || ticket.requested_by;
+  const normalizedFallback = ticket.requested_by
+    .toLowerCase()
+    .replace(/\s/g, ".");
+  const displayEmail =
+    assigneeEmail?.trim() ||
+    (normalizedFallback.includes("@")
+      ? normalizedFallback
+      : `${normalizedFallback}@fertility.com`);
 
   return (
     <Box
@@ -103,13 +117,12 @@ const TicketContentPanel = ({
         <Box display="flex" justifyContent="space-between" mb={2}>
           <Stack direction="row" spacing={1} alignItems="center">
             <Avatar
-              src={`https://ui-avatars.com/api/?name=${ticket.requested_by}&background=random`}
+              src={`https://ui-avatars.com/api/?name=${displayName}&background=random`}
             />
             <Box>
-              <Typography fontWeight={700}>{ticket.requested_by}</Typography>
+              <Typography fontWeight={700}>{displayName}</Typography>
               <Typography variant="caption" color="text.secondary">
-                {ticket.requested_by.toLowerCase().replace(/\s/g, ".")}
-                @fertility.com
+                {displayEmail}
               </Typography>
             </Box>
           </Stack>
@@ -211,8 +224,6 @@ const TicketContentPanel = ({
 
             // call original send logic if exists
             replyProps.handleSendReply();
-
-            setOpenReply(false);
           }}
         />
       ) : null}
