@@ -1,13 +1,18 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  User, Mail, Building2, Shield, Globe,
-  LogOut, ChevronRight, Loader2, BadgeCheck, Hash
+  User,
+  Mail,
+  Building2,
+  Shield,
+  Globe,
+  LogOut,
+  ChevronRight,
+  BadgeCheck,
+  Hash,
 } from "lucide-react";
-import { clearAuth, selectToken, selectUser } from "../store/authSlice";
+import { clearAuth, selectUser } from "../store/authSlice";
 import type { AppDispatch } from "../store";
-import { authApi } from "../services/auth.api";
 
 interface ProfileData {
   user_id: number;
@@ -29,32 +34,17 @@ interface ProfileData {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
-  const token = useSelector(selectToken);
   const authUser = useSelector(selectUser);
 
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const p = authUser as unknown as ProfileData;
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        if (!token) throw new Error("No token");
-        const data = await authApi.getProfile(token);
-        setProfile(data);
-      } catch {
-        if (authUser) {
-          setProfile(authUser as unknown as ProfileData);
-        } else {
-          setError("Could not load profile.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [authUser, token]);
+  if (!p) {
+    return (
+      <div style={styles.loadingWrap}>
+        <p style={{ color: "#f87171" }}>Could not load profile.</p>
+      </div>
+    );
+  }
 
   const handleLogout = () => {
     dispatch(clearAuth());
@@ -64,30 +54,11 @@ export default function ProfilePage() {
   const getInitials = (first: string, last: string) =>
     `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
 
-  if (loading) {
-    return (
-      <div style={styles.loadingWrap}>
-        <Loader2 size={32} style={{ animation: "spin 1s linear infinite", color: "#6366f1" }} />
-        <p style={{ color: "#94a3b8", marginTop: 12 }}>Loading profile…</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={styles.loadingWrap}>
-        <p style={{ color: "#f87171" }}>{error}</p>
-      </div>
-    );
-  }
-
-  const p = profile!;
-  const fullName = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.username;
+  const fullName =
+    `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.username;
 
   return (
     <div style={styles.page}>
-
       {/* ── Hero Card ── */}
       <div style={styles.heroCard}>
         <div style={styles.avatarRing}>
@@ -99,20 +70,32 @@ export default function ProfilePage() {
         <div style={styles.heroInfo}>
           <div style={styles.nameRow}>
             <h1 style={styles.name}>{fullName}</h1>
+
             {p.is_superuser && (
               <span style={styles.superBadge}>
                 <BadgeCheck size={13} style={{ marginRight: 4 }} />
                 Superuser
               </span>
             )}
+
             {p.is_staff && !p.is_superuser && (
-              <span style={{ ...styles.superBadge, background: "rgba(16,185,129,0.18)", color: "#10b981" }}>
+              <span
+                style={{
+                  ...styles.superBadge,
+                  background: "rgba(16,185,129,0.18)",
+                  color: "#10b981",
+                }}
+              >
                 <BadgeCheck size={13} style={{ marginRight: 4 }} />
                 Staff
               </span>
             )}
           </div>
-          <p style={styles.designation}>{p.designation_label || p.designation}</p>
+
+          <p style={styles.designation}>
+            {p.designation_label || p.designation}
+          </p>
+
           <p style={styles.tenant}>{p.tenant}</p>
         </div>
 
@@ -124,31 +107,57 @@ export default function ProfilePage() {
 
       {/* ── Details Grid ── */}
       <div style={styles.grid}>
-        <InfoCard icon={<User size={18} color="#6366f1" />}     label="Username"     value={p.username} />
-        <InfoCard icon={<Mail size={18} color="#6366f1" />}     label="Email"        value={p.email || "—"} />
-        <InfoCard icon={<Building2 size={18} color="#6366f1" />} label="Organisation" value={`${p.tenant} (ID: ${p.tenant_id})`} />
-        <InfoCard icon={<Shield size={18} color="#6366f1" />}   label="Role"         value={p.designation_label || p.designation || "—"} />
-        <InfoCard icon={<Globe size={18} color="#6366f1" />}    label="Language"     value={`${p.language_name} (${(p.language_code ?? "").toUpperCase()})`} />
-        <InfoCard icon={<Hash size={18} color="#6366f1" />}     label="User ID"      value={`#${p.user_id}`} />
+        <InfoCard
+          icon={<User size={18} color="#6366f1" />}
+          label="Username"
+          value={p.username}
+        />
+        <InfoCard
+          icon={<Mail size={18} color="#6366f1" />}
+          label="Email"
+          value={p.email || "—"}
+        />
+        <InfoCard
+          icon={<Building2 size={18} color="#6366f1" />}
+          label="Organisation"
+          value={`${p.tenant} (ID: ${p.tenant_id})`}
+        />
+        <InfoCard
+          icon={<Shield size={18} color="#6366f1" />}
+          label="Role"
+          value={p.designation_label || p.designation || "—"}
+        />
+        <InfoCard
+          icon={<Globe size={18} color="#6366f1" />}
+          label="Language"
+          value={`${p.language_name} (${(p.language_code ?? "").toUpperCase()})`}
+        />
+        <InfoCard
+          icon={<Hash size={18} color="#6366f1" />}
+          label="User ID"
+          value={`#${p.user_id}`}
+        />
       </div>
 
       {/* ── Bottom logout row ── */}
       <button style={styles.logoutRow} onClick={handleLogout}>
         <div style={styles.logoutRowLeft}>
           <LogOut size={18} color="#f87171" />
-          <span style={{ color: "#f87171", fontWeight: 500 }}>Sign out of account</span>
+          <span style={{ color: "#f87171", fontWeight: 500 }}>
+            Sign out of account
+          </span>
         </div>
         <ChevronRight size={18} color="#f87171" />
       </button>
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
 // ── InfoCard ────────────────────────────────────────────────────────────────
 function InfoCard({
-  icon, label, value,
+  icon,
+  label,
+  value,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -175,7 +184,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   loadingWrap: {
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     minHeight: 300,
@@ -189,13 +197,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 20,
     marginBottom: 24,
     boxShadow: "0 8px 32px rgba(99,102,241,0.3)",
-    flexWrap: "wrap" as const,
+    flexWrap: "wrap",
   },
   avatarRing: {
     padding: 3,
     borderRadius: "50%",
     background: "rgba(255,255,255,0.3)",
-    flexShrink: 0,
   },
   avatar: {
     width: 72,
@@ -217,7 +224,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    flexWrap: "wrap" as const,
+    flexWrap: "wrap",
   },
   name: {
     margin: 0,
@@ -257,7 +264,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: 14,
     fontWeight: 600,
-    flexShrink: 0,
   },
   grid: {
     display: "grid",
@@ -275,7 +281,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 14,
     padding: "16px 20px",
     cursor: "pointer",
-    boxSizing: "border-box" as const,
   },
   logoutRowLeft: {
     display: "flex",
@@ -291,7 +296,6 @@ const cardStyles: Record<string, React.CSSProperties> = {
     borderRadius: 14,
     padding: "16px 18px",
     display: "flex",
-    alignItems: "flex-start",
     gap: 14,
     boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
   },
@@ -303,14 +307,13 @@ const cardStyles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
   label: {
     margin: "0 0 2px",
     fontSize: 11,
     fontWeight: 600,
     color: "#94a3b8",
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase",
     letterSpacing: "0.05em",
   },
   value: {
