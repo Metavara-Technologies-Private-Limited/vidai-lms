@@ -37,7 +37,7 @@ export default function AppRoutes() {
       if (!token) return;
 
       try {
-        const profile = await authApi.getProfile(token);
+        const profile = await authApi.getProfile();
 
         dispatch(
           setAuth({
