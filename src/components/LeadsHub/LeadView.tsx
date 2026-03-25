@@ -89,6 +89,8 @@ import {
   FLOW_COPY_BY_APP,
 } from "../../config/appType";
 
+import BookAppointmentModal from "./BookAppointmentModal";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1402,6 +1404,9 @@ export default function LeadDetailView() {
   const [historyView, setHistoryView] = React.useState<HistoryView>("chatbot");
   const [emailDialogOpen, setEmailDialogOpen] = React.useState(false);
 
+  // ✅ FIX 1: bookApptOpen state is now correctly inside the component
+  const [bookApptOpen, setBookApptOpen] = React.useState(false);
+
   const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>([]);
   const [emailHistoryLoading, setEmailHistoryLoading] = React.useState(false);
 
@@ -1831,13 +1836,12 @@ export default function LeadDetailView() {
     });
   };
 
-  // ✅ FIXED: replaces undefined setSelectedLead / setOpenBookModal usage
+  // ✅ FIX 2: handleBookAppointment now correctly opens the modal inline
+  // instead of navigating away — uses bookApptOpen state defined above
   const handleBookAppointment = React.useCallback(() => {
     if (!activeLead) return;
-    navigate(`/leads/edit/${getCleanLeadId(activeLead.id)}`, {
-      state: { lead: activeLead, openBookAppointment: true },
-    });
-  }, [activeLead, navigate]);
+    setBookApptOpen(true);
+  }, [activeLead]);
 
   if (loading && !activeLead)
     return (
@@ -2415,6 +2419,17 @@ export default function LeadDetailView() {
           onDeleteNote={handleDeleteNote}
         />
       )}
+
+      {/* ✅ FIX 3: BookAppointmentModal is now correctly placed inside the JSX return */}
+      <BookAppointmentModal
+        open={bookApptOpen}
+        lead={activeLead}
+        onClose={() => setBookApptOpen(false)}
+        onSaved={() => {
+          setBookApptOpen(false);
+          dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+        }}
+      />
 
       <Dialog
         open={openConvertPopup}
