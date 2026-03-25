@@ -45,6 +45,8 @@ type ExtendedKpiCounts = LiveKpiCounts & {
   negotiation: number;
   proposalSent: number;
   contractSigned: number;
+  registered: number;
+  treatment: number;
 };
 
 /* KPI → ICON MAP */
@@ -109,11 +111,11 @@ const normalizeLeadStatus = (status?: string | null): string => {
   ) {
     return LEAD_STATUS.FOLLOW_UPS.toLowerCase();
   }
-  if (value === "converted") return LEAD_STATUS.CONVERTED.toLowerCase();
+  if (value === "converted" || value === "converted-lead") return LEAD_STATUS.CONVERTED.toLowerCase();
   if (value === "cycle-conversion" || value === "cycleconversion") {
     return LEAD_STATUS.CYCLE_CONVERSION.toLowerCase();
   }
-  if (value === "lost") return LEAD_STATUS.LOST.toLowerCase();
+  if (value === "lost" || value === "lost-lead") return LEAD_STATUS.LOST.toLowerCase();
 
   // Contracts statuses
   if (value === "negotiation" || value === "in-negotiation" || value === "under-negotiation") {
@@ -133,14 +135,14 @@ const formatCount = (value: number) => new Intl.NumberFormat("en-IN").format(val
 
 const KpiCards = () => {
   const leads = useSelector(selectLeads);
+  const sourceLeads = useMemo<Lead[]>(() => (Array.isArray(leads) ? (leads as Lead[]) : []), [leads]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  // ── Live counts derived from Redux store ──
   const counts = useMemo<ExtendedKpiCounts>(() => {
-    if (!Array.isArray(leads) || leads.length === 0) {
+    if (sourceLeads.length === 0) {
       return {
         totalLeads: 0,
         newLeads: 0,
@@ -148,9 +150,6 @@ const KpiCards = () => {
         followUps: 0,
         cycleConversion: 0,
         totalConverted: 0,
-        negotiation: 0,
-        proposalSent: 0,
-        contractSigned: 0,
         lostLeads: 0,
         registered: 0,
         treatment: 0,
@@ -172,12 +171,12 @@ const KpiCards = () => {
     let proposalSent = 0;
     let contractSigned = 0;
 
-    for (const lead of leads as Lead[]) {
+    for (const lead of sourceLeads) {
       if (lead?.is_active === false) continue;
 
       totalLeads += 1;
       const status = normalizeLeadStatus(
-        lead.lead_status || (lead as unknown as { status?: string }).status,
+        lead.lead_status || (lead as { status?: string }).status,
       );
 
       if (status === LEAD_STATUS.NEW.toLowerCase()) newLeads += 1;
@@ -210,7 +209,7 @@ const KpiCards = () => {
       proposalSent,
       contractSigned,
     };
-  }, [leads]);
+  }, [sourceLeads]);
 
   const dynamicKpis = useMemo<LocalKpiCardData[]>(() => {
     const cards: LocalKpiCardData[] = [
@@ -218,12 +217,10 @@ const KpiCards = () => {
       { id: "newLeads", label: "New Leads", value: counts.newLeads },
     ];
 
-    // Show "Appointments" card only for medical
     if (IS_MEDICAL_APP) {
       cards.push({ id: "appointments", label: "Appointments", value: counts.appointments });
     }
 
-    // Show contracts-only cards
     if (IS_CONTRACTS_APP) {
       cards.push(
         { id: "negotiation", label: "Negotiation", value: counts.negotiation },
@@ -234,7 +231,6 @@ const KpiCards = () => {
 
     cards.push({ id: "followUps", label: "Follow Ups", value: counts.followUps });
 
-    // "Cycle Conversion" — only for medical
     if (IS_MEDICAL_APP) {
       cards.push({
         id: "cycleConversion",
@@ -263,7 +259,6 @@ const KpiCards = () => {
     return cards;
   }, [counts]);
 
-  // ── Scroll arrow visibility ──
   const checkScroll = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
@@ -376,9 +371,7 @@ const KpiCards = () => {
                     {item.breakdown?.map((b) => (
                       <Box key={b.label}>
                         <Typography sx={kpiCardsStyles.breakdownLabel}>{b.label}</Typography>
-                        <Typography sx={kpiCardsStyles.breakdownValue}>
-                          {formatCount(b.value)}
-                        </Typography>
+                        <Typography sx={kpiCardsStyles.breakdownValue}>{formatCount(b.value)}</Typography>
                       </Box>
                     ))}
                   </Box>
