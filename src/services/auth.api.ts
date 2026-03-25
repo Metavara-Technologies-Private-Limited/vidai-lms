@@ -39,7 +39,7 @@ export const authApi = {
   },
 
   searchUsers: async (params: UserSearchParams) => {
-    const res = await http.get("/users/", {
+    const res = await http.get("/users-search/", {
       params: {
         limit: params.limit ?? 10,
         offset: params.offset ?? 0,
