@@ -8,7 +8,13 @@ export type MenuItem = {
   subMenu?: MenuItem[];
 };
 
-export const LEADS_MENU: MenuItem[] = [
+// ✅ Change this to "demo" to restrict to 3 pages, or "full" to show all
+export const APP_CONDITION: "demo" | "full" = "demo";  //we can add full(to see all tabs )
+
+// Demo allowed keys
+export const DEMO_ALLOWED_KEYS = ["dashboard", "leads", "settings"];
+
+const ALL_LEADS_MENU: MenuItem[] = [
   {
     key: "dashboard",
     label: "Dashboard",
@@ -34,11 +40,11 @@ export const LEADS_MENU: MenuItem[] = [
     page: lazy(() => import("../pages/Campaigns")),
   },
   {
-  key: "reputation",
-  label: "Reputation Management",
-  path: "/reputation",
-  page: lazy(() => import("../pages/Reputation")),
-},
+    key: "reputation",
+    label: "Reputation Management",
+    path: "/reputation",
+    page: lazy(() => import("../pages/Reputation")),
+  },
   {
     key: "reports",
     label: "Reports",
@@ -61,7 +67,12 @@ export const LEADS_MENU: MenuItem[] = [
         key: "integration",
         label: "Integration",
         path: "/settings/integration",
-        page: lazy(() => import("../components/Settings/Integration/Integration.tsx")),
+        page: lazy(
+          () =>
+            import(
+              "../components/Settings/Integration/Integration.tsx"
+            ),
+        ),
       },
       {
         key: "tickets",
@@ -80,6 +91,12 @@ export const LEADS_MENU: MenuItem[] = [
     ],
   },
 ];
+
+// ✅ Export filtered or full menu based on condition
+export const LEADS_MENU: MenuItem[] =
+  APP_CONDITION === "demo"
+    ? ALL_LEADS_MENU.filter((item) => DEMO_ALLOWED_KEYS.includes(item.key))
+    : ALL_LEADS_MENU;
 
 export const DOCUMENTS_MENU: MenuItem[] = [
   {
