@@ -1,4 +1,4 @@
-import { Box, Typography, CircularProgress } from "@mui/material";
+﻿import { Box, Typography, CircularProgress } from "@mui/material";
 import { useState, useMemo } from "react";
 import { useSelector } from "react-redux";
 import type { Lead as ApiLead } from "../../services/leads.api";

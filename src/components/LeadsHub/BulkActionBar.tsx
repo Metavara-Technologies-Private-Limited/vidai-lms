@@ -47,6 +47,7 @@ import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import ChangeHistoryIcon from "@mui/icons-material/ChangeHistory";
 import LockClockOutlinedIcon from "@mui/icons-material/LockClockOutlined";
 import CreateOutlinedIcon from "@mui/icons-material/CreateOutlined";
+import ExportIcon from "../../assets/icons/export.svg";
 
 import {
   deleteLeads,
@@ -229,6 +230,7 @@ interface Props {
   tab: "active" | "archived";
   onDelete: () => void;
   onArchive: (archive: boolean) => void;
+  onExport?: () => void;
   onSendEmail?: (
     to: string,
     subject: string,
@@ -243,6 +245,7 @@ const BulkActionBar: React.FC<Props> = ({
   tab,
   onDelete,
   onArchive,
+  onExport,
   onSendEmail,
   onSendSMS,
 }) => {
@@ -872,6 +875,19 @@ const BulkActionBar: React.FC<Props> = ({
           }}
         >
           Email
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<img src={ExportIcon} alt="Export" width={18} height={18} />}
+          onClick={onExport}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
+          }}
+        >
+          Export
         </Button>
       </Stack>
 

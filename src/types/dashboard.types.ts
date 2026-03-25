@@ -35,9 +35,10 @@ export interface LiveKpiCounts {
   appointments: number;
   followUps: number;
   totalConverted: number;
+  negotiation: number;
+  proposalSent: number;
+  contractSigned: number;
   lostLeads: number;
-  registered: number;
-  treatment: number;
 }
 
 export interface SlaAlert {

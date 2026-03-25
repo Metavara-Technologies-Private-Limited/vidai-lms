@@ -126,6 +126,60 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
 
   const handleBulkDelete  = () => { setLocalLeads((p) => p.filter((l) => !selectedIds.includes(l.id))); setSelectedIds([]); };
   const handleBulkArchive = (archive: boolean) => { setLocalLeads((p) => p.map((l) => selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l)); setSelectedIds([]); };
+  const handleBulkExport = () => {
+    const selectedLeads = localLeads.filter((lead) => selectedIds.includes(lead.id));
+    if (selectedLeads.length === 0) {
+      toast.info("No selected leads to export.", toastOptions);
+      return;
+    }
+
+    const headers = [
+      "Lead ID",
+      "Name",
+      "Phone",
+      "Email",
+      "Status",
+      "Source",
+      "Location",
+      "Assigned To",
+      "Created At",
+    ];
+
+    const escapeCsv = (value: unknown): string => {
+      const text = String(value ?? "");
+      if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+      return text;
+    };
+
+    const rows = selectedLeads.map((lead) => [
+      lead.id,
+      lead.full_name || lead.name || "",
+      lead.contact_no || "",
+      lead.email || "",
+      lead.status || lead.lead_status || "",
+      lead.source || "",
+      lead.location || "",
+      lead.assigned || lead.assigned_to_name || "",
+      lead.created_at || "",
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => escapeCsv(cell)).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    anchor.href = url;
+    anchor.download = `selected_leads_export_${stamp}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+
+    toast.success("Selected leads exported successfully.", toastOptions);
+  };
 
   // ── Loading / Error / Empty states ──
   if (loading)
@@ -297,7 +351,7 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
         </Stack>
       </Stack>
 
-      <BulkActionBar selectedIds={selectedIds} tab={tab} onDelete={handleBulkDelete} onArchive={handleBulkArchive} />
+      <BulkActionBar selectedIds={selectedIds} tab={tab} onDelete={handleBulkDelete} onArchive={handleBulkArchive} onExport={handleBulkExport} />
       <Dialogs />
 
       <CallDialog open={Boolean(callLead)} name={callLead?.full_name || callLead?.name || "Unknown"} onClose={() => setCallLead(null)} />
