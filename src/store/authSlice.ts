@@ -5,6 +5,11 @@ const AUTH_TOKEN_KEY = "auth_token";
 const AUTH_TOKEN_ALT_KEY = "authToken";
 const UI_AUTH_KEY = "vidai_ui_logged_in";
 
+interface Clinic {
+  clinic__name: string;
+  clinic_id: number;
+  is_default: boolean;
+}
 interface Permission {
   access: "view" | "add" | "edit" | "print";
   male: boolean;
@@ -45,6 +50,7 @@ export interface AuthUser {
   language_code: string;
   language_name: string;
   permissions: { modules: Module[] };
+  clinics?: Clinic[];
 }
 
 interface AuthState {

@@ -17,7 +17,10 @@ import MessageQuestionIcon from "@/assets/icons/message-question.svg";
 import UserAvatarIcon from "@/assets/icons/Ellipse_12.svg";
 import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchClinic, selectClinic } from "../../store/clinicSlice";
+import {
+  fetchClinic,
+  // selectClinic
+} from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
 import { clearAuth, selectUser } from "../../store/authSlice";
 import { fetchCampaign } from "../../store/campaignSlice";
@@ -29,8 +32,16 @@ const Header = () => {
   const user = useSelector(selectUser);
   // we intentionally only need the clinic name in the header;
   // other state is loaded by thunks but not read here.
-  const clinic = useSelector(selectClinic);
-  const clinicName = clinic?.name || "";
+  const clinics = user?.clinics || [];
+  const selectedClinic = clinics.find((c) => c.is_default) || clinics[0];
+  const [clinicAnchor, setClinicAnchor] = useState<null | HTMLElement>(null);
+
+  const handleClinicOpen = (e: React.MouseEvent<HTMLElement>) =>
+    setClinicAnchor(e.currentTarget);
+
+  const handleClinicClose = () => setClinicAnchor(null);
+  // const clinic = useSelector(selectClinic);
+  // const clinicName = clinic?.name || "";
 
   /* ================= ICON MENU STATE ================= */
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -92,12 +103,38 @@ const Header = () => {
 
         {/* RIGHT */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography
-            variant="body2"
-            sx={{ display: { xs: "none", md: "block" } }}
-          >
-            Clinic: <b>{clinicName || "—"}</b>
-          </Typography>
+          <Box>
+            <Box
+              onClick={handleClinicOpen}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                cursor: "pointer",
+                background: "#f3f4f6",
+                px: 2,
+                py: 1,
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="body2">
+                Clinic: <b>{selectedClinic?.clinic__name || "—"}</b>
+              </Typography>
+              <ArrowDropDownIcon />
+            </Box>
+
+            <Menu
+              anchorEl={clinicAnchor}
+              open={Boolean(clinicAnchor)}
+              onClose={handleClinicClose}
+            >
+              {clinics.map((c) => (
+                <MenuItem key={c.clinic_id} onClick={handleClinicClose}>
+                  {c.clinic__name}
+                </MenuItem>
+              ))}
+            </Menu>
+          </Box>
 
           {iconMenus.map(({ icon, type }) => (
             <IconButton

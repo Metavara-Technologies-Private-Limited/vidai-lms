@@ -28,13 +28,8 @@ export const authApi = {
     return res.data;
   },
 
-  getProfile: async (token: string) => {
-    const res = await http.get("/me/profile", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
+  getProfile: async () => {
+    const res = await http.get("/me/profile");
     return res.data;
   },
 
