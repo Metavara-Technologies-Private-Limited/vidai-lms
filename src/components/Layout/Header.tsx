@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AppBar,
   Toolbar,
@@ -18,11 +19,13 @@ import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClinic, selectClinic } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
+import { clearAuth } from "../../store/authSlice";
 import { fetchCampaign } from "../../store/campaignSlice";
 import { fetchAllTemplates } from "../../store/templateSlice";
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   // we intentionally only need the clinic name in the header;
   // other state is loaded by thunks but not read here.
   const clinic = useSelector(selectClinic);
@@ -58,6 +61,11 @@ const Header = () => {
   const handleUserMenuOpen = (e: React.MouseEvent<HTMLElement>) =>
     setUserAnchorEl(e.currentTarget);
   const handleUserMenuClose = () => setUserAnchorEl(null);
+  const handleLogout = () => {
+    handleUserMenuClose();
+    dispatch(clearAuth());
+    navigate("/login", { replace: true });
+  };
 
   const iconMenus = [
     { icon: CalendarIcon, type: "calendar" },
@@ -151,7 +159,9 @@ const Header = () => {
         <MenuItem>My Account</MenuItem>
         <MenuItem>Change Password</MenuItem>
         <MenuItem>Settings</MenuItem>
-        <MenuItem sx={{ color: "red", fontWeight: 600 }}>Logout</MenuItem>
+        <MenuItem onClick={handleLogout} sx={{ color: "red", fontWeight: 600 }}>
+          Logout
+        </MenuItem>
       </Menu>
     </AppBar>
   );

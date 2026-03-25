@@ -23,7 +23,7 @@
 .formPanel {
   position: relative;
   background: #e8e8ea;
-  padding: 16px 20px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
 }
@@ -32,7 +32,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
+  gap: 16px;
 }
 
 .languageWrap {
@@ -65,10 +65,10 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
-  gap: 14px;
-  padding-top: 70px;
+  gap: 20px;
+  padding: clamp(32px, 10vh, 120px) 0 24px;
 }
 
 .logo {
@@ -77,7 +77,7 @@
 }
 
 .loginForm {
-  width: min(320px, 100%);
+  width: min(360px, 100%);
   display: flex;
   flex-direction: column;
   gap: 30px;
@@ -159,45 +159,40 @@
 
 @media (max-width: 1200px) {
   .loginPage {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr);
   }
 
   .heroPanel {
-    min-height: 44vh;
-    border-right: 0;
-    border-bottom: 1px solid #d8d8da;
+    min-height: 100dvh;
   }
 
   .formPanel {
-    min-height: 56vh;
+    min-height: 100dvh;
     padding: 24px;
   }
 
   .topSection {
-    align-items: stretch;
-    gap: 10px;
+    align-items: flex-end;
+    gap: 14px;
   }
 
   .languageWrap {
-    align-self: stretch;
-    max-width: none;
+    width: min(175px, 100%);
   }
 
   .languageLabel {
-    font-size: 18px;
+    font-size: 15px;
   }
 
   .languageSelect {
-    font-size: 20px;
-    height: 44px;
-    border-radius: 12px;
+    font-size: 15px;
+    height: 38px;
+    border-radius: 10px;
   }
 
   .formContent {
-    gap: 26px;
-    justify-content: flex-start;
-    padding-top: 36px;
+    gap: 24px;
+    padding-top: clamp(40px, 14vh, 120px);
   }
 
   .logo {
@@ -224,6 +219,101 @@
   }
 
   .forgotButton {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .loginPage {
+    display: flex;
+    min-height: 100dvh;
+  }
+
+  .heroPanel {
+    display: none;
+  }
+
+  .formPanel {
+    width: 100%;
+    min-height: 100dvh;
+    padding: 20px;
+  }
+
+  .topSection {
+    align-items: flex-end;
+    gap: 20px;
+  }
+
+  .languageWrap {
+    align-self: flex-end;
+    width: min(175px, 100%);
+  }
+
+  .languageLabel {
+    font-size: 16px;
+  }
+
+  .languageSelect {
+    height: 44px;
+    font-size: 16px;
+    padding: 0 12px;
+  }
+
+  .logo {
+    width: min(180px, 62vw);
+  }
+
+  .formContent {
+    justify-content: flex-start;
+    padding: 32px 0 12px;
+  }
+
+  .loginForm {
+    width: 100%;
+    max-width: 420px;
+    gap: 22px;
+  }
+
+  .inputField {
     font-size: 18px;
+  }
+
+  .loginButton {
+    margin-top: 8px;
+    height: 46px;
+    font-size: 18px;
+  }
+
+  .forgotButton {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .formPanel {
+    padding: 16px;
+  }
+
+  .topSection {
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .languageWrap {
+    align-self: stretch;
+    width: 100%;
+    max-width: none;
+  }
+
+  .formContent {
+    padding-top: 24px;
+  }
+
+  .loginForm {
+    gap: 18px;
+  }
+
+  .inputField {
+    font-size: 17px;
   }
 }

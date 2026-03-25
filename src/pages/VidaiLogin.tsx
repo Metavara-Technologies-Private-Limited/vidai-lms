@@ -93,7 +93,7 @@ export default function VidaiLogin() {
           <img className={styles.logo} src={logo} alt="Vidai" />
         </div>
 
-        <div className={styles.formContent} style={{ marginTop: 150 }}>
+        <div className={styles.formContent}>
           <form className={styles.loginForm} onSubmit={handleSubmit}>
             <div className={styles.inputGroup}>
               <User size={18} className={styles.inputIcon} aria-hidden="true" />
