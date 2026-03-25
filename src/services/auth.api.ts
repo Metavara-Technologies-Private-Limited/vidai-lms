@@ -16,6 +16,12 @@ type LoginResponse = {
   };
 };
 
+type UserSearchParams = {
+  limit?: number;
+  offset?: number;
+  search?: string;
+};
+
 export const authApi = {
   login: async (data: LoginPayload) => {
     const res = await http.post<LoginResponse>("/login/", data);
@@ -26,6 +32,18 @@ export const authApi = {
     const res = await http.get("/me/profile", {
       headers: {
         Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return res.data;
+  },
+
+  searchUsers: async (params: UserSearchParams) => {
+    const res = await http.get("/users/", {
+      params: {
+        limit: params.limit ?? 10,
+        offset: params.offset ?? 0,
+        search: params.search ?? "",
       },
     });
 
