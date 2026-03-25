@@ -178,33 +178,12 @@ export default function VidaiLogin() {
         password: password.trim(),
       });
 
-      const profile = await authApi.getProfile(loginRes.token);
-
-      const user = {
-        access: loginRes.token,
-
-        user_id: profile.user_id,
-        username: profile.username,
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        email: profile.email,
-        designation: profile.designation,
-        designation_label: profile.designation_label,
-
-        tenant: profile.tenant,
-        tenant_id: profile.tenant_id,
-
-        is_staff: profile.is_staff,
-        is_superuser: profile.is_superuser,
-
-        language_id: profile.language_id,
-        language_code: profile.language_code,
-        language_name: profile.language_name,
-
-        permissions: profile.permissions || { modules: [] },
-      };
-
-      dispatch(setAuth(user));
+      dispatch(
+        setAuth({
+          access: loginRes.token,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any), // temporary minimal payload
+      );
       localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
 
       navigate("/dashboard", { replace: true });
