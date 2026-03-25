@@ -56,7 +56,7 @@ interface AuthState {
 const initialState: AuthState = {
   user: null,
   token: localStorage.getItem(AUTH_TOKEN_KEY),
-  authed: localStorage.getItem(UI_AUTH_KEY) === "1",
+  authed: !!localStorage.getItem(AUTH_TOKEN_KEY),
 };
 
 const authSlice = createSlice({

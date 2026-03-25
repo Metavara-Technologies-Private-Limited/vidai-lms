@@ -19,30 +19,16 @@ type LoginResponse = {
 export const authApi = {
   login: async (data: LoginPayload) => {
     const res = await http.post<LoginResponse>("/login/", data);
+    return res.data;
+  },
 
-    return {
-      access: res.data.token,
-      user_id: 0,
-      username: res.data.user.username,
-      first_name: res.data.user.first_name,
-      last_name: res.data.user.last_name,
-      email: res.data.user.email,
-      designation: res.data.user.designation,
-
-      // ✅ required extras
-      designation_label: res.data.user.designation,
-      tenant: "",
-      tenant_id: 0,
-      is_staff: false,
-      is_superuser: false,
-      language_id: 1,
-      language_code: "en",
-      language_name: "English",
-
-      // ✅ required permissions structure
-      permissions: {
-        modules: [],
+  getProfile: async (token: string) => {
+    const res = await http.get("/me/profile", {
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-    };
+    });
+
+    return res.data;
   },
 };

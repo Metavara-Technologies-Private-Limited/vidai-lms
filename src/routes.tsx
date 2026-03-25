@@ -2,14 +2,17 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import {
   lazy,
   Suspense,
+  useEffect,
   type ComponentType,
   type LazyExoticComponent,
 } from "react";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
 import { APP_CONDITION, DEMO_ALLOWED_KEYS } from "./config/sidebar.menu";
-import { useSelector } from "react-redux";
-import { selectAuthed } from "./store/authSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { selectAuthed, selectToken, setAuth } from "./store/authSlice";
+import type { AppDispatch } from "./store";
+import { authApi } from "./services/auth.api";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
@@ -25,7 +28,30 @@ function LoadedComponent({ Comp }: LoaderProps) {
 }
 
 export default function AppRoutes() {
+  const dispatch = useDispatch<AppDispatch>();
   const authed = useSelector(selectAuthed);
+  const token = useSelector(selectToken);
+
+  useEffect(() => {
+    const restoreUser = async () => {
+      if (!token) return;
+
+      try {
+        const profile = await authApi.getProfile(token);
+
+        dispatch(
+          setAuth({
+            access: token,
+            ...profile,
+          }),
+        );
+      } catch (err: unknown) {
+        console.error("Failed to restore user", err);
+      }
+    };
+
+    restoreUser();
+  }, [token, authed, dispatch]);
 
   return (
     <Routes>
@@ -69,7 +95,9 @@ export default function AppRoutes() {
         path="/"
         element={
           authed ? (
-            <Suspense fallback={<div style={{ padding: 12 }}>Loading app...</div>}>
+            <Suspense
+              fallback={<div style={{ padding: 12 }}>Loading app...</div>}
+            >
               <MainLayout />
             </Suspense>
           ) : (

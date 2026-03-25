@@ -173,10 +173,36 @@ export default function VidaiLogin() {
     }
 
     try {
-      const user = await authApi.login({
+      const loginRes = await authApi.login({
         username: username.trim(),
         password: password.trim(),
       });
+
+      const profile = await authApi.getProfile(loginRes.token);
+
+      const user = {
+        access: loginRes.token,
+
+        user_id: profile.user_id,
+        username: profile.username,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        designation: profile.designation,
+        designation_label: profile.designation_label,
+
+        tenant: profile.tenant,
+        tenant_id: profile.tenant_id,
+
+        is_staff: profile.is_staff,
+        is_superuser: profile.is_superuser,
+
+        language_id: profile.language_id,
+        language_code: profile.language_code,
+        language_name: profile.language_name,
+
+        permissions: profile.permissions || { modules: [] },
+      };
 
       dispatch(setAuth(user));
       localStorage.setItem(STORAGE_LANGUAGE_KEY, language);

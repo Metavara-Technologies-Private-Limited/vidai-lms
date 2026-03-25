@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { clearAuth, selectToken, selectUser } from "../store/authSlice";
 import type { AppDispatch } from "../store";
+import { authApi } from "../services/auth.api";
 
 interface ProfileData {
   user_id: number;
@@ -38,18 +39,10 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        // ✅ Same pattern as VidaiLogin — uses /stage-api proxy
-        const res = await fetch("/stage-api/api/me/profile", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        if (!res.ok) throw new Error("Failed to fetch profile");
-        const data = await res.json();
+        if (!token) throw new Error("No token");
+        const data = await authApi.getProfile(token);
         setProfile(data);
       } catch {
-        // Fallback to auth store data if API fails
         if (authUser) {
           setProfile(authUser as unknown as ProfileData);
         } else {
@@ -61,7 +54,7 @@ export default function ProfilePage() {
     };
 
     fetchProfile();
-  }, [token, authUser]);
+  }, [authUser, token]);
 
   const handleLogout = () => {
     dispatch(clearAuth());

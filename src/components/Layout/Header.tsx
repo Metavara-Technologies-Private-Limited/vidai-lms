@@ -19,13 +19,14 @@ import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClinic, selectClinic } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
-import { clearAuth } from "../../store/authSlice";
+import { clearAuth, selectUser } from "../../store/authSlice";
 import { fetchCampaign } from "../../store/campaignSlice";
 import { fetchAllTemplates } from "../../store/templateSlice";
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const user = useSelector(selectUser);
   // we intentionally only need the clinic name in the header;
   // other state is loaded by thunks but not read here.
   const clinic = useSelector(selectClinic);
@@ -121,9 +122,12 @@ const Header = () => {
               sx={{ width: 36, height: 36, borderRadius: "10px" }}
             />
             <Box sx={{ display: { xs: "none", sm: "block" } }}>
-              <Typography fontWeight={600}>Kate Russell</Typography>
+              <Typography fontWeight={600}>
+                {user ? `${user.first_name} ${user.last_name}` : "—"}
+              </Typography>
+
               <Typography fontSize={12} color="#6b7280">
-                Receptionist
+                {user?.designation_label || user?.designation || "—"}
               </Typography>
             </Box>
             <IconButton size="small" onClick={handleUserMenuOpen}>
