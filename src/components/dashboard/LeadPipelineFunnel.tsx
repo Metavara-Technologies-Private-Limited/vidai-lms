@@ -110,7 +110,11 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
         <svg width="760" height="380" viewBox="0 0 760 380">
           <defs>
             {/* 3D Shading Gradients */}
+<<<<<<< Updated upstream
             {data.map((_item, index) => (
+=======
+            {data.map((_, index) => (
+>>>>>>> Stashed changes
               <linearGradient key={`grad-${index}`} id={`grad-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" style={{ stopColor: POSITION_COLORS[index], stopOpacity: 1 }} />
                 <stop offset="50%" style={{ stopColor: POSITION_COLORS[index], stopOpacity: 0.85 }} />

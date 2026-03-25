@@ -6,8 +6,6 @@ import {
   IconButton,
   Button,
 } from "@mui/material";
-import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
-import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -153,6 +151,8 @@ const LeadsConversation = React.lazy(() => import("../components/LeadsHub/LeadsC
 const Activity = React.lazy(() => import("../components/LeadsHub/Activity"));
 const FilterDialog = React.lazy(() => import("../components/LeadsHub/FilterDialog"));
 const LeadsFollowUp = React.lazy(() => import("../components/LeadsHub/LeadsFollowUp"));
+const LeadsImportButton = React.lazy(() => import("../components/LeadsHub/LeadsImportButton"));
+const LeadsBulkImportModal = React.lazy(() => import("../components/LeadsHub/LeadsBulkImportModal"));
 
 const Leads: React.FC = () => {
   const navigate = useNavigate();
@@ -197,7 +197,7 @@ const Leads: React.FC = () => {
   const [viewMode, setViewMode] = React.useState<"table" | "board">(loadSavedViewMode());
   const [activeFilters, setActiveFilters] = React.useState<FilterValues>(loadSavedFilters());
   const [counts, setCounts] = React.useState({ all: 0, followUps: 0, archived: 0 });
-  const importInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
   const [importedLeads, setImportedLeads] = React.useState<Lead[]>([]);
   const [isSavingImport, setIsSavingImport] = React.useState(false);
 
@@ -252,7 +252,13 @@ const Leads: React.FC = () => {
     catch (error) { console.error("Failed to save view mode:", error); }
   }, [viewMode]);
 
-  React.useEffect(() => { dispatch(fetchLeads()); }, [dispatch]);
+  const loadInitialLeads = React.useCallback(() => {
+    dispatch(fetchLeads());
+  }, [dispatch]);
+
+  React.useEffect(() => {
+    loadInitialLeads();
+  }, [loadInitialLeads]);
 
   React.useEffect(() => {
     if (leads && leads.length > 0) {
@@ -288,31 +294,10 @@ const Leads: React.FC = () => {
     { label: "Activity", count: null },
   ];
 
-  const visibleLeads = React.useMemo(() => {
-    const filteredLeads = applyFilters(leads);
-    const followUpStatuses = ["new", "lost", "cycle conversion"];
-
-    if (tab === 2) {
-      return filteredLeads.filter((lead) => lead.is_active === false);
-    }
-
-    if (tab === 1) {
-      return filteredLeads.filter((lead) => {
-        const status = (lead.lead_status || lead.status || "").toLowerCase().trim();
-        return lead.is_active !== false && followUpStatuses.includes(status);
-      });
-    }
-
-    return filteredLeads.filter((lead) => lead.is_active !== false);
-  }, [applyFilters, leads, tab]);
-
   const saveImportedRowsToDb = React.useCallback(async (rows: ImportedRow[], headerMatches: HeaderMatch[]) => {
     if (headerMatches.length === 0 || rows.length === 0) {
-      toast.info("Import a file with matched headers first.");
-      return;
+      return { createdLeads: [] as Lead[], failedCount: 0 };
     }
-
-    setIsSavingImport(true);
 
     const clinicId = clinic?.id ?? (Number(localStorage.getItem("clinic_id") || 0) || leads[0]?.clinic_id || 1);
 
@@ -380,192 +365,146 @@ const Leads: React.FC = () => {
       }
     }
 
-    if (createdLeads.length > 0) {
-      setImportedLeads((current) => [...current, ...createdLeads]);
+    return { createdLeads, failedCount };
+  }, [clinic?.id, leads]);
+
+  const importSingleFile = React.useCallback(async (file: File) => {
+    const isExcelFile = /\.(xlsx|xls)$/i.test(file.name);
+    const isCsvFile = /\.csv$/i.test(file.name);
+    if (!isExcelFile && !isCsvFile) {
+      toast.error("Please select a valid file (.xlsx, .xls, or .csv).");
+      return { createdLeads: [] as Lead[], failedCount: 0 };
+    }
+
+    try {
+      let sourceHeaders: string[] = [];
+      let parsedRows: ImportedRow[] = [];
+
+      if (isCsvFile) {
+        const text = await file.text();
+        const lines = text
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+
+        sourceHeaders = (lines[0] ?? "")
+          .split(",")
+          .map((value: string) => value.trim().replace(/^"|"$/g, ""))
+          .filter((value: string) => value.length > 0);
+
+        parsedRows = lines.slice(1).map((line: string, index: number) => {
+          const columns = line
+            .split(",")
+            .map((value: string) => value.trim().replace(/^"|"$/g, ""));
+
+          const values = sourceHeaders.reduce<Record<string, string>>((accumulator, header, headerIndex) => {
+            accumulator[header] = String(columns[headerIndex] ?? "").trim();
+            return accumulator;
+          }, {});
+
+          return {
+            rowNumber: index + 2,
+            values,
+          };
+        });
+      } else {
+        if (/\.xls$/i.test(file.name)) {
+          toast.error("Old .xls files are not supported here. Please use .xlsx or .csv.");
+          return { createdLeads: [] as Lead[], failedCount: 0 };
+        }
+
+        const buffer = await file.arrayBuffer();
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
+          toast.error("No worksheet found in the selected file.");
+          return { createdLeads: [] as Lead[], failedCount: 0 };
+        }
+
+        const firstRow = worksheet.getRow(1);
+        const rowValues = Array.isArray(firstRow.values) ? firstRow.values : [];
+        sourceHeaders = rowValues
+          .slice(1)
+          .map((value: unknown) => String(value ?? "").trim())
+          .filter((value: string) => value.length > 0);
+
+        parsedRows = [];
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+
+          const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+          const rowRecord = sourceHeaders.reduce<Record<string, string>>((accumulator, header, index) => {
+            accumulator[header] = String(values[index] ?? "").trim();
+            return accumulator;
+          }, {});
+
+          const hasData = Object.values(rowRecord).some((value) => value.length > 0);
+          if (hasData) {
+            parsedRows.push({ rowNumber, values: rowRecord });
+          }
+        });
+      }
+
+      const normalizedSourceHeaders = new Map(sourceHeaders.map((header) => [normalizeHeader(header), header]));
+      const matched = IMPORT_FIELD_CONFIGS
+        .map((config) => {
+          const matchedSourceHeader = config.aliases
+            .map((alias) => normalizedSourceHeaders.get(normalizeHeader(alias)))
+            .find((value) => Boolean(value));
+
+          if (!matchedSourceHeader) return null;
+
+          return {
+            tableHeader: config.tableHeader,
+            importedHeader: matchedSourceHeader,
+            payloadKey: config.payloadKey,
+          } satisfies HeaderMatch;
+        })
+        .filter((value): value is HeaderMatch => value !== null);
+
+      if (matched.length > 0) {
+        return await saveImportedRowsToDb(parsedRows, matched);
+      }
+
+      toast.info(`No matching headers found for ${file.name}.`);
+      return { createdLeads: [] as Lead[], failedCount: 0 };
+    } catch {
+      toast.error(`Failed to read imported file: ${file.name}`);
+      return { createdLeads: [] as Lead[], failedCount: 0 };
+    }
+  }, [saveImportedRowsToDb]);
+
+  const handleImportFiles = React.useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setIsSavingImport(true);
+
+    const allCreatedLeads: Lead[] = [];
+    let totalFailed = 0;
+
+    for (const file of files) {
+      const { createdLeads, failedCount } = await importSingleFile(file);
+      allCreatedLeads.push(...createdLeads);
+      totalFailed += failedCount;
+    }
+
+    if (allCreatedLeads.length > 0) {
+      setImportedLeads((current) => [...allCreatedLeads, ...current]);
       await dispatch(fetchLeads());
     }
 
-    if (createdLeads.length > 0 && failedCount === 0) {
-      toast.success(`${createdLeads.length} leads imported and saved to DB.`);
-    } else if (createdLeads.length > 0) {
-      toast.warning(`${createdLeads.length} leads saved, ${failedCount} failed.`);
+    if (allCreatedLeads.length > 0 && totalFailed === 0) {
+      toast.success(`${allCreatedLeads.length} leads imported and saved to DB.`);
+    } else if (allCreatedLeads.length > 0) {
+      toast.warning(`${allCreatedLeads.length} leads saved, ${totalFailed} failed.`);
     } else {
       toast.error("No imported rows could be saved.");
     }
 
     setIsSavingImport(false);
-  }, [clinic?.id, dispatch, leads]);
-
-  const handleExport = () => {
-    if (visibleLeads.length === 0) {
-      toast.info("No leads available to export.");
-      return;
-    }
-
-    const headers = [
-      "Lead ID",
-      "Name",
-      "Phone",
-      "Email",
-      "Status",
-      "Source",
-      "Department",
-      "Assigned To",
-      "Created At",
-    ];
-
-    const escapeCsv = (value: unknown): string => {
-      const text = String(value ?? "");
-      if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
-      return text;
-    };
-
-    const rows = visibleLeads.map((lead) => [
-      lead.id,
-      lead.full_name,
-      lead.contact_no,
-      lead.email || "",
-      lead.lead_status || lead.status || "",
-      lead.source,
-      lead.department_name,
-      lead.assigned_to_name || "",
-      lead.created_at,
-    ]);
-
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => escapeCsv(cell)).join(","))
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    const stamp = new Date().toISOString().slice(0, 10);
-    anchor.href = url;
-    anchor.download = `leads_export_${stamp}.csv`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
-
-    toast.success("Leads exported successfully.");
-  };
-
-  const handleImportClick = () => {
-    importInputRef.current?.click();
-  };
-
-  const handleImportChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const isExcelFile = /\.(xlsx|xls)$/i.test(file.name);
-    const isCsvFile = /\.csv$/i.test(file.name);
-    if (!isExcelFile && !isCsvFile) {
-      toast.error("Please select a valid file (.xlsx, .xls, or .csv).");
-      event.target.value = "";
-      return;
-    }
-
-    void (async () => {
-      try {
-        let sourceHeaders: string[] = [];
-        let parsedRows: ImportedRow[] = [];
-
-        if (isCsvFile) {
-          const text = await file.text();
-          const lines = text
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0);
-
-          sourceHeaders = (lines[0] ?? "")
-            .split(",")
-            .map((value: string) => value.trim().replace(/^"|"$/g, ""))
-            .filter((value: string) => value.length > 0);
-
-          parsedRows = lines.slice(1).map((line: string, index: number) => {
-            const columns = line
-              .split(",")
-              .map((value: string) => value.trim().replace(/^"|"$/g, ""));
-
-            const values = sourceHeaders.reduce<Record<string, string>>((accumulator, header, headerIndex) => {
-              accumulator[header] = String(columns[headerIndex] ?? "").trim();
-              return accumulator;
-            }, {});
-
-            return {
-              rowNumber: index + 2,
-              values,
-            };
-          });
-        } else {
-          if (/\.xls$/i.test(file.name)) {
-            toast.error("Old .xls files are not supported here. Please use .xlsx or .csv.");
-            return;
-          }
-
-          const buffer = await file.arrayBuffer();
-          const workbook = new ExcelJS.Workbook();
-          await workbook.xlsx.load(buffer);
-
-          const worksheet = workbook.worksheets[0];
-          if (!worksheet) {
-            toast.error("No worksheet found in the selected file.");
-            return;
-          }
-
-          const firstRow = worksheet.getRow(1);
-          const rowValues = Array.isArray(firstRow.values) ? firstRow.values : [];
-          sourceHeaders = rowValues
-            .slice(1)
-            .map((value: unknown) => String(value ?? "").trim())
-            .filter((value: string) => value.length > 0);
-
-          parsedRows = [];
-          worksheet.eachRow((row, rowNumber) => {
-            if (rowNumber === 1) return;
-
-            const values = Array.isArray(row.values) ? row.values.slice(1) : [];
-            const rowRecord = sourceHeaders.reduce<Record<string, string>>((accumulator, header, index) => {
-              accumulator[header] = String(values[index] ?? "").trim();
-              return accumulator;
-            }, {});
-
-            const hasData = Object.values(rowRecord).some((value) => value.length > 0);
-            if (hasData) {
-              parsedRows.push({ rowNumber, values: rowRecord });
-            }
-          });
-        }
-
-        const normalizedSourceHeaders = new Map(sourceHeaders.map((header) => [normalizeHeader(header), header]));
-        const matched = IMPORT_FIELD_CONFIGS
-          .map((config) => {
-            const matchedSourceHeader = config.aliases
-              .map((alias) => normalizedSourceHeaders.get(normalizeHeader(alias)))
-              .find((value) => Boolean(value));
-
-            if (!matchedSourceHeader) return null;
-
-            return {
-              tableHeader: config.tableHeader,
-              importedHeader: matchedSourceHeader,
-              payloadKey: config.payloadKey,
-            } satisfies HeaderMatch;
-          })
-          .filter((value): value is HeaderMatch => value !== null);
-
-        if (matched.length > 0) {
-          await saveImportedRowsToDb(parsedRows, matched);
-        } else {
-          toast.info("No matching headers found with Leads table.");
-        }
-      } catch {
-        toast.error("Failed to read imported file.");
-      }
-    })();
-
-    event.target.value = "";
-  };
+  }, [dispatch, importSingleFile]);
 
   return (
     <Box className="leads-page">
@@ -582,14 +521,6 @@ const Leads: React.FC = () => {
         </Typography>
 
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flexShrink: 0, flexWrap: "nowrap" }}>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            style={{ display: "none" }}
-            onChange={handleImportChange}
-          />
-
           {/* Search */}
           <Box
             sx={{
@@ -688,6 +619,10 @@ const Leads: React.FC = () => {
             )}
           </Box>
 
+          <React.Suspense fallback={null}>
+            <LeadsImportButton onClick={() => setIsImportModalOpen(true)} disabled={isSavingImport} />
+          </React.Suspense>
+
           {/* Add New Lead */}
           <Button className="add-lead-btn" onClick={() => navigate("/leads/add")} sx={{ flexShrink: 0 }}>
             + Add New Lead
@@ -696,53 +631,13 @@ const Leads: React.FC = () => {
       </Stack>
 
       {/* PILL TABS */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3, gap: 1.5 }}>
-        <Stack direction="row" spacing={1} className="pill-tabs" sx={{ mb: 0 }}>
-          {tabs.map((t, i) => (
-            <Box key={i} className={`pill-tab ${tab === i ? "active" : ""}`} onClick={() => setTab(i)}>
-              {t.label}
-              {t.count !== null && <span className="tab-count">({t.count})</span>}
-            </Box>
-          ))}
-        </Stack>
-
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="contained"
-            startIcon={<FileDownloadOutlinedIcon />}
-            onClick={handleImportClick}
-            disabled={isSavingImport}
-            sx={{
-              flexShrink: 0,
-              textTransform: "none",
-              borderRadius: "10px",
-              bgcolor: "#1F2937",
-              color: "#FFFFFF",
-              height: 36,
-              "&:hover": { bgcolor: "#111827" },
-              "&:disabled": { bgcolor: "#9CA3AF", color: "#FFFFFF" },
-            }}
-          >
-            {isSavingImport ? "Importing..." : "Import"}
-          </Button>
-
-          <Button
-            variant="contained"
-            startIcon={<FileUploadOutlinedIcon />}
-            onClick={handleExport}
-            sx={{
-              flexShrink: 0,
-              textTransform: "none",
-              borderRadius: "10px",
-              bgcolor: "#1F2937",
-              color: "#FFFFFF",
-              height: 36,
-              "&:hover": { bgcolor: "#111827" },
-            }}
-          >
-            Export
-          </Button>
-        </Stack>
+      <Stack direction="row" spacing={1} className="pill-tabs" sx={{ mb: 3 }}>
+        {tabs.map((t, i) => (
+          <Box key={i} className={`pill-tab ${tab === i ? "active" : ""}`} onClick={() => setTab(i)}>
+            {t.label}
+            {t.count !== null && <span className="tab-count">({t.count})</span>}
+          </Box>
+        ))}
       </Stack>
 
       {/* CONTENT */}
@@ -769,6 +664,15 @@ const Leads: React.FC = () => {
           <FilterDialog open={filterOpen} onClose={() => setFilterOpen(false)} onApplyFilters={handleApplyFilters} />
         </React.Suspense>
       )}
+
+      <React.Suspense fallback={null}>
+        <LeadsBulkImportModal
+          open={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={handleImportFiles}
+          importing={isSavingImport}
+        />
+      </React.Suspense>
     </Box>
   );
 };

@@ -4,7 +4,10 @@ export type Status =
   | "Follow-Ups"
   | "Converted"
   | "Lost"
-  | "Cycle Conversion";
+  | "Cycle Conversion"
+  | "Negotiation"
+  | "Proposal Sent"
+  | "Contract Signed";
 
 export type Quality = "Hot" | "Warm" | "Cold";
 

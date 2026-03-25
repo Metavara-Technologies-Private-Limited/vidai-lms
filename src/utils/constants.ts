@@ -4,6 +4,9 @@ export const LEAD_STATUS = {
   FOLLOW_UPS: "Follow-Ups",
   CONVERTED: "Converted",
   CYCLE_CONVERSION: "Cycle Conversion",
+  NEGOTIATION: "Negotiation",
+  PROPOSAL_SENT: "Proposal Sent",
+  CONTRACT_SIGNED: "Contract Signed",
   LOST: "Lost",
 } as const;
 

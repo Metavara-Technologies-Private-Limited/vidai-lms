@@ -74,7 +74,7 @@ const KpiCards = () => {
   const [showRightArrow, setShowRightArrow] = useState(false);
 
   // ── Live counts derived from Redux store ──
-  const counts: LiveKpiCounts = useMemo(() => {
+  const counts: LiveKpiCounts & { registered: number; treatment: number } = useMemo(() => {
     const followUpStatuses = new Set(["new", "lost", "cycle-conversion"]);
 
     if (!leads || leads.length === 0) {
@@ -84,6 +84,9 @@ const KpiCards = () => {
         appointments: 0,
         followUps: 0,
         totalConverted: 0,
+        negotiation: 0,
+        proposalSent: 0,
+        contractSigned: 0,
         lostLeads: 0,
         registered: 0,
         treatment: 0,
@@ -123,6 +126,9 @@ const KpiCards = () => {
       appointments,
       followUps,
       totalConverted: converted + cycleConversion,
+      negotiation: cycleConversion,
+      proposalSent: 0,
+      contractSigned: 0,
       lostLeads,
       registered: converted,
       treatment: cycleConversion,
