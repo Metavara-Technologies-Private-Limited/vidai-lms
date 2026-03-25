@@ -33,33 +33,14 @@ export default defineConfig({
       ],
     },
     // ── API Proxy ──────────────────────────────────────────────────────────
+    // All requests to /api/* are forwarded to Django (localhost:8000)
+    // This means you NEVER need to update a URL when Cloudflare tunnel changes.
+    // Your axios calls stay as:  axios.get("/api/mail-insights/get/")
     proxy: {
-      // ✅ /stage-api → preview-api.vidaisolutions.com
-      // Used by: VidaiLogin → /stage-api/api/login/
-      //          ProfilePage → /stage-api/api/me/profile
-      "/stage-api": {
-        target: "https://99999.preview-api.vidaisolutions.com",  // ✅ correct URL
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/stage-api/, ""),
-        configure: (proxy) => {
-          proxy.on("error", (err) => {
-            console.error("[proxy /stage-api error]", err.message);
-          });
-        },
-      },
-
-      // ✅ /api → preview-api.vidaisolutions.com (demo mode — Django not running)
-      // Switch target back to "http://localhost:8000" when Django is running locally.
       "/api": {
-        target: "https://99999.preview-api.vidaisolutions.com",  // ✅ correct URL
+        target: "http://localhost:8000",
         changeOrigin: true,
         secure: false,
-        configure: (proxy) => {
-          proxy.on("error", (err) => {
-            console.error("[proxy /api error]", err.message);
-          });
-        },
       },
     },
   },
