@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 
 import { SHOW_ICONS, SIDEBAR_TABS } from "../../config/sidebar.tabs";
+import { APP_CONDITION, DEMO_ALLOWED_KEYS } from "../../config/sidebar.menu";
 import ClinicLogoLMS from "../../assets/icons/Clinic-Logo-LMS.svg";
 import VidaiLogo from "../../assets/icons/Vidai-logo.svg";
 import DashboardCardBg from "../../assets/icons/dashboard_card_bg.svg";
@@ -23,7 +24,13 @@ export default function Sidebar() {
   const [activeTab, setActiveTab] = useState(0);
   const showSettingsMenu = location.pathname.startsWith("/settings");
 
-  const tab = SIDEBAR_TABS[activeTab];
+  // ✅ In demo mode, only show the "leads" tab (which contains dashboard/leads/settings)
+  const visibleTabs =
+    APP_CONDITION === "demo"
+      ? SIDEBAR_TABS.filter((t) => t.key === "leads")
+      : SIDEBAR_TABS;
+
+  const tab = visibleTabs[activeTab] ?? visibleTabs[0];
 
   return (
     <Drawer
@@ -47,13 +54,13 @@ export default function Sidebar() {
         />
       </Box>
 
-      {/* TOP ICON ROW */}
+      {/* TOP ICON ROW — hidden in demo since only 1 tab */}
       <Box
         sx={{
           position: "relative",
           height: 56,
           mx: 1,
-          display: SHOW_ICONS ? "flex" : "none",
+          display: SHOW_ICONS && APP_CONDITION !== "demo" ? "flex" : "none",
         }}
       >
         <Box
@@ -68,7 +75,7 @@ export default function Sidebar() {
         />
 
         <Box className={styles.iconrowbox}>
-          {SIDEBAR_TABS.map((t, idx) => {
+          {visibleTabs.map((t, idx) => {
             const size = 35 * t.icon.baseScale;
             return (
               <Box key={t.key}>
@@ -96,6 +103,14 @@ export default function Sidebar() {
 
           <List>
             {tab.menu.map((item) => {
+              // ✅ In demo mode, skip items not in allowed list
+              if (
+                APP_CONDITION === "demo" &&
+                !DEMO_ALLOWED_KEYS.includes(item.key)
+              ) {
+                return null;
+              }
+
               const isSettings = item.key === "settings";
               const isActive =
                 location.pathname.startsWith(item.path) ||

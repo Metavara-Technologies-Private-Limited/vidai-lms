@@ -7,13 +7,13 @@ import {
 } from "react";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
+import { APP_CONDITION, DEMO_ALLOWED_KEYS } from "./config/sidebar.menu";
 import { useSelector } from "react-redux";
 import { selectAuthed } from "./store/authSlice";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
 const VidaiLogin = lazy(() => import("./pages/VidaiLogin"));
-// ✅ No ProfilePage import here — handled via EXTRA_ROUTES
 
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
@@ -28,63 +28,69 @@ export default function AppRoutes() {
   const authed = useSelector(selectAuthed);
 
   return (
-    <>
-      <Routes>
-        <Route
-          path="/login"
-          element={
-            authed ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <LoadedComponent Comp={VidaiLogin} />
-            )
-          }
-        />
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          authed ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <LoadedComponent Comp={VidaiLogin} />
+          )
+        }
+      />
 
-        <Route
-          path="/review/:requestId/:leadId"
-          element={<LoadedComponent Comp={ReviewFormPage} />}
-        />
-        <Route
-          path="/review/:requestId/:leadId/:channel"
-          element={<LoadedComponent Comp={ReviewFormPage} />}
-        />
-        <Route
-          path="/review/*"
-          element={<LoadedComponent Comp={ReviewFormPage} />}
-        />
-        <Route
-          path="/settings/integration/review/:requestId/:leadId"
-          element={<LoadedComponent Comp={ReviewFormPage} />}
-        />
-        <Route
-          path="/settings/integration/review/:requestId/:leadId/:channel"
-          element={<LoadedComponent Comp={ReviewFormPage} />}
-        />
-        <Route
-          path="/settings/integration/review/*"
-          element={<LoadedComponent Comp={ReviewFormPage} />}
-        />
+      <Route
+        path="/review/:requestId/:leadId"
+        element={<LoadedComponent Comp={ReviewFormPage} />}
+      />
+      <Route
+        path="/review/:requestId/:leadId/:channel"
+        element={<LoadedComponent Comp={ReviewFormPage} />}
+      />
+      <Route
+        path="/review/*"
+        element={<LoadedComponent Comp={ReviewFormPage} />}
+      />
+      <Route
+        path="/settings/integration/review/:requestId/:leadId"
+        element={<LoadedComponent Comp={ReviewFormPage} />}
+      />
+      <Route
+        path="/settings/integration/review/:requestId/:leadId/:channel"
+        element={<LoadedComponent Comp={ReviewFormPage} />}
+      />
+      <Route
+        path="/settings/integration/review/*"
+        element={<LoadedComponent Comp={ReviewFormPage} />}
+      />
 
-        <Route
-          path="/"
-          element={
-            authed ? (
-              <Suspense
-                fallback={<div style={{ padding: 12 }}>Loading app...</div>}
-              >
-                <MainLayout />
-              </Suspense>
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+      <Route
+        path="/"
+        element={
+          authed ? (
+            <Suspense fallback={<div style={{ padding: 12 }}>Loading app...</div>}>
+              <MainLayout />
+            </Suspense>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      >
+        <Route index element={<Navigate to="/dashboard" replace />} />
 
-          {/* Sidebar routes */}
-          {SIDEBAR_TABS.flatMap((tab) =>
-            tab.menu.flatMap((item) => [
+        {/* ✅ Sidebar routes — filtered by demo condition */}
+        {SIDEBAR_TABS.flatMap((tab) =>
+          tab.menu.flatMap((item) => {
+            // In demo mode, skip routes not in allowed list
+            if (
+              APP_CONDITION === "demo" &&
+              !DEMO_ALLOWED_KEYS.includes(item.key)
+            ) {
+              return [];
+            }
+
+            return [
               item.page && (
                 <Route
                   key={item.key}
@@ -101,21 +107,21 @@ export default function AppRoutes() {
                   />
                 ) : null,
               ),
-            ]),
-          )}
+            ];
+          }),
+        )}
 
-          {/* Extra routes — profile is registered here */}
-          {EXTRA_ROUTES.map((route) => (
-            <Route
-              key={route.key}
-              path={route.path}
-              element={<LoadedComponent Comp={route.page} />}
-            />
-          ))}
+        {/* Extra routes — always available */}
+        {EXTRA_ROUTES.map((route) => (
+          <Route
+            key={route.key}
+            path={route.path}
+            element={<LoadedComponent Comp={route.page} />}
+          />
+        ))}
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-      </Routes>
-    </>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+    </Routes>
   );
 }
