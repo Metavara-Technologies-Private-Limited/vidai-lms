@@ -370,8 +370,8 @@ export default function AddNewLead() {
 
   // ── Step indicator config ────────────────────────────────────────
   const steps = [
-    { label: "Patient Details", step: 1 },
-    { label: "Medical Details", step: 2 },
+    { label: "Lead Details", step: 1 },
+    { label: "Product Details", step: 2 },
     { label: "Book Appointment", step: 3 },
   ];
 

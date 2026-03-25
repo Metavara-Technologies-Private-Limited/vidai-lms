@@ -308,10 +308,10 @@ export function Step2({
   return (
     <Box>
       <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
-        TREATMENT INFORMATION
+        PRODUCT INFORMATION
       </Typography>
       <Box sx={{ mb: 3 }}>
-        <Typography sx={labelStyle}>Treatment Interest</Typography>
+        <Typography sx={labelStyle}>Product Interest</Typography>
         <TextField
           select fullWidth size="small" value={form.treatmentInterest}
           onChange={(e) => {
@@ -326,10 +326,9 @@ export function Step2({
           SelectProps={{ displayEmpty: true }}
         >
           <MenuItem value="" disabled>Select</MenuItem>
-          <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
-          <MenuItem value="IVF">IVF</MenuItem>
-          <MenuItem value="IUI">IUI</MenuItem>
-          <MenuItem value="Consultation">Consultation</MenuItem>
+          <MenuItem value="PGT-A">PGT-A</MenuItem>
+          <MenuItem value="PGT-M">PGT-M</MenuItem>
+          <MenuItem value="PGT-SR">PGT-SR</MenuItem>
         </TextField>
       </Box>
 

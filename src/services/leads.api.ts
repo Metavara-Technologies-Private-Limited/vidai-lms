@@ -69,7 +69,7 @@ export type Lead = {
   appointment_date: string;
   slot: string;
   remark?: string;
-  documents?: LeadDocument[]; // ← FIXED: was string[], now object[]
+  documents?: LeadDocument[];
   is_active: boolean;
   created_at: string;
   modified_at: string;
@@ -116,6 +116,9 @@ export type LeadEmailPayload = {
   sender_email?: string | null;
   scheduled_at?: string | null;
   send_now?: boolean;
+  cc?: string[];           // ← FIXED: added for CC recipients
+  bcc?: string[];          // ← FIXED: added for BCC recipients
+  additional_to?: string[]; // ← FIXED: added for extra To recipients
 };
 
 export type LeadEmailStatus =
