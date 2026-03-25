@@ -13,10 +13,7 @@ import { selectAuthed } from "./store/authSlice";
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
 const VidaiLogin = lazy(() => import("./pages/VidaiLogin"));
-
-// const UI_AUTH_KEY = "vidai_ui_logged_in";
-
-// const isAuthenticated = () => localStorage.getItem(UI_AUTH_KEY) === "1";
+// ✅ No ProfilePage import here — handled via EXTRA_ROUTES
 
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
@@ -95,7 +92,6 @@ export default function AppRoutes() {
                   element={<LoadedComponent Comp={item.page} />}
                 />
               ),
-              // {/* Sidebar sub menu routes */}
               item.subMenu?.map((sub) =>
                 sub.page ? (
                   <Route
@@ -108,7 +104,7 @@ export default function AppRoutes() {
             ]),
           )}
 
-          {/* Extra routes */}
+          {/* Extra routes — profile is registered here */}
           {EXTRA_ROUTES.map((route) => (
             <Route
               key={route.key}
