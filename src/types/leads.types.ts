@@ -29,6 +29,12 @@ export type Lead = {
   taskStatus: TaskStatus;
   activity: string;
   archived?: boolean;
+  // Contracts-only contact fields
+  contactFullName?: string;
+  designation?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  leadGeneratedBy?: string;
 };
 
 /* ================= ACTIVITY ================= */
@@ -67,6 +73,13 @@ export type FormState = {
   marital: string;
   address: string;
   language: string;
+
+  // Contracts-only contact fields (for AddNewLead form state)
+  contactFullName: string;
+  designation: string;
+  contactPhone: string;
+  contactEmail: string;
+  leadGeneratedBy: string;
 
   partnerName: string;
   partnerAge: string;

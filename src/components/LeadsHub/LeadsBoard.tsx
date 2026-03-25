@@ -32,7 +32,6 @@ import {
   type LeadItem,
   type RawLead,
   type AppointmentState,
-  BOARD_COLUMNS,
   mapRawToLeadItem,
 } from "./Leadsboardtypes";
 import { BookAppointmentModal } from "./Leadsboardmodals";
@@ -75,13 +74,19 @@ import FormatColorTextOutlinedIcon from "@mui/icons-material/FormatColorTextOutl
 import BrushOutlinedIcon from "@mui/icons-material/BrushOutlined";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 
+import {
+  APP_TYPE,
+  IS_MEDICAL_APP,
+  STATUS_OPTIONS_BY_APP,
+} from "../../config/appType";
+
 // ====================== Props ======================
 interface Props {
   search: string;
   filters?: FilterValues;
 }
 
-// ====================== Phone normalizer (same as LeadsTable) ======================
+// ====================== Phone normalizer ======================
 const normalizePhone = (phone: string | undefined): string => {
   if (!phone) return "";
   const cleaned = phone.replace(/\s+/g, "").replace(/-/g, "");
@@ -117,6 +122,28 @@ const emptyAppointment = (): AppointmentState => ({
   success: false,
 });
 
+// ====================== Board columns built from appType config ======================
+const BOARD_COLUMNS = STATUS_OPTIONS_BY_APP[APP_TYPE].map((status) => ({
+  label: status,
+  statusKey: [status.toLowerCase()],
+  color:
+    status === "New"
+      ? "#F97316"
+      : status === "Appointment"
+        ? "#3B82F6"
+        : status === "Follow Up"
+          ? "#8B5CF6"
+          : status === "Negotiation"
+            ? "#F59E0B"
+            : status === "Proposal Sent"
+              ? "#06B6D4"
+              : status === "Contract Signed"
+                ? "#10B981"
+                : status === "Converted Lead"
+                  ? "#22C55E"
+                  : "#EF4444",
+}));
+
 // ====================== SMS Template type ======================
 interface SMSTemplate {
   id: string;
@@ -125,7 +152,7 @@ interface SMSTemplate {
   use_case?: string;
 }
 
-// ====================== Use Case options (exact same as LeadsTable) ======================
+// ====================== Use Case options ======================
 const USE_CASE_OPTIONS = [
   "Appointment",
   "Feedback",
@@ -139,13 +166,13 @@ const USE_CASE_OPTIONS = [
 const getUseCaseChipSx = (useCase: string | undefined) => {
   const lower = (useCase || "").toLowerCase();
   const map: Record<string, { color: string; bg: string }> = {
-    appointment: { color: "#16A34A", bg: "#F0FDF4" },
-    reminder: { color: "#D97706", bg: "#FFFBEB" },
-    feedback: { color: "#3B82F6", bg: "#EFF6FF" },
-    "follow-up": { color: "#8B5CF6", bg: "#F5F3FF" },
+    appointment:     { color: "#16A34A", bg: "#F0FDF4" },
+    reminder:        { color: "#D97706", bg: "#FFFBEB" },
+    feedback:        { color: "#3B82F6", bg: "#EFF6FF" },
+    "follow-up":     { color: "#8B5CF6", bg: "#F5F3FF" },
     "re-engagement": { color: "#EC4899", bg: "#FDF2F8" },
-    "no-show": { color: "#EF4444", bg: "#FEF2F2" },
-    general: { color: "#6B7280", bg: "#F3F4F6" },
+    "no-show":       { color: "#EF4444", bg: "#FEF2F2" },
+    general:         { color: "#6B7280", bg: "#F3F4F6" },
   };
   const s = map[lower] ?? { color: "#6B7280", bg: "#F3F4F6" };
   return {
@@ -155,16 +182,16 @@ const getUseCaseChipSx = (useCase: string | undefined) => {
 };
 
 const USE_CASE_BODY_SUGGESTIONS: Record<string, string> = {
-  Appointment: "Hi {lead_first_name}, your appointment at {clinic_name} is on {appointment_date} at {appointment_time}. Reply YES to confirm.",
-  Feedback: "Hi {lead_first_name}, we'd love to hear about your experience at {clinic_name}. Please share your feedback: {feedback_link}",
-  Reminder: "Hi {lead_first_name}, this is a reminder for your appointment on {appointment_date} at {appointment_time} at {clinic_name}.",
-  "Follow-Up": "Hi {lead_first_name}, thank you for visiting {clinic_name}. How are you feeling? Reply to this message if you need any assistance.",
+  Appointment:     "Hi {lead_first_name}, your appointment at {clinic_name} is on {appointment_date} at {appointment_time}. Reply YES to confirm.",
+  Feedback:        "Hi {lead_first_name}, we'd love to hear about your experience at {clinic_name}. Please share your feedback: {feedback_link}",
+  Reminder:        "Hi {lead_first_name}, this is a reminder for your appointment on {appointment_date} at {appointment_time} at {clinic_name}.",
+  "Follow-Up":     "Hi {lead_first_name}, thank you for visiting {clinic_name}. How are you feeling? Reply to this message if you need any assistance.",
   "Re-engagement": "Hi {lead_first_name}, we miss you at {clinic_name}! It's been a while. Would you like to schedule a visit? Reply YES to book.",
-  "No-Show": "Hi {lead_first_name}, we noticed you missed your appointment at {clinic_name}. Would you like to reschedule? Reply to this message.",
-  General: "Hi {lead_first_name}, ",
+  "No-Show":       "Hi {lead_first_name}, we noticed you missed your appointment at {clinic_name}. Would you like to reschedule? Reply to this message.",
+  General:         "Hi {lead_first_name}, ",
 };
 
-// ====================== New SMS Template Dialog (exact copy from LeadsTable) ======================
+// ====================== New SMS Template Dialog ======================
 interface NewSMSTemplateDialogProps {
   open: boolean;
   onClose: () => void;
@@ -174,17 +201,19 @@ interface NewSMSTemplateDialogProps {
 type TemplateFormView = "form" | "preview";
 
 const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open, onClose, onSaved }) => {
-  const [view, setView] = React.useState<TemplateFormView>("form");
-  const [name, setName] = React.useState("");
-  const [useCase, setUseCase] = React.useState("");
-  const [body, setBody] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [view, setView]                     = React.useState<TemplateFormView>("form");
+  const [name, setName]                     = React.useState("");
+  const [useCase, setUseCase]               = React.useState("");
+  const [body, setBody]                     = React.useState("");
+  const [saving, setSaving]                 = React.useState(false);
+  const [error, setError]                   = React.useState<string | null>(null);
   const [dropdownAnchor, setDropdownAnchor] = React.useState<null | HTMLElement>(null);
   const dropdownOpen = Boolean(dropdownAnchor);
 
   React.useEffect(() => {
-    if (!open) { setView("form"); setName(""); setUseCase(""); setBody(""); setError(null); setDropdownAnchor(null); }
+    if (!open) {
+      setView("form"); setName(""); setUseCase(""); setBody(""); setError(null); setDropdownAnchor(null);
+    }
   }, [open]);
 
   const handleSelectUseCase = (uc: string) => {
@@ -205,7 +234,11 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open, onClo
     if (!body.trim()) { setError("Body is required."); return; }
     setSaving(true); setError(null);
     try {
-      const payload = { clinic: 1, name: name.trim(), use_case: useCase.toLowerCase() || "general", body: body.trim(), created_by: 1, is_active: true };
+      const payload = {
+        clinic: 1, name: name.trim(),
+        use_case: useCase.toLowerCase() || "general",
+        body: body.trim(), created_by: 1, is_active: true,
+      };
       let saved: SMSTemplate | null = null;
       try {
         saved = await TemplateService.createTemplate("sms", payload);
@@ -216,11 +249,21 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open, onClo
       onClose();
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to save template."));
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const outlineBtn = { height: 40, px: 3, textTransform: "none" as const, fontWeight: 500, borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "transparent", "&:hover": { bgcolor: "#F9FAFB" } };
-  const darkBtn = { height: 40, px: 3, textTransform: "none" as const, fontWeight: 600, borderRadius: "8px", bgcolor: "#1F2937", color: "white", "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } };
+  const outlineBtn = {
+    height: 40, px: 3, textTransform: "none" as const, fontWeight: 500, borderRadius: "8px",
+    border: "1px solid #D1D5DB", color: "#374151", bgcolor: "transparent",
+    "&:hover": { bgcolor: "#F9FAFB" },
+  };
+  const darkBtn = {
+    height: 40, px: 3, textTransform: "none" as const, fontWeight: 600, borderRadius: "8px",
+    bgcolor: "#1F2937", color: "white",
+    "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" },
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1500 }}>
@@ -232,17 +275,42 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open, onClo
           </DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
             <Stack spacing={2}>
-              <TextField label="Name" value={name} onChange={(e) => { setName(e.target.value); setError(null); }} placeholder="e.g. Appointment Confirmation" fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
+              <TextField
+                label="Name" value={name}
+                onChange={(e) => { setName(e.target.value); setError(null); }}
+                placeholder="e.g. Appointment Confirmation" fullWidth size="small"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
+              />
               <Box>
                 <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>Use Case</Typography>
-                <Box onClick={(e) => setDropdownAnchor(e.currentTarget)}
-                  sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid", borderColor: dropdownOpen ? "#1976d2" : "#D1D5DB", borderRadius: "8px", px: 1.5, cursor: "pointer", minHeight: 40, bgcolor: "#fff", boxShadow: dropdownOpen ? "0 0 0 2px rgba(25,118,210,0.15)" : "none", "&:hover": { borderColor: "#9CA3AF" }, transition: "all 0.15s" }}>
-                  {useCase ? <Chip label={useCase} size="small" sx={getUseCaseChipSx(useCase)} /> : <Typography fontSize="14px" color="#9CA3AF" sx={{ py: 1 }}>Select use case</Typography>}
+                <Box
+                  onClick={(e) => setDropdownAnchor(e.currentTarget)}
+                  sx={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    border: "1px solid", borderColor: dropdownOpen ? "#1976d2" : "#D1D5DB",
+                    borderRadius: "8px", px: 1.5, cursor: "pointer", minHeight: 40, bgcolor: "#fff",
+                    boxShadow: dropdownOpen ? "0 0 0 2px rgba(25,118,210,0.15)" : "none",
+                    "&:hover": { borderColor: "#9CA3AF" }, transition: "all 0.15s",
+                  }}
+                >
+                  {useCase
+                    ? <Chip label={useCase} size="small" sx={getUseCaseChipSx(useCase)} />
+                    : <Typography fontSize="14px" color="#9CA3AF" sx={{ py: 1 }}>Select use case</Typography>}
                   <Typography sx={{ fontSize: "12px", color: "#6B7280", ml: 1, transform: dropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", userSelect: "none" }}>▼</Typography>
                 </Box>
-                <Menu anchorEl={dropdownAnchor} open={dropdownOpen} onClose={() => setDropdownAnchor(null)} anchorOrigin={{ vertical: "bottom", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }} disablePortal={false} PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", mt: 0.5, minWidth: 240 } }} sx={{ zIndex: 99999 }}>
+                <Menu
+                  anchorEl={dropdownAnchor} open={dropdownOpen} onClose={() => setDropdownAnchor(null)}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                  transformOrigin={{ vertical: "top", horizontal: "left" }}
+                  disablePortal={false}
+                  PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", mt: 0.5, minWidth: 240 } }}
+                  sx={{ zIndex: 99999 }}
+                >
                   {USE_CASE_OPTIONS.map((uc) => (
-                    <MenuItem key={uc} selected={useCase === uc} onClick={() => handleSelectUseCase(uc)} sx={{ py: 1, px: 1.5, "&.Mui-selected": { bgcolor: "#F1F5F9" }, "&:hover": { bgcolor: "#F8FAFC" } }}>
+                    <MenuItem
+                      key={uc} selected={useCase === uc} onClick={() => handleSelectUseCase(uc)}
+                      sx={{ py: 1, px: 1.5, "&.Mui-selected": { bgcolor: "#F1F5F9" }, "&:hover": { bgcolor: "#F8FAFC" } }}
+                    >
                       <Chip label={uc} size="small" sx={getUseCaseChipSx(uc)} />
                     </MenuItem>
                   ))}
@@ -250,10 +318,15 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open, onClo
               </Box>
               <Box>
                 <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>Body</Typography>
-                <textarea value={body} onChange={(e) => { setBody(e.target.value); setError(null); }} placeholder="Type your message here..." maxLength={1600} rows={6}
+                <textarea
+                  value={body}
+                  onChange={(e) => { setBody(e.target.value); setError(null); }}
+                  placeholder="Type your message here..."
+                  maxLength={1600} rows={6}
                   style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: "14px", fontFamily: "inherit", color: "#1E293B", lineHeight: "1.6", border: "1px solid #D1D5DB", borderRadius: "8px", resize: "vertical", outline: "none", transition: "border-color 0.15s, box-shadow 0.15s", background: "#fff" }}
                   onFocus={(e) => { e.target.style.borderColor = "#1976d2"; e.target.style.boxShadow = "0 0 0 2px rgba(25,118,210,0.15)"; }}
-                  onBlur={(e) => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }} />
+                  onBlur={(e)  => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }}
+                />
                 <Typography fontSize="11px" color="#94A3B8" mt={0.5}>{body.length}/1600 — Use {"{variable_name}"} for dynamic fields</Typography>
               </Box>
               {error && <MuiAlert severity="error" sx={{ borderRadius: "8px", py: 0.5 }}>{error}</MuiAlert>}
@@ -262,7 +335,9 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open, onClo
           <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
             <Button onClick={onClose} sx={outlineBtn}>Cancel</Button>
             <Button onClick={handlePreview} sx={outlineBtn}>Preview</Button>
-            <Button onClick={handleSave} disabled={saving || !name.trim() || !body.trim()} sx={darkBtn}>{saving ? "Saving..." : "Save"}</Button>
+            <Button onClick={handleSave} disabled={saving || !name.trim() || !body.trim()} sx={darkBtn}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
           </DialogActions>
         </>
       )}
@@ -282,7 +357,9 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open, onClo
               <Box sx={{ alignSelf: "flex-start", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "0px 12px 12px 12px", px: 2, py: 1.25, maxWidth: "90%", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
                 <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
                   {body.split(/(\{[^}]+\})/g).map((part, i) =>
-                    /^\{[^}]+\}$/.test(part) ? <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 600 }}>{part}</Box> : part
+                    /^\{[^}]+\}$/.test(part)
+                      ? <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 600 }}>{part}</Box>
+                      : part
                   )}
                 </Typography>
               </Box>
@@ -301,7 +378,7 @@ const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open, onClo
   );
 };
 
-// ====================== SMS Template Picker (exact copy from LeadsTable) ======================
+// ====================== SMS Template Picker ======================
 interface SMSTemplatePickerProps {
   open: boolean;
   onClose: () => void;
@@ -309,11 +386,11 @@ interface SMSTemplatePickerProps {
 }
 
 const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, onSelect }) => {
-  const [templates, setTemplates] = React.useState<SMSTemplate[]>([]);
-  const [loadingTpl, setLoadingTpl] = React.useState(false);
-  const [view, setView] = React.useState<"list" | "preview">("list");
-  const [selected, setSelected] = React.useState<SMSTemplate | null>(null);
-  const [previewBody, setPreviewBody] = React.useState("");
+  const [templates, setTemplates]           = React.useState<SMSTemplate[]>([]);
+  const [loadingTpl, setLoadingTpl]         = React.useState(false);
+  const [view, setView]                     = React.useState<"list" | "preview">("list");
+  const [selected, setSelected]             = React.useState<SMSTemplate | null>(null);
+  const [previewBody, setPreviewBody]       = React.useState("");
   const [newTemplateOpen, setNewTemplateOpen] = React.useState(false);
 
   const loadTemplates = React.useCallback(() => {
@@ -331,9 +408,7 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, on
   }, [open, loadTemplates]);
 
   const handlePickTemplate = (tpl: SMSTemplate) => { setSelected(tpl); setPreviewBody(tpl.body); setView("preview"); };
-
   const handleSave = () => { onSelect(previewBody); onClose(); };
-
   const handleNewTemplateSaved = (tpl: SMSTemplate) => {
     setNewTemplateOpen(false);
     onSelect(tpl.body);
@@ -344,7 +419,6 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, on
   return (
     <>
       <NewSMSTemplateDialog open={newTemplateOpen} onClose={() => setNewTemplateOpen(false)} onSaved={handleNewTemplateSaved} />
-
       <Dialog open={open && !newTemplateOpen} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1300 }}>
         {view === "list" && (
           <>
@@ -364,8 +438,17 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, on
                       <ListItem disablePadding>
                         <ListItemButton onClick={() => handlePickTemplate(tpl)} sx={{ borderRadius: "8px", px: 1.5, py: 1.25, "&:hover": { bgcolor: "#F8FAFC" } }}>
                           <ListItemText
-                            primary={<Stack direction="row" spacing={1} alignItems="center"><Typography fontSize="14px" fontWeight={600} color="#1E293B">{tpl.name}</Typography>{tpl.use_case && <Chip label={tpl.use_case} size="small" sx={getUseCaseChipSx(tpl.use_case)} />}</Stack>}
-                            secondary={<Typography fontSize="12px" color="#64748B" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{tpl.body}</Typography>}
+                            primary={
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography fontSize="14px" fontWeight={600} color="#1E293B">{tpl.name}</Typography>
+                                {tpl.use_case && <Chip label={tpl.use_case} size="small" sx={getUseCaseChipSx(tpl.use_case)} />}
+                              </Stack>
+                            }
+                            secondary={
+                              <Typography fontSize="12px" color="#64748B" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                {tpl.body}
+                              </Typography>
+                            }
                           />
                         </ListItemButton>
                       </ListItem>
@@ -406,7 +489,9 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, on
                   <Box sx={{ alignSelf: "flex-start", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "0px 12px 12px 12px", px: 2, py: 1.25, maxWidth: "90%", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
                     <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
                       {previewBody.split(/(\{[^}]+\})/g).map((part, i) =>
-                        /^\{[^}]+\}$/.test(part) ? <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 500 }}>{part}</Box> : part
+                        /^\{[^}]+\}$/.test(part)
+                          ? <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 500 }}>{part}</Box>
+                          : part
                       )}
                     </Typography>
                   </Box>
@@ -414,7 +499,12 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, on
                     {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                   </Typography>
                 </Box>
-                <TextField label="Edit message before sending" multiline rows={4} value={previewBody} onChange={(e) => setPreviewBody(e.target.value)} inputProps={{ maxLength: 1600 }} helperText={`${previewBody.length}/1600`} sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }} />
+                <TextField
+                  label="Edit message before sending" multiline rows={4} value={previewBody}
+                  onChange={(e) => setPreviewBody(e.target.value)}
+                  inputProps={{ maxLength: 1600 }} helperText={`${previewBody.length}/1600`}
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+                />
               </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
@@ -428,7 +518,7 @@ const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, on
   );
 };
 
-// ====================== SMS Dialog (exact copy from LeadsTable) ======================
+// ====================== SMS Dialog ======================
 interface SMSDialogProps {
   open: boolean;
   lead: LeadItem | null;
@@ -436,9 +526,9 @@ interface SMSDialogProps {
 }
 
 const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
-  const [message, setMessage] = React.useState("");
-  const [sending, setSending] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [message, setMessage]                   = React.useState("");
+  const [sending, setSending]                   = React.useState(false);
+  const [error, setError]                       = React.useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
 
   const handleClose = () => {
@@ -458,13 +548,14 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
       setMessage(""); onClose();
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to send SMS. Please try again."));
-    } finally { setSending(false); }
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <>
       <SMSTemplatePicker open={templatePickerOpen} onClose={() => setTemplatePickerOpen(false)} onSelect={(body) => setMessage(body)} />
-
       <Dialog open={open && !templatePickerOpen} onClose={handleClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1300 }}>
         <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1 }}>Send SMS</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
@@ -474,7 +565,13 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
               <Typography fontWeight={600} fontSize="14px">{(lead?.full_name ?? lead?.name ?? "Unknown") as string}</Typography>
               <Typography color="text.secondary" fontSize="13px">{(lead?.contact_no ?? "No number") as string}</Typography>
             </Box>
-            <TextField label="Message" multiline rows={4} value={message} onChange={(e) => setMessage(e.target.value)} disabled={sending} placeholder="Type your message here..." inputProps={{ maxLength: 1600 }} helperText={`${message.length}/1600`} sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }} />
+            <TextField
+              label="Message" multiline rows={4} value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              disabled={sending} placeholder="Type your message here..."
+              inputProps={{ maxLength: 1600 }} helperText={`${message.length}/1600`}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+            />
             {error && <MuiAlert severity="error" sx={{ borderRadius: "8px" }}>{error}</MuiAlert>}
           </Stack>
         </DialogContent>
@@ -504,33 +601,40 @@ interface NewEmailTemplateDialogProps {
 }
 
 const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({ open, onClose, onSaved }) => {
-  const [name, setName] = React.useState("");
-  const [subject, setSubject] = React.useState("");
-  const [description, setDesc] = React.useState("");
-  const [body, setBody] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [name, setName]         = React.useState("");
+  const [subject, setSubject]   = React.useState("");
+  const [description, setDesc]  = React.useState("");
+  const [body, setBody]         = React.useState("");
+  const [saving, setSaving]     = React.useState(false);
+  const [error, setError]       = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) { setName(""); setSubject(""); setDesc(""); setBody(""); setError(null); }
   }, [open]);
 
   const handleSave = async () => {
-    if (!name.trim()) { setError("Template name is required."); return; }
+    if (!name.trim())    { setError("Template name is required."); return; }
     if (!subject.trim()) { setError("Subject is required."); return; }
-    if (!body.trim()) { setError("Body is required."); return; }
+    if (!body.trim())    { setError("Body is required."); return; }
     setSaving(true); setError(null);
     try {
-      const saved = await EmailTemplateAPI.create({ clinic: 1, name: name.trim(), subject: subject.trim(), description: description.trim(), use_case: "general", body: body.trim(), created_by: 1, is_active: true } as EmailTemplatePayload);
+      const saved = await EmailTemplateAPI.create({
+        clinic: 1, name: name.trim(), subject: subject.trim(),
+        description: description.trim(), use_case: "general",
+        body: body.trim(), created_by: 1, is_active: true,
+      } as EmailTemplatePayload);
       onSaved(saved); onClose();
     } catch {
-      const local: EmailTemplate = { id: `local-${Date.now()}`, name: name.trim(), subject: subject.trim(), body: body.trim(), description: description.trim() };
+      const local: EmailTemplate = {
+        id: `local-${Date.now()}`, name: name.trim(),
+        subject: subject.trim(), body: body.trim(), description: description.trim(),
+      };
       onSaved(local); onClose();
     } finally { setSaving(false); }
   };
 
   const outlineBtn = { height: 40, px: 3, textTransform: "none" as const, fontWeight: 500, borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "transparent", "&:hover": { bgcolor: "#F9FAFB" } };
-  const darkBtn = { height: 40, px: 3, textTransform: "none" as const, fontWeight: 600, borderRadius: "8px", bgcolor: "#1F2937", color: "white", "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } };
+  const darkBtn    = { height: 40, px: 3, textTransform: "none" as const, fontWeight: 600, borderRadius: "8px", bgcolor: "#1F2937", color: "white", "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1600 }}>
@@ -544,10 +648,15 @@ const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({ open, o
           <TextField label="Description (optional)" value={description} onChange={(e) => setDesc(e.target.value)} placeholder="Short description of when to use this template" fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
           <Box>
             <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>Body</Typography>
-            <textarea value={body} onChange={(e) => { setBody(e.target.value); setError(null); }} placeholder="Write your email body here... Use {{name}} for the lead's name." rows={8}
+            <textarea
+              value={body}
+              onChange={(e) => { setBody(e.target.value); setError(null); }}
+              placeholder="Write your email body here... Use {{name}} for the lead's name."
+              rows={8}
               style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: "14px", fontFamily: "inherit", color: "#1E293B", lineHeight: "1.6", border: "1px solid #D1D5DB", borderRadius: "8px", resize: "vertical", outline: "none", background: "#fff" }}
               onFocus={(e) => { e.target.style.borderColor = "#1976d2"; e.target.style.boxShadow = "0 0 0 2px rgba(25,118,210,0.15)"; }}
-              onBlur={(e) => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }} />
+              onBlur={(e)  => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }}
+            />
             <Typography fontSize="11px" color="#94A3B8" mt={0.5}>Use {"{{name}}"} for lead's name</Typography>
           </Box>
           {error && <MuiAlert severity="error" sx={{ borderRadius: "8px", py: 0.5 }}>{error}</MuiAlert>}
@@ -555,7 +664,9 @@ const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({ open, o
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
         <Button onClick={onClose} sx={outlineBtn}>Cancel</Button>
-        <Button onClick={handleSave} disabled={saving || !name.trim() || !subject.trim() || !body.trim()} sx={darkBtn}>{saving ? "Saving..." : "Save Template"}</Button>
+        <Button onClick={handleSave} disabled={saving || !name.trim() || !subject.trim() || !body.trim()} sx={darkBtn}>
+          {saving ? "Saving..." : "Save Template"}
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -595,7 +706,7 @@ const MoreMenu: React.FC<MoreMenuProps> = ({ anchorEl, onClose, onAction }) => (
   </Menu>
 );
 
-// ====================== Email Dialog (exact copy from LeadsTable) ======================
+// ====================== Email Dialog ======================
 interface EmailDialogProps {
   open: boolean;
   lead: LeadItem | null;
@@ -603,32 +714,42 @@ interface EmailDialogProps {
 }
 
 const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
-  const [step, setStep] = React.useState<"template" | "preview" | "compose">("template");
-  const [previewTemplate, setPreviewTemplate] = React.useState<EmailTemplate | null>(null);
+  const [step, setStep]                             = React.useState<"template" | "preview" | "compose">("template");
+  const [previewTemplate, setPreviewTemplate]       = React.useState<EmailTemplate | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
-  const [subject, setSubject] = React.useState("");
-  const [body, setBody] = React.useState("");
-  const [sending, setSending] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [emailTemplates, setEmailTemplates] = React.useState<EmailTemplate[]>([]);
-  const [loadingTemplates, setLoadingTemplates] = React.useState(false);
-  const [templateError, setTemplateError] = React.useState<string | null>(null);
+  const [subject, setSubject]                       = React.useState("");
+  const [body, setBody]                             = React.useState("");
+  const [sending, setSending]                       = React.useState(false);
+  const [error, setError]                           = React.useState<string | null>(null);
+  const [emailTemplates, setEmailTemplates]         = React.useState<EmailTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates]     = React.useState(false);
+  const [templateError, setTemplateError]           = React.useState<string | null>(null);
   const [newEmailTemplateOpen, setNewEmailTemplateOpen] = React.useState(false);
-  const [emojiAnchor, setEmojiAnchor] = React.useState<HTMLElement | null>(null);
-  const [formatAnchor, setFormatAnchor] = React.useState<HTMLElement | null>(null);
-  const [moreAnchor, setMoreAnchor] = React.useState<HTMLElement | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [emojiAnchor, setEmojiAnchor]               = React.useState<HTMLElement | null>(null);
+  const [formatAnchor, setFormatAnchor]             = React.useState<HTMLElement | null>(null);
+  const [moreAnchor, setMoreAnchor]                 = React.useState<HTMLElement | null>(null);
+  const fileInputRef  = React.useRef<HTMLInputElement>(null);
   const imageInputRef = React.useRef<HTMLInputElement>(null);
-  const bodyRef = React.useRef<HTMLTextAreaElement>(null);
-  const cursorPos = React.useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+  const bodyRef       = React.useRef<HTMLTextAreaElement>(null);
+  const cursorPos     = React.useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
-  const saveCursor = () => { const el = bodyRef.current; if (el) cursorPos.current = { start: el.selectionStart, end: el.selectionEnd }; };
+  const saveCursor = () => {
+    const el = bodyRef.current;
+    if (el) cursorPos.current = { start: el.selectionStart, end: el.selectionEnd };
+  };
 
   const insertAtCursor = React.useCallback((text: string) => {
     const { start, end } = cursorPos.current;
     setBody((prev) => {
       const next = prev.substring(0, start) + text + prev.substring(end);
-      requestAnimationFrame(() => { const el = bodyRef.current; if (el) { el.focus(); el.setSelectionRange(start + text.length, start + text.length); cursorPos.current = { start: start + text.length, end: start + text.length }; } });
+      requestAnimationFrame(() => {
+        const el = bodyRef.current;
+        if (el) {
+          el.focus();
+          el.setSelectionRange(start + text.length, start + text.length);
+          cursorPos.current = { start: start + text.length, end: start + text.length };
+        }
+      });
       return next;
     });
   }, []);
@@ -637,9 +758,18 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     const { start, end } = cursorPos.current;
     setBody((prev) => {
       const selected = prev.substring(start, end) || placeholder;
-      const wrapped = before + selected + after;
-      const next = prev.substring(0, start) + wrapped + prev.substring(end);
-      requestAnimationFrame(() => { const el = bodyRef.current; if (el) { el.focus(); const ns = start + before.length; const ne = ns + selected.length; el.setSelectionRange(ns, ne); cursorPos.current = { start: ns, end: ne }; } });
+      const wrapped  = before + selected + after;
+      const next     = prev.substring(0, start) + wrapped + prev.substring(end);
+      requestAnimationFrame(() => {
+        const el = bodyRef.current;
+        if (el) {
+          el.focus();
+          const ns = start + before.length;
+          const ne = ns + selected.length;
+          el.setSelectionRange(ns, ne);
+          cursorPos.current = { start: ns, end: ne };
+        }
+      });
       return next;
     });
   }, []);
@@ -660,11 +790,14 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     }
   }, [open, loadEmailTemplates]);
 
-  const handleClose = () => { if (sending) return; onClose(); };
+  const handleClose      = () => { if (sending) return; onClose(); };
   const handleComposeNew = () => { setSelectedTemplateId(null); setSubject(""); setBody(""); setStep("compose"); };
-  const recipientName = (lead?.full_name ?? lead?.name ?? "Patient") as string;
-  const leadEmail = lead?.email as string | undefined;
-  const resolveBody = (raw: string) => raw.replace(/\{\{name\}\}/g, recipientName).replace(/\{\{lead_name\}\}/g, recipientName).replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
+  const recipientName    = (lead?.full_name ?? lead?.name ?? "Patient") as string;
+  const leadEmail        = lead?.email as string | undefined;
+  const resolveBody      = (raw: string) => raw
+    .replace(/\{\{name\}\}/g, recipientName)
+    .replace(/\{\{lead_name\}\}/g, recipientName)
+    .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
 
   const handleNext = () => {
     const template = emailTemplates.find((t) => String(t.id) === selectedTemplateId);
@@ -672,16 +805,24 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     setStep("compose");
   };
 
-  const handleNewEmailTemplateSaved = (tpl: EmailTemplate) => { setNewEmailTemplateOpen(false); setEmailTemplates((prev) => [tpl, ...prev]); setSelectedTemplateId(String(tpl.id)); };
+  const handleNewEmailTemplateSaved = (tpl: EmailTemplate) => {
+    setNewEmailTemplateOpen(false);
+    setEmailTemplates((prev) => [tpl, ...prev]);
+    setSelectedTemplateId(String(tpl.id));
+  };
 
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) { setError("Subject and body are required."); return; }
-    if (!lead?.id) { setError("Lead ID is missing."); return; }
-    if (!leadEmail) { setError("This lead has no email address."); return; }
+    if (!lead?.id)   { setError("Lead ID is missing."); return; }
+    if (!leadEmail)  { setError("This lead has no email address."); return; }
     setSending(true); setError(null);
-    try { await LeadEmailAPI.sendNow({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: leadEmail ?? null }); toast.success(`Email sent to ${recipientName}!`, { position: "top-right", autoClose: 3000, theme: "colored" }); onClose(); }
-    catch (err: unknown) { setError(extractErrorMessage(err, "Failed to send email. Please try again.")); }
-    finally { setSending(false); }
+    try {
+      await LeadEmailAPI.sendNow({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: leadEmail ?? null });
+      toast.success(`Email sent to ${recipientName}!`, { position: "top-right", autoClose: 3000, theme: "colored" });
+      onClose();
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, "Failed to send email. Please try again."));
+    } finally { setSending(false); }
   };
 
   const handleSaveAsDraft = async () => {
@@ -689,30 +830,43 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
     try { await LeadEmailAPI.saveAsDraft({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: leadEmail ?? null }); } catch { /* silent */ }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { const files = Array.from(e.target.files || []); if (!files.length) return; saveCursor(); insertAtCursor(`\n[📎 Attachment: ${files.map((f) => f.name).join(", ")}]\n`); e.target.value = ""; };
+  const handleFileChange  = (e: React.ChangeEvent<HTMLInputElement>) => { const files = Array.from(e.target.files || []); if (!files.length) return; saveCursor(); insertAtCursor(`\n[📎 Attachment: ${files.map((f) => f.name).join(", ")}]\n`); e.target.value = ""; };
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; saveCursor(); insertAtCursor(`\n[🖼 Image: ${file.name}]\n`); e.target.value = ""; };
   const handleEmojiSelect = (emoji: string) => { saveCursor(); insertAtCursor(emoji); };
+
   const handleFormat = (type: string) => {
     saveCursor();
-    const formats: Record<string, [string, string, string?]> = { "Bold": ["**","**","bold text"],"Italic": ["_","_","italic text"],"Underline": ["__","__","underlined text"],"Strikethrough": ["~~","~~","strikethrough"],"Bullet list": ["\n• ","","item"],"Numbered list": ["\n1. ","","item"],"Quote": ["\n> ","","quote"],"Code": ["`","`","code"] };
-    const fmt = formats[type]; if (fmt) wrapSelection(fmt[0], fmt[1], fmt[2]);
+    const formats: Record<string, [string, string, string?]> = {
+      "Bold": ["**","**","bold text"], "Italic": ["_","_","italic text"], "Underline": ["__","__","underlined text"],
+      "Strikethrough": ["~~","~~","strikethrough"], "Bullet list": ["\n• ","","item"], "Numbered list": ["\n1. ","","item"],
+      "Quote": ["\n> ","","quote"], "Code": ["`","`","code"],
+    };
+    const fmt = formats[type];
+    if (fmt) wrapSelection(fmt[0], fmt[1], fmt[2]);
   };
+
   const handleMoreAction = (action: string) => {
     saveCursor();
-    const snippets: Record<string, string> = { "Insert signature": `\n\n---\nWarm regards,\nCrysta IVF, Bangalore\n(935) 555-0128 | crysta@gmail.com`, "Insert divider": "\n\n---\n\n", "Insert table": "\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n" };
-    if (action === "Clear formatting") { setBody((prev) => prev.replace(/(\*\*|__|~~|_|`)/g, "")); } else { insertAtCursor(snippets[action] || ""); }
+    const snippets: Record<string, string> = {
+      "Insert signature": `\n\n---\nWarm regards,\nCrysta IVF, Bangalore\n(935) 555-0128 | crysta@gmail.com`,
+      "Insert divider": "\n\n---\n\n",
+      "Insert table": "\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n",
+    };
+    if (action === "Clear formatting") { setBody((prev) => prev.replace(/(\*\*|__|~~|_|`)/g, "")); }
+    else { insertAtCursor(snippets[action] || ""); }
   };
 
   return (
     <>
-      <input ref={fileInputRef} type="file" multiple style={{ display: "none" }} onChange={handleFileChange} />
+      <input ref={fileInputRef}  type="file" multiple      style={{ display: "none" }} onChange={handleFileChange}  />
       <input ref={imageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageChange} />
-      <EmojiPicker anchorEl={emojiAnchor} onClose={() => setEmojiAnchor(null)} onSelect={handleEmojiSelect} />
-      <FormatMenu anchorEl={formatAnchor} onClose={() => setFormatAnchor(null)} onFormat={handleFormat} />
-      <MoreMenu anchorEl={moreAnchor} onClose={() => setMoreAnchor(null)} onAction={handleMoreAction} />
+      <EmojiPicker  anchorEl={emojiAnchor}  onClose={() => setEmojiAnchor(null)}  onSelect={handleEmojiSelect} />
+      <FormatMenu   anchorEl={formatAnchor} onClose={() => setFormatAnchor(null)} onFormat={handleFormat} />
+      <MoreMenu     anchorEl={moreAnchor}   onClose={() => setMoreAnchor(null)}   onAction={handleMoreAction} />
       <NewEmailTemplateDialog open={newEmailTemplateOpen} onClose={() => setNewEmailTemplateOpen(false)} onSaved={handleNewEmailTemplateSaved} />
 
       <Dialog open={open && !newEmailTemplateOpen} onClose={handleClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }} sx={{ zIndex: 1300 }}>
+
         {step === "template" && (
           <>
             <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -730,15 +884,29 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
               </Box>
               {loadingTemplates && <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={28} /></Box>}
               {!loadingTemplates && templateError && <MuiAlert severity="warning" sx={{ borderRadius: "8px", mb: 1.5, fontSize: "13px" }}>{templateError}</MuiAlert>}
-              {!loadingTemplates && !templateError && emailTemplates.length === 0 && <Box sx={{ textAlign: "center", py: 3 }}><Typography color="text.secondary" fontSize="14px">No email templates found.</Typography><Typography color="text.secondary" fontSize="12px" mt={0.5}>Click "+ New Template" above to create one.</Typography></Box>}
+              {!loadingTemplates && !templateError && emailTemplates.length === 0 && (
+                <Box sx={{ textAlign: "center", py: 3 }}>
+                  <Typography color="text.secondary" fontSize="14px">No email templates found.</Typography>
+                  <Typography color="text.secondary" fontSize="12px" mt={0.5}>Click "+ New Template" above to create one.</Typography>
+                </Box>
+              )}
               {!loadingTemplates && emailTemplates.length > 0 && (
                 <RadioGroup value={selectedTemplateId || ""} onChange={(e) => setSelectedTemplateId(e.target.value)}>
                   <Stack spacing={0} divider={<Divider />} sx={{ maxHeight: 340, overflowY: "auto" }}>
                     {emailTemplates.map((template) => (
                       <Box key={template.id} onClick={() => setSelectedTemplateId(String(template.id))} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1.5, px: 0.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}>
-                        <FormControlLabel value={String(template.id)} control={<Radio size="small" sx={{ color: selectedTemplateId === String(template.id) ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }} />}
-                          label={<Box><Typography fontWeight={600} fontSize="13.5px" color="#1E293B">{template.name}</Typography>{template.description && <Typography fontSize="12px" color="#64748B" mt={0.2}>{template.description}</Typography>}{template.subject && <Typography fontSize="11px" color="#94A3B8" mt={0.25}>Subject: {template.subject}</Typography>}</Box>}
-                          sx={{ m: 0, flex: 1 }} />
+                        <FormControlLabel
+                          value={String(template.id)}
+                          control={<Radio size="small" sx={{ color: selectedTemplateId === String(template.id) ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }} />}
+                          label={
+                            <Box>
+                              <Typography fontWeight={600} fontSize="13.5px" color="#1E293B">{template.name}</Typography>
+                              {template.description && <Typography fontSize="12px" color="#64748B" mt={0.2}>{template.description}</Typography>}
+                              {template.subject && <Typography fontSize="11px" color="#94A3B8" mt={0.25}>Subject: {template.subject}</Typography>}
+                            </Box>
+                          }
+                          sx={{ m: 0, flex: 1 }}
+                        />
                         <Tooltip title="Preview template">
                           <IconButton size="small" onClick={(e) => { e.stopPropagation(); setSelectedTemplateId(String(template.id)); setPreviewTemplate(template); setStep("preview"); }} sx={{ color: "#93C5FD", ml: 1, "&:hover": { color: "#3B82F6", bgcolor: "#EFF6FF" } }}>
                             <VisibilityOutlinedIcon fontSize="small" />
@@ -791,7 +959,9 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                 <Box sx={{ bgcolor: "#FFFFFF", px: 2.5, py: 2.5, maxHeight: 260, overflowY: "auto" }}>
                   <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.85, whiteSpace: "pre-wrap", fontFamily: "Georgia, serif" }}>
                     {resolveBody(previewTemplate.body || "").split(/(\{\{[^}]+\}\}|\{[^}]+\})/g).map((part, i) =>
-                      /^(\{\{[^}]+\}\}|\{[^}]+\})$/.test(part) ? <Box key={i} component="span" sx={{ color: "#7C3AED", fontWeight: 600, bgcolor: "#F5F3FF", borderRadius: "3px", px: 0.5 }}>{part}</Box> : part
+                      /^(\{\{[^}]+\}\}|\{[^}]+\})$/.test(part)
+                        ? <Box key={i} component="span" sx={{ color: "#7C3AED", fontWeight: 600, bgcolor: "#F5F3FF", borderRadius: "3px", px: 0.5 }}>{part}</Box>
+                        : part
                     )}
                   </Typography>
                 </Box>
@@ -816,7 +986,9 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
               <Stack spacing={0} divider={<Divider />}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
                   <Typography fontSize="13px" color="text.secondary" minWidth={55}>To:</Typography>
-                  <Box sx={{ flex: 1 }}><Chip label={recipientName} size="small" onDelete={() => {}} deleteIcon={<CloseIcon sx={{ fontSize: "14px !important" }} />} sx={{ bgcolor: "#EFF6FF", color: "#1D4ED8", fontWeight: 500, fontSize: "12px", height: 24, "& .MuiChip-deleteIcon": { color: "#93C5FD" } }} /></Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Chip label={recipientName} size="small" onDelete={() => {}} deleteIcon={<CloseIcon sx={{ fontSize: "14px !important" }} />} sx={{ bgcolor: "#EFF6FF", color: "#1D4ED8", fontWeight: 500, fontSize: "12px", height: 24, "& .MuiChip-deleteIcon": { color: "#93C5FD" } }} />
+                  </Box>
                   <Typography fontSize="12px" color="text.secondary" sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" } }}>Cc | Bcc</Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
@@ -824,8 +996,12 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
                   <TextField fullWidth variant="standard" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={sending} InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }} placeholder="Enter subject..." />
                 </Box>
                 <Box sx={{ py: 1.5 }}>
-                  <textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} onSelect={saveCursor} onKeyUp={saveCursor} onMouseUp={saveCursor} disabled={sending} placeholder="Write your email..." rows={12}
-                    style={{ width: "100%", boxSizing: "border-box", resize: "vertical", border: "none", outline: "none", fontSize: "13px", lineHeight: 1.7, fontFamily: "inherit", color: "#1E293B", background: "transparent", padding: 0 }} />
+                  <textarea
+                    ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)}
+                    onSelect={saveCursor} onKeyUp={saveCursor} onMouseUp={saveCursor}
+                    disabled={sending} placeholder="Write your email..." rows={12}
+                    style={{ width: "100%", boxSizing: "border-box", resize: "vertical", border: "none", outline: "none", fontSize: "13px", lineHeight: 1.7, fontFamily: "inherit", color: "#1E293B", background: "transparent", padding: 0 }}
+                  />
                 </Box>
                 {error && <MuiAlert severity="error" sx={{ borderRadius: "8px", my: 1 }}>{error}</MuiAlert>}
               </Stack>
@@ -858,7 +1034,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
 
 // ====================== Main LeadsBoard Component ======================
 const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch   = useDispatch<AppDispatch>();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
   const reduxLeads = useSelector(selectLeads);
@@ -875,16 +1051,16 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     }
   }, [reduxLeads]);
 
-  const [openBookModal, setOpenBookModal]   = React.useState(false);
-  const [selectedLead,  setSelectedLead ]   = React.useState<LeadItem | null>(null);
-  const [smsLead,       setSmsLead      ]   = React.useState<LeadItem | null>(null);
-  const [emailLead,     setEmailLead    ]   = React.useState<LeadItem | null>(null);
-  const [callLead,      setCallLead     ]   = React.useState<LeadItem | null>(null);
-  const [appointment,   setAppointment  ]   = React.useState<AppointmentState>(emptyAppointment());
+  const [openBookModal, setOpenBookModal] = React.useState(false);
+  const [selectedLead,  setSelectedLead ] = React.useState<LeadItem | null>(null);
+  const [smsLead,       setSmsLead      ] = React.useState<LeadItem | null>(null);
+  const [emailLead,     setEmailLead    ] = React.useState<LeadItem | null>(null);
+  const [callLead,      setCallLead     ] = React.useState<LeadItem | null>(null);
+  const [appointment,   setAppointment  ] = React.useState<AppointmentState>(emptyAppointment());
 
   const handleCallOpen = async (lead: LeadItem) => {
     const phone = normalizePhone(lead.contact_no as string | undefined);
-    if (!phone) { toast.error("No contact number for this lead.", { position: "top-right", autoClose: 3000, theme: "colored" }); return; }
+    if (!phone)   { toast.error("No contact number for this lead.", { position: "top-right", autoClose: 3000, theme: "colored" }); return; }
     if (!lead.id) { toast.error("Lead ID is missing. Cannot initiate call.", { position: "top-right", autoClose: 3000, theme: "colored" }); return; }
     setCallLead(lead);
     try { await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone }); }
@@ -896,16 +1072,26 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     const fetchAll = async () => {
       setAppointment((prev) => ({ ...prev, loadingDepartments: true, loadingEmployees: true, error: null }));
       try {
-        const [departments, employees] = await Promise.all([DepartmentAPI.listActiveByClinic(selectedLead.clinic_id as number), EmployeeAPI.listByClinic(selectedLead.clinic_id as number)]);
+        const [departments, employees] = await Promise.all([
+          DepartmentAPI.listActiveByClinic(selectedLead.clinic_id as number),
+          EmployeeAPI.listByClinic(selectedLead.clinic_id as number),
+        ]);
         setAppointment((prev) => ({ ...prev, departments, employees }));
-      } catch { setAppointment((prev) => ({ ...prev, error: "Failed to load departments/personnel. Please try again." })); }
-      finally { setAppointment((prev) => ({ ...prev, loadingDepartments: false, loadingEmployees: false })); }
+      } catch {
+        setAppointment((prev) => ({ ...prev, error: "Failed to load departments/personnel. Please try again." }));
+      } finally {
+        setAppointment((prev) => ({ ...prev, loadingDepartments: false, loadingEmployees: false }));
+      }
     };
     fetchAll();
   }, [openBookModal, selectedLead]);
 
   React.useEffect(() => {
     setAppointment((prev) => {
+      // For contracts app: no department filtering — show all employees
+      if (!IS_MEDICAL_APP) {
+        return { ...prev, filteredEmployees: prev.employees };
+      }
       if (!prev.selectedDepartmentId) return { ...prev, filteredEmployees: prev.employees };
       const deptName = prev.departments.find((d) => d.id === Number(prev.selectedDepartmentId))?.name ?? "";
       const filtered = prev.employees.filter((emp) => emp.department_name?.toLowerCase() === deptName.toLowerCase());
@@ -916,13 +1102,17 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
 
   const filteredLeads = React.useMemo(() => {
     return leads.filter((lead) => {
-      const searchStr = `${lead.full_name || lead.name || ""} ${lead.id || ""}`.toLowerCase();
+      const searchStr   = `${lead.full_name || lead.name || ""} ${lead.id || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
-      const isActive = lead.is_active !== false;
+      const isActive    = lead.is_active !== false;
+
       if (filters) {
-        if (filters.department && lead.department_id !== Number(filters.department)) return false;
-        if (filters.assignee   && lead.assigned_to_id !== Number(filters.assignee))  return false;
-        if (filters.status) { const ls = (lead.lead_status || lead.status || "").toLowerCase(); if (ls !== filters.status.toLowerCase()) return false; }
+        if (filters.department && lead.department_id   !== Number(filters.department)) return false;
+        if (filters.assignee   && lead.assigned_to_id !== Number(filters.assignee))   return false;
+        if (filters.status) {
+          const ls = (lead.lead_status || lead.status || "").toLowerCase();
+          if (ls !== filters.status.toLowerCase()) return false;
+        }
         if (filters.quality && lead.quality !== filters.quality) return false;
         if (filters.source  && lead.source  !== filters.source)  return false;
         if (filters.dateFrom || filters.dateTo) {
@@ -937,31 +1127,81 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
   }, [leads, search, filters]);
 
   const handleBookAppointmentSubmit = async () => {
-    if (!selectedLead?.id)                 { setAppointment((p) => ({ ...p, error: "Lead ID is missing." })); return; }
-    if (!appointment.selectedDepartmentId) { setAppointment((p) => ({ ...p, error: "Please select a department." })); return; }
-    if (!appointment.date)                 { setAppointment((p) => ({ ...p, error: "Please select an appointment date." })); return; }
-    if (!appointment.slot)                 { setAppointment((p) => ({ ...p, error: "Please select a time slot." })); return; }
+    if (!selectedLead?.id) {
+      setAppointment((p) => ({ ...p, error: "Lead ID is missing." }));
+      return;
+    }
+
+    // Department is required for medical app only
+    if (IS_MEDICAL_APP && !appointment.selectedDepartmentId) {
+      setAppointment((p) => ({ ...p, error: "Please select a department." }));
+      return;
+    }
+
+    if (!appointment.date) {
+      setAppointment((p) => ({ ...p, error: "Please select an appointment date." }));
+      return;
+    }
+    if (!appointment.slot) {
+      setAppointment((p) => ({ ...p, error: "Please select a time slot." }));
+      return;
+    }
+
     setAppointment((p) => ({ ...p, submitting: true, error: null }));
     const leadId        = selectedLead.id.replace(/^#/, "");
     const formattedDate = appointment.date.toISOString().split("T")[0];
-    const result = await dispatch(bookAppointment({ leadId, payload: { department_id: Number(appointment.selectedDepartmentId), appointment_date: formattedDate, slot: appointment.slot, remark: appointment.remark, ...(appointment.selectedEmployeeId && { assigned_to_id: Number(appointment.selectedEmployeeId) }) } }));
+
+    const result = await dispatch(bookAppointment({
+      leadId,
+      payload: {
+        // Only include department_id for medical app
+        ...(IS_MEDICAL_APP && { department_id: Number(appointment.selectedDepartmentId) }),
+        appointment_date: formattedDate,
+        slot: appointment.slot,
+        remark: appointment.remark,
+        ...(appointment.selectedEmployeeId && { assigned_to_id: Number(appointment.selectedEmployeeId) }),
+      },
+    }));
+
     setAppointment((p) => ({ ...p, submitting: false }));
-    if (bookAppointment.rejected.match(result)) { const errMsg = typeof result.payload === "string" ? result.payload : "Failed to book appointment. Please try again."; setAppointment((p) => ({ ...p, error: errMsg })); return; }
+
+    if (bookAppointment.rejected.match(result)) {
+      const errMsg = typeof result.payload === "string"
+        ? result.payload
+        : "Failed to book appointment. Please try again.";
+      setAppointment((p) => ({ ...p, error: errMsg }));
+      return;
+    }
+
     handleCloseBook();
     toast.success("Appointment booked successfully!", { position: "top-right", autoClose: 3000, theme: "colored" });
   };
 
   const handleOpenBookModal = (lead: LeadItem) => {
     setSelectedLead(lead);
-    setAppointment({ ...emptyAppointment(), selectedDepartmentId: lead.department_id != null ? String(lead.department_id) : "", selectedEmployeeId: lead.assigned_to_id != null ? String(lead.assigned_to_id) : "", date: lead.appointment_date ? new Date(lead.appointment_date) : null, slot: lead.slot || "", remark: lead.remark || "" });
+    setAppointment({
+      ...emptyAppointment(),
+      selectedDepartmentId: lead.department_id   != null ? String(lead.department_id)   : "",
+      selectedEmployeeId:   lead.assigned_to_id  != null ? String(lead.assigned_to_id)  : "",
+      date:   lead.appointment_date ? new Date(lead.appointment_date) : null,
+      slot:   lead.slot   || "",
+      remark: lead.remark || "",
+    });
     setOpenBookModal(true);
   };
 
-  const handleCloseBook = () => { setOpenBookModal(false); setSelectedLead(null); setAppointment((p) => ({ ...p, error: null, submitting: false })); };
+  const handleCloseBook = () => {
+    setOpenBookModal(false);
+    setSelectedLead(null);
+    setAppointment((p) => ({ ...p, error: null, submitting: false }));
+  };
 
   if (loading) return (
     <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
-      <Stack alignItems="center" spacing={2}><CircularProgress /><Typography color="text.secondary">Loading leads...</Typography></Stack>
+      <Stack alignItems="center" spacing={2}>
+        <CircularProgress />
+        <Typography color="text.secondary">Loading leads...</Typography>
+      </Stack>
     </Box>
   );
 
@@ -969,19 +1209,25 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     <Alert severity="error" sx={{ mb: 3 }}>
       <Typography fontWeight={600}>Failed to load leads</Typography>
       <Typography variant="body2">{error}</Typography>
-      <Typography variant="body2" sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }} onClick={() => dispatch(fetchLeads())}>Try again</Typography>
+      <Typography variant="body2" sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }} onClick={() => dispatch(fetchLeads())}>
+        Try again
+      </Typography>
     </Alert>
   );
 
   if (leads.length === 0) return (
     <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
-      <Stack alignItems="center" spacing={2}><Typography variant="h6" color="text.secondary">No leads found</Typography><Typography variant="body2" color="text.secondary">Create your first lead to get started</Typography></Stack>
+      <Stack alignItems="center" spacing={2}>
+        <Typography variant="h6" color="text.secondary">No leads found</Typography>
+        <Typography variant="body2" color="text.secondary">Create your first lead to get started</Typography>
+      </Stack>
     </Box>
   );
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ display: "flex", overflowX: "auto", gap: 3, p: 4, bgcolor: "#F8FAFC", height: "calc(100vh - 64px)", alignItems: "flex-start", "&::-webkit-scrollbar": { height: "10px" }, "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "10px" } }}>
+
         {BOARD_COLUMNS.map((col) => {
           const leadsInCol = filteredLeads.filter((l) => {
             const leadStatus = (l.status || l.lead_status || "no status").toLowerCase().trim();
@@ -994,7 +1240,7 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
               leads={leadsInCol}
               hoveredId={hoveredId}
               onHover={setHoveredId}
-              onOpenSms={(lead) => setSmsLead(lead)}
+              onOpenSms={(lead)  => setSmsLead(lead)}
               onOpenMail={(lead) => setEmailLead(lead)}
               onOpenBook={handleOpenBookModal}
               onOpenCall={handleCallOpen}
@@ -1005,15 +1251,15 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
 
         <Dialogs />
 
-        {/* ── SMS Dialog ── */}
-        <SMSDialog open={Boolean(smsLead)} lead={smsLead} onClose={() => setSmsLead(null)} />
-
-        {/* ── Email Dialog ── */}
+        <SMSDialog   open={Boolean(smsLead)}   lead={smsLead}   onClose={() => setSmsLead(null)}   />
         <EmailDialog open={Boolean(emailLead)} lead={emailLead} onClose={() => setEmailLead(null)} />
+        <CallDialog  open={Boolean(callLead)}  name={(callLead?.full_name ?? callLead?.name ?? "Unknown") as string} onClose={() => setCallLead(null)} />
 
-        {/* ── Call Dialog ── */}
-        <CallDialog open={Boolean(callLead)} name={(callLead?.full_name ?? callLead?.name ?? "Unknown") as string} onClose={() => setCallLead(null)} />
-
+        {/*
+         * BookAppointmentModal receives IS_MEDICAL_APP so it can conditionally
+         * render the Department dropdown. Pass it through as a prop, or the modal
+         * can import IS_MEDICAL_APP directly from appType config.
+         */}
         <BookAppointmentModal
           open={openBookModal}
           selectedLead={selectedLead}

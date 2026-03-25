@@ -30,7 +30,13 @@ import {
 import { validateStep } from "../LeadsHub/addNewLead.validation";
 import { Step1, Step2, Step3 } from "../LeadsHub/addNewLead.steps";
 
-// ── Capitalize first letter helper ──────────────────────────────────────────
+// ── Import appType config ─────────────────────────────────────────────────────
+import {
+  IS_MEDICAL_APP,
+  ACTIVE_FLOW_COPY,
+} from "../../config/appType";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 const capitalizeFirst = (value: string) =>
   value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
 
@@ -38,25 +44,19 @@ const toReadableError = (value: unknown): string => {
   if (value == null) return "Unknown error";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
-
   if (Array.isArray(value)) {
     const first = value[0];
     return first == null ? "Unknown error" : toReadableError(first);
   }
-
   if (typeof value === "object") {
     const obj = value as Record<string, unknown>;
-
     if (typeof obj.detail === "string") return obj.detail;
     if (typeof obj.message === "string") return obj.message;
     if (typeof obj.error === "string") return obj.error;
-
     const firstKey = Object.keys(obj)[0];
     if (!firstKey) return "Unknown error";
-    const firstValue = obj[firstKey];
-    return `${firstKey}: ${toReadableError(firstValue)}`;
+    return `${firstKey}: ${toReadableError(obj[firstKey])}`;
   }
-
   return "Unknown error";
 };
 
@@ -125,6 +125,12 @@ export default function AddNewLead() {
     appointmentDate: "",
     slot: "",
     remark: "",
+    // Contracts-only fields (optional in FormState type)
+    contactFullName: "",
+    designation: "",
+    contactPhone: "",
+    contactEmail: "",
+    leadGeneratedBy: "",
   });
 
   // ── Fetch Departments ────────────────────────────────────────────
@@ -194,8 +200,13 @@ export default function AddNewLead() {
     }));
   }, [form.campaign, campaigns]);
 
-  // ── Filter personnel by department ──────────────────────────────
+  // ── Filter personnel by department (medical only) ────────────────
   React.useEffect(() => {
+    if (!IS_MEDICAL_APP) {
+      // For contracts app, show all employees as appointment personnel
+      setFilteredPersonnel(employees);
+      return;
+    }
     if (!form.department || employees.length === 0) {
       setFilteredPersonnel([]);
       return;
@@ -205,7 +216,9 @@ export default function AddNewLead() {
     if (!selectedDept) { setFilteredPersonnel([]); return; }
     const normalize = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
     setFilteredPersonnel(
-      employees.filter((emp) => normalize(emp.department_name) === normalize(selectedDept.name)),
+      employees.filter(
+        (emp) => normalize(emp.department_name) === normalize(selectedDept.name),
+      ),
     );
   }, [form.department, employees, departments]);
 
@@ -217,15 +230,16 @@ export default function AddNewLead() {
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
 
-  // ✅ FIX: Don't clear assignee here — it belongs to Step 1 and is unrelated
-  // to appointment department. Only reset personnel so user re-picks from
-  // the newly filtered list.
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, department: e.target.value, personnel: "" }));
 
   const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newType = e.target.value;
-    setForm((prev) => ({ ...prev, nextType: newType, nextStatus: getAutoNextActionStatus(newType) }));
+    setForm((prev) => ({
+      ...prev,
+      nextType: newType,
+      nextStatus: getAutoNextActionStatus(newType),
+    }));
   };
 
   // ── File Handlers ────────────────────────────────────────────────
@@ -244,7 +258,9 @@ export default function AddNewLead() {
         return;
       }
       setPendingFiles((prev) =>
-        prev.find((f) => f.name === file.name && f.size === file.size) ? prev : [...prev, file],
+        prev.find((f) => f.name === file.name && f.size === file.size)
+          ? prev
+          : [...prev, file],
       );
     });
   };
@@ -276,7 +292,7 @@ export default function AddNewLead() {
   const buildPayload = (): LeadPayload => {
     const shouldBookAppointment =
       form.wantAppointment === "yes" &&
-      Boolean(form.department && form.appointmentDate && form.slot);
+      Boolean(form.appointmentDate && form.slot);
 
     const selectedDepartmentId = intOrNull(form.department);
     const fallbackDepartmentId = departments[0]?.id ?? 1;
@@ -303,39 +319,41 @@ export default function AddNewLead() {
         : null;
 
     return {
-    clinic_id: clinicId,
-    department_id: departmentId,
-    full_name: form.full_name.trim() || "Unknown Lead",
-    contact_no: form.contact.trim() || "0000000000",
-    source: form.source || "Direct",
-    sub_source: form.subSource || "",
-    treatment_interest: form.treatments.join(",") || form.treatmentInterest || "General",
-    appointment_date: shouldBookAppointment ? (form.appointmentDate ?? null) : null,
-    slot: shouldBookAppointment ? (form.slot ?? "") : "",
-    campaign_id: strOrNull(form.campaign),
-    email: strOrNull(form.email) ?? null,
-    language_preference: form.language ?? "",
-    location: form.location ?? "",
-    address: form.address ?? "",
-    remark: form.remark ?? "",
-    partner_full_name: form.partnerName ?? "",
-    next_action_description: form.nextDesc ?? "",
-    next_action_type: form.nextType || undefined,
-    gender: genderValue,
-    marital_status: maritalValue,
-    partner_gender: partnerGenderValue,
-    next_action_status:
-      form.nextStatus === "pending" || form.nextStatus === "completed" ? form.nextStatus : null,
-    assigned_to_id: intOrNull(form.assignee) ?? null,
-    // ✅ FIX: was hardcoded to null — now correctly reads form.personnel
-    personal_id: intOrNull(form.personnel) ?? null,
-    age: intOrNull(form.age) ?? null,
-    partner_age: intOrNull(form.partnerAge) ?? null,
-    partner_inquiry: isCouple === "yes",
-    book_appointment: shouldBookAppointment,
-    is_active: true,
-    lead_status: "new",
-  };
+      clinic_id: clinicId,
+      department_id: departmentId,
+      full_name: form.full_name.trim() || "Unknown Lead",
+      contact_no: form.contact.trim() || "0000000000",
+      source: form.source || "Direct",
+      sub_source: form.subSource || "",
+      treatment_interest:
+        form.treatments.join(",") || form.treatmentInterest || "General",
+      appointment_date: shouldBookAppointment ? (form.appointmentDate ?? null) : null,
+      slot: shouldBookAppointment ? (form.slot ?? "") : "",
+      campaign_id: strOrNull(form.campaign),
+      email: strOrNull(form.email) ?? null,
+      language_preference: form.language ?? "",
+      location: form.location ?? "",
+      address: form.address ?? "",
+      remark: form.remark ?? "",
+      partner_full_name: form.partnerName ?? "",
+      next_action_description: form.nextDesc ?? "",
+      next_action_type: form.nextType || undefined,
+      gender: IS_MEDICAL_APP ? genderValue : null,
+      marital_status: IS_MEDICAL_APP ? maritalValue : null,
+      partner_gender: IS_MEDICAL_APP ? partnerGenderValue : null,
+      next_action_status:
+        form.nextStatus === "pending" || form.nextStatus === "completed"
+          ? form.nextStatus
+          : null,
+      assigned_to_id: intOrNull(form.assignee) ?? null,
+      personal_id: intOrNull(form.personnel) ?? null,
+      age: IS_MEDICAL_APP ? (intOrNull(form.age) ?? null) : null,
+      partner_age: IS_MEDICAL_APP ? (intOrNull(form.partnerAge) ?? null) : null,
+      partner_inquiry: IS_MEDICAL_APP ? isCouple === "yes" : false,
+      book_appointment: shouldBookAppointment,
+      is_active: true,
+      lead_status: "new",
+    };
   };
 
   // ── Submit ───────────────────────────────────────────────────────
@@ -368,17 +386,23 @@ export default function AddNewLead() {
     }
   };
 
-  // ── Step indicator config ────────────────────────────────────────
+  // ── Step indicator config — labels from appType config ───────────
   const steps = [
-    { label: "Lead Details", step: 1 },
-    { label: "Product Details", step: 2 },
-    { label: "Book Appointment", step: 3 },
+    { label: ACTIVE_FLOW_COPY.detailsStep, step: 1 },   // "Lead Details" or "Patient Details"
+    { label: ACTIVE_FLOW_COPY.medicalStep, step: 2 },    // "Product Details" or "Medical Details"
+    { label: ACTIVE_FLOW_COPY.step3, step: 3 },          // "Book Appointment" (same for both)
   ];
 
   // ── Render ───────────────────────────────────────────────────────
   return (
-    <Paper sx={{ overflow: "hidden", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-
+    <Paper
+      sx={{
+        overflow: "hidden",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {/* Header */}
       <Box sx={{ bgcolor: "white", px: 3, py: 2 }}>
         <Typography variant="h6" fontWeight={700} color="#1E293B">
@@ -451,7 +475,10 @@ export default function AddNewLead() {
           flex: 1,
           overflowY: "auto",
           "&::-webkit-scrollbar": { width: "8px" },
-          "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "#CBD5E1",
+            borderRadius: "4px",
+          },
         }}
       >
         {currentStep === 1 && (
@@ -497,10 +524,24 @@ export default function AddNewLead() {
       </Box>
 
       {/* Footer */}
-      <Box sx={{ bgcolor: "white", p: 3, display: "flex", justifyContent: "flex-end", gap: 2, borderTop: "1px solid #F1F5F9" }}>
+      <Box
+        sx={{
+          bgcolor: "white",
+          p: 3,
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 2,
+          borderTop: "1px solid #F1F5F9",
+        }}
+      >
         <Button
           onClick={() => navigate("/leads")}
-          sx={{ textTransform: "none", color: "#64748B", fontWeight: 700, px: 3 }}
+          sx={{
+            textTransform: "none",
+            color: "#64748B",
+            fontWeight: 700,
+            px: 3,
+          }}
         >
           Cancel
         </Button>
@@ -553,7 +594,6 @@ export default function AddNewLead() {
           </Button>
         )}
       </Box>
-
     </Paper>
   );
 }
