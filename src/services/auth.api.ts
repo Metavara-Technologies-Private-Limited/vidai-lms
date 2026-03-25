@@ -30,7 +30,7 @@ export const authApi = {
 
   getProfile: async () => {
     const res = await http.get("/me/profile");
-    return res.data;
+    return res.data.data;
   },
 
   searchUsers: async (params: UserSearchParams) => {
