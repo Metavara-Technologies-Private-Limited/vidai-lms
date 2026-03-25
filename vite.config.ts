@@ -42,6 +42,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      "/stage-api": {
+        target: "https://stage-api.vidaisolutions.com",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/stage-api/, ""),
+        secure: true,
+      },
     },
   },
   test: {

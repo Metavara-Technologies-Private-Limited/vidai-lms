@@ -1,4 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
+import authReducer from "./authSlice";
 import clinicReducer from "./clinicSlice";
 import leadReducer from "./leadSlice";
 import emailTemplateReducer from "./emailTemplateSlice";
@@ -12,16 +13,17 @@ import pipelineReducer from "./pipelineSlice";
 
 export const store = configureStore({
   reducer: {
-    clinic:        clinicReducer,
-    leads:         leadReducer,
+    auth: authReducer,
+    clinic: clinicReducer,
+    leads: leadReducer,
     emailTemplate: emailTemplateReducer,
-    campaign:      campaignReducer,
-    tickets:       ticketReducer,
-    templates:     templateReducer,
-    emailHistory:  emailHistoryReducer,
-    mailInsights:  mailInsightsReducer,   // ✅ mail insights KPI
-    reputation:     reputationReducer,    
-    pipeline:      pipelineReducer,
+    campaign: campaignReducer,
+    tickets: ticketReducer,
+    templates: templateReducer,
+    emailHistory: emailHistoryReducer,
+    mailInsights: mailInsightsReducer, // ✅ mail insights KPI
+    reputation: reputationReducer,
+    pipeline: pipelineReducer,
   },
 });
 

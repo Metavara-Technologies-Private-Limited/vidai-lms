@@ -4,17 +4,21 @@ import { Eye, EyeOff, Lock, User } from "lucide-react";
 import logo from "../assets/icons/Vidai-logo.svg";
 import loginSpinner from "../assets/icons/Login_Spinner_Vidai.webp";
 import styles from "../styles/VidaiLogin.module.css";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "../store";
+import { setAuth } from "../store/authSlice";
 
-const AUTH_TOKEN_KEY = "auth_token";
-const AUTH_TOKEN_ALT_KEY = "authToken";
-const UI_AUTH_KEY = "vidai_ui_logged_in";
-const TEMP_USERNAME = "root";
-const TEMP_PASSWORD = "root";
+// const AUTH_TOKEN_KEY = "auth_token";
+// const AUTH_TOKEN_ALT_KEY = "authToken";
+// const UI_AUTH_KEY = "vidai_ui_logged_in";
+// const TEMP_USERNAME = "root";
+// const TEMP_PASSWORD = "root";
 
 const LANGUAGE_OPTIONS = ["English", "Hindi", "Espanol", "Portugues"];
 
 export default function VidaiLogin() {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -27,30 +31,33 @@ export default function VidaiLogin() {
     [username, password],
   );
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     if (!canSubmit) {
       setError("Please enter username and password.");
       return;
     }
 
-    if (
-      username.trim().toLowerCase() !== TEMP_USERNAME ||
-      password.trim().toLowerCase() !== TEMP_PASSWORD
-    ) {
-      setError("Invalid credentials. Use username: root and password: root.");
-      return;
-    }
+    try {
+      const response = await fetch("/stage-api/api/login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: username.trim(),
+          password: password.trim(),
+        }),
+      });
 
-    setError("");
-    const mockToken = `mock-token-${Date.now()}`;
-    localStorage.setItem(UI_AUTH_KEY, "1");
-    sessionStorage.setItem(UI_AUTH_KEY, "1");
-    localStorage.setItem(AUTH_TOKEN_KEY, mockToken);
-    localStorage.setItem(AUTH_TOKEN_ALT_KEY, mockToken);
-    localStorage.setItem("language", language);
-    navigate("/dashboard", { replace: true });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Login failed");
+
+      dispatch(setAuth(data));
+      localStorage.setItem("language", language);
+
+      navigate("/dashboard", { replace: true });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    }
   };
 
   return (

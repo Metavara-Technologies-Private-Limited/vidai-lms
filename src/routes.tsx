@@ -7,14 +7,16 @@ import {
 } from "react";
 import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
+import { useSelector } from "react-redux";
+import { selectAuthed } from "./store/authSlice";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
 const VidaiLogin = lazy(() => import("./pages/VidaiLogin"));
 
-const UI_AUTH_KEY = "vidai_ui_logged_in";
+// const UI_AUTH_KEY = "vidai_ui_logged_in";
 
-const isAuthenticated = () => localStorage.getItem(UI_AUTH_KEY) === "1";
+// const isAuthenticated = () => localStorage.getItem(UI_AUTH_KEY) === "1";
 
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
@@ -26,13 +28,15 @@ function LoadedComponent({ Comp }: LoaderProps) {
 }
 
 export default function AppRoutes() {
+  const authed = useSelector(selectAuthed);
+
   return (
     <>
       <Routes>
         <Route
           path="/login"
           element={
-            isAuthenticated() ? (
+            authed ? (
               <Navigate to="/dashboard" replace />
             ) : (
               <LoadedComponent Comp={VidaiLogin} />
@@ -68,7 +72,7 @@ export default function AppRoutes() {
         <Route
           path="/"
           element={
-            isAuthenticated() ? (
+            authed ? (
               <Suspense
                 fallback={<div style={{ padding: 12 }}>Loading app...</div>}
               >
