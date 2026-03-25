@@ -16,6 +16,13 @@ import type { AppDispatch } from "../../store";
 import type { NextActionStatus } from "../../types/leads.types";
 import { TASK_STATUS_FOR_TYPE, getAutoNextActionStatus } from "./LeadTaskConfig";
 
+// ====================== App-type config import ======================
+import {
+  IS_MEDICAL_APP,
+  IS_CONTRACTS_APP,
+  ACTIVE_FLOW_COPY,
+} from "../../config/appType"; // adjust path correctly/ adjust path to wherever you placed appConfig.ts
+
 // ====================== Extended Lead type ======================
 export interface LeadResponse extends Lead {
   gender?: "male" | "female" | "other" | null;
@@ -116,8 +123,13 @@ export const TIME_SLOTS = [
   "05:30 PM - 06:00 PM",
 ];
 
-// ====================== Stepper labels ======================
-export const STEPS = ["Patient Details", "Medical Details", "Book Appointment"] as const;
+// ====================== Stepper labels (app-type aware) ======================
+// Derive STEPS from ACTIVE_FLOW_COPY so labels update automatically
+export const STEPS = [
+  ACTIVE_FLOW_COPY.step1,   // "Patient Details" | "Lead Details"
+  ACTIVE_FLOW_COPY.step2,   // "Medical Details" | "Product Details"
+  ACTIVE_FLOW_COPY.step3,   // always "Book Appointment"
+] as const;
 export const TOTAL_STEPS = STEPS.length;
 
 // ====================== Shared MUI styles ======================
@@ -159,7 +171,6 @@ export const sectionLabelStyle = {
 } as const;
 
 // ====================== Helper: normalize truthy API value ======================
-// Handles true, 1, "1", "true" from various backends
 const isTruthy = (val: unknown): boolean =>
   val === true || val === 1 || val === "1" || val === "true";
 
@@ -208,20 +219,12 @@ export function useEditLead() {
   // Track the lead's original department_id so we never overwrite it
   const [leadDepartmentId, setLeadDepartmentId] = React.useState<number | null>(null);
 
-  // Step 1
+  // ── Step 1: shared fields ──
   const [fullName, setFullName] = React.useState("");
   const [contactNo, setContactNo] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [location, setLocation] = React.useState("");
-  const [gender, setGender] = React.useState("");
-  const [age, setAge] = React.useState("");
-  const [marital, setMarital] = React.useState("");
   const [address, setAddress] = React.useState("");
-  const [language, setLanguage] = React.useState("");
-  const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
-  const [partnerName, setPartnerName] = React.useState("");
-  const [partnerAge, setPartnerAge] = React.useState("");
-  const [partnerGender, setPartnerGender] = React.useState("");
   const [source, setSource] = React.useState("");
   const [subSource, setSubSource] = React.useState("");
   const [campaign, setCampaignId] = React.useState<string | number>("");
@@ -229,6 +232,23 @@ export function useEditLead() {
   const [nextType, setNextType] = React.useState("");
   const [nextStatus, setNextStatus] = React.useState("");
   const [nextDesc, setNextDesc] = React.useState("");
+
+  // ── Step 1: MEDICAL-only fields ──
+  const [gender, setGender] = React.useState("");
+  const [age, setAge] = React.useState("");
+  const [marital, setMarital] = React.useState("");
+  const [language, setLanguage] = React.useState("");
+  const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
+  const [partnerName, setPartnerName] = React.useState("");
+  const [partnerAge, setPartnerAge] = React.useState("");
+  const [partnerGender, setPartnerGender] = React.useState("");
+
+  // ── Step 1: CONTRACTS-only fields (Contact Information section) ──
+  const [contactPersonName, setContactPersonName] = React.useState("");
+  const [designation, setDesignation] = React.useState("");
+  const [contactPersonPhone, setContactPersonPhone] = React.useState("");
+  const [contactPersonEmail, setContactPersonEmail] = React.useState("");
+  const [leadGeneratedBy, setLeadGeneratedBy] = React.useState("");
 
   // Step 2
   const [treatmentInterest, setTreatmentInterest] = React.useState("");
@@ -238,7 +258,7 @@ export function useEditLead() {
   const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
 
-  // Step 3 — appointment fields (completely separate from Step 1 assignee)
+  // Step 3 — appointment fields
   const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("no");
   const [department, setDepartment] = React.useState("");
   const [appointmentPersonnel, setAppointmentPersonnel] = React.useState("");
@@ -287,15 +307,10 @@ export function useEditLead() {
     if (nextDate) setAppointmentDate(nextDate.format("YYYY-MM-DD"));
   };
 
-  // ── FIX: Reliable Yes/No toggle for book appointment ──
   const handleWantAppointmentChange = React.useCallback((value: "yes" | "no") => {
-    // Guard: only accept valid values
     if (value !== "yes" && value !== "no") return;
-
     setWantAppointment(value);
-
     if (value === "no") {
-      // Clear all appointment-specific fields when user selects "No"
       setDepartment("");
       setAppointmentPersonnel("");
       setAppointmentDate("");
@@ -334,23 +349,15 @@ export function useEditLead() {
         setLeadData(lead as unknown as Lead);
         setClinicId(lead.clinic_id ?? 1);
 
-        // Save original department_id so we never lose it
         const origDeptId = lead.department_id ?? null;
         setLeadDepartmentId(typeof origDeptId === "number" ? origDeptId : null);
 
+        // ── Shared fields ──
         setFullName(lead.full_name ?? "");
         setContactNo(lead.contact_no ?? "");
         setEmail(lead.email ?? "");
         setLocation(lead.location ?? "");
-        setGender(lead.gender === "male" ? "Male" : lead.gender === "female" ? "Female" : "");
-        setAge(lead.age?.toString() ?? "");
-        setMarital(lead.marital_status === "married" ? "Married" : lead.marital_status === "single" ? "Single" : "");
         setAddress(lead.address ?? "");
-        setLanguage(lead.language_preference ?? "");
-        setIsCouple(lead.partner_inquiry ? "yes" : "no");
-        setPartnerName(lead.partner_full_name ?? "");
-        setPartnerAge(lead.partner_age?.toString() ?? "");
-        setPartnerGender(lead.partner_gender === "male" ? "Male" : lead.partner_gender === "female" ? "Female" : "");
         setSource(lead.source ?? "");
         setSubSource(lead.sub_source ?? "");
 
@@ -362,17 +369,41 @@ export function useEditLead() {
         setNextStatus(lead.next_action_status ?? "");
         setNextDesc(lead.next_action_description ?? "");
 
+        // ── MEDICAL-only fields ──
+        if (IS_MEDICAL_APP) {
+          setGender(lead.gender === "male" ? "Male" : lead.gender === "female" ? "Female" : "");
+          setAge(lead.age?.toString() ?? "");
+          setMarital(lead.marital_status === "married" ? "Married" : lead.marital_status === "single" ? "Single" : "");
+          setLanguage(lead.language_preference ?? "");
+          setIsCouple(lead.partner_inquiry ? "yes" : "no");
+          setPartnerName(lead.partner_full_name ?? "");
+          setPartnerAge(lead.partner_age?.toString() ?? "");
+          setPartnerGender(lead.partner_gender === "male" ? "Male" : lead.partner_gender === "female" ? "Female" : "");
+        }
+
+        // ── CONTRACTS-only fields ──
+        if (IS_CONTRACTS_APP) {
+          const anyLead = lead as unknown as Record<string, unknown>;
+          setContactPersonName((anyLead.contact_person_name as string) ?? "");
+          setDesignation((anyLead.designation as string) ?? "");
+          setContactPersonPhone((anyLead.contact_person_phone as string) ?? "");
+          setContactPersonEmail((anyLead.contact_person_email as string) ?? "");
+          setLeadGeneratedBy((anyLead.lead_generated_by as string) ?? "");
+        }
+
         setTreatmentInterest(lead.treatment_interest ?? "");
         if (lead.treatment_interest) {
           setTreatments(lead.treatment_interest.split(",").map((t) => t.trim()));
         }
 
-        // ── FIX: Normalize book_appointment regardless of type (bool / number / string) ──
         const hasBooking = isTruthy(lead.book_appointment);
         setWantAppointment(hasBooking ? "yes" : "no");
 
         if (hasBooking) {
-          setDepartment(lead.department_id?.toString() ?? "");
+          // Only set department for appointment if medical app (contracts has no department field)
+          if (IS_MEDICAL_APP) {
+            setDepartment(lead.department_id?.toString() ?? "");
+          }
           const personnelId = (lead as unknown as { personal_id?: number }).personal_id;
           setAppointmentPersonnel(personnelId?.toString() ?? "");
           setAppointmentDate(lead.appointment_date ?? "");
@@ -461,9 +492,9 @@ export function useEditLead() {
 
     const bookingActive = wantAppointment === "yes";
 
-    // ── Validate appointment fields before hitting the API ──
     if (bookingActive) {
-      if (!department) {
+      // Department is only required for medical app
+      if (IS_MEDICAL_APP && !department) {
         setError("Please select a department for the appointment.");
         return;
       }
@@ -478,14 +509,8 @@ export function useEditLead() {
     }
 
     const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
-
-    // Backend does not allow changing lead department on update.
-    // Keep original lead department immutable; appointment department is only
-    // used to filter personnel/slots in UI.
-    const resolvedDeptId: number =
-      leadDepartmentId ?? leadData.department_id ?? clinicId;
-
-    const coupleActive = isCouple === "yes";
+    const resolvedDeptId: number = leadDepartmentId ?? leadData.department_id ?? clinicId;
+    const coupleActive = IS_MEDICAL_APP && isCouple === "yes";
 
     const updateData = {
       clinic_id: clinicId,
@@ -493,44 +518,55 @@ export function useEditLead() {
       full_name: fullName.trim(),
       contact_no: contactNo.trim(),
       email: strOrNull(email),
-      age: intOrNull(age),
-      marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
       location: location || "",
       address: address || "",
-
-      // ── Partner: only send partner fields when couple is active ──
-      partner_inquiry: coupleActive,
-      partner_full_name: coupleActive ? (partnerName || "") : "",
-      partner_age: coupleActive ? intOrNull(partnerAge) : null,
-      partner_gender: coupleActive && partnerGender
-        ? (partnerGender.toLowerCase() as "male" | "female")
-        : null,
-
       source,
       sub_source: subSource || "",
-
-      // ── campaign_id: preserve original type — send null when empty ──
       campaign_id: campaign ? String(campaign) : null,
-
       assigned_to_id: intOrNull(assignee),
       next_action_type: nextType || undefined,
       next_action_status: resolvedStatus,
       next_action_description: nextDesc || "",
       treatment_interest: treatments.length > 0 ? treatments.join(",") : (treatmentInterest || ""),
       is_active: leadData?.is_active !== false,
-      gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
-      language_preference: language || "",
-
       book_appointment: bookingActive,
 
-      // ── appointment fields: omit entirely when not booking ──
-      // API rejects null AND "" for appointment_date — must not send the key at all
+      // ── MEDICAL-only payload fields ──
+      ...(IS_MEDICAL_APP
+        ? {
+            age: intOrNull(age),
+            marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
+            gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
+            language_preference: language || "",
+            partner_inquiry: coupleActive,
+            partner_full_name: coupleActive ? (partnerName || "") : "",
+            partner_age: coupleActive ? intOrNull(partnerAge) : null,
+            partner_gender: coupleActive && partnerGender
+              ? (partnerGender.toLowerCase() as "male" | "female")
+              : null,
+          }
+        : {}),
+
+      // ── CONTRACTS-only payload fields ──
+      ...(IS_CONTRACTS_APP
+        ? {
+            contact_person_name: contactPersonName || "",
+            designation: designation || "",
+            contact_person_phone: contactPersonPhone || "",
+            contact_person_email: contactPersonEmail || "",
+            lead_generated_by: leadGeneratedBy || "",
+          }
+        : {}),
+
+      // ── Appointment fields: omit entirely when not booking ──
       ...(bookingActive
         ? {
             appointment_date: appointmentDate,
             slot: slot,
             remark: remark || "",
             personal_id: appointmentPersonnel ? intOrNull(appointmentPersonnel) : null,
+            // Department in appointment payload only for medical
+            ...(IS_MEDICAL_APP ? {} : {}),
           }
         : {
             appointment_date: undefined,
@@ -540,7 +576,6 @@ export function useEditLead() {
           }),
     };
 
-    // Debug: log exact payload so you can compare with what API expects
     console.log("Saving lead payload:", JSON.stringify(updateData, null, 2));
 
     setShowSuccess(true);
@@ -572,15 +607,10 @@ export function useEditLead() {
         const anyErr = err as { response?: { data?: { detail?: string; message?: string } }; detail?: string };
         if (anyErr?.response?.data?.detail) msg = anyErr.response.data.detail;
         else if (anyErr?.response?.data?.message) msg = anyErr.response.data.message;
-
         console.error("Save failed:", err);
         setError(msg);
         setShowSuccess(false);
-        toast.error(msg, {
-          position: "top-right",
-          autoClose: 5000,
-          theme: "colored",
-        });
+        toast.error(msg, { position: "top-right", autoClose: 5000, theme: "colored" });
       })
       .finally(() => {
         setSaving(false);
@@ -602,19 +632,12 @@ export function useEditLead() {
     loadingEmployees,
     employeeError, setEmployeeError,
     leadData,
+    // ── Shared fields ──
     fullName, setFullName,
     contactNo, setContactNo,
     email, setEmail,
     location, setLocation,
-    gender, setGender,
-    age, setAge,
-    marital, setMarital,
     address, setAddress,
-    language, setLanguage,
-    isCouple, setIsCouple,
-    partnerName, setPartnerName,
-    partnerAge, setPartnerAge,
-    partnerGender, setPartnerGender,
     source, setSource,
     subSource, setSubSource,
     campaign, handleCampaignChange,
@@ -624,6 +647,22 @@ export function useEditLead() {
     nextDesc, setNextDesc,
     availableTaskStatuses,
     handleNextTypeChange,
+    // ── Medical-only fields ──
+    gender, setGender,
+    age, setAge,
+    marital, setMarital,
+    language, setLanguage,
+    isCouple, setIsCouple,
+    partnerName, setPartnerName,
+    partnerAge, setPartnerAge,
+    partnerGender, setPartnerGender,
+    // ── Contracts-only fields ──
+    contactPersonName, setContactPersonName,
+    designation, setDesignation,
+    contactPersonPhone, setContactPersonPhone,
+    contactPersonEmail, setContactPersonEmail,
+    leadGeneratedBy, setLeadGeneratedBy,
+    // ── Step 2 ──
     treatmentInterest, setTreatmentInterest,
     treatments, setTreatments,
     documents,
@@ -632,6 +671,7 @@ export function useEditLead() {
     existingDocuments,
     docsLoading,
     handleRemoveExistingDocument,
+    // ── Step 3 ──
     wantAppointment,
     department, setDepartment,
     appointmentPersonnel, setAppointmentPersonnel,
@@ -641,5 +681,9 @@ export function useEditLead() {
     remark, setRemark,
     handleSave,
     handleWantAppointmentChange,
+    // ── App-type flags (pass through so EditLead.tsx can use directly) ──
+    IS_MEDICAL_APP,
+    IS_CONTRACTS_APP,
+    ACTIVE_FLOW_COPY,
   };
 }

@@ -56,19 +56,12 @@ export default function EditLead() {
     loadingEmployees,
     employeeError, setEmployeeError,
     leadData,
+    // ── Shared fields ──
     fullName, setFullName,
     contactNo, setContactNo,
     email, setEmail,
     location, setLocation,
-    gender, setGender,
-    age, setAge,
-    marital, setMarital,
     address, setAddress,
-    language, setLanguage,
-    isCouple, setIsCouple,
-    partnerName, setPartnerName,
-    partnerAge, setPartnerAge,
-    partnerGender, setPartnerGender,
     source,
     subSource,
     campaign, handleCampaignChange,
@@ -78,6 +71,22 @@ export default function EditLead() {
     nextDesc, setNextDesc,
     availableTaskStatuses,
     handleNextTypeChange,
+    // ── Medical-only fields ──
+    gender, setGender,
+    age, setAge,
+    marital, setMarital,
+    language, setLanguage,
+    isCouple, setIsCouple,
+    partnerName, setPartnerName,
+    partnerAge, setPartnerAge,
+    partnerGender, setPartnerGender,
+    // ── Contracts-only fields ──
+    contactPersonName, setContactPersonName,
+    designation, setDesignation,
+    contactPersonPhone, setContactPersonPhone,
+    contactPersonEmail, setContactPersonEmail,
+    leadGeneratedBy, setLeadGeneratedBy,
+    // ── Step 2 ──
     treatmentInterest, setTreatmentInterest,
     treatments, setTreatments,
     documents,
@@ -86,6 +95,7 @@ export default function EditLead() {
     existingDocuments,
     docsLoading,
     handleRemoveExistingDocument,
+    // ── Step 3 ──
     wantAppointment,
     department, setDepartment,
     appointmentPersonnel, setAppointmentPersonnel,
@@ -95,6 +105,10 @@ export default function EditLead() {
     remark, setRemark,
     handleSave,
     handleWantAppointmentChange,
+    // ── App-type flags ──
+    IS_MEDICAL_APP,
+    IS_CONTRACTS_APP,
+    ACTIVE_FLOW_COPY,
   } = useEditLead();
 
   // ====================== Loading / Error states ======================
@@ -206,7 +220,10 @@ export default function EditLead() {
           {/* ===== STEP 1 ===== */}
           {currentStep === 1 && (
             <Box>
+              {/* ── Section label: "LEAD INFORMATION" for both, but step label differs ── */}
               <Typography sx={sectionLabelStyle}>LEAD INFORMATION</Typography>
+
+              {/* ── Row 1: Full Name, Contact No, Email + conditionals ── */}
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
                 <Box>
                   <Typography sx={labelStyle}>Full Name *</Typography>
@@ -226,72 +243,135 @@ export default function EditLead() {
                 </Box>
               </Box>
 
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
-                <Box>
-                  <Typography sx={labelStyle}>Gender *</Typography>
-                  <TextField select fullWidth size="small" value={gender} onChange={(e) => setGender(e.target.value)} sx={inputStyle}>
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Male">Male</MenuItem>
-                    <MenuItem value="Female">Female</MenuItem>
-                    <MenuItem value="Other">Other</MenuItem>
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Age *</Typography>
-                  <TextField fullWidth size="small" type="number" value={age} onChange={(e) => setAge(e.target.value)} sx={inputStyle} />
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Marital Status</Typography>
-                  <TextField select fullWidth size="small" value={marital} onChange={(e) => setMarital(e.target.value)} sx={inputStyle}>
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="Married">Married</MenuItem>
-                    <MenuItem value="Single">Single</MenuItem>
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Address</Typography>
-                  <TextField fullWidth size="small" value={address} onChange={(e) => setAddress(e.target.value)} sx={inputStyle} />
-                </Box>
-              </Box>
-
-              <Box sx={{ mb: 3 }}>
-                <Typography sx={labelStyle}>Language Preference</Typography>
-                <TextField select size="small" value={language} onChange={(e) => setLanguage(e.target.value)} sx={{ ...inputStyle, maxWidth: "25%" }}>
-                  <MenuItem value="">-- Select --</MenuItem>
-                  <MenuItem value="English">English</MenuItem>
-                  <MenuItem value="Hindi">Hindi</MenuItem>
-                  <MenuItem value="Kannada">Kannada</MenuItem>
-                </TextField>
-              </Box>
-
-              {/* ---- Partner Information ---- */}
-              <Typography sx={sectionLabelStyle}>PARTNER INFORMATION</Typography>
-              <Box sx={{ mb: 1.5 }}>
-                <Typography sx={{ ...labelStyle, mb: 0.5 }}>Is This Inquiry For A Couple?</Typography>
-                <RadioGroup row value={isCouple} onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}>
-                  <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
-                  <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
-                </RadioGroup>
-              </Box>
-              {isCouple === "yes" && (
-                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 3 }}>
+              {/* ── Row 2: MEDICAL — Gender, Age, Marital Status, Address ── */}
+              {IS_MEDICAL_APP && (
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
                   <Box>
-                    <Typography sx={labelStyle}>Full Name</Typography>
-                    <TextField fullWidth size="small" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} sx={inputStyle} />
-                  </Box>
-                  <Box>
-                    <Typography sx={labelStyle}>Age</Typography>
-                    <TextField fullWidth size="small" type="number" value={partnerAge} onChange={(e) => setPartnerAge(e.target.value)} sx={inputStyle} />
-                  </Box>
-                  <Box>
-                    <Typography sx={labelStyle}>Gender</Typography>
-                    <TextField select fullWidth size="small" value={partnerGender} onChange={(e) => setPartnerGender(e.target.value)} sx={inputStyle}>
+                    <Typography sx={labelStyle}>Gender *</Typography>
+                    <TextField select fullWidth size="small" value={gender} onChange={(e) => setGender(e.target.value)} sx={inputStyle}>
                       <MenuItem value="">-- Select --</MenuItem>
                       <MenuItem value="Male">Male</MenuItem>
                       <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
                     </TextField>
                   </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Age *</Typography>
+                    <TextField fullWidth size="small" type="number" value={age} onChange={(e) => setAge(e.target.value)} sx={inputStyle} />
+                  </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Marital Status</Typography>
+                    <TextField select fullWidth size="small" value={marital} onChange={(e) => setMarital(e.target.value)} sx={inputStyle}>
+                      <MenuItem value="">-- Select --</MenuItem>
+                      <MenuItem value="Married">Married</MenuItem>
+                      <MenuItem value="Single">Single</MenuItem>
+                    </TextField>
+                  </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Address</Typography>
+                    <TextField fullWidth size="small" value={address} onChange={(e) => setAddress(e.target.value)} sx={inputStyle} />
+                  </Box>
                 </Box>
+              )}
+
+              {/* ── MEDICAL — Language Preference ── */}
+              {IS_MEDICAL_APP && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography sx={labelStyle}>Language Preference</Typography>
+                  <TextField select size="small" value={language} onChange={(e) => setLanguage(e.target.value)} sx={{ ...inputStyle, maxWidth: "25%" }}>
+                    <MenuItem value="">-- Select --</MenuItem>
+                    <MenuItem value="English">English</MenuItem>
+                    <MenuItem value="Hindi">Hindi</MenuItem>
+                    <MenuItem value="Kannada">Kannada</MenuItem>
+                  </TextField>
+                </Box>
+              )}
+
+              {/* ── CONTRACTS — Address (single row below email row) ── */}
+              {IS_CONTRACTS_APP && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography sx={labelStyle}>Address</Typography>
+                  <TextField fullWidth size="small" value={address} onChange={(e) => setAddress(e.target.value)} sx={inputStyle} />
+                </Box>
+              )}
+
+              {/* ── MEDICAL — Partner Information ── */}
+              {IS_MEDICAL_APP && (
+                <>
+                  <Typography sx={sectionLabelStyle}>PARTNER INFORMATION</Typography>
+                  <Box sx={{ mb: 1.5 }}>
+                    <Typography sx={{ ...labelStyle, mb: 0.5 }}>Is This Inquiry For A Couple?</Typography>
+                    <RadioGroup row value={isCouple} onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}>
+                      <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
+                      <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+                    </RadioGroup>
+                  </Box>
+                  {isCouple === "yes" && (
+                    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 3 }}>
+                      <Box>
+                        <Typography sx={labelStyle}>Full Name</Typography>
+                        <TextField fullWidth size="small" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} sx={inputStyle} />
+                      </Box>
+                      <Box>
+                        <Typography sx={labelStyle}>Age</Typography>
+                        <TextField fullWidth size="small" type="number" value={partnerAge} onChange={(e) => setPartnerAge(e.target.value)} sx={inputStyle} />
+                      </Box>
+                      <Box>
+                        <Typography sx={labelStyle}>Gender</Typography>
+                        <TextField select fullWidth size="small" value={partnerGender} onChange={(e) => setPartnerGender(e.target.value)} sx={inputStyle}>
+                          <MenuItem value="">-- Select --</MenuItem>
+                          <MenuItem value="Male">Male</MenuItem>
+                          <MenuItem value="Female">Female</MenuItem>
+                        </TextField>
+                      </Box>
+                    </Box>
+                  )}
+                </>
+              )}
+
+              {/* ── CONTRACTS — Contact Information section ── */}
+              {IS_CONTRACTS_APP && (
+                <>
+                  <Typography sx={sectionLabelStyle}>
+                    {ACTIVE_FLOW_COPY.contactSectionLabel}
+                  </Typography>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
+                    <Box>
+                      <Typography sx={labelStyle}>Full Name</Typography>
+                      <TextField
+                        fullWidth size="small" value={contactPersonName}
+                        onChange={(e) => setContactPersonName(e.target.value)} sx={inputStyle}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Designation</Typography>
+                      <TextField
+                        select fullWidth size="small" value={designation}
+                        onChange={(e) => setDesignation(e.target.value)} sx={inputStyle}
+                      >
+                        <MenuItem value="">-- Select --</MenuItem>
+                        <MenuItem value="Manager">Manager</MenuItem>
+                        <MenuItem value="Director">Director</MenuItem>
+                        <MenuItem value="Executive">Executive</MenuItem>
+                        <MenuItem value="Other">Other</MenuItem>
+                      </TextField>
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Contact No.</Typography>
+                      <TextField
+                        fullWidth size="small" value={contactPersonPhone}
+                        onChange={(e) => setContactPersonPhone(e.target.value)} sx={inputStyle}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Email</Typography>
+                      <TextField
+                        fullWidth size="small" value={contactPersonEmail}
+                        onChange={(e) => setContactPersonEmail(e.target.value)} sx={inputStyle}
+                      />
+                    </Box>
+                  </Box>
+                </>
               )}
 
               {/* ---- Source & Campaign ---- */}
@@ -349,8 +429,17 @@ export default function EditLead() {
                 </Box>
               </Box>
 
+              {/* ---- Assignee & Next Action ---- */}
               <Typography sx={sectionLabelStyle}>ASSIGNEE & NEXT ACTION DETAILS</Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 2 }}>
+              <Box sx={{
+                display: "grid",
+                // CONTRACTS app shows "Lead Generated By" so needs 5 cols; medical stays at 4
+                gridTemplateColumns: IS_CONTRACTS_APP
+                  ? "repeat(5, 1fr)"
+                  : "repeat(4, 1fr)",
+                gap: 2,
+                mb: 2,
+              }}>
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
                   <TextField
@@ -406,6 +495,25 @@ export default function EditLead() {
                   <Typography sx={labelStyle}>Next Action Description</Typography>
                   <TextField fullWidth size="small" value={nextDesc} onChange={(e) => setNextDesc(e.target.value)} sx={inputStyle} />
                 </Box>
+
+                {/* ── CONTRACTS-only: Lead Generated By ── */}
+                {IS_CONTRACTS_APP && (
+                  <Box>
+                    <Typography sx={labelStyle}>Lead Generated By</Typography>
+                    <TextField
+                      select fullWidth size="small" value={leadGeneratedBy}
+                      onChange={(e) => setLeadGeneratedBy(e.target.value)}
+                      sx={inputStyle} disabled={loadingEmployees}
+                    >
+                      <MenuItem value=""><em>-- Select Employee --</em></MenuItem>
+                      {employees.map((emp) => (
+                        <MenuItem key={emp.id} value={emp.id.toString()}>
+                          {emp.emp_name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Box>
+                )}
               </Box>
             </Box>
           )}
@@ -413,9 +521,13 @@ export default function EditLead() {
           {/* ===== STEP 2 ===== */}
           {currentStep === 2 && (
             <Box>
-              <Typography sx={sectionLabelStyle}>TREATMENT INFORMATION</Typography>
+              {/* Section label is dynamic: "TREATMENT INFORMATION" vs "PRODUCT INFORMATION" */}
+              <Typography sx={sectionLabelStyle}>
+                {ACTIVE_FLOW_COPY.medicalSection.toUpperCase()}
+              </Typography>
               <Box sx={{ mb: 2 }}>
-                <Typography sx={labelStyle}>Treatment Interest *</Typography>
+                {/* Treatment/Product label is dynamic */}
+                <Typography sx={labelStyle}>{ACTIVE_FLOW_COPY.treatmentLabel} *</Typography>
                 <TextField
                   select size="small" value={treatmentInterest}
                   onChange={(e) => {
@@ -426,10 +538,10 @@ export default function EditLead() {
                   sx={{ ...inputStyle, maxWidth: "50%" }}
                 >
                   <MenuItem value="" disabled>Select</MenuItem>
-                  <MenuItem value="Medical Checkup">Medical Checkup</MenuItem>
-                  <MenuItem value="IVF">IVF</MenuItem>
-                  <MenuItem value="IUI">IUI</MenuItem>
-                  <MenuItem value="Consultation">Consultation</MenuItem>
+                  {/* Options come from config — dynamic per app type */}
+                  {ACTIVE_FLOW_COPY.treatmentOptions.map((opt) => (
+                    <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                  ))}
                 </TextField>
               </Box>
               {treatments.length > 0 && (
@@ -580,7 +692,6 @@ export default function EditLead() {
 
               <Box sx={{ mb: 1.5 }}>
                 <Typography sx={{ ...labelStyle, mb: 0.5 }}>Want to Book an Appointment?</Typography>
-                {/* ── FIX: explicit string comparison, no type casting issues ── */}
                 <RadioGroup
                   row
                   value={wantAppointment}
@@ -596,30 +707,39 @@ export default function EditLead() {
                 </RadioGroup>
               </Box>
 
-              {/* ── FIX: strict equality check ensures section shows/hides correctly ── */}
               {wantAppointment === "yes" && (
                 <Box>
-                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
-                    <Box>
-                      <Typography sx={labelStyle}>Department *</Typography>
-                      <TextField
-                        select fullWidth size="small" value={department}
-                        onChange={(e) => {
-                          setDepartment(e.target.value);
-                          setAppointmentPersonnel("");
-                        }}
-                        sx={inputStyle}
-                        disabled={loadingDepartments}
-                        InputProps={{
-                          endAdornment: loadingDepartments ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null,
-                        }}
-                      >
-                        <MenuItem value=""><em>-- Select Department --</em></MenuItem>
-                        {departments.map((dept) => (
-                          <MenuItem key={dept.id} value={dept.id.toString()}>{dept.name}</MenuItem>
-                        ))}
-                      </TextField>
-                    </Box>
+                  <Box sx={{
+                    display: "grid",
+                    // MEDICAL shows Department + Personnel; CONTRACTS shows only Personnel
+                    gridTemplateColumns: IS_MEDICAL_APP ? "repeat(2, 1fr)" : "repeat(1, 1fr)",
+                    gap: 2,
+                    mb: 2,
+                    maxWidth: IS_CONTRACTS_APP ? "50%" : "100%",
+                  }}>
+                    {/* ── MEDICAL-only: Department field ── */}
+                    {IS_MEDICAL_APP && (
+                      <Box>
+                        <Typography sx={labelStyle}>Department *</Typography>
+                        <TextField
+                          select fullWidth size="small" value={department}
+                          onChange={(e) => {
+                            setDepartment(e.target.value);
+                            setAppointmentPersonnel("");
+                          }}
+                          sx={inputStyle}
+                          disabled={loadingDepartments}
+                          InputProps={{
+                            endAdornment: loadingDepartments ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null,
+                          }}
+                        >
+                          <MenuItem value=""><em>-- Select Department --</em></MenuItem>
+                          {departments.map((dept) => (
+                            <MenuItem key={dept.id} value={dept.id.toString()}>{dept.name}</MenuItem>
+                          ))}
+                        </TextField>
+                      </Box>
+                    )}
                     <Box>
                       <Typography sx={labelStyle}>Personnel</Typography>
                       <TextField
@@ -627,16 +747,17 @@ export default function EditLead() {
                         value={appointmentPersonnel}
                         onChange={(e) => setAppointmentPersonnel(e.target.value)}
                         sx={inputStyle}
-                        disabled={loadingEmployees || !department}
+                        // MEDICAL: disabled until department chosen; CONTRACTS: always enabled
+                        disabled={loadingEmployees || (IS_MEDICAL_APP && !department)}
                       >
-                        {!department ? (
+                        {IS_MEDICAL_APP && !department ? (
                           <MenuItem value="" disabled>Select department first</MenuItem>
-                        ) : filteredPersonnel.length === 0 ? (
+                        ) : filteredPersonnel.length === 0 && IS_MEDICAL_APP ? (
                           <MenuItem value="" disabled>No employees in this department</MenuItem>
                         ) : (
                           [
                             <MenuItem key="" value=""><em>-- Select Personnel --</em></MenuItem>,
-                            ...filteredPersonnel.map((emp) => (
+                            ...(IS_MEDICAL_APP ? filteredPersonnel : employees).map((emp) => (
                               <MenuItem key={emp.id} value={emp.id.toString()}>
                                 {emp.emp_name} ({emp.emp_type})
                               </MenuItem>
