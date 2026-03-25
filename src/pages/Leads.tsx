@@ -6,24 +6,146 @@ import {
   IconButton,
   Button,
 } from "@mui/material";
+import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import ExcelJS from "exceljs";
 
 import Filter_Leads from "../assets/icons/Filter_Leads.svg";
 import Leads_Gridview from "../assets/icons/Leads_Gridview.svg";
 import Leads_Tableview_icon from "../assets/icons/Leads_Tableview_icon.svg";
 
 import type { FilterValues } from "../types/leads.types";
-import type { Lead } from "../services/leads.api";
+import { DepartmentAPI, LeadAPI } from "../services/leads.api";
+import type { Department, Lead, LeadPayload } from "../services/leads.api";
 
 import { fetchLeads, selectLeads } from "../store/leadSlice";
+import { selectClinic } from "../store/clinicSlice";
 import type { AppDispatch } from "../store";
 import "../styles/Leads/leads.css";
 
 const STORAGE_KEY_FILTERS = "leads_filters";
 const STORAGE_KEY_TAB = "leads_active_tab";
 const STORAGE_KEY_VIEW = "leads_view_mode";
+
+interface HeaderMatch {
+  tableHeader: string;
+  importedHeader: string;
+  payloadKey: keyof LeadPayload | "assigned_to_name" | "department_name";
+}
+
+interface ImportedRow {
+  rowNumber: number;
+  values: Record<string, string>;
+}
+
+const IMPORT_FIELD_CONFIGS: Array<{
+  payloadKey: keyof LeadPayload | "assigned_to_name" | "department_name";
+  tableHeader: string;
+  aliases: string[];
+}> = [
+  { payloadKey: "full_name", tableHeader: "Lead Name | No", aliases: ["lead name", "full name", "name", "lead_name", "full_name"] },
+  { payloadKey: "contact_no", tableHeader: "Lead Name | No", aliases: ["lead no", "lead number", "contact no", "contact number", "phone", "phone number", "mobile", "mobile number", "contact_no"] },
+  { payloadKey: "location", tableHeader: "Location", aliases: ["location", "city", "area"] },
+  { payloadKey: "source", tableHeader: "Source", aliases: ["source", "lead source"] },
+  { payloadKey: "lead_status", tableHeader: "Lead Status", aliases: ["lead status", "status", "lead_status"] },
+  { payloadKey: "assigned_to_name", tableHeader: "Assigned To", aliases: ["assigned to", "assignee", "owner", "assigned_to"] },
+  { payloadKey: "department_name", tableHeader: "Department", aliases: ["department", "department name", "department_name"] },
+  { payloadKey: "email", tableHeader: "Email", aliases: ["email", "mail", "email address"] },
+  { payloadKey: "treatment_interest", tableHeader: "Treatment Interest", aliases: ["treatment interest", "treatment", "service", "interest"] },
+  { payloadKey: "appointment_date", tableHeader: "Date | Time", aliases: ["appointment date", "date", "date time", "created at", "created_at"] },
+  { payloadKey: "slot", tableHeader: "Date | Time", aliases: ["slot", "time", "appointment time"] },
+  { payloadKey: "remark", tableHeader: "Activity", aliases: ["remark", "remarks", "notes", "activity"] },
+  { payloadKey: "address", tableHeader: "Address", aliases: ["address"] },
+];
+
+const normalizeHeader = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/\|/g, " ")
+    .replace(/_/g, " ")
+    .replace(/\//g, " ")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizeLeadStatus = (value: string): "new" | "contacted" => {
+  const normalized = value.toLowerCase().trim();
+  if (
+    normalized.includes("contact") ||
+    normalized.includes("follow") ||
+    normalized.includes("appoint") ||
+    normalized.includes("convert") ||
+    normalized.includes("lost")
+  ) {
+    return "contacted";
+  }
+  return "new";
+};
+
+const sanitizeImportedEmail = (value: string): string | null => {
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailPattern.test(normalized) ? normalized : null;
+};
+
+const formatDateParts = (year: number, month: number, day: number): string | null => {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const normalizeImportedDate = (value: string): string | null => {
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  if (/^\d{5}(?:\.\d+)?$/.test(normalized)) {
+    const serial = Number(normalized);
+    if (!Number.isNaN(serial)) {
+      const excelEpoch = Date.UTC(1899, 11, 30);
+      const date = new Date(excelEpoch + Math.round(serial) * 24 * 60 * 60 * 1000);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+    }
+  }
+
+  const dateOnly = normalized.split("T")[0].split(" ")[0].trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+    const [year, month, day] = dateOnly.split("-").map(Number);
+    return formatDateParts(year, month, day);
+  }
+
+  const slashOrDashMatch = dateOnly.match(/^(\d{1,4})[/-](\d{1,2})[/-](\d{1,4})$/);
+  if (slashOrDashMatch) {
+    const first = Number(slashOrDashMatch[1]);
+    const second = Number(slashOrDashMatch[2]);
+    const third = Number(slashOrDashMatch[3]);
+
+    if (slashOrDashMatch[1].length === 4) {
+      return formatDateParts(first, second, third);
+    }
+
+    if (slashOrDashMatch[3].length === 4) {
+      return formatDateParts(third, second, first);
+    }
+  }
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+};
 
 const LeadsTable = React.lazy(() => import("../components/LeadsHub/LeadsTable"));
 const LeadsBoard = React.lazy(() => import("../components/LeadsHub/LeadsBoard"));
@@ -37,6 +159,7 @@ const Leads: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
 
   const leads = useSelector(selectLeads);
+  const clinic = useSelector(selectClinic);
 
   const loadSavedFilters = (): FilterValues => {
     try {
@@ -74,6 +197,9 @@ const Leads: React.FC = () => {
   const [viewMode, setViewMode] = React.useState<"table" | "board">(loadSavedViewMode());
   const [activeFilters, setActiveFilters] = React.useState<FilterValues>(loadSavedFilters());
   const [counts, setCounts] = React.useState({ all: 0, followUps: 0, archived: 0 });
+  const importInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [importedLeads, setImportedLeads] = React.useState<Lead[]>([]);
+  const [isSavingImport, setIsSavingImport] = React.useState(false);
 
   const applyFilters = React.useCallback((leadsToFilter: Array<Lead & { status?: string }>) => {
     return leadsToFilter.filter((lead) => {
@@ -162,6 +288,285 @@ const Leads: React.FC = () => {
     { label: "Activity", count: null },
   ];
 
+  const visibleLeads = React.useMemo(() => {
+    const filteredLeads = applyFilters(leads);
+    const followUpStatuses = ["new", "lost", "cycle conversion"];
+
+    if (tab === 2) {
+      return filteredLeads.filter((lead) => lead.is_active === false);
+    }
+
+    if (tab === 1) {
+      return filteredLeads.filter((lead) => {
+        const status = (lead.lead_status || lead.status || "").toLowerCase().trim();
+        return lead.is_active !== false && followUpStatuses.includes(status);
+      });
+    }
+
+    return filteredLeads.filter((lead) => lead.is_active !== false);
+  }, [applyFilters, leads, tab]);
+
+  const saveImportedRowsToDb = React.useCallback(async (rows: ImportedRow[], headerMatches: HeaderMatch[]) => {
+    if (headerMatches.length === 0 || rows.length === 0) {
+      toast.info("Import a file with matched headers first.");
+      return;
+    }
+
+    setIsSavingImport(true);
+
+    const clinicId = clinic?.id ?? (Number(localStorage.getItem("clinic_id") || 0) || leads[0]?.clinic_id || 1);
+
+    let departments: Department[] = [];
+    try {
+      departments = await DepartmentAPI.listActiveByClinic(clinicId);
+    } catch {
+      departments = [];
+    }
+
+    const defaultDepartmentId = departments[0]?.id ?? leads[0]?.department_id ?? 1;
+    const departmentByName = new Map(
+      departments.map((department) => [normalizeHeader(department.name), department.id]),
+    );
+    const sourceHeaderByPayloadKey = new Map(
+      headerMatches.map((match) => [match.payloadKey, match.importedHeader]),
+    );
+    const getValue = (row: ImportedRow, payloadKey: HeaderMatch["payloadKey"]): string => {
+      const sourceHeader = sourceHeaderByPayloadKey.get(payloadKey);
+      return sourceHeader ? String(row.values[sourceHeader] ?? "").trim() : "";
+    };
+
+    const createdLeads: Lead[] = [];
+    let failedCount = 0;
+
+    for (const row of rows) {
+      const departmentName = getValue(row, "department_name");
+      const resolvedDepartmentId =
+        departmentByName.get(normalizeHeader(departmentName)) ?? defaultDepartmentId;
+      const appointmentDate = normalizeImportedDate(getValue(row, "appointment_date"));
+      const slot = getValue(row, "slot");
+      const hasAppointmentDetails = Boolean(appointmentDate && slot);
+      const sanitizedEmail = sanitizeImportedEmail(getValue(row, "email"));
+
+      const payload: LeadPayload = {
+        clinic_id: clinicId,
+        department_id: resolvedDepartmentId,
+        full_name: getValue(row, "full_name") || "Unknown Lead",
+        contact_no: getValue(row, "contact_no") || "0000000000",
+        email: sanitizedEmail,
+        location: getValue(row, "location") || "",
+        address: getValue(row, "address") || "",
+        source: getValue(row, "source") || "Direct",
+        treatment_interest: getValue(row, "treatment_interest") || "General",
+        appointment_date: appointmentDate || null,
+        slot: slot || "",
+        remark: getValue(row, "remark") || "",
+        partner_inquiry: false,
+        book_appointment: hasAppointmentDetails,
+        is_active: true,
+        lead_status: normalizeLeadStatus(getValue(row, "lead_status")),
+        assigned_to_id: null,
+        personal_id: null,
+        campaign_id: null,
+        age: null,
+        marital_status: null,
+        next_action_status: null,
+      };
+
+      try {
+        const createdLead = await LeadAPI.create(payload);
+        createdLeads.push(createdLead);
+      } catch {
+        failedCount += 1;
+      }
+    }
+
+    if (createdLeads.length > 0) {
+      setImportedLeads((current) => [...current, ...createdLeads]);
+      await dispatch(fetchLeads());
+    }
+
+    if (createdLeads.length > 0 && failedCount === 0) {
+      toast.success(`${createdLeads.length} leads imported and saved to DB.`);
+    } else if (createdLeads.length > 0) {
+      toast.warning(`${createdLeads.length} leads saved, ${failedCount} failed.`);
+    } else {
+      toast.error("No imported rows could be saved.");
+    }
+
+    setIsSavingImport(false);
+  }, [clinic?.id, dispatch, leads]);
+
+  const handleExport = () => {
+    if (visibleLeads.length === 0) {
+      toast.info("No leads available to export.");
+      return;
+    }
+
+    const headers = [
+      "Lead ID",
+      "Name",
+      "Phone",
+      "Email",
+      "Status",
+      "Source",
+      "Department",
+      "Assigned To",
+      "Created At",
+    ];
+
+    const escapeCsv = (value: unknown): string => {
+      const text = String(value ?? "");
+      if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+      return text;
+    };
+
+    const rows = visibleLeads.map((lead) => [
+      lead.id,
+      lead.full_name,
+      lead.contact_no,
+      lead.email || "",
+      lead.lead_status || lead.status || "",
+      lead.source,
+      lead.department_name,
+      lead.assigned_to_name || "",
+      lead.created_at,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => escapeCsv(cell)).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    anchor.href = url;
+    anchor.download = `leads_export_${stamp}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+
+    toast.success("Leads exported successfully.");
+  };
+
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const isExcelFile = /\.(xlsx|xls)$/i.test(file.name);
+    const isCsvFile = /\.csv$/i.test(file.name);
+    if (!isExcelFile && !isCsvFile) {
+      toast.error("Please select a valid file (.xlsx, .xls, or .csv).");
+      event.target.value = "";
+      return;
+    }
+
+    void (async () => {
+      try {
+        let sourceHeaders: string[] = [];
+        let parsedRows: ImportedRow[] = [];
+
+        if (isCsvFile) {
+          const text = await file.text();
+          const lines = text
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+          sourceHeaders = (lines[0] ?? "")
+            .split(",")
+            .map((value: string) => value.trim().replace(/^"|"$/g, ""))
+            .filter((value: string) => value.length > 0);
+
+          parsedRows = lines.slice(1).map((line: string, index: number) => {
+            const columns = line
+              .split(",")
+              .map((value: string) => value.trim().replace(/^"|"$/g, ""));
+
+            const values = sourceHeaders.reduce<Record<string, string>>((accumulator, header, headerIndex) => {
+              accumulator[header] = String(columns[headerIndex] ?? "").trim();
+              return accumulator;
+            }, {});
+
+            return {
+              rowNumber: index + 2,
+              values,
+            };
+          });
+        } else {
+          if (/\.xls$/i.test(file.name)) {
+            toast.error("Old .xls files are not supported here. Please use .xlsx or .csv.");
+            return;
+          }
+
+          const buffer = await file.arrayBuffer();
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(buffer);
+
+          const worksheet = workbook.worksheets[0];
+          if (!worksheet) {
+            toast.error("No worksheet found in the selected file.");
+            return;
+          }
+
+          const firstRow = worksheet.getRow(1);
+          const rowValues = Array.isArray(firstRow.values) ? firstRow.values : [];
+          sourceHeaders = rowValues
+            .slice(1)
+            .map((value: unknown) => String(value ?? "").trim())
+            .filter((value: string) => value.length > 0);
+
+          parsedRows = [];
+          worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+
+            const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+            const rowRecord = sourceHeaders.reduce<Record<string, string>>((accumulator, header, index) => {
+              accumulator[header] = String(values[index] ?? "").trim();
+              return accumulator;
+            }, {});
+
+            const hasData = Object.values(rowRecord).some((value) => value.length > 0);
+            if (hasData) {
+              parsedRows.push({ rowNumber, values: rowRecord });
+            }
+          });
+        }
+
+        const normalizedSourceHeaders = new Map(sourceHeaders.map((header) => [normalizeHeader(header), header]));
+        const matched = IMPORT_FIELD_CONFIGS
+          .map((config) => {
+            const matchedSourceHeader = config.aliases
+              .map((alias) => normalizedSourceHeaders.get(normalizeHeader(alias)))
+              .find((value) => Boolean(value));
+
+            if (!matchedSourceHeader) return null;
+
+            return {
+              tableHeader: config.tableHeader,
+              importedHeader: matchedSourceHeader,
+              payloadKey: config.payloadKey,
+            } satisfies HeaderMatch;
+          })
+          .filter((value): value is HeaderMatch => value !== null);
+
+        if (matched.length > 0) {
+          await saveImportedRowsToDb(parsedRows, matched);
+        } else {
+          toast.info("No matching headers found with Leads table.");
+        }
+      } catch {
+        toast.error("Failed to read imported file.");
+      }
+    })();
+
+    event.target.value = "";
+  };
+
   return (
     <Box className="leads-page">
       {/* HEADER */}
@@ -177,6 +582,14 @@ const Leads: React.FC = () => {
         </Typography>
 
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flexShrink: 0, flexWrap: "nowrap" }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            style={{ display: "none" }}
+            onChange={handleImportChange}
+          />
+
           {/* Search */}
           <Box
             sx={{
@@ -283,13 +696,53 @@ const Leads: React.FC = () => {
       </Stack>
 
       {/* PILL TABS */}
-      <Stack direction="row" spacing={1} className="pill-tabs" sx={{ mb: 3 }}>
-        {tabs.map((t, i) => (
-          <Box key={i} className={`pill-tab ${tab === i ? "active" : ""}`} onClick={() => setTab(i)}>
-            {t.label}
-            {t.count !== null && <span className="tab-count">({t.count})</span>}
-          </Box>
-        ))}
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3, gap: 1.5 }}>
+        <Stack direction="row" spacing={1} className="pill-tabs" sx={{ mb: 0 }}>
+          {tabs.map((t, i) => (
+            <Box key={i} className={`pill-tab ${tab === i ? "active" : ""}`} onClick={() => setTab(i)}>
+              {t.label}
+              {t.count !== null && <span className="tab-count">({t.count})</span>}
+            </Box>
+          ))}
+        </Stack>
+
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="contained"
+            startIcon={<FileDownloadOutlinedIcon />}
+            onClick={handleImportClick}
+            disabled={isSavingImport}
+            sx={{
+              flexShrink: 0,
+              textTransform: "none",
+              borderRadius: "10px",
+              bgcolor: "#1F2937",
+              color: "#FFFFFF",
+              height: 36,
+              "&:hover": { bgcolor: "#111827" },
+              "&:disabled": { bgcolor: "#9CA3AF", color: "#FFFFFF" },
+            }}
+          >
+            {isSavingImport ? "Importing..." : "Import"}
+          </Button>
+
+          <Button
+            variant="contained"
+            startIcon={<FileUploadOutlinedIcon />}
+            onClick={handleExport}
+            sx={{
+              flexShrink: 0,
+              textTransform: "none",
+              borderRadius: "10px",
+              bgcolor: "#1F2937",
+              color: "#FFFFFF",
+              height: 36,
+              "&:hover": { bgcolor: "#111827" },
+            }}
+          >
+            Export
+          </Button>
+        </Stack>
       </Stack>
 
       {/* CONTENT */}
@@ -299,7 +752,12 @@ const Leads: React.FC = () => {
         {tab === 4 && <Activity />}
         {tab !== 1 && tab !== 3 && tab !== 4 && (
           viewMode === "table" ? (
-            <LeadsTable search={search} tab={tab === 2 ? "archived" : "active"} filters={activeFilters} />
+            <LeadsTable
+              search={search}
+              tab={tab === 2 ? "archived" : "active"}
+              filters={activeFilters}
+              importedLeads={tab === 0 ? importedLeads : []}
+            />
           ) : (
             <LeadsBoard search={search} filters={activeFilters} />
           )

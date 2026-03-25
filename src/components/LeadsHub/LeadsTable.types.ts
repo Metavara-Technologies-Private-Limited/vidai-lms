@@ -41,6 +41,7 @@ export interface Props {
   search: string;
   tab: "active" | "archived";
   filters?: FilterValues;
+  importedLeads?: RawLead[];
 }
 
 export interface ApiErrorShape {
