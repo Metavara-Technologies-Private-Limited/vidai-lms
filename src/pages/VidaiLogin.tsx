@@ -7,6 +7,7 @@ import styles from "../styles/VidaiLogin.module.css";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../store";
 import { setAuth } from "../store/authSlice";
+import { authApi } from "../services/auth.api";
 
 // const AUTH_TOKEN_KEY = "auth_token";
 // const AUTH_TOKEN_ALT_KEY = "authToken";
@@ -172,19 +173,12 @@ export default function VidaiLogin() {
     }
 
     try {
-      const response = await fetch("/api/login/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: username.trim(),
-          password: password.trim(),
-        }),
+      const user = await authApi.login({
+        username: username.trim(),
+        password: password.trim(),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.message || t.loginFailed);
-
-      dispatch(setAuth(data));
+      dispatch(setAuth(user));
       localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
 
       navigate("/dashboard", { replace: true });
