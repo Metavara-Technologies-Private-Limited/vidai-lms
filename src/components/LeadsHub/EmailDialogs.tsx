@@ -1,24 +1,25 @@
 import * as React from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, Divider, FormControlLabel, IconButton,
-  Radio, RadioGroup, Stack, TextField, Tooltip, Typography, Paper,
-  ClickAwayListener,
+  DialogContent, DialogTitle, Divider, IconButton,
+  Stack, TextField, Tooltip, Typography,
+  Avatar, InputBase, MenuItem, Radio,
+  Checkbox, Popover,
 } from "@mui/material";
 import { toast } from "react-toastify";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import SendIcon from "@mui/icons-material/Send";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
-import LinkIcon from "@mui/icons-material/Link";
 import EmojiEmotionsOutlinedIcon from "@mui/icons-material/EmojiEmotionsOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import FormatColorTextOutlinedIcon from "@mui/icons-material/FormatColorTextOutlined";
 import BrushOutlinedIcon from "@mui/icons-material/BrushOutlined";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 
 import type { ProcessedLead } from "./LeadsTable.types";
 import { extractErrorMessage } from "./LeadsTable.helpers";
@@ -26,6 +27,7 @@ import { outlineBtn, darkBtn } from "./LeadsTable.styles";
 import { EmojiPicker, FormatMenu, MoreMenu } from "./LeadsTable.toolbarcomponents";
 import { EmailTemplateAPI, LeadEmailAPI } from "../../services/leads.api";
 import type { EmailTemplate } from "../../services/leads.api";
+import { clinicsApi } from "../../services/tickets.api";
 
 // ── Shared toast options ──────────────────────────────────────────────────────
 const toastOptions = {
@@ -34,290 +36,177 @@ const toastOptions = {
   theme: "colored" as const,
 };
 
-// ── Clinic ID (update if dynamic) ─────────────────────────────────────────────
+// ── Clinic ID ─────────────────────────────────────────────────────────────────
 const CLINIC_ID = 1;
 
-// ── Strip HTML tags to produce plain text ─────────────────────────────────────
-const stripHtml = (html: string): string =>
-  html
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/div>/gi, "\n")
-    .replace(/<\/li>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&quot;/g, '"')
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+// ── Strip HTML tags ───────────────────────────────────────────────────────────
+const decodeEntities = (str: string): string => {
+  try {
+    const el = document.createElement("textarea");
+    el.innerHTML = str;
+    return el.value;
+  } catch {
+    return str
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  }
+};
 
-// ── Detect if a string contains HTML tags ────────────────────────────────────
-const isHtml = (text: string): boolean => /<[a-z][\s\S]*>/i.test(text);
+const stripHtml = (html: string): string => {
+  if (!html) return "";
+  let text = decodeEntities(html);
+  text = decodeEntities(text);
+  text = text
+    .replace(/<\/p\s*>/gi, "\n").replace(/<\/div\s*>/gi, "\n")
+    .replace(/<\/li\s*>/gi, "\n").replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/h[1-6]\s*>/gi, "\n").replace(/<\/tr\s*>/gi, "\n");
+  text = text.replace(/<[^>]*>/g, "");
+  text = text
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  return text.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").trim();
+};
 
-// ── Validate email format ─────────────────────────────────────────────────────
+// ── Validate email ────────────────────────────────────────────────────────────
 const isValidEmail = (val: string): boolean =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
 
-// ── Lead suggestion shape ────────────────────────────────────────────────────
-interface LeadSuggestion {
-  id: number | string;
-  name: string;
-  email: string;
-}
+// ── Normalize email ───────────────────────────────────────────────────────────
+const normalizeEmail = (val: string) => val.trim().toLowerCase();
 
-// ── Fetch lead suggestions from API ──────────────────────────────────────────
-// Replace with your actual leads search API endpoint
-const fetchLeadSuggestions = async (query: string): Promise<LeadSuggestion[]> => {
-  if (!query.trim()) return [];
-  try {
-    const res = await fetch(`/api/leads/?search=${encodeURIComponent(query)}&limit=10`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    // Adjust field mapping to match your API response shape
-    const results = data.results ?? data;
-    return results
-      .filter((l: ProcessedLead) => l.email)
-      .map((l: ProcessedLead) => ({
-        id: l.id,
-        name: l.full_name || l.name || "Unknown",
-        email: l.email as string,
-      }));
-  } catch {
-    return [];
-  }
+// ── Use case chip styles ──────────────────────────────────────────────────────
+const getUseCaseSx = (useCase?: string) => {
+  const map: Record<string, { bgcolor: string; color: string }> = {
+    appointment:     { bgcolor: "#ECFDF5", color: "#10B981" },
+    feedback:        { bgcolor: "#FEF2F2", color: "#EF4444" },
+    reminder:        { bgcolor: "#EFF6FF", color: "#3B82F6" },
+    "follow-up":     { bgcolor: "#FFF7ED", color: "#F59E0B" },
+    followup:        { bgcolor: "#FFF7ED", color: "#F59E0B" },
+    "re-engagement": { bgcolor: "#F5F3FF", color: "#7C3AED" },
+    "no-show":       { bgcolor: "#FFF1F2", color: "#F43F5E" },
+    general:         { bgcolor: "#F1F5F9", color: "#64748B" },
+    promotional:     { bgcolor: "#F5F3FF", color: "#7C3AED" },
+    welcome:         { bgcolor: "#ECFDF5", color: "#10B981" },
+  };
+  return map[(useCase ?? "").toLowerCase()] ?? { bgcolor: "#F1F5F9", color: "#64748B" };
 };
 
-// ── Fetch clinic email from API ───────────────────────────────────────────────
-const fetchClinicEmail = async (clinicId: number): Promise<string> => {
-  try {
-    const res = await fetch(`/api/clinics/${clinicId}/detail/`);
-    if (!res.ok) return "";
-    const data = await res.json();
-    return data.email ?? "";
-  } catch {
-    return "";
-  }
+// ── Clinic email extraction ───────────────────────────────────────────────────
+const getString = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+const extractClinicEmails = (clinicData: unknown): string[] => {
+  const record = asRecord(clinicData);
+  const direct = [
+    getString(record.email),
+    getString(record.clinic_email),
+    getString(record.reply_email),
+    getString(record.contact_email),
+  ].filter((mail) => mail && isValidEmail(mail));
+  const nested = Array.isArray(record.emails)
+    ? (record.emails as unknown[]).map((item) => getString(item)).filter((mail) => mail && isValidEmail(mail))
+    : [];
+  return Array.from(new Set([...direct, ...nested].map((e) => e.toLowerCase())));
 };
 
-// ====================== Recipient Field (chip input + dropdown) ======================
-interface RecipientFieldProps {
-  label: string;
-  chips: string[];
-  onAdd: (email: string) => void;
+// ── Lead suggestion shape ─────────────────────────────────────────────────────
+interface LeadSuggestion { id: number | string; name: string; email: string; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Shared RecipientChipRow — chip display + freetext input (no search dropdown)
+   Used internally by the To/Cc/Bcc rows that have their own Popover pickers.
+══════════════════════════════════════════════════════════════════════════════ */
+interface RecipientChipRowProps {
+  emails: string[];
+  inputValue: string;
+  onInputChange: (val: string) => void;
+  onInputBlur: () => void;
+  onInputKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onInputFocus: () => void;
   onRemove: (email: string) => void;
   chipColor: { bg: string; text: string; border: string };
   placeholder?: string;
-  onDismiss?: () => void;
-  disabled?: boolean;
 }
 
-const RecipientField: React.FC<RecipientFieldProps> = ({
-  label,
-  chips,
-  onAdd,
-  onRemove,
-  chipColor,
-  placeholder = "Search name or email...",
-  onDismiss,
-  disabled = false,
-}) => {
-  const [inputValue, setInputValue]     = React.useState("");
-  const [suggestions, setSuggestions]   = React.useState<LeadSuggestion[]>([]);
-  const [loading, setLoading]           = React.useState(false);
-  const [open, setOpen]                 = React.useState(false);
-  const [highlightIdx, setHighlightIdx] = React.useState(-1);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const inputRef     = React.useRef<HTMLInputElement>(null);
-  const debounceRef  = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+const RecipientChipRow: React.FC<RecipientChipRowProps> = ({
+  emails, inputValue, onInputChange, onInputBlur, onInputKeyDown, onInputFocus,
+  onRemove, chipColor, placeholder = "Add recipients",
+}) => (
+  <Box display="flex" gap={1} flexWrap="wrap" flex={1} minWidth={180} alignItems="center"
+    sx={{ maxHeight: "90px", overflowY: "auto", "&::-webkit-scrollbar": { width: "6px" }, "&::-webkit-scrollbar-track": { bgcolor: "#F3F4F6", borderRadius: "3px" }, "&::-webkit-scrollbar-thumb": { bgcolor: "#D1D5DB", borderRadius: "3px" } }}>
+    {emails.map((email) => (
+      <Box key={email} display="flex" alignItems="center" gap={0.75} px={1.2} py={0.4} borderRadius="16px"
+        sx={{ bgcolor: chipColor.bg, border: `1px solid ${chipColor.border}` }}>
+        <Avatar sx={{ width: 18, height: 18, fontSize: 9, bgcolor: chipColor.text }}>{email.charAt(0).toUpperCase()}</Avatar>
+        <Typography fontSize="12px" fontWeight={500} color={chipColor.text}>{email}</Typography>
+        <Box component="span" onClick={() => onRemove(email)}
+          sx={{ cursor: "pointer", fontSize: 14, color: chipColor.text, opacity: 0.6, "&:hover": { opacity: 1 }, lineHeight: 1 }}>×</Box>
+      </Box>
+    ))}
+    <InputBase
+      value={inputValue}
+      placeholder={emails.length === 0 ? placeholder : ""}
+      onFocus={onInputFocus}
+      onChange={(e) => onInputChange(e.target.value)}
+      onBlur={onInputBlur}
+      onKeyDown={onInputKeyDown}
+      sx={{ minWidth: 140, fontSize: "13px", flex: 1 }}
+    />
+  </Box>
+);
 
-  const search = React.useCallback(async (val: string) => {
-    if (!val.trim()) { setSuggestions([]); setOpen(false); return; }
-    setLoading(true);
-    const results = await fetchLeadSuggestions(val);
-    const filtered = results.filter((s) => !chips.includes(s.email));
-    setSuggestions(filtered);
-    setOpen(filtered.length > 0);
-    setHighlightIdx(-1);
-    setLoading(false);
-  }, [chips]);
+/* ══════════════════════════════════════════════════════════════════════════════
+   Shared RecipientPickerPopover — the checkbox lead-picker dropdown
+══════════════════════════════════════════════════════════════════════════════ */
+interface RecipientPickerPopoverProps {
+  open: boolean;
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
+  paperRef: React.RefObject<HTMLDivElement | null>;
+  leads: LeadSuggestion[];
+  selectedEmails: string[];
+  onToggle: (email: string) => void;
+}
 
-  const handleInputChange = (val: string) => {
-    setInputValue(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(val), 280);
-  };
-
-  const commit = (val: string) => {
-    const trimmed = val.trim().replace(/,$/, "");
-    if (trimmed && isValidEmail(trimmed) && !chips.includes(trimmed)) onAdd(trimmed);
-    setInputValue(""); setSuggestions([]); setOpen(false); setHighlightIdx(-1);
-  };
-
-  const pick = (s: LeadSuggestion) => {
-    if (!chips.includes(s.email)) onAdd(s.email);
-    setInputValue(""); setSuggestions([]); setOpen(false); setHighlightIdx(-1);
-    inputRef.current?.focus();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightIdx((i) => Math.min(i + 1, suggestions.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (highlightIdx >= 0 && suggestions[highlightIdx]) pick(suggestions[highlightIdx]);
-      else commit(inputValue);
-    } else if (["Tab", ","].includes(e.key)) {
-      e.preventDefault(); commit(inputValue);
-    } else if (e.key === "Backspace" && !inputValue && chips.length) {
-      onRemove(chips[chips.length - 1]);
-    } else if (e.key === "Escape") {
-      setOpen(false);
-    }
-  };
-
-  return (
-    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, py: 1, position: "relative" }}>
-      {label && (
-        <Typography fontSize="13px" color="text.secondary" minWidth={55} mt="7px" flexShrink={0}>
-          {label}
-        </Typography>
-      )}
-
-      <ClickAwayListener onClickAway={() => setOpen(false)}>
-        <Box ref={containerRef} sx={{ flex: 1, position: "relative" }}>
-
-          {/* ── Input area: chips + text input ── */}
-          <Box
-            onClick={() => inputRef.current?.focus()}
-            sx={{
-              display: "flex", flexWrap: "wrap", gap: "4px",
-              alignItems: "center", minHeight: 32, cursor: "text",
-            }}
-          >
-            {chips.map((email) => (
-              <Chip
-                key={email}
-                label={email}
-                size="small"
-                onDelete={() => onRemove(email)}
-                deleteIcon={<CloseIcon sx={{ fontSize: "11px !important" }} />}
-                sx={{
-                  bgcolor: chipColor.bg,
-                  color: chipColor.text,
-                  border: `1px solid ${chipColor.border}`,
-                  fontWeight: 500,
-                  fontSize: "12px",
-                  height: 22,
-                  borderRadius: "5px",
-                  "& .MuiChip-label": { px: "8px" },
-                  "& .MuiChip-deleteIcon": { color: chipColor.text, opacity: 0.5, ml: "2px", mr: "4px", "&:hover": { opacity: 1 } },
-                }}
-              />
-            ))}
-
-            <Box sx={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, minWidth: 120 }}>
-              {loading && <CircularProgress size={11} sx={{ color: "#94A3B8", flexShrink: 0 }} />}
-              <input
-                ref={inputRef}
-                value={inputValue}
-                onChange={(e) => handleInputChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={() => setTimeout(() => { commit(inputValue); setOpen(false); }, 160)}
-                onFocus={() => { if (suggestions.length > 0) setOpen(true); }}
-                placeholder={chips.length === 0 ? placeholder : ""}
-                disabled={disabled}
-                style={{
-                  border: "none", outline: "none",
-                  fontSize: "13px", lineHeight: "1.5",
-                  fontFamily: "inherit", color: "#1E293B",
-                  background: "transparent", flex: 1, padding: "2px 0",
-                  minWidth: 80,
-                }}
-              />
-            </Box>
+const RecipientPickerPopover: React.FC<RecipientPickerPopoverProps> = ({
+  open, anchorEl, onClose, paperRef, leads, selectedEmails, onToggle,
+}) => (
+  <Popover
+    open={open} anchorEl={anchorEl} onClose={onClose}
+    anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+    transformOrigin={{ vertical: "top", horizontal: "left" }}
+    disableAutoFocus disableEnforceFocus disableRestoreFocus
+    PaperProps={{
+      ref: paperRef,
+      onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => e.preventDefault(),
+      sx: { borderRadius: "10px", border: "1px solid #E2E8F0", boxShadow: "0 4px 20px rgba(0,0,0,0.09)" },
+    }}
+  >
+    <Box sx={{ width: 300, maxHeight: 220, overflowY: "auto", p: 1 }}>
+      {leads.length === 0 ? (
+        <Typography fontSize="13px" color="text.secondary" p={1}>No recipients available</Typography>
+      ) : leads.map((r) => (
+        <Box key={r.id} onClick={() => onToggle(r.email)}
+          sx={{ p: 0.8, borderRadius: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, "&:hover": { backgroundColor: "#F5F5F5" } }}>
+          <Checkbox size="small"
+            checked={selectedEmails.some((m) => normalizeEmail(m) === normalizeEmail(r.email))}
+            onChange={() => onToggle(r.email)} />
+          <Box>
+            <Typography fontSize="13px" fontWeight={500}>{r.name}</Typography>
+            <Typography fontSize="12px" color="text.secondary">{r.email}</Typography>
           </Box>
-
-          {/* ── Dropdown ── */}
-          {open && suggestions.length > 0 && (
-            <Paper
-              elevation={0}
-              sx={{
-                position: "absolute",
-                top: "calc(100% + 6px)",
-                left: -8,
-                right: -8,
-                zIndex: 2100,
-                borderRadius: "10px",
-                border: "1px solid #E2E8F0",
-                boxShadow: "0 4px 20px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.05)",
-                overflow: "hidden",
-                maxHeight: 230,
-                overflowY: "auto",
-              }}
-            >
-              {/* Header */}
-              <Box sx={{ px: 2, py: 0.75, bgcolor: "#F8FAFC", borderBottom: "1px solid #F1F5F9" }}>
-                <Typography fontSize="11px" color="#94A3B8" fontWeight={600} letterSpacing="0.04em" textTransform="uppercase">
-                  Leads
-                </Typography>
-              </Box>
-
-              {suggestions.map((s, idx) => (
-                <Box
-                  key={s.id}
-                  onMouseDown={(e) => { e.preventDefault(); pick(s); }}
-                  onMouseEnter={() => setHighlightIdx(idx)}
-                  sx={{
-                    display: "flex", alignItems: "center", gap: 1.5,
-                    px: 2, py: 1,
-                    cursor: "pointer",
-                    bgcolor: idx === highlightIdx ? "#F0F7FF" : "#fff",
-                    borderBottom: "1px solid #F8FAFC",
-                    "&:last-child": { borderBottom: "none" },
-                    transition: "background 0.1s",
-                  }}
-                >
-                  {/* Initials avatar */}
-                  <Box sx={{
-                    width: 28, height: 28, borderRadius: "50%",
-                    bgcolor: idx === highlightIdx ? "#DBEAFE" : "#EFF6FF",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0, transition: "background 0.1s",
-                  }}>
-                    <Typography fontSize="11px" fontWeight={700} color="#2563EB">
-                      {s.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography fontSize="13px" fontWeight={600} color="#1E293B" noWrap>{s.name}</Typography>
-                    <Typography fontSize="11.5px" color="#64748B" noWrap>{s.email}</Typography>
-                  </Box>
-                  {idx === highlightIdx && (
-                    <Typography fontSize="10px" color="#93C5FD" fontWeight={500}>↵ select</Typography>
-                  )}
-                </Box>
-              ))}
-            </Paper>
-          )}
         </Box>
-      </ClickAwayListener>
-
-      {onDismiss && (
-        <IconButton size="small" onClick={onDismiss} sx={{ color: "#CBD5E1", mt: "2px", flexShrink: 0, "&:hover": { color: "#94A3B8" } }}>
-          <CloseIcon sx={{ fontSize: 13 }} />
-        </IconButton>
-      )}
+      ))}
     </Box>
-  );
-};
+  </Popover>
+);
 
-// ====================== New Email Template Dialog ======================
+/* ══════════════════════════════════════════════════════════════════════════════
+   NewEmailTemplateDialog
+══════════════════════════════════════════════════════════════════════════════ */
 interface NewEmailTemplateDialogProps {
   open: boolean;
   onClose: () => void;
@@ -345,52 +234,42 @@ export const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({
     setSaving(true); setError(null);
     try {
       const saved = await EmailTemplateAPI.create({
-        clinic: CLINIC_ID,
-        name: name.trim(),
-        subject: subject.trim(),
-        description: description.trim(),
-        use_case: "general",
-        body: body.trim(),
-        created_by: 1,
-        is_active: true,
+        clinic: CLINIC_ID, name: name.trim(), subject: subject.trim(),
+        description: description.trim(), use_case: "general",
+        body: body.trim(), created_by: 1, is_active: true,
       });
       onSaved(saved); onClose();
     } catch {
       const local: EmailTemplate = {
-        id: `local-${Date.now()}`,
-        name: name.trim(),
-        subject: subject.trim(),
-        description: description.trim(),
-        body: body.trim(),
+        id: `local-${Date.now()}`, name: name.trim(), subject: subject.trim(),
+        description: description.trim(), body: body.trim(),
       };
       onSaved(local); onClose();
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
-    <Dialog
-      open={open} onClose={onClose} maxWidth="sm" fullWidth
-      PaperProps={{ sx: { borderRadius: "16px" } }}
-      sx={{ zIndex: 1600 }}
-    >
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+      PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1600 }}>
       <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, fontSize: "1.05rem", pb: 0 }}>
         New Email Template
         <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
       </DialogTitle>
       <DialogContent sx={{ pt: 2 }}>
         <Stack spacing={2}>
-          <TextField label="Template Name" value={name} onChange={(e) => { setName(e.target.value); setError(null); }} placeholder="e.g. IVF Follow-Up" fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
-          <TextField label="Subject" value={subject} onChange={(e) => { setSubject(e.target.value); setError(null); }} placeholder="e.g. Following up on your IVF inquiry" fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
-          <TextField label="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description of when to use this template" fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
+          <TextField label="Template Name" value={name} onChange={(e) => { setName(e.target.value); setError(null); }}
+            placeholder="e.g. IVF Follow-Up" fullWidth size="small"
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
+          <TextField label="Subject" value={subject} onChange={(e) => { setSubject(e.target.value); setError(null); }}
+            placeholder="e.g. Following up on your IVF inquiry" fullWidth size="small"
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
+          <TextField label="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)}
+            placeholder="Short description of when to use this template" fullWidth size="small"
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
           <Box>
             <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>Body</Typography>
-            <textarea
-              value={body}
-              onChange={(e) => { setBody(e.target.value); setError(null); }}
-              placeholder="Write your message here... Use {{name}} for the lead's name."
-              rows={8}
+            <textarea value={body} onChange={(e) => { setBody(e.target.value); setError(null); }}
+              placeholder="Write your message here... Use {{name}} for the lead's name." rows={8}
               style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: "14px", fontFamily: "inherit", color: "#1E293B", lineHeight: "1.6", border: "1px solid #D1D5DB", borderRadius: "8px", resize: "vertical", outline: "none", background: "#fff" }}
               onFocus={(e) => { e.target.style.borderColor = "#1976d2"; e.target.style.boxShadow = "0 0 0 2px rgba(25,118,210,0.15)"; }}
               onBlur={(e)  => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }}
@@ -410,7 +289,9 @@ export const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({
   );
 };
 
-// ====================== Email Dialog ======================
+/* ══════════════════════════════════════════════════════════════════════════════
+   EmailDialog
+══════════════════════════════════════════════════════════════════════════════ */
 interface EmailDialogProps {
   open: boolean;
   lead: ProcessedLead | null;
@@ -418,41 +299,146 @@ interface EmailDialogProps {
 }
 
 export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
-  const [step, setStep]                             = React.useState<"template" | "preview" | "compose">("template");
-  const [previewTemplate, setPreviewTemplate]       = React.useState<EmailTemplate | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
-  const [subject, setSubject]                       = React.useState("");
-  const [body, setBody]                             = React.useState("");
-  const [sending, setSending]                       = React.useState(false);
-  const [error, setError]                           = React.useState<string | null>(null);
 
-  const [emailTemplates, setEmailTemplates]         = React.useState<EmailTemplate[]>([]);
-  const [loadingTemplates, setLoadingTemplates]     = React.useState(false);
-  const [templateError, setTemplateError]           = React.useState<string | null>(null);
-  const [newEmailTemplateOpen, setNewEmailTemplateOpen] = React.useState(false);
+  /* ── Step ─────────────────────────────────────────────────────────────── */
+  const [step, setStep] = React.useState<"selector" | "composer">("selector");
 
-  // ── From (fetched from clinic API) ───────────────────────────────────────
-  const [fromEmail, setFromEmail]       = React.useState<string>("");
-  const [loadingFrom, setLoadingFrom]   = React.useState(false);
+  /* ── Email content state ──────────────────────────────────────────────── */
+  const [subject, setSubject]     = React.useState("");
+  const [body, setBody]           = React.useState("");
+  const [sending, setSending]     = React.useState(false);
+  const [error, setError]         = React.useState<string | null>(null);
 
-  // ── To / CC / BCC chip state ─────────────────────────────────────────────
+  /* ── From ─────────────────────────────────────────────────────────────── */
+  const [fromEmail, setFromEmail]     = React.useState("");
+  const [fromOptions, setFromOptions] = React.useState<string[]>([]);
+  const [loadingFrom, setLoadingFrom] = React.useState(false);
+
+  /* ── To / CC / BCC ────────────────────────────────────────────────────── */
   const [toEmails, setToEmails]   = React.useState<string[]>([]);
   const [ccEmails, setCcEmails]   = React.useState<string[]>([]);
   const [bccEmails, setBccEmails] = React.useState<string[]>([]);
   const [showCc, setShowCc]       = React.useState(false);
   const [showBcc, setShowBcc]     = React.useState(false);
 
-  // ── Toolbar popovers ─────────────────────────────────────────────────────
-  const [emojiAnchor, setEmojiAnchor]   = React.useState<HTMLElement | null>(null);
+  /* ── Row refs ─────────────────────────────────────────────────────────── */
+  const toRowRef  = React.useRef<HTMLDivElement | null>(null);
+  const ccRowRef  = React.useRef<HTMLDivElement | null>(null);
+  const bccRowRef = React.useRef<HTMLDivElement | null>(null);
+
+  /* ── Picker paper refs ────────────────────────────────────────────────── */
+  const toPickerPaperRef  = React.useRef<HTMLDivElement | null>(null);
+  const ccPickerPaperRef  = React.useRef<HTMLDivElement | null>(null);
+  const bccPickerPaperRef = React.useRef<HTMLDivElement | null>(null);
+
+  /* ── Anchor els ───────────────────────────────────────────────────────── */
+  const [toAnchorEl,  setToAnchorEl]  = React.useState<HTMLElement | null>(null);
+  const [ccAnchorEl,  setCcAnchorEl]  = React.useState<HTMLElement | null>(null);
+  const [bccAnchorEl, setBccAnchorEl] = React.useState<HTMLElement | null>(null);
+
+  /* ── Input values ─────────────────────────────────────────────────────── */
+  const [toInput,  setToInput]  = React.useState("");
+  const [ccInput,  setCcInput]  = React.useState("");
+  const [bccInput, setBccInput] = React.useState("");
+
+  const openToPicker  = Boolean(toAnchorEl);
+  const openCcPicker  = Boolean(ccAnchorEl);
+  const openBccPicker = Boolean(bccAnchorEl);
+
+  /* ── Templates ────────────────────────────────────────────────────────── */
+  const [emailTemplates, setEmailTemplates]             = React.useState<EmailTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates]         = React.useState(false);
+  const [templateError, setTemplateError]               = React.useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate]         = React.useState<EmailTemplate | null>(null);
+  const [previewTemplate, setPreviewTemplate]           = React.useState<EmailTemplate | null>(null);
+  const [newEmailTemplateOpen, setNewEmailTemplateOpen] = React.useState(false);
+
+  /* ── Toolbar popovers ─────────────────────────────────────────────────── */
+  const [emojiAnchor,  setEmojiAnchor]  = React.useState<HTMLElement | null>(null);
   const [formatAnchor, setFormatAnchor] = React.useState<HTMLElement | null>(null);
-  const [moreAnchor, setMoreAnchor]     = React.useState<HTMLElement | null>(null);
+  const [moreAnchor,   setMoreAnchor]   = React.useState<HTMLElement | null>(null);
 
   const fileInputRef  = React.useRef<HTMLInputElement>(null);
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const bodyRef       = React.useRef<HTMLTextAreaElement>(null);
   const cursorPos     = React.useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
-  // ── Cursor helpers ───────────────────────────────────────────────────────
+  const leadEmail = lead?.email ?? "";
+  const leadName  = lead?.full_name ?? (lead as unknown as { name?: string })?.name ?? "Patient";
+
+  /* ── Close-outside-click handlers ────────────────────────────────────── */
+  React.useEffect(() => {
+    if (!openToPicker) return;
+    const handler = (e: PointerEvent) => {
+      if (!toPickerPaperRef.current?.contains(e.target as Node)) setToAnchorEl(null);
+    };
+    document.addEventListener("pointerdown", handler, true);
+    return () => document.removeEventListener("pointerdown", handler, true);
+  }, [openToPicker]);
+
+  React.useEffect(() => {
+    if (!openCcPicker) return;
+    const handler = (e: PointerEvent) => {
+      if (!ccPickerPaperRef.current?.contains(e.target as Node)) setCcAnchorEl(null);
+    };
+    document.addEventListener("pointerdown", handler, true);
+    return () => document.removeEventListener("pointerdown", handler, true);
+  }, [openCcPicker]);
+
+  React.useEffect(() => {
+    if (!openBccPicker) return;
+    const handler = (e: PointerEvent) => {
+      if (!bccPickerPaperRef.current?.contains(e.target as Node)) setBccAnchorEl(null);
+    };
+    document.addEventListener("pointerdown", handler, true);
+    return () => document.removeEventListener("pointerdown", handler, true);
+  }, [openBccPicker]);
+
+  /* ── Reset + load on open ─────────────────────────────────────────────── */
+  React.useEffect(() => {
+    if (!open) return;
+    setStep("selector");
+    setSubject(""); setBody(""); setError(null); setSending(false);
+    setSelectedTemplate(null); setPreviewTemplate(null);
+    setToEmails(leadEmail && leadEmail !== "N/A" ? [leadEmail] : []);
+    setCcEmails([]); setBccEmails([]);
+    setShowCc(false); setShowBcc(false);
+    setToInput(""); setCcInput(""); setBccInput("");
+    setToAnchorEl(null); setCcAnchorEl(null); setBccAnchorEl(null);
+    setEmojiAnchor(null); setFormatAnchor(null); setMoreAnchor(null);
+
+    // Load clinic from-emails
+    setLoadingFrom(true);
+    (async () => {
+      try {
+        const clinicData = await clinicsApi.getClinicDetail(CLINIC_ID);
+        const emails = extractClinicEmails(clinicData);
+        if (emails.length > 0) { setFromOptions(emails); setFromEmail(emails[0]); }
+        else { setFromOptions(["noreply@fertility.com"]); setFromEmail("noreply@fertility.com"); }
+      } catch {
+        setFromOptions(["noreply@fertility.com"]); setFromEmail("noreply@fertility.com");
+      } finally { setLoadingFrom(false); }
+    })();
+
+    // Load templates
+    setLoadingTemplates(true); setTemplateError(null);
+    EmailTemplateAPI.list()
+      .then((data) => setEmailTemplates(data.filter((t) => t.is_active !== false)))
+      .catch(() => { setTemplateError("Could not load templates. You can still compose a new email."); setEmailTemplates([]); })
+      .finally(() => setLoadingTemplates(false));
+  }, [open, leadEmail]);
+
+  /* ── Template selection ───────────────────────────────────────────────── */
+  const handleSelectTemplate = (t: EmailTemplate) => {
+    setSelectedTemplate(t);
+    setSubject(t.subject || "");
+    const rawBody = (t.body || "")
+      .replace(/\{\{name\}\}/g, leadName).replace(/\{\{lead_name\}\}/g, leadName)
+      .replace(/\{\{lead_first_name\}\}/g, leadName.split(" ")[0]);
+    setBody(stripHtml(rawBody));
+  };
+
+  /* ── Cursor helpers ───────────────────────────────────────────────────── */
   const saveCursor = () => {
     const el = bodyRef.current;
     if (el) cursorPos.current = { start: el.selectionStart, end: el.selectionEnd };
@@ -464,11 +450,7 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
       const next = prev.substring(0, start) + text + prev.substring(end);
       requestAnimationFrame(() => {
         const el = bodyRef.current;
-        if (el) {
-          el.focus();
-          el.setSelectionRange(start + text.length, start + text.length);
-          cursorPos.current = { start: start + text.length, end: start + text.length };
-        }
+        if (el) { el.focus(); el.setSelectionRange(start + text.length, start + text.length); cursorPos.current = { start: start + text.length, end: start + text.length }; }
       });
       return next;
     });
@@ -494,120 +476,76 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
     });
   }, []);
 
-  // ── Load clinic "From" email ──────────────────────────────────────────────
-  const loadClinicEmail = React.useCallback(async () => {
-    setLoadingFrom(true);
-    const email = await fetchClinicEmail(CLINIC_ID);
-    setFromEmail(email);
-    setLoadingFrom(false);
-  }, []);
-
-  // ── Load templates ───────────────────────────────────────────────────────
-  const loadEmailTemplates = React.useCallback(async () => {
-    setLoadingTemplates(true); setTemplateError(null);
-    try {
-      const data = await EmailTemplateAPI.list();
-      setEmailTemplates(data);
-    } catch {
-      setTemplateError("Could not load templates. You can still compose a new email.");
-      setEmailTemplates([]);
-    } finally {
-      setLoadingTemplates(false);
-    }
-  }, []);
-
-  // ── Reset on open ────────────────────────────────────────────────────────
-  React.useEffect(() => {
-    if (open) {
-      setStep("template");
-      setSelectedTemplateId(null);
-      setPreviewTemplate(null);
-      setSubject("");
-      setBody("");
-      setError(null);
-      setSending(false);
-      setEmojiAnchor(null);
-      setFormatAnchor(null);
-      setMoreAnchor(null);
-      setToEmails(lead?.email ? [lead.email] : []);
-      setCcEmails([]);
-      setBccEmails([]);
-      setShowCc(false);
-      setShowBcc(false);
-      loadClinicEmail();
-      loadEmailTemplates();
-    }
-  }, [open, loadClinicEmail, loadEmailTemplates]);
-
-  const handleClose = () => { if (sending) return; onClose(); };
-
-  const handleComposeNew = () => {
-    setSelectedTemplateId(null);
-    setSubject("");
-    setBody("");
-    setStep("compose");
+  /* ── Email input helpers ──────────────────────────────────────────────── */
+  const addEmailsFromInput = (value: string, list: string[], setList: (v: string[]) => void) => {
+    const chunks = value.split(/[;,\n]/).map((i) => i.trim()).filter(Boolean);
+    if (!chunks.length) return;
+    const next = [...list];
+    chunks.forEach((mail) => {
+      if (isValidEmail(mail) && !next.some((m) => normalizeEmail(m) === normalizeEmail(mail))) next.push(mail);
+    });
+    setList(next);
   };
 
-  const handleNext = () => {
-    if (!selectedTemplateId) return;
-    const template = emailTemplates.find((t) => String(t.id) === selectedTemplateId);
-    if (template) {
-      const recipientName = lead?.full_name || lead?.name || "Patient";
-      const rawBody = (template.body || "")
-        .replace(/\{\{name\}\}/g, recipientName)
-        .replace(/\{\{lead_name\}\}/g, recipientName)
-        .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
-      setSubject(template.subject);
-      setBody(isHtml(rawBody) ? stripHtml(rawBody) : rawBody);
-    }
-    setStep("compose");
+  /* ── Toggle helpers ───────────────────────────────────────────────────── */
+  const toggleToEmail = (email: string) => {
+    const exists = toEmails.some((m) => normalizeEmail(m) === normalizeEmail(email));
+    if (exists) setToEmails(toEmails.filter((m) => normalizeEmail(m) !== normalizeEmail(email)));
+    else if (isValidEmail(email)) setToEmails([...toEmails, email]);
   };
 
-  const handleNewEmailTemplateSaved = (tpl: EmailTemplate) => {
-    setNewEmailTemplateOpen(false);
-    setEmailTemplates((prev) => [tpl, ...prev]);
-    setSelectedTemplateId(String(tpl.id));
+  const toggleCcEmail = (email: string) => {
+    const exists = ccEmails.some((m) => normalizeEmail(m) === normalizeEmail(email));
+    if (exists) setCcEmails(ccEmails.filter((m) => normalizeEmail(m) !== normalizeEmail(email)));
+    else if (isValidEmail(email)) setCcEmails([...ccEmails, email]);
   };
 
+  const toggleBccEmail = (email: string) => {
+    const exists = bccEmails.some((m) => normalizeEmail(m) === normalizeEmail(email));
+    if (exists) setBccEmails(bccEmails.filter((m) => normalizeEmail(m) !== normalizeEmail(email)));
+    else if (isValidEmail(email)) setBccEmails([...bccEmails, email]);
+  };
+
+  /* ── Lead list for pickers ────────────────────────────────────────────── */
+  const leadRecipient = React.useMemo(() =>
+    leadEmail && leadEmail !== "N/A"
+      ? [{ id: lead?.id ?? 0, name: leadName, email: leadEmail }]
+      : [],
+    [lead?.id, leadName, leadEmail],
+  );
+
+  /* ── Send ─────────────────────────────────────────────────────────────── */
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) { setError("Subject and body are required."); return; }
-    if (!lead?.id)    { setError("Lead ID is missing. Cannot send email."); return; }
-    if (!lead?.email) { setError("This lead has no email address.");         return; }
+    if (!lead?.id)          { setError("Lead ID is missing."); return; }
+    if (toEmails.length === 0) { setError("Please add at least one recipient."); return; }
     setSending(true); setError(null);
     try {
       await LeadEmailAPI.sendNow({
         lead: lead.id,
         subject: subject.trim(),
         email_body: body.trim(),
-        sender_email: fromEmail,
+        sender_email: fromEmail || undefined,
         cc: ccEmails,
         bcc: bccEmails,
-        additional_to: toEmails,
+        additional_to: toEmails.filter((e) => e !== leadEmail),
       });
-      toast.success(`Email sent to ${lead?.full_name || lead?.name || "Patient"}!`, toastOptions);
+      toast.success(`Email sent to ${leadName}!`, toastOptions);
       onClose();
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to send email. Please try again."));
-    } finally {
-      setSending(false);
-    }
+    } finally { setSending(false); }
   };
 
-  const handleSaveAsTemplate = async () => {
+  const handleSaveAsDraft = async () => {
     if (!subject.trim() || !body.trim() || !lead?.id) return;
     try {
-      await LeadEmailAPI.saveAsDraft({
-        lead: lead.id,
-        subject: subject.trim(),
-        email_body: body.trim(),
-        sender_email: fromEmail,
-      });
-    } catch (err) {
-      console.error("Failed to save draft:", err);
-    }
+      await LeadEmailAPI.saveAsDraft({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: fromEmail });
+      toast.success("Saved as draft!", toastOptions);
+    } catch (err) { console.error("Failed to save draft:", err); }
   };
 
-  // ── Toolbar handlers ──────────────────────────────────────────────────────
+  /* ── Toolbar handlers ─────────────────────────────────────────────────── */
   const handleAttach      = () => fileInputRef.current?.click();
   const handleImageAttach = () => imageInputRef.current?.click();
 
@@ -640,14 +578,14 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
   const handleFormat = (type: string) => {
     saveCursor();
     const formats: Record<string, [string, string, string?]> = {
-      "Bold":           ["**", "**", "bold text"],
-      "Italic":         ["_",  "_",  "italic text"],
-      "Underline":      ["__", "__", "underlined text"],
-      "Strikethrough":  ["~~", "~~", "strikethrough"],
-      "Bullet list":    ["\n• ", "", "item"],
-      "Numbered list":  ["\n1. ", "", "item"],
-      "Quote":          ["\n> ", "", "quote"],
-      "Code":           ["`",  "`",  "code"],
+      "Bold":          ["**", "**", "bold text"],
+      "Italic":        ["_",  "_",  "italic text"],
+      "Underline":     ["__", "__", "underlined text"],
+      "Strikethrough": ["~~", "~~", "strikethrough"],
+      "Bullet list":   ["\n• ", "", "item"],
+      "Numbered list": ["\n1. ", "", "item"],
+      "Quote":         ["\n> ", "", "quote"],
+      "Code":          ["`",  "`",  "code"],
     };
     const fmt = formats[type];
     if (fmt) wrapSelection(fmt[0], fmt[1], fmt[2]);
@@ -660,25 +598,25 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
       "Insert divider":   "\n\n---\n\n",
       "Insert table":     "\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n",
     };
-    if (action === "Clear formatting") {
-      setBody((prev) => prev.replace(/(\*\*|__|~~|_|`)/g, ""));
-    } else {
-      insertAtCursor(snippets[action] || "");
-    }
+    if (action === "Clear formatting") setBody((prev) => prev.replace(/(\*\*|__|~~|_|`)/g, ""));
+    else insertAtCursor(snippets[action] || "");
   };
 
-  const recipientName = lead?.full_name || lead?.name || "Patient";
+  const handleClose = () => { if (!sending) onClose(); };
 
-  const previewBodyText = previewTemplate
-    ? (() => {
-        const raw = (previewTemplate.body || "")
-          .replace(/\{\{name\}\}/g, recipientName)
-          .replace(/\{\{lead_name\}\}/g, recipientName)
-          .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
-        return isHtml(raw) ? stripHtml(raw) : raw;
-      })()
-    : "";
+  const retryTemplates = () => {
+    setLoadingTemplates(true); setTemplateError(null);
+    EmailTemplateAPI.list()
+      .then((data) => setEmailTemplates(data.filter((t) => t.is_active !== false)))
+      .catch(() => setTemplateError("Could not load templates."))
+      .finally(() => setLoadingTemplates(false));
+  };
 
+  const canSend = subject.trim() && body.trim() && toEmails.length > 0 && !sending;
+
+  /* ════════════════════════════════════════════════════════════════════════
+     RENDER
+  ════════════════════════════════════════════════════════════════════════ */
   return (
     <>
       <input ref={fileInputRef}  type="file" multiple         style={{ display: "none" }} onChange={handleFileChange}  />
@@ -691,377 +629,446 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose })
       <NewEmailTemplateDialog
         open={newEmailTemplateOpen}
         onClose={() => setNewEmailTemplateOpen(false)}
-        onSaved={handleNewEmailTemplateSaved}
+        onSaved={(tpl) => { setNewEmailTemplateOpen(false); setEmailTemplates((prev) => [tpl, ...prev]); setSelectedTemplate(tpl); }}
       />
 
+      {/* ── STEP 1: Template selector ──────────────────────────────────────── */}
       <Dialog
-        open={open && !newEmailTemplateOpen}
+        open={open && step === "selector" && !newEmailTemplateOpen}
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
         PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}
       >
+        {/* Header */}
+        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box>
+            <Typography fontWeight={700} fontSize="1.05rem">New Email</Typography>
+            <Typography variant="caption" color="text.secondary">
+              To {leadName}{leadEmail && leadEmail !== "N/A" ? ` · ${leadEmail}` : ""}
+            </Typography>
+          </Box>
+          <IconButton onClick={handleClose}><CloseIcon /></IconButton>
+        </Box>
 
-        {/* ══════════════════════════════════════════════════════════════════
-            Step 1 — Template Selection
-        ══════════════════════════════════════════════════════════════════ */}
-        {step === "template" && (
-          <>
-            <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              New Email
-              <IconButton size="small" onClick={handleClose}><CloseIcon fontSize="small" /></IconButton>
-            </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          {/* Compose from scratch */}
+          <Box
+            onClick={() => { setSelectedTemplate(null); setSubject(""); setBody(""); setStep("composer"); setError(null); }}
+            sx={{
+              border: "1px dashed #D1D5DB", borderRadius: 2, py: 3, textAlign: "center",
+              cursor: "pointer", mb: 2.5,
+              "&:hover": { bgcolor: "#F9FAFB", borderColor: "#9CA3AF" },
+              transition: "all 0.15s",
+            }}
+          >
+            <EditOutlinedIcon sx={{ color: "#6B7280" }} />
+            <Typography fontWeight={500} mt={0.75} color="#374151">Compose New Email</Typography>
+            <Typography variant="caption" color="text.secondary">Write a custom message from scratch</Typography>
+          </Box>
 
-            <DialogContent sx={{ pt: 1, pb: 0 }}>
-              <Box
-                onClick={handleComposeNew}
-                sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, py: 1.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}
-              >
-                <EditOutlinedIcon sx={{ fontSize: 18, color: "#475569" }} />
-                <Typography fontWeight={600} fontSize="14px" color="#475569">Compose New Email</Typography>
-              </Box>
+          <Divider sx={{ mb: 2 }}>
+            <Typography fontSize="12px" color="text.secondary">OR USE A TEMPLATE</Typography>
+          </Divider>
 
-              <Divider sx={{ my: 1.5 }}>
-                <Typography fontSize="12px" color="text.secondary">OR</Typography>
-              </Divider>
+          {/* New template button */}
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
+            <Typography fontSize="13px" color="text.secondary" fontWeight={500}>Select Email Template</Typography>
+            <Button size="small" onClick={() => setNewEmailTemplateOpen(true)}
+              sx={{ textTransform: "none", fontSize: "12px", fontWeight: 600, color: "#1F2937", border: "1px solid #E5E7EB", borderRadius: "6px", px: 1.5, py: 0.5, minWidth: 0, "&:hover": { bgcolor: "#F3F4F6" } }}>
+              + New Template
+            </Button>
+          </Box>
 
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
-                <Typography fontSize="13px" color="text.secondary" fontWeight={500}>Select Email Template</Typography>
-                <Button
-                  size="small"
-                  onClick={() => setNewEmailTemplateOpen(true)}
-                  sx={{ textTransform: "none", fontSize: "12px", fontWeight: 600, color: "#1F2937", border: "1px solid #E5E7EB", borderRadius: "6px", px: 1.5, py: 0.5, minWidth: 0, "&:hover": { bgcolor: "#F3F4F6" } }}
+          {loadingTemplates && (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}><CircularProgress size={22} /></Box>
+          )}
+
+          {!loadingTemplates && templateError && (
+            <Alert severity="warning" sx={{ borderRadius: "8px", mb: 1.5, fontSize: "13px" }}
+              action={<Button size="small" onClick={retryTemplates}>Retry</Button>}>
+              {templateError}
+            </Alert>
+          )}
+
+          {!loadingTemplates && !templateError && emailTemplates.length === 0 && (
+            <Box sx={{ textAlign: "center", py: 4 }}>
+              <Typography color="text.secondary" fontSize="14px">No email templates found.</Typography>
+              <Typography color="text.secondary" fontSize="12px" mt={0.5}>Click "+ New Template" above to create one.</Typography>
+            </Box>
+          )}
+
+          {!loadingTemplates && emailTemplates.length > 0 && (
+            <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+              {emailTemplates.map((t) => (
+                <Box key={t.id}
+                  onClick={() => handleSelectTemplate(t)}
+                  sx={{
+                    display: "flex", alignItems: "center", py: 1.5, px: 0.5,
+                    borderBottom: "1px solid #F3F4F6", cursor: "pointer", borderRadius: 1,
+                    bgcolor: selectedTemplate?.id === t.id ? "#F0F9FF" : "transparent",
+                    "&:hover": { bgcolor: selectedTemplate?.id === t.id ? "#F0F9FF" : "#F9FAFB" },
+                    transition: "background 0.15s",
+                  }}
                 >
-                  + New Template
-                </Button>
-              </Box>
-
-              {loadingTemplates && (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                  <CircularProgress size={28} />
-                </Box>
-              )}
-              {!loadingTemplates && templateError && (
-                <Alert severity="warning" sx={{ borderRadius: "8px", mb: 1.5, fontSize: "13px" }}>{templateError}</Alert>
-              )}
-              {!loadingTemplates && !templateError && emailTemplates.length === 0 && (
-                <Box sx={{ textAlign: "center", py: 3 }}>
-                  <Typography color="text.secondary" fontSize="14px">No email templates found.</Typography>
-                  <Typography color="text.secondary" fontSize="12px" mt={0.5}>Click "+ New Template" above to create one.</Typography>
-                </Box>
-              )}
-              {!loadingTemplates && emailTemplates.length > 0 && (
-                <RadioGroup value={selectedTemplateId || ""} onChange={(e) => setSelectedTemplateId(e.target.value)}>
-                  <Stack spacing={0} divider={<Divider />} sx={{ maxHeight: 340, overflowY: "auto" }}>
-                    {emailTemplates.map((template) => (
-                      <Box
-                        key={template.id}
-                        onClick={() => setSelectedTemplateId(String(template.id))}
-                        sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1.5, px: 0.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}
-                      >
-                        <FormControlLabel
-                          value={String(template.id)}
-                          control={<Radio size="small" sx={{ color: selectedTemplateId === String(template.id) ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }} />}
-                          label={
-                            <Box>
-                              <Typography fontWeight={600} fontSize="13.5px" color="#1E293B">{template.name}</Typography>
-                              {template.description && <Typography fontSize="12px" color="#64748B" mt={0.2}>{template.description}</Typography>}
-                              {template.subject     && <Typography fontSize="11px" color="#94A3B8" mt={0.25}>Subject: {template.subject}</Typography>}
-                            </Box>
-                          }
-                          sx={{ m: 0, flex: 1 }}
-                        />
-                        <Tooltip title="Preview template">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => { e.stopPropagation(); setSelectedTemplateId(String(template.id)); setPreviewTemplate(template); setStep("preview"); }}
-                            sx={{ color: "#93C5FD", ml: 1, "&:hover": { color: "#3B82F6", bgcolor: "#EFF6FF" } }}
-                          >
-                            <VisibilityOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    ))}
-                  </Stack>
-                </RadioGroup>
-              )}
-            </DialogContent>
-
-            <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
-              <Button onClick={handleClose} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>Cancel</Button>
-              <Button
-                onClick={handleNext}
-                disabled={!selectedTemplateId}
-                variant="contained"
-                sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" } }}
-              >
-                Next
-              </Button>
-            </DialogActions>
-          </>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════
-            Step 1.5 — Template Preview
-        ══════════════════════════════════════════════════════════════════ */}
-        {step === "preview" && previewTemplate && (
-          <>
-            <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <IconButton size="small" onClick={() => { setStep("template"); setPreviewTemplate(null); }}>
-                  <ChevronLeftIcon fontSize="small" />
-                </IconButton>
-                <Typography fontWeight={700} fontSize="1.05rem">Preview Template</Typography>
-              </Stack>
-              <IconButton size="small" onClick={handleClose}><CloseIcon fontSize="small" /></IconButton>
-            </DialogTitle>
-
-            <DialogContent sx={{ pt: 0, pb: 0 }}>
-              <Box sx={{ bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "10px", px: 2, py: 1.25, mb: 2 }}>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                  <Typography fontSize="12px" color="#64748B" fontWeight={500}>Template:</Typography>
-                  <Typography fontSize="13px" fontWeight={700} color="#1E293B">{previewTemplate.name}</Typography>
-                  {previewTemplate.use_case && (
-                    <Chip label={previewTemplate.use_case} size="small" sx={{ height: 20, fontSize: "11px", fontWeight: 600, bgcolor: "#EFF6FF", color: "#1D4ED8", borderRadius: "4px", "& .MuiChip-label": { px: 1 } }} />
-                  )}
-                </Stack>
-              </Box>
-
-              <Box sx={{ border: "1px solid #E2E8F0", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-                {/* Mac-style title bar */}
-                <Box sx={{ bgcolor: "#1F2937", px: 2, py: 1 }}>
-                  <Stack direction="row" spacing={0.75} alignItems="center">
-                    {["#EF4444", "#F59E0B", "#10B981"].map((c) => (
-                      <Box key={c} sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: c }} />
-                    ))}
-                    <Box sx={{ flex: 1, bgcolor: "#374151", borderRadius: "4px", height: 20, ml: 1, display: "flex", alignItems: "center", px: 1.5 }}>
-                      <Typography fontSize="10px" color="#94A3B8">Mail Preview</Typography>
-                    </Box>
-                  </Stack>
-                </Box>
-
-                {/* Email headers */}
-                <Box sx={{ bgcolor: "#FAFAFA", px: 2.5, py: 1.5, borderBottom: "1px solid #E2E8F0" }}>
-                  <Stack spacing={0.75}>
+                  <Radio
+                    checked={selectedTemplate?.id === t.id}
+                    onChange={() => handleSelectTemplate(t)}
+                    size="small"
+                    sx={{ color: selectedTemplate?.id === t.id ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }}
+                  />
+                  <Box sx={{ flex: 1, ml: 0.5, minWidth: 0 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>From:</Typography>
-                      <Typography fontSize="12px" color="#374151">
-                        {loadingFrom ? "Loading..." : fromEmail || "—"}
-                      </Typography>
+                      <Typography fontSize="13.5px" fontWeight={600} color="#1E293B" noWrap>{t.name}</Typography>
+                      {t.use_case && (
+                        <Chip label={t.use_case} size="small"
+                          sx={{ ...getUseCaseSx(t.use_case), fontSize: "11px", height: 20, textTransform: "capitalize" }} />
+                      )}
                     </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>To:</Typography>
-                      <Typography fontSize="12px" color="#374151">{recipientName}{lead?.email ? ` <${lead.email}>` : ""}</Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="flex-start">
-                      <Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>Subject:</Typography>
-                      <Typography fontSize="12px" color="#1E293B" fontWeight={700}>{previewTemplate.subject}</Typography>
-                    </Stack>
-                  </Stack>
-                </Box>
-
-                {/* Plain-text body */}
-                <Box sx={{ bgcolor: "#FFFFFF", px: 2.5, py: 2.5, maxHeight: 260, overflowY: "auto" }}>
-                  <Typography component="pre" sx={{ fontSize: "13px", color: "#1E293B", lineHeight: 1.85, fontFamily: "inherit", whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
-                    {previewBodyText}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ bgcolor: "#F8FAFC", borderTop: "1px solid #E2E8F0", px: 2.5, py: 1.25, textAlign: "center" }}>
-                  <Typography fontSize="11px" color="#94A3B8">
-                    Variables like{" "}
-                    <Box component="span" sx={{ color: "#7C3AED", fontWeight: 600 }}>{"{{name}}"}</Box>
-                    {" "}are auto-filled when sent
-                  </Typography>
-                </Box>
-              </Box>
-            </DialogContent>
-
-            <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
-              <Button
-                onClick={() => { setStep("template"); setPreviewTemplate(null); }}
-                sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}
-              >
-                Back
-              </Button>
-              <Button
-                onClick={() => { setSubject(previewTemplate.subject || ""); setBody(previewBodyText); setStep("compose"); }}
-                variant="contained"
-                sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" } }}
-              >
-                Use This Template
-              </Button>
-            </DialogActions>
-          </>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════
-            Step 2 — Compose Email
-        ══════════════════════════════════════════════════════════════════ */}
-        {step === "compose" && (
-          <>
-            <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              New Email
-              <IconButton size="small" onClick={handleClose}><CloseIcon fontSize="small" /></IconButton>
-            </DialogTitle>
-
-            <DialogContent sx={{ pt: 0, pb: 0 }}>
-              <Stack spacing={0} divider={<Divider />}>
-
-                {/* ── FROM ─────────────────────────────────────────────────── */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
-                  <Typography fontSize="13px" color="text.secondary" minWidth={55}>From:</Typography>
-                  {loadingFrom ? (
-                    <CircularProgress size={14} sx={{ color: "#94A3B8" }} />
-                  ) : (
-                    <Typography fontSize="13px" color="#1E293B" fontWeight={500}>
-                      {fromEmail || "—"}
-                    </Typography>
-                  )}
-                </Box>
-
-                {/* ── TO ───────────────────────────────────────────────────── */}
-                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, py: 0 }}>
-                  <Typography fontSize="13px" color="text.secondary" minWidth={55} mt="14px">To:</Typography>
-                  <Box sx={{ flex: 1 }}>
-                    <RecipientField
-                      label=""
-                      chips={toEmails}
-                      onAdd={(email) => setToEmails((prev) => [...prev, email])}
-                      onRemove={(email) => setToEmails(toEmails.filter((e) => e !== email))}
-                      chipColor={{ bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" }}
-                      placeholder="Search leads or type email..."
-                      disabled={sending}
-                    />
+                    {t.subject && <Typography fontSize="11px" color="#94A3B8" mt={0.25} noWrap>Subject: {t.subject}</Typography>}
                   </Box>
-                  {/* Cc / Bcc toggles */}
-                  <Box sx={{ display: "flex", gap: 0.75, mt: "5px", flexShrink: 0 }}>
-                    {!showCc && (
-                      <Typography fontSize="12px" color="#64748B" fontWeight={500} sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" }, userSelect: "none" }} onClick={() => setShowCc(true)}>
-                        Cc
-                      </Typography>
-                    )}
-                    {(!showCc || !showBcc) && <Typography fontSize="12px" color="#CBD5E1">|</Typography>}
-                    {!showBcc && (
-                      <Typography fontSize="12px" color="#64748B" fontWeight={500} sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" }, userSelect: "none" }} onClick={() => setShowBcc(true)}>
-                        Bcc
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-
-                {/* ── CC (conditional) ─────────────────────────────────────── */}
-                {showCc && (
-                  <RecipientField
-                    label="Cc:"
-                    chips={ccEmails}
-                    onAdd={(email) => setCcEmails((prev) => [...prev, email])}
-                    onRemove={(email) => setCcEmails(ccEmails.filter((e) => e !== email))}
-                    chipColor={{ bg: "#F0FDF4", text: "#16A34A", border: "#BBF7D0" }}
-                    placeholder="Search leads or type email..."
-                    onDismiss={() => { setShowCc(false); setCcEmails([]); }}
-                    disabled={sending}
-                  />
-                )}
-
-                {/* ── BCC (conditional) ────────────────────────────────────── */}
-                {showBcc && (
-                  <RecipientField
-                    label="Bcc:"
-                    chips={bccEmails}
-                    onAdd={(email) => setBccEmails((prev) => [...prev, email])}
-                    onRemove={(email) => setBccEmails(bccEmails.filter((e) => e !== email))}
-                    chipColor={{ bg: "#FFF7ED", text: "#EA580C", border: "#FED7AA" }}
-                    placeholder="Search leads or type email..."
-                    onDismiss={() => { setShowBcc(false); setBccEmails([]); }}
-                    disabled={sending}
-                  />
-                )}
-
-                {/* ── SUBJECT ──────────────────────────────────────────────── */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
-                  <Typography fontSize="13px" color="text.secondary" minWidth={55}>Subject:</Typography>
-                  <TextField
-                    fullWidth variant="standard"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    disabled={sending}
-                    InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }}
-                    placeholder="Enter subject..."
-                  />
-                </Box>
-
-                {/* ── BODY ─────────────────────────────────────────────────── */}
-                <Box sx={{ py: 1.5, minHeight: 180 }}>
-                  <textarea
-                    ref={bodyRef}
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    onSelect={saveCursor}
-                    onKeyUp={saveCursor}
-                    onMouseUp={saveCursor}
-                    disabled={sending}
-                    placeholder="Write your message..."
-                    rows={10}
-                    style={{ width: "100%", boxSizing: "border-box", resize: "vertical", border: "none", outline: "none", fontSize: "13px", lineHeight: 1.7, fontFamily: "inherit", color: "#1E293B", background: "transparent", padding: 0 }}
-                  />
-                </Box>
-
-                {error && <Alert severity="error" sx={{ borderRadius: "8px", my: 1 }}>{error}</Alert>}
-              </Stack>
-            </DialogContent>
-
-            <DialogActions sx={{ px: 3, pb: 3, pt: 1, flexDirection: "column", gap: 0 }}>
-              {/* ── Toolbar ────────────────────────────────────────────────── */}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, mb: 1.5, width: "100%", borderTop: "1px solid #E5E7EB", pt: 1.5, flexWrap: "wrap" }}>
-                {[
-                  { title: "Attach file",  icon: <AttachFileIcon sx={{ fontSize: 18 }} />,              onClick: handleAttach,      activeColor: undefined,   active: undefined },
-                  { title: "Insert link",  icon: <LinkIcon sx={{ fontSize: 18 }} />,                    onClick: handleInsertLink,  activeColor: undefined,   active: undefined },
-                  { title: "Emoji",        icon: <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />,   onClick: (e: React.MouseEvent<HTMLButtonElement>) => { saveCursor(); setEmojiAnchor(e.currentTarget); }, activeColor: "#F59E0B", active: Boolean(emojiAnchor) },
-                  { title: "Insert image", icon: <ImageOutlinedIcon sx={{ fontSize: 18 }} />,            onClick: handleImageAttach, activeColor: undefined,   active: undefined },
-                  { title: "Format text",  icon: <FormatColorTextOutlinedIcon sx={{ fontSize: 18 }} />, onClick: (e: React.MouseEvent<HTMLButtonElement>) => { saveCursor(); setFormatAnchor(e.currentTarget); }, activeColor: "#6366F1", active: Boolean(formatAnchor) },
-                  { title: "Highlight",    icon: <BrushOutlinedIcon sx={{ fontSize: 18 }} />,            onClick: () => { saveCursor(); wrapSelection("==", "==", "highlighted text"); }, activeColor: undefined, active: undefined },
-                  { title: "More options", icon: <AddCircleOutlineIcon sx={{ fontSize: 18 }} />,         onClick: (e: React.MouseEvent<HTMLButtonElement>) => { saveCursor(); setMoreAnchor(e.currentTarget); }, activeColor: "#10B981", active: Boolean(moreAnchor) },
-                ].map(({ title, icon, onClick, activeColor, active }) => (
-                  <Tooltip key={title} title={title}>
-                    <IconButton
-                      size="small"
-                      onClick={onClick as React.MouseEventHandler<HTMLButtonElement>}
-                      sx={{ color: (active && activeColor) ? activeColor : "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: activeColor || "#1E293B" } }}
-                    >
-                      {icon}
+                  <Tooltip title="Preview template">
+                    <IconButton size="small"
+                      onClick={(e) => { e.stopPropagation(); setPreviewTemplate(t); }}
+                      sx={{ color: "#93C5FD", ml: 1, "&:hover": { color: "#3B82F6", bgcolor: "#EFF6FF" } }}>
+                      <VisibilityOutlinedIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                   </Tooltip>
-                ))}
+                </Box>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
+          <Button onClick={handleClose} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => { setStep("composer"); setError(null); }}
+            variant="contained"
+            disabled={!selectedTemplate}
+            sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" } }}
+          >
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Template preview dialog ─────────────────────────────────────────── */}
+      <Dialog open={!!previewTemplate} onClose={() => setPreviewTemplate(null)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { borderRadius: "16px" } }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box>
+            <Typography fontWeight={600}>{previewTemplate?.name}</Typography>
+            {previewTemplate?.use_case && (
+              <Chip label={previewTemplate.use_case} size="small"
+                sx={{ ...getUseCaseSx(previewTemplate.use_case), fontSize: "11px", height: 20, mt: 0.5, textTransform: "capitalize" }} />
+            )}
+          </Box>
+          <IconButton onClick={() => setPreviewTemplate(null)}><CloseIcon /></IconButton>
+        </Box>
+        <DialogContent sx={{ px: 3 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px" }}>SUBJECT</Typography>
+          <Typography fontWeight={600} fontSize="14px" mb={2} mt={0.5}>{previewTemplate?.subject}</Typography>
+          <Divider sx={{ mb: 2 }} />
+          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px" }}>BODY</Typography>
+          <Typography component="pre" sx={{ mt: 0.5, p: 2, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "13px", lineHeight: 1.75, fontFamily: "inherit", whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
+            {stripHtml(previewTemplate?.body ?? "")}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setPreviewTemplate(null)} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
+            Close
+          </Button>
+          <Button variant="contained"
+            onClick={() => { if (previewTemplate) { handleSelectTemplate(previewTemplate); } setPreviewTemplate(null); }}
+            sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" } }}>
+            Use This Template
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── STEP 2: Full Gmail-style composer ──────────────────────────────── */}
+      <Dialog
+        open={open && step === "composer"}
+        onClose={handleClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}
+      >
+        {/* Header */}
+        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <IconButton size="small" onClick={() => setStep("selector")} disabled={sending}>
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
+            <Box>
+              <Typography fontWeight={700} fontSize="1.05rem">
+                {selectedTemplate ? selectedTemplate.name : "New Email"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Sending to {toEmails.length} recipient{toEmails.length !== 1 ? "s" : ""}
+              </Typography>
+            </Box>
+          </Stack>
+          <IconButton onClick={handleClose} disabled={sending}><CloseIcon /></IconButton>
+        </Box>
+
+        <DialogContent sx={{ px: 3, pb: 1 }}>
+          {error && (
+            <Alert severity="error" sx={{ borderRadius: "10px", mb: 2 }} onClose={() => setError(null)}>{error}</Alert>
+          )}
+
+          <Stack spacing={0} divider={<Divider />}>
+
+            {/* ── FROM ───────────────────────────────────────────────────── */}
+            <Box display="flex" alignItems="center" gap={1} py={1.2}>
+              <Typography fontSize="13px" color="text.secondary" minWidth={55}>From:</Typography>
+              {loadingFrom
+                ? <CircularProgress size={14} sx={{ color: "#94A3B8" }} />
+                : fromOptions.length > 1
+                  ? (
+                    <TextField select value={fromEmail} onChange={(e) => setFromEmail(e.target.value)}
+                      variant="standard" size="small"
+                      sx={{ minWidth: 260, "& .MuiInputBase-input": { fontSize: "13px" } }}
+                      InputProps={{ disableUnderline: true }}>
+                      {fromOptions.map((email) => (
+                        <MenuItem key={email} value={email} sx={{ fontSize: "13px" }}>{email}</MenuItem>
+                      ))}
+                    </TextField>
+                  ) : (
+                    <Typography fontSize="13px" color="#1E293B" fontWeight={500}>{fromEmail || "—"}</Typography>
+                  )
+              }
+            </Box>
+
+            {/* ── TO ─────────────────────────────────────────────────────── */}
+            <Box
+              ref={toRowRef}
+              display="flex" alignItems="flex-start" gap={1}
+              py={1} sx={{ flexWrap: "wrap" }}
+            >
+              <Typography fontSize="13px" color="text.secondary" minWidth={55} mt="8px">To:</Typography>
+
+              <RecipientChipRow
+                emails={toEmails}
+                inputValue={toInput}
+                onInputChange={setToInput}
+                onInputFocus={() => { if (leadRecipient.length > 0 && toRowRef.current) setToAnchorEl(toRowRef.current); }}
+                onInputBlur={() => { addEmailsFromInput(toInput, toEmails, setToEmails); setToInput(""); }}
+                onInputKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                    e.preventDefault(); addEmailsFromInput(toInput, toEmails, setToEmails); setToInput("");
+                  }
+                }}
+                onRemove={(email) => setToEmails(toEmails.filter((m) => m !== email))}
+                chipColor={{ bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" }}
+                placeholder="Add recipients"
+              />
+
+              {/* Cc / Bcc toggles */}
+              <Box display="flex" gap={0.75} ml="auto" pt={1} flexShrink={0}>
+                {!showCc && (
+                  <Typography fontSize="12px" color="#64748B" fontWeight={500}
+                    sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" }, userSelect: "none" }}
+                    onClick={() => setShowCc(true)}>Cc</Typography>
+                )}
+                {(!showCc || !showBcc) && <Typography fontSize="12px" color="#CBD5E1">|</Typography>}
+                {!showBcc && (
+                  <Typography fontSize="12px" color="#64748B" fontWeight={500}
+                    sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" }, userSelect: "none" }}
+                    onClick={() => setShowBcc(true)}>Bcc</Typography>
+                )}
               </Box>
 
-              {/* ── Action buttons ─────────────────────────────────────────── */}
-              <Box sx={{ display: "flex", gap: 1, width: "100%", justifyContent: "flex-end" }}>
-                <Button onClick={handleClose} disabled={sending} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveAsTemplate}
-                  disabled={sending || !subject.trim() || !body.trim()}
-                  startIcon={<BookmarkBorderIcon fontSize="small" />}
-                  sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 2, "&:hover": { bgcolor: "#F3F4F6" } }}
-                >
-                  Save as Draft
-                </Button>
-                <Button
-                  onClick={handleSend}
-                  disabled={sending || !subject.trim() || !body.trim()}
-                  variant="contained"
-                  startIcon={sending ? <CircularProgress size={14} sx={{ color: "white" }} /> : <SendIcon fontSize="small" />}
-                  sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}
-                >
-                  {sending ? "Sending..." : "Send"}
-                </Button>
-              </Box>
-            </DialogActions>
-          </>
-        )}
+              {/* To picker popover */}
+              <RecipientPickerPopover
+                open={openToPicker}
+                anchorEl={toAnchorEl}
+                onClose={() => setToAnchorEl(null)}
+                paperRef={toPickerPaperRef}
+                leads={leadRecipient}
+                selectedEmails={toEmails}
+                onToggle={toggleToEmail}
+              />
+            </Box>
 
+            {/* ── CC (conditional) ───────────────────────────────────────── */}
+            {(showCc || ccEmails.length > 0) && (
+              <Box
+                ref={ccRowRef}
+                display="flex" alignItems="flex-start" gap={1}
+                py={1} sx={{ flexWrap: "wrap" }}
+              >
+                <Typography fontSize="13px" color="text.secondary" minWidth={55} mt="8px">Cc:</Typography>
+
+                <RecipientChipRow
+                  emails={ccEmails}
+                  inputValue={ccInput}
+                  onInputChange={setCcInput}
+                  onInputFocus={() => { if (leadRecipient.length > 0 && ccRowRef.current) setCcAnchorEl(ccRowRef.current); }}
+                  onInputBlur={() => { addEmailsFromInput(ccInput, ccEmails, setCcEmails); setCcInput(""); }}
+                  onInputKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                      e.preventDefault(); addEmailsFromInput(ccInput, ccEmails, setCcEmails); setCcInput("");
+                    }
+                  }}
+                  onRemove={(email) => setCcEmails(ccEmails.filter((m) => m !== email))}
+                  chipColor={{ bg: "#F0FDF4", text: "#16A34A", border: "#BBF7D0" }}
+                  placeholder="Add Cc recipients"
+                />
+
+                {/* Remove Cc */}
+                <Box display="flex" gap={0.75} ml="auto" pt={1} flexShrink={0}>
+                  <Typography fontSize="12px" color="#64748B" fontWeight={500}
+                    sx={{ cursor: "pointer", "&:hover": { color: "#EF4444" }, userSelect: "none" }}
+                    onClick={() => { setShowCc(false); setCcEmails([]); setCcAnchorEl(null); }}>✕</Typography>
+                </Box>
+
+                {/* Cc picker popover */}
+                <RecipientPickerPopover
+                  open={openCcPicker}
+                  anchorEl={ccAnchorEl}
+                  onClose={() => setCcAnchorEl(null)}
+                  paperRef={ccPickerPaperRef}
+                  leads={leadRecipient}
+                  selectedEmails={ccEmails}
+                  onToggle={toggleCcEmail}
+                />
+              </Box>
+            )}
+
+            {/* ── BCC (conditional) ──────────────────────────────────────── */}
+            {(showBcc || bccEmails.length > 0) && (
+              <Box
+                ref={bccRowRef}
+                display="flex" alignItems="flex-start" gap={1}
+                py={1} sx={{ flexWrap: "wrap" }}
+              >
+                <Typography fontSize="13px" color="text.secondary" minWidth={55} mt="8px">Bcc:</Typography>
+
+                <RecipientChipRow
+                  emails={bccEmails}
+                  inputValue={bccInput}
+                  onInputChange={setBccInput}
+                  onInputFocus={() => { if (leadRecipient.length > 0 && bccRowRef.current) setBccAnchorEl(bccRowRef.current); }}
+                  onInputBlur={() => { addEmailsFromInput(bccInput, bccEmails, setBccEmails); setBccInput(""); }}
+                  onInputKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                      e.preventDefault(); addEmailsFromInput(bccInput, bccEmails, setBccEmails); setBccInput("");
+                    }
+                  }}
+                  onRemove={(email) => setBccEmails(bccEmails.filter((m) => m !== email))}
+                  chipColor={{ bg: "#FFF7ED", text: "#EA580C", border: "#FED7AA" }}
+                  placeholder="Add Bcc recipients"
+                />
+
+                {/* Remove Bcc */}
+                <Box display="flex" gap={0.75} ml="auto" pt={1} flexShrink={0}>
+                  <Typography fontSize="12px" color="#64748B" fontWeight={500}
+                    sx={{ cursor: "pointer", "&:hover": { color: "#EF4444" }, userSelect: "none" }}
+                    onClick={() => { setShowBcc(false); setBccEmails([]); setBccAnchorEl(null); }}>✕</Typography>
+                </Box>
+
+                {/* Bcc picker popover */}
+                <RecipientPickerPopover
+                  open={openBccPicker}
+                  anchorEl={bccAnchorEl}
+                  onClose={() => setBccAnchorEl(null)}
+                  paperRef={bccPickerPaperRef}
+                  leads={leadRecipient}
+                  selectedEmails={bccEmails}
+                  onToggle={toggleBccEmail}
+                />
+              </Box>
+            )}
+
+            {/* ── SUBJECT ────────────────────────────────────────────────── */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
+              <Typography fontSize="13px" color="text.secondary" minWidth={55}>Subject:</Typography>
+              <TextField fullWidth variant="standard" value={subject} onChange={(e) => setSubject(e.target.value)}
+                disabled={sending} InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }}
+                placeholder="Enter subject..." />
+            </Box>
+
+            {/* ── BODY ───────────────────────────────────────────────────── */}
+            <Box sx={{ py: 1.5, minHeight: 160 }}>
+              <textarea
+                ref={bodyRef}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                onSelect={saveCursor}
+                onKeyUp={saveCursor}
+                onMouseUp={saveCursor}
+                disabled={sending}
+                placeholder="Write your message..."
+                rows={9}
+                style={{
+                  width: "100%", boxSizing: "border-box", resize: "vertical",
+                  border: "none", outline: "none",
+                  fontSize: "13px", lineHeight: 1.7,
+                  fontFamily: "inherit", color: "#1E293B",
+                  background: "transparent", padding: 0,
+                }}
+              />
+            </Box>
+          </Stack>
+        </DialogContent>
+
+        {/* Toolbar + Action buttons */}
+        <Box sx={{ px: 3, pb: 3, pt: 1, borderTop: "1px solid #E5E7EB" }}>
+          {/* Formatting toolbar */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, mb: 1.5, pt: 1, flexWrap: "wrap" }}>
+            {[
+              { title: "Attach file",   icon: <AttachFileOutlinedIcon sx={{ fontSize: 18 }} />,       onClick: handleAttach,                                                                                    active: false,               activeColor: undefined },
+              { title: "Insert link",   icon: <LinkOutlinedIcon sx={{ fontSize: 18 }} />,             onClick: handleInsertLink,                                                                                active: false,               activeColor: undefined },
+              { title: "Emoji",         icon: <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />,   onClick: (e: React.MouseEvent<HTMLButtonElement>) => { saveCursor(); setEmojiAnchor(e.currentTarget); },  active: Boolean(emojiAnchor),  activeColor: "#F59E0B" },
+              { title: "Insert image",  icon: <ImageOutlinedIcon sx={{ fontSize: 18 }} />,           onClick: handleImageAttach,                                                                               active: false,               activeColor: undefined },
+              { title: "Format text",   icon: <FormatColorTextOutlinedIcon sx={{ fontSize: 18 }} />, onClick: (e: React.MouseEvent<HTMLButtonElement>) => { saveCursor(); setFormatAnchor(e.currentTarget); }, active: Boolean(formatAnchor), activeColor: "#6366F1" },
+              { title: "Highlight",     icon: <BrushOutlinedIcon sx={{ fontSize: 18 }} />,           onClick: () => { saveCursor(); wrapSelection("==", "==", "highlighted text"); },                         active: false,               activeColor: undefined },
+              { title: "More options",  icon: <AddCircleOutlineIcon sx={{ fontSize: 18 }} />,        onClick: (e: React.MouseEvent<HTMLButtonElement>) => { saveCursor(); setMoreAnchor(e.currentTarget); },   active: Boolean(moreAnchor),   activeColor: "#10B981" },
+            ].map(({ title, icon, onClick, active, activeColor }) => (
+              <Tooltip key={title} title={title}>
+                <IconButton size="small"
+                  onClick={onClick as React.MouseEventHandler<HTMLButtonElement>}
+                  disabled={sending}
+                  sx={{ color: (active && activeColor) ? activeColor : "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: activeColor || "#1E293B" } }}>
+                  {icon}
+                </IconButton>
+              </Tooltip>
+            ))}
+          </Box>
+
+          {/* Action buttons */}
+          <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+            <Button
+              onClick={() => setStep("selector")} disabled={sending}
+              sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>
+              Back
+            </Button>
+            <Button
+              onClick={handleSaveAsDraft}
+              disabled={sending || !subject.trim() || !body.trim()}
+              startIcon={<BookmarkBorderIcon fontSize="small" />}
+              sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 2, "&:hover": { bgcolor: "#F3F4F6" } }}>
+              Save as Draft
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSend}
+              disabled={!canSend}
+              endIcon={sending ? <CircularProgress size={14} sx={{ color: "white" }} /> : <SendOutlinedIcon />}
+              sx={{
+                height: 40, backgroundColor: "#4B5563", color: "white", fontWeight: 500,
+                textTransform: "none", borderRadius: "8px", px: 3, minWidth: 90,
+                "&:hover": { backgroundColor: "#374151" },
+                "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" },
+              }}>
+              {sending ? "Sending..." : "Send"}
+            </Button>
+          </Box>
+        </Box>
       </Dialog>
     </>
   );
