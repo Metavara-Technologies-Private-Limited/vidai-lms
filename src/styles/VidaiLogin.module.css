@@ -2,7 +2,7 @@
   min-height: 100dvh;
   width: 100%;
   display: grid;
-  grid-template-columns: 1.85fr 1fr;
+  grid-template-columns: 1.7fr 0.95fr;
   background: #e8e8ea;
 }
 
@@ -10,20 +10,42 @@
   position: relative;
   overflow: hidden;
   border-right: 1px solid #d8d8da;
-  background: #e8e8ea;
+  background: #fff;
 }
 
-.heroFullImage {
-  width: 100%;
+.heroImage {
+  width: 90%;
   height: 100%;
-  object-fit: fill;
+  object-fit: contain;
+  padding: 90px;
+  box-sizing: border-box;
   display: block;
+  margin-top: -100px;
+}
+
+.heroTagline {
+  position: absolute;
+  left: 50%;
+  bottom: 34%;
+  transform: translateX(-50%);
+  width: min(620px, 86%);
+  margin: 0;
+  text-align: center;
+  color: #2b3445;
+  font-size: clamp(22px, 1.5vw, 26px);
+  font-weight: 500;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.heroTaglineAccent {
+  color: #e17e61;
 }
 
 .formPanel {
   position: relative;
   background: #e8e8ea;
-  padding: 24px 28px;
+  padding: 18px 22px;
   display: flex;
   flex-direction: column;
 }
@@ -32,31 +54,31 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 16px;
+  gap: 12px;
 }
 
 .languageWrap {
   align-self: flex-end;
-  width: min(175px, 100%);
+  width: min(155px, 100%);
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 .languageLabel {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #666;
 }
 
 .languageSelect {
   width: 100%;
-  height: 34px;
+  height: 32px;
   border: 1px solid #dd876f;
   border-radius: 8px;
   background: #ececee;
   color: #5d5d5d;
-  font-size: 14px;
+  font-size: 13px;
   padding: 0 8px;
   outline: none;
 }
@@ -67,20 +89,20 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 20px;
-  padding: clamp(32px, 10vh, 120px) 0 24px;
+  gap: 16px;
+  padding: clamp(22px, 7vh, 80px) 0 18px;
 }
 
 .logo {
-  width: min(160px, 70%);
+  width: min(140px, 62%);
   align-self: center;
 }
 
 .loginForm {
-  width: min(360px, 100%);
+  width: min(320px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 20px;
 }
 
 .inputGroup {
@@ -104,7 +126,7 @@
   width: 100%;
   border: 0;
   background: transparent;
-  font-size: 20px;
+  font-size: 18px;
   color: #8a8c91;
   outline: none;
   line-height: 1.1;
@@ -130,13 +152,13 @@
 }
 
 .loginButton {
-  margin-top: 10px;
-  height: 42px;
+  margin-top: 6px;
+  height: 40px;
   border: 0;
   border-radius: 10px;
   background: #595a5f;
   color: #fff;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16);
@@ -152,59 +174,69 @@
   border: 0;
   background: transparent;
   color: #1f2d45;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
 }
 
 @media (max-width: 1200px) {
   .loginPage {
-    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr);
+    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.95fr);
   }
 
   .heroPanel {
     min-height: 100dvh;
   }
 
+  .heroImage {
+    padding: 26px;
+  }
+
+  .heroTagline {
+    bottom: 28%;
+    font-size: clamp(22px, 1.5vw, 26px);
+  }
+
   .formPanel {
     min-height: 100dvh;
-    padding: 24px;
+    padding: 18px 20px;
   }
 
   .topSection {
     align-items: flex-end;
-    gap: 14px;
+    gap: 12px;
   }
 
   .languageWrap {
-    width: min(175px, 100%);
+    width: min(155px, 100%);
   }
 
   .languageLabel {
-    font-size: 15px;
+    font-size: 13px;
   }
 
   .languageSelect {
-    font-size: 15px;
-    height: 38px;
+    font-size: 13px;
+    height: 34px;
     border-radius: 10px;
   }
 
   .formContent {
-    gap: 24px;
-    padding-top: clamp(40px, 14vh, 120px);
+    gap: 18px;
+    padding-top: clamp(28px, 10vh, 88px);
   }
 
   .logo {
-    width: 180px;
+    width: 150px;
   }
 
   .loginForm {
+    max-width: 340px;
     gap: 16px;
   }
 
   .inputField {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .errorText {
@@ -212,14 +244,14 @@
   }
 
   .loginButton {
-    margin-top: 20px;
-    height: 48px;
+    margin-top: 10px;
+    height: 42px;
     border-radius: 12px;
-    font-size: 20px;
+    font-size: 16px;
   }
 
   .forgotButton {
-    font-size: 16px;
+    font-size: 14px;
   }
 }
 
