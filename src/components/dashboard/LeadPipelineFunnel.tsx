@@ -13,13 +13,15 @@ interface LeadPipelineFunnelProps {
 }
 
 const stages = [
-  { stage: "Converted Leads", key: "Converted" as Status, color: "#7e879d" },
-  { stage: "New Leads", key: "New" as Status, color: "#8a92a8" },
-  { stage: "Appointments", key: "Appointment" as Status, color: "#9ba3b5" },
-  { stage: "Follow-Ups", key: "Follow-Ups" as Status, color: "#b8bdcc" },
-  { stage: "Cycle Conversion", key: "Cycle Conversion" as Status, color: "#d1d4de" },
-  { stage: "Lost Leads", key: "Lost" as Status, color: "#eceef4" },
+  { stage: "Converted Leads", key: "Converted" as Status },
+  { stage: "New Leads", key: "New" as Status },
+  { stage: "Appointments", key: "Appointment" as Status },
+  { stage: "Follow-Ups", key: "Follow-Ups" as Status },
+  { stage: "Cycle Conversion", key: "Cycle Conversion" as Status },
+  { stage: "Lost Leads", key: "Lost" as Status },
 ];
+
+const POSITION_COLORS = ["#7e879d", "#8a92a8", "#9ba3b5", "#b8bdcc", "#d1d4de", "#eceef4"];
 
 const FOLLOW_UP_SOURCE_STAGES: Status[] = ["New", "Lost", "Cycle Conversion"];
 
@@ -110,9 +112,9 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
             {/* 3D Shading Gradients */}
             {data.map((item, index) => (
               <linearGradient key={`grad-${index}`} id={`grad-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" style={{ stopColor: item.color, stopOpacity: 1 }} />
-                <stop offset="50%" style={{ stopColor: item.color, stopOpacity: 0.85 }} />
-                <stop offset="100%" style={{ stopColor: item.color, stopOpacity: 1 }} />
+                <stop offset="0%" style={{ stopColor: POSITION_COLORS[index], stopOpacity: 1 }} />
+                <stop offset="50%" style={{ stopColor: POSITION_COLORS[index], stopOpacity: 0.85 }} />
+                <stop offset="100%" style={{ stopColor: POSITION_COLORS[index], stopOpacity: 1 }} />
               </linearGradient>
             ))}
             <filter id="bubbleShadow" x="-20%" y="-20%" width="140%" height="140%">
