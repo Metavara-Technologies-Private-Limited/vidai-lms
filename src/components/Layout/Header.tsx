@@ -33,7 +33,9 @@ const Header = () => {
   // we intentionally only need the clinic name in the header;
   // other state is loaded by thunks but not read here.
   const clinics = user?.clinics || [];
-  const selectedClinic = clinics.find((c) => c.is_default) || clinics[0];
+  const [selectedClinic, setSelectedClinic] = useState(
+    clinics.find((c) => c.is_default) || clinics[0],
+  );
   const [clinicAnchor, setClinicAnchor] = useState<null | HTMLElement>(null);
 
   const handleClinicOpen = (e: React.MouseEvent<HTMLElement>) =>
@@ -129,7 +131,13 @@ const Header = () => {
               onClose={handleClinicClose}
             >
               {clinics.map((c) => (
-                <MenuItem key={c.clinic_id} onClick={handleClinicClose}>
+                <MenuItem
+                  key={c.clinic_id}
+                  onClick={() => {
+                    setSelectedClinic(c);
+                    handleClinicClose();
+                  }}
+                >
                   {c.clinic__name}
                 </MenuItem>
               ))}
