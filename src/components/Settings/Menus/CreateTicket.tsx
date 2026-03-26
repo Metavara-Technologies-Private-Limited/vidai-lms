@@ -1,7 +1,7 @@
 import {
   Dialog, DialogContent, DialogTitle, IconButton, TextField, Box, Button,
   MenuItem, Stack, Typography, Divider, CircularProgress,
-  Autocomplete, 
+  Autocomplete,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useState, useEffect } from "react";
@@ -14,28 +14,91 @@ import { toast } from "react-toastify";
 import type { AppDispatch } from "../../../store";
 import { fetchTickets, fetchTicketDashboard } from "../../../store/ticketSlice";
 import { ticketsApi, labsApi, clinicsApi } from "../../../services/tickets.api";
+import { authApi } from "../../../services/auth.api";
 import type { CreateTicketProps } from "../../../types/Settings.types";
-import type { CreateTicketRequest, TicketPriority, Lab, Department, Employee, PaginatedResponse } from "../../../types/tickets.types";
+import type { CreateTicketRequest, TicketPriority, Lab, Department, PaginatedResponse } from "../../../types/tickets.types";
 
 import {
   createTicketFocusedFieldSx, createTicketDialogPaperSx, createTicketCloseButtonSx,
   createTicketCancelButtonSx, createTicketSaveButtonSx, createTicketUploadButtonSx,
 } from "../../../styles/Settings/Tickets.styles";
-import { authApi } from "../../../services/auth.api";
 import { selectUser } from "../../../store/authSlice";
 
-type User = {
+type AssigneeOption = {
   id: number;
-  first_name: string;
-  last_name: string;
-  email: string;
-  role: string;
+  first_name: string | undefined;
+  last_name: string | undefined;
+  username: string | undefined;
+  role: string | undefined;
+  designation: string | undefined;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
+const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
+  const root = asRecord(raw);
+  const list: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(root?.objects)
+      ? (root?.objects as unknown[])
+      : Array.isArray(root?.results)
+        ? (root?.results as unknown[])
+        : Array.isArray(root?.data)
+          ? (root?.data as unknown[])
+          : [];
+
+  return list
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record) return null;
+
+      const idValue = record.id ?? record.user_id;
+      const id =
+        typeof idValue === "number"
+          ? idValue
+          : typeof idValue === "string"
+            ? Number(idValue)
+            : NaN;
+
+      if (!Number.isFinite(id)) return null;
+
+      return {
+        id,
+        first_name:
+          typeof record.first_name === "string" ? record.first_name : undefined,
+        last_name:
+          typeof record.last_name === "string" ? record.last_name : undefined,
+        username: typeof record.username === "string" ? record.username : undefined,
+        role: typeof record.role === "string" ? record.role : undefined,
+        designation:
+          typeof record.designation === "string" ? record.designation : undefined,
+      };
+    })
+    .filter((item): item is AssigneeOption => item !== null);
+};
+
+const assigneeLabel = (option: AssigneeOption): string => {
+  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const primary = fullName || option.username || `User ${option.id}`;
+  const secondary = option.role || option.designation;
+  return secondary ? `${primary} (${secondary})` : primary;
 };
 
 const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const dispatch = useDispatch<AppDispatch>();
   const user = useSelector(selectUser);
-  const CLINIC_ID = "1";
+  const preferredClinicId =
+    user?.clinics?.find((clinic) => clinic.is_default)?.clinic_id ??
+    user?.clinics?.[0]?.clinic_id ??
+    1;
+  const isLocalHost =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1");
+  const clinicId = isLocalHost ? 1 : preferredClinicId;
 
   // --- Form States ---
   const [subject, setSubject] = useState("");
@@ -46,16 +109,15 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [assigneeId, setAssigneeId] = useState<number | "">("");
   const [assigneeName, setAssigneeName] = useState("");
+  const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
+  const [assigneeLoading, setAssigneeLoading] = useState(false);
   const [requestedBy, setRequestedBy] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [userOptions, setUserOptions] = useState<User[]>([]);
-  const [userSearch, setUserSearch] = useState("");
-  const [searchLoading, setSearchLoading] = useState(false);
 
   // --- Data States (Dropdowns) ---
   const [labs, setLabs] = useState<Lab[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [, setEmployees] = useState<Employee[]>([]);
 
   // --- UI States ---
   const [loading, setLoading] = useState(false);
@@ -65,32 +127,35 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   useEffect(() => {
     if (user?.first_name && user?.last_name) {
       setRequestedBy(`${user.first_name} ${user.last_name}`);
+    } else if (user?.username) {
+      setRequestedBy(user.username);
     }
   }, [user]);
 
   useEffect(() => {
-    const delayDebounce = setTimeout(async () => {
-      if (!userSearch.trim()) return;
+    const timer = setTimeout(async () => {
+      if (!assigneeSearch.trim()) {
+        setAssigneeOptions([]);
+        return;
+      }
 
       try {
-        setSearchLoading(true);
-
-        const res = await authApi.searchUsers({
-          search: userSearch,
-          limit: 10,
+        setAssigneeLoading(true);
+        const response = await authApi.searchUsers({
+          search: assigneeSearch,
+          limit: 20,
           offset: 0,
         });
-
-        setUserOptions(res.objects || []);
+        setAssigneeOptions(normalizeAssignees(response));
       } catch {
-        toast.error("Failed to fetch users");
+        setAssigneeOptions([]);
       } finally {
-        setSearchLoading(false);
+        setAssigneeLoading(false);
       }
-    }, 400);
+    }, 350);
 
-    return () => clearTimeout(delayDebounce);
-  }, [userSearch]);
+    return () => clearTimeout(timer);
+  }, [assigneeSearch]);
 
   // 1. Fetch live data for dropdowns matching Swagger definitions
   useEffect(() => {
@@ -98,10 +163,19 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
       const loadData = async () => {
         setLoadingData(true);
         try {
+          const extractDepartments = (clinicPayload: unknown): Department[] => {
+            if (!clinicPayload || typeof clinicPayload !== "object") return [];
+            const data = clinicPayload as Record<string, unknown>;
+            const byDepartment = data.department;
+            const byDepartmentSet = data.department_set;
+            if (Array.isArray(byDepartment)) return byDepartment as Department[];
+            if (Array.isArray(byDepartmentSet)) return byDepartmentSet as Department[];
+            return [];
+          };
+
           const results = await Promise.allSettled([
             labsApi.getLabs(),
-            clinicsApi.getClinicDetail(CLINIC_ID),
-            clinicsApi.getClinicEmployees(CLINIC_ID),
+            clinicsApi.getClinicDetail(clinicId),
           ]);
 
           if (results[0].status === 'fulfilled') {
@@ -115,14 +189,29 @@ setLabs(labList.filter((l) => l.is_active));
           }
 
           if (results[1].status === 'fulfilled') {
-            setDepartments(results[1].value?.department || []);
+            const primaryDepartments = extractDepartments(results[1].value);
+            if (primaryDepartments.length > 0) {
+              setDepartments(primaryDepartments);
+            } else if (clinicId !== 1) {
+              try {
+                const fallbackClinic = await clinicsApi.getClinicDetail(1);
+                setDepartments(extractDepartments(fallbackClinic));
+              } catch {
+                setDepartments([]);
+              }
+            } else {
+              setDepartments([]);
+            }
+          } else if (clinicId !== 1) {
+            try {
+              const fallbackClinic = await clinicsApi.getClinicDetail(1);
+              setDepartments(extractDepartments(fallbackClinic));
+            } catch {
+              setDepartments([]);
+            }
+          } else {
+            setDepartments([]);
           }
-
-          if (results[2].status === 'fulfilled') {
-const empData = results[2].value as Employee[] | PaginatedResponse<Employee>;
-setEmployees(Array.isArray(empData) ? empData : empData.results);
-          }
-
 } catch {
   const connError = "Connection error. Check backend server.";
   toast.error(connError);
@@ -133,7 +222,7 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
       };
       loadData();
     }
-  }, [open]);
+  }, [open, clinicId]);
 
   // 2. Submit Logic matching TicketWrite definition
   const handleSubmit = async () => {
@@ -191,7 +280,7 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
         priority: priority as TicketPriority,
         status: "new",
         assigned_to: assigneeId ? Number(assigneeId) : null,
-        assigned_to_name: assigneeName,
+        assigned_to_name: assigneeName || undefined,
         due_date: dueDate ? dueDate.format("YYYY-MM-DD") : null,
       };
 
@@ -211,10 +300,21 @@ handleClose();
   if (typeof err === "object" && err !== null && "response" in err) {
     const serverData = (err as { response?: { data?: unknown } }).response?.data;
 
+    const stringifyError = (value: unknown): string => {
+      if (value == null) return "Unknown error";
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+      if (Array.isArray(value)) return value.map(stringifyError).join(", ");
+      if (typeof value === "object") {
+        return Object.entries(value as Record<string, unknown>)
+          .map(([key, nestedValue]) => `${key}: ${stringifyError(nestedValue)}`)
+          .join(" | ");
+      }
+      return String(value);
+    };
+
     if (serverData && typeof serverData === "object") {
-      finalError = Object.entries(serverData as Record<string, unknown>)
-        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`)
-        .join(" | ");
+      finalError = stringifyError(serverData);
     }
   }
 
@@ -228,6 +328,8 @@ handleClose();
   const reset = () => {
     setSubject(""); setDescription(""); setDueDate(null); setLabId("");
     setDepartmentId(""); setPriority(""); setAssigneeId(""); setRequestedBy("");
+    setAssigneeName("");
+    setAssigneeSearch(""); setAssigneeOptions([]);
     setSelectedFile(null);
   };
 
@@ -235,24 +337,6 @@ handleClose();
     reset();
     onClose();
   };
-
-//  Filter employees by selected department (using dep_id relation)
-// const filteredEmployees =
-//   departmentId === ""
-//     ? employees
-//     : employees.filter((emp) => {
-//         // Try ID match first (if backend sends dep_id)
-//         if (emp.dep_id !== undefined && emp.dep_id !== null) {
-//           return String(emp.dep_id) === String(departmentId);
-//         }
-
-//         // Fallback to department name match
-//         const selectedDept = departments.find(
-//           (d) => String(d.id) === String(departmentId)
-//         );
-
-//         return selectedDept && emp.department_name === selectedDept.name;
-//       });
 
   return (
     <Dialog
@@ -456,29 +540,25 @@ handleClose();
 
             <Stack direction="row" spacing={2}>
               <Autocomplete
-                options={userOptions}
-                loading={searchLoading}
+                options={assigneeOptions}
+                loading={assigneeLoading}
+                value={assigneeOptions.find((option) => option.id === assigneeId) || null}
+                onInputChange={(_, value) => setAssigneeSearch(value)}
+                onChange={(_, value) => {
+                  setAssigneeId(value?.id ?? "");
+                  setAssigneeName(value ? assigneeLabel(value) : "");
+                }}
+                getOptionLabel={assigneeLabel}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
                 fullWidth
-                getOptionLabel={(option) =>
-                  `${option.first_name} ${option.last_name} (${option.role})`
-                }
-                onInputChange={(_, value) => setUserSearch(value)}
-                  onChange={(_, value) => {
-                    setAssigneeId(value?.id || "");
-                    setAssigneeName(value?.first_name || '');
-                  }}
+                disabled={loading}
+                noOptionsText="Type to search assignee"
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="Assign To"
-                    placeholder="Search user..."
-                    fullWidth
-                    sx={{
-                      ...createTicketFocusedFieldSx,
-                      "& .MuiInputBase-root": {
-                        height: 56,
-                      },
-                    }}
+                    placeholder="Search assignee"
+                    sx={createTicketFocusedFieldSx}
                     InputLabelProps={{ shrink: true }}
                   />
                 )}

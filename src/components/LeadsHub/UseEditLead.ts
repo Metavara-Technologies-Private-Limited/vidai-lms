@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
 import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
+import { authApi } from "../../services/auth.api";
 import { fetchLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
 import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
@@ -53,6 +54,62 @@ export interface CampaignOption {
   subSource: string;
   isActive: boolean;
 }
+
+type AssigneeOption = {
+  id: number;
+  first_name: string | undefined;
+  last_name: string | undefined;
+  username: string | undefined;
+  role: string | undefined;
+  designation: string | undefined;
+  email: string | undefined;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
+const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
+  const root = asRecord(raw);
+  const list: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(root?.objects)
+      ? (root?.objects as unknown[])
+      : Array.isArray(root?.results)
+        ? (root?.results as unknown[])
+        : Array.isArray(root?.data)
+          ? (root?.data as unknown[])
+          : [];
+
+  return list
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record) return null;
+      const idValue = record.id ?? record.user_id;
+      const id =
+        typeof idValue === "number"
+          ? idValue
+          : typeof idValue === "string"
+            ? Number(idValue)
+            : NaN;
+      if (!Number.isFinite(id)) return null;
+      return {
+        id,
+        first_name:
+          typeof record.first_name === "string" ? record.first_name : undefined,
+        last_name:
+          typeof record.last_name === "string" ? record.last_name : undefined,
+        username:
+          typeof record.username === "string" ? record.username : undefined,
+        role: typeof record.role === "string" ? record.role : undefined,
+        designation:
+          typeof record.designation === "string" ? record.designation : undefined,
+        email: typeof record.email === "string" ? record.email : undefined,
+      };
+    })
+    .filter((item): item is AssigneeOption => item !== null);
+};
 
 // ====================== Helpers ======================
 export const strOrNull = (val: string | undefined | null): string | null =>
@@ -229,6 +286,10 @@ export function useEditLead() {
   const [subSource, setSubSource] = React.useState("");
   const [campaign, setCampaignId] = React.useState<string | number>("");
   const [assignee, setAssignee] = React.useState("");
+  const [assigneeName, setAssigneeName] = React.useState("");
+  const [assigneeSearch, setAssigneeSearch] = React.useState("");
+  const [assigneeOptions, setAssigneeOptions] = React.useState<AssigneeOption[]>([]);
+  const [assigneeLoading, setAssigneeLoading] = React.useState(false);
   const [nextType, setNextType] = React.useState("");
   const [nextStatus, setNextStatus] = React.useState("");
   const [nextDesc, setNextDesc] = React.useState("");
@@ -365,6 +426,7 @@ export function useEditLead() {
         if (campaignId) setCampaignId(String(campaignId));
 
         setAssignee(lead.assigned_to_id?.toString() ?? "");
+        setAssigneeName(lead.assigned_to_name ?? "");
         setNextType(lead.next_action_type ?? "");
         setNextStatus(lead.next_action_status ?? "");
         setNextDesc(lead.next_action_description ?? "");
@@ -475,6 +537,30 @@ export function useEditLead() {
     load();
   }, [clinicId]);
 
+  React.useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!assigneeSearch.trim()) {
+        setAssigneeOptions([]);
+        return;
+      }
+      try {
+        setAssigneeLoading(true);
+        const response = await authApi.searchUsers({
+          search: assigneeSearch,
+          limit: 20,
+          offset: 0,
+        });
+        setAssigneeOptions(normalizeAssignees(response));
+      } catch {
+        setAssigneeOptions([]);
+      } finally {
+        setAssigneeLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [assigneeSearch]);
+
   // ====================== Filter Personnel by Appointment Department ======================
   React.useEffect(() => {
     if (!department || employees.length === 0) { setFilteredPersonnel([]); return; }
@@ -524,6 +610,7 @@ export function useEditLead() {
       sub_source: subSource || "",
       campaign_id: campaign ? String(campaign) : null,
       assigned_to_id: intOrNull(assignee),
+      assigned_to_name: assigneeName.trim() || null,
       next_action_type: nextType || undefined,
       next_action_status: resolvedStatus,
       next_action_description: nextDesc || "",
@@ -642,6 +729,10 @@ export function useEditLead() {
     subSource, setSubSource,
     campaign, handleCampaignChange,
     assignee, setAssignee,
+    assigneeName, setAssigneeName,
+    assigneeSearch, setAssigneeSearch,
+    assigneeOptions,
+    assigneeLoading,
     nextType,
     nextStatus, setNextStatus,
     nextDesc, setNextDesc,

@@ -68,7 +68,7 @@ const TicketContentPanel = ({
     if (leads.length === 0) {
       dispatch(fetchLeads());
     }
-  }, [dispatch]);
+  }, [dispatch, leads.length]);
 
   //  Convert Leads into Email Recipients
   const recipients = (Array.isArray(leads) ? leads : [])
@@ -116,9 +116,9 @@ const TicketContentPanel = ({
       >
         <Box display="flex" justifyContent="space-between" mb={2}>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Avatar
-              src={`https://ui-avatars.com/api/?name=${displayName}&background=random`}
-            />
+            <Avatar>
+              {(displayName?.trim()?.charAt(0) || "U").toUpperCase()}
+            </Avatar>
             <Box>
               <Typography fontWeight={700}>{displayName}</Typography>
               <Typography variant="caption" color="text.secondary">

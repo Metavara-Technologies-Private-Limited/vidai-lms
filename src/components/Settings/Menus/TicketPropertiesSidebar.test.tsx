@@ -17,7 +17,7 @@ const ticket = {
   created_at: "2024-01-01T10:00:00Z",
   requested_by: "John Doe",
   department_name: "Biochemistry",
-  assigned_to: 2,
+  assigned_to_id: 2,
   timeline: [
     {
       id: "t1",

@@ -4,6 +4,7 @@ import type {
   TicketDetail,
   CreateTicketRequest,
   UpdateTicketRequest,
+  UpdateTicketStatusPayload,
   TicketFilters,
   TicketDashboardCount,
   Lab,
@@ -65,12 +66,7 @@ export const ticketsApi = {
 
   updateTicketStatus: async (
     ticketId: string,
-    payload: {
-      status: string;
-      priority?: string;
-      assigned_to?: number | "";
-      type?: string;
-    },
+    payload: UpdateTicketStatusPayload,
   ): Promise<TicketDetail> => {
     const response = await apiClient.post(
       `/tickets/${ticketId}/status/`,

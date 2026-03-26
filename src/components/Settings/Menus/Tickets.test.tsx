@@ -63,7 +63,7 @@ const mockTickets = [
     department_name: "Biochemistry",
     priority: "high",
     status: "new",
-    assigned_to: 1,
+    assigned_to_id: 1,
   },
   {
     id: 102,
@@ -77,7 +77,7 @@ const mockTickets = [
     department_name: "Microbiology",
     priority: "low",
     status: "pending",
-    assigned_to: 2,
+    assigned_to_id: 2,
   },
 ];
 

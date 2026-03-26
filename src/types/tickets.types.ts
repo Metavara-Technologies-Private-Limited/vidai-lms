@@ -30,7 +30,7 @@ export interface FilterTicketsProps {
 export interface TicketTimeline {
   id?: string;
   action: string;
-  done_by?: number | null;
+  done_by_id?: number | null;
   done_by_name?: string;
   created_at?: string;
 }
@@ -58,11 +58,20 @@ export interface UpdateTicketRequest {
   department: number;
   requested_by: string;
   assigned_to?: number | null;
+  assigned_to_name?: string;
   priority: TicketPriority;
   status?: TicketStatus;
   type?: string;
   due_date?: string | null;
   documents?: TicketDocument[];
+}
+
+export interface UpdateTicketStatusPayload {
+  status: TicketStatus;
+  priority: TicketPriority;
+  assigned_to?: number | null;
+  assigned_to_name?: string;
+  type?: string;
 }
 
 // Ticket List Item (for list view)
@@ -78,7 +87,7 @@ export interface TicketListItem {
   department: number;
   department_name: string;
   priority: TicketPriority;
-  assigned_to?: number | null;
+  assigned_to_id?: number | null;
   assigned_to_name?: string;
   status: TicketStatus;
 }
@@ -95,7 +104,7 @@ export interface TicketDetail {
   department_name: string;
   requested_by: string;
   type: string;
-  assigned_to?: number | null;
+  assigned_to_id?: number | null;
   assigned_to_name?: string;
   priority: TicketPriority;
   status: TicketStatus;

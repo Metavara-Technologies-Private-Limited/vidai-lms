@@ -174,6 +174,8 @@ const TicketView = () => {
   const [status, setStatus] = useState<TicketStatus>("new");
   const [priority, setPriority] = useState<TicketPriority>("low");
   const [assignTo, setAssignTo] = useState<number | "">("");
+  const [assigneeName, setAssigneeName] = useState("");
+  const [assigneeEmail, setAssigneeEmail] = useState("");
   const [description, setDescription] = useState(""); // State for editable description
   const [openReply, setOpenReply] = useState(false);
   const [replyMessage, setReplyMessage] = useState("");
@@ -255,7 +257,12 @@ const TicketView = () => {
       // Sync local states with DB response
       setStatus(ticketData.status);
       setPriority(ticketData.priority);
-      setAssignTo(ticketData.assigned_to || "");
+      setAssignTo(ticketData.assigned_to_id || "");
+      setAssigneeName(ticketData.assigned_to_name || "");
+      setAssigneeEmail(
+        normalizedEmployees.find((emp) => emp.id === ticketData.assigned_to_id)
+          ?.email || "",
+      );
       setDescription(ticketData.description);
     } catch {
       setError("Failed to load ticket details from server.");
@@ -348,13 +355,14 @@ const TicketView = () => {
       if (
         status !== ticket.status ||
         priority !== ticket.priority ||
-        assignTo !== (ticket.assigned_to || "") ||
+        assignTo !== (ticket.assigned_to_id || "") ||
         type !== ticket.type
       ) {
         await ticketsApi.updateTicketStatus(id, {
           status,
           priority,
-          assigned_to: assignTo || "",
+          assigned_to: assignTo === "" ? null : assignTo,
+          assigned_to_name: assigneeName || undefined,
           type,
         });
 
@@ -656,10 +664,13 @@ const TicketView = () => {
     );
 
   const selectedAssigneeId =
-    assignTo === "" ? (ticket.assigned_to ?? null) : assignTo;
+    assignTo === "" ? (ticket.assigned_to_id ?? null) : assignTo;
   const selectedAssignee = !selectedAssigneeId
     ? undefined
     : employees.find((emp) => emp.id === Number(selectedAssigneeId));
+  const currentAssigneeName =
+    assigneeName || selectedAssignee?.emp_name || ticket.assigned_to_name || "";
+  const currentAssigneeEmail = assigneeEmail || selectedAssignee?.email || "";
 
   return (
     <Box sx={ticketViewWrapperSx}>
@@ -682,10 +693,8 @@ const TicketView = () => {
           handlePreviewOpen={handlePreviewOpen}
           openReply={openReply}
           setOpenReply={setOpenReply}
-          assigneeName={
-            selectedAssignee?.emp_name || ticket.assigned_to_name || ""
-          }
-          assigneeEmail={selectedAssignee?.email || ""}
+          assigneeName={currentAssigneeName}
+          assigneeEmail={currentAssigneeEmail}
           replyProps={{
             openReply,
             setOpenReply,
@@ -721,6 +730,7 @@ const TicketView = () => {
         <TicketPropertiesSidebar
           ticket={ticket}
           employees={employees}
+          selectedAssigneeName={currentAssigneeName}
           tab={tab}
           setTab={setTab}
           type={type}
@@ -731,7 +741,9 @@ const TicketView = () => {
           setPriority={setPriority}
           assignTo={assignTo}
           setAssignTo={setAssignTo}
-          selectedAssigneeEmail={selectedAssignee?.email || ""}
+          setAssigneeName={setAssigneeName}
+          setAssigneeEmail={setAssigneeEmail}
+          selectedAssigneeEmail={currentAssigneeEmail}
           handleUpdate={handleUpdate}
           updating={updating}
           ticketTypes={ticketTypes}
