@@ -81,6 +81,7 @@ export type LeadPayload = {
   department_id: number;
   campaign_id?: string | null;
   assigned_to_id?: number | null;
+  assigned_to_name?: string | null;
   personal_id?: number | null;
   full_name: string;
   contact_no: string;

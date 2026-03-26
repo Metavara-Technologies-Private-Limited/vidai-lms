@@ -92,7 +92,7 @@ const mockTicket: TicketDetail = {
   department_name: "Microbiology",
 
   requested_by: "user@test.com",
-  assigned_to: 2,
+  assigned_to_id: 2,
 
   created_at: "2024-01-01T10:00:00Z",
   updated_at: "2024-01-01T10:00:00Z",

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -11,8 +12,72 @@ import {
   Avatar,
   Button,
   CircularProgress,
+  Autocomplete,
 } from "@mui/material";
 import dayjs from "dayjs";
+import { authApi } from "../../../services/auth.api";
+
+type AssigneeOption = {
+  id: number;
+  first_name: string | undefined;
+  last_name: string | undefined;
+  username: string | undefined;
+  email: string | undefined;
+  role: string | undefined;
+  designation: string | undefined;
+};
+
+const asRecordSafe = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
+const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
+  const root = asRecordSafe(raw);
+  const list: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(root?.objects)
+      ? (root?.objects as unknown[])
+      : Array.isArray(root?.results)
+        ? (root?.results as unknown[])
+        : Array.isArray(root?.data)
+          ? (root?.data as unknown[])
+          : [];
+  return list
+    .map((item) => {
+      const record = asRecordSafe(item);
+      if (!record) return null;
+      const idValue = record.id ?? record.user_id;
+      const id =
+        typeof idValue === "number"
+          ? idValue
+          : typeof idValue === "string"
+            ? Number(idValue)
+            : NaN;
+      if (!Number.isFinite(id)) return null;
+      return {
+        id,
+        first_name: typeof record.first_name === "string" ? record.first_name : undefined,
+        last_name: typeof record.last_name === "string" ? record.last_name : undefined,
+        username: typeof record.username === "string" ? record.username : undefined,
+        email: typeof record.email === "string"
+          ? record.email
+          : typeof record.username === "string" && record.username.includes("@")
+            ? record.username
+            : undefined,
+        role: typeof record.role === "string" ? record.role : undefined,
+        designation: typeof record.designation === "string" ? record.designation : undefined,
+      };
+    })
+    .filter((item): item is AssigneeOption => item !== null);
+};
+
+const assigneeLabel = (option: AssigneeOption): string => {
+  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const primary = fullName || option.username || `User ${option.id}`;
+  const secondary = option.role || option.designation;
+  return secondary ? `${primary} (${secondary})` : primary;
+};
 import type {
   TicketDetail,
   Employee,
@@ -34,6 +99,7 @@ import {
 interface Props {
   ticket: TicketDetail | null;
   employees: Employee[];
+  selectedAssigneeName?: string;
   selectedAssigneeEmail?: string;
 
   tab: number;
@@ -52,6 +118,8 @@ interface Props {
   setAssignTo: (v: number | "") => void;
 
   handleUpdate: () => void;
+  setAssigneeName?: (name: string) => void;
+  setAssigneeEmail?: (email: string) => void;
 
   updating: boolean;
 
@@ -61,6 +129,7 @@ interface Props {
 const TicketPropertiesSidebar = ({
   ticket,
   employees,
+  selectedAssigneeName,
   selectedAssigneeEmail,
   tab,
   setTab,
@@ -72,11 +141,52 @@ const TicketPropertiesSidebar = ({
   setPriority,
   assignTo,
   setAssignTo,
+  setAssigneeName,
+  setAssigneeEmail,
   handleUpdate,
   updating,
   ticketTypes,
 }: Props) => {
+  const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
+  const [assigneeLoading, setAssigneeLoading] = useState(false);
+  const [selectedAssigneeOption, setSelectedAssigneeOption] = useState<AssigneeOption | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!assigneeSearch.trim()) {
+        setAssigneeOptions([]);
+        return;
+      }
+      try {
+        setAssigneeLoading(true);
+        const response = await authApi.searchUsers({ search: assigneeSearch, limit: 20, offset: 0 });
+        setAssigneeOptions(normalizeAssignees(response));
+      } catch {
+        setAssigneeOptions([]);
+      } finally {
+        setAssigneeLoading(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [assigneeSearch]);
+
   if (!ticket) return null;
+
+  const currentAssigneeName =
+    selectedAssigneeName?.trim() ||
+    (selectedAssigneeOption ? assigneeLabel(selectedAssigneeOption) : "") ||
+    employees.find((e) => e.id === ticket.assigned_to_id)?.emp_name ||
+    ticket.assigned_to_name ||
+    "";
+  const currentAssigneeEmail =
+    selectedAssigneeEmail?.trim() ||
+    selectedAssigneeOption?.email?.trim() ||
+    employees.find((e) => e.id === ticket.assigned_to_id)?.email ||
+    "";
+  const hasPendingAssignmentChange =
+    assignTo !== "" && assignTo !== (ticket.assigned_to_id ?? "");
+  const currentAssignmentAction = `Assigned to ${currentAssigneeName || "Assignee"}`;
 
   const handleUpdateWithTimeline = () => {
     const actions: string[] = [];
@@ -92,12 +202,9 @@ const TicketPropertiesSidebar = ({
       actions.push(`Priority changed from ${ticket.priority} to ${priority}`);
     }
 
-    if (ticket.assigned_to !== assignTo) {
-      const oldEmp = employees.find((e) => e.id === ticket.assigned_to);
-      const newEmp = employees.find((e) => e.id === assignTo);
-
+    if (ticket.assigned_to_id !== assignTo) {
       actions.push(
-        `Assigned changed from ${oldEmp?.emp_name || "Unassigned"} to ${newEmp?.emp_name}`,
+        `Assigned changed from ${ticket.assigned_to_name || "Unassigned"} to ${currentAssigneeName || "Assignee"}`,
       );
     }
 
@@ -140,6 +247,21 @@ const TicketPropertiesSidebar = ({
             />
             <DetailRow label="Requested By" value={ticket.requested_by} />
             <DetailRow label="Department" value={ticket.department_name} />
+
+            {/* ASSIGNED TO with avatar */}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+              <Typography variant="body2" color="text.secondary">
+                Assigned To :
+              </Typography>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: "#7B61FF" }}>
+                  {(currentAssigneeName.trim().charAt(0) || "U").toUpperCase()}
+                </Avatar>
+                <Typography variant="body2" fontWeight={600}>
+                  {currentAssigneeName || "Unassigned"}
+                </Typography>
+              </Stack>
+            </Box>
           </Box>
 
           <Divider />
@@ -210,31 +332,53 @@ const TicketPropertiesSidebar = ({
               </TextField>
 
               {/* ASSIGN */}
-              <TextField
-                select
-                label="Assign To"
-                value={assignTo}
-                onChange={(e) =>
-                  setAssignTo(
-                    e.target.value === "" ? "" : Number(e.target.value),
-                  )
-                }
+              <Autocomplete
+                options={assigneeOptions}
+                loading={assigneeLoading}
+                value={selectedAssigneeOption}
+                onInputChange={(_, value) => setAssigneeSearch(value)}
+                onChange={(_, value) => {
+                  setSelectedAssigneeOption(value);
+                  setAssignTo(value?.id ?? "");
+                  const name = value ? assigneeLabel(value) : "";
+                  const email = value?.email?.trim() || "";
+                  setAssigneeName?.(name);
+                  setAssigneeEmail?.(email);
+                }}
+                getOptionLabel={assigneeLabel}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
                 fullWidth
-                size="small"
-                sx={propertyFieldSx}
-                InputLabelProps={{ sx: floatingLabelSx }}
-              >
-                {employees.map((emp) => (
-                  <MenuItem key={emp.id} value={emp.id}>
+                noOptionsText="Type to search assignee"
+                renderOption={(props, option) => (
+                  <li {...props} key={option.id}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <Avatar sx={{ width: 24, height: 24, fontSize: 11 }}>
-                        {emp.emp_name?.[0]}
+                        {(assigneeLabel(option).trim().charAt(0) || "U").toUpperCase()}
                       </Avatar>
-                      <Typography fontSize={13}>{emp.emp_name}</Typography>
+                      <Typography fontSize={13}>{assigneeLabel(option)}</Typography>
                     </Stack>
-                  </MenuItem>
-                ))}
-              </TextField>
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Assign To"
+                    placeholder={ticket.assigned_to_name || "Search assignee"}
+                    size="small"
+                    sx={propertyFieldSx}
+                    InputLabelProps={{ ...params.InputLabelProps, sx: floatingLabelSx, shrink: true }}
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {assigneeLoading ? <CircularProgress size={14} /> : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+              />
             </Box>
           </Box>
 
@@ -264,22 +408,25 @@ const TicketPropertiesSidebar = ({
 
             const displayItems: (TicketTimeline & { is_injected?: boolean })[] =
               [...timeline];
-            const hasAssignment = displayItems.some((t) =>
-              t.action?.toLowerCase().includes("assigned"),
+            const hasCurrentAssignmentItem = displayItems.some(
+              (t) =>
+                t.action?.trim().toLowerCase() ===
+                currentAssignmentAction.trim().toLowerCase(),
             );
+            const shouldShowCurrentAssignment =
+              Boolean(assignTo || ticket.assigned_to_id) &&
+              Boolean(currentAssigneeName) &&
+              (hasPendingAssignmentChange || !hasCurrentAssignmentItem);
 
-            if (!hasAssignment && ticket.assigned_to) {
-              const assignItem = {
-                id: "auto-assign",
-                action: `Assigned to ${ticket.assigned_to_name || "Assignee"}`,
-                created_at: ticket.created_at,
+            if (shouldShowCurrentAssignment) {
+              displayItems.unshift({
+                id: `pending-assign-${assignTo}`,
+                action: currentAssignmentAction,
+                created_at: hasPendingAssignmentChange
+                  ? new Date().toISOString()
+                  : ticket.updated_at || ticket.created_at,
                 is_injected: true,
-              };
-              if (displayItems.length > 0) {
-                displayItems.splice(1, 0, assignItem);
-              } else {
-                displayItems.push(assignItem);
-              }
+              });
             }
 
             return displayItems.map((item, index) => {
@@ -322,10 +469,9 @@ const TicketPropertiesSidebar = ({
                     }}
                   >
                     {isAssigned ? (
-                      <Avatar
-                        src={`https://ui-avatars.com/api/?name=${ticket.assigned_to_name || "User"}`}
-                        sx={{ width: 34, height: 34 }}
-                      />
+                      <Avatar sx={{ width: 34, height: 34 }}>
+                        {(currentAssigneeName.trim().charAt(0) || "U").toUpperCase()}
+                      </Avatar>
                     ) : (
                       <Box
                         sx={{
@@ -341,16 +487,18 @@ const TicketPropertiesSidebar = ({
                   {/* TEXT CONTENT */}
                   <Box ml={5}>
                     <Typography fontSize={14} fontWeight={500}>
-                      {item.action}
+                      {item.is_injected
+                        ? currentAssignmentAction
+                        : item.action}
                     </Typography>
 
-                    {isAssigned && selectedAssigneeEmail ? (
+                    {isAssigned && item.is_injected && currentAssigneeEmail ? (
                       <Typography
                         fontSize={12}
                         color="#8A8A8A"
                         sx={{ mt: 0.25 }}
                       >
-                        {selectedAssigneeEmail}
+                        {currentAssigneeEmail}
                       </Typography>
                     ) : null}
 

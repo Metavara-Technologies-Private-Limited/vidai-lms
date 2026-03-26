@@ -15,6 +15,7 @@ import { selectCampaign } from "../../store/campaignSlice";
 import type { FormState } from "../../types/leads.types";
 import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import type { Department, Employee } from "../../services/leads.api";
+import { authApi } from "../../services/auth.api";
 
 import {
   getAutoNextActionStatus,
@@ -60,6 +61,72 @@ const toReadableError = (value: unknown): string => {
   return "Unknown error";
 };
 
+type AssigneeOption = {
+  id: number;
+  first_name: string | undefined;
+  last_name: string | undefined;
+  username: string | undefined;
+  role: string | undefined;
+  designation: string | undefined;
+  email: string | undefined;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
+const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
+  const root = asRecord(raw);
+  const list: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(root?.objects)
+      ? (root?.objects as unknown[])
+      : Array.isArray(root?.results)
+        ? (root?.results as unknown[])
+        : Array.isArray(root?.data)
+          ? (root?.data as unknown[])
+          : [];
+
+  return list
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record) return null;
+
+      const idValue = record.id ?? record.user_id;
+      const id =
+        typeof idValue === "number"
+          ? idValue
+          : typeof idValue === "string"
+            ? Number(idValue)
+            : NaN;
+
+      if (!Number.isFinite(id)) return null;
+
+      return {
+        id,
+        first_name:
+          typeof record.first_name === "string" ? record.first_name : undefined,
+        last_name:
+          typeof record.last_name === "string" ? record.last_name : undefined,
+        username:
+          typeof record.username === "string" ? record.username : undefined,
+        role: typeof record.role === "string" ? record.role : undefined,
+        designation:
+          typeof record.designation === "string" ? record.designation : undefined,
+        email: typeof record.email === "string" ? record.email : undefined,
+      };
+    })
+    .filter((item): item is AssigneeOption => item !== null);
+};
+
+const assigneeLabel = (option: AssigneeOption): string => {
+  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const primary = fullName || option.username || `User ${option.id}`;
+  const secondary = option.role || option.designation;
+  return secondary ? `${primary} (${secondary})` : primary;
+};
+
 // ====================== Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
@@ -74,6 +141,10 @@ export default function AddNewLead() {
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
   const [clinicId] = React.useState(1);
+  const [assigneeName, setAssigneeName] = React.useState("");
+  const [assigneeSearch, setAssigneeSearch] = React.useState("");
+  const [assigneeOptions, setAssigneeOptions] = React.useState<AssigneeOption[]>([]);
+  const [assigneeLoading, setAssigneeLoading] = React.useState(false);
 
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
   const [docDragOver, setDocDragOver] = React.useState(false);
@@ -183,6 +254,31 @@ export default function AddNewLead() {
     };
     fetchEmployees();
   }, [clinicId]);
+
+  React.useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!assigneeSearch.trim()) {
+        setAssigneeOptions([]);
+        return;
+      }
+
+      try {
+        setAssigneeLoading(true);
+        const response = await authApi.searchUsers({
+          search: assigneeSearch,
+          limit: 20,
+          offset: 0,
+        });
+        setAssigneeOptions(normalizeAssignees(response));
+      } catch {
+        setAssigneeOptions([]);
+      } finally {
+        setAssigneeLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [assigneeSearch]);
 
   // ── Auto-fill source from campaign ──────────────────────────────
   React.useEffect(() => {
@@ -346,6 +442,7 @@ export default function AddNewLead() {
           ? form.nextStatus
           : null,
       assigned_to_id: intOrNull(form.assignee) ?? null,
+      assigned_to_name: assigneeName.trim() || null,
       personal_id: intOrNull(form.personnel) ?? null,
       age: IS_MEDICAL_APP ? (intOrNull(form.age) ?? null) : null,
       partner_age: IS_MEDICAL_APP ? (intOrNull(form.partnerAge) ?? null) : null,
@@ -488,8 +585,16 @@ export default function AddNewLead() {
             setIsCouple={setIsCouple}
             employees={employees}
             loadingEmployees={loadingEmployees}
+            assigneeName={assigneeName}
+            assigneeOptions={assigneeOptions}
+            assigneeLoading={assigneeLoading}
             campaigns={campaigns}
             handleChange={handleChange}
+            handleAssigneeInputChange={setAssigneeSearch}
+            handleAssigneeChange={(value) => {
+              setForm((prev) => ({ ...prev, assignee: value ? String(value.id) : "" }));
+              setAssigneeName(value ? assigneeLabel(value) : "");
+            }}
             handleCampaignChange={handleCampaignChange}
             handleNextTypeChange={handleNextTypeChange}
           />

@@ -301,14 +301,16 @@ const getCount = (status: string): number => {
 
               <Box flex={columns[8].flex} display="flex" alignItems="center" gap={1}>
                 <Avatar sx={ticketsAvatarSx}>
-                  {t.assigned_to
-                    ? employees.find(item => item.id === t.assigned_to)?.emp_name?.[0] || t.assigned_to_name
+                  {t.assigned_to_id
+                    ? (employees.find(item => item.id === t.assigned_to_id)?.emp_name?.trim()?.charAt(0) ||
+                      t.assigned_to_name?.trim()?.charAt(0) ||
+                      "?").toUpperCase()
                     : "?"}
                 </Avatar>
 
                 <Typography sx={ticketsAssigneeTextSx}>
 
-                  {employees.find(item => item.id === t.assigned_to)?.emp_name || "Unassigned"}
+                  {employees.find(item => item.id === t.assigned_to_id)?.emp_name || t.assigned_to_name || "Unassigned"}
                 </Typography>
               </Box>
 

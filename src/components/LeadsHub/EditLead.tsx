@@ -17,6 +17,7 @@ import {
   Alert,
   CircularProgress,
   IconButton,
+  Autocomplete,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -66,6 +67,10 @@ export default function EditLead() {
     subSource,
     campaign, handleCampaignChange,
     assignee, setAssignee,
+    assigneeName, setAssigneeName,
+    setAssigneeSearch,
+    assigneeOptions,
+    assigneeLoading,
     nextType,
     nextStatus, setNextStatus,
     nextDesc, setNextDesc,
@@ -145,6 +150,19 @@ export default function EditLead() {
   }
 
   const leadLabel = leadData.id ? formatLeadId(leadData.id.toString()) : "";
+  const assigneeOptionLabel = (option: {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    role?: string;
+    designation?: string;
+  }): string => {
+    const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+    const primary = fullName || option.username || `User ${option.id}`;
+    const secondary = option.role || option.designation;
+    return secondary ? `${primary} (${secondary})` : primary;
+  };
 
   return (
     <Box>
@@ -442,21 +460,46 @@ export default function EditLead() {
               }}>
                 <Box>
                   <Typography sx={labelStyle}>Assigned To</Typography>
-                  <TextField
-                    select fullWidth size="small" value={assignee}
-                    onChange={(e) => setAssignee(e.target.value)}
-                    sx={inputStyle} disabled={loadingEmployees}
-                    InputProps={{
-                      endAdornment: loadingEmployees ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null,
+                  <Autocomplete
+                    options={assigneeOptions}
+                    loading={assigneeLoading}
+                    value={assigneeOptions.find((option) => String(option.id) === assignee) || null}
+                    inputValue={assigneeName}
+                    onInputChange={(_, value, reason) => {
+                      if (reason !== "reset") {
+                        setAssigneeSearch(value);
+                        setAssigneeName(value);
+                      }
                     }}
-                  >
-                    <MenuItem value=""><em>-- Select Employee --</em></MenuItem>
-                    {employees.map((emp) => (
-                      <MenuItem key={emp.id} value={emp.id.toString()}>
-                        {emp.emp_name} ({emp.emp_type}){emp.department_name ? ` - ${emp.department_name}` : ""}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    onChange={(_, value) => {
+                      setAssignee(value ? String(value.id) : "");
+                      setAssigneeName(value ? assigneeOptionLabel(value) : "");
+                    }}
+                    getOptionLabel={assigneeOptionLabel}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    noOptionsText="Type to search assignee"
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.id}>{assigneeOptionLabel(option)}</li>
+                    )}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        fullWidth
+                        size="small"
+                        placeholder="Search assignee"
+                        sx={inputStyle}
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {assigneeLoading ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
                 </Box>
 
                 <Box>
