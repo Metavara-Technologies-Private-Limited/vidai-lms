@@ -2056,7 +2056,13 @@ export default function LeadDetailView() {
       )
     : "N/A";
   const appointmentPersonnel = hasAppointment
-    ? capitalizeWords(activeLead.personal_name || activeLead.personnel || "N/A")
+    ? capitalizeWords(
+        activeLead.personal_name ||
+        activeLead.personnel ||
+        activeLead.assigned_to_name ||
+        activeLead.assigned ||
+        "N/A",
+      )
     : "N/A";
   const appointmentDate =
     hasAppointment && activeLead.appointment_date

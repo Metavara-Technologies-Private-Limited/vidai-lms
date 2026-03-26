@@ -1,8 +1,10 @@
 import * as React from "react";
 import {
-  Alert, Avatar, Box, Checkbox, Chip, CircularProgress, IconButton,
-  Paper, Stack, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Tooltip, Typography,
+  Alert, Avatar, Box, Checkbox, Chip, CircularProgress, Dialog,
+  DialogActions, DialogContent, DialogTitle, IconButton,
+  Paper, Stack, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
+  Button,
 } from "@mui/material";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +14,8 @@ import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import CloseIcon from "@mui/icons-material/Close";
+import Lead_Status_Edit from "../../assets/icons/Lead_Status_Edit.svg";
 
 import {
   fetchLeads, selectLeads, selectLeadsLoading, selectLeadsError,
@@ -23,19 +27,204 @@ import { TwilioAPI } from "../../services/leads.api";
 import CallDialog from "./CallDialog";
 
 import type { RawLead, ProcessedLead, Props } from "./LeadsTable.types";
-import { rowsPerPage, stickyContactStyle, stickyMenuStyle, stickyHeaderContactStyle, stickyHeaderMenuStyle } from "./LeadsTable.types";
+import {
+  rowsPerPage,
+  stickyContactStyle,
+  stickyMenuStyle,
+  stickyHeaderContactStyle,
+  stickyHeaderMenuStyle,
+} from "./LeadsTable.types";
 import { extractErrorMessage, normalizePhone, processLead } from "./LeadsTable.helpers";
 import { getStatusChipSx, getTaskStatusChipSx } from "./LeadsTable.styles";
 import { SMSDialog } from "./SmsDialogs";
 import { EmailDialog } from "./EmailDialogs";
 
-// ── Shared toast options — identical to useEditLead.ts ────────────────
+// ── App-type config ───────────────────────────────────────────────────────────
+import {
+  IS_CONTRACTS_APP,
+  ACTIVE_STATUS_OPTIONS,
+} from "../../config/appType";
+
+// ── Shared toast options ──────────────────────────────────────────────────────
 const toastOptions = {
   position: "top-right" as const,
   autoClose: 3000,
   theme: "colored" as const,
 };
 
+// ── Status chip color map (matches getStatusChipSx palette) ─────────────────
+const STATUS_CHIP_STYLES: Record<string, { color: string; borderColor: string; bg: string }> = {
+  "New":             { color: "#7C3AED", borderColor: "#7C3AED", bg: "#F5F3FF" },
+  "Appointment":     { color: "#6366F1", borderColor: "#6366F1", bg: "#EEF2FF" },
+  "Follow Up":       { color: "#F59E0B", borderColor: "#F59E0B", bg: "#FFFBEB" },
+  "Negotiation":     { color: "#F97316", borderColor: "#F97316", bg: "#FFF7ED" },
+  "Proposal Sent":   { color: "#8B5CF6", borderColor: "#8B5CF6", bg: "#F5F3FF" },
+  "Contract Signed": { color: "#0EA5E9", borderColor: "#0EA5E9", bg: "#F0F9FF" },
+  "Converted Lead":  { color: "#10B981", borderColor: "#10B981", bg: "#ECFDF5" },
+  "Lost Lead":       { color: "#EF4444", borderColor: "#EF4444", bg: "#FEF2F2" },
+};
+
+const getStatusOptionChipSx = (status: string) => {
+  const s = STATUS_CHIP_STYLES[status] ?? { color: "#64748B", borderColor: "#64748B", bg: "#F8FAFC" };
+  return {
+    color: s.color,
+    borderColor: s.borderColor,
+    backgroundColor: s.bg,
+    fontWeight: 500,
+    fontSize: "12px",
+    height: 26,
+    borderRadius: "999px",
+    border: "1.5px solid",
+    cursor: "pointer",
+    "& .MuiChip-label": { px: 1.5 },
+    "&:hover": { opacity: 0.85 },
+  };
+};
+
+// ── Edit Status Dialog ────────────────────────────────────────────────────────
+interface EditStatusDialogProps {
+  open: boolean;
+  currentStatus: string;
+  onClose: () => void;
+  onSave: (newStatus: string) => void;
+}
+
+const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
+  open,
+  currentStatus,
+  onClose,
+  onSave,
+}) => {
+  const [selected, setSelected] = React.useState(currentStatus);
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open) { setSelected(currentStatus); setDropdownOpen(false); }
+  }, [open, currentStatus]);
+
+  const selectedStyle = STATUS_CHIP_STYLES[selected] ?? { color: "#64748B", borderColor: "#64748B", bg: "#F8FAFC" };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: { width: 340, borderRadius: 3, p: 1, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          pb: 1,
+          fontWeight: 700,
+          fontSize: "1rem",
+        }}
+      >
+        Edit Status
+        <IconButton size="small" onClick={onClose}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ pt: 0.5, pb: 1 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+          Status
+        </Typography>
+
+        {/* Custom trigger — shows selected chip + chevron */}
+        <Box
+          onClick={() => setDropdownOpen((v) => !v)}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            border: `2px solid ${dropdownOpen ? selectedStyle.borderColor : "#E2E8F0"}`,
+            borderRadius: 2,
+            px: 1.5,
+            py: 0.75,
+            cursor: "pointer",
+            transition: "border-color 0.15s",
+            "&:hover": { borderColor: selectedStyle.borderColor },
+          }}
+        >
+          <Chip
+            label={selected}
+            size="small"
+            sx={getStatusOptionChipSx(selected)}
+          />
+          <Box
+            component="span"
+            sx={{
+              ml: 1,
+              fontSize: 18,
+              color: "#94A3B8",
+              transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s",
+              lineHeight: 1,
+            }}
+          >
+            ▾
+          </Box>
+        </Box>
+
+        {/* Dropdown list */}
+        {dropdownOpen && (
+          <Box
+            sx={{
+              mt: 0.5,
+              border: "1px solid #E2E8F0",
+              borderRadius: 2,
+              py: 1,
+              px: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: 0.75,
+              maxHeight: 280,
+              overflowY: "auto",
+              backgroundColor: "#fff",
+            }}
+          >
+            {(ACTIVE_STATUS_OPTIONS as readonly string[]).map((opt) => (
+              <Box
+                key={opt}
+                onClick={() => { setSelected(opt); setDropdownOpen(false); }}
+                sx={{ display: "inline-flex", pl: 0.5 }}
+              >
+                <Chip
+                  label={opt}
+                  size="small"
+                  sx={{
+                    ...getStatusOptionChipSx(opt),
+                    ...(opt === selected && {
+                      boxShadow: `0 0 0 2px ${STATUS_CHIP_STYLES[opt]?.borderColor ?? "#64748B"}44`,
+                    }),
+                  }}
+                />
+              </Box>
+            ))}
+          </Box>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+        <Button variant="outlined" onClick={onClose} sx={{ flex: 1, borderRadius: 2 }}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => onSave(selected)}
+          sx={{ flex: 1, borderRadius: 2 }}
+        >
+          Save
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+// ── Main Component ────────────────────────────────────────────────────────────
 const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -52,6 +241,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
   const [smsLead, setSmsLead] = React.useState<ProcessedLead | null>(null);
   const [emailLead, setEmailLead] = React.useState<ProcessedLead | null>(null);
 
+  // ── Edit Status state ──
+  const [editStatusLead, setEditStatusLead] = React.useState<ProcessedLead | null>(null);
+
   React.useEffect(() => {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
   }, [dispatch]);
@@ -67,7 +259,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
   }, [leads, importedLeads]);
 
   const toggleSelect = (id: string) =>
-    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   const isSelected = (id: string) => selectedIds.includes(id);
 
   const handleCallOpen = async (e: React.MouseEvent, lead: ProcessedLead) => {
@@ -89,6 +283,26 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
     setSmsLead(lead);
   };
 
+  // ── Handle Edit Status open ──
+  const handleEditStatusOpen = (e: React.MouseEvent, lead: ProcessedLead) => {
+    e.stopPropagation();
+    setEditStatusLead(lead);
+  };
+
+  // ── Handle Edit Status save ──
+  const handleEditStatusSave = (newStatus: string) => {
+    if (!editStatusLead) return;
+    setLocalLeads((prev) =>
+      prev.map((l) =>
+        l.id === editStatusLead.id
+          ? { ...l, status: newStatus, lead_status: newStatus }
+          : l
+      )
+    );
+    toast.success(`Status updated to "${newStatus}".`, toastOptions);
+    setEditStatusLead(null);
+  };
+
   const filteredLeads = React.useMemo(() => {
     return localLeads.filter((lead: ProcessedLead) => {
       const searchStr = `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
@@ -106,8 +320,16 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
         if (filters.dateFrom || filters.dateTo) {
           const leadDate = lead.created_at ? new Date(lead.created_at) : null;
           if (!leadDate) return false;
-          if (filters.dateFrom) { const f = new Date(filters.dateFrom); f.setHours(0,0,0,0); if (leadDate < f) return false; }
-          if (filters.dateTo)   { const t = new Date(filters.dateTo);   t.setHours(23,59,59,999); if (leadDate > t) return false; }
+          if (filters.dateFrom) {
+            const f = new Date(filters.dateFrom);
+            f.setHours(0, 0, 0, 0);
+            if (leadDate < f) return false;
+          }
+          if (filters.dateTo) {
+            const t = new Date(filters.dateTo);
+            t.setHours(23, 59, 59, 999);
+            if (leadDate > t) return false;
+          }
         }
       }
       return matchSearch && matchTab;
@@ -117,15 +339,25 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
   React.useEffect(() => { setPage(1); setSelectedIds([]); }, [search, tab, filters]);
 
   const totalEntries = filteredLeads.length;
-  const totalPages   = Math.ceil(totalEntries / rowsPerPage);
-  React.useEffect(() => { if (page > totalPages && totalPages > 0) setPage(totalPages); }, [totalPages, page]);
+  const totalPages = Math.ceil(totalEntries / rowsPerPage);
+  React.useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [totalPages, page]);
 
   const currentLeads = filteredLeads.slice((page - 1) * rowsPerPage, page * rowsPerPage);
-  const startEntry   = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
-  const endEntry     = Math.min(page * rowsPerPage, totalEntries);
+  const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
+  const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
-  const handleBulkDelete  = () => { setLocalLeads((p) => p.filter((l) => !selectedIds.includes(l.id))); setSelectedIds([]); };
-  const handleBulkArchive = (archive: boolean) => { setLocalLeads((p) => p.map((l) => selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l)); setSelectedIds([]); };
+  const handleBulkDelete = () => {
+    setLocalLeads((p) => p.filter((l) => !selectedIds.includes(l.id)));
+    setSelectedIds([]);
+  };
+  const handleBulkArchive = (archive: boolean) => {
+    setLocalLeads((p) =>
+      p.map((l) => (selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l))
+    );
+    setSelectedIds([]);
+  };
   const handleBulkExport = () => {
     const selectedLeads = localLeads.filter((lead) => selectedIds.includes(lead.id));
     if (selectedLeads.length === 0) {
@@ -134,15 +366,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
     }
 
     const headers = [
-      "Lead ID",
-      "Name",
-      "Phone",
-      "Email",
-      "Status",
-      "Source",
-      "Location",
-      "Assigned To",
-      "Created At",
+      "Lead ID", "Name", "Phone", "Email", "Status",
+      "Source", "Location", "Assigned To", "Created At",
     ];
 
     const escapeCsv = (value: unknown): string => {
@@ -181,11 +406,14 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
     toast.success("Selected leads exported successfully.", toastOptions);
   };
 
-  // ── Loading / Error / Empty states ──
+  // ── Loading / Error / Empty states ──────────────────────────────────────────
   if (loading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
-        <Stack alignItems="center" spacing={2}><CircularProgress /><Typography color="text.secondary">Loading leads...</Typography></Stack>
+        <Stack alignItems="center" spacing={2}>
+          <CircularProgress />
+          <Typography color="text.secondary">Loading leads...</Typography>
+        </Stack>
       </Box>
     );
 
@@ -194,8 +422,13 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
       <Alert severity="error" sx={{ mb: 3 }}>
         <Typography fontWeight={600}>Failed to load leads</Typography>
         <Typography variant="body2">{error}</Typography>
-        <Typography variant="body2" sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
-          onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}>Try again</Typography>
+        <Typography
+          variant="body2"
+          sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
+          onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}
+        >
+          Try again
+        </Typography>
       </Alert>
     );
 
@@ -204,7 +437,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
           <Typography variant="h6" color="text.secondary">No leads found</Typography>
-          <Typography variant="body2" color="text.secondary">{tab === "archived" ? "No archived leads yet" : "Create your first lead to get started"}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {tab === "archived" ? "No archived leads yet" : "Create your first lead to get started"}
+          </Typography>
         </Stack>
       </Box>
     );
@@ -213,9 +448,17 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <Stack alignItems="center" spacing={2}>
-          <Typography variant="h6" color="text.secondary">No {tab === "archived" ? "archived" : "active"} leads found</Typography>
+          <Typography variant="h6" color="text.secondary">
+            No {tab === "archived" ? "archived" : "active"} leads found
+          </Typography>
           <Typography variant="body2" color="text.secondary">
-            {search ? `No results for "${search}"` : filters && Object.values(filters).some((v) => v !== "" && v !== null) ? "No leads match the selected filters" : tab === "archived" ? "No archived leads yet" : "No active leads"}
+            {search
+              ? `No results for "${search}"`
+              : filters && Object.values(filters).some((v) => v !== "" && v !== null)
+              ? "No leads match the selected filters"
+              : tab === "archived"
+              ? "No archived leads yet"
+              : "No active leads"}
           </Typography>
         </Stack>
       </Box>
@@ -229,9 +472,18 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
             <TableRow>
               <TableCell padding="checkbox" className="checkbox-cell">
                 <Checkbox
-                  indeterminate={currentLeads.some((l) => selectedIds.includes(l.id)) && !currentLeads.every((l) => selectedIds.includes(l.id))}
-                  checked={currentLeads.length > 0 && currentLeads.every((l) => selectedIds.includes(l.id))}
-                  onChange={(e) => { if (e.target.checked) setSelectedIds(currentLeads.map((l) => l.id)); else setSelectedIds([]); }}
+                  indeterminate={
+                    currentLeads.some((l) => selectedIds.includes(l.id)) &&
+                    !currentLeads.every((l) => selectedIds.includes(l.id))
+                  }
+                  checked={
+                    currentLeads.length > 0 &&
+                    currentLeads.every((l) => selectedIds.includes(l.id))
+                  }
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedIds(currentLeads.map((l) => l.id));
+                    else setSelectedIds([]);
+                  }}
                 />
               </TableCell>
               <TableCell>Lead Name | No</TableCell>
@@ -240,12 +492,15 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
               <TableCell>Source</TableCell>
               <TableCell>Lead Status</TableCell>
               <TableCell>Quality</TableCell>
-              <TableCell>AI Score</TableCell>
+              {/* AI Score — hidden for contracts app */}
+              {!IS_CONTRACTS_APP && <TableCell>AI Score</TableCell>}
               <TableCell>Assigned To</TableCell>
               <TableCell>Task Type</TableCell>
               <TableCell>Task Status</TableCell>
               <TableCell>Activity</TableCell>
-              <TableCell align="center" sx={stickyHeaderContactStyle}>Contact Option</TableCell>
+              <TableCell align="center" sx={stickyHeaderContactStyle}>
+                Contact Option
+              </TableCell>
               <TableCell align="center" sx={stickyHeaderMenuStyle} />
             </TableRow>
           </TableHead>
@@ -255,16 +510,27 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
               <TableRow
                 key={lead.id}
                 sx={{ cursor: "pointer" }}
-                onClick={() => navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)}
+                onClick={() =>
+                  navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)
+                }
                 className={isSelected(lead.id) ? "row-selected" : ""}
               >
-                <TableCell padding="checkbox" className="checkbox-cell" onClick={(e) => e.stopPropagation()}>
-                  <Checkbox checked={isSelected(lead.id)} onChange={() => toggleSelect(lead.id)} />
+                <TableCell
+                  padding="checkbox"
+                  className="checkbox-cell"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={isSelected(lead.id)}
+                    onChange={() => toggleSelect(lead.id)}
+                  />
                 </TableCell>
 
                 <TableCell>
                   <Stack direction="row" spacing={2} alignItems="center">
-                    <Avatar className="lead-avatar">{lead.initials || lead.full_name?.charAt(0)?.toUpperCase()}</Avatar>
+                    <Avatar className="lead-avatar">
+                      {lead.initials || lead.full_name?.charAt(0)?.toUpperCase()}
+                    </Avatar>
                     <Box>
                       <Typography className="lead-name-text">{lead.full_name}</Typography>
                       <Typography className="lead-id-text">{lead.displayId}</Typography>
@@ -273,56 +539,148 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
                 </TableCell>
 
                 <TableCell>
-                  <Typography className="lead-date">{lead.created_at ? new Date(lead.created_at).toLocaleDateString("en-GB") : "N/A"}</Typography>
-                  <Typography className="lead-time">{lead.created_at ? new Date(lead.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "N/A"}</Typography>
+                  <Typography className="lead-date">
+                    {lead.created_at
+                      ? new Date(lead.created_at).toLocaleDateString("en-GB")
+                      : "N/A"}
+                  </Typography>
+                  <Typography className="lead-time">
+                    {lead.created_at
+                      ? new Date(lead.created_at).toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "N/A"}
+                  </Typography>
                 </TableCell>
 
                 <TableCell>{lead.location || "N/A"}</TableCell>
                 <TableCell>{lead.source || "N/A"}</TableCell>
 
-                <TableCell><Chip label={lead.status} size="small" sx={getStatusChipSx(lead.status ?? "")} /></TableCell>
+                {/* ── Lead Status cell with inline edit icon ── */}
+                <TableCell>
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    alignItems="center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Chip
+                      label={lead.status}
+                      size="small"
+                      sx={getStatusChipSx(lead.status ?? "")}
+                    />
+                    <Tooltip title="Edit status">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleEditStatusOpen(e, lead)}
+                        sx={{
+                          p: 0.25,
+                          color: "text.secondary",
+                          "&:hover": { color: "primary.main" },
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={Lead_Status_Edit}
+                          alt="Edit status"
+                          sx={{ width: 14, height: 14 }}
+                        />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                </TableCell>
 
-                <TableCell><Chip label={lead.quality} size="small" className={`lead-chip quality-${lead.quality?.toLowerCase()}`} /></TableCell>
+                <TableCell>
+                  <Chip
+                    label={lead.quality}
+                    size="small"
+                    className={`lead-chip quality-${lead.quality?.toLowerCase()}`}
+                  />
+                </TableCell>
 
-                <TableCell className="score">{String(lead.score || 0).includes("%") ? lead.score : `${lead.score || 0}%`}</TableCell>
+                {/* AI Score — hidden for contracts app */}
+                {!IS_CONTRACTS_APP && (
+                  <TableCell className="score">
+                    {String(lead.score || 0).includes("%")
+                      ? lead.score
+                      : `${lead.score || 0}%`}
+                  </TableCell>
+                )}
 
                 <TableCell>{lead.assigned}</TableCell>
 
                 <TableCell>
-                  <Typography sx={{ fontSize: "13px", color: lead.taskType ? "#1E293B" : "#94A3B8", fontWeight: lead.taskType ? 500 : 400 }}>
+                  <Typography
+                    sx={{
+                      fontSize: "13px",
+                      color: lead.taskType ? "#1E293B" : "#94A3B8",
+                      fontWeight: lead.taskType ? 500 : 400,
+                    }}
+                  >
                     {lead.taskType || "—"}
                   </Typography>
                 </TableCell>
 
                 <TableCell>
-                  {lead.taskStatus
-                    ? <Chip label={lead.taskStatus} size="small" sx={getTaskStatusChipSx(lead.taskStatus)} />
-                    : <Typography sx={{ fontSize: "13px", color: "#94A3B8" }}>—</Typography>}
+                  {lead.taskStatus ? (
+                    <Chip
+                      label={lead.taskStatus}
+                      size="small"
+                      sx={getTaskStatusChipSx(lead.taskStatus)}
+                    />
+                  ) : (
+                    <Typography sx={{ fontSize: "13px", color: "#94A3B8" }}>—</Typography>
+                  )}
                 </TableCell>
 
-                <TableCell sx={{ color: "primary.main", fontWeight: 700 }}
-                  onClick={(e) => { e.stopPropagation(); navigate("/leads/activity", { state: { lead } }); }}>
+                <TableCell
+                  sx={{ color: "primary.main", fontWeight: 700 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/leads/activity", { state: { lead } });
+                  }}
+                >
                   {lead.activity || "View Activity"}
                 </TableCell>
 
-                <TableCell align="center" sx={stickyContactStyle} onClick={(e) => e.stopPropagation()}>
+                <TableCell
+                  align="center"
+                  sx={stickyContactStyle}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Stack direction="row" spacing={1} justifyContent="center">
                     <Tooltip title={`Call ${lead.contact_no || "N/A"}`}>
                       <span>
-                        <IconButton className="action-btn" size="small" onClick={(e) => handleCallOpen(e, lead)}>
+                        <IconButton
+                          className="action-btn"
+                          size="small"
+                          onClick={(e) => handleCallOpen(e, lead)}
+                        >
                           <PhoneIcon fontSize="small" />
                         </IconButton>
                       </span>
                     </Tooltip>
                     <Tooltip title={`SMS ${lead.contact_no || "N/A"}`}>
-                      <IconButton className="action-btn" size="small" onClick={(e) => handleSMSOpen(e, lead)}>
+                      <IconButton
+                        className="action-btn"
+                        size="small"
+                        onClick={(e) => handleSMSOpen(e, lead)}
+                      >
                         <ChatBubbleOutlineIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title={lead.email ? `Email ${lead.email}` : "No email"}>
                       <span>
-                        <IconButton className="action-btn" size="small" disabled={!lead.email}
-                          onClick={(e) => { e.stopPropagation(); setEmailLead(lead); }}>
+                        <IconButton
+                          className="action-btn"
+                          size="small"
+                          disabled={!lead.email}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEmailLead(lead);
+                          }}
+                        >
                           <EmailOutlinedIcon fontSize="small" />
                         </IconButton>
                       </span>
@@ -330,7 +688,11 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
                   </Stack>
                 </TableCell>
 
-                <TableCell align="center" sx={stickyMenuStyle} onClick={(e) => e.stopPropagation()}>
+                <TableCell
+                  align="center"
+                  sx={stickyMenuStyle}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <MenuButton lead={lead} setLeads={setLocalLeads} tab={tab} />
                 </TableCell>
               </TableRow>
@@ -341,22 +703,55 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
 
       {/* Pagination */}
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
-        <Typography color="text.secondary">Showing {startEntry} to {endEntry} of {totalEntries}</Typography>
+        <Typography color="text.secondary">
+          Showing {startEntry} to {endEntry} of {totalEntries}
+        </Typography>
         <Stack direction="row" spacing={1}>
-          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeftIcon /></IconButton>
+          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+            <ChevronLeftIcon />
+          </IconButton>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Box key={p} onClick={() => setPage(p)} className={`page-number ${page === p ? "active" : ""}`}>{p}</Box>
+            <Box
+              key={p}
+              onClick={() => setPage(p)}
+              className={`page-number ${page === p ? "active" : ""}`}
+            >
+              {p}
+            </Box>
           ))}
-          <IconButton disabled={page === totalPages || totalPages === 0} onClick={() => setPage((p) => p + 1)}><ChevronRightIcon /></IconButton>
+          <IconButton
+            disabled={page === totalPages || totalPages === 0}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            <ChevronRightIcon />
+          </IconButton>
         </Stack>
       </Stack>
 
-      <BulkActionBar selectedIds={selectedIds} tab={tab} onDelete={handleBulkDelete} onArchive={handleBulkArchive} onExport={handleBulkExport} />
+      <BulkActionBar
+        selectedIds={selectedIds}
+        tab={tab}
+        onDelete={handleBulkDelete}
+        onArchive={handleBulkArchive}
+        onExport={handleBulkExport}
+      />
       <Dialogs />
 
-      <CallDialog open={Boolean(callLead)} name={callLead?.full_name || callLead?.name || "Unknown"} onClose={() => setCallLead(null)} />
-      <SMSDialog   open={Boolean(smsLead)}   lead={smsLead}   onClose={() => setSmsLead(null)} />
+      <CallDialog
+        open={Boolean(callLead)}
+        name={callLead?.full_name || callLead?.name || "Unknown"}
+        onClose={() => setCallLead(null)}
+      />
+      <SMSDialog open={Boolean(smsLead)} lead={smsLead} onClose={() => setSmsLead(null)} />
       <EmailDialog open={Boolean(emailLead)} lead={emailLead} onClose={() => setEmailLead(null)} />
+
+      {/* ── Edit Status Dialog ── */}
+      <EditStatusDialog
+        open={Boolean(editStatusLead)}
+        currentStatus={editStatusLead?.status ?? editStatusLead?.lead_status ?? "New"}
+        onClose={() => setEditStatusLead(null)}
+        onSave={handleEditStatusSave}
+      />
     </>
   );
 };
