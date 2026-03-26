@@ -1,6 +1,7 @@
 import {
   Dialog, DialogContent, DialogTitle, IconButton, TextField, Box, Button,
-  MenuItem, Stack, Typography, Divider, CircularProgress, 
+  MenuItem, Stack, Typography, Divider, CircularProgress,
+  Autocomplete, 
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useState, useEffect } from "react";
@@ -8,7 +9,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import type { Dayjs } from "dayjs";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import type { AppDispatch } from "../../../store";
 import { fetchTickets, fetchTicketDashboard } from "../../../store/ticketSlice";
@@ -20,9 +21,20 @@ import {
   createTicketFocusedFieldSx, createTicketDialogPaperSx, createTicketCloseButtonSx,
   createTicketCancelButtonSx, createTicketSaveButtonSx, createTicketUploadButtonSx,
 } from "../../../styles/Settings/Tickets.styles";
+import { authApi } from "../../../services/auth.api";
+import { selectUser } from "../../../store/authSlice";
+
+type User = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+};
 
 const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const dispatch = useDispatch<AppDispatch>();
+  const user = useSelector(selectUser);
   const CLINIC_ID = "1";
 
   // --- Form States ---
@@ -35,15 +47,49 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [assigneeId, setAssigneeId] = useState<number | "">("");
   const [requestedBy, setRequestedBy] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [userOptions, setUserOptions] = useState<User[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // --- Data States (Dropdowns) ---
   const [labs, setLabs] = useState<Lab[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [, setEmployees] = useState<Employee[]>([]);
 
   // --- UI States ---
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+
+  
+  useEffect(() => {
+    if (user?.first_name && user?.last_name) {
+      setRequestedBy(`${user.first_name} ${user.last_name}`);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(async () => {
+      if (!userSearch.trim()) return;
+
+      try {
+        setSearchLoading(true);
+
+        const res = await authApi.searchUsers({
+          search: userSearch,
+          limit: 10,
+          offset: 0,
+        });
+
+        setUserOptions(res.objects || []);
+      } catch {
+        toast.error("Failed to fetch users");
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
+  }, [userSearch]);
 
   // 1. Fetch live data for dropdowns matching Swagger definitions
   useEffect(() => {
@@ -189,92 +235,102 @@ handleClose();
   };
 
 //  Filter employees by selected department (using dep_id relation)
-const filteredEmployees =
-  departmentId === ""
-    ? employees
-    : employees.filter((emp) => {
-        // Try ID match first (if backend sends dep_id)
-        if (emp.dep_id !== undefined && emp.dep_id !== null) {
-          return String(emp.dep_id) === String(departmentId);
-        }
+// const filteredEmployees =
+//   departmentId === ""
+//     ? employees
+//     : employees.filter((emp) => {
+//         // Try ID match first (if backend sends dep_id)
+//         if (emp.dep_id !== undefined && emp.dep_id !== null) {
+//           return String(emp.dep_id) === String(departmentId);
+//         }
 
-        // Fallback to department name match
-        const selectedDept = departments.find(
-          (d) => String(d.id) === String(departmentId)
-        );
+//         // Fallback to department name match
+//         const selectedDept = departments.find(
+//           (d) => String(d.id) === String(departmentId)
+//         );
 
-        return selectedDept && emp.department_name === selectedDept.name;
-      });
+//         return selectedDept && emp.department_name === selectedDept.name;
+//       });
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth={false} PaperProps={{ sx: createTicketDialogPaperSx }}>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth={false}
+      PaperProps={{ sx: createTicketDialogPaperSx }}
+    >
       <DialogTitle sx={{ position: "relative" }}>
-        <Typography fontWeight={700} fontSize="1.1rem">New Ticket</Typography>
-        <IconButton onClick={handleClose} sx={createTicketCloseButtonSx}><CloseIcon fontSize="small" /></IconButton>
+        <Typography fontWeight={700} fontSize="1.1rem">
+          New Ticket
+        </Typography>
+        <IconButton onClick={handleClose} sx={createTicketCloseButtonSx}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
         <Divider sx={{ mt: 2, mx: -3 }} />
       </DialogTitle>
 
       <DialogContent>
-
         {loadingData ? (
           <Box display="flex" flexDirection="column" alignItems="center" py={6}>
             <CircularProgress size={32} sx={{ mb: 2 }} />
-            <Typography variant="caption" color="text.secondary">Fetching latest Lab & Assignee records...</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Fetching latest Lab & Assignee records...
+            </Typography>
           </Box>
         ) : (
           <Stack spacing={2.5} mt={2}>
-<TextField 
-label="Subject" 
-placeholder="Enter subject" 
-value={subject} 
-onChange={(e) => {
-  const value = e.target.value;
+            <TextField
+              label="Subject"
+              placeholder="Enter subject"
+              value={subject}
+              onChange={(e) => {
+                const value = e.target.value;
 
-  // Allow only alphanumeric + space
-  const alphanumericRegex = /^[a-zA-Z0-9 ]*$/;
+                // Allow only alphanumeric + space
+                const alphanumericRegex = /^[a-zA-Z0-9 ]*$/;
 
-  if (!alphanumericRegex.test(value)) {
-    toast.error("Only letters and numbers are allowed");
-    return;
-  }
+                if (!alphanumericRegex.test(value)) {
+                  toast.error("Only letters and numbers are allowed");
+                  return;
+                }
 
-  if (value.length === 1 && !/^[a-zA-Z]/.test(value)) {
-    toast.error("Subject must start with a letter");
-    return;
-  }
+                if (value.length === 1 && !/^[a-zA-Z]/.test(value)) {
+                  toast.error("Subject must start with a letter");
+                  return;
+                }
 
-  setSubject(value);
-}}
-fullWidth 
-sx={createTicketFocusedFieldSx} 
-InputLabelProps={{ shrink: true }} 
-disabled={loading} 
-/>
+                setSubject(value);
+              }}
+              fullWidth
+              sx={createTicketFocusedFieldSx}
+              InputLabelProps={{ shrink: true }}
+              disabled={loading}
+            />
 
             <TextField
               label="Detailed Description"
               placeholder="Enter description"
               value={description}
-onChange={(e) => {
-  const value = e.target.value;
+              onChange={(e) => {
+                const value = e.target.value;
 
-  if (value.length === 1 && !/^[a-zA-Z]/.test(value)) {
-    toast.error("Description must start with a letter");
-    return;
-  }
+                if (value.length === 1 && !/^[a-zA-Z]/.test(value)) {
+                  toast.error("Description must start with a letter");
+                  return;
+                }
 
-  setDescription(value);
-}}              multiline
+                setDescription(value);
+              }}
+              multiline
               minRows={1}
               maxRows={3}
               fullWidth
               sx={createTicketFocusedFieldSx}
               InputLabelProps={{
-                shrink: true,   
+                shrink: true,
               }}
               disabled={loading}
             />
-
 
             <Stack direction="row" spacing={2}>
               <TextField
@@ -290,9 +346,15 @@ onChange={(e) => {
                   displayEmpty: true,
                   renderValue: (selected) => {
                     if (!selected) {
-                      return <span className="ticket-select-placeholder">Select lab name</span>;
+                      return (
+                        <span className="ticket-select-placeholder">
+                          Select lab name
+                        </span>
+                      );
                     }
-                    const lab = labs.find((l) => String(l.id) === String(selected));
+                    const lab = labs.find(
+                      (l) => String(l.id) === String(selected),
+                    );
                     return lab ? lab.name : "";
                   },
                 }}
@@ -308,11 +370,12 @@ onChange={(e) => {
                 select
                 label="Department"
                 value={departmentId}
-onChange={(e) => {
-  const value = e.target.value === "" ? "" : Number(e.target.value);
-  setDepartmentId(value);
-  setAssigneeId(""); 
-}}
+                onChange={(e) => {
+                  const value =
+                    e.target.value === "" ? "" : Number(e.target.value);
+                  setDepartmentId(value);
+                  setAssigneeId("");
+                }}
                 fullWidth
                 sx={createTicketFocusedFieldSx}
                 InputLabelProps={{ shrink: true }}
@@ -329,7 +392,7 @@ onChange={(e) => {
                     }
 
                     const dept = departments.find(
-                      (d) => String(d.id) === String(selected)
+                      (d) => String(d.id) === String(selected),
                     );
                     return dept ? dept.name : "";
                   },
@@ -341,31 +404,17 @@ onChange={(e) => {
                   </MenuItem>
                 ))}
               </TextField>
-
             </Stack>
 
             <Stack direction="row" spacing={2}>
-<TextField 
-label="Requested By" 
-placeholder="Enter Name" 
-value={requestedBy} 
-onChange={(e) => {
-  const value = e.target.value;
-
-  const alphabetRegex = /^[a-zA-Z ]*$/;
-
-  if (!alphabetRegex.test(value)) {
-    toast.error("Enter Alphabets only");
-    return;
-  }
-
-  setRequestedBy(value);
-}}
-fullWidth 
-sx={createTicketFocusedFieldSx} 
-InputLabelProps={{ shrink: true }} 
-disabled={loading} 
-/>
+              <TextField
+                label="Requested By"
+                value={requestedBy}
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled
+              />
 
               <TextField
                 select
@@ -401,80 +450,55 @@ disabled={loading}
                 <MenuItem value="medium">Medium</MenuItem>
                 <MenuItem value="high">High</MenuItem>
               </TextField>
-
             </Stack>
 
             <Stack direction="row" spacing={2}>
-              <TextField
-                select
-                label="Assign To"
-                value={assigneeId}
-                onChange={(e) =>
-                  setAssigneeId(e.target.value === "" ? "" : Number(e.target.value))
-                }
+              <Autocomplete
+                options={userOptions}
+                loading={searchLoading}
                 fullWidth
-                sx={createTicketFocusedFieldSx}
-                InputLabelProps={{ shrink: true }}
-                disabled={loading}
-                SelectProps={{
-                  displayEmpty: true,
-                  renderValue: (selected) => {
-                    if (!selected) {
-                      return (
-                        <span className="ticket-select-placeholder">
-                          Select assignee
-                        </span>
-                      );
-                    }
+                getOptionLabel={(option) =>
+                  `${option.first_name} ${option.last_name} (${option.role})`
+                }
+                onInputChange={(_, value) => setUserSearch(value)}
+                onChange={(_, value) => setAssigneeId(value?.id || "")}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Assign To"
+                    placeholder="Search user..."
+                    fullWidth
+                    sx={{
+                      ...createTicketFocusedFieldSx,
+                      "& .MuiInputBase-root": {
+                        height: 56,
+                      },
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                )}
+              />
 
-const emp = filteredEmployees.find(
-  (e) => String(e.id) === String(selected)
-);
-
-                    return emp
-                      ? `${emp.emp_name} (${emp.department_name})`
-                      : "";
-                  },
-                }}
-              >
-{filteredEmployees.length > 0 ? (
-  filteredEmployees.map((e) => (
-    <MenuItem key={e.id} value={e.id}>
-      {e.emp_name} ({e.department_name})
-    </MenuItem>
-  ))
-) : (
-  <MenuItem disabled>
-    {departmentId
-      ? `No assignee in ${
-          departments.find((d) => String(d.id) === String(departmentId))?.name || "selected department"
-        }`
-      : "Select department first"}
-  </MenuItem>
-)}
-              </TextField>
-
-
-<LocalizationProvider dateAdapter={AdapterDayjs}>
-  <DatePicker
-    label="Due Date"
-    value={dueDate}
-onChange={(v) => setDueDate(v as Dayjs | null)}    disabled={loading}
-    slotProps={{
-      textField: {
-        fullWidth: true,
-        sx: createTicketFocusedFieldSx,
-        InputLabelProps: { shrink: true }
-      }
-    }}
-  />
-</LocalizationProvider>
-
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                  label="Due Date"
+                  value={dueDate}
+                  onChange={(v) => setDueDate(v as Dayjs | null)}
+                  disabled={loading}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      sx: createTicketFocusedFieldSx,
+                      InputLabelProps: { shrink: true },
+                    },
+                  }}
+                />
+              </LocalizationProvider>
             </Stack>
 
             <Box
               sx={{
-                width: { xs: "100%", sm: "70%", md: "50%" }, 
+                width: { xs: "100%", sm: "70%", md: "50%" },
               }}
             >
               <TextField
@@ -496,21 +520,36 @@ onChange={(v) => setDueDate(v as Dayjs | null)}    disabled={loading}
                       <input
                         hidden
                         type="file"
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        onChange={(e) =>
+                          setSelectedFile(e.target.files?.[0] || null)
+                        }
                       />
                     </Button>
-
                   ),
                   readOnly: true,
                 }}
               />
             </Box>
 
-
             <Stack direction="row" justifyContent="flex-end" spacing={2} pt={1}>
-              <Button onClick={handleClose} sx={createTicketCancelButtonSx} disabled={loading}>Cancel</Button>
-              <Button variant="contained" onClick={handleSubmit} sx={createTicketSaveButtonSx} disabled={loading}>
-                {loading ? <CircularProgress size={20} color="inherit" /> : "Save"}
+              <Button
+                onClick={handleClose}
+                sx={createTicketCancelButtonSx}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                sx={createTicketSaveButtonSx}
+                disabled={loading}
+              >
+                {loading ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  "Save"
+                )}
               </Button>
             </Stack>
           </Stack>
