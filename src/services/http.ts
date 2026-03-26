@@ -23,12 +23,6 @@ http.redirect = (path: string): void => {
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem("auth_token");
 
-  if (config.url?.includes("/me/profile")) {
-    console.log("🚀 PROFILE REQUEST");
-    console.log("URL:", config.baseURL + config.url);
-    console.log("TOKEN:", token);
-  }
-
   if (token) {
     config.headers.set("Authorization", `Bearer ${token}`);
   }
