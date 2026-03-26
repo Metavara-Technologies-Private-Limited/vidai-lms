@@ -175,15 +175,16 @@ const TicketPropertiesSidebar = ({
 
   const currentAssigneeName =
     selectedAssigneeName?.trim() ||
-    (selectedAssigneeOption ? assigneeLabel(selectedAssigneeOption) : "") ||
     employees.find((e) => e.id === ticket.assigned_to_id)?.emp_name ||
     ticket.assigned_to_name ||
     "";
   const currentAssigneeEmail =
     selectedAssigneeEmail?.trim() ||
-    selectedAssigneeOption?.email?.trim() ||
     employees.find((e) => e.id === ticket.assigned_to_id)?.email ||
     "";
+  const pendingAssigneeName = selectedAssigneeOption
+    ? assigneeLabel(selectedAssigneeOption)
+    : "";
   const hasPendingAssignmentChange =
     assignTo !== "" && assignTo !== (ticket.assigned_to_id ?? "");
   const currentAssignmentAction = `Assigned to ${currentAssigneeName || "Assignee"}`;
@@ -402,31 +403,69 @@ const TicketPropertiesSidebar = ({
           </Button>
         </Stack>
       ) : (
-        <Box>
+        <Box
+          sx={{
+            maxHeight: "60vh",
+            overflowY: "auto",
+            pr: 0.5,
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+            "&::-webkit-scrollbar": {
+              display: "none",
+            },
+          }}
+        >
           {(() => {
             const timeline = (ticket.timeline || []) as TicketTimeline[];
 
             const displayItems: (TicketTimeline & { is_injected?: boolean })[] =
-              [...timeline];
-            const hasCurrentAssignmentItem = displayItems.some(
-              (t) =>
-                t.action?.trim().toLowerCase() ===
-                currentAssignmentAction.trim().toLowerCase(),
+              [...timeline].sort(
+                (a, b) =>
+                  dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf(),
+              );
+            const hasAssignmentHistory = displayItems.some((t) =>
+              t.action?.toLowerCase().includes("assign"),
             );
             const shouldShowCurrentAssignment =
-              Boolean(assignTo || ticket.assigned_to_id) &&
+              Boolean(ticket.assigned_to_id) &&
               Boolean(currentAssigneeName) &&
-              (hasPendingAssignmentChange || !hasCurrentAssignmentItem);
+              !hasAssignmentHistory;
+
+            if (hasPendingAssignmentChange && pendingAssigneeName) {
+              const oldAssignedName =
+                ticket.assigned_to_name ||
+                employees.find((e) => e.id === ticket.assigned_to_id)?.emp_name ||
+                "Unassigned";
+              const pendingAction =
+                `Assigned changed from ${oldAssignedName} to ${pendingAssigneeName}`;
+
+              const hasPendingAction = displayItems.some(
+                (t) =>
+                  t.action?.trim().toLowerCase() ===
+                  pendingAction.trim().toLowerCase(),
+              );
+
+              if (!hasPendingAction) {
+                displayItems.push({
+                  id: `pending-assign-${assignTo}`,
+                  action: pendingAction,
+                  created_at: new Date().toISOString(),
+                  is_injected: true,
+                });
+              }
+            }
 
             if (shouldShowCurrentAssignment) {
-              displayItems.unshift({
-                id: `pending-assign-${assignTo}`,
+              displayItems.push({
+                id: `committed-assign-${ticket.assigned_to_id}`,
                 action: currentAssignmentAction,
-                created_at: hasPendingAssignmentChange
-                  ? new Date().toISOString()
-                  : ticket.updated_at || ticket.created_at,
+                created_at: ticket.updated_at || ticket.created_at,
                 is_injected: true,
               });
+              displayItems.sort(
+                (a, b) =>
+                  dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf(),
+              );
             }
 
             return displayItems.map((item, index) => {

@@ -90,15 +90,10 @@ const assigneeLabel = (option: AssigneeOption): string => {
 const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const dispatch = useDispatch<AppDispatch>();
   const user = useSelector(selectUser);
-  const preferredClinicId =
+  const clinicId =
     user?.clinics?.find((clinic) => clinic.is_default)?.clinic_id ??
     user?.clinics?.[0]?.clinic_id ??
     1;
-  const isLocalHost =
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1");
-  const clinicId = isLocalHost ? 1 : preferredClinicId;
 
   // --- Form States ---
   const [subject, setSubject] = useState("");
@@ -108,11 +103,9 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [departmentId, setDepartmentId] = useState<number | "">("");
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [assigneeId, setAssigneeId] = useState<number | "">("");
-  const [assigneeName, setAssigneeName] = useState("");
   const [assigneeSearch, setAssigneeSearch] = useState("");
   const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = useState(false);
-  const [selectedAssigneeOption, setSelectedAssigneeOption] = useState<AssigneeOption | null>(null);
   const [requestedBy, setRequestedBy] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -164,16 +157,6 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
       const loadData = async () => {
         setLoadingData(true);
         try {
-          const extractDepartments = (clinicPayload: unknown): Department[] => {
-            if (!clinicPayload || typeof clinicPayload !== "object") return [];
-            const data = clinicPayload as Record<string, unknown>;
-            const byDepartment = data.department;
-            const byDepartmentSet = data.department_set;
-            if (Array.isArray(byDepartment)) return byDepartment as Department[];
-            if (Array.isArray(byDepartmentSet)) return byDepartmentSet as Department[];
-            return [];
-          };
-
           const results = await Promise.allSettled([
             labsApi.getLabs(),
             clinicsApi.getClinicDetail(clinicId),
@@ -190,28 +173,7 @@ setLabs(labList.filter((l) => l.is_active));
           }
 
           if (results[1].status === 'fulfilled') {
-            const primaryDepartments = extractDepartments(results[1].value);
-            if (primaryDepartments.length > 0) {
-              setDepartments(primaryDepartments);
-            } else if (clinicId !== 1) {
-              try {
-                const fallbackClinic = await clinicsApi.getClinicDetail(1);
-                setDepartments(extractDepartments(fallbackClinic));
-              } catch {
-                setDepartments([]);
-              }
-            } else {
-              setDepartments([]);
-            }
-          } else if (clinicId !== 1) {
-            try {
-              const fallbackClinic = await clinicsApi.getClinicDetail(1);
-              setDepartments(extractDepartments(fallbackClinic));
-            } catch {
-              setDepartments([]);
-            }
-          } else {
-            setDepartments([]);
+            setDepartments(results[1].value?.department || []);
           }
 } catch {
   const connError = "Connection error. Check backend server.";
@@ -281,7 +243,6 @@ setLabs(labList.filter((l) => l.is_active));
         priority: priority as TicketPriority,
         status: "new",
         assigned_to: assigneeId ? Number(assigneeId) : null,
-        assigned_to_name: assigneeName || undefined,
         due_date: dueDate ? dueDate.format("YYYY-MM-DD") : null,
       };
 
@@ -329,8 +290,7 @@ handleClose();
   const reset = () => {
     setSubject(""); setDescription(""); setDueDate(null); setLabId("");
     setDepartmentId(""); setPriority(""); setAssigneeId(""); setRequestedBy("");
-    setAssigneeName("");
-    setAssigneeSearch(""); setAssigneeOptions([]); setSelectedAssigneeOption(null);
+    setAssigneeSearch(""); setAssigneeOptions([]);
     setSelectedFile(null);
   };
 
@@ -344,6 +304,7 @@ handleClose();
       open={open}
       onClose={handleClose}
       maxWidth={false}
+      scroll="paper"
       PaperProps={{ sx: createTicketDialogPaperSx }}
     >
       <DialogTitle sx={{ position: "relative" }}>
@@ -356,7 +317,12 @@ handleClose();
         <Divider sx={{ mt: 2, mx: -3 }} />
       </DialogTitle>
 
-      <DialogContent>
+      <DialogContent
+        sx={{
+          maxHeight: "calc(100vh - 180px)",
+          overflowY: "auto",
+        }}
+      >
         {loadingData ? (
           <Box display="flex" flexDirection="column" alignItems="center" py={6}>
             <CircularProgress size={32} sx={{ mb: 2 }} />
@@ -543,17 +509,9 @@ handleClose();
               <Autocomplete
                 options={assigneeOptions}
                 loading={assigneeLoading}
-                value={selectedAssigneeOption}
-                inputValue={assigneeSearch}
-                onInputChange={(_, value, reason) => {
-                  if (reason !== "reset") setAssigneeSearch(value);
-                }}
-                onChange={(_, value) => {
-                  setSelectedAssigneeOption(value);
-                  setAssigneeId(value?.id ?? "");
-                  setAssigneeName(value ? assigneeLabel(value) : "");
-                  if (value) setAssigneeSearch(assigneeLabel(value));
-                }}
+                value={assigneeOptions.find((option) => option.id === assigneeId) || null}
+                onInputChange={(_, value) => setAssigneeSearch(value)}
+                onChange={(_, value) => setAssigneeId(value?.id ?? "")}
                 getOptionLabel={assigneeLabel}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
                 fullWidth
