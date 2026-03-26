@@ -177,7 +177,6 @@ const TicketView = () => {
   const [description, setDescription] = useState(""); // State for editable description
   const [openReply, setOpenReply] = useState(false);
   const [replyMessage, setReplyMessage] = useState("");
-  const [fromOptions, setFromOptions] = useState<string[]>([]);
   const [replyFrom, setReplyFrom] = useState("");
   const [replyTo, setReplyTo] = useState<string[]>([]);
   const [replyCc, setReplyCc] = useState<string[]>([]);
@@ -230,7 +229,6 @@ const TicketView = () => {
         const clinicData = await clinicsApi.getClinicDetail(clinicId);
         const clinicEmails = extractClinicEmails(clinicData);
 
-        setFromOptions(clinicEmails);
         setReplyFrom((prev) => {
           const prevNormalized = prev.trim().toLowerCase();
           if (prevNormalized && clinicEmails.includes(prevNormalized))
@@ -238,7 +236,6 @@ const TicketView = () => {
           return clinicEmails[0] || "";
         });
       } catch {
-        setFromOptions([]);
         setReplyFrom("");
       }
 
@@ -694,7 +691,6 @@ const TicketView = () => {
             setOpenReply,
             fromEmail: replyFrom,
             setFromEmail: setReplyFrom,
-            fromOptions,
             replyTo,
             setReplyTo,
             replyCc,

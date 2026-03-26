@@ -9,7 +9,6 @@ import {
   Button,
   Checkbox,
   TextField,
-  MenuItem,
 } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
@@ -30,7 +29,6 @@ export interface TicketReplyEditorProps {
 
   fromEmail: string;
   setFromEmail: (v: string) => void;
-  fromOptions: string[];
 
   replyTo: string[];
   setReplyTo: (v: string[]) => void;
@@ -84,7 +82,6 @@ const TicketReplyEditor = ({
   openReply,
   fromEmail,
   setFromEmail,
-  fromOptions,
   replyTo,
   setReplyTo,
   replyCc,
@@ -285,25 +282,13 @@ const TicketReplyEditor = ({
         </Typography>
 
         <TextField
-          select
           value={fromEmail}
           onChange={(e) => setFromEmail(e.target.value)}
+          placeholder="Enter sender email"
           variant="standard"
           sx={{ minWidth: 260, "& .MuiInputBase-input": { fontSize: 14 } }}
           InputProps={{ disableUnderline: true }}
-        >
-          {fromOptions.length > 0 ? (
-            fromOptions.map((mail) => (
-              <MenuItem key={mail} value={mail} sx={{ fontSize: 14 }}>
-                {mail}
-              </MenuItem>
-            ))
-          ) : (
-            <MenuItem value="" disabled sx={{ fontSize: 14 }}>
-              No clinic email configured
-            </MenuItem>
-          )}
-        </TextField>
+        />
       </Box>
 
       {/* TO ROW */}
