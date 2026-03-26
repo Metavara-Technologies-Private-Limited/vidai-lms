@@ -14,11 +14,20 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import { useNavigate } from "react-router-dom";
 
 import { MenuButton } from "./LeadsMenuDialogs";
+import { STATUS_OPTIONS_BY_APP, APP_TYPE } from "../../config/appType";
 
 import type { LeadItem, ColumnConfig } from "./Leadsboardtypes";
 
 // Re-export so any file that was importing LeadItem from here still works
 export type { LeadItem, ColumnConfig };
+
+// ====================== Statuses that show Book Appointment button ======================
+// Driven from appType config — stays in sync if status names ever change
+const BOOK_APPOINTMENT_STATUSES = new Set(
+  STATUS_OPTIONS_BY_APP[APP_TYPE].filter(
+    (s) => s === "New" || s === "Follow Up"
+  )
+);
 
 // ====================== Shared icon button style ======================
 const iconBtnSx = {
@@ -54,8 +63,9 @@ export const CardContent: React.FC<CardContentProps> = ({
     );
   }
 
-  const showBookButton =
-    (columnLabel === "NEW LEADS" || columnLabel === "FOLLOW-UPS") && isHovered;
+  // ✅ FIX: use BOOK_APPOINTMENT_STATUSES set (matches "New" and "Follow Up")
+  // Previously was checking "NEW LEADS" and "FOLLOW-UPS" which never matched
+  const showBookButton = BOOK_APPOINTMENT_STATUSES.has(columnLabel as "New" | "Follow Up") && isHovered;
 
   const formattedDate = lead.created_at
     ? new Date(lead.created_at as string).toLocaleDateString("en-GB")
@@ -124,7 +134,6 @@ export const CardContent: React.FC<CardContentProps> = ({
         CONTACT OPTION
       </Typography>
       <Stack direction="row" spacing={1.5} sx={{ mb: showBookButton ? 2 : 0 }}>
-        {/* Call button — now wired to working handler */}
         <IconButton
           size="small"
           sx={iconBtnSx}
