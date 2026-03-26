@@ -19,6 +19,8 @@ import DollarCircleIcon from "../../assets/icons/dollar-circle.svg";
 import CallTranscriptPopup from "./CallTranscriptPopup";
 import { LeadAPI, api, type Lead } from "../../services/leads.api";
 import type { CallReportRow, CallViewMode } from "../../types/reports.types";
+import { selectClinic } from "../../store/clinicSlice";
+import { useSelector } from "react-redux";
 
 interface CallReportsProps {
   searchQuery: string;
@@ -135,6 +137,7 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
   const [selectedCallerName, setSelectedCallerName] = useState("");
   const [callRows, setCallRows] = useState<CallReportRow[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(false);
+  const clinic = useSelector(selectClinic);
 
   useEffect(() => {
     let isMounted = true;
@@ -143,9 +146,9 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
       try {
         setLoadingCalls(true);
 
-        const leads = await LeadAPI.list();
+        const leads = clinic?.id ? await LeadAPI.list(clinic?.id) : [];
         const leadById = new Map<string, Lead>();
-        leads.forEach((lead) => {
+        leads.forEach((lead: Lead) => {
           if (lead?.id) {
             leadById.set(String(lead.id), lead);
           }
@@ -159,7 +162,7 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
           allCalls = Array.isArray(payload) ? payload : payload?.results ?? [];
         } catch {
           const perLeadCalls = await Promise.allSettled(
-            leads.map(async (lead) => {
+            leads.map(async (lead: Lead) => {
               const response = await api.get<TwilioCallRecord[] | { results?: TwilioCallRecord[] }>(`/twilio/calls/?lead_uuid=${lead.id}`);
               const payload = response.data;
               return Array.isArray(payload) ? payload : payload?.results ?? [];

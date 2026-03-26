@@ -33,6 +33,8 @@ import { LeadAPI, LeadEmailAPI } from "../../../services/leads.api";
 import type { Employee } from "../../../services/leads.api";
 import { toast } from "react-toastify";
 import TicketPropertiesSidebar from "../Menus/TicketPropertiesSidebar";
+import { selectClinic } from "../../../store/clinicSlice";
+import { useSelector } from "react-redux";
 
 const FILE_BASE_URL = "http://127.0.0.1:8000";
 
@@ -160,6 +162,7 @@ const extractApiErrorMessage = (data: unknown): string | null => {
 const TicketView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const clinic = useSelector(selectClinic);
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [leads, setLeads] = useState<Array<{ id: string; email?: string }>>([]);
@@ -222,7 +225,7 @@ const TicketView = () => {
 
       const [empData, leadsData] = await Promise.all([
         clinicsApi.getClinicEmployees(clinicId),
-        LeadAPI.list(),
+        clinic?.id ? LeadAPI.list(clinic?.id) : Promise.resolve([]),
       ]);
 
       setTicket(ticketData);

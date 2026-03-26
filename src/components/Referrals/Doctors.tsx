@@ -18,6 +18,8 @@ import BackwardIcon from "../../assets/icons/Backward_icon.svg";
 import { useNavigate } from "react-router-dom";
 import { LeadAPI, ClinicAPI } from "../../services/leads.api";
 import type { Lead, Employee } from "../../services/leads.api";
+import { selectClinic } from "../../store/clinicSlice";
+import { useSelector } from "react-redux";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface DoctorRow {
@@ -49,6 +51,7 @@ const Doctors: React.FC = () => {
   const [doctors, setDoctors] = useState<DoctorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const clinic = useSelector(selectClinic);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,7 +59,7 @@ const Doctors: React.FC = () => {
         setLoading(true);
 
         // Step 1: Fetch all leads via LeadAPI (uses auth_token automatically)
-        const allLeads: Lead[] = await LeadAPI.list();
+        const allLeads: Lead[] = clinic?.id ? await LeadAPI.list(clinic?.id) : [];
 
         // Step 2: Group leads by assigned_to — each unique assigned_to = a doctor
         const doctorMap: Record<number, { id: number; name: string; referrals: number }> = {};
@@ -76,7 +79,7 @@ const Doctors: React.FC = () => {
 
         // Step 3: Try to get employee details (email/phone/clinic) for each doctor
         // Use clinic_id from the first lead to fetch employees
-        let empById: Record<number, Employee & { email?: string; contact_no?: string; clinic_name?: string }> = {};
+        const empById: Record<number, Employee & { email?: string; contact_no?: string; clinic_name?: string }> = {};
         try {
           const clinicId = allLeads[0]?.clinic_id;
           if (clinicId) {

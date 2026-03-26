@@ -22,6 +22,8 @@ import { CampaignAPI } from "../../services/campaign.api";
 import { LeadAPI, type Lead } from "../../services/leads.api";
 import type { CampaignAPIType } from "../../types/campaigns.types";
 import type { ReportChannelData, ReportTabKey, ReportTableRow } from "../../types/reports.types";
+import { selectClinic } from "../../store/clinicSlice";
+import { useSelector } from "react-redux";
 
 type CampaignReportTab = Exclude<ReportTabKey, "call">;
 
@@ -187,6 +189,7 @@ const buildReportDataByTab = (
 
 const ReportsDashboard = () => {
 	const navigate = useNavigate();
+	const clinic = useSelector(selectClinic);
 	const { tab } = useParams<{ tab?: string }>();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [reportsData, setReportsData] = useState<Record<CampaignReportTab, ReportChannelData>>(
@@ -215,9 +218,9 @@ const ReportsDashboard = () => {
 			try {
 				setReportsLoading(true);
 				const [campaignResponse, leadsResponse] = await Promise.all([
-					CampaignAPI.list(),
-					LeadAPI.list(),
-				]);
+          CampaignAPI.list(),
+          clinic?.id ? LeadAPI.list(clinic.id) : Promise.resolve([]),
+        ]);
 
 				if (!isMounted) return;
 				const campaigns = Array.isArray(campaignResponse.data) ? campaignResponse.data : [];

@@ -23,6 +23,8 @@ import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import BackwardIcon from "../../assets/icons/Backward_icon.svg";
 import { LeadAPI } from "../../services/leads.api";
 import type { Lead, LeadDocument } from "../../services/leads.api";
+import { selectClinic } from "../../store/clinicSlice";
+import { useSelector } from "react-redux";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface PatientCard {
@@ -124,6 +126,7 @@ const DoctorReferrals: React.FC = () => {
   const navigate = useNavigate();
   const { doctorId } = useParams<{ doctorId: string }>();
   const location = useLocation();
+  const clinic = useSelector(selectClinic);
   const state = location.state as { doctorName?: string } | null;
   const doctorName = state?.doctorName ?? `Doctor #${doctorId}`;
 
@@ -138,7 +141,7 @@ const DoctorReferrals: React.FC = () => {
         setLoading(true);
 
         // Use LeadAPI.list() — auth token handled automatically via axios interceptor
-        const allLeads: Lead[] = await LeadAPI.list();
+        const allLeads: Lead[] = clinic?.id ? await LeadAPI.list(clinic?.id) : [];
 
         // Filter leads assigned to this specific doctor
         const filtered = allLeads.filter(
