@@ -176,6 +176,7 @@ const TicketView = () => {
   const [assignTo, setAssignTo] = useState<number | "">("");
   const [assigneeName, setAssigneeName] = useState("");
   const [assigneeEmail, setAssigneeEmail] = useState("");
+  const [draftAssigneeName, setDraftAssigneeName] = useState("");
   const [description, setDescription] = useState(""); // State for editable description
   const [openReply, setOpenReply] = useState(false);
   const [replyMessage, setReplyMessage] = useState("");
@@ -263,6 +264,7 @@ const TicketView = () => {
         normalizedEmployees.find((emp) => emp.id === ticketData.assigned_to_id)
           ?.email || "",
       );
+      setDraftAssigneeName(ticketData.assigned_to_name || "");
       setDescription(ticketData.description);
     } catch {
       setError("Failed to load ticket details from server.");
@@ -362,7 +364,7 @@ const TicketView = () => {
           status,
           priority,
           assigned_to: assignTo === "" ? null : assignTo,
-          assigned_to_name: assigneeName || undefined,
+          assigned_to_name: draftAssigneeName || undefined,
           type,
         });
 
@@ -663,14 +665,15 @@ const TicketView = () => {
       </Alert>
     );
 
-  const selectedAssigneeId =
-    assignTo === "" ? (ticket.assigned_to_id ?? null) : assignTo;
-  const selectedAssignee = !selectedAssigneeId
-    ? undefined
-    : employees.find((emp) => emp.id === Number(selectedAssigneeId));
   const currentAssigneeName =
-    assigneeName || selectedAssignee?.emp_name || ticket.assigned_to_name || "";
-  const currentAssigneeEmail = assigneeEmail || selectedAssignee?.email || "";
+    assigneeName ||
+    employees.find((emp) => emp.id === ticket.assigned_to_id)?.emp_name ||
+    ticket.assigned_to_name ||
+    "";
+  const currentAssigneeEmail =
+    assigneeEmail ||
+    employees.find((emp) => emp.id === ticket.assigned_to_id)?.email ||
+    "";
 
   return (
     <Box sx={ticketViewWrapperSx}>
@@ -741,8 +744,7 @@ const TicketView = () => {
           setPriority={setPriority}
           assignTo={assignTo}
           setAssignTo={setAssignTo}
-          setAssigneeName={setAssigneeName}
-          setAssigneeEmail={setAssigneeEmail}
+          setAssigneeName={setDraftAssigneeName}
           selectedAssigneeEmail={currentAssigneeEmail}
           handleUpdate={handleUpdate}
           updating={updating}
