@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AppBar,
@@ -25,25 +25,31 @@ import type { AppDispatch } from "../../store";
 import { clearAuth, selectUser } from "../../store/authSlice";
 import { fetchCampaign } from "../../store/campaignSlice";
 import { fetchAllTemplates } from "../../store/templateSlice";
+import PersonIcon from "@mui/icons-material/Person";
+import EmailIcon from "@mui/icons-material/Email";
+import BusinessIcon from "@mui/icons-material/Business";
+import WorkIcon from "@mui/icons-material/Work";
+import LogoutIcon from "@mui/icons-material/Logout";
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const user = useSelector(selectUser);
-  // we intentionally only need the clinic name in the header;
-  // other state is loaded by thunks but not read here.
-  const clinics = user?.clinics || [];
-  const [selectedClinic, setSelectedClinic] = useState(
-    clinics.find((c) => c.is_default) || clinics[0],
+  const clinics = useMemo(() => user?.clinics ?? [], [user]);
+
+  const selectedClinic = useMemo(() => {
+    return clinics.find((c) => c.is_default) || clinics[0];
+  }, [clinics]);
+  const [manualClinic, setManualClinic] = useState<(typeof clinics)[0] | null>(
+    null,
   );
+
   const [clinicAnchor, setClinicAnchor] = useState<null | HTMLElement>(null);
 
   const handleClinicOpen = (e: React.MouseEvent<HTMLElement>) =>
     setClinicAnchor(e.currentTarget);
 
   const handleClinicClose = () => setClinicAnchor(null);
-  // const clinic = useSelector(selectClinic);
-  // const clinicName = clinic?.name || "";
 
   /* ================= ICON MENU STATE ================= */
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -120,7 +126,8 @@ const Header = () => {
               }}
             >
               <Typography variant="body2">
-                Clinic: <b>{selectedClinic?.clinic__name || "—"}</b>
+                Clinic:{" "}
+                <b>{(manualClinic || selectedClinic)?.clinic__name || "-"}</b>
               </Typography>
               <ArrowDropDownIcon />
             </Box>
@@ -134,7 +141,7 @@ const Header = () => {
                 <MenuItem
                   key={c.clinic_id}
                   onClick={() => {
-                    setSelectedClinic(c);
+                    setManualClinic(c);
                     handleClinicClose();
                   }}
                 >
@@ -160,7 +167,10 @@ const Header = () => {
           ))}
 
           {/* USER */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+            onClick={handleUserMenuOpen}
+          >
             <Box
               component="img"
               src={user?.photo || UserAvatarIcon}
@@ -175,7 +185,7 @@ const Header = () => {
                 {user?.designation_label || user?.designation || "—"}
               </Typography>
             </Box>
-            <IconButton size="small" onClick={handleUserMenuOpen}>
+            <IconButton size="small">
               <ArrowDropDownIcon />
             </IconButton>
           </Box>
@@ -205,10 +215,28 @@ const Header = () => {
         open={Boolean(userAnchorEl)}
         onClose={handleUserMenuClose}
       >
-        <MenuItem>My Account</MenuItem>
-        <MenuItem>Change Password</MenuItem>
-        <MenuItem>Settings</MenuItem>
+        <MenuItem disabled>
+          <PersonIcon sx={{ mr: 1 }} />
+          {user ? `${user.first_name} ${user.last_name}` : "-"}
+        </MenuItem>
+
+        <MenuItem disabled>
+          <EmailIcon sx={{ mr: 1 }} />
+          {user?.email || "-"}
+        </MenuItem>
+
+        <MenuItem disabled>
+          <BusinessIcon sx={{ mr: 1 }} />
+          {user?.clinics?.[0]?.clinic__name || "-"}
+        </MenuItem>
+
+        <MenuItem disabled>
+          <WorkIcon sx={{ mr: 1 }} />
+          {user?.designation_label || "-"}
+        </MenuItem>
+
         <MenuItem onClick={handleLogout} sx={{ color: "red", fontWeight: 600 }}>
+          <LogoutIcon sx={{ mr: 1 }} />
           Logout
         </MenuItem>
       </Menu>

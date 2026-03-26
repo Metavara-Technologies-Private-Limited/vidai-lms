@@ -17,6 +17,7 @@ import {
 import {
   CircularProgress,
   FormControl,
+  InputLabel,
   MenuItem,
   Select,
   type SelectChangeEvent,
@@ -140,14 +141,19 @@ export default function VidaiLogin() {
       <section className={styles.formPanel}>
         <div className={styles.topSection}>
           <div className={styles.languageWrap}>
-            <label className={styles.languageLabel} htmlFor="language-select">
-              {t.languageLabel}
-            </label>
-            <FormControl size="small" className={styles.languageSelect}>
+            <FormControl
+              size="small"
+              variant="outlined"
+              className={styles.languageSelect}
+            >
+              <InputLabel id="language-label">{t.languageLabel}</InputLabel>
+
               <Select
+                labelId="language-label"
                 id="language-select"
                 value={language}
                 onChange={handleLanguageChange}
+                label={t.languageLabel}
               >
                 {LANGUAGE_OPTIONS.map((option) => (
                   <MenuItem key={option.code} value={option.code}>

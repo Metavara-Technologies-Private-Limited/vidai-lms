@@ -10,7 +10,7 @@
 .cardWrapper {
     flex: 1;
     padding: 0 16px;
-    margin-top: 16px;
+    margin-top: 0px;
     margin-bottom: 0;
     overflow: hidden;
 }

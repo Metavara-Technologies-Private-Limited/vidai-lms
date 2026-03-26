@@ -13,15 +13,29 @@ import { useDispatch, useSelector } from "react-redux";
 import { selectAuthed, selectToken, setAuth } from "./store/authSlice";
 import type { AppDispatch } from "./store";
 import { authApi } from "./services/auth.api";
+import { Box, CircularProgress } from "@mui/material";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
 const VidaiLogin = lazy(() => import("./pages/VidaiLogin"));
 
+const Spinner = () => (
+  <Box
+    sx={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100vh",
+    }}
+  >
+    <CircularProgress />
+  </Box>
+);
+
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
   return (
-    <Suspense fallback={<div style={{ padding: 12 }}>Loading...</div>}>
+    <Suspense fallback={<Spinner/>}>
       <Comp />
     </Suspense>
   );
@@ -95,9 +109,7 @@ export default function AppRoutes() {
         path="/"
         element={
           authed ? (
-            <Suspense
-              fallback={<div style={{ padding: 12 }}>Loading app...</div>}
-            >
+            <Suspense fallback={<Spinner />}>
               <MainLayout />
             </Suspense>
           ) : (

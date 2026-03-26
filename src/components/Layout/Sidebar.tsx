@@ -96,7 +96,7 @@ export default function Sidebar() {
 
       {/* MAIN CARD */}
       <Box className={styles.cardWrapper} sx={{ pb: 2 }}>
-        <Box className={styles.card}>
+        <Box className={styles.card} sx={{ mt: '12px' }}>
           <Typography color="primary.main" sx={{ fontWeight: 700 }}>
             {tab.label}
           </Typography>
