@@ -278,7 +278,6 @@ const BulkActionBar: React.FC<Props> = ({
 
   // ── Email Composer (From/To/Cc/Bcc) ────────────────────────────────
   const [fromEmail, setFromEmail] = useState("");
-  const [fromOptions, setFromOptions] = useState<string[]>([]);
   const [replyTo, setReplyTo] = useState<string[]>([]);
   const [replyCc, setReplyCc] = useState<string[]>([]);
   const [replyBcc, setReplyBcc] = useState<string[]>([]);
@@ -479,6 +478,7 @@ const BulkActionBar: React.FC<Props> = ({
     setReplyTo([]);
     setReplyCc([]);
     setReplyBcc([]);
+    setFromEmail("noreply@fertility.com");
     setOpenEmail(true);
     fetchEmailTemplates();
 
@@ -505,17 +505,14 @@ const BulkActionBar: React.FC<Props> = ({
           // Extract clinic emails from clinic data
           const clinicEmails = extractClinicEmails(clinicData);
           if (clinicEmails.length > 0) {
-            setFromOptions(clinicEmails);
             setFromEmail(clinicEmails[0]);
           } else {
             // Fallback if no email found
-            setFromOptions(["noreply@fertility.com"]);
             setFromEmail("noreply@fertility.com");
           }
         } catch (err) {
           // If clinic fetch fails, use default
           console.error("Failed to fetch clinic email:", err);
-          setFromOptions(["noreply@fertility.com"]);
           setFromEmail("noreply@fertility.com");
         }
       }
@@ -878,7 +875,9 @@ const BulkActionBar: React.FC<Props> = ({
         </Button>
         <Button
           variant="outlined"
-          startIcon={<img src={ExportIcon} alt="Export" width={18} height={18} />}
+          startIcon={
+            <img src={ExportIcon} alt="Export" width={18} height={18} />
+          }
           onClick={onExport}
           disabled={anyProcessing}
           sx={{
@@ -2140,19 +2139,13 @@ const BulkActionBar: React.FC<Props> = ({
               From :
             </Typography>
             <TextField
-              select
               value={fromEmail}
               onChange={(e) => setFromEmail(e.target.value)}
+              placeholder="Enter sender email"
               variant="standard"
               sx={{ minWidth: 260, "& .MuiInputBase-input": { fontSize: 14 } }}
               InputProps={{ disableUnderline: true }}
-            >
-              {fromOptions.map((email) => (
-                <MenuItem key={email} value={email} sx={{ fontSize: 14 }}>
-                  {email}
-                </MenuItem>
-              ))}
-            </TextField>
+            />
           </Box>
 
           {/* TO ROW */}

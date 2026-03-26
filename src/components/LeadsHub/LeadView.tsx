@@ -385,6 +385,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
   >(null);
   const [previewTemplate, setPreviewTemplate] =
     React.useState<EmailTemplate | null>(null);
+  const [fromEmail, setFromEmail] = React.useState("noreply@fertility.com");
   const [subject, setSubject] = React.useState("");
   const [body, setBody] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -446,13 +447,30 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
       setStep("template");
       setSelectedTemplateId(null);
       setPreviewTemplate(null);
+      setFromEmail("noreply@fertility.com");
       setSubject("");
       setBody("");
       setError(null);
       setSending(false);
       loadEmailTemplates();
+
+      const clinicId = lead?.clinic_id;
+      if (clinicId) {
+        api
+          .get(`/clinics/${clinicId}/detail/`)
+          .then((res) => {
+            const clinicEmail =
+              typeof res?.data?.email === "string" ? res.data.email.trim() : "";
+            if (clinicEmail) {
+              setFromEmail(clinicEmail);
+            }
+          })
+          .catch(() => {
+            // Keep fallback sender when clinic email fetch fails.
+          });
+      }
     }
-  }, [open, loadEmailTemplates]);
+  }, [open, loadEmailTemplates, lead?.clinic_id]);
 
   const handleClose = () => {
     if (sending) return;
@@ -500,7 +518,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
         lead: lead.id,
         subject: subject.trim(),
         email_body: body.trim(),
-        sender_email: lead.email ?? null,
+        sender_email: fromEmail || null,
       });
       onSent?.();
       onClose();
@@ -518,7 +536,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
         lead: lead.id,
         subject: subject.trim(),
         email_body: body.trim(),
-        sender_email: lead.email ?? null,
+        sender_email: fromEmail || null,
       });
     } catch {
       // silent
@@ -945,10 +963,10 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
                         fontWeight={500}
                         minWidth={52}
                       >
-                        From:
+                       From:
                       </Typography>
                       <Typography fontSize="12px" color="#374151">
-                        noreply@crystaivf.com
+                        {fromEmail}
                       </Typography>
                     </Stack>
                     <Stack direction="row" spacing={1} alignItems="center">
@@ -1092,6 +1110,29 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
             </DialogTitle>
             <DialogContent sx={{ pt: 0, pb: 0 }}>
               <Stack spacing={0} divider={<Divider />}>
+                <Box
+                  sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}
+                >
+                  <Typography
+                    fontSize="13px"
+                    color="text.secondary"
+                    minWidth={55}
+                  >
+                    From:
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    variant="standard"
+                    value={fromEmail}
+                    onChange={(e) => setFromEmail(e.target.value)}
+                    disabled={sending}
+                    InputProps={{
+                      disableUnderline: true,
+                      sx: { fontSize: "13px" },
+                    }}
+                    placeholder="Enter sender email"
+                  />
+                </Box>
                 <Box
                   sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}
                 >
@@ -1407,7 +1448,9 @@ export default function LeadDetailView() {
   // ✅ FIX 1: bookApptOpen state is now correctly inside the component
   const [bookApptOpen, setBookApptOpen] = React.useState(false);
 
-  const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>([]);
+  const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>(
+    [],
+  );
   const [emailHistoryLoading, setEmailHistoryLoading] = React.useState(false);
 
   const fetchEmailHistory = React.useCallback(async (leadId: string) => {
@@ -1439,16 +1482,24 @@ export default function LeadDetailView() {
   const [actionDescription, setActionDescription] = React.useState("");
   const [actionSubmitting, setActionSubmitting] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
-  const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(null);
-  const [documents, setDocuments] = React.useState<{ url: string; name: string }[]>([]);
+  const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(
+    null,
+  );
+  const [documents, setDocuments] = React.useState<
+    { url: string; name: string }[]
+  >([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
   const [docsError, setDocsError] = React.useState<string | null>(null);
   const [callHistory, setCallHistory] = React.useState<TwilioCall[]>([]);
   const [callHistoryLoading, setCallHistoryLoading] = React.useState(false);
-  const [callHistoryError, setCallHistoryError] = React.useState<string | null>(null);
+  const [callHistoryError, setCallHistoryError] = React.useState<string | null>(
+    null,
+  );
   const [smsHistory, setSmsHistory] = React.useState<TwilioSMS[]>([]);
   const [smsHistoryLoading, setSmsHistoryLoading] = React.useState(false);
-  const [smsHistoryError, setSmsHistoryError] = React.useState<string | null>(null);
+  const [smsHistoryError, setSmsHistoryError] = React.useState<string | null>(
+    null,
+  );
   const [fullLead, setFullLead] = React.useState<LeadRecord | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false);
   const [selectedLeadStatus, setSelectedLeadStatus] =
@@ -1511,7 +1562,9 @@ export default function LeadDetailView() {
       setNotesLoading(true);
       setNotesError(null);
       const { data } = await api.get(`/leads/${leadUuid}/notes/`);
-      const results: RawNote[] = Array.isArray(data) ? data : (data.results ?? []);
+      const results: RawNote[] = Array.isArray(data)
+        ? data
+        : (data.results ?? []);
       setNotes(
         results
           .filter((n) => !n.is_deleted)
@@ -1539,9 +1592,13 @@ export default function LeadDetailView() {
     setDocsLoading(true);
     setDocsError(null);
     try {
-      setDocuments(Array.isArray(leadDocs) ? leadDocs.map(normalizeDocument) : []);
+      setDocuments(
+        Array.isArray(leadDocs) ? leadDocs.map(normalizeDocument) : [],
+      );
     } catch (err: unknown) {
-      setDocsError(err instanceof Error ? err.message : "Failed to load documents");
+      setDocsError(
+        err instanceof Error ? err.message : "Failed to load documents",
+      );
     } finally {
       setDocsLoading(false);
     }
@@ -1632,7 +1689,9 @@ export default function LeadDetailView() {
           uuid: createdNote.id,
           title: createdNote.title ?? newNoteTitle,
           content: createdNote.note ?? newNoteContent,
-          time: createdNote.created_at ? formatNoteTime(createdNote.created_at) : "",
+          time: createdNote.created_at
+            ? formatNoteTime(createdNote.created_at)
+            : "",
         },
       ]);
       setNewNoteTitle("");
@@ -1667,12 +1726,15 @@ export default function LeadDetailView() {
       setEditSubmitting(true);
       setNotesError(null);
       const userId = getCurrentUserId();
-      const { data: updated } = await api.put(`/leads/notes/${noteId}/update/`, {
-        title: editTitle.trim(),
-        note: editContent.trim(),
-        lead: decodeURIComponent(id || ""),
-        ...(userId !== null && { created_by: userId }),
-      });
+      const { data: updated } = await api.put(
+        `/leads/notes/${noteId}/update/`,
+        {
+          title: editTitle.trim(),
+          note: editContent.trim(),
+          lead: decodeURIComponent(id || ""),
+          ...(userId !== null && { created_by: userId }),
+        },
+      );
       const updatedNote = updated as RawNote;
       setNotes((prev) =>
         prev.map((n) =>
@@ -1724,7 +1786,10 @@ export default function LeadDetailView() {
         department_id: activeLead.department_id,
         full_name: activeLead.full_name || activeLead.name,
         contact_no:
-          activeLead.contact_no || activeLead.phone || activeLead.phone_number || "",
+          activeLead.contact_no ||
+          activeLead.phone ||
+          activeLead.phone_number ||
+          "",
         source: activeLead.source || "Unknown",
         treatment_interest: activeLead.treatment_interest || "N/A",
         book_appointment: activeLead.book_appointment || false,
@@ -1794,7 +1859,8 @@ export default function LeadDetailView() {
       ) {
         setConvertError(
           String(
-            (result as { payload?: string; error?: { message?: string } })?.payload ||
+            (result as { payload?: string; error?: { message?: string } })
+              ?.payload ||
               (result as { error?: { message?: string } })?.error?.message ||
               "Failed to convert lead.",
           ),
@@ -1828,7 +1894,8 @@ export default function LeadDetailView() {
       }
       setOpenConvertPopup(false);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to convert lead.";
+      const message =
+        err instanceof Error ? err.message : "Failed to convert lead.";
       setConvertError(message);
       toast.error(message, {
         position: "top-right",
@@ -1856,10 +1923,19 @@ export default function LeadDetailView() {
 
   if (loading && !activeLead)
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
-          <Typography color="text.secondary">Loading lead details...</Typography>
+          <Typography color="text.secondary">
+            Loading lead details...
+          </Typography>
         </Stack>
       </Box>
     );
@@ -1872,8 +1948,17 @@ export default function LeadDetailView() {
           <Typography variant="body2">{error}</Typography>
           <Typography
             variant="body2"
-            sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
-            onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}
+            sx={{
+              mt: 1,
+              color: "primary.main",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+            onClick={() =>
+              dispatch(
+                fetchLeads() as unknown as Parameters<typeof dispatch>[0],
+              )
+            }
           >
             Try again
           </Typography>
@@ -1891,7 +1976,12 @@ export default function LeadDetailView() {
           </Typography>
           <Typography
             variant="body2"
-            sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
+            sx={{
+              mt: 1,
+              color: "primary.main",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
             onClick={() => navigate("/leads")}
           >
             Go back to Leads Hub
@@ -1900,9 +1990,15 @@ export default function LeadDetailView() {
       </Box>
     );
 
-  const leadName = capitalizeWords(activeLead.full_name || activeLead.name || "Unknown");
+  const leadName = capitalizeWords(
+    activeLead.full_name || activeLead.name || "Unknown",
+  );
   const leadInitials = activeLead.initials || leadName.charAt(0).toUpperCase();
-  const leadPhone = activeLead.phone || activeLead.contact_number || activeLead.contact_no || "N/A";
+  const leadPhone =
+    activeLead.phone ||
+    activeLead.contact_number ||
+    activeLead.contact_no ||
+    "N/A";
   const leadEmail = activeLead.email || "N/A";
   const leadLocation = capitalizeWords(activeLead.location || "N/A");
   const leadGender = capitalize(activeLead.gender);
@@ -1910,7 +2006,9 @@ export default function LeadDetailView() {
   const leadMaritalStatus = capitalize(activeLead.marital_status);
   const leadAddress = capitalizeWords(activeLead.address || "N/A");
   const leadLanguage = capitalize(activeLead.language_preference || "N/A");
-  const leadAssigned = capitalizeWords(activeLead.assigned_to_name || activeLead.assigned || "Unassigned");
+  const leadAssigned = capitalizeWords(
+    activeLead.assigned_to_name || activeLead.assigned || "Unassigned",
+  );
   const leadStatus = selectedLeadStatus;
   const leadQuality = capitalize(activeLead.quality || "N/A");
   const leadScore = String(activeLead.score || 0).includes("%")
@@ -1919,9 +2017,13 @@ export default function LeadDetailView() {
   const leadSource = capitalizeWords(activeLead.source || "Unknown");
   const leadSubSource = capitalizeWords(activeLead.sub_source || "N/A");
   const leadCampaignName = capitalizeWords(activeLead.campaign_name || "N/A");
-  const leadCampaignDuration = capitalize(activeLead.campaign_duration || "N/A");
+  const leadCampaignDuration = capitalize(
+    activeLead.campaign_duration || "N/A",
+  );
   const leadDisplayId = formatLeadId(activeLead.id);
-  const partnerName = capitalizeWords(activeLead.partner_name || activeLead.partner_full_name || "N/A");
+  const partnerName = capitalizeWords(
+    activeLead.partner_name || activeLead.partner_full_name || "N/A",
+  );
   const partnerAge = String(activeLead.partner_age || "N/A");
   const partnerGender = capitalize(activeLead.partner_gender);
   const leadCreatedAt = activeLead.created_at
@@ -1933,15 +2035,25 @@ export default function LeadDetailView() {
         minute: "2-digit",
       })
     : "N/A";
-  const nextActionType = capitalizeWords(activeLead.next_action_type || activeLead.task || "N/A");
-  const nextActionStatus = capitalize(activeLead.next_action_status || activeLead.taskStatus || "Pending");
-  const nextActionDescription = capitalize(activeLead.next_action_description || "N/A");
+  const nextActionType = capitalizeWords(
+    activeLead.next_action_type || activeLead.task || "N/A",
+  );
+  const nextActionStatus = capitalize(
+    activeLead.next_action_status || activeLead.taskStatus || "Pending",
+  );
+  const nextActionDescription = capitalize(
+    activeLead.next_action_description || "N/A",
+  );
   const treatmentInterest = activeLead.treatment_interest
-    ? activeLead.treatment_interest.split(",").map((t) => capitalizeWords(t.trim()))
+    ? activeLead.treatment_interest
+        .split(",")
+        .map((t) => capitalizeWords(t.trim()))
     : [];
   const hasAppointment = activeLead.book_appointment === true;
   const appointmentDepartment = hasAppointment
-    ? capitalizeWords(activeLead.department_name || activeLead.department || "N/A")
+    ? capitalizeWords(
+        activeLead.department_name || activeLead.department || "N/A",
+      )
     : "N/A";
   const appointmentPersonnel = hasAppointment
     ? capitalizeWords(activeLead.personal_name || activeLead.personnel || "N/A")
@@ -1950,9 +2062,17 @@ export default function LeadDetailView() {
     hasAppointment && activeLead.appointment_date
       ? new Date(activeLead.appointment_date).toLocaleDateString("en-GB")
       : "N/A";
-  const appointmentSlot = hasAppointment ? capitalize(activeLead.slot || "N/A") : "N/A";
-  const appointmentRemark = hasAppointment ? capitalize(activeLead.remark || "N/A") : "N/A";
-  const currentStatus = (activeLead?.status || activeLead?.lead_status || "new").toLowerCase();
+  const appointmentSlot = hasAppointment
+    ? capitalize(activeLead.slot || "N/A")
+    : "N/A";
+  const appointmentRemark = hasAppointment
+    ? capitalize(activeLead.remark || "N/A")
+    : "N/A";
+  const currentStatus = (
+    activeLead?.status ||
+    activeLead?.lead_status ||
+    "new"
+  ).toLowerCase();
   const isAppointment = currentStatus === "appointment";
   const isFollowUp =
     currentStatus === "follow up" ||
@@ -1967,7 +2087,10 @@ export default function LeadDetailView() {
     currentStatus === "converted" ||
     (activeLead?.lead_status || "").toLowerCase() === "converted";
 
-  const leadStatusPill = LEAD_STATUS_PILL_COLORS[leadStatus] ?? { color: "#6B7280", bg: "#F3F4F6" };
+  const leadStatusPill = LEAD_STATUS_PILL_COLORS[leadStatus] ?? {
+    color: "#6B7280",
+    bg: "#F3F4F6",
+  };
 
   const openStatusDialog = () => {
     setDraftLeadStatus(selectedLeadStatus);
@@ -1989,7 +2112,10 @@ export default function LeadDetailView() {
         department_id: activeLead.department_id ?? 0,
         full_name: activeLead.full_name || activeLead.name || "",
         contact_no:
-          activeLead.contact_no || activeLead.phone || activeLead.phone_number || "",
+          activeLead.contact_no ||
+          activeLead.phone ||
+          activeLead.phone_number ||
+          "",
         source: activeLead.source || "Unknown",
         treatment_interest: activeLead.treatment_interest || "N/A",
         book_appointment: activeLead.book_appointment || false,
@@ -2005,7 +2131,10 @@ export default function LeadDetailView() {
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
       toast.success("Lead status updated.", toastOptions);
     } catch (err) {
-      toast.error(extractErr(err, "Failed to update lead status."), toastOptions);
+      toast.error(
+        extractErr(err, "Failed to update lead status."),
+        toastOptions,
+      );
     } finally {
       setStatusSaving(false);
     }
@@ -2079,35 +2208,70 @@ export default function LeadDetailView() {
             >
               {leadInitials}
             </Avatar>
-            <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
+            <Stack
+              spacing={0.5}
+              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+              >
                 Lead Name
               </Typography>
               <Typography fontWeight={700} variant="body1" fontSize="12px">
                 {leadName}
               </Typography>
             </Stack>
-            <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
+            <Stack
+              spacing={0.5}
+              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+              >
                 Lead ID
               </Typography>
               <Typography fontWeight={600} variant="body1" fontSize="12px">
                 {leadDisplayId}
               </Typography>
             </Stack>
-            <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
+            <Stack
+              spacing={0.5}
+              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+              >
                 Source
               </Typography>
               <Stack direction="row" alignItems="center" spacing={0.5}>
-                <Box sx={{ width: 16, height: 16, bgcolor: "#FFB800", borderRadius: "50%" }} />
+                <Box
+                  sx={{
+                    width: 16,
+                    height: 16,
+                    bgcolor: "#FFB800",
+                    borderRadius: "50%",
+                  }}
+                />
                 <Typography fontWeight={600} variant="body1" fontSize="12px">
                   {leadSource}
                 </Typography>
               </Stack>
             </Stack>
-            <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
+            <Stack
+              spacing={0.5}
+              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+              >
                 Lead Status
               </Typography>
               <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -2116,13 +2280,30 @@ export default function LeadDetailView() {
                   size="small"
                   sx={pillChipSx(leadStatusPill.color, leadStatusPill.bg)}
                 />
-                <IconButton size="small" onClick={openStatusDialog} sx={{ p: 0.35 }} aria-label="Edit lead status">
-                  <Box component="img" src={Lead_Status_Edit} alt="Edit Status" sx={{ width: 14, height: 14 }} />
+                <IconButton
+                  size="small"
+                  onClick={openStatusDialog}
+                  sx={{ p: 0.35 }}
+                  aria-label="Edit lead status"
+                >
+                  <Box
+                    component="img"
+                    src={Lead_Status_Edit}
+                    alt="Edit Status"
+                    sx={{ width: 14, height: 14 }}
+                  />
                 </IconButton>
               </Stack>
             </Stack>
-            <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
+            <Stack
+              spacing={0.5}
+              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+              >
                 Lead Quality
               </Typography>
               <Chip
@@ -2137,8 +2318,15 @@ export default function LeadDetailView() {
                 }
               />
             </Stack>
-            <Stack spacing={0.5} sx={{ flex: 1.3, transform: "translateY(14px)" }}>
-              <Typography variant="caption" color="text.secondary" fontSize="10px">
+            <Stack
+              spacing={0.5}
+              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+              >
                 AI Lead Score
               </Typography>
               <Typography fontWeight={700} color="#EC4899" fontSize="12px">
@@ -2152,7 +2340,9 @@ export default function LeadDetailView() {
       <Dialog
         open={statusDialogOpen}
         onClose={closeStatusDialog}
-        PaperProps={{ sx: { borderRadius: "20px", width: 360, overflow: "hidden" } }}
+        PaperProps={{
+          sx: { borderRadius: "20px", width: 360, overflow: "hidden" },
+        }}
       >
         <DialogTitle
           sx={{
@@ -2167,7 +2357,11 @@ export default function LeadDetailView() {
           <Typography fontWeight={700} fontSize="1.2rem">
             Edit Status
           </Typography>
-          <IconButton onClick={closeStatusDialog} size="small" sx={{ bgcolor: "#F3F4F6", width: 36, height: 36 }}>
+          <IconButton
+            onClick={closeStatusDialog}
+            size="small"
+            sx={{ bgcolor: "#F3F4F6", width: 36, height: 36 }}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
@@ -2178,27 +2372,48 @@ export default function LeadDetailView() {
             </Typography>
             <Select
               value={draftLeadStatus}
-              onChange={(event) => setDraftLeadStatus(event.target.value as LeadStatusOption)}
+              onChange={(event) =>
+                setDraftLeadStatus(event.target.value as LeadStatusOption)
+              }
               size="small"
               renderValue={(value) => {
-                const style = LEAD_STATUS_PILL_COLORS[value as LeadStatusOption] ?? {
+                const style = LEAD_STATUS_PILL_COLORS[
+                  value as LeadStatusOption
+                ] ?? {
                   color: "#6B7280",
                   bg: "#F3F4F6",
                 };
-                return <Chip label={value} size="small" sx={pillChipSx(style.color, style.bg)} />;
+                return (
+                  <Chip
+                    label={value}
+                    size="small"
+                    sx={pillChipSx(style.color, style.bg)}
+                  />
+                );
               }}
               sx={{
                 minHeight: 50,
                 borderRadius: "12px",
                 bgcolor: "#FFFFFF",
-                "& .MuiSelect-select": { display: "flex", alignItems: "center", py: 1.25 },
+                "& .MuiSelect-select": {
+                  display: "flex",
+                  alignItems: "center",
+                  py: 1.25,
+                },
               }}
             >
               {LEAD_STATUS_OPTIONS.map((statusOption) => {
-                const style = LEAD_STATUS_PILL_COLORS[statusOption] ?? { color: "#6B7280", bg: "#F3F4F6" };
+                const style = LEAD_STATUS_PILL_COLORS[statusOption] ?? {
+                  color: "#6B7280",
+                  bg: "#F3F4F6",
+                };
                 return (
                   <MenuItem key={statusOption} value={statusOption}>
-                    <Chip label={statusOption} size="small" sx={pillChipSx(style.color, style.bg)} />
+                    <Chip
+                      label={statusOption}
+                      size="small"
+                      sx={pillChipSx(style.color, style.bg)}
+                    />
                   </MenuItem>
                 );
               })}
@@ -2241,7 +2456,12 @@ export default function LeadDetailView() {
         </DialogActions>
       </Dialog>
 
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={3}
+      >
         <Box
           sx={{
             bgcolor: "#FAFAFA",
@@ -2292,7 +2512,12 @@ export default function LeadDetailView() {
               color: "#505050",
               border: "none",
               boxShadow: "none",
-              "&:hover": { bgcolor: "#f3f3f3", color: "#232323", border: "none", boxShadow: "none" },
+              "&:hover": {
+                bgcolor: "#f3f3f3",
+                color: "#232323",
+                border: "none",
+                boxShadow: "none",
+              },
             }}
           >
             Edit
@@ -2309,7 +2534,10 @@ export default function LeadDetailView() {
               color: isConverted ? "#94A3B8" : "#FFFFFF",
               px: 2,
               boxShadow: "none",
-              "&:hover": { bgcolor: isConverted ? "#E2E8F0" : "#232323", boxShadow: "none" },
+              "&:hover": {
+                bgcolor: isConverted ? "#E2E8F0" : "#232323",
+                boxShadow: "none",
+              },
               "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
             }}
           >
@@ -2474,12 +2702,20 @@ export default function LeadDetailView() {
               <Typography variant="h6" fontWeight={700} gutterBottom>
                 Convert Lead
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ px: 2, lineHeight: 1.6 }}>
-                Are you sure you want to Convert <b>"{leadName}"</b> lead into a patient &amp; register it?
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ px: 2, lineHeight: 1.6 }}
+              >
+                Are you sure you want to Convert <b>"{leadName}"</b> lead into a
+                patient &amp; register it?
               </Typography>
             </Box>
             {convertError && (
-              <Alert severity="error" sx={{ width: "100%", borderRadius: "10px", textAlign: "left" }}>
+              <Alert
+                severity="error"
+                sx={{ width: "100%", borderRadius: "10px", textAlign: "left" }}
+              >
                 {convertError}
               </Alert>
             )}
@@ -2516,7 +2752,11 @@ export default function LeadDetailView() {
                   "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
                 }}
               >
-                {convertLoading ? <CircularProgress size={20} sx={{ color: "white" }} /> : "Convert"}
+                {convertLoading ? (
+                  <CircularProgress size={20} sx={{ color: "white" }} />
+                ) : (
+                  "Convert"
+                )}
               </Button>
             </Stack>
           </Stack>

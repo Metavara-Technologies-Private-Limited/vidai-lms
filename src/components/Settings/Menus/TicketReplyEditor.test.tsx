@@ -17,7 +17,6 @@ const createProps = (): TicketReplyEditorProps => ({
 
   fromEmail: "clinic@example.com",
   setFromEmail: vi.fn(),
-  fromOptions: ["clinic@example.com"],
 
   replyTo: [],
   setReplyTo: vi.fn(),
