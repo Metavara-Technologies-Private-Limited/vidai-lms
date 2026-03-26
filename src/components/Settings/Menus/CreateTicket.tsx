@@ -112,6 +112,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [assigneeSearch, setAssigneeSearch] = useState("");
   const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = useState(false);
+  const [selectedAssigneeOption, setSelectedAssigneeOption] = useState<AssigneeOption | null>(null);
   const [requestedBy, setRequestedBy] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -329,7 +330,7 @@ handleClose();
     setSubject(""); setDescription(""); setDueDate(null); setLabId("");
     setDepartmentId(""); setPriority(""); setAssigneeId(""); setRequestedBy("");
     setAssigneeName("");
-    setAssigneeSearch(""); setAssigneeOptions([]);
+    setAssigneeSearch(""); setAssigneeOptions([]); setSelectedAssigneeOption(null);
     setSelectedFile(null);
   };
 
@@ -542,11 +543,16 @@ handleClose();
               <Autocomplete
                 options={assigneeOptions}
                 loading={assigneeLoading}
-                value={assigneeOptions.find((option) => option.id === assigneeId) || null}
-                onInputChange={(_, value) => setAssigneeSearch(value)}
+                value={selectedAssigneeOption}
+                inputValue={assigneeSearch}
+                onInputChange={(_, value, reason) => {
+                  if (reason !== "reset") setAssigneeSearch(value);
+                }}
                 onChange={(_, value) => {
+                  setSelectedAssigneeOption(value);
                   setAssigneeId(value?.id ?? "");
                   setAssigneeName(value ? assigneeLabel(value) : "");
+                  if (value) setAssigneeSearch(assigneeLabel(value));
                 }}
                 getOptionLabel={assigneeLabel}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
