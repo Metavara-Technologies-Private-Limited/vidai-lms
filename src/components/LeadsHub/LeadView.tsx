@@ -1809,6 +1809,11 @@ export default function LeadDetailView() {
             status: "converted",
           }) as LeadRecord,
       );
+      toast.success("Lead Converted & Register successfully as a Patient!", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
       try {
         const ids: string[] = JSON.parse(
           localStorage.getItem("converted_lead_ids") || "[]",
@@ -1823,7 +1828,13 @@ export default function LeadDetailView() {
       }
       setOpenConvertPopup(false);
     } catch (err: unknown) {
-      setConvertError(err instanceof Error ? err.message : "Failed to convert lead.");
+      const message = err instanceof Error ? err.message : "Failed to convert lead.";
+      setConvertError(message);
+      toast.error(message, {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
     } finally {
       setConvertLoading(false);
     }

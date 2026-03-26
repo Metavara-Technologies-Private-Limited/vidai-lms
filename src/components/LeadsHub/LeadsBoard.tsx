@@ -122,10 +122,29 @@ const emptyAppointment = (): AppointmentState => ({
   success: false,
 });
 
+// ====================== Status key aliases ======================
+// Maps each label (lowercased) to all possible API values it should match.
+// This handles mismatches between display labels and the actual strings
+// stored in lead.status / lead.lead_status coming from the backend.
+const getStatusKeys = (status: string): string[] => {
+  const base = status.toLowerCase();
+  const aliases: Record<string, string[]> = {
+    "converted lead":  ["converted lead", "converted"],
+    "contract signed": ["contract signed", "contracted", "contract"],
+    "proposal sent":   ["proposal sent",  "proposal"],
+    "follow up":       ["follow up",       "follow-up", "followup"],
+    "appointment":     ["appointment",     "appointments"],
+    "negotiation":     ["negotiation",     "negotiating"],
+    "new":             ["new"],
+    "closed":          ["closed", "lost", "closed lost"],
+  };
+  return aliases[base] ?? [base];
+};
+
 // ====================== Board columns built from appType config ======================
 const BOARD_COLUMNS = STATUS_OPTIONS_BY_APP[APP_TYPE].map((status) => ({
   label: status,
-  statusKey: [status.toLowerCase()],
+  statusKey: getStatusKeys(status),
   color:
     status === "New"
       ? "#F97316"
