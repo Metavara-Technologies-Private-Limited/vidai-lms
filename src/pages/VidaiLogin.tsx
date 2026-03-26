@@ -8,128 +8,20 @@ import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../store";
 import { setAuth } from "../store/authSlice";
 import { authApi } from "../services/auth.api";
-
-// const AUTH_TOKEN_KEY = "auth_token";
-// const AUTH_TOKEN_ALT_KEY = "authToken";
-// const UI_AUTH_KEY = "vidai_ui_logged_in";
-// const TEMP_USERNAME = "root";
-// const TEMP_PASSWORD = "root";
-
-type LanguageCode = "en" | "hi" | "es" | "pt";
-
-const STORAGE_LANGUAGE_KEY = "language";
-
-const LANGUAGE_OPTIONS: Array<{ code: LanguageCode; label: string }> = [
-  { code: "en", label: "English" },
-  { code: "hi", label: "Hindi" },
-  { code: "es", label: "Espanol" },
-  { code: "pt", label: "Portugues" },
-];
-
-const TRANSLATIONS: Record<
-  LanguageCode,
-  {
-    languageLabel: string;
-    languageOptions: {
-      en: string;
-      hi: string;
-      es: string;
-      pt: string;
-    };
-    usernamePlaceholder: string;
-    passwordPlaceholder: string;
-    loginButton: string;
-    forgotPassword: string;
-    validationError: string;
-    loginFailed: string;
-    genericError: string;
-    showPassword: string;
-    hidePassword: string;
-    heroPrefix: string;
-    heroAccent: string;
-  }
-> = {
-  en: {
-    languageLabel: "Language",
-    languageOptions: {
-      en: "English",
-      hi: "Hindi",
-      es: "Espanol",
-      pt: "Portugues",
-    },
-    usernamePlaceholder: "Username",
-    passwordPlaceholder: "Password",
-    loginButton: "Login",
-    forgotPassword: "Forgot Password?",
-    validationError: "Please enter username and password.",
-    loginFailed: "Login failed",
-    genericError: "Something went wrong",
-    showPassword: "Show password",
-    hidePassword: "Hide password",
-    heroPrefix: "Unlock the potential of the",
-    heroAccent: "AI-Powered Vidai EMR",
-  },
-  hi: {
-    languageLabel: "भाषा",
-    languageOptions: {
-      en: "अंग्रेजी",
-      hi: "हिंदी",
-      es: "स्पेनिश",
-      pt: "पुर्तगाली",
-    },
-    usernamePlaceholder: "यूजरनेम",
-    passwordPlaceholder: "पासवर्ड",
-    loginButton: "लॉगिन",
-    forgotPassword: "पासवर्ड भूल गए?",
-    validationError: "कृपया यूजरनेम और पासवर्ड दर्ज करें।",
-    loginFailed: "लॉगिन असफल रहा",
-    genericError: "कुछ गलत हो गया",
-    showPassword: "पासवर्ड दिखाएं",
-    hidePassword: "पासवर्ड छिपाएं",
-    heroPrefix: "AI-सक्षम Vidai EMR की क्षमता खोलें",
-    heroAccent: "",
-  },
-  es: {
-    languageLabel: "Idioma",
-    languageOptions: {
-      en: "Ingles",
-      hi: "Hindi",
-      es: "Espanol",
-      pt: "Portugues",
-    },
-    usernamePlaceholder: "Usuario",
-    passwordPlaceholder: "Contrasena",
-    loginButton: "Iniciar sesion",
-    forgotPassword: "Olvidaste tu contrasena?",
-    validationError: "Ingresa usuario y contrasena.",
-    loginFailed: "Error de inicio de sesion",
-    genericError: "Algo salio mal",
-    showPassword: "Mostrar contrasena",
-    hidePassword: "Ocultar contrasena",
-    heroPrefix: "Desbloquea el potencial de",
-    heroAccent: "Vidai EMR impulsado por IA",
-  },
-  pt: {
-    languageLabel: "Idioma",
-    languageOptions: {
-      en: "Ingles",
-      hi: "Hindi",
-      es: "Espanhol",
-      pt: "Portugues",
-    },
-    usernamePlaceholder: "Usuario",
-    passwordPlaceholder: "Senha",
-    loginButton: "Entrar",
-    forgotPassword: "Esqueceu a senha?",
-    validationError: "Informe usuario e senha.",
-    loginFailed: "Falha no login",
-    genericError: "Algo deu errado",
-    showPassword: "Mostrar senha",
-    hidePassword: "Ocultar senha",
-    heroPrefix: "Desbloqueie o potencial do",
-    heroAccent: "Vidai EMR com tecnologia de IA",
-  },
-};
+import {
+  LANGUAGE_OPTIONS,
+  STORAGE_LANGUAGE_KEY,
+  TRANSLATIONS,
+  type LanguageCode,
+} from "../utils/languages";
+import {
+  CircularProgress,
+  FormControl,
+  MenuItem,
+  Select,
+  type SelectChangeEvent,
+} from "@mui/material";
+import { toast } from "react-toastify";
 
 function resolveInitialLanguage(): LanguageCode {
   const raw = (localStorage.getItem(STORAGE_LANGUAGE_KEY) || "").trim();
@@ -151,6 +43,7 @@ export default function VidaiLogin() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
 
+  const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -167,12 +60,16 @@ export default function VidaiLogin() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError("");
     if (!canSubmit) {
-      setError(t.validationError);
+      const msg = t.validationError;
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
     try {
+      setLoading(true);
       const loginRes = await authApi.login({
         username: username.trim(),
         password: password.trim(),
@@ -181,20 +78,44 @@ export default function VidaiLogin() {
       dispatch(
         setAuth({
           access: loginRes.token,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any), // temporary minimal payload
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any),
       );
       localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
+      toast.success("Login successful!");
 
       navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t.genericError);
+      let msg = t.genericError;
+
+      const error = (
+        err as {
+          response?: {
+            data?: {
+              errors?: Array<{
+                code?: string;
+                detail?: string;
+              }>;
+            };
+          };
+        }
+      )?.response?.data?.errors?.[0];
+
+      const code = error?.code;
+
+      if (code === "no_active_account") {
+        msg = t.loginFailed;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+
+      toast.error(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleLanguageChange = (
-    event: React.ChangeEvent<HTMLSelectElement>,
-  ) => {
+  const handleLanguageChange = (event: SelectChangeEvent<LanguageCode>) => {
     const nextLanguage = event.target.value as LanguageCode;
     setLanguage(nextLanguage);
     localStorage.setItem(STORAGE_LANGUAGE_KEY, nextLanguage);
@@ -222,18 +143,19 @@ export default function VidaiLogin() {
             <label className={styles.languageLabel} htmlFor="language-select">
               {t.languageLabel}
             </label>
-            <select
-              id="language-select"
-              value={language}
-              onChange={handleLanguageChange}
-              className={styles.languageSelect}
-            >
-              {LANGUAGE_OPTIONS.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {t.languageOptions[option.code]}
-                </option>
-              ))}
-            </select>
+            <FormControl size="small" className={styles.languageSelect}>
+              <Select
+                id="language-select"
+                value={language}
+                onChange={handleLanguageChange}
+              >
+                {LANGUAGE_OPTIONS.map((option) => (
+                  <MenuItem key={option.code} value={option.code}>
+                    {t.languageOptions[option.code]}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </div>
 
           <img className={styles.logo} src={logo} alt="Vidai" />
@@ -275,8 +197,23 @@ export default function VidaiLogin() {
 
             {error ? <p className={styles.errorText}>{error}</p> : null}
 
-            <button className={styles.loginButton} type="submit">
-              {t.loginButton}
+            <button
+              className={styles.loginButton}
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <CircularProgress
+                    size={16}
+                    color="inherit"
+                    style={{ marginRight: 8 }}
+                  />
+                  Logging in...
+                </>
+              ) : (
+                t.loginButton
+              )}
             </button>
 
             <button type="button" className={styles.forgotButton}>

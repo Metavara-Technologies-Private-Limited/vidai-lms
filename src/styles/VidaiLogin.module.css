@@ -74,7 +74,7 @@
 .languageSelect {
   width: 100%;
   height: 32px;
-  border: 1px solid #dd876f;
+  /* border: 1px solid #dd876f; */
   border-radius: 8px;
   background: #ececee;
   color: #5d5d5d;
