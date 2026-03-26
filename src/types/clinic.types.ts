@@ -1,6 +1,7 @@
 export interface Clinic {
   id: number;
   name: string;
+  email: string;
   department: Department[];
 }
 

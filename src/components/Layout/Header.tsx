@@ -19,6 +19,7 @@ import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchClinic,
+  syncClinic,
   // selectClinic
 } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
@@ -140,9 +141,10 @@ const Header = () => {
               {clinics.map((c) => (
                 <MenuItem
                   key={c.clinic_id}
-                  onClick={() => {
+                  onClick={async () => {
                     setManualClinic(c);
                     handleClinicClose();
+                    await syncClinic(c, user?.email || "");
                   }}
                 >
                   {c.clinic__name}

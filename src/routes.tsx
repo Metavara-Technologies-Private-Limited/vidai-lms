@@ -14,6 +14,7 @@ import { selectAuthed, selectToken, setAuth } from "./store/authSlice";
 import type { AppDispatch } from "./store";
 import { authApi } from "./services/auth.api";
 import { Box, CircularProgress } from "@mui/material";
+import { syncClinic } from "./store/clinicSlice";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
@@ -59,6 +60,9 @@ export default function AppRoutes() {
             ...profile,
           }),
         );
+        if (profile?.clinics?.length) {
+          await syncClinic(profile.clinics[0], profile.email);
+        }
       } catch (err: unknown) {
         console.error("Failed to restore user", err);
       }

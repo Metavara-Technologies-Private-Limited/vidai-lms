@@ -23,7 +23,24 @@ export const fetchClinic = createAsyncThunk(
     return res.data;
   },
 );
+type ProfileClinic = {
+  clinic_id: number;
+  clinic__name: string;
+};
 
+export const syncClinic = async (
+  clinic: ProfileClinic,
+  email: string,
+) => {
+  const res = await clinicApi.searchByName(clinic.clinic__name);
+
+  if (res.data.length > 0) return;
+
+  await clinicApi.create({
+    name: clinic.clinic__name,
+    email,
+  });
+};
 const clinicSlice = createSlice({
   name: "clinic",
   initialState,
