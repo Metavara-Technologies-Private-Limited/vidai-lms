@@ -209,13 +209,13 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-        <Button variant="outlined" onClick={onClose} sx={{ flex: 1, borderRadius: 2 }}>
+        <Button variant="outlined" onClick={onClose} sx={{ flex: 1, borderRadius: 1, color:"#232323", borderColor:"#232323" }}>
           Cancel
         </Button>
         <Button
           variant="contained"
           onClick={() => onSave(selected)}
-          sx={{ flex: 1, borderRadius: 2 }}
+          sx={{ flex: 1, borderRadius: 1, backgroundColor: "#505050", color:"#FFFFFF","&:hover": { backgroundColor: "#232323" } }}
         >
           Save
         </Button>

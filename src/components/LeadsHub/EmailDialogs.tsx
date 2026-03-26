@@ -17,7 +17,6 @@ import {
   Typography,
   Avatar,
   InputBase,
-  MenuItem,
   Radio,
   Checkbox,
   Popover,
