@@ -44,7 +44,11 @@ export const syncClinic = async (
 const clinicSlice = createSlice({
   name: "clinic",
   initialState,
-  reducers: {},
+  reducers: {
+    setSelectedClinic: (state, action) => {
+      state.data = action.payload;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchClinic.pending, (state) => {
@@ -64,5 +68,6 @@ const clinicSlice = createSlice({
 
 export default clinicSlice.reducer;
 
+export const { setSelectedClinic } = clinicSlice.actions;
 export const selectClinic = (state: RootState) => state.clinic.data;
 export const selectClinicLoading = (state: RootState) => state.clinic.loading;

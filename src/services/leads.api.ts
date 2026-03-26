@@ -216,10 +216,8 @@ api.interceptors.response.use(
 
 // ====================== Lead API ======================
 export const LeadAPI = {
-  list: async (): Promise<Lead[]> => {
-    const response = await api.get<Lead[]>("/leads/list/");
-    return response.data;
-  },
+  list: (clinicId: number) =>
+    api.get(`/leads/list/?clinic=${clinicId}`).then((res) => res.data),
 
   create: async (data: LeadPayload): Promise<Lead> => {
     const response = await api.post<Lead>("/leads/", data);

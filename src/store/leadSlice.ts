@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { LeadAPI, api, type Lead, type LeadDocument } from "../services/leads.api";
+import type { RootState } from ".";
 
 // ====================== API Error Type ======================
 type ApiError = {
@@ -84,10 +85,17 @@ const formatDateForApi = (value: unknown): string => {
 export const fetchLeads = createAsyncThunk<
   Lead[],
   void,
-  { rejectValue: string }
->("leads/fetchAll", async (_, { rejectWithValue }) => {
+  { rejectValue: string, state: RootState }
+>("leads/fetchAll", async (_, { rejectWithValue, getState }) => {
   try {
-    const leads = await LeadAPI.list();
+    const state = getState();
+    const clinicId = state.clinic.data?.id;
+
+    if (!clinicId) {
+      return rejectWithValue("Clinic not selected");
+    }
+
+    const leads = await LeadAPI.list(clinicId);
     console.log("📊 Fetched leads from API:", leads.length);
     return leads;
   } catch (err) {

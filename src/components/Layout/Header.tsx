@@ -19,6 +19,8 @@ import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchClinic,
+  // selectClinic,
+  // setSelectedClinic,
   syncClinic,
   // selectClinic
 } from "../../store/clinicSlice";
@@ -31,16 +33,16 @@ import EmailIcon from "@mui/icons-material/Email";
 import BusinessIcon from "@mui/icons-material/Business";
 import WorkIcon from "@mui/icons-material/Work";
 import LogoutIcon from "@mui/icons-material/Logout";
+import { clinicApi } from "../../services/clinic.api";
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const user = useSelector(selectUser);
   const clinics = useMemo(() => user?.clinics ?? [], [user]);
+  // const dbClinic = useSelector(selectClinic);
 
-  const selectedClinic = useMemo(() => {
-    return clinics.find((c) => c.is_default) || clinics[0];
-  }, [clinics]);
+  const selectedClinic = useMemo(() => clinics[0], [clinics]);
   const [manualClinic, setManualClinic] = useState<(typeof clinics)[0] | null>(
     null,
   );
@@ -60,7 +62,25 @@ const Header = () => {
 
   // fire-and-forget on mount only; avoid looping when server returns empty arrays
   useEffect(() => {
-    dispatch(fetchClinic(1));
+    const current = manualClinic || selectedClinic;
+
+    if (!current) return;
+
+    const initClinic = async () => {
+      await syncClinic(current, user?.email || "");
+
+      const res = await clinicApi.searchByName(current.clinic__name);
+
+      if (res.data.length > 0) {
+        dispatch(fetchClinic(res.data[0].id));
+      }
+    };
+
+    initClinic();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClinic]);
+
+  useEffect(() => {
     dispatch(fetchCampaign());
     dispatch(fetchAllTemplates());
   }, [dispatch]);
@@ -144,7 +164,14 @@ const Header = () => {
                   onClick={async () => {
                     setManualClinic(c);
                     handleClinicClose();
+
                     await syncClinic(c, user?.email || "");
+
+                    const res = await clinicApi.searchByName(c.clinic__name);
+
+                    if (res.data.length > 0) {
+                      dispatch(fetchClinic(res.data[0].id));
+                    }
                   }}
                 >
                   {c.clinic__name}

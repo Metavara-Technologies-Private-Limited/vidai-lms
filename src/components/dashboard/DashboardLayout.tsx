@@ -12,10 +12,11 @@ import type { OverviewTab } from "./OverviewTabs";
 import type { AppDispatch } from "../../store";
 import {
   fetchLeads,
-  selectLeads,
+  // selectLeads,
   selectLeadsLoading,
 } from "../../store/leadSlice";
 import { fetchCampaign, selectCampaign } from "../../store/campaignSlice";
+import { selectClinic } from "../../store/clinicSlice";
 
 const SourcePerformanceChart = lazy(() => import("./SourcePerformanceChart"));
 const CommunicationChart = lazy(() => import("./CommunicationChart"));
@@ -26,22 +27,23 @@ const TeamPerformanceTab = lazy(() => import("./TeamPerformanceTab"));
 
 const DashboardLayout = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const leads = useSelector(selectLeads);
+  // const leads = useSelector(selectLeads);
   const campaigns = useSelector(selectCampaign);
   const leadsLoading = useSelector(selectLeadsLoading);
+  const clinic = useSelector(selectClinic);
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
   const [activeTab, setActiveTab] = useState<OverviewTab>("source");
 
   // load leads and campaigns once when the dashboard mounts
   useEffect(() => {
-    if (leads.length === 0) {
+    if (clinic?.id) {
       dispatch(fetchLeads());
     }
+
     if (campaigns.length === 0) {
       dispatch(fetchCampaign());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch]);
+  }, [clinic?.id, campaigns.length, dispatch]);
 
   return (
     <Box
