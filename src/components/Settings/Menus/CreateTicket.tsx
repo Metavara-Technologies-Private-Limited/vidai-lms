@@ -45,6 +45,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [departmentId, setDepartmentId] = useState<number | "">("");
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [assigneeId, setAssigneeId] = useState<number | "">("");
+  const [assigneeName, setAssigneeName] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [userOptions, setUserOptions] = useState<User[]>([]);
@@ -190,6 +191,7 @@ setEmployees(Array.isArray(empData) ? empData : empData.results);
         priority: priority as TicketPriority,
         status: "new",
         assigned_to: assigneeId ? Number(assigneeId) : null,
+        assigned_to_name: assigneeName,
         due_date: dueDate ? dueDate.format("YYYY-MM-DD") : null,
       };
 
@@ -461,7 +463,10 @@ handleClose();
                   `${option.first_name} ${option.last_name} (${option.role})`
                 }
                 onInputChange={(_, value) => setUserSearch(value)}
-                onChange={(_, value) => setAssigneeId(value?.id || "")}
+                  onChange={(_, value) => {
+                    setAssigneeId(value?.id || "");
+                    setAssigneeName(value?.first_name || '');
+                  }}
                 renderInput={(params) => (
                   <TextField
                     {...params}

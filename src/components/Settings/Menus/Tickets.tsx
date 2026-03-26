@@ -302,7 +302,7 @@ const getCount = (status: string): number => {
               <Box flex={columns[8].flex} display="flex" alignItems="center" gap={1}>
                 <Avatar sx={ticketsAvatarSx}>
                   {t.assigned_to
-                    ? employees.find(item => item.id === t.assigned_to)?.emp_name?.[0]
+                    ? employees.find(item => item.id === t.assigned_to)?.emp_name?.[0] || t.assigned_to_name
                     : "?"}
                 </Avatar>
 

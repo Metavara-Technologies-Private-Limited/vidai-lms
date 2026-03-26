@@ -155,7 +155,7 @@ const Header = () => {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Box
               component="img"
-              src={UserAvatarIcon}
+              src={user?.photo || UserAvatarIcon}
               sx={{ width: 36, height: 36, borderRadius: "10px" }}
             />
             <Box sx={{ display: { xs: "none", sm: "block" } }}>

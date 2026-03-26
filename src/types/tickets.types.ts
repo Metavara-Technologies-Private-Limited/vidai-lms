@@ -43,6 +43,7 @@ export interface CreateTicketRequest {
   department: number;
   requested_by: string;
   assigned_to?: number | null;
+  assigned_to_name?: string;
   priority: TicketPriority;
   status?: TicketStatus;
   due_date?: string | null; // ISO date format (YYYY-MM-DD)

@@ -51,6 +51,7 @@ export interface AuthUser {
   language_name: string;
   permissions: { modules: Module[] };
   clinics?: Clinic[];
+  photo?: string;
 }
 
 interface AuthState {
