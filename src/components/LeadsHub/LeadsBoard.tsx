@@ -2,7 +2,13 @@
 // Main component — no any, Date not Dayjs, exhaustive-deps fixed
 
 import * as React from "react";
-import { Box, Stack, Typography, CircularProgress, Alert } from "@mui/material";
+import {
+  Box,
+  Stack,
+  Typography,
+  CircularProgress,
+  Alert,
+} from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { useDispatch, useSelector } from "react-redux";
@@ -21,11 +27,8 @@ import {
   DepartmentAPI,
   EmployeeAPI,
   TwilioAPI,
-  LeadEmailAPI,
-  EmailTemplateAPI,
 } from "../../services/leads.api";
 import type { FilterValues } from "../../types/leads.types";
-import type { EmailTemplate, EmailTemplatePayload } from "../../services/leads.api";
 import TemplateService from "../../services/templates.api";
 
 import {
@@ -34,7 +37,7 @@ import {
   type AppointmentState,
   mapRawToLeadItem,
 } from "./Leadsboardtypes";
-import { BookAppointmentModal } from "./Leadsboardmodals";
+import { BookAppointmentModal, MailModal } from "./Leadsboardmodals";
 import { LeadColumn } from "./Leadsboardcard";
 import CallDialog from "./CallDialog";
 
@@ -46,7 +49,6 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  FormControlLabel,
   IconButton,
   List,
   ListItem,
@@ -54,25 +56,12 @@ import {
   ListItemText,
   Menu,
   MenuItem,
-  Radio,
-  RadioGroup,
   TextField,
-  Tooltip,
   Alert as MuiAlert,
+  CircularProgress as MuiCircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import SendIcon from "@mui/icons-material/Send";
-import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
-import LinkIcon from "@mui/icons-material/Link";
-import EmojiEmotionsOutlinedIcon from "@mui/icons-material/EmojiEmotionsOutlined";
-import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
-import FormatColorTextOutlinedIcon from "@mui/icons-material/FormatColorTextOutlined";
-import BrushOutlinedIcon from "@mui/icons-material/BrushOutlined";
-import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+
 
 import {
   APP_TYPE,
@@ -123,9 +112,6 @@ const emptyAppointment = (): AppointmentState => ({
 });
 
 // ====================== Status key aliases ======================
-// Maps each label (lowercased) to all possible API values it should match.
-// This handles mismatches between display labels and the actual strings
-// stored in lead.status / lead.lead_status coming from the backend.
 const getStatusKeys = (status: string): string[] => {
   const base = status.toLowerCase();
   const aliases: Record<string, string[]> = {
@@ -141,26 +127,19 @@ const getStatusKeys = (status: string): string[] => {
   return aliases[base] ?? [base];
 };
 
-// ====================== Board columns built from appType config ======================
+// ====================== Board columns ======================
 const BOARD_COLUMNS = STATUS_OPTIONS_BY_APP[APP_TYPE].map((status) => ({
   label: status,
   statusKey: getStatusKeys(status),
   color:
-    status === "New"
-      ? "#F97316"
-      : status === "Appointment"
-        ? "#3B82F6"
-        : status === "Follow Up"
-          ? "#8B5CF6"
-          : status === "Negotiation"
-            ? "#F59E0B"
-            : status === "Proposal Sent"
-              ? "#06B6D4"
-              : status === "Contract Signed"
-                ? "#10B981"
-                : status === "Converted Lead"
-                  ? "#22C55E"
-                  : "#EF4444",
+    status === "New"               ? "#F97316"
+    : status === "Appointment"     ? "#3B82F6"
+    : status === "Follow Up"       ? "#8B5CF6"
+    : status === "Negotiation"     ? "#F59E0B"
+    : status === "Proposal Sent"   ? "#06B6D4"
+    : status === "Contract Signed" ? "#10B981"
+    : status === "Converted Lead"  ? "#22C55E"
+    : "#EF4444",
 }));
 
 // ====================== SMS Template type ======================
@@ -173,13 +152,8 @@ interface SMSTemplate {
 
 // ====================== Use Case options ======================
 const USE_CASE_OPTIONS = [
-  "Appointment",
-  "Feedback",
-  "Reminder",
-  "Follow-Up",
-  "Re-engagement",
-  "No-Show",
-  "General",
+  "Appointment", "Feedback", "Reminder", "Follow-Up",
+  "Re-engagement", "No-Show", "General",
 ];
 
 const getUseCaseChipSx = (useCase: string | undefined) => {
@@ -405,11 +379,11 @@ interface SMSTemplatePickerProps {
 }
 
 const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onClose, onSelect }) => {
-  const [templates, setTemplates]           = React.useState<SMSTemplate[]>([]);
-  const [loadingTpl, setLoadingTpl]         = React.useState(false);
-  const [view, setView]                     = React.useState<"list" | "preview">("list");
-  const [selected, setSelected]             = React.useState<SMSTemplate | null>(null);
-  const [previewBody, setPreviewBody]       = React.useState("");
+  const [templates, setTemplates]             = React.useState<SMSTemplate[]>([]);
+  const [loadingTpl, setLoadingTpl]           = React.useState(false);
+  const [view, setView]                       = React.useState<"list" | "preview">("list");
+  const [selected, setSelected]               = React.useState<SMSTemplate | null>(null);
+  const [previewBody, setPreviewBody]         = React.useState("");
   const [newTemplateOpen, setNewTemplateOpen] = React.useState(false);
 
   const loadTemplates = React.useCallback(() => {
@@ -545,9 +519,9 @@ interface SMSDialogProps {
 }
 
 const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
-  const [message, setMessage]                   = React.useState("");
-  const [sending, setSending]                   = React.useState(false);
-  const [error, setError]                       = React.useState<string | null>(null);
+  const [message, setMessage]                       = React.useState("");
+  const [sending, setSending]                       = React.useState(false);
+  const [error, setError]                           = React.useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
 
   const handleClose = () => {
@@ -601,451 +575,12 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
           </Button>
           <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
             <Button fullWidth onClick={handleClose} disabled={sending} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Cancel</Button>
-            <Button fullWidth onClick={handleSend} disabled={sending || !message.trim()} startIcon={sending ? <CircularProgress size={16} sx={{ color: "white" }} /> : null}
+            <Button fullWidth onClick={handleSend} disabled={sending || !message.trim()} startIcon={sending ? <MuiCircularProgress size={16} sx={{ color: "white" }} /> : null}
               sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>
               {sending ? "Sending..." : "Send SMS"}
             </Button>
           </Stack>
         </DialogActions>
-      </Dialog>
-    </>
-  );
-};
-
-// ====================== New Email Template Dialog ======================
-interface NewEmailTemplateDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onSaved: (tpl: EmailTemplate) => void;
-}
-
-const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({ open, onClose, onSaved }) => {
-  const [name, setName]         = React.useState("");
-  const [subject, setSubject]   = React.useState("");
-  const [description, setDesc]  = React.useState("");
-  const [body, setBody]         = React.useState("");
-  const [saving, setSaving]     = React.useState(false);
-  const [error, setError]       = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!open) { setName(""); setSubject(""); setDesc(""); setBody(""); setError(null); }
-  }, [open]);
-
-  const handleSave = async () => {
-    if (!name.trim())    { setError("Template name is required."); return; }
-    if (!subject.trim()) { setError("Subject is required."); return; }
-    if (!body.trim())    { setError("Body is required."); return; }
-    setSaving(true); setError(null);
-    try {
-      const saved = await EmailTemplateAPI.create({
-        clinic: 1, name: name.trim(), subject: subject.trim(),
-        description: description.trim(), use_case: "general",
-        body: body.trim(), created_by: 1, is_active: true,
-      } as EmailTemplatePayload);
-      onSaved(saved); onClose();
-    } catch {
-      const local: EmailTemplate = {
-        id: `local-${Date.now()}`, name: name.trim(),
-        subject: subject.trim(), body: body.trim(), description: description.trim(),
-      };
-      onSaved(local); onClose();
-    } finally { setSaving(false); }
-  };
-
-  const outlineBtn = { height: 40, px: 3, textTransform: "none" as const, fontWeight: 500, borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "transparent", "&:hover": { bgcolor: "#F9FAFB" } };
-  const darkBtn    = { height: 40, px: 3, textTransform: "none" as const, fontWeight: 600, borderRadius: "8px", bgcolor: "#1F2937", color: "white", "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1600 }}>
-      <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, fontSize: "1.05rem", pb: 0 }}>
-        New Email Template <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ pt: 2 }}>
-        <Stack spacing={2}>
-          <TextField label="Template Name" value={name} onChange={(e) => { setName(e.target.value); setError(null); }} placeholder="e.g. IVF Follow-Up" fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
-          <TextField label="Subject" value={subject} onChange={(e) => { setSubject(e.target.value); setError(null); }} placeholder="e.g. Following up on your IVF inquiry" fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
-          <TextField label="Description (optional)" value={description} onChange={(e) => setDesc(e.target.value)} placeholder="Short description of when to use this template" fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
-          <Box>
-            <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>Body</Typography>
-            <textarea
-              value={body}
-              onChange={(e) => { setBody(e.target.value); setError(null); }}
-              placeholder="Write your email body here... Use {{name}} for the lead's name."
-              rows={8}
-              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: "14px", fontFamily: "inherit", color: "#1E293B", lineHeight: "1.6", border: "1px solid #D1D5DB", borderRadius: "8px", resize: "vertical", outline: "none", background: "#fff" }}
-              onFocus={(e) => { e.target.style.borderColor = "#1976d2"; e.target.style.boxShadow = "0 0 0 2px rgba(25,118,210,0.15)"; }}
-              onBlur={(e)  => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }}
-            />
-            <Typography fontSize="11px" color="#94A3B8" mt={0.5}>Use {"{{name}}"} for lead's name</Typography>
-          </Box>
-          {error && <MuiAlert severity="error" sx={{ borderRadius: "8px", py: 0.5 }}>{error}</MuiAlert>}
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
-        <Button onClick={onClose} sx={outlineBtn}>Cancel</Button>
-        <Button onClick={handleSave} disabled={saving || !name.trim() || !subject.trim() || !body.trim()} sx={darkBtn}>
-          {saving ? "Saving..." : "Save Template"}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
-// ====================== Emoji / Format / More popovers ======================
-const EMOJI_LIST = ["😊","😀","😂","🥰","😍","🤔","😎","🙏","👍","👏","❤️","🎉","🔥","✅","⭐","📋","📅","💊","🏥","🩺","💉","🧬","🌸","🌟","💙","📞","📧","🕐","✉️","📝"];
-
-interface EmojiPickerProps { anchorEl: HTMLElement | null; onClose: () => void; onSelect: (emoji: string) => void; }
-const EmojiPicker: React.FC<EmojiPickerProps> = ({ anchorEl, onClose, onSelect }) => (
-  <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={onClose} PaperProps={{ sx: { borderRadius: "12px", p: 1, boxShadow: "0 8px 30px rgba(0,0,0,0.15)", width: 220 } }}>
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.25 }}>
-      {EMOJI_LIST.map((emoji) => (
-        <Box key={emoji} onClick={() => { onSelect(emoji); onClose(); }} sx={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", cursor: "pointer", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9" }, transition: "background 0.1s" }}>{emoji}</Box>
-      ))}
-    </Box>
-  </Menu>
-);
-
-interface FormatMenuProps { anchorEl: HTMLElement | null; onClose: () => void; onFormat: (type: string) => void; }
-const FormatMenu: React.FC<FormatMenuProps> = ({ anchorEl, onClose, onFormat }) => (
-  <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={onClose} PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 160 } }}>
-    {[{ label: "Bold", shortcut: "Ctrl+B" },{ label: "Italic", shortcut: "Ctrl+I" },{ label: "Underline", shortcut: "Ctrl+U" },{ label: "Strikethrough", shortcut: "" },{ label: "Bullet list", shortcut: "" },{ label: "Numbered list", shortcut: "" },{ label: "Quote", shortcut: "" },{ label: "Code", shortcut: "" }].map(({ label, shortcut }) => (
-      <MenuItem key={label} onClick={() => { onFormat(label); onClose(); }} sx={{ fontSize: "13px", py: 1, display: "flex", justifyContent: "space-between", gap: 2 }}>
-        <span>{label}</span>{shortcut && <Typography fontSize="11px" color="text.secondary">{shortcut}</Typography>}
-      </MenuItem>
-    ))}
-  </Menu>
-);
-
-interface MoreMenuProps { anchorEl: HTMLElement | null; onClose: () => void; onAction: (action: string) => void; }
-const MoreMenu: React.FC<MoreMenuProps> = ({ anchorEl, onClose, onAction }) => (
-  <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={onClose} PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 180 } }}>
-    {["Insert signature","Insert divider","Insert table","Clear formatting"].map((action) => (
-      <MenuItem key={action} onClick={() => { onAction(action); onClose(); }} sx={{ fontSize: "13px", py: 1 }}>{action}</MenuItem>
-    ))}
-  </Menu>
-);
-
-// ====================== Email Dialog ======================
-interface EmailDialogProps {
-  open: boolean;
-  lead: LeadItem | null;
-  onClose: () => void;
-}
-
-const EmailDialog: React.FC<EmailDialogProps> = ({ open, lead, onClose }) => {
-  const [step, setStep]                             = React.useState<"template" | "preview" | "compose">("template");
-  const [previewTemplate, setPreviewTemplate]       = React.useState<EmailTemplate | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
-  const [subject, setSubject]                       = React.useState("");
-  const [body, setBody]                             = React.useState("");
-  const [sending, setSending]                       = React.useState(false);
-  const [error, setError]                           = React.useState<string | null>(null);
-  const [emailTemplates, setEmailTemplates]         = React.useState<EmailTemplate[]>([]);
-  const [loadingTemplates, setLoadingTemplates]     = React.useState(false);
-  const [templateError, setTemplateError]           = React.useState<string | null>(null);
-  const [newEmailTemplateOpen, setNewEmailTemplateOpen] = React.useState(false);
-  const [emojiAnchor, setEmojiAnchor]               = React.useState<HTMLElement | null>(null);
-  const [formatAnchor, setFormatAnchor]             = React.useState<HTMLElement | null>(null);
-  const [moreAnchor, setMoreAnchor]                 = React.useState<HTMLElement | null>(null);
-  const fileInputRef  = React.useRef<HTMLInputElement>(null);
-  const imageInputRef = React.useRef<HTMLInputElement>(null);
-  const bodyRef       = React.useRef<HTMLTextAreaElement>(null);
-  const cursorPos     = React.useRef<{ start: number; end: number }>({ start: 0, end: 0 });
-
-  const saveCursor = () => {
-    const el = bodyRef.current;
-    if (el) cursorPos.current = { start: el.selectionStart, end: el.selectionEnd };
-  };
-
-  const insertAtCursor = React.useCallback((text: string) => {
-    const { start, end } = cursorPos.current;
-    setBody((prev) => {
-      const next = prev.substring(0, start) + text + prev.substring(end);
-      requestAnimationFrame(() => {
-        const el = bodyRef.current;
-        if (el) {
-          el.focus();
-          el.setSelectionRange(start + text.length, start + text.length);
-          cursorPos.current = { start: start + text.length, end: start + text.length };
-        }
-      });
-      return next;
-    });
-  }, []);
-
-  const wrapSelection = React.useCallback((before: string, after: string, placeholder = "text") => {
-    const { start, end } = cursorPos.current;
-    setBody((prev) => {
-      const selected = prev.substring(start, end) || placeholder;
-      const wrapped  = before + selected + after;
-      const next     = prev.substring(0, start) + wrapped + prev.substring(end);
-      requestAnimationFrame(() => {
-        const el = bodyRef.current;
-        if (el) {
-          el.focus();
-          const ns = start + before.length;
-          const ne = ns + selected.length;
-          el.setSelectionRange(ns, ne);
-          cursorPos.current = { start: ns, end: ne };
-        }
-      });
-      return next;
-    });
-  }, []);
-
-  const loadEmailTemplates = React.useCallback(async () => {
-    setLoadingTemplates(true); setTemplateError(null);
-    try { const data = await EmailTemplateAPI.list(); setEmailTemplates(data); }
-    catch { setTemplateError("Could not load templates. You can still compose a new email."); setEmailTemplates([]); }
-    finally { setLoadingTemplates(false); }
-  }, []);
-
-  React.useEffect(() => {
-    if (open) {
-      setStep("template"); setSelectedTemplateId(null); setPreviewTemplate(null);
-      setSubject(""); setBody(""); setError(null); setSending(false);
-      setEmojiAnchor(null); setFormatAnchor(null); setMoreAnchor(null);
-      loadEmailTemplates();
-    }
-  }, [open, loadEmailTemplates]);
-
-  const handleClose      = () => { if (sending) return; onClose(); };
-  const handleComposeNew = () => { setSelectedTemplateId(null); setSubject(""); setBody(""); setStep("compose"); };
-  const recipientName    = (lead?.full_name ?? lead?.name ?? "Patient") as string;
-  const leadEmail        = lead?.email as string | undefined;
-  const resolveBody      = (raw: string) => raw
-    .replace(/\{\{name\}\}/g, recipientName)
-    .replace(/\{\{lead_name\}\}/g, recipientName)
-    .replace(/\{\{lead_first_name\}\}/g, recipientName.split(" ")[0]);
-
-  const handleNext = () => {
-    const template = emailTemplates.find((t) => String(t.id) === selectedTemplateId);
-    if (template) { setSubject(template.subject); setBody(resolveBody(template.body || "")); }
-    setStep("compose");
-  };
-
-  const handleNewEmailTemplateSaved = (tpl: EmailTemplate) => {
-    setNewEmailTemplateOpen(false);
-    setEmailTemplates((prev) => [tpl, ...prev]);
-    setSelectedTemplateId(String(tpl.id));
-  };
-
-  const handleSend = async () => {
-    if (!subject.trim() || !body.trim()) { setError("Subject and body are required."); return; }
-    if (!lead?.id)   { setError("Lead ID is missing."); return; }
-    if (!leadEmail)  { setError("This lead has no email address."); return; }
-    setSending(true); setError(null);
-    try {
-      await LeadEmailAPI.sendNow({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: leadEmail ?? null });
-      toast.success(`Email sent to ${recipientName}!`, { position: "top-right", autoClose: 3000, theme: "colored" });
-      onClose();
-    } catch (err: unknown) {
-      setError(extractErrorMessage(err, "Failed to send email. Please try again."));
-    } finally { setSending(false); }
-  };
-
-  const handleSaveAsDraft = async () => {
-    if (!subject.trim() || !body.trim() || !lead?.id) return;
-    try { await LeadEmailAPI.saveAsDraft({ lead: lead.id, subject: subject.trim(), email_body: body.trim(), sender_email: leadEmail ?? null }); } catch { /* silent */ }
-  };
-
-  const handleFileChange  = (e: React.ChangeEvent<HTMLInputElement>) => { const files = Array.from(e.target.files || []); if (!files.length) return; saveCursor(); insertAtCursor(`\n[📎 Attachment: ${files.map((f) => f.name).join(", ")}]\n`); e.target.value = ""; };
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; saveCursor(); insertAtCursor(`\n[🖼 Image: ${file.name}]\n`); e.target.value = ""; };
-  const handleEmojiSelect = (emoji: string) => { saveCursor(); insertAtCursor(emoji); };
-
-  const handleFormat = (type: string) => {
-    saveCursor();
-    const formats: Record<string, [string, string, string?]> = {
-      "Bold": ["**","**","bold text"], "Italic": ["_","_","italic text"], "Underline": ["__","__","underlined text"],
-      "Strikethrough": ["~~","~~","strikethrough"], "Bullet list": ["\n• ","","item"], "Numbered list": ["\n1. ","","item"],
-      "Quote": ["\n> ","","quote"], "Code": ["`","`","code"],
-    };
-    const fmt = formats[type];
-    if (fmt) wrapSelection(fmt[0], fmt[1], fmt[2]);
-  };
-
-  const handleMoreAction = (action: string) => {
-    saveCursor();
-    const snippets: Record<string, string> = {
-      "Insert signature": `\n\n---\nWarm regards,\nCrysta IVF, Bangalore\n(935) 555-0128 | crysta@gmail.com`,
-      "Insert divider": "\n\n---\n\n",
-      "Insert table": "\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n",
-    };
-    if (action === "Clear formatting") { setBody((prev) => prev.replace(/(\*\*|__|~~|_|`)/g, "")); }
-    else { insertAtCursor(snippets[action] || ""); }
-  };
-
-  return (
-    <>
-      <input ref={fileInputRef}  type="file" multiple      style={{ display: "none" }} onChange={handleFileChange}  />
-      <input ref={imageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageChange} />
-      <EmojiPicker  anchorEl={emojiAnchor}  onClose={() => setEmojiAnchor(null)}  onSelect={handleEmojiSelect} />
-      <FormatMenu   anchorEl={formatAnchor} onClose={() => setFormatAnchor(null)} onFormat={handleFormat} />
-      <MoreMenu     anchorEl={moreAnchor}   onClose={() => setMoreAnchor(null)}   onAction={handleMoreAction} />
-      <NewEmailTemplateDialog open={newEmailTemplateOpen} onClose={() => setNewEmailTemplateOpen(false)} onSaved={handleNewEmailTemplateSaved} />
-
-      <Dialog open={open && !newEmailTemplateOpen} onClose={handleClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }} sx={{ zIndex: 1300 }}>
-
-        {step === "template" && (
-          <>
-            <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              New Email <IconButton size="small" onClick={handleClose}><CloseIcon fontSize="small" /></IconButton>
-            </DialogTitle>
-            <DialogContent sx={{ pt: 1, pb: 0 }}>
-              <Box onClick={handleComposeNew} sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, py: 1.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}>
-                <EditOutlinedIcon sx={{ fontSize: 18, color: "#475569" }} />
-                <Typography fontWeight={600} fontSize="14px" color="#475569">Compose New Email</Typography>
-              </Box>
-              <Divider sx={{ my: 1.5 }}><Typography fontSize="12px" color="text.secondary">OR</Typography></Divider>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
-                <Typography fontSize="13px" color="text.secondary" fontWeight={500}>Select Email Template</Typography>
-                <Button size="small" onClick={() => setNewEmailTemplateOpen(true)} sx={{ textTransform: "none", fontSize: "12px", fontWeight: 600, color: "#1F2937", border: "1px solid #E5E7EB", borderRadius: "6px", px: 1.5, py: 0.5, "&:hover": { bgcolor: "#F3F4F6" } }}>+ New Template</Button>
-              </Box>
-              {loadingTemplates && <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={28} /></Box>}
-              {!loadingTemplates && templateError && <MuiAlert severity="warning" sx={{ borderRadius: "8px", mb: 1.5, fontSize: "13px" }}>{templateError}</MuiAlert>}
-              {!loadingTemplates && !templateError && emailTemplates.length === 0 && (
-                <Box sx={{ textAlign: "center", py: 3 }}>
-                  <Typography color="text.secondary" fontSize="14px">No email templates found.</Typography>
-                  <Typography color="text.secondary" fontSize="12px" mt={0.5}>Click "+ New Template" above to create one.</Typography>
-                </Box>
-              )}
-              {!loadingTemplates && emailTemplates.length > 0 && (
-                <RadioGroup value={selectedTemplateId || ""} onChange={(e) => setSelectedTemplateId(e.target.value)}>
-                  <Stack spacing={0} divider={<Divider />} sx={{ maxHeight: 340, overflowY: "auto" }}>
-                    {emailTemplates.map((template) => (
-                      <Box key={template.id} onClick={() => setSelectedTemplateId(String(template.id))} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1.5, px: 0.5, cursor: "pointer", borderRadius: "8px", "&:hover": { bgcolor: "#F8FAFC" }, transition: "background 0.15s" }}>
-                        <FormControlLabel
-                          value={String(template.id)}
-                          control={<Radio size="small" sx={{ color: selectedTemplateId === String(template.id) ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }} />}
-                          label={
-                            <Box>
-                              <Typography fontWeight={600} fontSize="13.5px" color="#1E293B">{template.name}</Typography>
-                              {template.description && <Typography fontSize="12px" color="#64748B" mt={0.2}>{template.description}</Typography>}
-                              {template.subject && <Typography fontSize="11px" color="#94A3B8" mt={0.25}>Subject: {template.subject}</Typography>}
-                            </Box>
-                          }
-                          sx={{ m: 0, flex: 1 }}
-                        />
-                        <Tooltip title="Preview template">
-                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setSelectedTemplateId(String(template.id)); setPreviewTemplate(template); setStep("preview"); }} sx={{ color: "#93C5FD", ml: 1, "&:hover": { color: "#3B82F6", bgcolor: "#EFF6FF" } }}>
-                            <VisibilityOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    ))}
-                  </Stack>
-                </RadioGroup>
-              )}
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
-              <Button onClick={handleClose} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>Cancel</Button>
-              <Button onClick={handleNext} disabled={!selectedTemplateId} variant="contained" sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" } }}>Next</Button>
-            </DialogActions>
-          </>
-        )}
-
-        {step === "preview" && previewTemplate && (
-          <>
-            <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <IconButton size="small" onClick={() => { setStep("template"); setPreviewTemplate(null); }}><ChevronLeftIcon fontSize="small" /></IconButton>
-                <Typography fontWeight={700} fontSize="1.05rem">Preview Template</Typography>
-              </Stack>
-              <IconButton size="small" onClick={handleClose}><CloseIcon fontSize="small" /></IconButton>
-            </DialogTitle>
-            <DialogContent sx={{ pt: 0, pb: 0 }}>
-              <Box sx={{ bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "10px", px: 2, py: 1.25, mb: 2 }}>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                  <Typography fontSize="12px" color="#64748B" fontWeight={500}>Template:</Typography>
-                  <Typography fontSize="13px" fontWeight={700} color="#1E293B">{previewTemplate.name}</Typography>
-                  {previewTemplate.use_case && <Chip label={previewTemplate.use_case} size="small" sx={{ height: 20, fontSize: "11px", fontWeight: 600, bgcolor: "#EFF6FF", color: "#1D4ED8", borderRadius: "4px", "& .MuiChip-label": { px: 1 } }} />}
-                </Stack>
-              </Box>
-              <Box sx={{ border: "1px solid #E2E8F0", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-                <Box sx={{ bgcolor: "#1F2937", px: 2, py: 1 }}>
-                  <Stack direction="row" spacing={0.75} alignItems="center">
-                    {["#EF4444","#F59E0B","#10B981"].map((c) => <Box key={c} sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: c }} />)}
-                    <Box sx={{ flex: 1, bgcolor: "#374151", borderRadius: "4px", height: 20, ml: 1, display: "flex", alignItems: "center", px: 1.5 }}><Typography fontSize="10px" color="#94A3B8">Mail Preview</Typography></Box>
-                  </Stack>
-                </Box>
-                <Box sx={{ bgcolor: "#FAFAFA", px: 2.5, py: 1.5, borderBottom: "1px solid #E2E8F0" }}>
-                  <Stack spacing={0.75}>
-                    <Stack direction="row" spacing={1} alignItems="center"><Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>From:</Typography><Typography fontSize="12px" color="#374151">noreply@crystaivf.com</Typography></Stack>
-                    <Stack direction="row" spacing={1} alignItems="center"><Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>To:</Typography><Typography fontSize="12px" color="#374151">{recipientName}{leadEmail ? ` <${leadEmail}>` : ""}</Typography></Stack>
-                    <Stack direction="row" spacing={1} alignItems="flex-start"><Typography fontSize="11px" color="#94A3B8" fontWeight={500} minWidth={52}>Subject:</Typography><Typography fontSize="12px" color="#1E293B" fontWeight={700}>{previewTemplate.subject}</Typography></Stack>
-                  </Stack>
-                </Box>
-                <Box sx={{ bgcolor: "#FFFFFF", px: 2.5, py: 2.5, maxHeight: 260, overflowY: "auto" }}>
-                  <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.85, whiteSpace: "pre-wrap", fontFamily: "Georgia, serif" }}>
-                    {resolveBody(previewTemplate.body || "").split(/(\{\{[^}]+\}\}|\{[^}]+\})/g).map((part, i) =>
-                      /^(\{\{[^}]+\}\}|\{[^}]+\})$/.test(part)
-                        ? <Box key={i} component="span" sx={{ color: "#7C3AED", fontWeight: 600, bgcolor: "#F5F3FF", borderRadius: "3px", px: 0.5 }}>{part}</Box>
-                        : part
-                    )}
-                  </Typography>
-                </Box>
-                <Box sx={{ bgcolor: "#F8FAFC", borderTop: "1px solid #E2E8F0", px: 2.5, py: 1.25, textAlign: "center" }}>
-                  <Typography fontSize="11px" color="#94A3B8">Variables shown in <Box component="span" sx={{ color: "#7C3AED", fontWeight: 600 }}>purple</Box> will be auto-filled when sent</Typography>
-                </Box>
-              </Box>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
-              <Button onClick={() => { setStep("template"); setPreviewTemplate(null); }} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>Back</Button>
-              <Button variant="contained" onClick={() => { setSubject(previewTemplate.subject || ""); setBody(resolveBody(previewTemplate.body || "")); setStep("compose"); }} sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" } }}>Use This Template</Button>
-            </DialogActions>
-          </>
-        )}
-
-        {step === "compose" && (
-          <>
-            <DialogTitle sx={{ fontWeight: 700, fontSize: "1.1rem", pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              New Email <IconButton size="small" onClick={handleClose}><CloseIcon fontSize="small" /></IconButton>
-            </DialogTitle>
-            <DialogContent sx={{ pt: 0, pb: 0 }}>
-              <Stack spacing={0} divider={<Divider />}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
-                  <Typography fontSize="13px" color="text.secondary" minWidth={55}>To:</Typography>
-                  <Box sx={{ flex: 1 }}>
-                    <Chip label={recipientName} size="small" onDelete={() => {}} deleteIcon={<CloseIcon sx={{ fontSize: "14px !important" }} />} sx={{ bgcolor: "#EFF6FF", color: "#1D4ED8", fontWeight: 500, fontSize: "12px", height: 24, "& .MuiChip-deleteIcon": { color: "#93C5FD" } }} />
-                  </Box>
-                  <Typography fontSize="12px" color="text.secondary" sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" } }}>Cc | Bcc</Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
-                  <Typography fontSize="13px" color="text.secondary" minWidth={55}>Subject:</Typography>
-                  <TextField fullWidth variant="standard" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={sending} InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }} placeholder="Enter subject..." />
-                </Box>
-                <Box sx={{ py: 1.5 }}>
-                  <textarea
-                    ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)}
-                    onSelect={saveCursor} onKeyUp={saveCursor} onMouseUp={saveCursor}
-                    disabled={sending} placeholder="Write your email..." rows={12}
-                    style={{ width: "100%", boxSizing: "border-box", resize: "vertical", border: "none", outline: "none", fontSize: "13px", lineHeight: 1.7, fontFamily: "inherit", color: "#1E293B", background: "transparent", padding: 0 }}
-                  />
-                </Box>
-                {error && <MuiAlert severity="error" sx={{ borderRadius: "8px", my: 1 }}>{error}</MuiAlert>}
-              </Stack>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3, pt: 1, flexDirection: "column", gap: 0 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, mb: 1.5, width: "100%", borderTop: "1px solid #E5E7EB", pt: 1.5, flexWrap: "wrap" }}>
-                <Tooltip title="Attach file"><IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}><AttachFileIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
-                <Tooltip title="Insert link"><IconButton size="small" onClick={() => { saveCursor(); const u = window.prompt("URL:", "https://"); if (u) { const l = window.prompt("Link label:", "Click here") || u; insertAtCursor(`[${l}](${u})`); } }} sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}><LinkIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
-                <Tooltip title="Emoji"><IconButton size="small" onClick={(e) => { saveCursor(); setEmojiAnchor(e.currentTarget); }} sx={{ color: emojiAnchor ? "#F59E0B" : "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#F59E0B" } }}><EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
-                <Tooltip title="Insert image"><IconButton size="small" onClick={() => imageInputRef.current?.click()} sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}><ImageOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
-                <Tooltip title="Format text"><IconButton size="small" onClick={(e) => { saveCursor(); setFormatAnchor(e.currentTarget); }} sx={{ color: formatAnchor ? "#6366F1" : "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#6366F1" } }}><FormatColorTextOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
-                <Tooltip title="Highlight"><IconButton size="small" onClick={() => { saveCursor(); wrapSelection("==", "==", "highlighted text"); }} sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}><BrushOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
-                <Tooltip title="More options"><IconButton size="small" onClick={(e) => { saveCursor(); setMoreAnchor(e.currentTarget); }} sx={{ color: moreAnchor ? "#10B981" : "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#10B981" } }}><AddCircleOutlineIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
-              </Box>
-              <Box sx={{ display: "flex", gap: 1, width: "100%", justifyContent: "flex-end" }}>
-                <Button onClick={handleClose} disabled={sending} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>Cancel</Button>
-                <Button onClick={handleSaveAsDraft} disabled={sending || !subject.trim() || !body.trim()} startIcon={<BookmarkBorderIcon fontSize="small" />} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 2, "&:hover": { bgcolor: "#F3F4F6" } }}>Save as Draft</Button>
-                <Button onClick={handleSend} disabled={sending || !subject.trim() || !body.trim()} variant="contained" startIcon={sending ? <CircularProgress size={14} sx={{ color: "white" }} /> : <SendIcon fontSize="small" />}
-                  sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>
-                  {sending ? "Sending..." : "Send"}
-                </Button>
-              </Box>
-            </DialogActions>
-          </>
-        )}
       </Dialog>
     </>
   );
@@ -1107,7 +642,6 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
 
   React.useEffect(() => {
     setAppointment((prev) => {
-      // For contracts app: no department filtering — show all employees
       if (!IS_MEDICAL_APP) {
         return { ...prev, filteredEmployees: prev.employees };
       }
@@ -1146,25 +680,10 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
   }, [leads, search, filters]);
 
   const handleBookAppointmentSubmit = async () => {
-    if (!selectedLead?.id) {
-      setAppointment((p) => ({ ...p, error: "Lead ID is missing." }));
-      return;
-    }
-
-    // Department is required for medical app only
-    if (IS_MEDICAL_APP && !appointment.selectedDepartmentId) {
-      setAppointment((p) => ({ ...p, error: "Please select a department." }));
-      return;
-    }
-
-    if (!appointment.date) {
-      setAppointment((p) => ({ ...p, error: "Please select an appointment date." }));
-      return;
-    }
-    if (!appointment.slot) {
-      setAppointment((p) => ({ ...p, error: "Please select a time slot." }));
-      return;
-    }
+    if (!selectedLead?.id) { setAppointment((p) => ({ ...p, error: "Lead ID is missing." })); return; }
+    if (IS_MEDICAL_APP && !appointment.selectedDepartmentId) { setAppointment((p) => ({ ...p, error: "Please select a department." })); return; }
+    if (!appointment.date) { setAppointment((p) => ({ ...p, error: "Please select an appointment date." })); return; }
+    if (!appointment.slot) { setAppointment((p) => ({ ...p, error: "Please select a time slot." })); return; }
 
     setAppointment((p) => ({ ...p, submitting: true, error: null }));
     const leadId        = selectedLead.id.replace(/^#/, "");
@@ -1173,7 +692,6 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     const result = await dispatch(bookAppointment({
       leadId,
       payload: {
-        // Only include department_id for medical app
         ...(IS_MEDICAL_APP && { department_id: Number(appointment.selectedDepartmentId) }),
         appointment_date: formattedDate,
         slot: appointment.slot,
@@ -1185,9 +703,7 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     setAppointment((p) => ({ ...p, submitting: false }));
 
     if (bookAppointment.rejected.match(result)) {
-      const errMsg = typeof result.payload === "string"
-        ? result.payload
-        : "Failed to book appointment. Please try again.";
+      const errMsg = typeof result.payload === "string" ? result.payload : "Failed to book appointment. Please try again.";
       setAppointment((p) => ({ ...p, error: errMsg }));
       return;
     }
@@ -1200,8 +716,8 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
     setSelectedLead(lead);
     setAppointment({
       ...emptyAppointment(),
-      selectedDepartmentId: lead.department_id   != null ? String(lead.department_id)   : "",
-      selectedEmployeeId:   lead.assigned_to_id  != null ? String(lead.assigned_to_id)  : "",
+      selectedDepartmentId: lead.department_id   != null ? String(lead.department_id)  : "",
+      selectedEmployeeId:   lead.assigned_to_id  != null ? String(lead.assigned_to_id) : "",
       date:   lead.appointment_date ? new Date(lead.appointment_date) : null,
       slot:   lead.slot   || "",
       remark: lead.remark || "",
@@ -1270,15 +786,13 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
 
         <Dialogs />
 
-        <SMSDialog   open={Boolean(smsLead)}   lead={smsLead}   onClose={() => setSmsLead(null)}   />
-        <EmailDialog open={Boolean(emailLead)} lead={emailLead} onClose={() => setEmailLead(null)} />
-        <CallDialog  open={Boolean(callLead)}  name={(callLead?.full_name ?? callLead?.name ?? "Unknown") as string} onClose={() => setCallLead(null)} />
+        <SMSDialog open={Boolean(smsLead)} lead={smsLead} onClose={() => setSmsLead(null)} />
 
-        {/*
-         * BookAppointmentModal receives IS_MEDICAL_APP so it can conditionally
-         * render the Department dropdown. Pass it through as a prop, or the modal
-         * can import IS_MEDICAL_APP directly from appType config.
-         */}
+        {/* ✅ MailModal is now fully self-contained — no extra props needed */}
+        <MailModal open={Boolean(emailLead)} selectedLead={emailLead} onClose={() => setEmailLead(null)} />
+
+        <CallDialog open={Boolean(callLead)} name={(callLead?.full_name ?? callLead?.name ?? "Unknown") as string} onClose={() => setCallLead(null)} />
+
         <BookAppointmentModal
           open={openBookModal}
           selectedLead={selectedLead}
