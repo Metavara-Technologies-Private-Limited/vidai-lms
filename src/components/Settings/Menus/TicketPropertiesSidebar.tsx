@@ -407,12 +407,7 @@ const TicketPropertiesSidebar = ({
           sx={{
             maxHeight: "60vh",
             overflowY: "auto",
-            pr: 0.5,
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-            "&::-webkit-scrollbar": {
-              display: "none",
-            },
+            overscrollBehaviorY: "auto",
           }}
         >
           {(() => {
