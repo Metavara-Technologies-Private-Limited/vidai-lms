@@ -65,6 +65,13 @@ type AssigneeOption = {
   email: string | undefined;
 };
 
+const assigneeOptionLabel = (option: AssigneeOption): string => {
+  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const primary = fullName || option.username || `User ${option.id}`;
+  const secondary = option.role || option.designation;
+  return secondary ? `${primary} (${secondary})` : primary;
+};
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
@@ -290,6 +297,9 @@ export function useEditLead() {
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
   const [assigneeOptions, setAssigneeOptions] = React.useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = React.useState(false);
+  const [leadGeneratedBySearch, setLeadGeneratedBySearch] = React.useState("");
+  const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<AssigneeOption[]>([]);
+  const [leadGeneratedByLoading, setLeadGeneratedByLoading] = React.useState(false);
   const [nextType, setNextType] = React.useState("");
   const [nextStatus, setNextStatus] = React.useState("");
   const [nextDesc, setNextDesc] = React.useState("");
@@ -310,6 +320,7 @@ export function useEditLead() {
   const [contactPersonPhone, setContactPersonPhone] = React.useState("");
   const [contactPersonEmail, setContactPersonEmail] = React.useState("");
   const [leadGeneratedBy, setLeadGeneratedBy] = React.useState("");
+  const [leadGeneratedById, setLeadGeneratedById] = React.useState("");
 
   // Step 2
   const [treatmentInterest, setTreatmentInterest] = React.useState("");
@@ -450,7 +461,14 @@ export function useEditLead() {
           setDesignation((anyLead.designation as string) ?? "");
           setContactPersonPhone((anyLead.contact_person_phone as string) ?? "");
           setContactPersonEmail((anyLead.contact_person_email as string) ?? "");
-          setLeadGeneratedBy((anyLead.lead_generated_by as string) ?? "");
+          setLeadGeneratedBy(
+            ((anyLead.lead_generated_by as string) ??
+              (anyLead.personal_name as string) ??
+              "") as string,
+          );
+          setLeadGeneratedById(
+            ((anyLead.personal_id as number | string | undefined)?.toString() ?? "") as string,
+          );
         }
 
         setTreatmentInterest(lead.treatment_interest ?? "");
@@ -561,6 +579,30 @@ export function useEditLead() {
     return () => clearTimeout(timer);
   }, [assigneeSearch]);
 
+  React.useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!leadGeneratedBySearch.trim()) {
+        setLeadGeneratedByOptions([]);
+        return;
+      }
+      try {
+        setLeadGeneratedByLoading(true);
+        const response = await authApi.searchUsers({
+          search: leadGeneratedBySearch,
+          limit: 20,
+          offset: 0,
+        });
+        setLeadGeneratedByOptions(normalizeAssignees(response));
+      } catch {
+        setLeadGeneratedByOptions([]);
+      } finally {
+        setLeadGeneratedByLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [leadGeneratedBySearch]);
+
   // ====================== Filter Personnel by Appointment Department ======================
   React.useEffect(() => {
     if (!department || employees.length === 0) { setFilteredPersonnel([]); return; }
@@ -597,6 +639,10 @@ export function useEditLead() {
     const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
     const resolvedDeptId: number = leadDepartmentId ?? leadData.department_id ?? clinicId;
     const coupleActive = IS_MEDICAL_APP && isCouple === "yes";
+    const matchedGeneratedByOption = leadGeneratedByOptions.find(
+      (option) => assigneeOptionLabel(option) === leadGeneratedBy,
+    );
+    const resolvedGeneratedById = intOrNull(leadGeneratedById) ?? matchedGeneratedByOption?.id ?? null;
 
     const updateData = {
       clinic_id: clinicId,
@@ -642,6 +688,8 @@ export function useEditLead() {
             contact_person_phone: contactPersonPhone || "",
             contact_person_email: contactPersonEmail || "",
             lead_generated_by: leadGeneratedBy || "",
+            personal_id: resolvedGeneratedById,
+            personal_name: leadGeneratedBy || null,
           }
         : {}),
 
@@ -651,7 +699,13 @@ export function useEditLead() {
             appointment_date: appointmentDate,
             slot: slot,
             remark: remark || "",
-            personal_id: appointmentPersonnel ? intOrNull(appointmentPersonnel) : null,
+            ...(IS_MEDICAL_APP
+              ? {
+                  personal_id: appointmentPersonnel
+                    ? intOrNull(appointmentPersonnel)
+                    : null,
+                }
+              : {}),
             // Department in appointment payload only for medical
             ...(IS_MEDICAL_APP ? {} : {}),
           }
@@ -659,7 +713,7 @@ export function useEditLead() {
             appointment_date: undefined,
             slot: undefined,
             remark: "",
-            personal_id: null,
+            ...(IS_MEDICAL_APP ? { personal_id: null } : {}),
           }),
     };
 
@@ -753,6 +807,10 @@ export function useEditLead() {
     contactPersonPhone, setContactPersonPhone,
     contactPersonEmail, setContactPersonEmail,
     leadGeneratedBy, setLeadGeneratedBy,
+    leadGeneratedById, setLeadGeneratedById,
+    leadGeneratedBySearch, setLeadGeneratedBySearch,
+    leadGeneratedByOptions,
+    leadGeneratedByLoading,
     // ── Step 2 ──
     treatmentInterest, setTreatmentInterest,
     treatments, setTreatments,

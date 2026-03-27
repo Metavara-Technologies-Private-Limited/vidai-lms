@@ -680,6 +680,7 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
                 value={
                   (lead as unknown as Record<string, string>).lead_generated_by_name ||
                   (lead as unknown as Record<string, string>).lead_generated_by ||
+                  (lead as unknown as Record<string, string>).personal_name ||
                   "N/A"
                 }
               />

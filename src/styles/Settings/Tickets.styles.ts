@@ -608,15 +608,29 @@ export const ticketViewWrapperSx = {
 /* Header row (Back + Ticket No) */
 export const ticketViewHeaderSx = {
   alignItems: "center",
-  mb: 1,
-  mt: -2,
+  display: "flex",
+  gap: 0.75,
+  mb: 1.25,
+  mt: 0,
+  minHeight: 32,
+  pl: 0.5,
 };
 
 /* Back button */
 export const ticketBackButtonSx = {
-  minWidth: "auto",
-  p: 0.2,
-  borderRadius: "2px",
+  minWidth: 42,
+  width: 42,
+  height: 42,
+  p: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 0,
+  "& img": {
+    display: "block",
+    width: 42,
+    height: 42,
+  },
 };
 
 

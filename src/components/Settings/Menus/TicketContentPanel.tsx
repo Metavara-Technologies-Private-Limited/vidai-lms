@@ -98,6 +98,12 @@ const TicketContentPanel = ({
       borderRadius={2}
       bgcolor="#FAFAFA"
       border="1px solid #E0E0E0"
+      sx={{
+        minHeight: 0,
+        height: "100%",
+        maxHeight: { xs: "48vh", lg: "100%" },
+        overflowY: "auto",
+      }}
     >
       {/* Subject */}
       <Typography fontSize={16} fontWeight={700} mb={1}>
