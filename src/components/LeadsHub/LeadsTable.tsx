@@ -23,7 +23,7 @@ import {
 import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
-import { TwilioAPI } from "../../services/leads.api";
+import { LeadAPI, TwilioAPI } from "../../services/leads.api";
 import CallDialog from "./CallDialog";
 
 import type { RawLead, ProcessedLead, Props } from "./LeadsTable.types";
@@ -44,12 +44,28 @@ import {
   IS_CONTRACTS_APP,
   ACTIVE_STATUS_OPTIONS,
 } from "../../config/appType";
+import type { LeadItem } from "./Leadsboardtypes";
 
 // ── Shared toast options ──────────────────────────────────────────────────────
 const toastOptions = {
   position: "top-right" as const,
   autoClose: 3000,
   theme: "colored" as const,
+};
+
+// Add this helper at the top of LeadsTable.tsx:
+const BACKEND_TO_DISPLAY: Record<string, string> = {
+  "new": "New",
+  "appointment": "Appointment",
+  "follow up": "Follow Up",
+  "follow_up": "Follow Up",
+  "negotiation": "Negotiation",
+  "proposal sent": "Proposal Sent",
+  "contract signed": "Contract Signed",
+  "converted": "Converted Lead",
+  "converted lead": "Converted Lead",
+  "lost": "Lost Lead",
+  "lost lead": "Lost Lead",
 };
 
 // ── Status chip color map (matches getStatusChipSx palette) ─────────────────
@@ -225,7 +241,12 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
 };
 
 // ── Main Component ────────────────────────────────────────────────────────────
-const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] }) => {
+const LeadsTable: React.FC<Props> = ({
+  search,
+  tab,
+  filters,
+  importedLeads = [],
+}) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -242,7 +263,10 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
   const [emailLead, setEmailLead] = React.useState<ProcessedLead | null>(null);
 
   // ── Edit Status state ──
-  const [editStatusLead, setEditStatusLead] = React.useState<ProcessedLead | null>(null);
+  // Change state type to LeadItem which has all the raw fields:
+  const [editStatusLead, setEditStatusLead] = React.useState<LeadItem | null>(
+    null,
+  );
 
   React.useEffect(() => {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
@@ -260,21 +284,30 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
 
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   const isSelected = (id: string) => selectedIds.includes(id);
 
   const handleCallOpen = async (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
     const phone = normalizePhone(lead.contact_no);
-    if (!phone) { toast.error("No contact number for this lead.", toastOptions); return; }
-    if (!lead.id) { toast.error("Lead ID is missing. Cannot initiate call.", toastOptions); return; }
+    if (!phone) {
+      toast.error("No contact number for this lead.", toastOptions);
+      return;
+    }
+    if (!lead.id) {
+      toast.error("Lead ID is missing. Cannot initiate call.", toastOptions);
+      return;
+    }
     setCallLead(lead);
     try {
       await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
     } catch (err: unknown) {
       setCallLead(null);
-      toast.error(extractErrorMessage(err, "Failed to initiate call."), toastOptions);
+      toast.error(
+        extractErrorMessage(err, "Failed to initiate call."),
+        toastOptions,
+      );
     }
   };
 
@@ -284,33 +317,83 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
   };
 
   // ── Handle Edit Status open ──
+  // In handleEditStatusOpen, cast the lead back to RawLead:
+  // handleEditStatusOpen — cast ProcessedLead to LeadItem:
   const handleEditStatusOpen = (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
-    setEditStatusLead(lead);
+    setEditStatusLead(lead as unknown as LeadItem);
   };
 
   // ── Handle Edit Status save ──
-  const handleEditStatusSave = (newStatus: string) => {
+  const STATUS_API_MAP: Record<string, string> = {
+    New: "new",
+    Appointment: "appointment",
+    "Follow Up": "follow up",
+    Negotiation: "negotiation",
+    "Proposal Sent": "proposal sent",
+    "Contract Signed": "contract signed",
+    "Converted Lead": "converted",
+    "Lost Lead": "lost",
+  };
+
+  // handleEditStatusSave — all fields now available:
+  const handleEditStatusSave = async (newStatus: string) => {
     if (!editStatusLead) return;
-    setLocalLeads((prev) =>
-      prev.map((l) =>
-        l.id === editStatusLead.id
-          ? { ...l, status: newStatus, lead_status: newStatus }
-          : l
-      )
-    );
-    toast.success(`Status updated to "${newStatus}".`, toastOptions);
-    setEditStatusLead(null);
+    const apiStatus = STATUS_API_MAP[newStatus] ?? newStatus.toLowerCase();
+    try {
+      await LeadAPI.update(editStatusLead.id, {
+        clinic_id: editStatusLead.clinic_id ?? 0,
+        department_id: editStatusLead.department_id ?? 0,
+        full_name: editStatusLead.full_name || "",
+        contact_no: editStatusLead.contact_no || "",
+        source: editStatusLead.source || "Unknown",
+        treatment_interest: editStatusLead.treatment_interest || "N/A",
+        book_appointment: editStatusLead.book_appointment || false,
+        appointment_date: editStatusLead.appointment_date || null,
+        slot: editStatusLead.slot || "",
+        is_active: editStatusLead.is_active !== false,
+        partner_inquiry: editStatusLead.partner_inquiry || false,
+        lead_status: apiStatus as "new" | "contacted",
+      });
+      setLocalLeads((prev) =>
+        prev.map((l) =>
+          l.id === editStatusLead.id
+            ? { ...l, status: newStatus, lead_status: newStatus }
+            : l,
+        ),
+      );
+      dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+      toast.success(`Status updated to "${newStatus}".`, toastOptions);
+    } catch (err: unknown) {
+      toast.error(
+        extractErrorMessage(err, "Failed to update status."),
+        toastOptions,
+      );
+    } finally {
+      setEditStatusLead(null);
+    }
   };
 
   const filteredLeads = React.useMemo(() => {
     return localLeads.filter((lead: ProcessedLead) => {
-      const searchStr = `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
+      const searchStr =
+        `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
-      const matchTab = tab === "archived" ? lead.is_active === false : lead.is_active !== false;
+      const matchTab =
+        tab === "archived"
+          ? lead.is_active === false
+          : lead.is_active !== false;
       if (filters) {
-        if (filters.department && lead.department_id !== Number(filters.department)) return false;
-        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) return false;
+        if (
+          filters.department &&
+          lead.department_id !== Number(filters.department)
+        )
+          return false;
+        if (
+          filters.assignee &&
+          lead.assigned_to_id !== Number(filters.assignee)
+        )
+          return false;
         if (filters.status) {
           const ls = (lead.lead_status || lead.status || "").toLowerCase();
           if (ls !== filters.status.toLowerCase()) return false;
@@ -336,7 +419,10 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
     });
   }, [localLeads, search, tab, filters]);
 
-  React.useEffect(() => { setPage(1); setSelectedIds([]); }, [search, tab, filters]);
+  React.useEffect(() => {
+    setPage(1);
+    setSelectedIds([]);
+  }, [search, tab, filters]);
 
   const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
@@ -344,7 +430,10 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
     if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [totalPages, page]);
 
-  const currentLeads = filteredLeads.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const currentLeads = filteredLeads.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage,
+  );
   const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
 
@@ -354,20 +443,31 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
   };
   const handleBulkArchive = (archive: boolean) => {
     setLocalLeads((p) =>
-      p.map((l) => (selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l))
+      p.map((l) =>
+        selectedIds.includes(l.id) ? { ...l, is_active: !archive } : l,
+      ),
     );
     setSelectedIds([]);
   };
   const handleBulkExport = () => {
-    const selectedLeads = localLeads.filter((lead) => selectedIds.includes(lead.id));
+    const selectedLeads = localLeads.filter((lead) =>
+      selectedIds.includes(lead.id),
+    );
     if (selectedLeads.length === 0) {
       toast.info("No selected leads to export.", toastOptions);
       return;
     }
 
     const headers = [
-      "Lead ID", "Name", "Phone", "Email", "Status",
-      "Source", "Location", "Assigned To", "Created At",
+      "Lead ID",
+      "Name",
+      "Phone",
+      "Email",
+      "Status",
+      "Source",
+      "Location",
+      "Assigned To",
+      "Created At",
     ];
 
     const escapeCsv = (value: unknown): string => {
@@ -409,7 +509,14 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
   // ── Loading / Error / Empty states ──────────────────────────────────────────
   if (loading)
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
           <Typography color="text.secondary">Loading leads...</Typography>
@@ -424,8 +531,15 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
         <Typography variant="body2">{error}</Typography>
         <Typography
           variant="body2"
-          sx={{ mt: 1, color: "primary.main", cursor: "pointer", textDecoration: "underline" }}
-          onClick={() => dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])}
+          sx={{
+            mt: 1,
+            color: "primary.main",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+          onClick={() =>
+            dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])
+          }
         >
           Try again
         </Typography>
@@ -434,11 +548,22 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
 
   if (localLeads.length === 0)
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
         <Stack alignItems="center" spacing={2}>
-          <Typography variant="h6" color="text.secondary">No leads found</Typography>
+          <Typography variant="h6" color="text.secondary">
+            No leads found
+          </Typography>
           <Typography variant="body2" color="text.secondary">
-            {tab === "archived" ? "No archived leads yet" : "Create your first lead to get started"}
+            {tab === "archived"
+              ? "No archived leads yet"
+              : "Create your first lead to get started"}
           </Typography>
         </Stack>
       </Box>
@@ -446,7 +571,14 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
 
   if (filteredLeads.length === 0)
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
         <Stack alignItems="center" spacing={2}>
           <Typography variant="h6" color="text.secondary">
             No {tab === "archived" ? "archived" : "active"} leads found
@@ -454,11 +586,12 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
           <Typography variant="body2" color="text.secondary">
             {search
               ? `No results for "${search}"`
-              : filters && Object.values(filters).some((v) => v !== "" && v !== null)
-              ? "No leads match the selected filters"
-              : tab === "archived"
-              ? "No archived leads yet"
-              : "No active leads"}
+              : filters &&
+                  Object.values(filters).some((v) => v !== "" && v !== null)
+                ? "No leads match the selected filters"
+                : tab === "archived"
+                  ? "No archived leads yet"
+                  : "No active leads"}
           </Typography>
         </Stack>
       </Box>
@@ -466,7 +599,12 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
 
   return (
     <>
-      <TableContainer component={Paper} elevation={0} className="leads-table" sx={{ overflowX: "auto" }}>
+      <TableContainer
+        component={Paper}
+        elevation={0}
+        className="leads-table"
+        sx={{ overflowX: "auto" }}
+      >
         <Table stickyHeader sx={{ minWidth: 1200 }}>
           <TableHead>
             <TableRow>
@@ -481,7 +619,8 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
                     currentLeads.every((l) => selectedIds.includes(l.id))
                   }
                   onChange={(e) => {
-                    if (e.target.checked) setSelectedIds(currentLeads.map((l) => l.id));
+                    if (e.target.checked)
+                      setSelectedIds(currentLeads.map((l) => l.id));
                     else setSelectedIds([]);
                   }}
                 />
@@ -511,7 +650,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
                 key={lead.id}
                 sx={{ cursor: "pointer" }}
                 onClick={() =>
-                  navigate(`/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`)
+                  navigate(
+                    `/leads/${encodeURIComponent(lead.id.replace(/^#/, ""))}`,
+                  )
                 }
                 className={isSelected(lead.id) ? "row-selected" : ""}
               >
@@ -529,11 +670,16 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
                 <TableCell>
                   <Stack direction="row" spacing={2} alignItems="center">
                     <Avatar className="lead-avatar">
-                      {lead.initials || lead.full_name?.charAt(0)?.toUpperCase()}
+                      {lead.initials ||
+                        lead.full_name?.charAt(0)?.toUpperCase()}
                     </Avatar>
                     <Box>
-                      <Typography className="lead-name-text">{lead.full_name}</Typography>
-                      <Typography className="lead-id-text">{lead.displayId}</Typography>
+                      <Typography className="lead-name-text">
+                        {lead.full_name}
+                      </Typography>
+                      <Typography className="lead-id-text">
+                        {lead.displayId}
+                      </Typography>
                     </Box>
                   </Stack>
                 </TableCell>
@@ -630,7 +776,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
                       sx={getTaskStatusChipSx(lead.taskStatus)}
                     />
                   ) : (
-                    <Typography sx={{ fontSize: "13px", color: "#94A3B8" }}>—</Typography>
+                    <Typography sx={{ fontSize: "13px", color: "#94A3B8" }}>
+                      —
+                    </Typography>
                   )}
                 </TableCell>
 
@@ -670,7 +818,9 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
                         <ChatBubbleOutlineIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={lead.email ? `Email ${lead.email}` : "No email"}>
+                    <Tooltip
+                      title={lead.email ? `Email ${lead.email}` : "No email"}
+                    >
                       <span>
                         <IconButton
                           className="action-btn"
@@ -700,14 +850,20 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
           </TableBody>
         </Table>
       </TableContainer>
-
       {/* Pagination */}
-      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2, px: 2 }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        sx={{ mt: 2, px: 2 }}
+      >
         <Typography color="text.secondary">
           Showing {startEntry} to {endEntry} of {totalEntries}
         </Typography>
         <Stack direction="row" spacing={1}>
-          <IconButton disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+          <IconButton
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
             <ChevronLeftIcon />
           </IconButton>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -727,7 +883,6 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
           </IconButton>
         </Stack>
       </Stack>
-
       <BulkActionBar
         selectedIds={selectedIds}
         tab={tab}
@@ -736,24 +891,36 @@ const LeadsTable: React.FC<Props> = ({ search, tab, filters, importedLeads = [] 
         onExport={handleBulkExport}
       />
       <Dialogs />
-
       <CallDialog
         open={Boolean(callLead)}
         name={callLead?.full_name || callLead?.name || "Unknown"}
         onClose={() => setCallLead(null)}
       />
-      <SMSDialog open={Boolean(smsLead)} lead={smsLead} onClose={() => setSmsLead(null)} />
-      <EmailDialog open={Boolean(emailLead)} lead={emailLead} onClose={() => setEmailLead(null)} />
-
+      <SMSDialog
+        open={Boolean(smsLead)}
+        lead={smsLead}
+        onClose={() => setSmsLead(null)}
+      />
+      <EmailDialog
+        open={Boolean(emailLead)}
+        lead={emailLead}
+        onClose={() => setEmailLead(null)}
+      />
       {/* ── Edit Status Dialog ── */}
       <EditStatusDialog
         open={Boolean(editStatusLead)}
-        currentStatus={editStatusLead?.status ?? editStatusLead?.lead_status ?? "New"}
+        currentStatus={
+          BACKEND_TO_DISPLAY[
+            editStatusLead?.lead_status?.toLowerCase() ?? ""
+          ] ??
+          editStatusLead?.lead_status ??
+          "New"
+        }
         onClose={() => setEditStatusLead(null)}
         onSave={handleEditStatusSave}
       />
     </>
   );
-};
+};;;;;
 
 export default LeadsTable;

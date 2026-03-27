@@ -37,13 +37,21 @@ const initialState: LeadState = {
 // ====================== Status Normalizer ======================
 const normalizeStatus = (raw: string): string => {
   const map: Record<string, string> = {
-    new:              "New",
-    contacted:        "Contacted",
-    appointment:      "Appointment",
-    follow_up:        "Follow Up",
-    converted:        "Converted",
+    new: "New",
+    contacted: "Contacted",
+    appointment: "Appointment",
+    "follow up": "Follow Up",
+    follow_up: "Follow Up",
+    "follow-up": "Follow Up",
+    negotiation: "Negotiation",
+    "proposal sent": "Proposal Sent",
+    "contract signed": "Contract Signed",
+    converted: "Converted Lead",
+    "converted lead": "Converted Lead",
+    lost: "Lost Lead",
+    "lost lead": "Lost Lead",
     cycle_conversion: "Cycle Conversion",
-    lost:             "Lost",
+    "cycle conversion": "Cycle Conversion",
   };
   return map[raw?.toLowerCase()?.trim()] ?? "New";
 };
