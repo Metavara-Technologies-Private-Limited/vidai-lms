@@ -15,6 +15,7 @@ import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { toast } from "react-toastify";
 import ExcelJS from "exceljs";
 
@@ -36,6 +37,40 @@ type UploadItem = {
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_FILE_REGEX = /\.(xls|xlsx|csv)$/i;
+
+const TEMPLATE_HEADERS = [
+  "Lead Name",
+  "Contact No",
+  "Location",
+  "Source",
+  "Lead Status",
+  "Assigned To",
+  "Department",
+  "Email",
+  "Treatment Interest",
+  "Date",
+  "Time",
+  "Activity",
+  "Notes",
+  "Address",
+];
+
+const TEMPLATE_SAMPLE_ROW = [
+  "John Doe",
+  "9876543210",
+  "Mumbai",
+  "Website",
+  "New",
+  "",
+  "",
+  "john.doe@example.com",
+  "General",
+  "2026-03-15",
+  "10:30 AM",
+  "Initial outreach",
+  "Interested in pricing details",
+  "Andheri East",
+];
 
 const formatSize = (size: number): string => {
   const mb = size / (1024 * 1024);
@@ -261,6 +296,23 @@ const LeadsBulkImportModal: React.FC<LeadsBulkImportModalProps> = ({
   const hasUploading = uploadItems.some((item) => item.status === "uploading");
   const canImport = uploadItems.some((item) => item.status === "ready") && !hasUploading && !importing;
 
+  const handleDownloadTemplate = () => {
+    const rows = [TEMPLATE_HEADERS, TEMPLATE_SAMPLE_ROW];
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "leads-import-template.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Dialog
       open={open}
@@ -345,9 +397,25 @@ const LeadsBulkImportModal: React.FC<LeadsBulkImportModalProps> = ({
               letterSpacing: 0,
             }}
           >
-            Supported formats: XLS  Max Size: 10.00MB
+            Supported formats: CSV, XLSX  Max Size: 10.00MB
           </Typography>
         </Box>
+
+        <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
+          <Button
+            variant="text"
+            onClick={handleDownloadTemplate}
+            startIcon={<DownloadOutlinedIcon />}
+            sx={{
+              textTransform: "none",
+              fontFamily: "Montserrat",
+              fontWeight: 600,
+              color: "#4F7CF4",
+            }}
+          >
+            Download Import Template
+          </Button>
+        </Stack>
 
         {uploadItems.length > 0 && (
           <Stack spacing={1.5} sx={{ mb: 1 }}>

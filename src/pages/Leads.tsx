@@ -17,7 +17,7 @@ import Leads_Gridview from "../assets/icons/Leads_Gridview.svg";
 import Leads_Tableview_icon from "../assets/icons/Leads_Tableview_icon.svg";
 
 import type { FilterValues } from "../types/leads.types";
-import { DepartmentAPI, LeadAPI } from "../services/leads.api";
+import { api, DepartmentAPI, LeadAPI } from "../services/leads.api";
 import type { Department, Lead, LeadPayload } from "../services/leads.api";
 
 import { fetchLeads, selectLeads } from "../store/leadSlice";
@@ -32,7 +32,7 @@ const STORAGE_KEY_VIEW = "leads_view_mode";
 interface HeaderMatch {
   tableHeader: string;
   importedHeader: string;
-  payloadKey: keyof LeadPayload | "assigned_to_name" | "department_name";
+  payloadKey: keyof LeadPayload | "assigned_to_name" | "department_name" | "import_note";
 }
 
 interface ImportedRow {
@@ -41,7 +41,7 @@ interface ImportedRow {
 }
 
 const IMPORT_FIELD_CONFIGS: Array<{
-  payloadKey: keyof LeadPayload | "assigned_to_name" | "department_name";
+  payloadKey: keyof LeadPayload | "assigned_to_name" | "department_name" | "import_note";
   tableHeader: string;
   aliases: string[];
 }> = [
@@ -56,9 +56,41 @@ const IMPORT_FIELD_CONFIGS: Array<{
   { payloadKey: "treatment_interest", tableHeader: "Treatment Interest", aliases: ["treatment interest", "treatment", "service", "interest"] },
   { payloadKey: "appointment_date", tableHeader: "Date | Time", aliases: ["appointment date", "date", "date time", "created at", "created_at"] },
   { payloadKey: "slot", tableHeader: "Date | Time", aliases: ["slot", "time", "appointment time"] },
-  { payloadKey: "remark", tableHeader: "Activity", aliases: ["remark", "remarks", "notes", "activity"] },
+  { payloadKey: "remark", tableHeader: "Activity", aliases: ["remark", "remarks", "activity"] },
+  { payloadKey: "import_note", tableHeader: "Notes", aliases: ["note", "notes", "lead note", "lead notes"] },
   { payloadKey: "address", tableHeader: "Address", aliases: ["address"] },
 ];
+
+const parseCsvRow = (line: string): string[] => {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+
+    if (character === '"') {
+      if (inQuotes && line[index + 1] === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (character === "," && !inQuotes) {
+      values.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += character;
+  }
+
+  values.push(current.trim());
+  return values;
+};
 
 const normalizeHeader = (value: string): string =>
   value
@@ -296,7 +328,7 @@ const Leads: React.FC = () => {
 
   const saveImportedRowsToDb = React.useCallback(async (rows: ImportedRow[], headerMatches: HeaderMatch[]) => {
     if (headerMatches.length === 0 || rows.length === 0) {
-      return { createdLeads: [] as Lead[], failedCount: 0 };
+      return { createdLeads: [] as Lead[], failedCount: 0, noteFailedCount: 0 };
     }
 
     const clinicId = clinic?.id ?? (Number(localStorage.getItem("clinic_id") || 0) || leads[0]?.clinic_id || 1);
@@ -322,6 +354,7 @@ const Leads: React.FC = () => {
 
     const createdLeads: Lead[] = [];
     let failedCount = 0;
+    let noteFailedCount = 0;
 
     for (const row of rows) {
       const departmentName = getValue(row, "department_name");
@@ -329,6 +362,7 @@ const Leads: React.FC = () => {
         departmentByName.get(normalizeHeader(departmentName)) ?? defaultDepartmentId;
       const appointmentDate = normalizeImportedDate(getValue(row, "appointment_date"));
       const slot = getValue(row, "slot");
+      const importedNote = getValue(row, "import_note");
       const hasAppointmentDetails = Boolean(appointmentDate && slot);
       const sanitizedEmail = sanitizeImportedEmail(getValue(row, "email"));
 
@@ -359,13 +393,31 @@ const Leads: React.FC = () => {
 
       try {
         const createdLead = await LeadAPI.create(payload);
-        createdLeads.push(createdLead);
+        if (importedNote) {
+          try {
+            await api.post("/leads/notes/", {
+              title: "Imported Note",
+              note: importedNote,
+              lead: createdLead.id,
+              is_active: true,
+              is_deleted: false,
+            });
+          } catch {
+            noteFailedCount += 1;
+          }
+        }
+
+        createdLeads.push({
+          ...createdLead,
+          // If file has date/created-at mapping, keep it for UI ordering.
+          created_at: appointmentDate || createdLead.created_at,
+        });
       } catch {
         failedCount += 1;
       }
     }
 
-    return { createdLeads, failedCount };
+    return { createdLeads, failedCount, noteFailedCount };
   }, [clinic?.id, leads]);
 
   const importSingleFile = React.useCallback(async (file: File) => {
@@ -373,7 +425,7 @@ const Leads: React.FC = () => {
     const isCsvFile = /\.csv$/i.test(file.name);
     if (!isExcelFile && !isCsvFile) {
       toast.error("Please select a valid file (.xlsx, .xls, or .csv).");
-      return { createdLeads: [] as Lead[], failedCount: 0 };
+      return { createdLeads: [] as Lead[], failedCount: 0, noteFailedCount: 0 };
     }
 
     try {
@@ -387,14 +439,12 @@ const Leads: React.FC = () => {
           .map((line) => line.trim())
           .filter((line) => line.length > 0);
 
-        sourceHeaders = (lines[0] ?? "")
-          .split(",")
+        sourceHeaders = parseCsvRow(lines[0] ?? "")
           .map((value: string) => value.trim().replace(/^"|"$/g, ""))
           .filter((value: string) => value.length > 0);
 
         parsedRows = lines.slice(1).map((line: string, index: number) => {
-          const columns = line
-            .split(",")
+          const columns = parseCsvRow(line)
             .map((value: string) => value.trim().replace(/^"|"$/g, ""));
 
           const values = sourceHeaders.reduce<Record<string, string>>((accumulator, header, headerIndex) => {
@@ -410,7 +460,7 @@ const Leads: React.FC = () => {
       } else {
         if (/\.xls$/i.test(file.name)) {
           toast.error("Old .xls files are not supported here. Please use .xlsx or .csv.");
-          return { createdLeads: [] as Lead[], failedCount: 0 };
+          return { createdLeads: [] as Lead[], failedCount: 0, noteFailedCount: 0 };
         }
 
         const buffer = await file.arrayBuffer();
@@ -420,7 +470,7 @@ const Leads: React.FC = () => {
         const worksheet = workbook.worksheets[0];
         if (!worksheet) {
           toast.error("No worksheet found in the selected file.");
-          return { createdLeads: [] as Lead[], failedCount: 0 };
+          return { createdLeads: [] as Lead[], failedCount: 0, noteFailedCount: 0 };
         }
 
         const firstRow = worksheet.getRow(1);
@@ -469,10 +519,10 @@ const Leads: React.FC = () => {
       }
 
       toast.info(`No matching headers found for ${file.name}.`);
-      return { createdLeads: [] as Lead[], failedCount: 0 };
+      return { createdLeads: [] as Lead[], failedCount: 0, noteFailedCount: 0 };
     } catch {
       toast.error(`Failed to read imported file: ${file.name}`);
-      return { createdLeads: [] as Lead[], failedCount: 0 };
+      return { createdLeads: [] as Lead[], failedCount: 0, noteFailedCount: 0 };
     }
   }, [saveImportedRowsToDb]);
 
@@ -483,11 +533,13 @@ const Leads: React.FC = () => {
 
     const allCreatedLeads: Lead[] = [];
     let totalFailed = 0;
+    let totalNoteFailed = 0;
 
     for (const file of files) {
-      const { createdLeads, failedCount } = await importSingleFile(file);
+      const { createdLeads, failedCount, noteFailedCount } = await importSingleFile(file);
       allCreatedLeads.push(...createdLeads);
       totalFailed += failedCount;
+      totalNoteFailed += noteFailedCount;
     }
 
     if (allCreatedLeads.length > 0) {
@@ -495,8 +547,12 @@ const Leads: React.FC = () => {
       await dispatch(fetchLeads());
     }
 
-    if (allCreatedLeads.length > 0 && totalFailed === 0) {
+    if (allCreatedLeads.length > 0 && totalFailed === 0 && totalNoteFailed === 0) {
       toast.success(`${allCreatedLeads.length} leads imported and saved to DB.`);
+    } else if (allCreatedLeads.length > 0 && totalFailed === 0 && totalNoteFailed > 0) {
+      toast.warning(
+        `${allCreatedLeads.length} leads saved, but ${totalNoteFailed} imported notes could not be saved.`,
+      );
     } else if (allCreatedLeads.length > 0) {
       toast.warning(`${allCreatedLeads.length} leads saved, ${totalFailed} failed.`);
     } else {

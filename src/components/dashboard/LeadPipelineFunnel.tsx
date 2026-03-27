@@ -45,6 +45,7 @@ const MEDICAL_FALLBACK_STAGE_KEYS: FunnelStatus[] = [
 const CONTRACTS_FALLBACK_STAGE_KEYS: FunnelStatus[] = [
   "Converted",
   "New",
+  "Appointment",
   "Follow-Ups",
   "Negotiation",
   "Proposal Sent",
@@ -76,7 +77,7 @@ const POSITION_COLORS = [
 ];
 
 const isStatusAllowedByApp = (status: FunnelStatus): boolean => {
-  if (!IS_MEDICAL_APP && (status === "Appointment" || status === "Cycle Conversion")) return false;
+  if (!IS_MEDICAL_APP && status === "Cycle Conversion") return false;
   if (
     !IS_CONTRACTS_APP &&
     (status === "Negotiation" || status === "Proposal Sent" || status === "Contract Signed")
@@ -120,6 +121,17 @@ const normalizeLeadStatus = (status?: string | null): FunnelStatus | null => {
   return null;
 };
 
+const getStageLabelLines = (label: string): string[] => {
+  const compact = label.trim();
+  if (!compact) return [""];
+
+  // Keep this as one token to preserve the familiar funnel wording.
+  if (compact.toLowerCase() === "follow-ups") return ["Follow-Ups"];
+
+  const parts = compact.split(/\s+/).filter(Boolean);
+  return parts.length > 0 ? parts : [compact];
+};
+
 const getActiveStageKeys = (): FunnelStatus[] => {
   const raw = STATUS_OPTIONS_BY_APP[APP_TYPE] as readonly string[] | undefined;
 
@@ -127,6 +139,15 @@ const getActiveStageKeys = (): FunnelStatus[] => {
     .map((s) => normalizeLeadStatus(s))
     .filter((s): s is FunnelStatus => Boolean(s))
     .filter(isStatusAllowedByApp);
+
+  if (IS_CONTRACTS_APP && !normalized.includes("Appointment")) {
+    const newIndex = normalized.indexOf("New");
+    if (newIndex >= 0) {
+      normalized.splice(newIndex + 1, 0, "Appointment");
+    } else {
+      normalized.push("Appointment");
+    }
+  }
 
   const unique = Array.from(new Set(normalized));
   if (unique.length) return unique;
@@ -193,10 +214,16 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
       );
     }
 
-    return stages.map((item) => ({
+    const ordered = stages.map((item) => ({
       ...item,
       value: countsByStage[item.key] ?? 0,
     }));
+
+    // Show highest-volume stages first; keep original order for ties.
+    return ordered.sort((a, b) => {
+      if (b.value !== a.value) return b.value - a.value;
+      return stages.findIndex((s) => s.key === a.key) - stages.findIndex((s) => s.key === b.key);
+    });
   }, [sourceLeads, timeRange, activeStageKeys, stages]);
 
   if (loading) {
@@ -237,6 +264,7 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
       >
         <svg width="760" height="380" viewBox="0 0 760 380">
           <defs>
+            {/* 3D Shading Gradients */}
             {data.map((_, index) => (
               <linearGradient key={`grad-${index}`} id={`grad-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" style={{ stopColor: colorAt(index), stopOpacity: 1 }} />
@@ -258,6 +286,9 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
             const ny2 = yAt(index + 1, bottomStart, bottomEnd);
 
             const isHovered = hoveredIndex === index;
+            const stageLines = getStageLabelLines(item.stage);
+            const lineHeight = 12;
+            const firstLineOffset = -((stageLines.length - 1) * lineHeight) / 2;
 
             return (
               <g
@@ -287,7 +318,15 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
                   transform={`rotate(-90, ${x + segmentWidth / 2}, 182)`}
                   style={{ pointerEvents: "none", opacity: 0.9 }}
                 >
-                  {item.stage}
+                  {stageLines.map((line, lineIndex) => (
+                    <tspan
+                      key={`${item.key}-line-${lineIndex}`}
+                      x={x + segmentWidth / 2}
+                      dy={lineIndex === 0 ? firstLineOffset : lineHeight}
+                    >
+                      {line}
+                    </tspan>
+                  ))}
                 </text>
 
                 {isHovered && (

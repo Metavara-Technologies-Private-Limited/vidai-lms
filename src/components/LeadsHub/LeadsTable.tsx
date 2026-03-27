@@ -279,7 +279,20 @@ const LeadsTable: React.FC<Props> = ({
       ...leads.filter((lead) => !importedLeadIds.has(lead.id)),
       ...importedLeads,
     ];
-    setLocalLeads(mergedLeads.map(processLead));
+
+    // Keep list ordered by lead date, so imports are placed correctly.
+    const getLeadTimestamp = (lead: RawLead): number => {
+      const primary = lead.created_at;
+      const secondary = (lead as RawLead & { appointment_date?: string }).appointment_date;
+      const parsed = Date.parse(primary || secondary || "");
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    const sortedMergedLeads = [...mergedLeads].sort(
+      (a, b) => getLeadTimestamp(b) - getLeadTimestamp(a),
+    );
+
+    setLocalLeads(sortedMergedLeads.map(processLead));
   }, [leads, importedLeads]);
 
   const toggleSelect = (id: string) =>
