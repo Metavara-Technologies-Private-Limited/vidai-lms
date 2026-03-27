@@ -274,7 +274,7 @@ const TicketView = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [clinic?.id, id]);
 
   useEffect(() => {
     loadData();
@@ -679,18 +679,35 @@ const TicketView = () => {
     "";
 
   return (
-    <Box sx={ticketViewWrapperSx}>
+    <Box
+      sx={{
+        ...ticketViewWrapperSx,
+        height: "calc(100vh - 16px)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       <Stack direction="row" sx={ticketViewHeaderSx}>
         <Button onClick={() => navigate(-1)} sx={ticketBackButtonSx}>
-          <img src={BackwardIcon} alt="Back" />
+          <img src={BackwardIcon} style={{ marginLeft: -20 }} alt="Back" />
         </Button>
 
-        <Typography fontSize={14} fontWeight={700}>
+        <Typography fontSize={14} ml={-2.5} mb={0.8} fontWeight={700}>
           {ticket.ticket_no?.replace("TICKET-", "TN-")}
         </Typography>
       </Stack>
 
-      <Box display="flex" gap={4}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", lg: "row" },
+          gap: { xs: 2, lg: 4 },
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
         {/*#####    Ticket Content comes here ################ */}
         <TicketContentPanel
           ticket={ticket}

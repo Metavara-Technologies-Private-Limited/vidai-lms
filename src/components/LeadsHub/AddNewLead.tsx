@@ -35,6 +35,7 @@ import { Step1, Step2, Step3 } from "../LeadsHub/addNewLead.steps";
 // ── Import appType config ─────────────────────────────────────────────────────
 import {
   IS_MEDICAL_APP,
+  IS_CONTRACTS_APP,
   ACTIVE_FLOW_COPY,
 } from "../../config/appType";
 
@@ -146,6 +147,10 @@ export default function AddNewLead() {
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
   const [assigneeOptions, setAssigneeOptions] = React.useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = React.useState(false);
+  const [leadGeneratedBySearch, setLeadGeneratedBySearch] = React.useState("");
+  const [leadGeneratedById, setLeadGeneratedById] = React.useState("");
+  const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<AssigneeOption[]>([]);
+  const [leadGeneratedByLoading, setLeadGeneratedByLoading] = React.useState(false);
 
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
   const [docDragOver, setDocDragOver] = React.useState(false);
@@ -281,6 +286,31 @@ export default function AddNewLead() {
     return () => clearTimeout(timer);
   }, [assigneeSearch]);
 
+  React.useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!leadGeneratedBySearch.trim()) {
+        setLeadGeneratedByOptions([]);
+        return;
+      }
+
+      try {
+        setLeadGeneratedByLoading(true);
+        const response = await authApi.searchUsers({
+          search: leadGeneratedBySearch,
+          limit: 20,
+          offset: 0,
+        });
+        setLeadGeneratedByOptions(normalizeAssignees(response));
+      } catch {
+        setLeadGeneratedByOptions([]);
+      } finally {
+        setLeadGeneratedByLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [leadGeneratedBySearch]);
+
   // ── Auto-fill source from campaign ──────────────────────────────
   React.useEffect(() => {
     if (!form.campaign) {
@@ -415,6 +445,11 @@ export default function AddNewLead() {
         ? (partnerGenderRaw.toLowerCase() as "male" | "female")
         : null;
 
+    const generatedByOption = leadGeneratedByOptions.find(
+      (option) => assigneeLabel(option) === (form.leadGeneratedBy ?? "").trim(),
+    );
+    const resolvedGeneratedById = intOrNull(leadGeneratedById) ?? generatedByOption?.id ?? null;
+
     return {
       clinic_id: clinicId,
       department_id: departmentId,
@@ -444,7 +479,13 @@ export default function AddNewLead() {
           : null,
       assigned_to_id: intOrNull(form.assignee) ?? null,
       assigned_to_name: assigneeName.trim() || null,
-      personal_id: intOrNull(form.personnel) ?? null,
+      lead_generated_by: form.leadGeneratedBy?.trim() || "",
+      personal_id: IS_CONTRACTS_APP
+        ? resolvedGeneratedById
+        : (intOrNull(form.personnel) ?? null),
+      personal_name: IS_CONTRACTS_APP
+        ? (form.leadGeneratedBy?.trim() || null)
+        : null,
       age: IS_MEDICAL_APP ? (intOrNull(form.age) ?? null) : null,
       partner_age: IS_MEDICAL_APP ? (intOrNull(form.partnerAge) ?? null) : null,
       partner_inquiry: IS_MEDICAL_APP ? isCouple === "yes" : false,
@@ -591,20 +632,37 @@ export default function AddNewLead() {
             form={form}
             isCouple={isCouple}
             setIsCouple={setIsCouple}
-            employees={employees}
-            loadingEmployees={loadingEmployees}
             assigneeName={assigneeName}
             assigneeOptions={assigneeOptions}
             assigneeLoading={assigneeLoading}
+            leadGeneratedByInput={form.leadGeneratedBy ?? ""}
+            leadGeneratedByOptions={leadGeneratedByOptions}
+            leadGeneratedByLoading={leadGeneratedByLoading}
             campaigns={campaigns}
             handleChange={handleChange}
-            handleAssigneeInputChange={setAssigneeSearch}
+            handleAssigneeInputChange={(value) => {
+              setAssigneeSearch(value);
+              setAssigneeName(value);
+              setForm((prev) => ({ ...prev, assignee: "" }));
+            }}
             handleAssigneeChange={(value) => {
               setForm((prev) => ({
                 ...prev,
                 assignee: value ? String(value.id) : "",
               }));
               setAssigneeName(value ? assigneeLabel(value) : "");
+            }}
+            handleLeadGeneratedByInputChange={(value) => {
+              setLeadGeneratedBySearch(value);
+              setLeadGeneratedById("");
+              setForm((prev) => ({ ...prev, leadGeneratedBy: value }));
+            }}
+            handleLeadGeneratedByChange={(value) => {
+              setLeadGeneratedById(value ? String(value.id) : "");
+              setForm((prev) => ({
+                ...prev,
+                leadGeneratedBy: value ? assigneeLabel(value) : "",
+              }));
             }}
             handleCampaignChange={handleCampaignChange}
             handleNextTypeChange={handleNextTypeChange}

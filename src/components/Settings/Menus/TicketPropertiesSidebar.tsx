@@ -221,6 +221,12 @@ const TicketPropertiesSidebar = ({
       p={3}
       borderRadius={2}
       border="1px solid #E0E0E0"
+      sx={{
+        minHeight: 0,
+        height: "100%",
+        maxHeight: { xs: "48vh", lg: "100%" },
+        overflowY: "auto",
+      }}
     >
       <Tabs
         value={tab}
@@ -403,13 +409,7 @@ const TicketPropertiesSidebar = ({
           </Button>
         </Stack>
       ) : (
-        <Box
-          sx={{
-            maxHeight: "60vh",
-            overflowY: "auto",
-            overscrollBehaviorY: "auto",
-          }}
-        >
+        <Box>
           {(() => {
             const timeline = (ticket.timeline || []) as TicketTimeline[];
 

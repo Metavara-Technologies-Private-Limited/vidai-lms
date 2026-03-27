@@ -38,7 +38,9 @@ export type LeadPayload = {
   campaign_id: string | null;
   assigned_to_id: number | null;
   assigned_to_name?: string | null;
+  lead_generated_by?: string;
   personal_id: number | null;
+  personal_name?: string | null;
   full_name: string;
   contact_no: string;
   age: number | null;
