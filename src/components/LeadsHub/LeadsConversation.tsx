@@ -64,6 +64,8 @@ import {
   getSMSStatusColor,
 } from "./LeadDetailHelpers";
 import { toast } from "react-toastify";
+import TemplateService from "../../services/templates.api";
+import { normalizePhone } from "./LeadsTable.helpers";
 
 // ── Shared toast options ──────────────────────────────────────────────────────
 const toastOptions = {
@@ -189,14 +191,9 @@ interface SMSTemplate {
 /* ── Fetch SMS templates ─────────────────────────────────────────────────── */
 const fetchSMSTemplates = async (): Promise<SMSTemplate[]> => {
   try {
-    const res = await fetch("/api/sms-templates/", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("auth_token") ?? ""}`,
-      },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : (data.results ?? []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await (TemplateService as any).getTemplates("sms");
+    return data || [];
   } catch {
     return [];
   }
@@ -331,26 +328,50 @@ const SMSSuite: React.FC<SMSSuiteProps> = ({ open, lead, onClose, onSent }) => {
   };
 
   const handleSend = async () => {
-    if (!smsMessage.trim()) return;
+    if (!smsMessage.trim()) {
+      setSmsError("Message cannot be empty");
+      return;
+    }
+
+    const phone = normalizePhone(lead?.contact_no as string | undefined);
+
+    if (!phone) {
+      setSmsError("This lead has no contact number.");
+      return;
+    }
+
+    if (!lead?.id) {
+      setSmsError("Lead ID is missing. Cannot send SMS.");
+      return;
+    }
+
     setIsSending(true);
+
     try {
       await TwilioAPI.sendSMS({
         lead_uuid: lead.id,
-        to: lead.contact_no,
+        to: phone,
         message: smsMessage.trim(),
       });
-      toast.success(
-        `SMS sent to ${lead.full_name || "Patient"}!`,
-        toastOptions,
-      );
+
+      toast.success(`SMS sent to ${lead.full_name || "Patient"}!`);
+
       setTimeout(() => {
         onSent();
         onClose();
       }, 800);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to send SMS.";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error("SMS ERROR:", err);
+
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Failed to send SMS.";
+
       setSmsError(msg);
-      toast.error(msg, toastErrorOptions);
+      toast.error(msg);
     } finally {
       setIsSending(false);
     }
