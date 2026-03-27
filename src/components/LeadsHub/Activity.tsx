@@ -98,7 +98,7 @@ const Activity = () => {
   const end = Math.min(page * ROWS_PER_PAGE, total);
 
   return (
-    <Card sx={{ p: 2, borderRadius: "16px" }}>
+    <Card sx={{ p: 2, borderRadius: "16px", overflow: "visible" }}>
       <TableContainer component={Paper} elevation={0}>
         <Table>
           <TableHead>
@@ -236,7 +236,11 @@ const Activity = () => {
         </Typography>
 
         <Stack direction="row" spacing={1} alignItems="center">
-          <IconButton size="small" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+          <IconButton
+            size="small"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
             <ChevronLeftIcon />
           </IconButton>
 
@@ -245,17 +249,25 @@ const Activity = () => {
               key={p}
               onClick={() => setPage(p)}
               sx={{
-                px: 1.2, py: 0.4, borderRadius: "6px", cursor: "pointer",
+                px: 1.2,
+                py: 0.4,
+                borderRadius: "6px",
+                cursor: "pointer",
                 bgcolor: page === p ? "#111" : "transparent",
                 color: page === p ? "#FFF" : "#6B7280",
-                fontSize: "13px", userSelect: "none",
+                fontSize: "13px",
+                userSelect: "none",
               }}
             >
               {p}
             </Box>
           ))}
 
-          <IconButton size="small" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
+          <IconButton
+            size="small"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
             <ChevronRightIcon />
           </IconButton>
         </Stack>

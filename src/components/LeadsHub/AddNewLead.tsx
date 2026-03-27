@@ -4,6 +4,7 @@ import {
   Button,
   Typography,
   Paper,
+  CircularProgress,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -495,20 +496,20 @@ export default function AddNewLead() {
     <Paper
       sx={{
         overflow: "hidden",
-        minHeight: "100vh",
+        minHeight: "88vh",
         display: "flex",
         flexDirection: "column",
       }}
     >
       {/* Header */}
-      <Box sx={{ bgcolor: "white", px: 3, py: 2 }}>
+      <Box sx={{ bgcolor: "white", px: 1, py: 1 }}>
         <Typography variant="h6" fontWeight={700} color="#1E293B">
           Add New Lead
         </Typography>
       </Box>
 
       {/* Step Indicator */}
-      <Box sx={{ bgcolor: "white", px: 6, pt: 3, pb: 2 }}>
+      <Box sx={{ bgcolor: "white", px: 1, pt: 1, pb: 3 }}>
         <Box
           sx={{
             display: "inline-flex",
@@ -522,7 +523,10 @@ export default function AddNewLead() {
           }}
         >
           {steps.map(({ label, step }) => (
-            <Box key={step} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              key={step}
+              sx={{ display: "flex", alignItems: "center", gap: 1 }}
+            >
               <Box
                 sx={{
                   width: 24,
@@ -532,7 +536,9 @@ export default function AddNewLead() {
                     currentStep > step
                       ? "#10B981"
                       : currentStep === step
-                        ? step === 3 ? "#3B82F6" : "#F97316"
+                        ? step === 3
+                          ? "#3B82F6"
+                          : "#F97316"
                         : "#E2E8F0",
                   color: "white",
                   display: "flex",
@@ -553,7 +559,9 @@ export default function AddNewLead() {
                     currentStep > step
                       ? "#10B981"
                       : currentStep === step
-                        ? step === 3 ? "#3B82F6" : "#F97316"
+                        ? step === 3
+                          ? "#3B82F6"
+                          : "#F97316"
                         : "#94A3B8",
                 }}
               >
@@ -568,7 +576,7 @@ export default function AddNewLead() {
       <Box
         sx={{
           bgcolor: "white",
-          p: 3,
+          p: 1,
           flex: 1,
           overflowY: "auto",
           "&::-webkit-scrollbar": { width: "8px" },
@@ -592,7 +600,10 @@ export default function AddNewLead() {
             handleChange={handleChange}
             handleAssigneeInputChange={setAssigneeSearch}
             handleAssigneeChange={(value) => {
-              setForm((prev) => ({ ...prev, assignee: value ? String(value.id) : "" }));
+              setForm((prev) => ({
+                ...prev,
+                assignee: value ? String(value.id) : "",
+              }));
               setAssigneeName(value ? assigneeLabel(value) : "");
             }}
             handleCampaignChange={handleCampaignChange}
@@ -695,7 +706,11 @@ export default function AddNewLead() {
               "&:hover": { bgcolor: "#1E293B" },
             }}
           >
-            Save
+            {isSubmitting ? (
+              <CircularProgress size={18} sx={{ color: "#fff" }} />
+            ) : (
+              "Save"
+            )}
           </Button>
         )}
       </Box>

@@ -17,6 +17,7 @@ import {
 } from "../../store/leadSlice";
 import { fetchCampaign, selectCampaign } from "../../store/campaignSlice";
 import { selectClinic } from "../../store/clinicSlice";
+import { CircularProgress } from "@mui/material";
 
 const SourcePerformanceChart = lazy(() => import("./SourcePerformanceChart"));
 const CommunicationChart = lazy(() => import("./CommunicationChart"));
@@ -61,12 +62,14 @@ const DashboardLayout = () => {
     >
       {/* LEFT SECTION */}
       <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-          {leadsLoading && (
-    <Typography variant="caption" color="text.secondary">
-      Loading leads...
-    </Typography>
-  )}
-        {" "}
+        {leadsLoading && (
+          <Box display="flex" alignItems="center" gap={1} mb={1}>
+            <CircularProgress size={16} />
+            <Typography variant="caption" color="text.secondary">
+              Loading leads...
+            </Typography>
+          </Box>
+        )}{" "}
         {/* ADD */}
         <Typography variant="h6" pb={2}>
           Refera MD Dashboard

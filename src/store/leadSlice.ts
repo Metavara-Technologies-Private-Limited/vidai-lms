@@ -91,11 +91,11 @@ export const fetchLeads = createAsyncThunk<
     const state = getState();
     const clinicId = state.clinic.data?.id;
 
-    if (!clinicId) {
-      return rejectWithValue("Clinic not selected");
-    }
+    // if (!clinicId) {
+    //   return rejectWithValue("Clinic not selected");
+    // }
 
-    const leads = await LeadAPI.list(clinicId);
+    const leads = await LeadAPI.list(clinicId || 1);
     console.log("📊 Fetched leads from API:", leads.length);
     return leads;
   } catch (err) {

@@ -24,12 +24,12 @@
 .leads-page {
   /* padding: 24px; */
   background: #ffffff;
-  min-height: 100vh;
+  /* min-height: 100vh; */
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: auto;
 }
 
 /* ===============================

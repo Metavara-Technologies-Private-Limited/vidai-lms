@@ -177,10 +177,19 @@ export default function EditLead() {
         </Alert>
       )}
 
-      <Paper elevation={0} sx={{ borderRadius: "12px", overflow: "hidden" }}>
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: "12px",
+          overflow: "hidden",
+          height: "88vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
 
         {/* ---- Header ---- */}
-        <Box sx={{ bgcolor: "#FFFFFF", px: 4, py: 1.5 }}>
+        <Box sx={{ bgcolor: "#FFFFFF", px: 1, py: 1 }}>
           <Typography fontSize="18px" fontWeight={700} color="#0F172A">
             Edit Lead Details{" "}
             <Typography component="span" fontSize="14px" fontWeight={400} color="#64748B">
@@ -190,7 +199,7 @@ export default function EditLead() {
         </Box>
 
         {/* ---- Stepper ---- */}
-        <Box sx={{ px: 4, py: 1.5, bgcolor: "#FFFFFF" }}>
+        <Box sx={{ px: 1, py: 1.5, bgcolor: "#FFFFFF" }}>
           <Box sx={{
             display: "inline-flex", alignItems: "center",
             bgcolor: "#F8FAFC", border: "1px solid #E2E8F0",
@@ -230,7 +239,7 @@ export default function EditLead() {
 
         {/* ---- Scrollable Form ---- */}
         <Box sx={{
-          bgcolor: "white", px: 4, pt: 3, pb: 2, overflowY: "auto",
+          bgcolor: "white", px: 1, pt: 2, pb: 2, overflowY: "auto",
           "&::-webkit-scrollbar": { width: "6px" },
           "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
         }}>

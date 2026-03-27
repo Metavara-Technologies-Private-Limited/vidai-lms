@@ -2159,7 +2159,7 @@ export default function LeadDetailView() {
       ];
 
   return (
-    <Box p={1} minHeight="100vh">
+    <Box p={1} sx={{ minHeight: "80vh", overflowY: "auto" }}>
       <Card
         elevation={0}
         sx={{
