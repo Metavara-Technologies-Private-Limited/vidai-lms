@@ -71,7 +71,6 @@ import {
   normalizeDocument,
   formatNoteTime,
   getCleanLeadId,
-  getCurrentUserId,
 } from "./LeadDetailHelpers";
 import type {
   LeadRecord,
@@ -1672,14 +1671,12 @@ export default function LeadDetailView() {
     try {
       setNoteSubmitting(true);
       setNotesError(null);
-      const userId = getCurrentUserId();
       const { data: created } = await api.post("/leads/notes/", {
         title: newNoteTitle.trim() || "Note",
         note: newNoteContent.trim(),
         lead: decodeURIComponent(id || ""),
         is_active: true,
         is_deleted: false,
-        ...(userId !== null && { created_by: userId }),
       });
       const createdNote = created as RawNote;
       setNotes((prev) => [
@@ -1725,14 +1722,12 @@ export default function LeadDetailView() {
     try {
       setEditSubmitting(true);
       setNotesError(null);
-      const userId = getCurrentUserId();
       const { data: updated } = await api.put(
         `/leads/notes/${noteId}/update/`,
         {
           title: editTitle.trim(),
           note: editContent.trim(),
           lead: decodeURIComponent(id || ""),
-          ...(userId !== null && { created_by: userId }),
         },
       );
       const updatedNote = updated as RawNote;
