@@ -191,8 +191,8 @@ const normalizeLeadStatus = (value: string): "new" | "contacted" => {
   return "new";
 };
 
-const normalizeStatusFilterValue = (value: string): string =>
-  value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
+// const normalizeStatusFilterValue = (value: string): string =>
+//   value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
 
 const sanitizeImportedEmail = (value: string): string | null => {
   const normalized = value.trim();
@@ -482,13 +482,13 @@ const Leads: React.FC = () => {
     dispatch(fetchLeads());
   }, [dispatch, clinic?.id, user?.user_id]);
 
-  const waitingForContext = React.useMemo(() => {
-    if (!authed) return false;
-    // Wait while profile/clinic context is still being hydrated after refresh.
-    if (!user) return true;
-    if (clinicLoading) return true;
-    return false;
-  }, [authed, user, clinicLoading]);
+  // const waitingForContext = React.useMemo(() => {
+  //   if (!authed) return false;
+  //   // Wait while profile/clinic context is still being hydrated after refresh.
+  //   if (!user) return true;
+  //   if (clinicLoading) return true;
+  //   return false;
+  // }, [authed, user, clinicLoading]);
 
   React.useEffect(() => {
     if (leads && leads.length > 0) {
@@ -1058,7 +1058,6 @@ const Leads: React.FC = () => {
             <LeadsBoard search={search} filters={activeFilters} />
           ))}
       </React.Suspense>
-      )}
 
       {filterOpen && (
         <React.Suspense fallback={null}>
