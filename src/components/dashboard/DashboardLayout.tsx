@@ -37,9 +37,8 @@ const DashboardLayout = () => {
 
   // load leads and campaigns once when the dashboard mounts
   useEffect(() => {
-    if (clinic?.id) {
-      dispatch(fetchLeads());
-    }
+    // Always fetch leads; leadSlice handles clinic fallback internally.
+    dispatch(fetchLeads());
 
     if (campaigns.length === 0) {
       dispatch(fetchCampaign());

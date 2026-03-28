@@ -55,6 +55,7 @@ import {
   selectLeadsLoading,
   selectLeadsError,
 } from "../../store/leadSlice";
+import { selectUser } from "../../store/authSlice";
 import {
   api,
   LeadAPI,
@@ -89,6 +90,7 @@ import {
 } from "../../config/appType";
 
 import BookAppointmentModal from "./BookAppointmentModal";
+import type { AppointmentResult } from "./BookAppointmentModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -1436,6 +1438,7 @@ export default function LeadDetailView() {
   const leads = useSelector(selectLeads) as LeadRecord[] | null;
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
+  const authedUser = useSelector(selectUser);
 
   const [activeTab, setActiveTab] = React.useState(TAB_LABELS[0]);
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
@@ -1548,6 +1551,87 @@ export default function LeadDetailView() {
   }, [id]);
 
   const activeLead: LeadRecord | undefined = fullLead ?? lead;
+
+  const sendLeadSummaryEmail = React.useCallback(
+    async ({
+      leadData,
+      eventType,
+      appointmentResult,
+      statusLabel,
+    }: {
+      leadData: LeadRecord;
+      eventType: "appointment" | "update";
+      appointmentResult?: AppointmentResult;
+      statusLabel?: string;
+    }) => {
+      const recipientEmail = (leadData.email || "").trim();
+      if (!recipientEmail) return;
+
+      const leadName = (leadData.full_name || leadData.name || "Lead").trim();
+      const leadFirstName = leadName.split(/\s+/)[0] || "Lead";
+      const appointmentDate =
+        appointmentResult?.appointment_date || leadData.appointment_date || "-";
+      const appointmentSlot = appointmentResult?.slot || leadData.slot || "-";
+      const appointmentBooked =
+        appointmentResult?.book_appointment || leadData.book_appointment
+          ? "Yes"
+          : "No";
+      const senderName =
+        [authedUser?.first_name, authedUser?.last_name]
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        authedUser?.username ||
+        "Team";
+      const senderEmail = authedUser?.email?.trim() || undefined;
+
+      const subject =
+        eventType === "appointment"
+          ? `Appointment Booked - ${appointmentDate}`
+          : `Lead Updated - ${leadName}`;
+
+      const emailBody = [
+        `Hi ${leadFirstName},`,
+        "",
+        eventType === "appointment"
+          ? `Your appointment has been booked successfully for ${appointmentDate} at ${appointmentSlot}.`
+          : "Your lead details have been updated successfully.",
+        "",
+        "Lead Details:",
+        `- Lead Name: ${leadName || "-"}`,
+        `- Contact Number: ${leadData.contact_no || leadData.phone || leadData.phone_number || "-"}`,
+        `- Email: ${recipientEmail}`,
+        `- Location: ${leadData.location || "-"}`,
+        `- Address: ${leadData.address || "-"}`,
+        `- Department: ${leadData.department_name || leadData.department || "-"}`,
+        `- Source: ${leadData.source || "-"}`,
+        `- Sub Source: ${leadData.sub_source || "-"}`,
+        `- Treatment Interest: ${leadData.treatment_interest || "-"}`,
+        `- Assigned To: ${leadData.assigned_to_name || leadData.assigned || "-"}`,
+        `- Lead Status: ${statusLabel || leadData.status || leadData.lead_status || "-"}`,
+        `- Next Action Type: ${leadData.next_action_type || "-"}`,
+        `- Next Action Status: ${leadData.next_action_status || "-"}`,
+        `- Next Action Description: ${leadData.next_action_description || "-"}`,
+        `- Appointment Booked: ${appointmentBooked}`,
+        `- Appointment Date: ${appointmentDate}`,
+        `- Appointment Slot: ${appointmentSlot}`,
+        `- Remark: ${appointmentResult?.remark || leadData.remark || "-"}`,
+        "",
+        `Sent by: ${senderName}`,
+        `Sender Email: ${senderEmail || "-"}`,
+        "",
+        "Thank you.",
+      ].join("\n");
+
+      await LeadEmailAPI.sendNow({
+        lead: String(leadData.id),
+        subject,
+        sender_email: senderEmail,
+        email_body: emailBody,
+      });
+    },
+    [authedUser],
+  );
 
   React.useEffect(() => {
     const current = normalizeLeadStatusForPill(
@@ -1916,6 +2000,54 @@ export default function LeadDetailView() {
     setBookApptOpen(true);
   }, [activeLead]);
 
+  const handleAppointmentSaved = React.useCallback((result: AppointmentResult) => {
+    setBookApptOpen(false);
+
+    const mailLeadData = {
+      ...(activeLead ?? {}),
+      book_appointment: true,
+      lead_status: "Appointment",
+      status: "Appointment",
+      appointment_date: result.appointment_date,
+      slot: result.slot,
+      remark: result.remark,
+      personal_name: result.personnelName || activeLead?.personal_name,
+      department_id: result.department_id ?? activeLead?.department_id,
+      department_name: result.departmentName || activeLead?.department_name,
+    } as LeadRecord;
+
+    void sendLeadSummaryEmail({
+      leadData: mailLeadData,
+      eventType: "appointment",
+      appointmentResult: result,
+      statusLabel: "Appointment",
+    }).catch(() => {
+      toast.warning("Appointment saved, but confirmation email could not be sent.", toastOptions);
+    });
+
+    // Keep detail pane in sync immediately after booking from this view.
+    setFullLead((prev) => {
+      const base = prev ?? activeLead ?? null;
+      if (!base) return prev;
+
+      return {
+        ...base,
+        book_appointment: true,
+        lead_status: "Appointment",
+        status: "Appointment",
+        appointment_date: result.appointment_date,
+        slot: result.slot,
+        remark: result.remark,
+        personal_id: result.personal_id,
+        personal_name: result.personnelName || base.personal_name,
+        department_id: result.department_id ?? base.department_id,
+        department_name: result.departmentName || base.department_name,
+      } as LeadRecord;
+    });
+
+    dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+  }, [activeLead, dispatch, sendLeadSummaryEmail]);
+
   if (loading && !activeLead)
     return (
       <Box
@@ -2130,6 +2262,21 @@ export default function LeadDetailView() {
       setSelectedLeadStatus(draftLeadStatus);
       setStatusDialogOpen(false);
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+
+      const mailLeadData = {
+        ...(activeLead ?? {}),
+        ...(updatedLead as unknown as LeadRecord),
+        status: draftLeadStatus,
+      } as LeadRecord;
+
+      void sendLeadSummaryEmail({
+        leadData: mailLeadData,
+        eventType: "update",
+        statusLabel: draftLeadStatus,
+      }).catch(() => {
+        toast.warning("Lead status updated, but email could not be sent.", toastOptions);
+      });
+
       toast.success("Lead status updated.", toastOptions);
     } catch (err) {
       toast.error(
@@ -2665,10 +2812,7 @@ export default function LeadDetailView() {
         open={bookApptOpen}
         lead={activeLead}
         onClose={() => setBookApptOpen(false)}
-        onSaved={() => {
-          setBookApptOpen(false);
-          dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-        }}
+        onSaved={handleAppointmentSaved}
       />
 
       <Dialog

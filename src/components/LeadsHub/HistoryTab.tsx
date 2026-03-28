@@ -1724,6 +1724,129 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   emailHistoryLoading,
   onRefreshEmailHistory,
 }) => {
+  const parseTimestamp = React.useCallback((value?: string | null): number => {
+    if (!value) return 0;
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }, []);
+
+  const sortedSmsHistory = React.useMemo(
+    () => [...smsHistory].sort((a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)),
+    [smsHistory, parseTimestamp],
+  );
+
+  const sortedCallHistory = React.useMemo(
+    () => [...callHistory].sort((a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)),
+    [callHistory, parseTimestamp],
+  );
+
+  const sortedEmailHistory = React.useMemo(
+    () => [...emailHistory].sort((a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)),
+    [emailHistory, parseTimestamp],
+  );
+
+  type TimelineActivity = {
+    key: string;
+    timestamp: number;
+    node: {
+      icon?: React.ReactNode;
+      title: string;
+      time: string;
+      onClick?: () => void;
+      isClickable?: boolean;
+      isAvatar?: boolean;
+      avatarInitial?: string;
+    };
+  };
+
+  const timelineItems = React.useMemo(() => {
+    const items: TimelineActivity[] = [];
+
+    if (hasAppointment) {
+      items.push({
+        key: "appointment",
+        timestamp: parseTimestamp(lead.appointment_date) || parseTimestamp(lead.created_at),
+        node: {
+          icon: <EventNoteIcon sx={{ fontSize: 16, color: "#10B981" }} />,
+          title: `Appointment Booked - ${appointmentDate} at ${appointmentSlot}`,
+          time: appointmentDate !== "N/A" ? `${appointmentDate} ${appointmentSlot !== "N/A" ? `(${appointmentSlot})` : ""}`.trim() : leadCreatedAt,
+          onClick: () => setHistoryView("appointment"),
+          isClickable: true,
+        },
+      });
+    }
+
+    if (sortedSmsHistory.length > 0) {
+      items.push({
+        key: "sms",
+        timestamp: parseTimestamp(sortedSmsHistory[0]?.created_at),
+        node: {
+          icon: <SmsOutlinedIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />,
+          title: `SMS History (${sortedSmsHistory.length} messages)`,
+          time: formatDateTime(sortedSmsHistory[0].created_at),
+          onClick: () => setHistoryView("sms"),
+          isClickable: true,
+        },
+      });
+    }
+
+    if (sortedCallHistory.length > 0) {
+      items.push({
+        key: "call",
+        timestamp: parseTimestamp(sortedCallHistory[0]?.created_at),
+        node: {
+          icon: <CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />,
+          title: `Call History (${sortedCallHistory.length} calls)`,
+          time: formatDateTime(sortedCallHistory[0].created_at),
+          onClick: () => setHistoryView("call"),
+          isClickable: true,
+        },
+      });
+    }
+
+    if (sortedEmailHistory.length > 0) {
+      items.push({
+        key: "email",
+        timestamp: parseTimestamp(sortedEmailHistory[0]?.created_at),
+        node: {
+          icon: <EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />,
+          title: `Email History (${sortedEmailHistory.length} email${sortedEmailHistory.length !== 1 ? "s" : ""})`,
+          time: formatDateTime(sortedEmailHistory[0].created_at),
+          onClick: () => setHistoryView("email"),
+          isClickable: true,
+        },
+      });
+    }
+
+    if (leadAssigned && leadAssigned !== "N/A") {
+      items.push({
+        key: "assigned",
+        timestamp: parseTimestamp(lead.created_at),
+        node: {
+          isAvatar: true,
+          avatarInitial: leadAssigned.charAt(0),
+          title: `Assigned to ${leadAssigned}`,
+          time: leadCreatedAt,
+        },
+      });
+    }
+
+    items.sort((a, b) => b.timestamp - a.timestamp);
+    return items;
+  }, [
+    appointmentDate,
+    appointmentSlot,
+    hasAppointment,
+    lead,
+    leadAssigned,
+    leadCreatedAt,
+    parseTimestamp,
+    setHistoryView,
+    sortedCallHistory,
+    sortedEmailHistory,
+    sortedSmsHistory,
+  ]);
+
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [callDialogOpen, setCallDialogOpen] = React.useState(false);
   const [callSnackbar, setCallSnackbar] = React.useState<{
@@ -1840,75 +1963,19 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
             Activity Timeline
           </Typography>
           <Stack spacing={0}>
-            {hasAppointment && (
+            {timelineItems.map((item, index) => (
               <TimelineItem
-                icon={<EventNoteIcon sx={{ fontSize: 16, color: "#10B981" }} />}
-                title={`Appointment Booked — ${appointmentDate} at ${appointmentSlot}`}
-                time={leadCreatedAt}
-                onClick={() => setHistoryView("appointment")}
-                isClickable
+                key={item.key}
+                icon={item.node.icon}
+                title={item.node.title}
+                time={item.node.time}
+                onClick={item.node.onClick}
+                isClickable={item.node.isClickable}
+                isAvatar={item.node.isAvatar}
+                avatarInitial={item.node.avatarInitial}
+                isLast={index === timelineItems.length - 1}
               />
-            )}
-            <TimelineItem
-              icon={<SmsOutlinedIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />}
-              title={`SMS History (${smsHistory.length} messages)`}
-              time={
-                smsHistory.length > 0
-                  ? formatDateTime(smsHistory[0].created_at)
-                  : leadCreatedAt
-              }
-              onClick={() => setHistoryView("sms")}
-              isClickable
-            />
-            <TimelineItem
-              icon={
-                <CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />
-              }
-              title={`Call History (${callHistory.length} calls)`}
-              time={
-                callHistory.length > 0
-                  ? formatDateTime(callHistory[0].created_at)
-                  : leadCreatedAt
-              }
-              onClick={() => setHistoryView("call")}
-              isClickable
-            />
-            <TimelineItem
-              icon={
-                <EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />
-              }
-              title="Patient shared contact number and email"
-              time={leadCreatedAt}
-              onClick={() => setHistoryView("email")}
-              isClickable
-            />
-            <TimelineItem
-              icon={
-                <EmailOutlinedIcon sx={{ fontSize: 16, color: "#3B82F6" }} />
-              }
-              title="Sent a Welcome Email"
-              time={leadCreatedAt}
-              onClick={() => setHistoryView("email")}
-              isClickable
-            />
-            <TimelineItem
-              isAvatar
-              avatarInitial={leadAssigned.charAt(0)}
-              title={`Assigned to ${leadAssigned}`}
-              time={leadCreatedAt}
-            />
-            <TimelineItem
-              icon={
-                <ChatBubbleOutlineIcon
-                  sx={{ fontSize: 16, color: "#8B5CF6" }}
-                />
-              }
-              title="Lead arrived from Website Chatbot"
-              time={leadCreatedAt}
-              onClick={() => setHistoryView("chatbot")}
-              isClickable
-              isLast
-            />
+            ))}
           </Stack>
         </Card>
 
@@ -2172,7 +2239,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                       SMS History
                     </Typography>
                     <Chip
-                      label={`${smsHistory.length} messages`}
+                      label={`${sortedSmsHistory.length} messages`}
                       size="small"
                       sx={{
                         bgcolor: "#F5F3FF",
@@ -2220,7 +2287,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   <Alert severity="error" sx={{ borderRadius: "10px" }}>
                     {smsHistoryError}
                   </Alert>
-                ) : smsHistory.length === 0 ? (
+                ) : sortedSmsHistory.length === 0 ? (
                   <Box sx={{ textAlign: "center", py: 6 }}>
                     <SmsOutlinedIcon
                       sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }}
@@ -2234,7 +2301,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   </Box>
                 ) : (
                   <Stack spacing={2}>
-                    {smsHistory.map((sms) => {
+                    {sortedSmsHistory.map((sms) => {
                       const ss = getSMSStatusColor(sms.status);
                       return (
                         <Card
@@ -2368,7 +2435,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                       Call History
                     </Typography>
                     <Chip
-                      label={`${callHistory.length} calls`}
+                      label={`${sortedCallHistory.length} calls`}
                       size="small"
                       sx={{
                         bgcolor: "#F0FDF4",
@@ -2441,7 +2508,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   <Alert severity="error" sx={{ borderRadius: "10px" }}>
                     {callHistoryError}
                   </Alert>
-                ) : callHistory.length === 0 ? (
+                ) : sortedCallHistory.length === 0 ? (
                   <Box sx={{ textAlign: "center", py: 6 }}>
                     <CallOutlinedIcon
                       sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }}
@@ -2455,7 +2522,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   </Box>
                 ) : (
                   <Stack spacing={2}>
-                    {callHistory.map((call) => {
+                    {sortedCallHistory.map((call) => {
                       const cs = getCallStatusColor(call.status);
                       return (
                         <Card
@@ -2769,7 +2836,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     </Typography>
                     {!emailHistoryLoading && (
                       <Chip
-                        label={`${emailHistory.length} email${emailHistory.length !== 1 ? "s" : ""}`}
+                        label={`${sortedEmailHistory.length} email${sortedEmailHistory.length !== 1 ? "s" : ""}`}
                         size="small"
                         sx={{
                           bgcolor: "#EFF6FF",
@@ -2847,7 +2914,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   </Box>
                 )}
 
-                {!emailHistoryLoading && emailHistory.length === 0 && (
+                {!emailHistoryLoading && sortedEmailHistory.length === 0 && (
                   <Box sx={{ textAlign: "center", py: 6 }}>
                     <EmailOutlinedIcon
                       sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }}
@@ -2888,9 +2955,9 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   </Box>
                 )}
 
-                {!emailHistoryLoading && emailHistory.length > 0 && (
+                {!emailHistoryLoading && sortedEmailHistory.length > 0 && (
                   <Stack spacing={2}>
-                    {emailHistory.map((mail) => (
+                    {sortedEmailHistory.map((mail) => (
                       <Card
                         key={mail.id}
                         sx={{
