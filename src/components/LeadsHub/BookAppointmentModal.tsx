@@ -156,36 +156,36 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
           ? (root?.data as unknown[])
           : [];
 
-  return list
-    .map((item) => {
-      const record = asRecord(item);
-      if (!record) return null;
+  const assignees: AssigneeOption[] = [];
+  for (const item of list) {
+    const record = asRecord(item);
+    if (!record) continue;
 
-      const idValue = record.id ?? record.user_id;
-      const id =
-        typeof idValue === "number"
-          ? idValue
-          : typeof idValue === "string"
-            ? Number(idValue)
-            : NaN;
+    const idValue = record.id ?? record.user_id;
+    const id =
+      typeof idValue === "number"
+        ? idValue
+        : typeof idValue === "string"
+          ? Number(idValue)
+          : NaN;
 
-      if (!Number.isFinite(id)) return null;
+    if (!Number.isFinite(id)) continue;
 
-      return {
-        id,
-        first_name:
-          typeof record.first_name === "string" ? record.first_name : undefined,
-        last_name:
-          typeof record.last_name === "string" ? record.last_name : undefined,
-        username:
-          typeof record.username === "string" ? record.username : undefined,
-        role: typeof record.role === "string" ? record.role : undefined,
-        designation:
-          typeof record.designation === "string" ? record.designation : undefined,
-        email: typeof record.email === "string" ? record.email : undefined,
-      };
-    })
-    .filter((item): item is AssigneeOption => item !== null);
+    assignees.push({
+      id,
+      first_name:
+        typeof record.first_name === "string" ? record.first_name : undefined,
+      last_name:
+        typeof record.last_name === "string" ? record.last_name : undefined,
+      username:
+        typeof record.username === "string" ? record.username : undefined,
+      role: typeof record.role === "string" ? record.role : undefined,
+      designation:
+        typeof record.designation === "string" ? record.designation : undefined,
+      email: typeof record.email === "string" ? record.email : undefined,
+    });
+  }
+  return assignees;
 };
 
 const assigneeLabel = (option: AssigneeOption): string => {
