@@ -131,6 +131,29 @@ const getStatusOptionChipSx = (status: string) => {
   };
 };
 
+const normalizeStatusKey = (value: string): string =>
+  value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
+
+const matchesStatusFilter = (leadValue: string, filterValue: string): boolean => {
+  const normalizedLead = normalizeStatusKey(leadValue);
+  const normalizedFilter = normalizeStatusKey(filterValue);
+
+  const equivalentStatuses: Record<string, string[]> = {
+    new: ["new"],
+    contacted: ["contacted"],
+    "follow-ups": ["follow-ups", "follow-up", "followup", "follow-up-leads", "follow-up-lead"],
+    converted: ["converted", "converted-lead", "converted-leads"],
+    lost: ["lost", "lost-lead", "lost-leads"],
+    "cycle-conversion": ["cycle-conversion", "cycleconversion"],
+    appointment: ["appointment", "appointments"],
+    negotiation: ["negotiation"],
+    "proposal-sent": ["proposal-sent", "proposal"],
+    "contract-signed": ["contract-signed", "contractsigned"],
+  };
+
+  return (equivalentStatuses[normalizedFilter] ?? [normalizedFilter]).includes(normalizedLead);
+};
+
 // ── Edit Status Dialog ────────────────────────────────────────────────────────
 interface EditStatusDialogProps {
   open: boolean;
@@ -516,7 +539,7 @@ const LeadsTable: React.FC<Props> = ({
   };
 
   const filteredLeads = React.useMemo(() => {
-    return localLeads.filter((lead: ProcessedLead) => {
+    const result = localLeads.filter((lead: ProcessedLead) => {
       const searchStr =
         `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
@@ -536,8 +559,8 @@ const LeadsTable: React.FC<Props> = ({
         )
           return false;
         if (filters.status) {
-          const ls = (lead.lead_status || lead.status || "").toLowerCase();
-          if (ls !== filters.status.toLowerCase()) return false;
+          const leadStatusValue = String(lead.lead_status || lead.status || "");
+          if (!matchesStatusFilter(leadStatusValue, filters.status)) return false;
         }
         if (filters.quality && lead.quality !== filters.quality) return false;
         if (filters.source && lead.source !== filters.source) return false;
@@ -558,6 +581,8 @@ const LeadsTable: React.FC<Props> = ({
       }
       return matchSearch && matchTab;
     });
+
+    return result;
   }, [localLeads, search, tab, filters]);
 
   React.useEffect(() => {
@@ -818,6 +843,18 @@ const LeadsTable: React.FC<Props> = ({
 
   return (
     <>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1.5}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        sx={{ mb: 1.5 }}
+      >
+        <Typography variant="body2" color="text.secondary" fontWeight={600}>
+          {totalEntries} lead{totalEntries !== 1 ? "s" : ""} found
+        </Typography>
+      </Stack>
+
       <TableContainer
         component={Paper}
         elevation={0}
@@ -1126,6 +1163,7 @@ const LeadsTable: React.FC<Props> = ({
         lead={emailLead}
         onClose={() => setEmailLead(null)}
       />
+
       {/* ── Edit Status Dialog ── */}
       <EditStatusDialog
         open={Boolean(editStatusLead)}

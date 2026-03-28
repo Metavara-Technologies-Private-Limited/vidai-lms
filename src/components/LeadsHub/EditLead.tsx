@@ -51,8 +51,6 @@ export default function EditLead() {
     saving,
     campaigns,
     departments,
-    employees,
-    filteredPersonnel,
     loadingDepartments,
     loadingEmployees,
     employeeError, setEmployeeError,
@@ -107,7 +105,12 @@ export default function EditLead() {
     // ── Step 3 ──
     wantAppointment,
     department, setDepartment,
-    appointmentPersonnel, setAppointmentPersonnel,
+    setAppointmentPersonnel,
+    appointmentPersonnelSearch, setAppointmentPersonnelSearch,
+    appointmentPersonnelOptions,
+    appointmentPersonnelLoading,
+    selectedAppointmentPersonnel,
+    personnelOptionLabel,
     selectedDate,
     handleDateChange,
     slot, setSlot,
@@ -477,13 +480,14 @@ export default function EditLead() {
                     options={assigneeOptions}
                     loading={assigneeLoading}
                     clearOnBlur={false}
+                    filterOptions={(options) => options}
                     value={assigneeOptions.find((option) => String(option.id) === assignee) || null}
                     inputValue={assigneeName}
                     onInputChange={(_, value, reason) => {
-                      if (reason !== "reset") {
-                        setAssigneeSearch(value);
-                        setAssigneeName(value);
-                      }
+                      if (reason === "reset") return;
+                      setAssigneeSearch(value);
+                      setAssigneeName(value);
+                      setAssignee("");
                     }}
                     onChange={(_, value) => {
                       setAssignee(value ? String(value.id) : "");
@@ -561,6 +565,7 @@ export default function EditLead() {
                       options={leadGeneratedByOptions}
                       loading={leadGeneratedByLoading}
                       clearOnBlur={false}
+                      filterOptions={(options) => options}
                       value={
                         leadGeneratedByOptions.find(
                           (option) => assigneeOptionLabel(option) === leadGeneratedBy,
@@ -568,11 +573,10 @@ export default function EditLead() {
                       }
                       inputValue={leadGeneratedBy}
                       onInputChange={(_, value, reason) => {
-                        if (reason !== "reset") {
-                          setLeadGeneratedBySearch(value);
-                          setLeadGeneratedBy(value);
-                          setLeadGeneratedById("");
-                        }
+                        if (reason === "reset") return;
+                        setLeadGeneratedBySearch(value);
+                        setLeadGeneratedBy(value);
+                        setLeadGeneratedById("");
                       }}
                       onChange={(_, value) => {
                         setLeadGeneratedBy(value ? assigneeOptionLabel(value) : "");
@@ -817,6 +821,7 @@ export default function EditLead() {
                           onChange={(e) => {
                             setDepartment(e.target.value);
                             setAppointmentPersonnel("");
+                            setAppointmentPersonnelSearch("");
                           }}
                           sx={inputStyle}
                           disabled={loadingDepartments}
@@ -833,29 +838,56 @@ export default function EditLead() {
                     )}
                     <Box>
                       <Typography sx={labelStyle}>Personnel</Typography>
-                      <TextField
-                        select fullWidth size="small"
-                        value={appointmentPersonnel}
-                        onChange={(e) => setAppointmentPersonnel(e.target.value)}
-                        sx={inputStyle}
-                        // MEDICAL: disabled until department chosen; CONTRACTS: always enabled
+                      <Autocomplete
+                        options={appointmentPersonnelOptions}
+                        loading={appointmentPersonnelLoading || loadingEmployees}
+                        clearOnBlur={false}
+                        filterOptions={(options) => options}
+                        value={selectedAppointmentPersonnel}
+                        inputValue={appointmentPersonnelSearch}
+                        onInputChange={(_, value, reason) => {
+                          if (reason === "reset") return;
+                          setAppointmentPersonnelSearch(value);
+                          setAppointmentPersonnel("");
+                        }}
+                        onChange={(_, value) => {
+                          setAppointmentPersonnel(value ? String(value.id) : "");
+                          setAppointmentPersonnelSearch(value ? personnelOptionLabel(value) : "");
+                        }}
+                        getOptionLabel={personnelOptionLabel}
+                        isOptionEqualToValue={(option, value) => option.id === value.id}
                         disabled={loadingEmployees || (IS_MEDICAL_APP && !department)}
-                      >
-                        {IS_MEDICAL_APP && !department ? (
-                          <MenuItem value="" disabled>Select department first</MenuItem>
-                        ) : filteredPersonnel.length === 0 && IS_MEDICAL_APP ? (
-                          <MenuItem value="" disabled>No employees in this department</MenuItem>
-                        ) : (
-                          [
-                            <MenuItem key="" value=""><em>-- Select Personnel --</em></MenuItem>,
-                            ...(IS_MEDICAL_APP ? filteredPersonnel : employees).map((emp) => (
-                              <MenuItem key={emp.id} value={emp.id.toString()}>
-                                {emp.emp_name} ({emp.emp_type})
-                              </MenuItem>
-                            )),
-                          ]
+                        noOptionsText={
+                          IS_MEDICAL_APP && !department
+                            ? "Select department first"
+                            : "Type to search personnel"
+                        }
+                        renderOption={(props, option) => (
+                          <li {...props} key={option.id}>
+                            {personnelOptionLabel(option)}
+                          </li>
                         )}
-                      </TextField>
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            fullWidth
+                            size="small"
+                            placeholder="Search appointment personnel"
+                            sx={inputStyle}
+                            InputProps={{
+                              ...params.InputProps,
+                              endAdornment: (
+                                <>
+                                  {appointmentPersonnelLoading || loadingEmployees
+                                    ? <CircularProgress size={20} sx={{ mr: 1 }} />
+                                    : null}
+                                  {params.InputProps.endAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
                     </Box>
                   </Box>
 

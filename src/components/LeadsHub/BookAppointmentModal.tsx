@@ -9,6 +9,7 @@
 // ============================================================
 import * as React from "react";
 import {
+  Autocomplete,
   Box,
   Button,
   CircularProgress,
@@ -34,8 +35,9 @@ import CloseIcon from "@mui/icons-material/Close";
 
 import { toast } from "react-toastify";
 
-import { api, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
-import type { Department, Employee } from "../../services/leads.api";
+import { api, DepartmentAPI } from "../../services/leads.api";
+import type { Department } from "../../services/leads.api";
+import { authApi } from "../../services/auth.api";
 import type { LeadRecord } from "./LeadDetailTypes";
 import { IS_MEDICAL_APP } from "../../config/appType";
 
@@ -127,6 +129,73 @@ const floatLabelSx = {
 };
 
 
+type AssigneeOption = {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  role?: string;
+  designation?: string;
+  email?: string;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
+const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
+  const root = asRecord(raw);
+  const list: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(root?.objects)
+      ? (root?.objects as unknown[])
+      : Array.isArray(root?.results)
+        ? (root?.results as unknown[])
+        : Array.isArray(root?.data)
+          ? (root?.data as unknown[])
+          : [];
+
+  const assignees: AssigneeOption[] = [];
+  for (const item of list) {
+    const record = asRecord(item);
+    if (!record) continue;
+
+    const idValue = record.id ?? record.user_id;
+    const id =
+      typeof idValue === "number"
+        ? idValue
+        : typeof idValue === "string"
+          ? Number(idValue)
+          : NaN;
+
+    if (!Number.isFinite(id)) continue;
+
+    assignees.push({
+      id,
+      first_name:
+        typeof record.first_name === "string" ? record.first_name : undefined,
+      last_name:
+        typeof record.last_name === "string" ? record.last_name : undefined,
+      username:
+        typeof record.username === "string" ? record.username : undefined,
+      role: typeof record.role === "string" ? record.role : undefined,
+      designation:
+        typeof record.designation === "string" ? record.designation : undefined,
+      email: typeof record.email === "string" ? record.email : undefined,
+    });
+  }
+  return assignees;
+};
+
+const assigneeLabel = (option: AssigneeOption): string => {
+  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  if (fullName) return fullName;
+  if (option.username?.trim()) return option.username.trim();
+  if (option.email?.trim()) return option.email.trim();
+  return `User #${option.id}`;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,6 +208,8 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   // ── Form state ──
   const [department, setDepartment] = React.useState("");
   const [personnel, setPersonnel]   = React.useState("");
+  const [selectedPersonnelOption, setSelectedPersonnelOption] =
+    React.useState<AssigneeOption | null>(null);
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
   const [slot, setSlot]             = React.useState("");
   const [remark, setRemark]         = React.useState("");
@@ -147,9 +218,10 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 
   // ── Lookup data ──
   const [departments, setDepartments]       = React.useState<Department[]>([]);
-  const [employees, setEmployees]           = React.useState<Employee[]>([]);
+  const [personnelOptions, setPersonnelOptions] = React.useState<AssigneeOption[]>([]);
+  const [personnelSearch, setPersonnelSearch] = React.useState("");
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
-  const [loadingEmployees, setLoadingEmployees]     = React.useState(false);
+  const [loadingPersonnel, setLoadingPersonnel]     = React.useState(false);
 
   const clinicId = lead?.clinic_id ?? 1;
   const today    = dayjs().startOf("day");
@@ -159,6 +231,8 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     if (open) {
       setDepartment("");
       setPersonnel("");
+      setSelectedPersonnelOption(null);
+      setPersonnelSearch("");
       setSelectedDate(null);
       setSlot("");
       setRemark("");
@@ -183,39 +257,34 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     })();
   }, [open, clinicId]);
 
-  // ── Fetch employees ──
+  // ── Fetch personnel from same API used by Assignee search ──
   React.useEffect(() => {
-    if (!open || !clinicId) return;
-    (async () => {
-      try {
-        setLoadingEmployees(true);
-        const list = await EmployeeAPI.listByClinic(clinicId);
-        setEmployees(Array.isArray(list) ? list : []);
-      } catch (e) {
-        console.error("Employees fetch failed:", e);
-        setEmployees([]);
-      } finally {
-        setLoadingEmployees(false);
-      }
-    })();
-  }, [open, clinicId]);
+    if (!open) return;
 
-  // ── Clear personnel when department changes ──
+    const timer = window.setTimeout(async () => {
+      try {
+        setLoadingPersonnel(true);
+        const response = await authApi.searchUsers({
+          search: personnelSearch,
+          limit: 20,
+          offset: 0,
+        });
+        setPersonnelOptions(normalizeAssignees(response));
+      } catch (e) {
+        console.error("Personnel fetch failed:", e);
+        setPersonnelOptions([]);
+      } finally {
+        setLoadingPersonnel(false);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [open, personnelSearch]);
+
+  // ── Clear selected personnel when department changes ──
   React.useEffect(() => {
     setPersonnel("");
   }, [department]);
-
-  // ── Filter personnel by department (medical) or return all (contracts) ──
-  const filteredPersonnel = React.useMemo<Employee[]>(() => {
-    if (!IS_MEDICAL_APP) return employees;
-    if (!department || employees.length === 0) return [];
-    const selectedDept = departments.find((d) => d.id === Number(department));
-    if (!selectedDept) return [];
-    const norm = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
-    return employees.filter(
-      (emp) => norm(emp.department_name) === norm(selectedDept.name),
-    );
-  }, [department, employees, departments]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Save handler
@@ -235,7 +304,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 
     // Lookup display names for the optimistic update
     const selectedDept = departments.find((d) => d.id === deptId);
-    const selectedEmp  = employees.find((e) => e.id === personnelId);
+    const selectedEmp = selectedPersonnelOption ?? personnelOptions.find((u) => u.id === personnelId);
 
     setSaving(true);
     setError(null);
@@ -248,6 +317,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         contact_no:         lead.contact_no || lead.phone || lead.phone_number || "",
         source:             lead.source || "Unknown",
         treatment_interest: lead.treatment_interest || "N/A",
+        lead_status:        "appointment",
         book_appointment:   true,
         appointment_date:   appointmentDateStr,
         slot,
@@ -272,7 +342,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         remark:           remark.trim(),
         personal_id:      personnelId,
         department_id:    deptId,
-        personnelName:    selectedEmp?.emp_name ?? "",
+        personnelName:    selectedEmp ? assigneeLabel(selectedEmp) : "",
         departmentName:   selectedDept?.name ?? "",
       });
 
@@ -399,42 +469,60 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
           )}
 
           {/* Personnel */}
-          <FormControl size="small" fullWidth sx={modalFieldSx} required>
-            <InputLabel shrink sx={floatLabelSx}>
-              Personnel <span style={{ color: "#EF4444" }}>*</span>
-            </InputLabel>
-            <Select
-              value={personnel}
-              label="Personnel *"
-              notched
-              onChange={(e) => setPersonnel(e.target.value)}
-              disabled={
-                saving ||
-                loadingEmployees ||
-                (IS_MEDICAL_APP && !department)
-              }
-              endAdornment={
-                loadingEmployees
-                  ? <CircularProgress size={14} sx={{ mr: 2 }} />
-                  : null
-              }
-            >
-              {IS_MEDICAL_APP && !department ? (
-                <MenuItem value="" disabled>Select department first</MenuItem>
-              ) : filteredPersonnel.length === 0 && IS_MEDICAL_APP ? (
-                <MenuItem value="" disabled>No employees in this department</MenuItem>
-              ) : (
-                [
-                  <MenuItem key="__empty__" value=""><em>Select Personnel</em></MenuItem>,
-                  ...filteredPersonnel.map((emp) => (
-                    <MenuItem key={emp.id} value={String(emp.id)}>
-                      {emp.emp_name}{emp.emp_type ? ` (${emp.emp_type})` : ""}
-                    </MenuItem>
-                  )),
-                ]
-              )}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            options={personnelOptions}
+            loading={loadingPersonnel}
+            clearOnBlur={false}
+            filterOptions={(options) => options}
+            value={selectedPersonnelOption}
+            inputValue={personnelSearch}
+            onInputChange={(_, value, reason) => {
+              if (reason === "reset") return;
+              setPersonnelSearch(value);
+            }}
+            onChange={(_, value) => {
+              setSelectedPersonnelOption(value);
+              setPersonnel(value ? String(value.id) : "");
+            }}
+            getOptionLabel={assigneeLabel}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            disabled={saving || (IS_MEDICAL_APP && !department)}
+            noOptionsText={
+              IS_MEDICAL_APP && !department
+                ? "Select department first"
+                : "Type to search personnel"
+            }
+            renderOption={(props, option) => (
+              <li {...props} key={option.id}>
+                {assigneeLabel(option)}
+                {option.designation ? ` (${option.designation})` : ""}
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                fullWidth
+                size="small"
+                label="Personnel *"
+                placeholder="Search personnel"
+                sx={modalFieldSx}
+                InputLabelProps={{
+                  ...params.InputLabelProps,
+                  shrink: true,
+                  sx: floatLabelSx,
+                }}
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {loadingPersonnel ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+          />
         </Box>
 
         {/* ── Row 2: Date + Slot ── */}

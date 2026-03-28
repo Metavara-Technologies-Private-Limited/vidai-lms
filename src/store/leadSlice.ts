@@ -97,15 +97,53 @@ export const fetchLeads = createAsyncThunk<
 >("leads/fetchAll", async (_, { rejectWithValue, getState }) => {
   try {
     const state = getState();
-    const clinicId = state.clinic.data?.id;
+    const clinicIdFromState = state.clinic.data?.id ?? null;
+    const clinicIdFromStorage =
+      typeof window !== "undefined"
+        ? Number(localStorage.getItem("clinic_id") || 0) || null
+        : null;
+    const clinicIdsFromProfile = (state.auth.user?.clinics || [])
+      .map((clinic) => clinic.clinic_id)
+      .filter((id): id is number => Number.isFinite(id));
 
-    // if (!clinicId) {
-    //   return rejectWithValue("Clinic not selected");
-    // }
+    const allowedClinicIds = new Set([1, 2]);
 
-    const leads = await LeadAPI.list(clinicId || 1);
-    console.log("📊 Fetched leads from API:", leads.length);
-    return leads;
+    const candidateClinicIds = Array.from(
+      new Set([
+        2,
+        1,
+        clinicIdFromState,
+        clinicIdFromStorage,
+        ...clinicIdsFromProfile,
+      ].filter((id): id is number => typeof id === "number" && allowedClinicIds.has(id))),
+    );
+
+    if (candidateClinicIds.length === 0) {
+      console.warn("[fetchLeads] skipped: no clinic context available");
+      return [];
+    }
+
+    let fallbackResult: Lead[] = [];
+
+    for (const clinicId of candidateClinicIds) {
+      try {
+        const leads = await LeadAPI.list(clinicId);
+        console.log("[fetchLeads] clinic=%d count=%d", clinicId, leads.length);
+
+        if (leads.length > 0) {
+          return leads;
+        }
+
+        if (fallbackResult.length === 0) {
+          fallbackResult = leads;
+        }
+      } catch {
+        // Ignore invalid clinic IDs (for example stale default clinic from auth payload).
+        console.warn("[fetchLeads] clinic=%d skipped due to API error", clinicId);
+      }
+    }
+
+    return fallbackResult;
   } catch (err) {
     const error = err as ApiError;
     const message =

@@ -15,7 +15,12 @@ import { api, DepartmentAPI, LeadAPI } from "../services/leads.api";
 import type { Department, Lead, LeadPayload } from "../services/leads.api";
 
 import { fetchLeads, selectLeads } from "../store/leadSlice";
-import { selectClinic } from "../store/clinicSlice";
+import {
+  fetchClinic,
+  selectClinic,
+  selectClinicLoading,
+} from "../store/clinicSlice";
+import { selectAuthed, selectUser } from "../store/authSlice";
 import type { AppDispatch } from "../store";
 import "../styles/Leads/leads.css";
 
@@ -186,6 +191,9 @@ const normalizeLeadStatus = (value: string): "new" | "contacted" => {
   return "new";
 };
 
+const normalizeStatusFilterValue = (value: string): string =>
+  value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
+
 const sanitizeImportedEmail = (value: string): string | null => {
   const normalized = value.trim();
   if (!normalized) return null;
@@ -288,6 +296,9 @@ const Leads: React.FC = () => {
 
   const leads = useSelector(selectLeads);
   const clinic = useSelector(selectClinic);
+  const clinicLoading = useSelector(selectClinicLoading);
+  const user = useSelector(selectUser);
+  const authed = useSelector(selectAuthed);
 
   const loadSavedFilters = (): FilterValues => {
     try {
@@ -343,6 +354,7 @@ const Leads: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
   const [importedLeads, setImportedLeads] = React.useState<Lead[]>([]);
   const [isSavingImport, setIsSavingImport] = React.useState(false);
+  const attemptedClinicHydrationRef = React.useRef<Set<number>>(new Set());
 
   const applyFilters = React.useCallback(
     (leadsToFilter: Array<Lead & { status?: string }>) => {
@@ -426,13 +438,57 @@ const Leads: React.FC = () => {
     }
   }, [viewMode]);
 
-  const loadInitialLeads = React.useCallback(() => {
-    dispatch(fetchLeads());
-  }, [dispatch]);
+  const clinicIdsToHydrate = React.useMemo(() => {
+    const clinics = user?.clinics ?? [];
+    const defaultId = clinics.find((clinicItem) => clinicItem.is_default)?.clinic_id;
+    const allowedClinicIds = new Set([1, 2]);
+    const ordered = [
+      defaultId,
+      ...clinics.map((clinicItem) => clinicItem.clinic_id),
+      1,
+      2,
+    ].filter((id): id is number => typeof id === "number" && allowedClinicIds.has(id));
+
+    const unique = Array.from(new Set(ordered));
+    return unique.length > 0 ? unique : [1, 2];
+  }, [user]);
 
   React.useEffect(() => {
-    loadInitialLeads();
-  }, [loadInitialLeads]);
+    if (!authed || !user || clinic || clinicLoading || clinicIdsToHydrate.length === 0) return;
+
+    let cancelled = false;
+
+    const hydrateClinic = async () => {
+      for (const clinicId of clinicIdsToHydrate) {
+        if (cancelled || attemptedClinicHydrationRef.current.has(clinicId)) continue;
+
+        attemptedClinicHydrationRef.current.add(clinicId);
+        const action = await dispatch(fetchClinic(clinicId));
+
+        if (fetchClinic.fulfilled.match(action)) {
+          return;
+        }
+      }
+    };
+
+    void hydrateClinic();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authed, user, clinic, clinicLoading, clinicIdsToHydrate, dispatch]);
+
+  React.useEffect(() => {
+    dispatch(fetchLeads());
+  }, [dispatch, clinic?.id, user?.user_id]);
+
+  const waitingForContext = React.useMemo(() => {
+    if (!authed) return false;
+    // Wait while profile/clinic context is still being hydrated after refresh.
+    if (!user) return true;
+    if (clinicLoading) return true;
+    return false;
+  }, [authed, user, clinicLoading]);
 
   React.useEffect(() => {
     if (leads && leads.length > 0) {
@@ -480,6 +536,7 @@ const Leads: React.FC = () => {
     { label: "Archived Leads", count: counts.archived },
     { label: "Leads Conversation", count: null },
     { label: "Activity", count: null },
+    { label: "Calendar", count: null },
   ];
 
   const saveImportedRowsToDb = React.useCallback(
@@ -1001,6 +1058,7 @@ const Leads: React.FC = () => {
             <LeadsBoard search={search} filters={activeFilters} />
           ))}
       </React.Suspense>
+      )}
 
       {filterOpen && (
         <React.Suspense fallback={null}>

@@ -18,6 +18,7 @@ export interface RawLead {
   lead_status?: string;
   is_active?: boolean;
   created_at?: string;
+  appointment_date?: string | null;
   location?: string;
   source?: string;
   score?: number | string;

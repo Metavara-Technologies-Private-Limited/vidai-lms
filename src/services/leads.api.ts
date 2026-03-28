@@ -1,5 +1,5 @@
 // services/leads.api.ts
-import axios from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 
 // ====================== Types ======================
 export type Department = {
@@ -100,7 +100,7 @@ export type LeadPayload = {
   partner_gender?: "male" | "female" | null;
   source: string;
   sub_source?: string;
-  lead_status?: "new" | "contacted";
+  lead_status?: "new" | "contacted" | "appointment";
   next_action_status?: "pending" | "completed" | null;
   next_action_description?: string;
   next_action_type?: string;
@@ -181,6 +181,9 @@ api.interceptors.response.use(
     const status = error?.response?.status;
     const url = error?.config?.url;
     const raw = error?.response?.data;
+    const skipErrorLog = Boolean(
+      (error?.config as { __skipErrorLog?: boolean } | undefined)?.__skipErrorLog,
+    );
     const normalizeError = (value: unknown): string => {
       if (value == null) return "Unknown error";
       if (typeof value === "string") return value;
@@ -212,7 +215,9 @@ api.interceptors.response.use(
     };
 
     const detail = normalizeError(raw ?? error?.message);
-    console.error(`❌ API Error [${status}] ${url}: ${detail}`);
+    if (!skipErrorLog) {
+      console.error(`❌ API Error [${status}] ${url}: ${detail}`);
+    }
     return Promise.reject(error);
   },
 );
@@ -349,10 +354,21 @@ export const LeadAPI = {
 
 // ====================== Lead Email API ======================
 export const LeadEmailAPI = {
-  create: async (data: LeadEmailPayload): Promise<LeadEmailResponse> => {
-    const response = await api.post<LeadEmailResponse>("/lead-email/", data);
+  create: async (
+    data: LeadEmailPayload,
+    options?: { suppressErrorLog?: boolean },
+  ): Promise<LeadEmailResponse> => {
+    const requestConfig: AxiosRequestConfig = {};
+    (requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }).__skipErrorLog =
+      options?.suppressErrorLog === true;
+
+    const response = await api.post<LeadEmailResponse>(
+      "/lead-email/",
+      data,
+      requestConfig,
+    );
     console.log("✅ Lead email created:", response.data);
-    return response.data;
+    return response.data as LeadEmailResponse;
   },
 
   sendNow: async (

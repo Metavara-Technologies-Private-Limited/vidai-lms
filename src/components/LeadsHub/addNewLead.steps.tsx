@@ -23,7 +23,7 @@ import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutl
 import CloseIcon from "@mui/icons-material/Close";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
-import type { Department, Employee } from "../../services/leads.api";
+import type { Department } from "../../services/leads.api";
 import type { FormState } from "../../types/leads.types";
 import {
   TASK_TYPES,
@@ -438,12 +438,12 @@ export function Step1({
             options={assigneeOptions}
             loading={assigneeLoading}
             clearOnBlur={false}
+            filterOptions={(options) => options}
             value={assigneeOptions.find((option) => String(option.id) === form.assignee) || null}
             inputValue={assigneeName}
             onInputChange={(_, value, reason) => {
-              if (reason !== "reset") {
-                handleAssigneeInputChange(value);
-              }
+              if (reason === "reset") return;
+              handleAssigneeInputChange(value);
             }}
             onChange={(_, value) => handleAssigneeChange(value)}
             getOptionLabel={assigneeLabel}
@@ -483,6 +483,7 @@ export function Step1({
               options={leadGeneratedByOptions}
               loading={leadGeneratedByLoading}
               clearOnBlur={false}
+              filterOptions={(options) => options}
               value={
                 leadGeneratedByOptions.find(
                   (option) => assigneeLabel(option) === leadGeneratedByInput,
@@ -490,9 +491,8 @@ export function Step1({
               }
               inputValue={leadGeneratedByInput}
               onInputChange={(_, value, reason) => {
-                if (reason !== "reset") {
-                  handleLeadGeneratedByInputChange(value);
-                }
+                if (reason === "reset") return;
+                handleLeadGeneratedByInputChange(value);
               }}
               onChange={(_, value) => handleLeadGeneratedByChange(value)}
               getOptionLabel={assigneeLabel}
@@ -816,9 +816,14 @@ interface Step3Props {
   selectedDate: Dayjs | null;
   setSelectedDate: React.Dispatch<React.SetStateAction<Dayjs | null>>;
   departments: Department[];
-  filteredPersonnel: Employee[];
   loadingDepartments: boolean;
   loadingEmployees: boolean;
+  personnelInput: string;
+  personnelOptions: AssigneeOption[];
+  personnelLoading: boolean;
+  selectedPersonnel: AssigneeOption | null;
+  handlePersonnelInputChange: (value: string) => void;
+  handlePersonnelChange: (value: AssigneeOption | null) => void;
   handleChange: (
     field: keyof FormState,
   ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -831,9 +836,14 @@ export function Step3({
   selectedDate,
   setSelectedDate,
   departments,
-  filteredPersonnel,
   loadingDepartments,
   loadingEmployees,
+  personnelInput,
+  personnelOptions,
+  personnelLoading,
+  selectedPersonnel,
+  handlePersonnelInputChange,
+  handlePersonnelChange,
   handleChange,
   handleDepartmentChange,
 }: Step3Props) {
@@ -918,30 +928,60 @@ export function Step3({
             )}
             <Box>
               <Typography sx={labelStyle}>Appointment Personnel</Typography>
-              <TextField
-                select fullWidth size="small"
-                value={form.personnel}
-                onChange={handleChange("personnel")}
-                sx={inputStyle}
-                disabled={
-                  loadingEmployees ||
-                  (IS_MEDICAL_APP ? !form.department : false)
+              <Autocomplete
+                options={personnelOptions}
+                loading={personnelLoading || loadingEmployees}
+                clearOnBlur={false}
+                filterOptions={(options) => options}
+                value={selectedPersonnel}
+                inputValue={personnelInput}
+                onInputChange={(_, value, reason) => {
+                  if (reason === "reset") return;
+                  handlePersonnelInputChange(value);
+                }}
+                onChange={(_, value) => handlePersonnelChange(value)}
+                getOptionLabel={assigneeLabel}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                disabled={loadingEmployees || (IS_MEDICAL_APP ? !form.department : false)}
+                noOptionsText={
+                  IS_MEDICAL_APP && !form.department
+                    ? "Select department first"
+                    : "Type to search personnel"
                 }
-              >
-                {IS_MEDICAL_APP && !form.department ? (
-                  <MenuItem value="" disabled>Select department first</MenuItem>
-                ) : loadingEmployees ? (
-                  <MenuItem value="" disabled>Loading...</MenuItem>
-                ) : filteredPersonnel.length === 0 ? (
-                  <MenuItem value="" disabled>No employees available</MenuItem>
-                ) : (
-                  filteredPersonnel.map((emp) => (
-                    <MenuItem key={emp.id} value={emp.id.toString()}>
-                      {emp.emp_name} ({emp.emp_type})
-                    </MenuItem>
-                  ))
+                renderOption={(props, option) => (
+                  <li {...props} key={option.id}>
+                    {assigneeLabel(option)}
+                  </li>
                 )}
-              </TextField>
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    fullWidth
+                    size="small"
+                    placeholder="Search appointment personnel"
+                    sx={inputStyle}
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {personnelLoading || loadingEmployees ? (
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                          ) : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+              />
+              {!personnelLoading
+                && !loadingEmployees
+                && !(IS_MEDICAL_APP && !form.department)
+                && personnelOptions.length === 0 && (
+                  <Typography sx={{ fontSize: "0.75rem", color: "#94A3B8", mt: 0.5 }}>
+                    Type to search personnel
+                  </Typography>
+              )}
             </Box>
           </Box>
 
