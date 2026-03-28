@@ -1,26 +1,9 @@
 import * as React from "react";
 import {
-  Alert,
-  Avatar,
-  Box,
-  Checkbox,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Tooltip,
-  Typography,
+  Alert, Avatar, Box, Checkbox, Chip, CircularProgress, Dialog,
+  DialogActions, DialogContent, DialogTitle, IconButton,
+  Paper, Stack, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
   Button,
 } from "@mui/material";
 import { toast } from "react-toastify";
@@ -29,18 +12,13 @@ import { useDispatch, useSelector } from "react-redux";
 import PhoneIcon from "@mui/icons-material/Phone";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
-import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import Lead_Status_Edit from "../../assets/icons/Lead_Status_Edit.svg";
 
 import {
-  fetchLeads,
-  selectLeads,
-  selectLeadsLoading,
-  selectLeadsError,
+  fetchLeads, selectLeads, selectLeadsLoading, selectLeadsError,
 } from "../../store/leadSlice";
 import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
@@ -56,17 +34,16 @@ import {
   stickyHeaderContactStyle,
   stickyHeaderMenuStyle,
 } from "./LeadsTable.types";
-import {
-  extractErrorMessage,
-  normalizePhone,
-  processLead,
-} from "./LeadsTable.helpers";
+import { extractErrorMessage, normalizePhone, processLead } from "./LeadsTable.helpers";
 import { getStatusChipSx, getTaskStatusChipSx } from "./LeadsTable.styles";
 import { SMSDialog } from "./SmsDialogs";
 import { EmailDialog } from "./EmailDialogs";
 
 // ── App-type config ───────────────────────────────────────────────────────────
-import { IS_CONTRACTS_APP, ACTIVE_STATUS_OPTIONS } from "../../config/appType";
+import {
+  IS_CONTRACTS_APP,
+  ACTIVE_STATUS_OPTIONS,
+} from "../../config/appType";
 import type { LeadItem } from "./Leadsboardtypes";
 
 // ── Shared toast options ──────────────────────────────────────────────────────
@@ -78,44 +55,33 @@ const toastOptions = {
 
 // Add this helper at the top of LeadsTable.tsx:
 const BACKEND_TO_DISPLAY: Record<string, string> = {
-  new: "New",
-  appointment: "Appointment",
+  "new": "New",
+  "appointment": "Appointment",
   "follow up": "Follow Up",
-  follow_up: "Follow Up",
-  negotiation: "Negotiation",
+  "follow_up": "Follow Up",
+  "negotiation": "Negotiation",
   "proposal sent": "Proposal Sent",
   "contract signed": "Contract Signed",
-  converted: "Converted Lead",
+  "converted": "Converted Lead",
   "converted lead": "Converted Lead",
-  lost: "Lost Lead",
+  "lost": "Lost Lead",
   "lost lead": "Lost Lead",
 };
 
 // ── Status chip color map (matches getStatusChipSx palette) ─────────────────
-const STATUS_CHIP_STYLES: Record<
-  string,
-  { color: string; borderColor: string; bg: string }
-> = {
-  New: { color: "#7C3AED", borderColor: "#7C3AED", bg: "#F5F3FF" },
-  Appointment: { color: "#6366F1", borderColor: "#6366F1", bg: "#EEF2FF" },
-  "Follow Up": { color: "#F59E0B", borderColor: "#F59E0B", bg: "#FFFBEB" },
-  Negotiation: { color: "#F97316", borderColor: "#F97316", bg: "#FFF7ED" },
-  "Proposal Sent": { color: "#8B5CF6", borderColor: "#8B5CF6", bg: "#F5F3FF" },
-  "Contract Signed": {
-    color: "#0EA5E9",
-    borderColor: "#0EA5E9",
-    bg: "#F0F9FF",
-  },
-  "Converted Lead": { color: "#10B981", borderColor: "#10B981", bg: "#ECFDF5" },
-  "Lost Lead": { color: "#EF4444", borderColor: "#EF4444", bg: "#FEF2F2" },
+const STATUS_CHIP_STYLES: Record<string, { color: string; borderColor: string; bg: string }> = {
+  "New":             { color: "#7C3AED", borderColor: "#7C3AED", bg: "#F5F3FF" },
+  "Appointment":     { color: "#6366F1", borderColor: "#6366F1", bg: "#EEF2FF" },
+  "Follow Up":       { color: "#F59E0B", borderColor: "#F59E0B", bg: "#FFFBEB" },
+  "Negotiation":     { color: "#F97316", borderColor: "#F97316", bg: "#FFF7ED" },
+  "Proposal Sent":   { color: "#8B5CF6", borderColor: "#8B5CF6", bg: "#F5F3FF" },
+  "Contract Signed": { color: "#0EA5E9", borderColor: "#0EA5E9", bg: "#F0F9FF" },
+  "Converted Lead":  { color: "#10B981", borderColor: "#10B981", bg: "#ECFDF5" },
+  "Lost Lead":       { color: "#EF4444", borderColor: "#EF4444", bg: "#FEF2F2" },
 };
 
 const getStatusOptionChipSx = (status: string) => {
-  const s = STATUS_CHIP_STYLES[status] ?? {
-    color: "#64748B",
-    borderColor: "#64748B",
-    bg: "#F8FAFC",
-  };
+  const s = STATUS_CHIP_STYLES[status] ?? { color: "#64748B", borderColor: "#64748B", bg: "#F8FAFC" };
   return {
     color: s.color,
     borderColor: s.borderColor,
@@ -162,61 +128,6 @@ interface EditStatusDialogProps {
   onSave: (newStatus: string) => void;
 }
 
-type SortKey =
-  | "name"
-  | "created_at"
-  | "location"
-  | "source"
-  | "lead_status"
-  | "quality"
-  | "score"
-  | "assigned"
-  | "taskType"
-  | "taskStatus"
-  | "activity";
-
-type SortDirection = "asc" | "desc";
-
-const QUALITY_RANK: Record<ProcessedLead["quality"], number> = {
-  Cold: 1,
-  Warm: 2,
-  Hot: 3,
-};
-
-const getSortValue = (lead: ProcessedLead, key: SortKey): string | number => {
-  switch (key) {
-    case "name":
-      return (lead.full_name || lead.name || "").trim().toLowerCase();
-    case "created_at": {
-      const ts = Date.parse(lead.created_at || "");
-      return Number.isNaN(ts) ? 0 : ts;
-    }
-    case "location":
-      return (lead.location || "").trim().toLowerCase();
-    case "source":
-      return (lead.source || "").trim().toLowerCase();
-    case "lead_status":
-      return (lead.lead_status || lead.status || "").trim().toLowerCase();
-    case "quality":
-      return QUALITY_RANK[lead.quality] ?? 0;
-    case "score": {
-      if (typeof lead.score === "number") return lead.score;
-      const parsed = Number(String(lead.score || "").replace("%", ""));
-      return Number.isNaN(parsed) ? 0 : parsed;
-    }
-    case "assigned":
-      return (lead.assigned || "").trim().toLowerCase();
-    case "taskType":
-      return (lead.taskType || "").trim().toLowerCase();
-    case "taskStatus":
-      return (lead.taskStatus || "").trim().toLowerCase();
-    case "activity":
-      return (lead.activity || "").trim().toLowerCase();
-    default:
-      return "";
-  }
-};
-
 const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
   open,
   currentStatus,
@@ -227,29 +138,17 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
 
   React.useEffect(() => {
-    if (open) {
-      setSelected(currentStatus);
-      setDropdownOpen(false);
-    }
+    if (open) { setSelected(currentStatus); setDropdownOpen(false); }
   }, [open, currentStatus]);
 
-  const selectedStyle = STATUS_CHIP_STYLES[selected] ?? {
-    color: "#64748B",
-    borderColor: "#64748B",
-    bg: "#F8FAFC",
-  };
+  const selectedStyle = STATUS_CHIP_STYLES[selected] ?? { color: "#64748B", borderColor: "#64748B", bg: "#F8FAFC" };
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
       PaperProps={{
-        sx: {
-          width: 340,
-          borderRadius: 3,
-          p: 1,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-        },
+        sx: { width: 340, borderRadius: 3, p: 1, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" },
       }}
     >
       <DialogTitle
@@ -269,11 +168,7 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
       </DialogTitle>
 
       <DialogContent sx={{ pt: 0.5, pb: 1 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ mb: 0.5, display: "block" }}
-        >
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
           Status
         </Typography>
 
@@ -333,10 +228,7 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
             {(ACTIVE_STATUS_OPTIONS as readonly string[]).map((opt) => (
               <Box
                 key={opt}
-                onClick={() => {
-                  setSelected(opt);
-                  setDropdownOpen(false);
-                }}
+                onClick={() => { setSelected(opt); setDropdownOpen(false); }}
                 sx={{ display: "inline-flex", pl: 0.5 }}
               >
                 <Chip
@@ -356,28 +248,13 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-        <Button
-          variant="outlined"
-          onClick={onClose}
-          sx={{
-            flex: 1,
-            borderRadius: 1,
-            color: "#232323",
-            borderColor: "#232323",
-          }}
-        >
+        <Button variant="outlined" onClick={onClose} sx={{ flex: 1, borderRadius: 1, color:"#232323", borderColor:"#232323" }}>
           Cancel
         </Button>
         <Button
           variant="contained"
           onClick={() => onSave(selected)}
-          sx={{
-            flex: 1,
-            borderRadius: 1,
-            backgroundColor: "#505050",
-            color: "#FFFFFF",
-            "&:hover": { backgroundColor: "#232323" },
-          }}
+          sx={{ flex: 1, borderRadius: 1, backgroundColor: "#505050", color:"#FFFFFF","&:hover": { backgroundColor: "#232323" } }}
         >
           Save
         </Button>
@@ -407,10 +284,6 @@ const LeadsTable: React.FC<Props> = ({
   const [callLead, setCallLead] = React.useState<ProcessedLead | null>(null);
   const [smsLead, setSmsLead] = React.useState<ProcessedLead | null>(null);
   const [emailLead, setEmailLead] = React.useState<ProcessedLead | null>(null);
-  const [sortConfig, setSortConfig] = React.useState<{
-    key: SortKey;
-    direction: SortDirection;
-  }>({ key: "created_at", direction: "desc" });
 
   // ── Edit Status state ──
   // Change state type to LeadItem which has all the raw fields:
@@ -433,8 +306,7 @@ const LeadsTable: React.FC<Props> = ({
     // Keep list ordered by lead date, so imports are placed correctly.
     const getLeadTimestamp = (lead: RawLead): number => {
       const primary = lead.created_at;
-      const secondary = (lead as RawLead & { appointment_date?: string })
-        .appointment_date;
+      const secondary = (lead as RawLead & { appointment_date?: string }).appointment_date;
       const parsed = Date.parse(primary || secondary || "");
       return Number.isNaN(parsed) ? 0 : parsed;
     };
@@ -588,98 +460,20 @@ const LeadsTable: React.FC<Props> = ({
   React.useEffect(() => {
     setPage(1);
     setSelectedIds([]);
-  }, [search, tab, filters, sortConfig]);
+  }, [search, tab, filters]);
 
-  const sortedLeads = React.useMemo(() => {
-    const sorted = [...filteredLeads];
-    sorted.sort((a, b) => {
-      const aVal = getSortValue(a, sortConfig.key);
-      const bVal = getSortValue(b, sortConfig.key);
-
-      let compare = 0;
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        compare = aVal - bVal;
-      } else {
-        compare = String(aVal).localeCompare(String(bVal), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-      }
-
-      return sortConfig.direction === "asc" ? compare : -compare;
-    });
-    return sorted;
-  }, [filteredLeads, sortConfig]);
-
-  const totalEntries = sortedLeads.length;
+  const totalEntries = filteredLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
   React.useEffect(() => {
     if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [totalPages, page]);
 
-  const currentLeads = sortedLeads.slice(
+  const currentLeads = filteredLeads.slice(
     (page - 1) * rowsPerPage,
     page * rowsPerPage,
   );
   const startEntry = totalEntries === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const endEntry = Math.min(page * rowsPerPage, totalEntries);
-
-  const toggleSort = React.useCallback((key: SortKey) => {
-    setSortConfig((prev) => {
-      if (prev.key === key) {
-        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
-      }
-      return { key, direction: "asc" };
-    });
-  }, []);
-
-  const renderSortableHeaderCell = (
-    label: string,
-    key: SortKey,
-    options?: { align?: "left" | "center" | "right"; sx?: object },
-  ) => {
-    const isActive = sortConfig.key === key;
-    const Icon =
-      isActive && sortConfig.direction === "asc"
-        ? ArrowUpwardIcon
-        : ArrowDownwardIcon;
-
-    return (
-      <TableCell align={options?.align} sx={options?.sx}>
-        <Box
-          role="button"
-          tabIndex={0}
-          onClick={() => toggleSort(key)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              toggleSort(key);
-            }
-          }}
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 0.75,
-            cursor: "pointer",
-            userSelect: "none",
-            "& .sort-arrow": {
-              opacity: isActive ? 1 : 0,
-              transform: isActive ? "scale(1)" : "scale(0.9)",
-              transition: "opacity 0.2s ease, transform 0.2s ease",
-              color: "#64748B",
-            },
-            "&:hover .sort-arrow": {
-              opacity: 1,
-              transform: "scale(1)",
-            },
-          }}
-        >
-          <span>{label}</span>
-          <Icon className="sort-arrow" sx={{ fontSize: 16 }} />
-        </Box>
-      </TableCell>
-    );
-  };
 
   const handleBulkDelete = () => {
     setLocalLeads((p) => p.filter((l) => !selectedIds.includes(l.id)));
@@ -881,19 +675,18 @@ const LeadsTable: React.FC<Props> = ({
                   }}
                 />
               </TableCell>
-              {renderSortableHeaderCell("Lead Name | No", "name")}
-              {renderSortableHeaderCell("Date | Time", "created_at")}
-              {renderSortableHeaderCell("Location", "location")}
-              {renderSortableHeaderCell("Source", "source")}
-              {renderSortableHeaderCell("Lead Status", "lead_status")}
-              {renderSortableHeaderCell("Quality", "quality")}
+              <TableCell>Lead Name | No</TableCell>
+              <TableCell>Date | Time</TableCell>
+              <TableCell>Location</TableCell>
+              <TableCell>Source</TableCell>
+              <TableCell>Lead Status</TableCell>
+              <TableCell>Quality</TableCell>
               {/* AI Score — hidden for contracts app */}
-              {!IS_CONTRACTS_APP &&
-                renderSortableHeaderCell("AI Score", "score")}
-              {renderSortableHeaderCell("Assigned To", "assigned")}
-              {renderSortableHeaderCell("Task Type", "taskType")}
-              {renderSortableHeaderCell("Task Status", "taskStatus")}
-              {renderSortableHeaderCell("Activity", "activity")}
+              {!IS_CONTRACTS_APP && <TableCell>AI Score</TableCell>}
+              <TableCell>Assigned To</TableCell>
+              <TableCell>Task Type</TableCell>
+              <TableCell>Task Status</TableCell>
+              <TableCell>Activity</TableCell>
               <TableCell align="center" sx={stickyHeaderContactStyle}>
                 Contact Option
               </TableCell>
@@ -1179,6 +972,6 @@ const LeadsTable: React.FC<Props> = ({
       />
     </>
   );
-};
+}
 
 export default LeadsTable;
