@@ -349,7 +349,7 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
                   </Stack>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <RoomOutlinedIcon sx={{ fontSize: 15, color: "#64748B" }} />
-                    <Typography fontSize="0.82rem" color="text.secondary">
+                    <Typography fontSize="0.81rem" color="text.secondary">
                       {lead.location || "Location not provided"}
                     </Typography>
                   </Stack>
@@ -361,6 +361,6 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
       </Card>
     </Stack>
   );
-};
+}; 
 
 export default LeadsCalendar;
