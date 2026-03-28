@@ -118,6 +118,8 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
     .filter((item): item is AssigneeOption => item !== null);
 };
 
+const personnelOptionLabel = (option: AssigneeOption): string => assigneeOptionLabel(option);
+
 // ====================== Helpers ======================
 export const strOrNull = (val: string | undefined | null): string | null =>
   val && val.trim() !== "" ? val.trim() : null;
@@ -334,6 +336,9 @@ export function useEditLead() {
   const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("no");
   const [department, setDepartment] = React.useState("");
   const [appointmentPersonnel, setAppointmentPersonnel] = React.useState("");
+  const [appointmentPersonnelSearch, setAppointmentPersonnelSearch] = React.useState("");
+  const [appointmentPersonnelOptions, setAppointmentPersonnelOptions] = React.useState<AssigneeOption[]>([]);
+  const [appointmentPersonnelLoading, setAppointmentPersonnelLoading] = React.useState(false);
   const [appointmentDate, setAppointmentDate] = React.useState("");
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
   const [slot, setSlot] = React.useState("");
@@ -385,6 +390,7 @@ export function useEditLead() {
     if (value === "no") {
       setDepartment("");
       setAppointmentPersonnel("");
+      setAppointmentPersonnelSearch("");
       setAppointmentDate("");
       setSelectedDate(null);
       setSlot("");
@@ -484,8 +490,10 @@ export function useEditLead() {
           if (IS_MEDICAL_APP) {
             setDepartment(lead.department_id?.toString() ?? "");
           }
-          const personnelId = (lead as unknown as { personal_id?: number }).personal_id;
+          const anyLead = lead as unknown as { personal_id?: number; personal_name?: string };
+          const personnelId = anyLead.personal_id;
           setAppointmentPersonnel(personnelId?.toString() ?? "");
+          setAppointmentPersonnelSearch(anyLead.personal_name ?? "");
           setAppointmentDate(lead.appointment_date ?? "");
           if (lead.appointment_date) setSelectedDate(dayjs(lead.appointment_date));
           setSlot(lead.slot ?? "");
@@ -602,6 +610,59 @@ export function useEditLead() {
 
     return () => clearTimeout(timer);
   }, [leadGeneratedBySearch]);
+
+  React.useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (wantAppointment !== "yes") {
+        setAppointmentPersonnelOptions([]);
+        return;
+      }
+
+      if (!appointmentPersonnelSearch.trim()) {
+        setAppointmentPersonnelOptions([]);
+        return;
+      }
+
+      try {
+        setAppointmentPersonnelLoading(true);
+        const response = await authApi.searchUsers({
+          search: appointmentPersonnelSearch,
+          limit: 20,
+          offset: 0,
+        });
+        setAppointmentPersonnelOptions(normalizeAssignees(response));
+      } catch {
+        setAppointmentPersonnelOptions([]);
+      } finally {
+        setAppointmentPersonnelLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [
+    appointmentPersonnelSearch,
+    wantAppointment,
+  ]);
+
+  const selectedAppointmentPersonnel = React.useMemo(() => {
+    const selectedId = Number(appointmentPersonnel);
+    if (Number.isFinite(selectedId)) {
+      const matched = appointmentPersonnelOptions.find((option) => option.id === selectedId);
+      if (matched) return matched;
+    }
+
+    if (!appointmentPersonnelSearch.trim()) return null;
+
+    return {
+      id: Number.isFinite(selectedId) ? selectedId : 0,
+      first_name: undefined,
+      last_name: undefined,
+      username: appointmentPersonnelSearch,
+      role: undefined,
+      designation: undefined,
+      email: undefined,
+    } satisfies AssigneeOption;
+  }, [appointmentPersonnel, appointmentPersonnelOptions, appointmentPersonnelSearch]);
 
   // ====================== Filter Personnel by Appointment Department ======================
   React.useEffect(() => {
@@ -824,6 +885,11 @@ export function useEditLead() {
     wantAppointment,
     department, setDepartment,
     appointmentPersonnel, setAppointmentPersonnel,
+    appointmentPersonnelSearch, setAppointmentPersonnelSearch,
+    appointmentPersonnelOptions,
+    appointmentPersonnelLoading,
+    selectedAppointmentPersonnel,
+    personnelOptionLabel,
     selectedDate,
     handleDateChange,
     slot, setSlot,

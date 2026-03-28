@@ -65,6 +65,7 @@ import CloseIcon from "@mui/icons-material/Close";
 
 import {
   APP_TYPE,
+  IS_CONTRACTS_APP,
   IS_MEDICAL_APP,
   STATUS_OPTIONS_BY_APP,
 } from "../../config/appType";
@@ -128,7 +129,11 @@ const getStatusKeys = (status: string): string[] => {
 };
 
 // ====================== Board columns ======================
-const BOARD_COLUMNS = STATUS_OPTIONS_BY_APP[APP_TYPE].map((status) => ({
+const BOARD_STATUSES = IS_CONTRACTS_APP
+  ? ["New", "Follow Up", "Appointment", "Negotiation", "Proposal Sent", "Contract Signed", "Converted Lead", "Lost Lead"]
+  : [...STATUS_OPTIONS_BY_APP[APP_TYPE]];
+
+const BOARD_COLUMNS = BOARD_STATUSES.map((status) => ({
   label: status,
   statusKey: getStatusKeys(status),
   color:
@@ -141,6 +146,29 @@ const BOARD_COLUMNS = STATUS_OPTIONS_BY_APP[APP_TYPE].map((status) => ({
     : status === "Converted Lead"  ? "#22C55E"
     : "#EF4444",
 }));
+
+const normalizeStatusKey = (value: string): string =>
+  value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
+
+const matchesStatusFilter = (leadValue: string, filterValue: string): boolean => {
+  const normalizedLead = normalizeStatusKey(leadValue);
+  const normalizedFilter = normalizeStatusKey(filterValue);
+
+  const equivalentStatuses: Record<string, string[]> = {
+    new: ["new"],
+    contacted: ["contacted"],
+    "follow-ups": ["follow-ups", "follow-up", "followup", "follow-up-leads", "follow-up-lead"],
+    converted: ["converted", "converted-lead", "converted-leads"],
+    lost: ["lost", "lost-lead", "lost-leads"],
+    "cycle-conversion": ["cycle-conversion", "cycleconversion"],
+    appointment: ["appointment", "appointments"],
+    negotiation: ["negotiation"],
+    "proposal-sent": ["proposal-sent", "proposal"],
+    "contract-signed": ["contract-signed", "contractsigned"],
+  };
+
+  return (equivalentStatuses[normalizedFilter] ?? [normalizedFilter]).includes(normalizedLead);
+};
 
 // ====================== SMS Template type ======================
 interface SMSTemplate {
@@ -663,8 +691,8 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
         if (filters.department && lead.department_id   !== Number(filters.department)) return false;
         if (filters.assignee   && lead.assigned_to_id !== Number(filters.assignee))   return false;
         if (filters.status) {
-          const ls = (lead.lead_status || lead.status || "").toLowerCase();
-          if (ls !== filters.status.toLowerCase()) return false;
+          const leadStatusValue = String(lead.lead_status || lead.status || "");
+          if (!matchesStatusFilter(leadStatusValue, filters.status)) return false;
         }
         if (filters.quality && lead.quality !== filters.quality) return false;
         if (filters.source  && lead.source  !== filters.source)  return false;

@@ -12,10 +12,11 @@ import { Dayjs } from "dayjs";
 
 import { useSelector } from "react-redux";
 import { selectCampaign } from "../../store/campaignSlice";
+import { selectUser } from "../../store/authSlice";
 
 import type { FormState } from "../../types/leads.types";
-import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
-import type { Department, Employee } from "../../services/leads.api";
+import { LeadAPI, DepartmentAPI, LeadEmailAPI } from "../../services/leads.api";
+import type { Department } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 
 import {
@@ -129,6 +130,8 @@ const assigneeLabel = (option: AssigneeOption): string => {
   return secondary ? `${primary} (${secondary})` : primary;
 };
 
+const personnelLabel = (option: AssigneeOption): string => assigneeLabel(option);
+
 // ====================== Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
@@ -138,10 +141,8 @@ export default function AddNewLead() {
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
 
   const [departments, setDepartments] = React.useState<Department[]>([]);
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>([]);
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
-  const [loadingEmployees, setLoadingEmployees] = React.useState(false);
+  const loadingEmployees = false;
   const [clinicId] = React.useState(1);
   const [assigneeName, setAssigneeName] = React.useState("");
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
@@ -151,12 +152,16 @@ export default function AddNewLead() {
   const [leadGeneratedById, setLeadGeneratedById] = React.useState("");
   const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<AssigneeOption[]>([]);
   const [leadGeneratedByLoading, setLeadGeneratedByLoading] = React.useState(false);
+  const [appointmentPersonnelInput, setAppointmentPersonnelInput] = React.useState("");
+  const [appointmentPersonnelOptions, setAppointmentPersonnelOptions] = React.useState<AssigneeOption[]>([]);
+  const [appointmentPersonnelLoading, setAppointmentPersonnelLoading] = React.useState(false);
 
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
   const [docDragOver, setDocDragOver] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const rawCampaigns = useSelector(selectCampaign);
+  const authedUser = useSelector(selectUser);
 
   const campaigns = React.useMemo(
     () =>
@@ -230,37 +235,6 @@ export default function AddNewLead() {
     fetchDepartments();
   }, [clinicId]);
 
-  // ── Fetch Employees ──────────────────────────────────────────────
-  React.useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        setLoadingEmployees(true);
-        const employees = await EmployeeAPI.listByClinic(clinicId);
-        setEmployees(Array.isArray(employees) ? employees : []);
-      } catch (err) {
-        const error = err as ApiError;
-        const status = error?.response?.status;
-        const msg =
-          status === 401
-            ? "Unauthorized — please log in again"
-            : status === 404
-              ? `Employees endpoint not found (clinic ${clinicId})`
-              : toReadableError(error?.response?.data) ||
-                error?.message ||
-                "Failed to load employees";
-        toast.warning(`Employees: ${msg}`, {
-          position: "top-right",
-          autoClose: 3000,
-          theme: "colored",
-        });
-        setEmployees([]);
-      } finally {
-        setLoadingEmployees(false);
-      }
-    };
-    fetchEmployees();
-  }, [clinicId]);
-
   React.useEffect(() => {
     const timer = setTimeout(async () => {
       if (!assigneeSearch.trim()) {
@@ -311,6 +285,60 @@ export default function AddNewLead() {
     return () => clearTimeout(timer);
   }, [leadGeneratedBySearch]);
 
+  React.useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (form.wantAppointment !== "yes") {
+        setAppointmentPersonnelOptions([]);
+        return;
+      }
+
+      if (!appointmentPersonnelInput.trim()) {
+        setAppointmentPersonnelOptions([]);
+        return;
+      }
+
+      try {
+        setAppointmentPersonnelLoading(true);
+        const response = await authApi.searchUsers({
+          search: appointmentPersonnelInput,
+          limit: 20,
+          offset: 0,
+        });
+        setAppointmentPersonnelOptions(normalizeAssignees(response));
+      } catch {
+        setAppointmentPersonnelOptions([]);
+      } finally {
+        setAppointmentPersonnelLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [
+    appointmentPersonnelInput,
+    form.department,
+    form.wantAppointment,
+  ]);
+
+  const selectedAppointmentPersonnel = React.useMemo(() => {
+    const selectedId = Number(form.personnel);
+    if (Number.isFinite(selectedId)) {
+      const matched = appointmentPersonnelOptions.find((option) => option.id === selectedId);
+      if (matched) return matched;
+    }
+
+    if (!appointmentPersonnelInput.trim()) return null;
+
+    return {
+      id: Number.isFinite(selectedId) ? selectedId : 0,
+      first_name: undefined,
+      last_name: undefined,
+      username: appointmentPersonnelInput,
+      role: undefined,
+      designation: undefined,
+      email: undefined,
+    } satisfies AssigneeOption;
+  }, [appointmentPersonnelInput, appointmentPersonnelOptions, form.personnel]);
+
   // ── Auto-fill source from campaign ──────────────────────────────
   React.useEffect(() => {
     if (!form.campaign) {
@@ -327,28 +355,6 @@ export default function AddNewLead() {
     }));
   }, [form.campaign, campaigns]);
 
-  // ── Filter personnel by department (medical only) ────────────────
-  React.useEffect(() => {
-    if (!IS_MEDICAL_APP) {
-      // For contracts app, show all employees as appointment personnel
-      setFilteredPersonnel(employees);
-      return;
-    }
-    if (!form.department || employees.length === 0) {
-      setFilteredPersonnel([]);
-      return;
-    }
-    const selectedDeptId = Number(form.department);
-    const selectedDept = departments.find((d) => d.id === selectedDeptId);
-    if (!selectedDept) { setFilteredPersonnel([]); return; }
-    const normalize = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
-    setFilteredPersonnel(
-      employees.filter(
-        (emp) => normalize(emp.department_name) === normalize(selectedDept.name),
-      ),
-    );
-  }, [form.department, employees, departments]);
-
   // ── Handlers ────────────────────────────────────────────────────
   const handleChange =
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -357,8 +363,10 @@ export default function AddNewLead() {
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
 
-  const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+  const handleDepartmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAppointmentPersonnelInput("");
     setForm((prev) => ({ ...prev, department: e.target.value, personnel: "" }));
+  };
 
   const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newType = e.target.value;
@@ -462,7 +470,7 @@ export default function AddNewLead() {
       appointment_date: shouldBookAppointment ? (form.appointmentDate ?? null) : null,
       slot: shouldBookAppointment ? (form.slot ?? "") : "",
       campaign_id: strOrNull(form.campaign),
-      email: strOrNull(form.email) ?? null,
+      email: strOrNull(form.email || form.contactEmail) ?? null,
       language_preference: form.language ?? "",
       location: form.location ?? "",
       address: form.address ?? "",
@@ -501,10 +509,125 @@ export default function AddNewLead() {
     try {
       setIsSubmitting(true);
       const payload = buildPayload();
+      const shouldSendAppointmentEmail =
+        payload.book_appointment === true &&
+        Boolean(payload.appointment_date && payload.slot);
+
       const response =
         pendingFiles.length > 0
           ? await LeadAPI.createWithDocuments(payload, pendingFiles)
           : await LeadAPI.create(payload);
+
+      if (shouldSendAppointmentEmail) {
+        try {
+          await LeadAPI.update(String(response.id), {
+            clinic_id: response.clinic_id ?? payload.clinic_id,
+            department_id: response.department_id ?? payload.department_id,
+            full_name: response.full_name || payload.full_name,
+            contact_no: response.contact_no || payload.contact_no,
+            source: response.source || payload.source,
+            treatment_interest: response.treatment_interest || payload.treatment_interest,
+            lead_status: "appointment",
+            book_appointment: true,
+            appointment_date: payload.appointment_date,
+            slot: payload.slot,
+            partner_inquiry: response.partner_inquiry ?? payload.partner_inquiry,
+            is_active: response.is_active !== false,
+          });
+        } catch {
+          toast.warning("Lead was created, but appointment status update failed.", {
+            position: "top-right",
+            autoClose: 2500,
+            theme: "colored",
+          });
+        }
+
+      }
+
+      const recipientEmail =
+        response.email?.trim() ||
+        payload.email?.trim() ||
+        form.contactEmail.trim() ||
+        "";
+      if (recipientEmail) {
+        const leadFirstName = (response.full_name || payload.full_name || "Patient")
+          .trim()
+          .split(/\s+/)[0] || "Patient";
+
+        const appointmentDateText = payload.appointment_date || "-";
+        const appointmentSlotText = payload.slot || "-";
+        const appointmentBookedText = payload.book_appointment ? "Yes" : "No";
+        const senderName = [authedUser?.first_name, authedUser?.last_name]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || authedUser?.username || "Team";
+        const senderEmail = authedUser?.email?.trim() || undefined;
+
+        const subject = payload.book_appointment
+          ? `Appointment Booked - ${appointmentDateText}`
+          : `Lead Registered - ${response.full_name || payload.full_name}`;
+
+        const emailBody = [
+          `Hi ${leadFirstName},`,
+          "",
+          payload.book_appointment
+            ? `Your appointment has been booked successfully for ${appointmentDateText} at ${appointmentSlotText}.`
+            : "Your lead has been registered successfully.",
+          "",
+          "Lead Details:",
+          `- Lead Name: ${response.full_name || payload.full_name || "-"}`,
+          `- Contact Number: ${response.contact_no || payload.contact_no || "-"}`,
+          `- Email: ${recipientEmail}`,
+          `- Location: ${response.location || payload.location || "-"}`,
+          `- Address: ${response.address || payload.address || "-"}`,
+          `- Department ID: ${String(response.department_id || payload.department_id || "-")}`,
+          `- Source: ${response.source || payload.source || "-"}`,
+          `- Sub Source: ${response.sub_source || payload.sub_source || "-"}`,
+          `- Treatment Interest: ${response.treatment_interest || payload.treatment_interest || "-"}`,
+          `- Assigned To: ${response.assigned_to_name || payload.assigned_to_name || "-"}`,
+          `- Lead Generated By: ${payload.lead_generated_by || "-"}`,
+          `- Contact Person Name: ${form.contactFullName || "-"}`,
+          `- Contact Designation: ${form.designation || "-"}`,
+          `- Contact Phone: ${form.contactPhone || "-"}`,
+          `- Contact Email: ${form.contactEmail || "-"}`,
+          `- Gender: ${payload.gender || "-"}`,
+          `- Age: ${payload.age ?? "-"}`,
+          `- Marital Status: ${payload.marital_status || "-"}`,
+          `- Partner Name: ${payload.partner_full_name || "-"}`,
+          `- Partner Gender: ${payload.partner_gender || "-"}`,
+          `- Partner Age: ${payload.partner_age ?? "-"}`,
+          `- Next Action Type: ${response.next_action_type || payload.next_action_type || "-"}`,
+          `- Next Action Status: ${response.next_action_status || payload.next_action_status || "-"}`,
+          `- Next Action Description: ${response.next_action_description || payload.next_action_description || "-"}`,
+          `- Appointment Booked: ${appointmentBookedText}`,
+          `- Appointment Date: ${appointmentDateText}`,
+          `- Appointment Slot: ${appointmentSlotText}`,
+          `- Remark: ${response.remark || payload.remark || "-"}`,
+          "",
+          `Sent by: ${senderName}`,
+          `Sender Email: ${senderEmail || "-"}`,
+          "",
+          "If any detail needs correction, please reply to this email.",
+          "",
+          "Thank you.",
+        ].join("\n");
+
+        try {
+          await LeadEmailAPI.sendNow({
+            lead: response.id,
+            subject,
+            sender_email: senderEmail,
+            email_body: emailBody,
+          });
+        } catch {
+          toast.warning("Lead was created, but confirmation email could not be sent.", {
+            position: "top-right",
+            autoClose: 2500,
+            theme: "colored",
+          });
+        }
+      }
+
       console.log("✅ Lead created:", response);
       toast.success("Lead saved successfully!", {
         position: "top-right", autoClose: 1500, theme: "colored",
@@ -688,9 +811,20 @@ export default function AddNewLead() {
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
             departments={departments}
-            filteredPersonnel={filteredPersonnel}
             loadingDepartments={loadingDepartments}
             loadingEmployees={loadingEmployees}
+            personnelInput={appointmentPersonnelInput}
+            personnelOptions={appointmentPersonnelOptions}
+            personnelLoading={appointmentPersonnelLoading}
+            selectedPersonnel={selectedAppointmentPersonnel}
+            handlePersonnelInputChange={(value) => {
+              setAppointmentPersonnelInput(value);
+              setForm((prev) => ({ ...prev, personnel: "" }));
+            }}
+            handlePersonnelChange={(value) => {
+              setForm((prev) => ({ ...prev, personnel: value ? String(value.id) : "" }));
+              setAppointmentPersonnelInput(value ? personnelLabel(value) : "");
+            }}
             handleChange={handleChange}
             handleDepartmentChange={handleDepartmentChange}
           />
