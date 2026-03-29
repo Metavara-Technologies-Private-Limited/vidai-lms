@@ -15,7 +15,10 @@ import RoomOutlinedIcon from "@mui/icons-material/RoomOutlined";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
-import { PickersDay, type PickersDayProps } from "@mui/x-date-pickers/PickersDay";
+import {
+  PickersDay,
+  type PickersDayProps,
+} from "@mui/x-date-pickers/PickersDay";
 import dayjs, { Dayjs } from "dayjs";
 
 import type { Lead } from "../../services/leads.api";
@@ -32,16 +35,28 @@ type AppointmentLead = Lead & {
 };
 
 const normalizeStatusKey = (value: string): string =>
-  value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[_\s-]+/g, "-");
 
-const matchesStatusFilter = (leadValue: string, filterValue: string): boolean => {
+const matchesStatusFilter = (
+  leadValue: string,
+  filterValue: string,
+): boolean => {
   const normalizedLead = normalizeStatusKey(leadValue);
   const normalizedFilter = normalizeStatusKey(filterValue);
 
   const equivalentStatuses: Record<string, string[]> = {
     new: ["new"],
     contacted: ["contacted"],
-    "follow-ups": ["follow-ups", "follow-up", "followup", "follow-up-leads", "follow-up-lead"],
+    "follow-ups": [
+      "follow-ups",
+      "follow-up",
+      "followup",
+      "follow-up-leads",
+      "follow-up-lead",
+    ],
     converted: ["converted", "converted-lead", "converted-leads"],
     lost: ["lost", "lost-lead", "lost-leads"],
     "cycle-conversion": ["cycle-conversion", "cycleconversion"],
@@ -51,67 +66,89 @@ const matchesStatusFilter = (leadValue: string, filterValue: string): boolean =>
     "contract-signed": ["contract-signed", "contractsigned"],
   };
 
-  return (equivalentStatuses[normalizedFilter] ?? [normalizedFilter]).includes(normalizedLead);
+  return (equivalentStatuses[normalizedFilter] ?? [normalizedFilter]).includes(
+    normalizedLead,
+  );
 };
 
 const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
   const appointments = React.useMemo<AppointmentLead[]>(() => {
     const query = search.trim().toLowerCase();
+    const filterDepartmentId = filters?.department
+      ? Number(filters.department)
+      : null;
+    const filterAssigneeId = filters?.assignee
+      ? Number(filters.assignee)
+      : null;
+    const filterStatus = filters?.status ? String(filters.status) : "";
+    const filterSource = filters?.source ? String(filters.source) : "";
+    const fromDate = filters?.dateFrom ? new Date(filters.dateFrom) : null;
+    const toDate = filters?.dateTo ? new Date(filters.dateTo) : null;
+
+    if (fromDate) fromDate.setHours(0, 0, 0, 0);
+    if (toDate) toDate.setHours(23, 59, 59, 999);
 
     // Same normalisation logic as LeadPipelineFunnel — appointment is identified
     // purely by lead_status, matching "appointment" or "appointments" variants.
     const isAppointmentLead = (lead: Lead) => {
-      const raw = ((lead.lead_status as string | undefined) || (lead as { status?: string }).status || "")
+      const raw = (
+        (lead.lead_status as string | undefined) ||
+        (lead as { status?: string }).status ||
+        ""
+      )
         .toLowerCase()
         .trim()
         .replace(/[_\s]+/g, "-");
-      return (raw === "appointment" || raw === "appointments") && Boolean(lead.appointment_date);
+      return (
+        (raw === "appointment" || raw === "appointments") &&
+        Boolean(lead.appointment_date)
+      );
     };
 
-    return leads
-      .filter((lead) => lead.is_active !== false)
-      .filter(isAppointmentLead)
-      .filter((lead) => {
-        const appointmentDate = dayjs(lead.appointment_date);
-        return appointmentDate.isValid();
-      })
-      .filter((lead) => {
-        const searchStr = `${lead.full_name || ""} ${lead.contact_no || ""} ${lead.email || ""} ${lead.id || ""}`.toLowerCase();
-        if (query && !searchStr.includes(query)) return false;
+    const result: AppointmentLead[] = [];
 
-        if (!filters) return true;
+    for (const lead of leads) {
+      if (lead.is_active === false) continue;
+      if (!isAppointmentLead(lead)) continue;
 
-        if (filters.department && lead.department_id !== Number(filters.department)) return false;
-        if (filters.assignee && lead.assigned_to_id !== Number(filters.assignee)) return false;
+      const appointmentDate = dayjs(lead.appointment_date);
+      if (!appointmentDate.isValid()) continue;
 
-        if (filters.status) {
-          const status = String(lead.lead_status || lead.status || "");
-          if (!matchesStatusFilter(status, filters.status)) return false;
-        }
+      if (query) {
+        const searchStr =
+          `${lead.full_name || ""} ${lead.contact_no || ""} ${lead.email || ""} ${lead.id || ""}`.toLowerCase();
+        if (!searchStr.includes(query)) continue;
+      }
 
-        if (filters.source && lead.source !== filters.source) return false;
+      if (
+        filterDepartmentId !== null &&
+        lead.department_id !== filterDepartmentId
+      )
+        continue;
+      if (filterAssigneeId !== null && lead.assigned_to_id !== filterAssigneeId)
+        continue;
 
-        if (filters.dateFrom || filters.dateTo) {
-          const leadDate = lead.created_at ? new Date(lead.created_at) : null;
-          if (!leadDate) return false;
+      if (filterStatus) {
+        const status = String(lead.lead_status || lead.status || "");
+        if (!matchesStatusFilter(status, filterStatus)) continue;
+      }
 
-          if (filters.dateFrom) {
-            const fromDate = new Date(filters.dateFrom);
-            fromDate.setHours(0, 0, 0, 0);
-            if (leadDate < fromDate) return false;
-          }
+      if (filterSource && lead.source !== filterSource) continue;
 
-          if (filters.dateTo) {
-            const toDate = new Date(filters.dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            if (leadDate > toDate) return false;
-          }
-        }
+      if (fromDate || toDate) {
+        const leadDate = lead.created_at ? new Date(lead.created_at) : null;
+        if (!leadDate) continue;
+        if (fromDate && leadDate < fromDate) continue;
+        if (toDate && leadDate > toDate) continue;
+      }
 
-        return true;
-      })
-      .map((lead) => ({ ...lead, appointmentDate: dayjs(lead.appointment_date) }))
-      .sort((a, b) => a.appointmentDate.valueOf() - b.appointmentDate.valueOf());
+      result.push({ ...lead, appointmentDate });
+    }
+
+    result.sort(
+      (a, b) => a.appointmentDate.valueOf() - b.appointmentDate.valueOf(),
+    );
+    return result;
   }, [filters, leads, search]);
 
   const appointmentCountByDay = React.useMemo(() => {
@@ -176,17 +213,24 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
     return appointments
       .filter((item) => item.appointmentDate.isSame(selectedDate, "day"))
       .sort((a, b) =>
-        String(a.slot || "").toLowerCase().localeCompare(String(b.slot || "").toLowerCase()),
+        String(a.slot || "")
+          .toLowerCase()
+          .localeCompare(String(b.slot || "").toLowerCase()),
       );
   }, [appointments, selectedDate]);
 
   const isMissedAppointment = React.useCallback((lead: AppointmentLead) => {
-    const status = String(lead.lead_status || (lead as { status?: string }).status || "")
+    const status = String(
+      lead.lead_status || (lead as { status?: string }).status || "",
+    )
       .toLowerCase()
       .trim()
       .replace(/[_\s]+/g, "-");
-    const isAppointmentStatus = status === "appointment" || status === "appointments";
-    const isPastDate = lead.appointmentDate.startOf("day").isBefore(dayjs().startOf("day"));
+    const isAppointmentStatus =
+      status === "appointment" || status === "appointments";
+    const isPastDate = lead.appointmentDate
+      .startOf("day")
+      .isBefore(dayjs().startOf("day"));
     return isAppointmentStatus && isPastDate;
   }, []);
 
@@ -221,7 +265,12 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
               ...props.sx,
               // Highlight appointment days with a subtle green tint when not selected.
               ...(hasAppointment && !props.selected
-                ? { bgcolor: "#D1FAE5", color: "#065F46", fontWeight: 700, borderRadius: "50%" }
+                ? {
+                    bgcolor: "#D1FAE5",
+                    color: "#065F46",
+                    fontWeight: 700,
+                    borderRadius: "50%",
+                  }
                 : {}),
             }}
           />
@@ -270,13 +319,24 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
                   bgcolor: "#F8FAFC",
                 }}
               >
-                <Typography variant="caption" fontWeight={600} noWrap sx={{ maxWidth: 170 }}>
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  noWrap
+                  sx={{ maxWidth: 170 }}
+                >
                   {lead.full_name || "Unnamed lead"}
                 </Typography>
                 <Chip
                   size="small"
                   label={formatReminderLabel(lead.appointmentDate)}
-                  sx={{ height: 22, fontSize: "0.7rem", bgcolor: "#ECFDF5", color: "#047857", fontWeight: 700 }}
+                  sx={{
+                    height: 22,
+                    fontSize: "0.7rem",
+                    bgcolor: "#ECFDF5",
+                    color: "#047857",
+                    fontWeight: 700,
+                  }}
                 />
               </Stack>
             ))}
@@ -285,7 +345,12 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
       </Card>
 
       <Card sx={{ p: 2, borderRadius: "14px", flex: 1, minHeight: 420 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 1.5 }}
+        >
           <Typography variant="subtitle1" fontWeight={700}>
             {selectedDate ? selectedDate.format("DD MMM YYYY") : "Appointments"}
           </Typography>
@@ -320,16 +385,35 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
                   bgcolor: "#FFFFFF",
                 }}
               >
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ mb: 1 }}
+                >
                   <Typography fontWeight={700} fontSize="0.9rem">
                     {lead.full_name}
                   </Typography>
                   <Chip
                     size="small"
-                    label={isMissedAppointment(lead) ? "Missed" : (lead.status || lead.lead_status || "Appointment")}
-                    sx={isMissedAppointment(lead)
-                      ? { bgcolor: "#FEF2F2", color: "#B91C1C", fontWeight: 700 }
-                      : { bgcolor: "#EEF2FF", color: "#4F46E5", fontWeight: 600 }}
+                    label={
+                      isMissedAppointment(lead)
+                        ? "Missed"
+                        : lead.status || lead.lead_status || "Appointment"
+                    }
+                    sx={
+                      isMissedAppointment(lead)
+                        ? {
+                            bgcolor: "#FEF2F2",
+                            color: "#B91C1C",
+                            fontWeight: 700,
+                          }
+                        : {
+                            bgcolor: "#EEF2FF",
+                            color: "#4F46E5",
+                            fontWeight: 600,
+                          }
+                    }
                   />
                 </Stack>
 
@@ -342,7 +426,9 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
                     </Typography>
                   </Stack>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <PersonOutlineIcon sx={{ fontSize: 15, color: "#64748B" }} />
+                    <PersonOutlineIcon
+                      sx={{ fontSize: 15, color: "#64748B" }}
+                    />
                     <Typography fontSize="0.82rem" color="text.secondary">
                       {lead.assigned_to_name || "Unassigned"}
                     </Typography>
@@ -361,6 +447,6 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
       </Card>
     </Stack>
   );
-}; 
+};
 
 export default LeadsCalendar;
