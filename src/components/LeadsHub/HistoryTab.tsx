@@ -427,71 +427,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                 avatarInitial={item.node.avatarInitial}
                 isLast={index === timelineItems.length - 1}
               />
-<<<<<<< Updated upstream
             ))}
-=======
-            )}
-            <TimelineItem
-              icon={<SmsOutlinedIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />}
-              title={`SMS History (${smsHistory.length} messages)`}
-              time={
-                smsHistory.length > 0
-                  ? formatDateTime(smsHistory[0].created_at)
-                  : leadCreatedAt
-              }
-              onClick={() => setHistoryView("sms")}
-              isClickable
-            />
-            <TimelineItem
-              icon={
-                <CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />
-              }
-              title={`Call History (${callHistory.length} calls)`}
-              time={
-                callHistory.length > 0
-                  ? formatDateTime(callHistory[0].created_at)
-                  : leadCreatedAt
-              }
-              onClick={() => setHistoryView("call")}
-              isClickable
-            />
-            <TimelineItem
-              isAvatar
-              avatarInitial={leadAssigned.charAt(0)}
-              title={`Assigned to ${leadAssigned}`}
-              time={leadCreatedAt}
-            />
-            <TimelineItem
-              icon={
-                <EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />
-              }
-              title="Patient shared contact number and email"
-              time={leadCreatedAt}
-              onClick={() => setHistoryView("email")}
-              isClickable
-            />
-            <TimelineItem
-              icon={
-                <EmailOutlinedIcon sx={{ fontSize: 16, color: "#3B82F6" }} />
-              }
-              title="Sent a Welcome Email"
-              time={leadCreatedAt}
-              onClick={() => setHistoryView("email")}
-              isClickable
-            />
-            <TimelineItem
-              icon={
-                <ChatBubbleOutlineIcon
-                  sx={{ fontSize: 16, color: "#8B5CF6" }}
-                />
-              }
-              title="Lead arrived from Website Chatbot"
-              time={leadCreatedAt}
-              onClick={() => setHistoryView("chatbot")}
-              isClickable
-              isLast
-            />
->>>>>>> Stashed changes
           </Stack>
         </Card>
 
