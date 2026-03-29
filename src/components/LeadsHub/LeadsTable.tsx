@@ -1,9 +1,26 @@
 import * as React from "react";
 import {
-  Alert, Avatar, Box, Checkbox, Chip, CircularProgress, Dialog,
-  DialogActions, DialogContent, DialogTitle, IconButton,
-  Paper, Stack, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
+  Alert,
+  Avatar,
+  Box,
+  Checkbox,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tooltip,
+  Typography,
   Button,
 } from "@mui/material";
 import { toast } from "react-toastify";
@@ -15,10 +32,15 @@ import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import Lead_Status_Edit from "../../assets/icons/Lead_Status_Edit.svg";
 
 import {
-  fetchLeads, selectLeads, selectLeadsLoading, selectLeadsError,
+  fetchLeads,
+  selectLeads,
+  selectLeadsLoading,
+  selectLeadsError,
 } from "../../store/leadSlice";
 import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
@@ -34,16 +56,17 @@ import {
   stickyHeaderContactStyle,
   stickyHeaderMenuStyle,
 } from "./LeadsTable.types";
-import { extractErrorMessage, normalizePhone, processLead } from "./LeadsTable.helpers";
+import {
+  extractErrorMessage,
+  normalizePhone,
+  processLead,
+} from "./LeadsTable.helpers";
 import { getStatusChipSx, getTaskStatusChipSx } from "./LeadsTable.styles";
 import { SMSDialog } from "./SmsDialogs";
 import { EmailDialog } from "./EmailDialogs";
 
 // ── App-type config ───────────────────────────────────────────────────────────
-import {
-  IS_CONTRACTS_APP,
-  ACTIVE_STATUS_OPTIONS,
-} from "../../config/appType";
+import { IS_CONTRACTS_APP, ACTIVE_STATUS_OPTIONS } from "../../config/appType";
 import type { LeadItem } from "./Leadsboardtypes";
 
 // ── Shared toast options ──────────────────────────────────────────────────────
@@ -55,33 +78,44 @@ const toastOptions = {
 
 // Add this helper at the top of LeadsTable.tsx:
 const BACKEND_TO_DISPLAY: Record<string, string> = {
-  "new": "New",
-  "appointment": "Appointment",
+  new: "New",
+  appointment: "Appointment",
   "follow up": "Follow Up",
-  "follow_up": "Follow Up",
-  "negotiation": "Negotiation",
+  follow_up: "Follow Up",
+  negotiation: "Negotiation",
   "proposal sent": "Proposal Sent",
   "contract signed": "Contract Signed",
-  "converted": "Converted Lead",
+  converted: "Converted Lead",
   "converted lead": "Converted Lead",
-  "lost": "Lost Lead",
+  lost: "Lost Lead",
   "lost lead": "Lost Lead",
 };
 
 // ── Status chip color map (matches getStatusChipSx palette) ─────────────────
-const STATUS_CHIP_STYLES: Record<string, { color: string; borderColor: string; bg: string }> = {
-  "New":             { color: "#7C3AED", borderColor: "#7C3AED", bg: "#F5F3FF" },
-  "Appointment":     { color: "#6366F1", borderColor: "#6366F1", bg: "#EEF2FF" },
-  "Follow Up":       { color: "#F59E0B", borderColor: "#F59E0B", bg: "#FFFBEB" },
-  "Negotiation":     { color: "#F97316", borderColor: "#F97316", bg: "#FFF7ED" },
-  "Proposal Sent":   { color: "#8B5CF6", borderColor: "#8B5CF6", bg: "#F5F3FF" },
-  "Contract Signed": { color: "#0EA5E9", borderColor: "#0EA5E9", bg: "#F0F9FF" },
-  "Converted Lead":  { color: "#10B981", borderColor: "#10B981", bg: "#ECFDF5" },
-  "Lost Lead":       { color: "#EF4444", borderColor: "#EF4444", bg: "#FEF2F2" },
+const STATUS_CHIP_STYLES: Record<
+  string,
+  { color: string; borderColor: string; bg: string }
+> = {
+  New: { color: "#7C3AED", borderColor: "#7C3AED", bg: "#F5F3FF" },
+  Appointment: { color: "#6366F1", borderColor: "#6366F1", bg: "#EEF2FF" },
+  "Follow Up": { color: "#F59E0B", borderColor: "#F59E0B", bg: "#FFFBEB" },
+  Negotiation: { color: "#F97316", borderColor: "#F97316", bg: "#FFF7ED" },
+  "Proposal Sent": { color: "#8B5CF6", borderColor: "#8B5CF6", bg: "#F5F3FF" },
+  "Contract Signed": {
+    color: "#0EA5E9",
+    borderColor: "#0EA5E9",
+    bg: "#F0F9FF",
+  },
+  "Converted Lead": { color: "#10B981", borderColor: "#10B981", bg: "#ECFDF5" },
+  "Lost Lead": { color: "#EF4444", borderColor: "#EF4444", bg: "#FEF2F2" },
 };
 
 const getStatusOptionChipSx = (status: string) => {
-  const s = STATUS_CHIP_STYLES[status] ?? { color: "#64748B", borderColor: "#64748B", bg: "#F8FAFC" };
+  const s = STATUS_CHIP_STYLES[status] ?? {
+    color: "#64748B",
+    borderColor: "#64748B",
+    bg: "#F8FAFC",
+  };
   return {
     color: s.color,
     borderColor: s.borderColor,
@@ -98,16 +132,28 @@ const getStatusOptionChipSx = (status: string) => {
 };
 
 const normalizeStatusKey = (value: string): string =>
-  value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[_\s-]+/g, "-");
 
-const matchesStatusFilter = (leadValue: string, filterValue: string): boolean => {
+const matchesStatusFilter = (
+  leadValue: string,
+  filterValue: string,
+): boolean => {
   const normalizedLead = normalizeStatusKey(leadValue);
   const normalizedFilter = normalizeStatusKey(filterValue);
 
   const equivalentStatuses: Record<string, string[]> = {
     new: ["new"],
     contacted: ["contacted"],
-    "follow-ups": ["follow-ups", "follow-up", "followup", "follow-up-leads", "follow-up-lead"],
+    "follow-ups": [
+      "follow-ups",
+      "follow-up",
+      "followup",
+      "follow-up-leads",
+      "follow-up-lead",
+    ],
     converted: ["converted", "converted-lead", "converted-leads"],
     lost: ["lost", "lost-lead", "lost-leads"],
     "cycle-conversion": ["cycle-conversion", "cycleconversion"],
@@ -117,7 +163,9 @@ const matchesStatusFilter = (leadValue: string, filterValue: string): boolean =>
     "contract-signed": ["contract-signed", "contractsigned"],
   };
 
-  return (equivalentStatuses[normalizedFilter] ?? [normalizedFilter]).includes(normalizedLead);
+  return (equivalentStatuses[normalizedFilter] ?? [normalizedFilter]).includes(
+    normalizedLead,
+  );
 };
 
 // ── Edit Status Dialog ────────────────────────────────────────────────────────
@@ -138,17 +186,29 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
 
   React.useEffect(() => {
-    if (open) { setSelected(currentStatus); setDropdownOpen(false); }
+    if (open) {
+      setSelected(currentStatus);
+      setDropdownOpen(false);
+    }
   }, [open, currentStatus]);
 
-  const selectedStyle = STATUS_CHIP_STYLES[selected] ?? { color: "#64748B", borderColor: "#64748B", bg: "#F8FAFC" };
+  const selectedStyle = STATUS_CHIP_STYLES[selected] ?? {
+    color: "#64748B",
+    borderColor: "#64748B",
+    bg: "#F8FAFC",
+  };
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
       PaperProps={{
-        sx: { width: 340, borderRadius: 3, p: 1, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" },
+        sx: {
+          width: 340,
+          borderRadius: 3,
+          p: 1,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+        },
       }}
     >
       <DialogTitle
@@ -168,7 +228,11 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
       </DialogTitle>
 
       <DialogContent sx={{ pt: 0.5, pb: 1 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ mb: 0.5, display: "block" }}
+        >
           Status
         </Typography>
 
@@ -228,7 +292,10 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
             {(ACTIVE_STATUS_OPTIONS as readonly string[]).map((opt) => (
               <Box
                 key={opt}
-                onClick={() => { setSelected(opt); setDropdownOpen(false); }}
+                onClick={() => {
+                  setSelected(opt);
+                  setDropdownOpen(false);
+                }}
                 sx={{ display: "inline-flex", pl: 0.5 }}
               >
                 <Chip
@@ -248,13 +315,28 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-        <Button variant="outlined" onClick={onClose} sx={{ flex: 1, borderRadius: 1, color:"#232323", borderColor:"#232323" }}>
+        <Button
+          variant="outlined"
+          onClick={onClose}
+          sx={{
+            flex: 1,
+            borderRadius: 1,
+            color: "#232323",
+            borderColor: "#232323",
+          }}
+        >
           Cancel
         </Button>
         <Button
           variant="contained"
           onClick={() => onSave(selected)}
-          sx={{ flex: 1, borderRadius: 1, backgroundColor: "#505050", color:"#FFFFFF","&:hover": { backgroundColor: "#232323" } }}
+          sx={{
+            flex: 1,
+            borderRadius: 1,
+            backgroundColor: "#505050",
+            color: "#FFFFFF",
+            "&:hover": { backgroundColor: "#232323" },
+          }}
         >
           Save
         </Button>
@@ -291,6 +373,9 @@ const LeadsTable: React.FC<Props> = ({
     null,
   );
 
+  const [sortCol, setSortCol] = React.useState<string | null>(null);
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
+
   React.useEffect(() => {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
   }, [dispatch]);
@@ -306,7 +391,8 @@ const LeadsTable: React.FC<Props> = ({
     // Keep list ordered by lead date, so imports are placed correctly.
     const getLeadTimestamp = (lead: RawLead): number => {
       const primary = lead.created_at;
-      const secondary = (lead as RawLead & { appointment_date?: string }).appointment_date;
+      const secondary = (lead as RawLead & { appointment_date?: string })
+        .appointment_date;
       const parsed = Date.parse(primary || secondary || "");
       return Number.isNaN(parsed) ? 0 : parsed;
     };
@@ -432,7 +518,8 @@ const LeadsTable: React.FC<Props> = ({
           return false;
         if (filters.status) {
           const leadStatusValue = String(lead.lead_status || lead.status || "");
-          if (!matchesStatusFilter(leadStatusValue, filters.status)) return false;
+          if (!matchesStatusFilter(leadStatusValue, filters.status))
+            return false;
         }
         if (filters.quality && lead.quality !== filters.quality) return false;
         if (filters.source && lead.source !== filters.source) return false;
@@ -457,18 +544,83 @@ const LeadsTable: React.FC<Props> = ({
     return result;
   }, [localLeads, search, tab, filters]);
 
+  const sortedLeads = React.useMemo(() => {
+    if (!sortCol) return filteredLeads;
+    return [...filteredLeads].sort((a, b) => {
+      let aVal: string | number = "";
+      let bVal: string | number = "";
+      switch (sortCol) {
+        case "name":
+          aVal = a.full_name || "";
+          bVal = b.full_name || "";
+          break;
+        case "date":
+          aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
+          bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
+          break;
+        case "location":
+          aVal = a.location || "";
+          bVal = b.location || "";
+          break;
+        case "source":
+          aVal = a.source || "";
+          bVal = b.source || "";
+          break;
+        case "status":
+          aVal = a.lead_status || a.status || "";
+          bVal = b.lead_status || b.status || "";
+          break;
+        case "quality":
+          aVal = a.quality || "";
+          bVal = b.quality || "";
+          break;
+        case "assigned":
+          aVal = a.assigned || a.assigned_to_name || "";
+          bVal = b.assigned || b.assigned_to_name || "";
+          break;
+        case "taskType":
+          aVal = a.taskType || "";
+          bVal = b.taskType || "";
+          break;
+        case "taskStatus":
+          aVal = a.taskStatus || "";
+          bVal = b.taskStatus || "";
+          break;
+        case "activity":
+          aVal = a.activity || "";
+          bVal = b.activity || "";
+          break;
+        default:
+          return 0;
+      }
+      if (typeof aVal === "number" && typeof bVal === "number")
+        return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+      return sortDir === "asc"
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
+    });
+  }, [filteredLeads, sortCol, sortDir]);
+
+  const handleSort = (col: string) => {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  };
+
   React.useEffect(() => {
     setPage(1);
     setSelectedIds([]);
   }, [search, tab, filters]);
 
-  const totalEntries = filteredLeads.length;
+  const totalEntries = sortedLeads.length;
   const totalPages = Math.ceil(totalEntries / rowsPerPage);
   React.useEffect(() => {
     if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [totalPages, page]);
 
-  const currentLeads = filteredLeads.slice(
+  const currentLeads = sortedLeads.slice(
     (page - 1) * rowsPerPage,
     page * rowsPerPage,
   );
@@ -675,18 +827,368 @@ const LeadsTable: React.FC<Props> = ({
                   }}
                 />
               </TableCell>
-              <TableCell>Lead Name | No</TableCell>
-              <TableCell>Date | Time</TableCell>
-              <TableCell>Location</TableCell>
-              <TableCell>Source</TableCell>
-              <TableCell>Lead Status</TableCell>
-              <TableCell>Quality</TableCell>
+              <TableCell
+                onClick={() => handleSort("name")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "name" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Lead Name | No
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "name" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "name" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("date")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "date" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Date | Time
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "date" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "date" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("location")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "location" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Location
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "location" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "location" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("source")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "source" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Source
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "source" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "source" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("status")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "status" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Lead Status
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "status" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "status" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("quality")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "quality" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Quality
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "quality" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "quality" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
               {/* AI Score — hidden for contracts app */}
               {!IS_CONTRACTS_APP && <TableCell>AI Score</TableCell>}
-              <TableCell>Assigned To</TableCell>
-              <TableCell>Task Type</TableCell>
-              <TableCell>Task Status</TableCell>
-              <TableCell>Activity</TableCell>
+              <TableCell
+                onClick={() => handleSort("assigned")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "assigned" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Assigned To
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "assigned" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "assigned" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("taskType")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "taskType" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Task Type
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "taskType" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "taskType" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("taskStatus")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "taskStatus" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Task Status
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "taskStatus" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "taskStatus" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("activity")}
+                sx={{
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "& .col-sort-icon": {
+                    opacity: sortCol === "activity" ? 1 : 0,
+                    transition: "opacity 0.15s",
+                  },
+                  "&:hover .col-sort-icon": { opacity: 1 },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  Activity
+                  <Box
+                    className="col-sort-icon"
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 14,
+                      color: sortCol === "activity" ? "#E17E61" : "inherit",
+                    }}
+                  >
+                    {sortCol === "activity" ? (
+                      sortDir === "asc" ? (
+                        <ArrowUpwardIcon fontSize="inherit" />
+                      ) : (
+                        <ArrowDownwardIcon fontSize="inherit" />
+                      )
+                    ) : (
+                      <ArrowDownwardIcon fontSize="inherit" />
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
               <TableCell align="center" sx={stickyHeaderContactStyle}>
                 Contact Option
               </TableCell>
@@ -972,6 +1474,6 @@ const LeadsTable: React.FC<Props> = ({
       />
     </>
   );
-}
+};
 
 export default LeadsTable;

@@ -1,25 +1,17 @@
 import * as React from "react";
 import {
-  Badge,
   Box,
   Card,
   Chip,
-  Divider,
+  IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
-import EventNoteIcon from "@mui/icons-material/EventNote";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import RoomOutlinedIcon from "@mui/icons-material/RoomOutlined";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
-import {
-  PickersDay,
-  type PickersDayProps,
-} from "@mui/x-date-pickers/PickersDay";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import dayjs, { Dayjs } from "dayjs";
+import { useNavigate } from "react-router-dom";
 
 import type { Lead } from "../../services/leads.api";
 import type { FilterValues } from "../../types/leads.types";
@@ -33,6 +25,8 @@ type Props = {
 type AppointmentLead = Lead & {
   appointmentDate: Dayjs;
 };
+
+type CalendarViewMode = "day" | "week" | "month";
 
 const normalizeStatusKey = (value: string): string =>
   value
@@ -72,6 +66,8 @@ const matchesStatusFilter = (
 };
 
 const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
+  const navigate = useNavigate();
+
   const appointments = React.useMemo<AppointmentLead[]>(() => {
     const query = search.trim().toLowerCase();
     const filterDepartmentId = filters?.department
@@ -151,11 +147,13 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
     return result;
   }, [filters, leads, search]);
 
-  const appointmentCountByDay = React.useMemo(() => {
-    const map = new Map<string, number>();
+  const appointmentsByDay = React.useMemo(() => {
+    const map = new Map<string, AppointmentLead[]>();
     for (const item of appointments) {
       const key = item.appointmentDate.format("YYYY-MM-DD");
-      map.set(key, (map.get(key) || 0) + 1);
+      const existing = map.get(key) ?? [];
+      existing.push(item);
+      map.set(key, existing);
     }
     return map;
   }, [appointments]);
@@ -181,268 +179,830 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
   }, [appointments]);
 
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
+  const [visibleMonth, setVisibleMonth] = React.useState<Dayjs>(
+    dayjs().startOf("month"),
+  );
+  const [viewMode, setViewMode] = React.useState<CalendarViewMode>("day");
+  const [todayOnlyMode, setTodayOnlyMode] = React.useState(true);
 
   // Set initial selected date once appointments are ready.
   React.useEffect(() => {
     if (selectedDate === null) {
       setSelectedDate(defaultDate);
+      setVisibleMonth(defaultDate.startOf("month"));
     }
   }, [defaultDate, selectedDate]);
 
-  const upcomingAppointments = React.useMemo(() => {
-    const todayStart = dayjs().startOf("day");
-    return appointments
-      .filter(
-        (item) =>
-          item.appointmentDate.startOf("day").isSame(todayStart) ||
-          item.appointmentDate.startOf("day").isAfter(todayStart),
-      )
-      .slice(0, 3);
-  }, [appointments]);
-
-  const formatReminderLabel = React.useCallback((date: Dayjs) => {
+  const getAppointmentState = React.useCallback((date: Dayjs) => {
     const today = dayjs().startOf("day");
-    const diff = date.startOf("day").diff(today, "day");
-    if (diff === 0) return "Today";
-    if (diff === 1) return "Tomorrow";
-    return `In ${diff} day${diff === 1 ? "" : "s"}`;
+    const candidate = date.startOf("day");
+
+    if (candidate.isBefore(today)) {
+      return {
+        label: "Completed",
+        chipBg: "#FEE2E2",
+        chipColor: "#B91C1C",
+      };
+    }
+
+    if (candidate.isSame(today)) {
+      return {
+        label: "Today",
+        chipBg: "#DCFCE7",
+        chipColor: "#15803D",
+      };
+    }
+
+    return {
+      label: "Upcoming",
+      chipBg: "#EDE9FE",
+      chipColor: "#6D28D9",
+    };
   }, []);
 
-  const selectedDateAppointments = React.useMemo(() => {
-    if (!selectedDate) return [];
+  const monthGridDays = React.useMemo(() => {
+    const monthStart = visibleMonth.startOf("month");
+    const gridStart = monthStart.startOf("week");
+    return Array.from({ length: 42 }, (_, index) =>
+      gridStart.add(index, "day"),
+    );
+  }, [visibleMonth]);
+
+  const handleSelectDate = React.useCallback(
+    (date: Dayjs) => {
+      setSelectedDate(date.startOf("day"));
+      if (!date.isSame(visibleMonth, "month")) {
+        setVisibleMonth(date.startOf("month"));
+      }
+    },
+    [visibleMonth],
+  );
+
+  const weekDays = React.useMemo(
+    () => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    [],
+  );
+
+  const appointmentDayTimeline = React.useMemo(() => {
+    const start = dayjs().startOf("month");
+    const end = dayjs().endOf("year");
+    const grouped = new Map<string, AppointmentLead[]>();
+
+    for (const item of appointments) {
+      const d = item.appointmentDate.startOf("day");
+      if (d.isBefore(start) || d.isAfter(end)) continue;
+      const key = d.format("YYYY-MM-DD");
+      const existing = grouped.get(key) ?? [];
+      existing.push(item);
+      grouped.set(key, existing);
+    }
+
+    return Array.from(grouped.entries())
+      .sort((a, b) => dayjs(a[0]).valueOf() - dayjs(b[0]).valueOf())
+      .map(([key, items]) => ({
+        date: dayjs(key),
+        items: items.sort((a, b) =>
+          String(a.slot || "")
+            .toLowerCase()
+            .localeCompare(String(b.slot || "").toLowerCase()),
+        ),
+      }));
+  }, [appointments]);
+
+  const todaysAppointments = React.useMemo(() => {
+    const today = dayjs().startOf("day");
     return appointments
-      .filter((item) => item.appointmentDate.isSame(selectedDate, "day"))
+      .filter((item) => item.appointmentDate.startOf("day").isSame(today))
       .sort((a, b) =>
         String(a.slot || "")
           .toLowerCase()
           .localeCompare(String(b.slot || "").toLowerCase()),
       );
-  }, [appointments, selectedDate]);
+  }, [appointments]);
 
-  const isMissedAppointment = React.useCallback((lead: AppointmentLead) => {
-    const status = String(
-      lead.lead_status || (lead as { status?: string }).status || "",
-    )
-      .toLowerCase()
-      .trim()
-      .replace(/[_\s]+/g, "-");
-    const isAppointmentStatus =
-      status === "appointment" || status === "appointments";
-    const isPastDate = lead.appointmentDate
-      .startOf("day")
-      .isBefore(dayjs().startOf("day"));
-    return isAppointmentStatus && isPastDate;
-  }, []);
+  const selectedBaseDate = selectedDate ?? dayjs();
 
-  const renderDay = React.useCallback(
-    (props: PickersDayProps) => {
-      const rawDay = props.day as Dayjs | Date;
-      // Use dayjs local formatting (not toISOString which is UTC) so the key
-      // matches the ones in appointmentCountByDay which also use local time.
-      const dayKey = dayjs(rawDay).format("YYYY-MM-DD");
-      const hasAppointment = Boolean(appointmentCountByDay.get(dayKey));
+  const weekDaysForSelected = React.useMemo(() => {
+    const weekStart = selectedBaseDate.startOf("week");
+    return Array.from({ length: 7 }, (_, index) => weekStart.add(index, "day"));
+  }, [selectedBaseDate]);
 
-      return (
-        <Badge
-          key={dayKey}
-          overlap="circular"
-          variant="dot"
-          color="success"
-          invisible={!hasAppointment}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          sx={{
-            "& .MuiBadge-dot": {
-              width: 6,
-              height: 6,
-              bottom: 4,
-              right: 4,
-            },
-          }}
-        >
-          <PickersDay
-            {...props}
-            sx={{
-              ...props.sx,
-              // Highlight appointment days with a subtle green tint when not selected.
-              ...(hasAppointment && !props.selected
-                ? {
-                    bgcolor: "#D1FAE5",
-                    color: "#065F46",
-                    fontWeight: 700,
-                    borderRadius: "50%",
-                  }
-                : {}),
-            }}
-          />
-        </Badge>
-      );
-    },
-    [appointmentCountByDay],
+  const viewHeaderTitle = React.useMemo(() => {
+    if (todayOnlyMode) {
+      return "Today's Appointments";
+    }
+
+    if (viewMode === "month") {
+      return visibleMonth.format("MMMM YYYY");
+    }
+
+    if (viewMode === "week") {
+      const start = weekDaysForSelected[0];
+      const end = weekDaysForSelected[6];
+      if (start.isSame(end, "month")) {
+        return `${start.format("DD")} - ${end.format("DD MMM YYYY")}`;
+      }
+      return `${start.format("DD MMM")} - ${end.format("DD MMM YYYY")}`;
+    }
+
+    return selectedBaseDate.format("DD MMM YYYY");
+  }, [
+    selectedBaseDate,
+    todayOnlyMode,
+    viewMode,
+    visibleMonth,
+    weekDaysForSelected,
+  ]);
+
+  const navigatePrevious = React.useCallback(() => {
+    if (todayOnlyMode) return;
+
+    if (viewMode === "month") {
+      setVisibleMonth((prev) => prev.subtract(1, "month"));
+      return;
+    }
+
+    if (viewMode === "week") {
+      handleSelectDate(selectedBaseDate.subtract(1, "week"));
+      return;
+    }
+
+    handleSelectDate(selectedBaseDate.subtract(1, "day"));
+  }, [handleSelectDate, selectedBaseDate, todayOnlyMode, viewMode]);
+
+  const navigateNext = React.useCallback(() => {
+    if (todayOnlyMode) return;
+
+    if (viewMode === "month") {
+      setVisibleMonth((prev) => prev.add(1, "month"));
+      return;
+    }
+
+    if (viewMode === "week") {
+      handleSelectDate(selectedBaseDate.add(1, "week"));
+      return;
+    }
+
+    handleSelectDate(selectedBaseDate.add(1, "day"));
+  }, [handleSelectDate, selectedBaseDate, todayOnlyMode, viewMode]);
+
+  const handleGoToToday = React.useCallback(() => {
+    setTodayOnlyMode(true);
+    setViewMode("day");
+    handleSelectDate(dayjs());
+  }, [handleSelectDate]);
+
+  const segmentedTabs = React.useMemo(
+    () => [
+      { id: "day" as CalendarViewMode, label: "Day" },
+      { id: "week" as CalendarViewMode, label: "Week" },
+      { id: "month" as CalendarViewMode, label: "Month" },
+    ],
+    [],
   );
 
   return (
-    <Stack direction={{ xs: "column", lg: "row" }} spacing={2}>
-      <Card sx={{ p: 2, borderRadius: "14px", minWidth: { lg: 360 } }}>
-        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
-          Appointment Calendar
-        </Typography>
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DateCalendar
-            value={selectedDate}
-            onChange={(value) => setSelectedDate(value as Dayjs | null)}
-            slots={{ day: renderDay }}
-          />
-        </LocalizationProvider>
-
-        <Divider sx={{ my: 1.5 }} />
-
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          Reminders
-        </Typography>
-
-        {upcomingAppointments.length === 0 ? (
-          <Typography variant="caption" color="text.secondary">
-            No upcoming appointments.
-          </Typography>
-        ) : (
-          <Stack spacing={0.8}>
-            {upcomingAppointments.map((lead) => (
-              <Stack
-                key={`reminder-${lead.id}-${lead.appointment_date}`}
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-                sx={{
-                  px: 1,
-                  py: 0.75,
-                  borderRadius: "8px",
-                  bgcolor: "#F8FAFC",
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  fontWeight={600}
-                  noWrap
-                  sx={{ maxWidth: 170 }}
-                >
-                  {lead.full_name || "Unnamed lead"}
-                </Typography>
-                <Chip
-                  size="small"
-                  label={formatReminderLabel(lead.appointmentDate)}
-                  sx={{
-                    height: 22,
-                    fontSize: "0.7rem",
-                    bgcolor: "#ECFDF5",
-                    color: "#047857",
-                    fontWeight: 700,
-                  }}
-                />
-              </Stack>
-            ))}
-          </Stack>
-        )}
-      </Card>
-
-      <Card sx={{ p: 2, borderRadius: "14px", flex: 1, minHeight: 420 }}>
+    <Stack spacing={2}>
+      <Card sx={{ p: 2, borderRadius: "14px" }}>
         <Stack
           direction="row"
           justifyContent="space-between"
           alignItems="center"
           sx={{ mb: 1.5 }}
         >
-          <Typography variant="subtitle1" fontWeight={700}>
-            {selectedDate ? selectedDate.format("DD MMM YYYY") : "Appointments"}
+          <Typography variant="h6" sx={{ color: "#E17E61", fontWeight: 700 }}>
+            {viewHeaderTitle}
           </Typography>
-          <Chip
-            size="small"
-            label={`${selectedDateAppointments.length} appointment${selectedDateAppointments.length !== 1 ? "s" : ""}`}
-            sx={{ bgcolor: "#ECFDF5", color: "#10B981", fontWeight: 600 }}
-          />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                p: 0.35,
+                borderRadius: "10px",
+                bgcolor: "#F1EEEC",
+                border: "1px solid #E5E7EB",
+              }}
+            >
+              {segmentedTabs.map((tab, index) => {
+                const selected = tab.id === viewMode && !todayOnlyMode;
+                return (
+                  <Box
+                    key={tab.id}
+                    onClick={() => {
+                      setTodayOnlyMode(false);
+                      setViewMode(tab.id);
+                    }}
+                    sx={{
+                      px: 2,
+                      py: 0.45,
+                      borderRadius: "8px",
+                      fontSize: "0.78rem",
+                      lineHeight: 1.3,
+                      fontWeight: selected ? 700 : 500,
+                      color: selected ? "#E17E61" : "#9e9e9e",
+                      bgcolor: selected ? "#FFFFFF" : "transparent",
+                      boxShadow: selected
+                        ? "0 1px 2px rgba(0, 0, 0, 0.08)"
+                        : "none",
+                      cursor: "pointer",
+                      userSelect: "none",
+                      borderLeft:
+                        index > 0
+                          ? "1px solid rgba(148, 163, 184, 0.28)"
+                          : "none",
+                    }}
+                  >
+                    {tab.label}
+                  </Box>
+                );
+              })}
+            </Box>
+            <Chip
+              label="Today"
+              size="small"
+              onClick={handleGoToToday}
+              sx={{
+                borderRadius: "8px",
+                bgcolor: todayOnlyMode ? "#E17E61" : "#FFF7ED",
+                color: todayOnlyMode ? "#FFFFFF" : "#E17E61",
+                border: "1px solid #F6D7CD",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            />
+            <IconButton
+              size="small"
+              onClick={navigatePrevious}
+              disabled={todayOnlyMode}
+            >
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={navigateNext}
+              disabled={todayOnlyMode}
+            >
+              <ChevronRightIcon fontSize="small" />
+            </IconButton>
+          </Stack>
         </Stack>
 
-        <Divider sx={{ mb: 1.5 }} />
-
-        {selectedDateAppointments.length === 0 ? (
-          <Box sx={{ py: 8, textAlign: "center" }}>
-            <EventNoteIcon sx={{ color: "#CBD5E1", fontSize: 42, mb: 1 }} />
-            <Typography fontWeight={600} color="text.secondary">
-              No appointments on this date
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Pick another date to view scheduled leads.
-            </Typography>
-          </Box>
-        ) : (
-          <Stack spacing={1.25}>
-            {selectedDateAppointments.map((lead) => (
-              <Box
-                key={`${lead.id}-${lead.appointment_date}`}
-                sx={{
-                  border: "1px solid #E2E8F0",
-                  borderRadius: "12px",
-                  p: 1.5,
-                  bgcolor: "#FFFFFF",
-                }}
-              >
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  sx={{ mb: 1 }}
+        {viewMode === "month" && (
+          <Box
+            sx={{
+              border: "1px solid #E5E7EB",
+              borderRadius: "12px",
+              overflow: "hidden",
+              bgcolor: "#FFFFFF",
+            }}
+          >
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                borderBottom: "1px solid #E5E7EB",
+                bgcolor: "#FAFAFA",
+              }}
+            >
+              {weekDays.map((day) => (
+                <Box
+                  key={day}
+                  sx={{
+                    py: 1,
+                    textAlign: "center",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    color: "#334155",
+                  }}
                 >
-                  <Typography fontWeight={700} fontSize="0.9rem">
-                    {lead.full_name}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    label={
-                      isMissedAppointment(lead)
-                        ? "Missed"
-                        : lead.status || lead.lead_status || "Appointment"
-                    }
-                    sx={
-                      isMissedAppointment(lead)
-                        ? {
-                            bgcolor: "#FEF2F2",
-                            color: "#B91C1C",
-                            fontWeight: 700,
-                          }
-                        : {
-                            bgcolor: "#EEF2FF",
-                            color: "#4F46E5",
-                            fontWeight: 600,
-                          }
-                    }
-                  />
-                </Stack>
+                  {day}
+                </Box>
+              ))}
+            </Box>
 
-                <Stack spacing={0.7}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <AccessTimeIcon sx={{ fontSize: 15, color: "#64748B" }} />
-                    <Typography fontSize="0.82rem" color="text.secondary">
-                      {lead.appointmentDate.format("DD MMM YYYY")}
-                      {lead.slot ? ` · ${lead.slot}` : " · Time not specified"}
-                    </Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+              }}
+            >
+              {monthGridDays.map((date) => {
+                const dayKey = date.format("YYYY-MM-DD");
+                const dayAppointments = appointmentsByDay.get(dayKey) ?? [];
+                const isCurrentMonth = date.isSame(visibleMonth, "month");
+                const isSelected = Boolean(selectedDate?.isSame(date, "day"));
+                const isToday = date.isSame(dayjs(), "day");
+                const isPastDay = date
+                  .startOf("day")
+                  .isBefore(dayjs().startOf("day"));
+
+                const tooltipContent =
+                  dayAppointments.length > 0 ? (
+                    <Stack spacing={0.6} sx={{ p: 0.25 }}>
+                      {dayAppointments.map((lead) => {
+                        const tone = getAppointmentState(lead.appointmentDate);
+                        return (
+                          <Stack
+                            key={`tip-${lead.id}`}
+                            direction="row"
+                            spacing={0.8}
+                            alignItems="center"
+                          >
+                            <Box
+                              sx={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                bgcolor: tone.chipColor,
+                                flexShrink: 0,
+                              }}
+                            />
+                            <Typography
+                              sx={{
+                                fontSize: "0.72rem",
+                                color: "#F8FAFC",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {lead.full_name || "Unnamed lead"}
+                              {lead.slot ? ` · ${lead.slot}` : ""}
+                            </Typography>
+                          </Stack>
+                        );
+                      })}
+                    </Stack>
+                  ) : (
+                    ""
+                  );
+
+                return (
+                  <Tooltip
+                    key={dayKey}
+                    title={tooltipContent}
+                    placement="top"
+                    arrow
+                    disableHoverListener={dayAppointments.length === 0}
+                  >
+                    <Box
+                      onClick={() => handleSelectDate(date)}
+                      sx={{
+                        minHeight: { xs: 96, md: 114 },
+                        p: 0.9,
+                        borderRight: "1px solid #F1F5F9",
+                        borderBottom: "1px solid #F1F5F9",
+                        cursor: "pointer",
+                        bgcolor: isSelected
+                          ? "#FFF7ED"
+                          : isPastDay
+                            ? "#FAFAFA"
+                            : "#FFFFFF",
+                        transition: "background-color 120ms ease",
+                        "&:hover": {
+                          bgcolor: isSelected
+                            ? "#FFF1E6"
+                            : isPastDay
+                              ? "#F3F4F6"
+                              : "#FAFAFA",
+                        },
+                      }}
+                    >
+                      <Stack spacing={0.7}>
+                        {isToday ? (
+                          <Box
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 26,
+                              height: 26,
+                              borderRadius: "50%",
+                              bgcolor: "#E17E61",
+                              color: "#FFFFFF",
+                              fontSize: "0.9rem",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {date.date()}
+                          </Box>
+                        ) : (
+                          <Typography
+                            sx={{
+                              fontSize: "0.8rem",
+                              fontWeight: 600,
+                              color: !isCurrentMonth ? "#94A3B8" : "#334155",
+                            }}
+                          >
+                            {date.date()}
+                          </Typography>
+                        )}
+
+                        {isToday && dayAppointments.length === 0 && (
+                          <Typography
+                            sx={{
+                              fontSize: "0.67rem",
+                              color: "#94A3B8",
+                              fontStyle: "italic",
+                              mt: 0.25,
+                            }}
+                          >
+                            No Appointments
+                          </Typography>
+                        )}
+
+                        {dayAppointments.length > 0 && (
+                          <Box
+                            sx={{
+                              maxHeight: 90,
+                              overflowY: "auto",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "4px",
+                              pr: 0.25,
+                              "&::-webkit-scrollbar": { width: 3 },
+                              "&::-webkit-scrollbar-thumb": {
+                                bgcolor: "#CBD5E1",
+                                borderRadius: 4,
+                              },
+                            }}
+                          >
+                            {dayAppointments.map((lead) => {
+                              const tone = getAppointmentState(
+                                lead.appointmentDate,
+                              );
+                              return (
+                                <Box
+                                  key={`calendar-${lead.id}-${lead.appointment_date}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(
+                                      `/leads/${String(lead.id).replace(/^#/, "")}`,
+                                    );
+                                  }}
+                                  sx={{
+                                    px: 0.7,
+                                    py: 0.35,
+                                    borderRadius: "6px",
+                                    fontSize: "0.68rem",
+                                    lineHeight: 1.25,
+                                    fontWeight: 700,
+                                    bgcolor: tone.chipBg,
+                                    color: tone.chipColor,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    cursor: "pointer",
+                                    flexShrink: 0,
+                                    "&:hover": { opacity: 0.78 },
+                                  }}
+                                >
+                                  {lead.full_name || "Unnamed lead"}
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        )}
+                      </Stack>
+                    </Box>
+                  </Tooltip>
+                );
+              })}
+            </Box>
+          </Box>
+        )}
+
+        {viewMode === "week" && (
+          <Box
+            sx={{
+              border: "1px solid #E5E7EB",
+              borderRadius: "12px",
+              overflow: "hidden",
+              bgcolor: "#FFFFFF",
+            }}
+          >
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                borderBottom: "1px solid #E5E7EB",
+                bgcolor: "#FAFAFA",
+              }}
+            >
+              {weekDaysForSelected.map((date) => (
+                <Box
+                  key={`week-head-${date.format("YYYY-MM-DD")}`}
+                  sx={{ py: 1, textAlign: "center" }}
+                >
+                  <Typography sx={{ fontSize: "0.75rem", color: "#64748B" }}>
+                    {date.format("ddd")}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: "0.84rem",
+                      fontWeight: date.isSame(selectedBaseDate, "day")
+                        ? 800
+                        : 600,
+                      color: date.isSame(dayjs(), "day")
+                        ? "#E17E61"
+                        : "#334155",
+                    }}
+                  >
+                    {date.format("DD")}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+              }}
+            >
+              {weekDaysForSelected.map((date) => {
+                const dayKey = date.format("YYYY-MM-DD");
+                const dayAppointments = appointmentsByDay.get(dayKey) ?? [];
+                return (
+                  <Box
+                    key={`week-body-${dayKey}`}
+                    onClick={() => handleSelectDate(date)}
+                    sx={{
+                      minHeight: 190,
+                      p: 0.9,
+                      borderRight: "1px solid #F1F5F9",
+                      cursor: "pointer",
+                      bgcolor: selectedDate?.isSame(date, "day")
+                        ? "#FFF7ED"
+                        : "#FFFFFF",
+                    }}
+                  >
+                    <Stack spacing={0.7}>
+                      {dayAppointments.length === 0 ? (
+                        <Typography
+                          sx={{ fontSize: "0.72rem", color: "#94A3B8" }}
+                        >
+                          No appointments
+                        </Typography>
+                      ) : (
+                        <Box
+                          sx={{
+                            maxHeight: 160,
+                            overflowY: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                            pr: 0.25,
+                            "&::-webkit-scrollbar": { width: 3 },
+                            "&::-webkit-scrollbar-thumb": {
+                              bgcolor: "#CBD5E1",
+                              borderRadius: 4,
+                            },
+                          }}
+                        >
+                          {dayAppointments.map((lead) => {
+                            const tone = getAppointmentState(
+                              lead.appointmentDate,
+                            );
+                            return (
+                              <Box
+                                key={`week-${lead.id}-${lead.appointment_date}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(
+                                    `/leads/${String(lead.id).replace(/^#/, "")}`,
+                                  );
+                                }}
+                                sx={{
+                                  px: 0.7,
+                                  py: 0.4,
+                                  borderRadius: "6px",
+                                  fontSize: "0.68rem",
+                                  lineHeight: 1.25,
+                                  fontWeight: 700,
+                                  bgcolor: tone.chipBg,
+                                  color: tone.chipColor,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  cursor: "pointer",
+                                  flexShrink: 0,
+                                  "&:hover": { opacity: 0.78 },
+                                }}
+                              >
+                                {lead.full_name || "Unnamed lead"}
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+                    </Stack>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+        )}
+
+        {viewMode === "day" && !todayOnlyMode && (
+          <Box
+            sx={{
+              border: "1px solid #E5E7EB",
+              borderRadius: "12px",
+              bgcolor: "#FFFFFF",
+              p: 1.2,
+            }}
+          >
+            <Stack spacing={1.1}>
+              <Typography sx={{ fontSize: "0.8rem", color: "#64748B" }}>
+                Showing appointment days for current month to{" "}
+                {dayjs().endOf("year").format("DD MMM YYYY")}.
+              </Typography>
+
+              {appointmentDayTimeline.length === 0 ? (
+                <Typography sx={{ fontSize: "0.86rem", color: "#64748B" }}>
+                  No appointment days found in this range.
+                </Typography>
+              ) : (
+                <Box
+                  sx={{
+                    maxHeight: 520,
+                    overflowY: "auto",
+                    pr: 0.4,
+                  }}
+                >
+                  <Stack spacing={0.9}>
+                    {appointmentDayTimeline.map((entry) => {
+                      const tone = getAppointmentState(entry.date);
+                      return (
+                        <Stack
+                          key={`day-timeline-${entry.date.format("YYYY-MM-DD")}`}
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          onClick={() => handleSelectDate(entry.date)}
+                          sx={{
+                            px: 1,
+                            py: 0.85,
+                            borderRadius: "8px",
+                            border: "1px solid #E5E7EB",
+                            cursor: "pointer",
+                            bgcolor: selectedDate?.isSame(entry.date, "day")
+                              ? "#FFF7ED"
+                              : "#FFFFFF",
+                          }}
+                        >
+                          <Stack spacing={0.2} sx={{ minWidth: 0 }}>
+                            <Typography
+                              sx={{
+                                fontSize: "0.84rem",
+                                fontWeight: 700,
+                                color: "#334155",
+                              }}
+                            >
+                              {entry.date.format("DD MMM YYYY, ddd")}
+                            </Typography>
+                            <Stack
+                              direction="row"
+                              flexWrap="wrap"
+                              gap={0.5}
+                              sx={{ mt: 0.25 }}
+                            >
+                              {entry.items.map((item) => {
+                                const tone = getAppointmentState(
+                                  item.appointmentDate,
+                                );
+                                return (
+                                  <Box
+                                    key={`tl-name-${item.id}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(
+                                        `/leads/${String(item.id).replace(/^#/, "")}`,
+                                      );
+                                    }}
+                                    sx={{
+                                      px: 0.8,
+                                      py: 0.2,
+                                      borderRadius: "6px",
+                                      fontSize: "0.72rem",
+                                      fontWeight: 700,
+                                      bgcolor: tone.chipBg,
+                                      color: tone.chipColor,
+                                      cursor: "pointer",
+                                      "&:hover": { opacity: 0.78 },
+                                    }}
+                                  >
+                                    {item.full_name || "Unnamed lead"}
+                                    {item.slot ? ` · ${item.slot}` : ""}
+                                  </Box>
+                                );
+                              })}
+                            </Stack>
+                          </Stack>
+
+                          <Stack
+                            direction="row"
+                            spacing={0.7}
+                            alignItems="center"
+                          >
+                            <Chip
+                              size="small"
+                              label={`${entry.items.length} appointment${entry.items.length > 1 ? "s" : ""}`}
+                              sx={{
+                                bgcolor: "#F1F5F9",
+                                color: "#475569",
+                                fontWeight: 700,
+                              }}
+                            />
+                            <Chip
+                              size="small"
+                              label={tone.label}
+                              sx={{
+                                bgcolor: tone.chipBg,
+                                color: tone.chipColor,
+                                fontWeight: 700,
+                              }}
+                            />
+                          </Stack>
+                        </Stack>
+                      );
+                    })}
                   </Stack>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <PersonOutlineIcon
-                      sx={{ fontSize: 15, color: "#64748B" }}
-                    />
-                    <Typography fontSize="0.82rem" color="text.secondary">
-                      {lead.assigned_to_name || "Unassigned"}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <RoomOutlinedIcon sx={{ fontSize: 15, color: "#64748B" }} />
-                    <Typography fontSize="0.81rem" color="text.secondary">
-                      {lead.location || "Location not provided"}
-                    </Typography>
-                  </Stack>
-                </Stack>
-              </Box>
-            ))}
-          </Stack>
+                </Box>
+              )}
+            </Stack>
+          </Box>
+        )}
+
+        {viewMode === "day" && todayOnlyMode && (
+          <Box
+            sx={{
+              border: "1px solid #E5E7EB",
+              borderRadius: "12px",
+              bgcolor: "#FFFFFF",
+              p: 1.2,
+            }}
+          >
+            <Stack spacing={0.9}>
+              {todaysAppointments.length === 0 ? (
+                <Typography sx={{ fontSize: "0.86rem", color: "#64748B" }}>
+                  No appointments scheduled for today.
+                </Typography>
+              ) : (
+                todaysAppointments.map((lead) => {
+                  const tone = getAppointmentState(lead.appointmentDate);
+                  return (
+                    <Stack
+                      key={`today-${lead.id}-${lead.appointment_date}`}
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      onClick={() =>
+                        navigate(`/leads/${String(lead.id).replace(/^#/, "")}`)
+                      }
+                      sx={{
+                        px: 1,
+                        py: 0.8,
+                        borderRadius: "8px",
+                        border: "1px solid #E5E7EB",
+                        cursor: "pointer",
+                        "&:hover": { bgcolor: "#FAFAFA" },
+                      }}
+                    >
+                      <Stack spacing={0.1} sx={{ minWidth: 0 }}>
+                        <Typography
+                          sx={{
+                            fontSize: "0.82rem",
+                            fontWeight: 700,
+                            color: "#334155",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {lead.full_name || "Unnamed lead"}
+                        </Typography>
+                        <Typography
+                          sx={{ fontSize: "0.74rem", color: "#64748B" }}
+                        >
+                          {lead.slot || "Time not specified"}
+                        </Typography>
+                      </Stack>
+                      <Chip
+                        size="small"
+                        label={tone.label}
+                        sx={{
+                          bgcolor: tone.chipBg,
+                          color: tone.chipColor,
+                          fontWeight: 700,
+                        }}
+                      />
+                    </Stack>
+                  );
+                })
+              )}
+            </Stack>
+          </Box>
         )}
       </Card>
     </Stack>
