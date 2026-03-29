@@ -24,22 +24,14 @@ interface FilterDialogProps {
   open: boolean;
   onClose: () => void;
   onApplyFilters?: (filters: FilterValues) => void;
-  initialFilters?: FilterValues;
 }
 
-const FilterDialog: React.FC<FilterDialogProps> = ({
-  open,
-  onClose,
-  onApplyFilters,
-  initialFilters,
-}) => {
+const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilters }) => {
   const [clinicId] = React.useState(1);
 
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>(
-    [],
-  );
+  const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
 
   const setLoadingDepartments = React.useState(false)[1];
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
@@ -58,24 +50,6 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   const [dateTo, setDateTo] = React.useState<Dayjs | null>(null);
   const [location, setLocation] = React.useState("");
   const [subSource, setSubSource] = React.useState("");
-
-  React.useEffect(() => {
-    if (!open) return;
-
-    const nextFilters: FilterValues = {
-      department: initialFilters?.department ?? "",
-      assignee: initialFilters?.assignee ?? "",
-      status: initialFilters?.status ?? "",
-      quality: initialFilters?.quality ?? "",
-      source: initialFilters?.source ?? "",
-      dateFrom: initialFilters?.dateFrom ?? null,
-      dateTo: initialFilters?.dateTo ?? null,
-    };
-
-    setFilters(nextFilters);
-    setDateFrom(nextFilters.dateFrom ? dayjs(nextFilters.dateFrom) : null);
-    setDateTo(nextFilters.dateTo ? dayjs(nextFilters.dateTo) : null);
-  }, [open, initialFilters]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -115,16 +89,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
       setFilteredEmployees(employees);
       return;
     }
-    const selectedDept = departments.find(
-      (d) => d.id === Number(filters.department),
-    );
+    const selectedDept = departments.find((d) => d.id === Number(filters.department));
     if (!selectedDept) {
       setFilteredEmployees(employees);
       return;
     }
     const normalize = (s: string) => (s ?? "").trim().toLowerCase();
     const filtered = employees.filter(
-      (emp) => normalize(emp.department_name) === normalize(selectedDept.name),
+      (emp) => normalize(emp.department_name) === normalize(selectedDept.name)
     );
     setFilteredEmployees(filtered);
   }, [filters.department, employees, departments]);
@@ -251,11 +223,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
           py: 2,
         }}
       >
-        <Typography
-          variant="h6"
-          fontWeight={600}
-          sx={{ fontSize: "16px", color: "#111827" }}
-        >
+        <Typography variant="h6" fontWeight={600} sx={{ fontSize: "16px", color: "#111827" }}>
           Filter By
         </Typography>
         <IconButton onClick={onClose} size="small" sx={{ color: "#6B7280" }}>
@@ -313,9 +281,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   fullWidth
                   size="small"
                   value={filters.quality}
-                  onChange={(e) =>
-                    handleFilterChange("quality", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange("quality", e.target.value)}
                   sx={inputStyle}
                   SelectProps={{
                     displayEmpty: true,
@@ -368,18 +334,10 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   }}
                 >
                   <MenuItem value="">Select Location</MenuItem>
-                  <MenuItem value="LA Jolla, California">
-                    LA Jolla, California
-                  </MenuItem>
-                  <MenuItem value="Oceanview, California">
-                    Oceanview, California
-                  </MenuItem>
-                  <MenuItem value="Palm Sibo, California">
-                    Palm Sibo, California
-                  </MenuItem>
-                  <MenuItem value="Sunny C, California">
-                    Sunny C, California
-                  </MenuItem>
+                  <MenuItem value="LA Jolla, California">LA Jolla, California</MenuItem>
+                  <MenuItem value="Oceanview, California">Oceanview, California</MenuItem>
+                  <MenuItem value="Palm Sibo, California">Palm Sibo, California</MenuItem>
+                  <MenuItem value="Sunny C, California">Sunny C, California</MenuItem>
                 </TextField>
               </Box>
               <Box sx={{ flex: 1 }}>
@@ -389,9 +347,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   fullWidth
                   size="small"
                   value={filters.assignee}
-                  onChange={(e) =>
-                    handleFilterChange("assignee", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange("assignee", e.target.value)}
                   disabled={loadingEmployees}
                   sx={inputStyle}
                   SelectProps={{
