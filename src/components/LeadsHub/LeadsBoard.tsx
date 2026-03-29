@@ -37,9 +37,11 @@ import {
   type AppointmentState,
   mapRawToLeadItem,
 } from "./Leadsboardtypes";
-import { BookAppointmentModal, MailModal } from "./Leadsboardmodals";
+import { BookAppointmentModal } from "./Leadsboardmodals";
 import { LeadColumn } from "./Leadsboardcard";
 import CallDialog from "./CallDialog";
+import { EmailDialog } from "../LeadsHub/EmailDialogs";
+import type { ProcessedLead } from "./LeadsTable.types";
 
 import {
   Button,
@@ -61,7 +63,6 @@ import {
   CircularProgress as MuiCircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-
 
 import {
   APP_TYPE,
@@ -816,8 +817,12 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
 
         <SMSDialog open={Boolean(smsLead)} lead={smsLead} onClose={() => setSmsLead(null)} />
 
-        {/* ✅ MailModal is now fully self-contained — no extra props needed */}
-        <MailModal open={Boolean(emailLead)} selectedLead={emailLead} onClose={() => setEmailLead(null)} />
+        {/* EmailDialog — imported from LeadsTableEmailDialogs, replaces MailModal */}
+        <EmailDialog
+          open={Boolean(emailLead)}
+          lead={emailLead as unknown as ProcessedLead}
+          onClose={() => setEmailLead(null)}
+        />
 
         <CallDialog open={Boolean(callLead)} name={(callLead?.full_name ?? callLead?.name ?? "Unknown") as string} onClose={() => setCallLead(null)} />
 

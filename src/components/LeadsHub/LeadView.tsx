@@ -2733,7 +2733,6 @@ export default function LeadDetailView() {
           lead={activeLead}
           historyView={historyView}
           setHistoryView={setHistoryView}
-          onComposeEmail={() => setEmailDialogOpen(true)}
           leadName={leadName}
           leadPhone={leadPhone}
           leadEmail={leadEmail}
