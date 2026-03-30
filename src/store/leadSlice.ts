@@ -93,57 +93,20 @@ const formatDateForApi = (value: unknown): string => {
 export const fetchLeads = createAsyncThunk<
   Lead[],
   void,
-  { rejectValue: string, state: RootState }
+  { rejectValue: string; state: RootState }
 >("leads/fetchAll", async (_, { rejectWithValue, getState }) => {
   try {
     const state = getState();
-    const clinicIdFromState = state.clinic.data?.id ?? null;
-    const clinicIdFromStorage =
-      typeof window !== "undefined"
-        ? Number(localStorage.getItem("clinic_id") || 0) || null
-        : null;
-    const clinicIdsFromProfile = (state.auth.user?.clinics || [])
-      .map((clinic) => clinic.clinic_id)
-      .filter((id): id is number => Number.isFinite(id));
+    console.log("cc:state", state);
+    const clinicId = state.clinic.data?.id;
 
-    const allowedClinicIds = new Set([1, 2]);
-
-    const candidateClinicIds = Array.from(
-      new Set([
-        2,
-        1,
-        clinicIdFromState,
-        clinicIdFromStorage,
-        ...clinicIdsFromProfile,
-      ].filter((id): id is number => typeof id === "number" && allowedClinicIds.has(id))),
-    );
-
-    if (candidateClinicIds.length === 0) {
-      console.warn("[fetchLeads] skipped: no clinic context available");
-      return [];
+    if (!clinicId) {
+      return rejectWithValue("Clinic not selected");
     }
 
-    let fallbackResult: Lead[] = [];
-
-    for (const clinicId of candidateClinicIds) {
-      try {
-        const leads = await LeadAPI.list(clinicId);
-        console.log("[fetchLeads] clinic=%d count=%d", clinicId, leads.length);
-
-        if (leads.length > 0) {
-          return leads;
-        }
-
-        if (fallbackResult.length === 0) {
-          fallbackResult = leads;
-        }
-      } catch {
-        // Ignore invalid clinic IDs (for example stale default clinic from auth payload).
-        console.warn("[fetchLeads] clinic=%d skipped due to API error", clinicId);
-      }
-    }
-
-    return fallbackResult;
+    const leads = await LeadAPI.list(clinicId);
+    console.log("📊 Fetched leads from API:", leads.length);
+    return leads;
   } catch (err) {
     const error = err as ApiError;
     const message =

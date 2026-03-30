@@ -11,12 +11,12 @@ import OverviewTabs from "./OverviewTabs";
 import type { OverviewTab } from "./OverviewTabs";
 import type { AppDispatch } from "../../store";
 import {
-  fetchLeads,
+  // fetchLeads,
   // selectLeads,
   selectLeadsLoading,
 } from "../../store/leadSlice";
 import { fetchCampaign, selectCampaign } from "../../store/campaignSlice";
-import { selectClinic } from "../../store/clinicSlice";
+// import { selectClinic } from "../../store/clinicSlice";
 import { CircularProgress } from "@mui/material";
 
 const SourcePerformanceChart = lazy(() => import("./SourcePerformanceChart"));
@@ -31,19 +31,17 @@ const DashboardLayout = () => {
   // const leads = useSelector(selectLeads);
   const campaigns = useSelector(selectCampaign);
   const leadsLoading = useSelector(selectLeadsLoading);
-  const clinic = useSelector(selectClinic);
+  // const clinic = useSelector(selectClinic);
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
   const [activeTab, setActiveTab] = useState<OverviewTab>("source");
 
   // load leads and campaigns once when the dashboard mounts
   useEffect(() => {
     // Always fetch leads; leadSlice handles clinic fallback internally.
-    dispatch(fetchLeads());
-
     if (campaigns.length === 0) {
       dispatch(fetchCampaign());
     }
-  }, [clinic?.id, campaigns.length, dispatch]);
+  }, [campaigns.length, dispatch]);
 
   return (
     <Box

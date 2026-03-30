@@ -34,6 +34,8 @@ import BusinessIcon from "@mui/icons-material/Business";
 import WorkIcon from "@mui/icons-material/Work";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { clinicApi } from "../../services/clinic.api";
+import { fetchLeads } from "../../store/leadSlice";
+// import { fetchLeads } from "../../store/leadSlice";
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -60,25 +62,36 @@ const Header = () => {
     "calendar" | "notification" | "help" | null
   >(null);
 
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const initClinic = async (current:any) => {
+    await syncClinic(current, user?.email || "");
+
+    const res = await clinicApi.searchByName(current.clinic__name);
+    // dispatch(fetchLeads());
+
+    if (res.data.length > 0) {
+      const matchedClinic = res.data.find(
+        (clinic) =>
+          clinic.name.toLowerCase() === current.clinic__name.toLowerCase(),
+      );
+
+      if (matchedClinic) {
+        await dispatch(fetchClinic(matchedClinic.id));
+        
+    await dispatch(fetchLeads());
+      }
+    }
+  };
   // fire-and-forget on mount only; avoid looping when server returns empty arrays
   useEffect(() => {
     const current = manualClinic || selectedClinic;
 
     if (!current) return;
 
-    const initClinic = async () => {
-      await syncClinic(current, user?.email || "");
-
-      const res = await clinicApi.searchByName(current.clinic__name);
-
-      if (res.data.length > 0) {
-        dispatch(fetchClinic(res.data[0].id));
-      }
-    };
-
-    initClinic();
+    initClinic(current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClinic]);
+  }, [selectedClinic?.clinic_id, manualClinic]);
 
   useEffect(() => {
     dispatch(fetchCampaign());
@@ -164,14 +177,6 @@ const Header = () => {
                   onClick={async () => {
                     setManualClinic(c);
                     handleClinicClose();
-
-                    await syncClinic(c, user?.email || "");
-
-                    const res = await clinicApi.searchByName(c.clinic__name);
-
-                    if (res.data.length > 0) {
-                      dispatch(fetchClinic(res.data[0].id));
-                    }
                   }}
                 >
                   {c.clinic__name}
