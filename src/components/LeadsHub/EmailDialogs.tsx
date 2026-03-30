@@ -58,6 +58,9 @@ const toastOptions = {
 // ── Clinic ID ─────────────────────────────────────────────────────────────────
 const CLINIC_ID = 1;
 
+// ── Default fallback from-email ───────────────────────────────────────────────
+const DEFAULT_FROM_EMAIL = "noreply@fertility.com";
+
 // ── Strip HTML tags ───────────────────────────────────────────────────────────
 const decodeEntities = (str: string): string => {
   try {
@@ -560,7 +563,9 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
   const [error, setError] = React.useState<string | null>(null);
 
   /* ── From ─────────────────────────────────────────────────────────────── */
-  const [fromEmail, setFromEmail] = React.useState("");
+  // FIX: initialise directly to DEFAULT_FROM_EMAIL so the field is never empty
+  // while the async clinic fetch is in-flight or if it fails.
+  const [fromEmail, setFromEmail] = React.useState<string>(DEFAULT_FROM_EMAIL);
 
   /* ── To / CC / BCC ────────────────────────────────────────────────────── */
   const [toEmails, setToEmails] = React.useState<string[]>([]);
@@ -679,7 +684,10 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
     setToInput("");
     setCcInput("");
     setBccInput("");
-    setFromEmail("noreply@fertility.com");
+    // FIX: always reset to a valid non-empty default first, then try to
+    // load the clinic's real sender address. This ensures fromEmail is
+    // never an empty string when the user hits Send.
+    setFromEmail(DEFAULT_FROM_EMAIL);
     setToAnchorEl(null);
     setCcAnchorEl(null);
     setBccAnchorEl(null);
@@ -687,18 +695,18 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
     setFormatAnchor(null);
     setMoreAnchor(null);
 
-    // Load clinic from-emails
+    // Load clinic from-emails — only overwrite if we get a valid address back
     (async () => {
       try {
         const clinicData = await clinicsApi.getClinicDetail(CLINIC_ID);
         const emails = extractClinicEmails(clinicData);
-        if (emails.length > 0) {
+        // FIX: only update if we actually received a valid email address
+        if (emails.length > 0 && isValidEmail(emails[0])) {
           setFromEmail(emails[0]);
-        } else {
-          setFromEmail("noreply@fertility.com");
         }
+        // else: keep the DEFAULT_FROM_EMAIL that was set above
       } catch {
-        setFromEmail("noreply@fertility.com");
+        // Swallow error — DEFAULT_FROM_EMAIL is already set, nothing to do
       }
     })();
 
@@ -857,6 +865,14 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
       setError("Please add at least one recipient.");
       return;
     }
+
+    // FIX: derive a clean sender value — never send an empty string.
+    // If the user cleared the From field, fall back to the default.
+    const senderEmail =
+      fromEmail.trim() && isValidEmail(fromEmail.trim())
+        ? fromEmail.trim()
+        : DEFAULT_FROM_EMAIL;
+
     setSending(true);
     setError(null);
     try {
@@ -864,7 +880,8 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
         lead: lead.id,
         subject: subject.trim(),
         email_body: body.trim(),
-        sender_email: fromEmail || undefined,
+        // FIX: always pass a valid sender_email — never undefined or empty
+        sender_email: senderEmail,
         cc: ccEmails,
         bcc: bccEmails,
         additional_to: toEmails.filter((e) => e !== leadEmail),
@@ -882,12 +899,17 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
 
   const handleSaveAsDraft = async () => {
     if (!subject.trim() || !body.trim() || !lead?.id) return;
+    // FIX: same fallback logic for draft saves
+    const senderEmail =
+      fromEmail.trim() && isValidEmail(fromEmail.trim())
+        ? fromEmail.trim()
+        : DEFAULT_FROM_EMAIL;
     try {
       await LeadEmailAPI.saveAsDraft({
         lead: lead.id,
         subject: subject.trim(),
         email_body: body.trim(),
-        sender_email: fromEmail,
+        sender_email: senderEmail,
       });
       toast.success("Saved as draft!", toastOptions);
     } catch (err) {
@@ -1476,7 +1498,7 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
                 onChange={(e) => setFromEmail(e.target.value)}
                 variant="standard"
                 size="small"
-                placeholder="Enter sender email"
+                placeholder={DEFAULT_FROM_EMAIL}
                 sx={{
                   minWidth: 260,
                   "& .MuiInputBase-input": { fontSize: "13px" },
