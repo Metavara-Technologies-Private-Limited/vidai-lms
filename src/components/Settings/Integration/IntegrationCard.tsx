@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Card, Box, Typography, Button } from "@mui/material";
+import { Card, Box, Typography, Button, Chip } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 
 import ConnectedLogo from "../../../assets/icons/Connected-Logo.svg";
 import NotConnectedLogo from "../../../assets/icons/Not-Connected-Logo.svg";
@@ -8,14 +10,22 @@ import type { IntegrationCardProps } from "../../../types/Settings.types";
 import { styles } from "../../../styles/Settings/Integration.styles";
 import { integrationApi } from "../../../services/integration.api";
 
+// Extend the existing IntegrationCardProps type inline
+// (if you prefer, add upcomingAppointments?: number to Settings.types.ts instead)
+type ExtendedIntegrationCardProps = IntegrationCardProps & {
+  upcomingAppointments?: number;
+};
+
 const IntegrationCard = ({
   name,
   description,
   icon,
   headerBgColor,
-}: IntegrationCardProps) => {
+  upcomingAppointments,
+}: ExtendedIntegrationCardProps) => {
   const storageKey = `integration_${name}`;
   const [connected, setConnected] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setConnected(localStorage.getItem(storageKey) === "true");
@@ -32,7 +42,10 @@ const IntegrationCard = ({
       return;
     }
 
-    // Demo connect for other platforms
+    // Google Calendar and Google Ads — localStorage demo connect.
+    // No backend OAuth endpoint exists yet.
+    // When backend is ready, add connectGoogleCalendar() to integrationApi
+    // and call it here instead.
     localStorage.setItem(storageKey, "true");
     setConnected(true);
   };
@@ -41,6 +54,8 @@ const IntegrationCard = ({
     localStorage.removeItem(storageKey);
     setConnected(false);
   };
+
+  const isGoogleCalendar = name === "Google Calendar";
 
   return (
     <Card sx={styles.card}>
@@ -73,6 +88,56 @@ const IntegrationCard = ({
             ? `Awesome!! your ${name} account is all setup and connected.`
             : `Connect Your ${name} account to get Started.`}
         </Typography>
+
+        {/* Google Calendar connected — show upcoming appointment count */}
+        {isGoogleCalendar && connected && (
+          <Box
+            sx={{
+              mt: 1.5,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            <Chip
+              icon={
+                <CalendarMonthOutlinedIcon
+                  sx={{ fontSize: "16px !important" }}
+                />
+              }
+              label={
+                upcomingAppointments === 0
+                  ? "No upcoming appointments"
+                  : `${upcomingAppointments} upcoming appointment${
+                      upcomingAppointments !== 1 ? "s" : ""
+                    }`
+              }
+              size="small"
+              sx={{
+                bgcolor:
+                  upcomingAppointments === 0 ? "#F1F5F9" : "#EDE9FE",
+                color:
+                  upcomingAppointments === 0 ? "#64748B" : "#6D28D9",
+                fontWeight: 600,
+                fontSize: "12px",
+                px: 0.5,
+              }}
+            />
+            <Typography
+              sx={{
+                fontSize: "11px",
+                color: "#94A3B8",
+                cursor: "pointer",
+                textDecoration: "underline",
+                "&:hover": { color: "#475569" },
+              }}
+              onClick={() => navigate("/leads?tab=calendar")}
+            >
+              View in Leads Calendar
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Action */}

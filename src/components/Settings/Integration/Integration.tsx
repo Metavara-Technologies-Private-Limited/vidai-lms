@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { Box, Typography } from "@mui/material";
+import { useSelector } from "react-redux";
+import dayjs from "dayjs";
 
 import Facebook from "../../../assets/icons/Facebook.svg";
 import Instagram from "../../../assets/icons/Instagram.svg";
@@ -10,9 +12,40 @@ import GoogleCalender from "../../../assets/icons/Google_Calender.svg";
 
 import { styles } from "../../../styles/Settings/Integration.styles";
 import IntegrationCard from "./IntegrationCard";
+import { selectLeads } from "../../../store/leadSlice";
 
 const Integration = () => {
   const location = useLocation();
+
+  // Pull leads from Redux to show upcoming appointment count on Google Calendar card
+  const rawLeads = useSelector(selectLeads) as
+    | {
+        lead_status?: string;
+        status?: string;
+        appointment_date?: string;
+        is_active?: boolean;
+      }[]
+    | null;
+
+  const upcomingAppointmentCount = (() => {
+    if (!rawLeads) return 0;
+    const today = dayjs().startOf("day");
+    return rawLeads.filter((lead) => {
+      if (lead.is_active === false) return false;
+      const status = (lead.lead_status || lead.status || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[_\s]+/g, "-");
+      const isAppointment =
+        status === "appointment" || status === "appointments";
+      if (!isAppointment || !lead.appointment_date) return false;
+      const apptDate = dayjs(lead.appointment_date);
+      return (
+        apptDate.isValid() &&
+        !apptDate.startOf("day").isBefore(today)
+      );
+    }).length;
+  })();
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -24,6 +57,10 @@ const Integration = () => {
     if (params.get("facebook") === "connected") {
       localStorage.setItem("integration_Facebook", "true");
       localStorage.setItem("integration_Instagram", "true");
+    }
+
+    if (params.get("google_calendar") === "connected") {
+      localStorage.setItem("integration_Google Calendar", "true");
     }
 
     window.history.replaceState({}, document.title, "/settings/integration");
@@ -67,6 +104,7 @@ const Integration = () => {
           description="For appointments, calls, meets.."
           icon={GoogleCalender}
           headerBgColor="rgba(0, 133, 247, 0.04)"
+          upcomingAppointments={upcomingAppointmentCount}
         />
       </Box>
     </Box>
