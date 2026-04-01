@@ -9,7 +9,7 @@ export type MenuItem = {
 };
 
 // ✅ Change this to "demo" to restrict to 3 pages, or "full" to show all
-export const APP_CONDITION: "demo" | "full" = "demo";  //we can add full(to see all tabs )
+export const APP_CONDITION: "demo" | "full" = "full";  //we can add full(to see all tabs )
 
 // Demo allowed keys
 export const DEMO_ALLOWED_KEYS = ["dashboard", "leads", "settings"];
@@ -94,9 +94,9 @@ const ALL_LEADS_MENU: MenuItem[] = [
 
 // ✅ Export filtered or full menu based on condition
 export const LEADS_MENU: MenuItem[] =
-  APP_CONDITION === "demo"
-    ? ALL_LEADS_MENU.filter((item) => DEMO_ALLOWED_KEYS.includes(item.key))
-    : ALL_LEADS_MENU;
+  APP_CONDITION === "full"
+    ? ALL_LEADS_MENU
+    : ALL_LEADS_MENU.filter((item) => DEMO_ALLOWED_KEYS.includes(item.key));
 
 export const DOCUMENTS_MENU: MenuItem[] = [
   {
