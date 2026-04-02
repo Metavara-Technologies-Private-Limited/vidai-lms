@@ -2,11 +2,13 @@ import React, { lazy, Suspense, useState } from "react";
 import { Box, CircularProgress, Tab, Tabs, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
-const UserDetailsForm = lazy(() => import("./UserDetails/UserDetailsForm"));
+const UsersList = lazy(() => import("./UserDetails/UsersList"));
+const UserDetailsForm = lazy(() => import("./UserDetails/UserDetailsForm.tsx"));
 const UserRightsForm = lazy(() => import("./UserRights/UserRightsForm"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabKey = "details" | "rights";
+type DetailsView = "list" | "form";
 // ─── Step indicator ───────────────────────────────────────────────────────────
 const StepDot = ({
   index,
@@ -19,7 +21,7 @@ const StepDot = ({
   active: boolean;
   done: boolean;
 }) => (
-  <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+  <Box sx={{ display: "flex", alignItems: "center", gap: 1.2, minHeight: 22 }}>
     <Box
       sx={{
         width: 22,
@@ -28,7 +30,7 @@ const StepDot = ({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: done ? "#4CAF50" : active ? "#E97B5A" : "#BDBDBD",
+        bgcolor: done ? "#016A1C" : active ? "#E17E61" : "#BBBBBB",
         color: "#fff",
         fontSize: 11,
         fontWeight: 700,
@@ -41,7 +43,7 @@ const StepDot = ({
       sx={{
         fontSize: 12,
         fontWeight: 500,
-        color: done ? "#4CAF50" : active ? "#E97B5A" : "#9E9E9E",
+        color: done ? "#016A1C" : active ? "#E17E61" : "#BBBBBB",
       }}
     >
       {label}
@@ -52,10 +54,12 @@ const StepDot = ({
 const StepConnector = ({ done }: { done: boolean }) => (
   <Box
     sx={{
-      flex: 1,
-      height: 2,
-      bgcolor: done ? "#4CAF50" : "#E0E0E0",
-      mx: 1,
+      width: 120,
+      height: "2px",
+      bgcolor: done ? "#016A1C" : "#BBBBBB",
+      mx: 1.5,
+      borderRadius: 1,
+      transition: "background-color 0.2s ease",
     }}
   />
 );
@@ -64,39 +68,62 @@ const StepConnector = ({ done }: { done: boolean }) => (
 
 const UsersPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("details");
+  const [detailsView, setDetailsView] = useState<DetailsView>("list");
 
   const handleSaveAndNext = () => {
-    // Step 1 done → switch to User Rights tab
     setActiveTab("rights");
   };
 
-  const handleCancel = () => {
+  const handleOpenNewUser = () => {
+    setDetailsView("form");
+    setActiveTab("details");
+  };
+
+  const handleCancelDetails = () => {
+    setDetailsView("list");
+    setActiveTab("details");
+  };
+
+  const handleCancelRights = () => {
+    setDetailsView("list");
     setActiveTab("details");
   };
 
   const handleSaveGrantAccess = () => {
-    // TODO: submit to API
+    setDetailsView("list");
     setActiveTab("details");
   };
 
   return (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box
+      sx={{ height: "100%", display: "flex", flexDirection: "column", pt: 0 }}
+    >
       {/* ── Top tab bar (matches the Figma tab header) ── */}
       <Tabs
         value={activeTab}
         onChange={(_, v: TabKey) => setActiveTab(v)}
+        variant="fullWidth"
         sx={{
           borderBottom: "1px solid #E0E0E0",
-          "& .MuiTabs-indicator": { bgcolor: "#D32F2F", height: 2 },
+          minHeight: 40,
+          mx: -3,
+          mt: -2,
+          "& .MuiTabs-indicator": {
+            backgroundColor: "#E17E61",
+            height: 2.1,
+          },
+
           "& .MuiTab-root": {
             textTransform: "none",
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: 500,
-            color: "#9E9E9E",
-            minHeight: 44,
+            color: "#BBBBBB",
+            minHeight: 40,
+            p: 0,
           },
+
           "& .MuiTab-root.Mui-selected": {
-            color: "#232323",
+            color: "#212121",
             fontWeight: 600,
           },
         }}
@@ -107,49 +134,59 @@ const UsersPage: React.FC = () => {
 
       {/* ── Content area ── */}
       <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
-        {/* Add New User heading */}
-        <Typography sx={{ fontSize: 15, fontWeight: 700, mb: 2 }}>
-          Add New User
-        </Typography>
+        {(activeTab === "rights" || detailsView === "form") && (
+          <>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, mb: 2 }}>
+              Add New User
+            </Typography>
 
-        {/* Stepper */}
-        <Box
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            border: "1px solid #E0E0E0",
-            borderRadius: "8px",
-            px: 2,
-            py: 1,
-            mb: 3,
-          }}
-        >
-          <StepDot
-            index={0}
-            label="User Details"
-            active={activeTab === "details"}
-            done={activeTab === "rights"}
-          />
-          <StepConnector done={activeTab === "rights"} />
-          <StepDot
-            index={1}
-            label="User Rights"
-            active={activeTab === "rights"}
-            done={false}
-          />
-        </Box>
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                border: "1px solid #E0E0E0",
+                borderRadius: "8px",
+                px: 2,
+                py: 1,
+                mb: 3,
+                backgroundColor: "#FFFFFF",
+                boxShadow: "0px 2px 6px rgba(0,0,0,0.08)",
+              }}
+            >
+              <StepDot
+                index={0}
+                label="User Details"
+                active={activeTab === "details"}
+                done={activeTab === "rights"}
+              />
+              <StepConnector done={activeTab === "rights"} />
+              <StepDot
+                index={1}
+                label="User Rights"
+                active={activeTab === "rights"}
+                done={false}
+              />
+            </Box>
+          </>
+        )}
 
         {/* Tab panels */}
         <Suspense fallback={<CircularProgress size={24} />}>
-          {activeTab === "details" && (
+          {activeTab === "details" && detailsView === "list" && (
+            <UsersList
+              onNewUser={handleOpenNewUser}
+              onEditUser={handleOpenNewUser}
+            />
+          )}
+          {activeTab === "details" && detailsView === "form" && (
             <UserDetailsForm
               onNext={handleSaveAndNext}
-              onCancel={handleCancel}
+              onCancel={handleCancelDetails}
             />
           )}
           {activeTab === "rights" && (
             <UserRightsForm
-              onCancel={handleCancel}
+              onCancel={handleCancelRights}
               onSave={handleSaveGrantAccess}
             />
           )}
