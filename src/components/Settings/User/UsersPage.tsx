@@ -4,7 +4,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
 const UsersList = lazy(() => import("./UserDetails/UsersList"));
 const UserDetailsForm = lazy(() => import("./UserDetails/UserDetailsForm.tsx"));
-const UserRightsForm = lazy(() => import("./UserRights/UserRightsForm"));
+const UserRightsForm = lazy(() => import("./UserRights/UserRightsForm.tsx"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabKey = "details" | "rights";
