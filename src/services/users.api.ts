@@ -1,0 +1,388 @@
+import { http } from "./http";
+
+export type UserGender = "Male" | "Female" | "Other";
+
+export type UserRecord = {
+  id: number;
+  source: "local" | "client";
+  firstName: string;
+  lastName: string;
+  gender: UserGender;
+  dateOfJoining: string;
+  dateOfBirth: string;
+  roleId: number | null;
+  role: string;
+  username: string;
+  mobileNumber: string;
+  email: string;
+  status: boolean;
+};
+
+type UserApiRecord = Record<string, unknown>;
+type ApiWrapped<T> = {
+  success?: boolean;
+  message?: string;
+  data?: T;
+};
+
+export type RoleRecord = {
+  id: number;
+  name: string;
+};
+
+type RoleApiRecord = {
+  id: number;
+  name: string;
+};
+
+type UserListResponse =
+  | ApiWrapped<UserApiRecord[]>
+  | UserApiRecord[]
+  | {
+      data?: UserApiRecord[];
+      results?: UserApiRecord[];
+    };
+
+type UserSearchResponse =
+  | ApiWrapped<UserApiRecord[]>
+  | UserApiRecord[]
+  | {
+      data?: UserApiRecord[];
+      results?: UserApiRecord[];
+      objects?: UserApiRecord[];
+    };
+
+type UserSingleResponse = UserApiRecord | ApiWrapped<UserApiRecord>;
+
+type RoleListResponse = RoleApiRecord[] | ApiWrapped<RoleApiRecord[]>;
+
+export type UserCreateUpdatePayload = {
+  username?: string;
+  email: string;
+  password?: string;
+  confirm_password?: string;
+  first_name?: string;
+  last_name?: string;
+  gender?: string;
+  date_of_joining?: string | null;
+  date_of_birth?: string | null;
+  mobile_no?: string;
+  role?: number;
+  photo?: string | null;
+};
+
+const extractApiErrorMessage = (error: unknown): string => {
+  const payload =
+    (error as { response?: { data?: unknown } })?.response?.data ?? null;
+
+  const GENERIC_MESSAGES = new Set([
+    "Error occurred",
+    "Request failed",
+    "Internal Server Error",
+  ]);
+
+  const normalize = (value: unknown): string => {
+    if (value == null) return "Request failed";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+
+    if (Array.isArray(value)) {
+      const first = value[0];
+      return first == null ? "Request failed" : normalize(first);
+    }
+
+    if (typeof value === "object") {
+      const obj = value as Record<string, unknown>;
+
+      const preferredKeys = Object.keys(obj).filter(
+        (key) =>
+          ![
+            "message",
+            "detail",
+            "error",
+            "request_id",
+            "success",
+            "status",
+          ].includes(key),
+      );
+
+      if (preferredKeys.length > 0) {
+        const key = preferredKeys[0];
+        return `${key}: ${normalize(obj[key])}`;
+      }
+
+      if (typeof obj.detail === "string" && !GENERIC_MESSAGES.has(obj.detail)) {
+        return obj.detail;
+      }
+
+      if (
+        typeof obj.message === "string" &&
+        !GENERIC_MESSAGES.has(obj.message)
+      ) {
+        return obj.message;
+      }
+
+      if (typeof obj.error === "string" && !GENERIC_MESSAGES.has(obj.error)) {
+        return obj.error;
+      }
+
+      const firstEntry = Object.entries(obj)[0];
+      if (!firstEntry) return "Request failed";
+
+      const [key, val] = firstEntry;
+      return `${key}: ${normalize(val)}`;
+    }
+
+    return "Request failed";
+  };
+
+  return normalize(payload);
+};
+
+const toSafeString = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return "";
+};
+
+const toBoolean = (value: unknown): boolean => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "active", "enabled"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "inactive", "disabled"].includes(normalized)) {
+      return false;
+    }
+  }
+  return false;
+};
+
+const toGender = (value: unknown): UserGender => {
+  const text = toSafeString(value).trim().toLowerCase();
+  if (text === "male") {
+    return "Male";
+  }
+  if (text === "female") {
+    return "Female";
+  }
+  return "Other";
+};
+
+const normalizeUser = (
+  raw: UserApiRecord,
+  source: "local" | "client" = "local",
+): UserRecord => {
+  const firstName =
+    toSafeString(raw.first_name) ||
+    toSafeString(raw.firstName) ||
+    toSafeString(raw.name).split(" ")[0] ||
+    "";
+  const lastName =
+    toSafeString(raw.last_name) ||
+    toSafeString(raw.lastName) ||
+    toSafeString(raw.name).split(" ").slice(1).join(" ") ||
+    "";
+
+  return {
+    id: Number(raw.id ?? 0),
+    source,
+    firstName,
+    lastName,
+    gender: toGender(raw.gender),
+    dateOfJoining: toSafeString(raw.date_of_joining ?? raw.dateOfJoining),
+    dateOfBirth: toSafeString(raw.date_of_birth ?? raw.dateOfBirth),
+    roleId:
+      raw.role === null || raw.role === undefined
+        ? null
+        : Number(raw.role) || null,
+    role: toSafeString(raw.role_name ?? raw.role ?? raw.user_role),
+    username: toSafeString(raw.username ?? raw.user_name ?? raw.email),
+    mobileNumber: toSafeString(
+      raw.mobile_no ?? raw.mobile_number ?? raw.mobileNo,
+    ),
+    email: toSafeString(raw.email ?? raw.email_id),
+    status: toBoolean(raw.is_active ?? raw.status),
+  };
+};
+
+const extractSingleRecord = (payload: UserSingleResponse): UserApiRecord => {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    const wrapped = payload as ApiWrapped<UserApiRecord>;
+    if (wrapped.data && typeof wrapped.data === "object") {
+      return wrapped.data;
+    }
+  }
+
+  return payload as UserApiRecord;
+};
+
+const extractUserArray = (payload: UserListResponse): UserApiRecord[] => {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    const wrapped = payload as ApiWrapped<UserApiRecord[]>;
+    if (Array.isArray(wrapped.data)) {
+      return wrapped.data;
+    }
+  }
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload.data)) {
+    return payload.data;
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "results" in payload &&
+    Array.isArray(payload.results)
+  ) {
+    return payload.results;
+  }
+
+  return [];
+};
+
+const extractUserSearchArray = (
+  payload: UserSearchResponse,
+): UserApiRecord[] => {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    const wrapped = payload as ApiWrapped<UserApiRecord[]>;
+    if (Array.isArray(wrapped.data)) {
+      return wrapped.data;
+    }
+  }
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "results" in payload &&
+    Array.isArray(payload.results)
+  ) {
+    return payload.results;
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "objects" in payload &&
+    Array.isArray(payload.objects)
+  ) {
+    return payload.objects;
+  }
+
+  return [];
+};
+
+const extractRoleArray = (payload: RoleListResponse): RoleApiRecord[] => {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    const wrapped = payload as ApiWrapped<RoleApiRecord[]>;
+    if (Array.isArray(wrapped.data)) {
+      return wrapped.data;
+    }
+  }
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  return [];
+};
+
+export const usersApi = {
+  listLocal: async (): Promise<UserRecord[]> => {
+    const response = await http.get<UserListResponse>("/users/list/");
+    return extractUserArray(response.data).map((user) =>
+      normalizeUser(user, "local"),
+    );
+  },
+
+  listClient: async (): Promise<UserRecord[]> => {
+    const response = await http.get<UserSearchResponse>("/users-search/", {
+      params: {
+        limit: 200,
+        offset: 0,
+        search: "",
+      },
+    });
+
+    return extractUserSearchArray(response.data).map((user) =>
+      normalizeUser(user, "client"),
+    );
+  },
+
+  list: async (): Promise<UserRecord[]> => {
+    const [localResult, clientResult] = await Promise.allSettled([
+      usersApi.listLocal(),
+      usersApi.listClient(),
+    ]);
+
+    const localUsers =
+      localResult.status === "fulfilled" ? localResult.value : [];
+    const clientUsers =
+      clientResult.status === "fulfilled" ? clientResult.value : [];
+
+    return [...localUsers, ...clientUsers];
+  },
+
+  getById: async (userId: number): Promise<UserRecord> => {
+    const response = await http.get<UserSingleResponse>(`/users/${userId}/`);
+    return normalizeUser(extractSingleRecord(response.data));
+  },
+
+  listRoles: async (): Promise<RoleRecord[]> => {
+    const response = await http.get<RoleListResponse>("/roles/list/");
+    return extractRoleArray(response.data).map((role) => ({
+      id: Number(role.id),
+      name: toSafeString(role.name),
+    }));
+  },
+
+  create: async (payload: UserCreateUpdatePayload): Promise<UserRecord> => {
+    try {
+      const response = await http.post<UserSingleResponse>("/users/", payload);
+      return normalizeUser(extractSingleRecord(response.data));
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error));
+    }
+  },
+
+  update: async (
+    userId: number,
+    payload: UserCreateUpdatePayload,
+  ): Promise<UserRecord> => {
+    try {
+      const response = await http.put<UserSingleResponse>(
+        `/users/${userId}/update/`,
+        payload,
+      );
+      return normalizeUser(extractSingleRecord(response.data));
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error));
+    }
+  },
+
+  patchStatus: async (userId: number, isActive: boolean): Promise<void> => {
+    await http.patch(`/users/${userId}/status/`, {
+      is_active: isActive,
+    });
+  },
+};

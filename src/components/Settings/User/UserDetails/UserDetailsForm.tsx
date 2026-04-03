@@ -40,8 +40,12 @@ export interface UserFormData {
 }
 
 interface Props {
-  onNext: (userType: UserType, data: UserFormData) => void;
+  mode?: "create" | "edit";
+  initialData?: UserFormData | null;
+  roleOptions?: { value: string; label: string }[];
+  onSave: (data: UserFormData) => Promise<void> | void;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
 const inputSx = {
@@ -137,12 +141,14 @@ const PasswordField = ({
   onChange,
   show,
   onToggle,
+  onFocus,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   show: boolean;
   onToggle: () => void;
+  onFocus?: () => void;
 }) => (
   <TextField
     fullWidth
@@ -151,6 +157,7 @@ const PasswordField = ({
     type={show ? "text" : "password"}
     value={value}
     onChange={(e) => onChange(e.target.value)}
+    onFocus={onFocus}
     sx={inputSx}
     InputLabelProps={{ shrink: true }}
     InputProps={{
@@ -174,8 +181,17 @@ const capitalizeFirst = (value: string): string => {
   return value.charAt(0).toUpperCase() + value.slice(1);
 };
 
-const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
-  const [form, setForm] = useState<UserFormData>(defaultForm);
+const EDIT_PASSWORD_PLACEHOLDER = "********";
+
+const UserDetailsForm: React.FC<Props> = ({
+  mode = "create",
+  initialData = null,
+  roleOptions = [],
+  onSave,
+  onCancel,
+  isSubmitting = false,
+}) => {
+  const [form, setForm] = useState<UserFormData>(initialData ?? defaultForm);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -200,6 +216,13 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
   };
 
   const validateForm = (): boolean => {
+    if (!form.userRole.trim()) {
+      toast.error("User Role is required", {
+        toastId: "user-role-required",
+      });
+      return false;
+    }
+
     if (form.userName.trim() && /^[^a-zA-Z0-9]/.test(form.userName)) {
       toast.error("User Name should not start with special characters");
       return false;
@@ -218,11 +241,20 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
     return true;
   };
 
-  const handleSaveAndNext = () => {
+  const handleSave = async () => {
     if (!validateForm()) return;
 
-    toast.success("User details saved successfully");
-    onNext("employee", form);
+    try {
+      await onSave(form);
+
+      toast.success(
+        mode === "edit"
+          ? "User details updated successfully"
+          : "User created successfully",
+      );
+    } catch {
+      // Error toast is handled by page-level integration.
+    }
   };
 
   return (
@@ -277,7 +309,7 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
             />
           </Box>
           <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
-            New User Information
+            {mode === "edit" ? "Edit User Information" : "New User Information"}
           </Typography>
         </Box>
 
@@ -352,11 +384,7 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
               label="User Role"
               value={form.userRole}
               onChange={(v) => setForm((prev) => ({ ...prev, userRole: v }))}
-              options={[
-                { value: "Admin", label: "Admin" },
-                { value: "Staff", label: "Staff" },
-                { value: "Viewer", label: "Viewer" },
-              ]}
+              options={roleOptions}
             />
           </FieldGrid>
 
@@ -418,6 +446,14 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
               label="Password"
               value={form.password}
               onChange={(v) => setForm((prev) => ({ ...prev, password: v }))}
+              onFocus={() => {
+                if (
+                  mode === "edit" &&
+                  form.password === EDIT_PASSWORD_PLACEHOLDER
+                ) {
+                  setForm((prev) => ({ ...prev, password: "" }));
+                }
+              }}
               show={showPassword}
               onToggle={() => setShowPassword((prev) => !prev)}
             />
@@ -430,6 +466,14 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
               onChange={(v) =>
                 setForm((prev) => ({ ...prev, confirmPassword: v }))
               }
+              onFocus={() => {
+                if (
+                  mode === "edit" &&
+                  form.confirmPassword === EDIT_PASSWORD_PLACEHOLDER
+                ) {
+                  setForm((prev) => ({ ...prev, confirmPassword: "" }));
+                }
+              }}
               show={showConfirm}
               onToggle={() => setShowConfirm((prev) => !prev)}
             />
@@ -442,6 +486,7 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
           <Button
             variant="outlined"
             onClick={onCancel}
+            disabled={isSubmitting}
             sx={{
               borderColor: "#BDBDBD",
               color: "#505050",
@@ -456,7 +501,8 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
           </Button>
           <Button
             variant="contained"
-            onClick={handleSaveAndNext}
+            onClick={handleSave}
+            disabled={isSubmitting}
             sx={{
               bgcolor: "#505050",
               color: "#ffffff",
@@ -467,7 +513,7 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
               "&:hover": { bgcolor: "#232323" },
             }}
           >
-            Save &amp; Next
+            {mode === "edit" ? "Update User" : "Create New User"}
           </Button>
         </Box>
       </Box>
