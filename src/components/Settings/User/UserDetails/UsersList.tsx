@@ -22,12 +22,19 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import CheckIcon from "@mui/icons-material/Check";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import usersMockData, { type User } from "./UsersListMockData";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import { type UserRecord as User } from "../../../../services/users.api";
 import EditUser from "../../../../assets/icons/Edit_User_List.svg";
 
 interface Props {
+  users: User[];
+  isLoading?: boolean;
+  onToggleUserStatus: (userId: number) => Promise<void> | void;
   onNewUser: () => void;
   onEditUser?: (user: User) => void;
+  pinnedUserId?: number | null;
 }
 
 type OptionalColumnKey =
@@ -36,6 +43,9 @@ type OptionalColumnKey =
   | "dateOfBirth"
   | "mobileNumber"
   | "email";
+
+type SortKey = "username" | "name" | "role";
+type SortDirection = "asc" | "desc";
 
 const OPTIONAL_COLUMNS: Array<{
   key: OptionalColumnKey;
@@ -63,7 +73,7 @@ const OPTIONAL_COLUMNS: Array<{
 
 const ROWS_PER_PAGE = 8;
 
-const FIXED_TABLE_MIN_WIDTH = 760;
+const FIXED_TABLE_MIN_WIDTH = 670;
 const OPTIONAL_COLUMN_MIN_WIDTH = 160;
 
 const headerCellSx = {
@@ -150,8 +160,14 @@ const EditActionIcon = ({
   />
 );
 
-const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
-  const [users, setUsers] = useState<User[]>(usersMockData);
+const UsersList: React.FC<Props> = ({
+  users,
+  isLoading = false,
+  onToggleUserStatus,
+  onNewUser,
+  onEditUser,
+  pinnedUserId,
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [columnPickerAnchor, setColumnPickerAnchor] =
@@ -165,14 +181,8 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
     mobileNumber: false,
     email: false,
   });
-
-  const handleToggleUserFlag = (userId: number, field: "locked" | "status") => {
-    setUsers((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === userId ? { ...user, [field]: !user[field] } : user,
-      ),
-    );
-  };
+  const [sortBy, setSortBy] = useState<SortKey | null>("username");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const filteredUsers = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -192,6 +202,44 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
     [visibleOptionalColumns],
   );
 
+  const sortedUsers = useMemo(() => {
+    const list = [...filteredUsers];
+
+    if (sortBy) {
+      const resolveValue = (user: User): string => {
+        if (sortBy === "name") {
+          return `${user.firstName} ${user.lastName}`.trim().toLowerCase();
+        }
+
+        if (sortBy === "role") {
+          return user.role.toLowerCase();
+        }
+
+        return user.username.toLowerCase();
+      };
+
+      list.sort((a, b) => {
+        const left = resolveValue(a);
+        const right = resolveValue(b);
+
+        if (left < right) return sortDirection === "asc" ? -1 : 1;
+        if (left > right) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    // Pin the recently updated/created user to the very first row.
+    if (pinnedUserId != null) {
+      const pinnedIndex = list.findIndex((u) => u.id === pinnedUserId);
+      if (pinnedIndex > 0) {
+        const [pinned] = list.splice(pinnedIndex, 1);
+        list.unshift(pinned);
+      }
+    }
+
+    return list;
+  }, [filteredUsers, sortBy, sortDirection, pinnedUserId]);
+
   const isColumnPickerOpen = Boolean(columnPickerAnchor);
 
   const handleOpenColumnPicker = (event: React.MouseEvent<HTMLElement>) => {
@@ -209,17 +257,36 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
     }));
   };
 
-  const pageCount = Math.max(
-    1,
-    Math.ceil(filteredUsers.length / ROWS_PER_PAGE),
-  );
+  const handleSort = (nextSortBy: SortKey) => {
+    if (sortBy === nextSortBy) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortBy(nextSortBy);
+    setSortDirection("asc");
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (!sortBy || sortBy !== key) {
+      return <UnfoldMoreIcon sx={{ fontSize: 14, color: "#9A9A9A" }} />;
+    }
+
+    return sortDirection === "asc" ? (
+      <ArrowUpwardIcon sx={{ fontSize: 14, color: "#676767" }} />
+    ) : (
+      <ArrowDownwardIcon sx={{ fontSize: 14, color: "#676767" }} />
+    );
+  };
+
+  const pageCount = Math.max(1, Math.ceil(sortedUsers.length / ROWS_PER_PAGE));
   const safePage = Math.min(page, pageCount);
   const startIndex = (safePage - 1) * ROWS_PER_PAGE;
-  const paginatedUsers = filteredUsers.slice(
+  const paginatedUsers = sortedUsers.slice(
     startIndex,
     startIndex + ROWS_PER_PAGE,
   );
-  const showingFrom = filteredUsers.length === 0 ? 0 : startIndex + 1;
+  const showingFrom = sortedUsers.length === 0 ? 0 : startIndex + 1;
   const showingTo = startIndex + paginatedUsers.length;
   const tableMinWidth =
     FIXED_TABLE_MIN_WIDTH +
@@ -299,7 +366,7 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
         </Box>
       </Box>
 
-      <TableContainer sx={{ overflowX: "auto", borderRadius: "8px", }}>
+      <TableContainer sx={{ overflowX: "auto", borderRadius: "8px" }}>
         <Table
           sx={{
             minWidth: tableMinWidth,
@@ -319,13 +386,58 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
           >
             <TableRow>
               <TableCell sx={{ ...headerCellSx, minWidth: 170 }}>
-                Username
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+                  <Typography
+                    component="span"
+                    sx={{ fontSize: 11, fontWeight: 600 }}
+                  >
+                    Username
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleSort("username")}
+                    sx={{ p: 0.1 }}
+                    aria-label="Sort by username"
+                  >
+                    {renderSortIcon("username")}
+                  </IconButton>
+                </Box>
               </TableCell>
               <TableCell sx={{ ...headerCellSx, minWidth: 180 }}>
-                Name
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+                  <Typography
+                    component="span"
+                    sx={{ fontSize: 11, fontWeight: 600 }}
+                  >
+                    Name
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleSort("name")}
+                    sx={{ p: 0.1 }}
+                    aria-label="Sort by name"
+                  >
+                    {renderSortIcon("name")}
+                  </IconButton>
+                </Box>
               </TableCell>
               <TableCell sx={{ ...headerCellSx, minWidth: 120 }}>
-                Role
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+                  <Typography
+                    component="span"
+                    sx={{ fontSize: 11, fontWeight: 600 }}
+                  >
+                    Role
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleSort("role")}
+                    sx={{ p: 0.1 }}
+                    aria-label="Sort by role"
+                  >
+                    {renderSortIcon("role")}
+                  </IconButton>
+                </Box>
               </TableCell>
               {activeOptionalColumns.map((column) => (
                 <TableCell
@@ -335,9 +447,6 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
                   {column.label}
                 </TableCell>
               ))}
-              <TableCell sx={{ ...headerCellSx, minWidth: 90 }}>
-                Locked
-              </TableCell>
               <TableCell sx={{ ...headerCellSx, minWidth: 90 }}>
                 Status
               </TableCell>
@@ -378,20 +487,9 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
                 ))}
                 <TableCell sx={{ ...bodyCellSx, minWidth: 90 }}>
                   <Checkbox
-                    checked={user.locked}
-                    onChange={() => handleToggleUserFlag(user.id, "locked")}
-                    icon={checkboxIcon}
-                    checkedIcon={checkedCheckboxIcon}
-                    sx={checkboxSx}
-                    inputProps={{
-                      "aria-label": `Toggle locked for ${user.username}`,
-                    }}
-                  />
-                </TableCell>
-                <TableCell sx={{ ...bodyCellSx, minWidth: 90 }}>
-                  <Checkbox
                     checked={user.status}
-                    onChange={() => handleToggleUserFlag(user.id, "status")}
+                    onChange={() => onToggleUserStatus(user.id)}
+                    disabled={isLoading}
                     icon={checkboxIcon}
                     checkedIcon={checkedCheckboxIcon}
                     sx={checkboxSx}
@@ -414,10 +512,10 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
             {paginatedUsers.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6 + activeOptionalColumns.length}
+                  colSpan={5 + activeOptionalColumns.length}
                   sx={{ ...bodyCellSx, textAlign: "center", py: 4 }}
                 >
-                  No users found.
+                  {isLoading ? "Loading users..." : "No users found."}
                 </TableCell>
               </TableRow>
             )}
@@ -439,7 +537,7 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
             Select Columns
           </Typography>
           <Typography sx={{ fontSize: 11, color: "#8A8A8A", mb: 1.2 }}>
-            Fixed: Username, Name, Role, Locked, Status
+            Fixed: Username, Name, Role, Status
           </Typography>
           {OPTIONAL_COLUMNS.map((column) => (
             <Box
@@ -476,7 +574,7 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
         }}
       >
         <Typography sx={{ fontSize: 12, color: "#9A9A9A" }}>
-          {`Showing ${showingFrom} to ${showingTo} of ${filteredUsers.length} entries`}
+          {`Showing ${showingFrom} to ${showingTo} of ${sortedUsers.length} entries`}
         </Typography>
 
         <Pagination
