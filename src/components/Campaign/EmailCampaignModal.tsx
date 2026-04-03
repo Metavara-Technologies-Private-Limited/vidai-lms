@@ -142,7 +142,7 @@ export default function EmailCampaignModal({
         "YYYY-MM-DD HH:mm",
       ).format("YYYY-MM-DDTHH:mm:ss");
 
-      const shouldActivateCampaign = status === CAMPAIGN_STATUS.SCHEDULED;
+      const isScheduled = status === CAMPAIGN_STATUS.SCHEDULED;
 
       const payload: EmailCampaignPayload = {
         clinic: clinicId,
@@ -153,11 +153,12 @@ export default function EmailCampaignModal({
         start_date: startDate,
         end_date: endDate,
         campaign_mode: CAMPAIGN_MODE.EMAIL,
+        status: status.toLowerCase(),
 
         // Schedule details
-        selected_start: shouldActivateCampaign ? start : null,
-        selected_end: shouldActivateCampaign ? end : null,
-        enter_time: shouldActivateCampaign ? scheduleTime : null,
+        selected_start: isScheduled ? start : null,
+        selected_end: isScheduled ? end : null,
+        enter_time: isScheduled ? scheduleTime : null,
 
         // Email config
         email: [
@@ -167,9 +168,9 @@ export default function EmailCampaignModal({
             email_body: emailBody,
             template_name: "EMAIL",
             template_id: selectedTemplateId,
-            sender_email: SENDER_EMAIL,
-            scheduled_at: shouldActivateCampaign ? scheduledDateTime : null,
-            is_active: shouldActivateCampaign,
+            sender_email: clinic?.email ?? SENDER_EMAIL,
+            scheduled_at: isScheduled ? scheduledDateTime : null,
+            is_active: isScheduled,
           },
         ],
       };
@@ -564,41 +565,55 @@ export default function EmailCampaignModal({
                   <div
                     className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}
                   >
-                    <label>Select Date</label>
-                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                      <div style={{ display: "flex", gap: "12px" }}>
-                        <DatePicker
-                          label="From"
-                          value={scheduleRange[0]}
-                          minDate={dayjs()}
-                          maxDate={
-                            scheduleRange[1] ??
-                            (endDate ? dayjs(endDate) : undefined)
-                          }
-                          onChange={(v) =>
-                            setScheduleRange([
-                              v ? dayjs(v) : null,
-                              scheduleRange[1],
-                            ])
-                          }
-                          slotProps={{ textField: { fullWidth: true } }}
-                        />
-
-                        <DatePicker
-                          label="To"
-                          value={scheduleRange[1]}
-                          minDate={scheduleRange[0] ?? dayjs()}
-                          maxDate={endDate ? dayjs(endDate) : undefined}
-                          onChange={(v) =>
-                            setScheduleRange([
-                              scheduleRange[0],
-                              v ? dayjs(v) : null,
-                            ])
-                          }
-                          slotProps={{ textField: { fullWidth: true } }}
-                        />
+                    {/* <label>Select Date</label> */}
+                    <div className="form-row">
+                      <div
+                        className={`form-group half ${submitted && !startDate ? "error" : ""}`}
+                      >
+                        <label>Scheduled From</label>
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                          <DatePicker
+                            format="DD/MM/YYYY"
+                            value={scheduleRange[0]}
+                            minDate={dayjs()}
+                            maxDate={
+                              scheduleRange[1] ??
+                              (endDate ? dayjs(endDate) : undefined)
+                            }
+                            onChange={(v) =>
+                              setScheduleRange([
+                                v ? dayjs(v) : null,
+                                scheduleRange[1],
+                              ])
+                            }
+                            slots={{ openPickerIcon: CalendarTodayIcon }}
+                            slotProps={{ textField: { fullWidth: true } }}
+                          />
+                        </LocalizationProvider>{" "}
                       </div>
-                    </LocalizationProvider>
+
+                      <div
+                        className={`form-group half ${submitted && !endDate ? "error" : ""}`}
+                      >
+                        <label>Scheduled Till</label>
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                          <DatePicker
+                            format="DD/MM/YYYY"
+                            value={scheduleRange[1]}
+                            minDate={scheduleRange[0] ?? dayjs()}
+                            maxDate={endDate ? dayjs(endDate) : undefined}
+                            onChange={(v) =>
+                              setScheduleRange([
+                                scheduleRange[0],
+                                v ? dayjs(v) : null,
+                              ])
+                            }
+                            slots={{ openPickerIcon: CalendarTodayIcon }}
+                            slotProps={{ textField: { fullWidth: true } }}
+                          />
+                        </LocalizationProvider>
+                      </div>
+                    </div>
                   </div>
 
                   <div

@@ -153,6 +153,7 @@ export interface EmailCampaignPayload {
   start_date: string;
   end_date: string;
   campaign_mode: number;
+  status: string;
 
   selected_start: string | null;
   selected_end: string | null;
