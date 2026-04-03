@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   IconButton,
   InputAdornment,
   Pagination,
@@ -22,12 +23,17 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import CheckIcon from "@mui/icons-material/Check";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import usersMockData, { type User } from "./UsersListMockData";
 import EditUser from "../../../../assets/icons/Edit_User_List.svg";
+import {
+  userProfileApi,
+  type UserProfileRead,
+} from "../../../../services/userProfile.api";
+import { toast } from "react-toastify";
 
 interface Props {
   onNewUser: () => void;
-  onEditUser?: (user: User) => void;
+  onEditUser?: (user: UserProfileRead) => void;
+  refreshKey?: number;
 }
 
 type OptionalColumnKey =
@@ -40,25 +46,25 @@ type OptionalColumnKey =
 const OPTIONAL_COLUMNS: Array<{
   key: OptionalColumnKey;
   label: string;
-  getValue: (user: User) => string;
+  getValue: (user: UserProfileRead) => string;
 }> = [
-  { key: "gender", label: "Gender", getValue: (user) => user.gender },
+  { key: "gender", label: "Gender", getValue: () => "-" },
   {
     key: "dateOfJoining",
     label: "Date Of Joining",
-    getValue: (user) => user.dateOfJoining,
+    getValue: (user) => user.created_at?.slice(0, 10) || "-",
   },
   {
     key: "dateOfBirth",
     label: "Date Of Birth",
-    getValue: (user) => user.dateOfBirth,
+    getValue: (user) => user.date_of_birth?.slice(0, 10) || "-",
   },
   {
     key: "mobileNumber",
     label: "Mobile Number",
-    getValue: (user) => user.mobileNumber,
+    getValue: (user) => user.mobile_no || "-",
   },
-  { key: "email", label: "Email", getValue: (user) => user.email },
+  { key: "email", label: "Email", getValue: (user) => user.email || "-" },
 ];
 
 const ROWS_PER_PAGE = 8;
@@ -150,8 +156,9 @@ const EditActionIcon = ({
   />
 );
 
-const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
-  const [users, setUsers] = useState<User[]>(usersMockData);
+const UsersList: React.FC<Props> = ({ onNewUser, onEditUser, refreshKey = 0 }) => {
+  const [users, setUsers] = useState<UserProfileRead[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [columnPickerAnchor, setColumnPickerAnchor] =
@@ -166,12 +173,62 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
     email: false,
   });
 
-  const handleToggleUserFlag = (userId: number, field: "locked" | "status") => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const data = await userProfileApi.list();
+        if (!cancelled) {
+          setUsers(data);
+        }
+      } catch {
+        if (!cancelled) {
+          toast.error("Failed to load users.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingUsers(false);
+        }
+      }
+    };
+
+    loadUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  const handleToggleUserFlag = async (
+    userId: number,
+    field: "locked" | "status",
+  ) => {
+    if (field === "locked") return;
+
+    const target = users.find((user) => user.id === userId);
+    if (!target) return;
+
+    const nextStatus = !target.is_active;
     setUsers((currentUsers) =>
       currentUsers.map((user) =>
-        user.id === userId ? { ...user, [field]: !user[field] } : user,
+        user.id === userId ? { ...user, is_active: nextStatus } : user,
       ),
     );
+
+    try {
+      const updated = await userProfileApi.update(userId, { is_active: nextStatus });
+      setUsers((currentUsers) =>
+        currentUsers.map((user) => (user.id === userId ? updated : user)),
+      );
+    } catch {
+      setUsers((currentUsers) =>
+        currentUsers.map((user) =>
+          user.id === userId ? { ...user, is_active: target.is_active } : user,
+        ),
+      );
+      toast.error("Failed to update user status.");
+    }
   };
 
   const filteredUsers = useMemo(() => {
@@ -182,7 +239,15 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
     }
 
     return users.filter((user) =>
-      user.username.toLowerCase().includes(normalizedSearch),
+      [
+        user.username,
+        user.first_name,
+        user.last_name,
+        user.email,
+        user.role_name,
+      ]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(normalizedSearch)),
     );
   }, [searchTerm, users]);
 
@@ -299,14 +364,19 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
         </Box>
       </Box>
 
-      <TableContainer sx={{ overflowX: "auto", borderRadius: "8px", }}>
-        <Table
-          sx={{
-            minWidth: tableMinWidth,
-            borderCollapse: "separate",
-            borderSpacing: 0,
-          }}
-        >
+      <TableContainer sx={{ overflowX: "auto", borderRadius: "8px" }}>
+        {loadingUsers ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : (
+          <Table
+            sx={{
+              minWidth: tableMinWidth,
+              borderCollapse: "separate",
+              borderSpacing: 0,
+            }}
+          >
           <TableHead
             sx={{
               "& .MuiTableRow-root .MuiTableCell-head:first-of-type": {
@@ -364,9 +434,9 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
                 </TableCell>
                 <TableCell
                   sx={{ ...bodyCellSx, minWidth: 180 }}
-                >{`${user.firstName} ${user.lastName}`}</TableCell>
+                >{`${user.first_name} ${user.last_name}`.trim() || "-"}</TableCell>
                 <TableCell sx={{ ...bodyCellSx, minWidth: 120 }}>
-                  {user.role}
+                  {user.role_name || "-"}
                 </TableCell>
                 {activeOptionalColumns.map((column) => (
                   <TableCell
@@ -378,8 +448,9 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
                 ))}
                 <TableCell sx={{ ...bodyCellSx, minWidth: 90 }}>
                   <Checkbox
-                    checked={user.locked}
+                    checked={false}
                     onChange={() => handleToggleUserFlag(user.id, "locked")}
+                    disabled
                     icon={checkboxIcon}
                     checkedIcon={checkedCheckboxIcon}
                     sx={checkboxSx}
@@ -390,7 +461,7 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
                 </TableCell>
                 <TableCell sx={{ ...bodyCellSx, minWidth: 90 }}>
                   <Checkbox
-                    checked={user.status}
+                    checked={user.is_active}
                     onChange={() => handleToggleUserFlag(user.id, "status")}
                     icon={checkboxIcon}
                     checkedIcon={checkedCheckboxIcon}
@@ -422,7 +493,8 @@ const UsersList: React.FC<Props> = ({ onNewUser, onEditUser }) => {
               </TableRow>
             )}
           </TableBody>
-        </Table>
+          </Table>
+        )}
       </TableContainer>
 
       <Popover

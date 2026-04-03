@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Box,
@@ -19,8 +19,13 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
-import type { Dayjs } from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import { toast } from "react-toastify";
+import { roleApi } from "../../../../services/role.api";
+import {
+  userProfileApi,
+  type UserProfileRead,
+} from "../../../../services/userProfile.api";
 
 export type UserType = "employee";
 
@@ -40,9 +45,15 @@ export interface UserFormData {
 }
 
 interface Props {
-  onNext: (userType: UserType, data: UserFormData) => void;
+  initialProfile?: UserProfileRead | null;
+  onNext: (savedProfile: UserProfileRead) => void;
   onCancel: () => void;
 }
+
+type RoleOption = {
+  value: string;
+  label: string;
+};
 
 const inputSx = {
   "& .MuiOutlinedInput-root": {
@@ -72,6 +83,25 @@ const defaultForm: UserFormData = {
   profilePhoto: null,
 };
 
+const buildFormFromProfile = (profile?: UserProfileRead | null): UserFormData => {
+  if (!profile) return defaultForm;
+
+  return {
+    firstName: profile.first_name || "",
+    lastName: profile.last_name || "",
+    gender: "",
+    dateOfJoining: profile.created_at ? dayjs(profile.created_at) : null,
+    dateOfBirth: profile.date_of_birth ? dayjs(profile.date_of_birth) : null,
+    userRole: profile.role_id ? String(profile.role_id) : "",
+    userName: profile.username || "",
+    mobileNo: profile.mobile_no || "",
+    emailId: profile.email || "",
+    password: "",
+    confirmPassword: "",
+    profilePhoto: profile.profile_picture || null,
+  };
+};
+
 const FieldGrid = ({ children }: { children: React.ReactNode }) => (
   <Grid size={{ xs: 12, sm: 3 }}>{children}</Grid>
 );
@@ -95,7 +125,10 @@ const SelectField = ({
       displayEmpty
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      renderValue={(v) => v || <span style={{ color: "#9E9E9E" }}>Select</span>}
+      renderValue={(v) => {
+        const selected = options.find((o) => o.value === String(v));
+        return selected?.label || <span style={{ color: "#9E9E9E" }}>Select</span>;
+      }}
       sx={{ height: 40, fontSize: 13 }}
     >
       {options.map((o) => (
@@ -174,11 +207,39 @@ const capitalizeFirst = (value: string): string => {
   return value.charAt(0).toUpperCase() + value.slice(1);
 };
 
-const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
-  const [form, setForm] = useState<UserFormData>(defaultForm);
+const UserDetailsForm: React.FC<Props> = ({ initialProfile, onNext, onCancel }) => {
+  const [form, setForm] = useState<UserFormData>(() => buildFormFromProfile(initialProfile));
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setForm(buildFormFromProfile(initialProfile));
+  }, [initialProfile]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    roleApi
+      .list()
+      .then((roles) => {
+        if (cancelled) return;
+        setRoleOptions(
+          roles.map((role) => ({ value: String(role.id), label: role.name })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error("Failed to load role options.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -215,14 +276,52 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
       return false;
     }
 
+    if (!initialProfile && !form.password.trim()) {
+      toast.error("Password is required");
+      return false;
+    }
+
     return true;
   };
 
-  const handleSaveAndNext = () => {
+  const handleSaveAndNext = async () => {
     if (!validateForm()) return;
 
-    toast.success("User details saved successfully");
-    onNext("employee", form);
+    const payload = {
+      username: form.userName.trim(),
+      first_name: form.firstName.trim(),
+      last_name: form.lastName.trim(),
+      email: form.emailId.trim().toLowerCase(),
+      mobile_no: form.mobileNo.trim(),
+      role_id: form.userRole ? Number(form.userRole) : undefined,
+      ...(form.password.trim() ? { password: form.password } : {}),
+    };
+
+    setSaving(true);
+    try {
+      const savedProfile = initialProfile
+        ? await userProfileApi.update(initialProfile.id, payload)
+        : await userProfileApi.create({
+            ...payload,
+            password: form.password,
+          });
+
+      toast.success(
+        initialProfile
+          ? "User details updated successfully"
+          : "User details saved successfully",
+      );
+      onNext(savedProfile);
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { detail?: string; username?: string[] } } })
+          ?.response?.data?.username?.[0] ||
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "Failed to save user details.";
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -352,11 +451,7 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
               label="User Role"
               value={form.userRole}
               onChange={(v) => setForm((prev) => ({ ...prev, userRole: v }))}
-              options={[
-                { value: "Admin", label: "Admin" },
-                { value: "Staff", label: "Staff" },
-                { value: "Viewer", label: "Viewer" },
-              ]}
+              options={roleOptions}
             />
           </FieldGrid>
 
@@ -457,6 +552,7 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
           <Button
             variant="contained"
             onClick={handleSaveAndNext}
+            disabled={saving}
             sx={{
               bgcolor: "#505050",
               color: "#ffffff",
@@ -467,7 +563,7 @@ const UserDetailsForm: React.FC<Props> = ({ onNext, onCancel }) => {
               "&:hover": { bgcolor: "#232323" },
             }}
           >
-            Save &amp; Next
+            {saving ? "Saving..." : "Save & Next"}
           </Button>
         </Box>
       </Box>

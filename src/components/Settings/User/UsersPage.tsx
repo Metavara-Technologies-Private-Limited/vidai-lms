@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useState } from "react";
 import { Box, CircularProgress, Tab, Tabs, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import type { UserProfileRead } from "../../../services/userProfile.api";
 
 const UsersList = lazy(() => import("./UserDetails/UsersList"));
 const UserDetailsForm = lazy(() => import("./UserDetails/UserDetailsForm.tsx"));
@@ -69,27 +70,42 @@ const StepConnector = ({ done }: { done: boolean }) => (
 const UsersPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("details");
   const [detailsView, setDetailsView] = useState<DetailsView>("list");
+  const [editingProfile, setEditingProfile] = useState<UserProfileRead | null>(null);
+  const [listRefreshKey, setListRefreshKey] = useState(0);
 
   const handleSaveAndNext = () => {
+    setListRefreshKey((prev) => prev + 1);
     setActiveTab("rights");
   };
 
   const handleOpenNewUser = () => {
+    setEditingProfile(null);
+    setDetailsView("form");
+    setActiveTab("details");
+  };
+
+  const handleEditUser = (profile: UserProfileRead) => {
+    setEditingProfile(profile);
     setDetailsView("form");
     setActiveTab("details");
   };
 
   const handleCancelDetails = () => {
+    setEditingProfile(null);
     setDetailsView("list");
     setActiveTab("details");
   };
 
   const handleCancelRights = () => {
+    setEditingProfile(null);
+    setListRefreshKey((prev) => prev + 1);
     setDetailsView("list");
     setActiveTab("details");
   };
 
   const handleSaveGrantAccess = () => {
+    setEditingProfile(null);
+    setListRefreshKey((prev) => prev + 1);
     setDetailsView("list");
     setActiveTab("details");
   };
@@ -174,12 +190,14 @@ const UsersPage: React.FC = () => {
         <Suspense fallback={<CircularProgress size={24} />}>
           {activeTab === "details" && detailsView === "list" && (
             <UsersList
+              refreshKey={listRefreshKey}
               onNewUser={handleOpenNewUser}
-              onEditUser={handleOpenNewUser}
+              onEditUser={handleEditUser}
             />
           )}
           {activeTab === "details" && detailsView === "form" && (
             <UserDetailsForm
+              initialProfile={editingProfile}
               onNext={handleSaveAndNext}
               onCancel={handleCancelDetails}
             />
