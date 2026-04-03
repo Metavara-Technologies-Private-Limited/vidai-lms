@@ -1,180 +1,238 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
   Checkbox,
-  Chip,
+  CircularProgress,
   FormControlLabel,
   IconButton,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import CancelIcon from "@mui/icons-material/Cancel";
 import CheckIcon from "@mui/icons-material/Check";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import CancelIcon from "@mui/icons-material/Cancel";
 import { LEADS_MENU } from "../../../../config/sidebar.menu";
+import {
+  roleApi,
+  type RolePermissionPayload,
+  type RoleRead,
+} from "../../../../services/role.api.ts";
 
-interface PermissionRow {
-  label: string;
-  genderMale: boolean;
-  genderFemale: boolean;
-  all: boolean;
+type RoleName = "Super Admin" | "Admin" | "User";
+
+type PermissionFlags = {
+  male: boolean;
+  female: boolean;
   add: boolean;
   edit: boolean;
   view: boolean;
   print: boolean;
-}
+};
 
-type PermissionFlags = Omit<PermissionRow, "label">;
-
-interface RoleRights {
+type RoleRights = {
   modules: string[];
   categories: string[];
   subCategories: string[];
-}
+};
 
-interface RoleEntry {
-  name: "Super Admin" | "Admin" | "User";
-  totalCount: number;
-  badgeCount: number;
+type RoleEntry = {
+  apiId: number | null;  // backend id, null for unsaved
+  name: RoleName;
+  count: number;
+  badge: number;
   checked: boolean;
-  savedRights: RoleRights;
-  savedPermissions: Record<string, PermissionFlags>;
-}
+  rights: RoleRights;
+  permissions: Record<string, PermissionFlags>;
+};
 
-interface Props {
-  onCancel: () => void;
-  onSave: () => void;
-}
-
-const STEP_LABELS = ["Module", "Category", "Sub Category"];
-const MODULE_OPTIONS = ["Admin", "Clinical", "Lab", "Settings"];
-
-const emptyRights = (): RoleRights => ({
-  modules: [],
-  categories: [],
-  subCategories: [],
+// ──────────────────────────────────────────────────────────────────────────────
+// API ↔ UI mapping helpers
+// Modules   → module_key = item, category_key = "_", subcategory_key = null
+// Categories → module_key = "_", category_key = item, subcategory_key = null
+// SubCats   → module_key = "_", category_key = "_", subcategory_key = item
+// ──────────────────────────────────────────────────────────────────────────────
+const flagsFromApiPerm = (p: RolePermissionPayload): PermissionFlags => ({
+  male: false,
+  female: false,
+  add: p.can_add,
+  edit: p.can_edit,
+  view: p.can_view,
+  print: p.can_print,
 });
 
-const getDefaultPermission = (label: string): PermissionFlags => {
-  const value = label.toLowerCase();
+const fromApiRole = (r: RoleRead): Partial<RoleEntry> => {
+  const rights: RoleRights = { modules: [], categories: [], subCategories: [] };
+  const permissions: Record<string, PermissionFlags> = {};
 
-  if (value.includes("andrology")) {
-    return {
-      genderMale: true,
-      genderFemale: false,
-      all: true,
-      add: true,
-      edit: true,
-      view: true,
-      print: true,
-    };
+  for (const p of r.permissions) {
+    if (p.module_key !== "_") {
+      rights.modules.push(p.module_key);
+      permissions[p.module_key] = flagsFromApiPerm(p);
+    } else if (p.category_key !== "_") {
+      rights.categories.push(p.category_key);
+      permissions[p.category_key] = flagsFromApiPerm(p);
+    } else if (p.subcategory_key) {
+      rights.subCategories.push(p.subcategory_key);
+      permissions[p.subcategory_key] = flagsFromApiPerm(p);
+    }
   }
 
-  if (value.includes("embryology")) {
-    return {
-      genderMale: true,
-      genderFemale: false,
-      all: true,
-      add: true,
-      edit: true,
-      view: true,
-      print: true,
-    };
+  return { apiId: r.id, rights, permissions };
+};
+
+const toApiPermissions = (
+  rights: RoleRights,
+  perms: Record<string, PermissionFlags>,
+  existingApiPerms: RolePermissionPayload[] = [],
+): RolePermissionPayload[] => {
+  // Build a map of existing perm ids by label for updates
+  const existingById: Record<string, number> = {};
+  for (const p of existingApiPerms) {
+    const label =
+      p.module_key !== "_" ? p.module_key :
+      p.category_key !== "_" ? p.category_key :
+      (p.subcategory_key ?? "");
+    if (label && p.id !== undefined) existingById[label] = p.id as number;
   }
 
-  if (value.includes("billing")) {
-    return {
-      genderMale: false,
-      genderFemale: true,
-      all: false,
-      add: false,
-      edit: false,
-      view: true,
-      print: false,
-    };
-  }
+  const build = (
+    items: string[],
+    toObj: (item: string) => Omit<RolePermissionPayload, "id" | "can_view" | "can_add" | "can_edit" | "can_print">,
+  ): RolePermissionPayload[] =>
+    items.map((item) => {
+      const flags = perms[item] ?? { add: false, edit: false, view: false, print: false };
+      const base: RolePermissionPayload = {
+        ...toObj(item),
+        can_view: flags.view,
+        can_add: flags.add,
+        can_edit: flags.edit,
+        can_print: flags.print,
+      };
+      if (existingById[item] !== undefined) base.id = existingById[item];
+      return base;
+    });
 
-  if (value.includes("menstrual")) {
-    return {
-      genderMale: false,
-      genderFemale: false,
-      all: false,
-      add: false,
-      edit: false,
-      view: true,
-      print: false,
-    };
-  }
+  return [
+    ...build(rights.modules, (item) => ({ module_key: item, category_key: "_", subcategory_key: null })),
+    ...build(rights.categories, (item) => ({ module_key: "_", category_key: item, subcategory_key: null })),
+    ...build(rights.subCategories, (item) => ({ module_key: "_", category_key: "_", subcategory_key: item })),
+  ];
+};
+
+type Props = {
+  onCancel: () => void;
+  onSave: () => void;
+};
+
+type ViewMode = "empty" | "summary" | "edit";
+
+const STEP_LABELS = ["Module", "Category", "Sub Category"];
+const MODULE_OPTIONS = ["Vidai Leads"];
+
+const fullPerm = (): PermissionFlags => ({
+  male: true,
+  female: true,
+  add: true,
+  edit: true,
+  view: true,
+  print: true,
+});
+
+const emptyRights = (): RoleRights => ({ modules: [], categories: [], subCategories: [] });
+
+const buildDefaultRole = (name: RoleName, count: number, badge: number): RoleEntry => {
+  const permissions: Record<string, PermissionFlags> = {};
+  MODULE_OPTIONS.forEach((item) => {
+    permissions[item] = fullPerm();
+  });
 
   return {
-    genderMale: true,
-    genderFemale: true,
-    all: true,
-    add: true,
-    edit: true,
-    view: true,
-    print: true,
+    apiId: null,
+    name,
+    count,
+    badge,
+    checked: false,
+    rights: {
+      modules: [...MODULE_OPTIONS],
+      categories: [],
+      subCategories: [],
+    },
+    permissions,
   };
 };
 
 const initialRoles: RoleEntry[] = [
-  {
-    name: "Super Admin",
-    totalCount: 1,
-    badgeCount: 1,
-    checked: false,
-    savedRights: emptyRights(),
-    savedPermissions: {},
-  },
-  {
-    name: "Admin",
-    totalCount: 43,
-    badgeCount: 8,
-    checked: false,
-    savedRights: emptyRights(),
-    savedPermissions: {},
-  },
-  {
-    name: "User",
-    totalCount: 25,
-    badgeCount: 5,
-    checked: false,
-    savedRights: emptyRights(),
-    savedPermissions: {},
-  },
+  buildDefaultRole("Super Admin", 1, 1),
+  buildDefaultRole("Admin", 43, 8),
+  buildDefaultRole("User", 25, 5),
 ];
 
-const StepItem = ({
-  number,
+const Tick = ({ checked, onClick }: { checked: boolean; onClick?: () => void }) => (
+  <Box
+    onClick={onClick}
+    sx={{
+      width: 22,
+      height: 22,
+      borderRadius: "4px",
+      border: checked ? "none" : "1px solid #D5D5D5",
+      bgcolor: checked ? "#DDF2E3" : "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: onClick ? "pointer" : "default",
+      mx: "auto",
+      flexShrink: 0,
+    }}
+  >
+    {checked ? <CheckIcon sx={{ fontSize: 14, color: "#43B45B" }} /> : null}
+  </Box>
+);
+
+const StepDot = ({
+  index,
   label,
   active,
+  done,
+  onClick,
 }: {
-  number: number;
+  index: number;
   label: string;
   active: boolean;
+  done: boolean;
+  onClick?: () => void;
 }) => (
-  <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+  <Box
+    onClick={onClick}
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      gap: 0.8,
+      cursor: onClick ? "pointer" : "default",
+      userSelect: "none",
+    }}
+  >
     <Box
       sx={{
-        width: 22,
-        height: 22,
+        width: 30,
+        height: 30,
         borderRadius: "50%",
-        bgcolor: active ? "#E97B5A" : "#BDBDBD",
-        color: "#fff",
-        fontSize: 11,
-        fontWeight: 700,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        bgcolor: done ? "#3FAE53" : active ? "#E97B5A" : "#C9C9C9",
+        color: "#fff",
+        fontSize: 15,
+        fontWeight: 700,
       }}
     >
-      {number}
+      {done ? <CheckIcon sx={{ fontSize: 18 }} /> : index + 1}
     </Box>
     <Typography
       sx={{
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: 600,
-        color: active ? "#E97B5A" : "#9E9E9E",
+        color: done ? "#3FAE53" : active ? "#E97B5A" : "#B2B2B2",
       }}
     >
       {label}
@@ -182,99 +240,139 @@ const StepItem = ({
   </Box>
 );
 
-const StepLine = () => <Box sx={{ width: 68, height: 12, bgcolor: "#D9D9D9", mx: 1.5 }} />;
-
-const PermissionToggle = ({
-  checked,
-  onToggle,
-}: {
-  checked: boolean;
-  onToggle?: () => void;
-}) => (
+const StepConnector = ({ done }: { done: boolean }) => (
   <Box
-    onClick={onToggle}
     sx={{
-      width: 18,
-      height: 18,
-      borderRadius: "5px",
-      border: checked ? "none" : "1px solid #D9D9D9",
-      bgcolor: checked ? "#DFF3E5" : "#fff",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      cursor: onToggle ? "pointer" : "default",
-      mx: "auto",
+      flex: 1,
+      height: 2,
+      minWidth: 72,
+      bgcolor: done ? "#3FAE53" : "#D7D7D7",
+      mx: 1.5,
+      borderRadius: 999,
+      alignSelf: "center",
+      opacity: 1,
     }}
-  >
-    {checked ? <CheckIcon sx={{ color: "#56B56B", fontSize: 13 }} /> : null}
-  </Box>
+  />
 );
 
-const legendItems = [
-  { label: "Exceptional User", color: "#E07A59" },
-  { label: "Module", color: "#3A7BD5" },
-  { label: "Category", color: "#37BF1D" },
-  { label: "Subcategory", color: "#ECD63F" },
-  { label: "Type", color: "#E8B07E" },
-  { label: "Subtype", color: "#A6A6A6" },
-];
+const chipBorderColor = ["#5B8FF9", "#5EBB63", "#5EBB63", "#F0C247", "#E8A16D"];
 
-const borderColors = ["#5B8FF9", "#5EBB63", "#5EBB63", "#F0C247", "#E8A16D"];
-
-const UserRightsForm: React.FC<Props> = ({ onCancel, onSave }) => {
+const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   const [roles, setRoles] = useState<RoleEntry[]>(initialRoles);
-  const [selectedRoleIdx, setSelectedRoleIdx] = useState(0);
+  const [selectedRoleIdx, setSelectedRoleIdx] = useState<number | null>(null);
+  const [mode, setMode] = useState<ViewMode>("empty");
   const [activeStep, setActiveStep] = useState(0);
-  const [draftRights, setDraftRights] = useState<RoleRights>(initialRoles[0].savedRights);
-  const [draftPermissions, setDraftPermissions] = useState<Record<string, PermissionFlags>>({});
+  const [draftRights, setDraftRights] = useState<RoleRights>(emptyRights());
+  const [draftPerms, setDraftPerms] = useState<Record<string, PermissionFlags>>({});
+  const [loadingRoles, setLoadingRoles] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const categories = useMemo(() => LEADS_MENU.map((menu) => menu.label), []);
-  const settingsSubCategories = useMemo(() => {
-    const settingsMenu = LEADS_MENU.find((menu) => menu.key === "settings");
-    return settingsMenu?.subMenu?.map((menu) => menu.label) ?? [];
+  // ── Fetch roles from backend ──────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    roleApi.list()
+      .then((apiRoles: RoleRead[]) => {
+        if (cancelled) return;
+        setRoles((prev) =>
+          prev.map((entry) => {
+            const found = apiRoles.find(
+              (r: RoleRead) => r.name.toLowerCase() === entry.name.toLowerCase(),
+            );
+            if (!found) return entry;
+            const mapped = fromApiRole(found);
+            return {
+              ...entry,
+              apiId: mapped.apiId ?? null,
+              rights: mapped.rights ?? entry.rights,
+              permissions: mapped.permissions ?? entry.permissions,
+            };
+          }),
+        );
+      })
+      .catch(() => {/* silently fall back to defaults */})
+      .finally(() => { if (!cancelled) setLoadingRoles(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  const handleRoleSelect = (idx: number) => {
+  const categories = useMemo(() => LEADS_MENU.map((item) => item.label), []);
+  const subCategories = useMemo(() => {
+    const settings = LEADS_MENU.find((item) => item.key === "settings");
+    return settings?.subMenu?.map((item) => item.label) ?? [];
+  }, []);
+
+  const activeRole = selectedRoleIdx !== null ? roles[selectedRoleIdx] : null;
+
+  const optionList = activeStep === 0 ? MODULE_OPTIONS : activeStep === 1 ? categories : subCategories;
+  const rightsKey: keyof RoleRights = activeStep === 0 ? "modules" : activeStep === 1 ? "categories" : "subCategories";
+
+  const allSelected = optionList.length > 0 && draftRights[rightsKey].length === optionList.length;
+  const hasStepSelection = draftRights[rightsKey].length > 0;
+
+  const summaryRows = useMemo(() => {
+    if (!activeRole) return [] as { label: string; perm: PermissionFlags }[];
+    const labels = Array.from(
+      new Set([
+        ...activeRole.rights.modules,
+        ...activeRole.rights.categories,
+        ...activeRole.rights.subCategories,
+      ]),
+    );
+    return labels.map((label) => ({ label, perm: activeRole.permissions[label] ?? fullPerm() }));
+  }, [activeRole]);
+
+  const editRows = useMemo(() => {
+    const labels = Array.from(new Set([...draftRights.modules, ...draftRights.categories, ...draftRights.subCategories]));
+    return labels.map((label) => ({ label, perm: draftPerms[label] ?? fullPerm() }));
+  }, [draftRights, draftPerms]);
+
+  const selectRole = (idx: number) => {
+    const role = roles[idx];
+
+    setRoles((prev) => prev.map((r, i) => ({ ...r, checked: i === idx })));
     setSelectedRoleIdx(idx);
-    setDraftRights(roles[idx]?.savedRights ?? emptyRights());
-    setDraftPermissions(roles[idx]?.savedPermissions ?? {});
+    setDraftRights(role.rights);
+    setDraftPerms(role.permissions);
     setActiveStep(0);
+    setMode("summary");
   };
 
-  const selectedLabels = useMemo(
-    () => Array.from(new Set([...draftRights.modules, ...draftRights.categories, ...draftRights.subCategories])),
-    [draftRights],
-  );
-
-  const permissionRows: PermissionRow[] = useMemo(
-    () =>
-      selectedLabels.map((label) => ({
-        label,
-        ...(draftPermissions[label] ?? getDefaultPermission(label)),
-      })),
-    [selectedLabels, draftPermissions],
-  );
-
-  const toggleFromList = (label: string, key: keyof RoleRights, checked: boolean) => {
+  const toggleOption = (label: string, checked: boolean) => {
     setDraftRights((prev) => {
-      const current = prev[key];
-      if (checked) {
-        if (current.includes(label)) return prev;
-        return { ...prev, [key]: [...current, label] };
-      }
+      const values = prev[rightsKey];
+      const next = checked ? [...new Set([...values, label])] : values.filter((item) => item !== label);
+      return { ...prev, [rightsKey]: next };
+    });
 
-      return { ...prev, [key]: current.filter((item) => item !== label) };
+    if (checked) {
+      setDraftPerms((prev) => ({ ...prev, [label]: prev[label] ?? fullPerm() }));
+    }
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    setDraftRights((prev) => ({
+      ...prev,
+      [rightsKey]: checked ? [...optionList] : [],
+    }));
+
+    if (checked) {
+      setDraftPerms((prev) => {
+        const next = { ...prev };
+        optionList.forEach((item) => {
+          next[item] = next[item] ?? fullPerm();
+        });
+        return next;
+      });
+    }
+  };
+
+  const togglePerm = (label: string, key: keyof PermissionFlags) => {
+    setDraftPerms((prev) => {
+      const base = prev[label] ?? fullPerm();
+      return { ...prev, [label]: { ...base, [key]: !base[key] } };
     });
   };
 
-  const removeFromList = (label: string, key: keyof RoleRights) => {
-    setDraftRights((prev) => ({
-      ...prev,
-      [key]: prev[key].filter((item) => item !== label),
-    }));
-  };
-
-  const removeFromAny = (label: string) => {
+  const removeRow = (label: string) => {
     setDraftRights((prev) => ({
       modules: prev.modules.filter((item) => item !== label),
       categories: prev.categories.filter((item) => item !== label),
@@ -282,43 +380,19 @@ const UserRightsForm: React.FC<Props> = ({ onCancel, onSave }) => {
     }));
   };
 
-  const togglePermission = (label: string, field: keyof PermissionFlags) => {
-    setDraftPermissions((prev) => {
-      const base = prev[label] ?? getDefaultPermission(label);
-
-      if (field === "all") {
-        const nextAll = !base.all;
-        return {
-          ...prev,
-          [label]: {
-            ...base,
-            all: nextAll,
-            add: nextAll,
-            edit: nextAll,
-            view: nextAll,
-            print: nextAll,
-          },
-        };
-      }
-
-      const next = {
-        ...base,
-        [field]: !base[field],
-      } as PermissionFlags;
-
-      next.all = next.add && next.edit && next.view && next.print;
-      return { ...prev, [label]: next };
-    });
+  const persistRole = () => {
+    if (selectedRoleIdx === null) return;
+    setRoles((prev) =>
+      prev.map((role, idx) => (idx === selectedRoleIdx ? { ...role, rights: draftRights, permissions: draftPerms } : role)),
+    );
   };
 
-  const handleSaveForRole = () => {
-    setRoles((prev) =>
-      prev.map((role, idx) =>
-        idx === selectedRoleIdx
-          ? { ...role, savedRights: draftRights, savedPermissions: draftPermissions }
-          : role,
-      ),
-    );
+  const handleEditClick = () => {
+    if (!activeRole) return;
+    setDraftRights(activeRole.rights);
+    setDraftPerms(activeRole.permissions);
+    setActiveStep(0);
+    setMode("edit");
   };
 
   const handleNext = () => {
@@ -326,474 +400,297 @@ const UserRightsForm: React.FC<Props> = ({ onCancel, onSave }) => {
       setActiveStep((prev) => prev + 1);
       return;
     }
-
-    handleSaveForRole();
+    persistRole();
+    setMode("summary");
   };
 
-  const handleFinalSave = () => {
-    handleSaveForRole();
-    onSave();
+  const handleSave = () => {
+    persistRole();
   };
 
-  const selectedRole = roles[selectedRoleIdx];
+  const handleSaveGrant = async () => {
+    if (selectedRoleIdx === null) return;
+    persistRole();
 
-  const renderStepOptions = () => {
-    if (activeStep === 0) {
-      return (
-        <>
-          <Box sx={{ display: "flex", gap: 2.5, flexWrap: "wrap" }}>
-            {MODULE_OPTIONS.map((label) => (
-              <FormControlLabel
-                key={label}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={draftRights.modules.includes(label)}
-                    onChange={(event) => toggleFromList(label, "modules", event.target.checked)}
-                    sx={{ p: 0, mr: 0.5, color: "#BDBDBD", "&.Mui-checked": { color: "#1976d2" } }}
-                  />
-                }
-                label={<Typography sx={{ fontSize: 13 }}>{label}</Typography>}
-                sx={{ m: 0 }}
-              />
-            ))}
-          </Box>
-          <Box sx={{ mt: 0.3 }}>
-            {draftRights.modules.length > 0 && (
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                {draftRights.modules.map((label) => (
-                  <Chip
-                    key={label}
-                    label={label}
-                    size="small"
-                    deleteIcon={<CancelIcon sx={{ fontSize: "14px !important", color: "#FF6666 !important" }} />}
-                    onDelete={() => removeFromList(label, "modules")}
-                    sx={{
-                      fontSize: 12,
-                      height: 30,
-                      border: "1px solid #5B8FF9",
-                      borderRadius: "8px",
-                      bgcolor: "#fff",
-                    }}
-                  />
-                ))}
-              </Box>
-            )}
-          </Box>
-        </>
+    const role = roles[selectedRoleIdx];
+    // Use the freshly persisted values from draftRights/draftPerms
+    const rights = draftRights;
+    const perms = draftPerms;
+    const name = role.name;
+
+    // Gather existing API perm objects for id-passing on update
+    const existingApiPerms: RolePermissionPayload[] = role.apiId !== null
+      ? await roleApi.list()
+          .then((list: RoleRead[]) => list.find((r: RoleRead) => r.id === role.apiId)?.permissions ?? [])
+          .catch(() => [])
+      : [];
+
+    const payload = {
+      name,
+      permissions: toApiPermissions(rights, perms, existingApiPerms),
+    };
+
+    setSaving(true);
+    try {
+      let saved: RoleRead;
+      if (role.apiId !== null) {
+        saved = await roleApi.update(role.apiId, payload);
+      } else {
+        saved = await roleApi.create(payload);
+      }
+      // Sync apiId back to local state
+      setRoles((prev) =>
+        prev.map((r, i) =>
+          i === selectedRoleIdx ? { ...r, apiId: saved.id } : r,
+        ),
       );
+      setMode("summary");
+      onSave();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { name?: string[]; detail?: string; non_field_errors?: string[] } } })
+          ?.response?.data?.name?.[0] ??
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        "Failed to save role. Please try again.";
+      const { toast } = await import("react-toastify");
+      toast.error(msg);
+    } finally {
+      setSaving(false);
     }
-
-    if (activeStep === 1) {
-      return (
-        <>
-          <Box sx={{ display: "flex", gap: 2.5, flexWrap: "wrap" }}>
-            {categories.map((label) => (
-              <FormControlLabel
-                key={label}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={draftRights.categories.includes(label)}
-                    onChange={(event) => toggleFromList(label, "categories", event.target.checked)}
-                    sx={{ p: 0, mr: 0.5, color: "#BDBDBD", "&.Mui-checked": { color: "#1976d2" } }}
-                  />
-                }
-                label={<Typography sx={{ fontSize: 13 }}>{label}</Typography>}
-                sx={{ m: 0 }}
-              />
-            ))}
-          </Box>
-          <Box sx={{ mt: 0.3 }}>
-            {draftRights.categories.length > 0 && (
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                {draftRights.categories.map((label) => (
-                  <Chip
-                    key={label}
-                    label={label}
-                    size="small"
-                    deleteIcon={<CancelIcon sx={{ fontSize: "14px !important", color: "#FF6666 !important" }} />}
-                    onDelete={() => removeFromList(label, "categories")}
-                    sx={{
-                      fontSize: 12,
-                      height: 30,
-                      border: "1px solid #5EBB63",
-                      borderRadius: "8px",
-                      bgcolor: "#fff",
-                    }}
-                  />
-                ))}
-              </Box>
-            )}
-          </Box>
-        </>
-      );
-    }
-
-    return (
-      <>
-        <Box sx={{ display: "flex", gap: 2.5, flexWrap: "wrap" }}>
-          {settingsSubCategories.map((label) => (
-            <FormControlLabel
-              key={label}
-              control={
-                <Checkbox
-                  size="small"
-                  checked={draftRights.subCategories.includes(label)}
-                  onChange={(event) => toggleFromList(label, "subCategories", event.target.checked)}
-                  sx={{ p: 0, mr: 0.5, color: "#BDBDBD", "&.Mui-checked": { color: "#1976d2" } }}
-                />
-              }
-              label={<Typography sx={{ fontSize: 13 }}>{label}</Typography>}
-              sx={{ m: 0 }}
-            />
-          ))}
-        </Box>
-        <Box sx={{ mt: 0.3 }}>
-          {draftRights.subCategories.length > 0 && (
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {draftRights.subCategories.map((label) => (
-                <Chip
-                  key={label}
-                  label={label}
-                  size="small"
-                  deleteIcon={<CancelIcon sx={{ fontSize: "14px !important", color: "#FF6666 !important" }} />}
-                  onDelete={() => removeFromList(label, "subCategories")}
-                  sx={{
-                    fontSize: 12,
-                    height: 30,
-                    border: "1px solid #F0C247",
-                    borderRadius: "8px",
-                    bgcolor: "#fff",
-                  }}
-                />
-              ))}
-            </Box>
-          )}
-        </Box>
-      </>
-    );
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, height: "100%", minHeight: 0 }}>
-      <Box sx={{ display: "flex", gap: 2, minHeight: 0 }}>
-        <Box
-          sx={{
-            width: 260,
-            flexShrink: 0,
-            border: "1px solid #E0E0E0",
-            borderRadius: "8px",
-            p: "14px 12px",
-            display: "flex",
-            flexDirection: "column",
-            bgcolor: "#fff",
-            overflowY: "auto",
-          }}
-        >
-          <Typography sx={{ fontSize: 14, fontWeight: 700, mb: 1.5, color: "#232323" }}>
-            All Roles
-          </Typography>
+    <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+      <Box
+        sx={{
+          width: 360,
+          border: "1px solid #E0E0E0",
+          borderRadius: "10px",
+          bgcolor: "#fff",
+          p: 2,
+        }}
+      >
+        <Typography sx={{ fontSize: 14, fontWeight: 700, mb: 1.6, color: "#1F1F1F" }}>All Roles</Typography>
 
-          {roles.map((role, idx) => (
+        {loadingRoles ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+            <CircularProgress size={20} />
+          </Box>
+        ) : (
+          roles.map((role, idx) => (
             <Box
               key={role.name}
+              onClick={() => selectRole(idx)}
               sx={{
                 display: "flex",
                 alignItems: "center",
-                py: 0.55,
-                px: 0.5,
+                py: 0.65,
+                px: 0.4,
+                borderRadius: "6px",
                 cursor: "pointer",
-                borderRadius: "4px",
-                bgcolor: selectedRoleIdx === idx ? "#FFF3EE" : undefined,
+                bgcolor: role.checked ? "#FFF3EE" : "transparent",
                 "&:hover": { bgcolor: "#FFF8F5" },
               }}
-              onClick={() => handleRoleSelect(idx)}
             >
               <Checkbox
                 size="small"
                 checked={role.checked}
-                onChange={() => {
-                  setRoles((prev) =>
-                    prev.map((item, mapIdx) =>
-                      mapIdx === idx ? { ...item, checked: !item.checked } : item,
-                    ),
-                  );
-                }}
-                sx={{ p: 0, mr: 0.8, color: "#BDBDBD", "&.Mui-checked": { color: "#1976d2" } }}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => selectRole(idx)}
+                sx={{ p: 0, mr: 0.9, color: "#909090", "&.Mui-checked": { color: "#1F1F1F" } }}
               />
-
-              <Typography
-                sx={{
-                  fontSize: 12.5,
-                  flex: 1,
-                  fontWeight: selectedRoleIdx === idx ? 600 : 400,
-                  color: "#232323",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {role.name}
+              <Typography sx={{ fontSize: 14, flex: 1, color: "#1F1F1F" }}>
+                {role.name} <Box component="span" sx={{ color: "#738091", fontSize: 13 }}>({role.count})</Box>
               </Typography>
-
-              <Typography
-                sx={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#E57373",
-                  minWidth: 22,
-                  textAlign: "right",
-                  mr: 0.8,
-                }}
-              >
-                {String(role.badgeCount).padStart(2, "0")}
-              </Typography>
-
-              <IconButton
-                size="small"
-                sx={{
-                  p: 0,
-                  width: 20,
-                  height: 20,
-                  bgcolor: "#F5F5F5",
-                  borderRadius: "4px",
-                  "&:hover": { bgcolor: "#E8E8E8" },
-                }}
-              >
-                <AddIcon sx={{ fontSize: 14, color: "#505050" }} />
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#FF8181", mr: 0.8 }}>{String(role.badge).padStart(2, "0")}</Typography>
+              <IconButton size="small" sx={{ p: 0.1, bgcolor: "#F2F2F2", borderRadius: "4px" }}>
+                <AddIcon sx={{ fontSize: 16, color: "#A3A3A3" }} />
               </IconButton>
             </Box>
-          ))}
-        </Box>
+          ))
+        )}
+      </Box>
 
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        {mode === "empty" && (
           <Box
             sx={{
               border: "1px solid #E0E0E0",
-              borderRadius: "8px",
-              p: 2,
+              borderRadius: "10px",
               bgcolor: "#fff",
+              minHeight: 520,
               display: "flex",
               flexDirection: "column",
-              gap: 1.5,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#232323" }}>
-              Page Access
+            <Typography sx={{ fontSize: 20, color: "#6B7480", mb: 1 }}>Select a Role or User to Continue</Typography>
+            <Typography sx={{ fontSize: 13, color: "#A3AAB1" }}>
+              Please select a role or individual users from the left panel to configure page access permissions.
             </Typography>
+          </Box>
+        )}
 
+        {mode === "summary" && activeRole && (
+          <Box sx={{ border: "1px solid #E0E0E0", borderRadius: "10px", bgcolor: "#fff", p: 2 }}>
             <Box
               sx={{
                 display: "flex",
                 alignItems: "center",
-                border: "1px solid #E0E0E0",
-                borderRadius: "6px",
+                justifyContent: "space-between",
+                bgcolor: "#F6F6F6",
+                borderRadius: "10px",
                 px: 2,
-                py: 0.8,
-                width: "fit-content",
+                py: 1.2,
+                mb: 1.5,
               }}
             >
-              {STEP_LABELS.map((label, index) => (
+              <Typography sx={{ fontSize: 18, fontWeight: 700 }}>{activeRole.name.toUpperCase()}</Typography>
+              <IconButton onClick={handleEditClick} sx={{ color: "#6D9CF1" }}>
+                <EditOutlinedIcon />
+              </IconButton>
+            </Box>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: "260px repeat(6, 1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "8px", px: 1.2, py: 1.2, mb: 0.8 }}>
+              <Box />
+              {["Male", "Female", "Add", "Edit", "View", "Print"].map((h) => (
+                <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
+              ))}
+            </Box>
+
+            {summaryRows.map((row) => (
+              <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "260px repeat(6, 1fr)", alignItems: "center", px: 1.2, py: 1 }}>
+                <Box sx={{ borderLeft: "6px solid #3A7BD5", bgcolor: "#EDF2F8", borderRadius: "4px", px: 1.3, py: 0.8, fontSize: 13 }}>{row.label}</Box>
+                <Tick checked={row.perm.male} />
+                <Tick checked={row.perm.female} />
+                <Tick checked={row.perm.add} />
+                <Tick checked={row.perm.edit} />
+                <Tick checked={row.perm.view} />
+                <Tick checked={row.perm.print} />
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {mode === "edit" && activeRole && (
+          <Box sx={{ border: "1px solid #E0E0E0", borderRadius: "10px", bgcolor: "#fff", p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Page Access</Typography>
+
+            <Box sx={{ border: "1px solid #ECECEC", borderRadius: "12px", px: 2, py: 1, display: "flex", alignItems: "center", width: "100%" }}>
+              {STEP_LABELS.map((label, idx) => (
                 <React.Fragment key={label}>
-                  <StepItem number={index + 1} label={label} active={activeStep === index} />
-                  {index < STEP_LABELS.length - 1 && <StepLine />}
+                  <StepDot
+                    index={idx}
+                    label={label}
+                    active={activeStep === idx}
+                    done={idx < activeStep}
+                    onClick={() => setActiveStep(idx)}
+                  />
+                  {idx < STEP_LABELS.length - 1 && <StepConnector done={idx < activeStep} />}
                 </React.Fragment>
               ))}
             </Box>
 
-            {renderStepOptions()}
-
-            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={onCancel}
-                sx={{
-                  textTransform: "none",
-                  fontSize: 14,
-                  borderColor: "#2D2D2D",
-                  color: "#2D2D2D",
-                  borderRadius: "10px",
-                  px: 3,
-                  py: 1,
-                  "&:hover": { borderColor: "#000", bgcolor: "transparent" },
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={handleNext}
-                sx={{
-                  textTransform: "none",
-                  fontSize: 14,
-                  borderColor: "#BDBDBD",
-                  color: "#505050",
-                  borderRadius: "8px",
-                  px: 3,
-                  py: 1,
-                  "&:hover": { borderColor: "#757575", bgcolor: "transparent" },
-                }}
-              >
-                {activeStep < 2 ? "Next" : "Save"}
-              </Button>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(180px,1fr))", gap: 1.2 }}>
+              {optionList.map((label) => (
+                <FormControlLabel
+                  key={label}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={draftRights[rightsKey].includes(label)}
+                      onChange={(e) => toggleOption(label, e.target.checked)}
+                      sx={{ p: 0, mr: 0.8, color: "#CDCDCD", "&.Mui-checked": { color: "#4CAF50" } }}
+                    />
+                  }
+                  label={<Typography sx={{ fontSize: 13 }}>{label}</Typography>}
+                  sx={{ m: 0 }}
+                />
+              ))}
             </Box>
 
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "220px 190px 60px 60px 60px 60px 60px",
-                alignItems: "center",
-                py: 1,
-                px: 1,
-                bgcolor: "#F7F7F7",
-                borderRadius: "10px",
-              }}
-            >
-              <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#2A2A2A" }}>Doctor 1</Typography>
-              <Typography sx={{ fontSize: 12.5, color: "#505050" }}>Gender</Typography>
-              {["All", "Add", "Edit", "View", "Print"].map((col) => (
-                <Box key={col} sx={{ textAlign: "center" }}>
-                  <Typography sx={{ fontSize: 12.5, color: "#505050", mb: 0.5 }}>{col}</Typography>
-                  <PermissionToggle checked={false} />
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={allSelected}
+                    onChange={(e) => toggleSelectAll(e.target.checked)}
+                    sx={{ p: 0, mr: 0.8, color: "#CDCDCD", "&.Mui-checked": { color: "#4CAF50" } }}
+                  />
+                }
+                label={<Typography sx={{ fontSize: 13 }}>{allSelected ? "Deselect All" : "Select All"}</Typography>}
+                sx={{ m: 0 }}
+              />
+              <Box sx={{ flex: 1 }} />
+              <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={!hasStepSelection} sx={{ textTransform: "none", minWidth: 110, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
+            </Box>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: "220px 190px repeat(5,1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "10px", px: 1.2, py: 1 }}>
+              <Box />
+              <Typography sx={{ fontSize: 13 }}>Gender</Typography>
+              {["All", "Add", "Edit", "View", "Print"].map((h) => (
+                <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
+              ))}
+            </Box>
+
+            <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
+              {editRows.map((row, idx) => (
+                <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "220px 190px repeat(5,1fr)", alignItems: "center", px: 1, py: 0.8 }}>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <Box sx={{ border: `1px solid ${chipBorderColor[idx % chipBorderColor.length]}`, borderRadius: "8px", px: 1.1, py: 0.5, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 0.8 }}>
+                      {row.label}
+                      <CancelIcon sx={{ fontSize: 15, color: "#FF6666", cursor: "pointer" }} onClick={() => removeRow(row.label)} />
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ display: "flex", gap: 1.2 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+                      <Tick checked={row.perm.male} onClick={() => togglePerm(row.label, "male")} />
+                      <Typography sx={{ fontSize: 12 }}>Male</Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+                      <Tick checked={row.perm.female} onClick={() => togglePerm(row.label, "female")} />
+                      <Typography sx={{ fontSize: 12 }}>Female</Typography>
+                    </Box>
+                  </Box>
+
+                  <Tick checked={row.perm.add && row.perm.edit && row.perm.view && row.perm.print} onClick={() => {
+                    const allOn = row.perm.add && row.perm.edit && row.perm.view && row.perm.print;
+                    setDraftPerms((prev) => ({
+                      ...prev,
+                      [row.label]: {
+                        ...row.perm,
+                        add: !allOn,
+                        edit: !allOn,
+                        view: !allOn,
+                        print: !allOn,
+                      },
+                    }));
+                  }} />
+                  <Tick checked={row.perm.add} onClick={() => togglePerm(row.label, "add")} />
+                  <Tick checked={row.perm.edit} onClick={() => togglePerm(row.label, "edit")} />
+                  <Tick checked={row.perm.view} onClick={() => togglePerm(row.label, "view")} />
+                  <Tick checked={row.perm.print} onClick={() => togglePerm(row.label, "print")} />
                 </Box>
               ))}
             </Box>
 
-            <Box
-              sx={{
-                overflowY: "auto",
-                maxHeight: 320,
-                pr: 0.5,
-              }}
-            >
-              {permissionRows.length === 0 ? (
-                <Box sx={{ py: 3, textAlign: "center" }}>
-                  <Typography sx={{ fontSize: 13, color: "#9E9E9E" }}>
-                    Select options above to add access rows.
-                  </Typography>
-                </Box>
-              ) : (
-                permissionRows.map((row, index) => (
-                  <Box
-                    key={row.label}
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: "220px 190px 60px 60px 60px 60px 60px",
-                      alignItems: "center",
-                      py: 0.75,
-                      px: 1,
-                    }}
-                  >
-                    <Chip
-                      label={row.label}
-                      size="small"
-                      deleteIcon={<CancelIcon sx={{ fontSize: "14px !important", color: "#FF6666 !important" }} />}
-                      onDelete={() => removeFromAny(row.label)}
-                      sx={{
-                        width: "fit-content",
-                        fontSize: 12,
-                        height: 30,
-                        bgcolor: "#fff",
-                        border: `1px solid ${borderColors[index % borderColors.length]}`,
-                        borderRadius: "8px",
-                        "& .MuiChip-label": { px: 1.2 },
-                      }}
-                    />
-
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                        <PermissionToggle
-                          checked={row.genderMale}
-                          onToggle={() => togglePermission(row.label, "genderMale")}
-                        />
-                        <Typography sx={{ fontSize: 12, color: "#505050" }}>Male</Typography>
-                      </Box>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                        <PermissionToggle
-                          checked={row.genderFemale}
-                          onToggle={() => togglePermission(row.label, "genderFemale")}
-                        />
-                        <Typography sx={{ fontSize: 12, color: "#505050" }}>Female</Typography>
-                      </Box>
-                    </Box>
-
-                    <PermissionToggle checked={row.all} onToggle={() => togglePermission(row.label, "all")} />
-                    <PermissionToggle checked={row.add} onToggle={() => togglePermission(row.label, "add")} />
-                    <PermissionToggle checked={row.edit} onToggle={() => togglePermission(row.label, "edit")} />
-                    <PermissionToggle checked={row.view} onToggle={() => togglePermission(row.label, "view")} />
-                    <PermissionToggle checked={row.print} onToggle={() => togglePermission(row.label, "print")} />
-                  </Box>
-                ))
-              )}
-            </Box>
-
-            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.3, pt: 0.5 }}>
-              <Button
-                variant="outlined"
-                onClick={onCancel}
-                sx={{
-                  textTransform: "none",
-                  minWidth: 110,
-                  height: 38,
-                  borderRadius: "10px",
-                  borderColor: "#2D2D2D",
-                  color: "#2D2D2D",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  "&:hover": { borderColor: "#000", bgcolor: "transparent" },
-                }}
-              >
-                Cancel
-              </Button>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.2 }}>
+              <Button variant="outlined" onClick={() => setMode("summary")} sx={{ textTransform: "none", minWidth: 130, borderRadius: "12px", fontSize: 14 }}>Cancel</Button>
               <Button
                 variant="contained"
-                onClick={handleFinalSave}
-                sx={{
-                  textTransform: "none",
-                  minWidth: 200,
-                  height: 38,
-                  borderRadius: "10px",
-                  bgcolor: "#525252",
-                  color: "#fff",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  boxShadow: "none",
-                  "&:hover": { bgcolor: "#444", boxShadow: "none" },
-                }}
+                onClick={handleSaveGrant}
+                disabled={saving}
+                sx={{ textTransform: "none", minWidth: 240, borderRadius: "12px", bgcolor: "#545454", fontSize: 14 }}
               >
-                Save & Grant Access
+                {saving ? <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} /> : null}
+                Save &amp; Grant Access
               </Button>
             </Box>
-
-            <Typography sx={{ fontSize: 12, color: "#7A7A7A" }}>
-              Current role: {selectedRole.name}. Save stores access for this role only.
-            </Typography>
           </Box>
-        </Box>
-      </Box>
-
-      <Box
-        sx={{
-          border: "1px solid #E0E0E0",
-          borderRadius: "8px",
-          bgcolor: "#fff",
-          px: 2.5,
-          py: 1.1,
-          display: "flex",
-          justifyContent: "center",
-          flexWrap: "wrap",
-          gap: 3,
-        }}
-      >
-        {legendItems.map((item) => (
-          <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: item.color }} />
-            <Typography sx={{ fontSize: 12, color: "#2E2E2E" }}>{item.label}</Typography>
-          </Box>
-        ))}
+        )}
       </Box>
     </Box>
   );
