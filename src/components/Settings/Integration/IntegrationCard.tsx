@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+// import { useState, useEffect } from "react";
 import { Card, Box, Typography, Button, Chip } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
@@ -13,6 +13,7 @@ import { integrationApi } from "../../../services/integration.api";
 // Extend the existing IntegrationCardProps type inline
 // (if you prefer, add upcomingAppointments?: number to Settings.types.ts instead)
 type ExtendedIntegrationCardProps = IntegrationCardProps & {
+  isConnected?: boolean;
   upcomingAppointments?: number;
 };
 
@@ -21,15 +22,17 @@ const IntegrationCard = ({
   description,
   icon,
   headerBgColor,
+  isConnected = false,
   upcomingAppointments,
 }: ExtendedIntegrationCardProps) => {
-  const storageKey = `integration_${name}`;
-  const [connected, setConnected] = useState(false);
+  // const storageKey = `integration_${name}`;
+  // const [connected, setConnected] = useState(false);
+  const connected = isConnected;
   const navigate = useNavigate();
 
-  useEffect(() => {
-    setConnected(localStorage.getItem(storageKey) === "true");
-  }, [storageKey]);
+  // useEffect(() => {
+  //   setConnected(localStorage.getItem(storageKey) === "true");
+  // }, [storageKey]);
 
   const handleConnect = () => {
     if (name === "LinkedIn") {
@@ -41,18 +44,21 @@ const IntegrationCard = ({
       integrationApi.connectFacebook();
       return;
     }
+    if (name === "Google Calendar" || name === "Google Ads") {
+      integrationApi.connectGoogle();
+      return;
+    }
 
     // Google Calendar and Google Ads — localStorage demo connect.
     // No backend OAuth endpoint exists yet.
     // When backend is ready, add connectGoogleCalendar() to integrationApi
     // and call it here instead.
-    localStorage.setItem(storageKey, "true");
-    setConnected(true);
+    // localStorage.setItem(storageKey, "true");
+    // setConnected(true);
   };
 
   const handleDisconnect = () => {
-    localStorage.removeItem(storageKey);
-    setConnected(false);
+    console.log("Disconnect API not implemented yet");
   };
 
   const isGoogleCalendar = name === "Google Calendar";
@@ -115,10 +121,8 @@ const IntegrationCard = ({
               }
               size="small"
               sx={{
-                bgcolor:
-                  upcomingAppointments === 0 ? "#F1F5F9" : "#EDE9FE",
-                color:
-                  upcomingAppointments === 0 ? "#64748B" : "#6D28D9",
+                bgcolor: upcomingAppointments === 0 ? "#F1F5F9" : "#EDE9FE",
+                color: upcomingAppointments === 0 ? "#64748B" : "#6D28D9",
                 fontWeight: 600,
                 fontSize: "12px",
                 px: 0.5,
