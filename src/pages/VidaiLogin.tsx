@@ -6,8 +6,9 @@ import loginLogo from "../assets/icons/Login_Logo_Vidai.webp";
 import styles from "../styles/VidaiLogin.module.css";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../store";
-import { setAuth } from "../store/authSlice";
+import { setAuth, type AuthUser } from "../store/authSlice";
 import { authApi } from "../services/auth.api";
+import { usersApi } from "../services/users.api";
 import {
   LANGUAGE_OPTIONS,
   STORAGE_LANGUAGE_KEY,
@@ -40,6 +41,63 @@ function resolveInitialLanguage(): LanguageCode {
   return legacyMap[normalized] || "en";
 }
 
+const buildAuthUserFromLogin = (
+  token: string,
+  loginIdentifier: string,
+  resolvedRole?: string,
+  user?: {
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    designation?: string;
+  },
+): AuthUser => {
+  const designation = (resolvedRole || user?.designation || "").trim();
+  const designationLower = designation.toLowerCase();
+
+  const isSuperAdmin = designationLower === "super admin";
+  const isAdmin = designationLower === "admin" || isSuperAdmin;
+
+  return {
+    access: token,
+    user_id: 0,
+    username: user?.username || loginIdentifier,
+    first_name: user?.first_name || "",
+    last_name: user?.last_name || "",
+    email: user?.email || "",
+    designation,
+    designation_label: designation,
+    tenant: "",
+    tenant_id: 0,
+    is_staff: isAdmin,
+    is_superuser: isSuperAdmin,
+    language_id: 0,
+    language_code: "",
+    language_name: "",
+    permissions: { modules: [] },
+    clinics: [],
+    photo: "",
+  };
+};
+
+const resolveRoleFromUserList = async (
+  loginIdentifier: string,
+): Promise<string | undefined> => {
+  try {
+    const users = await usersApi.listLocal();
+    const idKey = loginIdentifier.trim().toLowerCase();
+    const match = users.find((u) => {
+      const usernameKey = (u.username || "").trim().toLowerCase();
+      const emailKey = (u.email || "").trim().toLowerCase();
+      return usernameKey === idKey || emailKey === idKey;
+    });
+    return match?.role?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export default function VidaiLogin() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
@@ -71,17 +129,40 @@ export default function VidaiLogin() {
 
     try {
       setLoading(true);
+      const loginIdentifier = username.trim();
       const loginRes = await authApi.login({
-        username: username.trim(),
+        username: loginIdentifier,
+        email: loginIdentifier,
         password: password.trim(),
       });
 
+      const resolvedRole = await resolveRoleFromUserList(loginIdentifier);
+
       dispatch(
-        setAuth({
-          access: loginRes.token,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any),
+        setAuth(
+          buildAuthUserFromLogin(
+            loginRes.token,
+            loginIdentifier,
+            resolvedRole,
+            loginRes.user,
+          ),
+        ),
       );
+
+      try {
+        const profile = await authApi.getProfile();
+        if (profile && typeof profile === "object") {
+          dispatch(
+            setAuth({
+              access: loginRes.token,
+              ...(profile as Record<string, unknown>),
+            } as AuthUser),
+          );
+        }
+      } catch {
+        // Keep login successful even if profile hydration is delayed.
+      }
+
       localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
       toast.success("Login successful!");
 
@@ -89,23 +170,29 @@ export default function VidaiLogin() {
     } catch (err: unknown) {
       let msg = t.genericError;
 
-      const error = (
-        err as {
-          response?: {
-            data?: {
-              errors?: Array<{
-                code?: string;
-                detail?: string;
-              }>;
-            };
+      const responseData = (err as {
+        response?: {
+          data?: {
+            message?: string;
+            detail?: string;
+            errors?: Array<{
+              code?: string;
+              detail?: string;
+            }>;
           };
-        }
-      )?.response?.data?.errors?.[0];
+        };
+      })?.response?.data;
+
+      const error = responseData?.errors?.[0];
 
       const code = error?.code;
 
       if (code === "no_active_account") {
         msg = t.loginFailed;
+      } else if (responseData?.message) {
+        msg = responseData.message;
+      } else if (responseData?.detail) {
+        msg = responseData.detail;
       } else if (err instanceof Error) {
         msg = err.message;
       }

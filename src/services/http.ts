@@ -14,6 +14,13 @@ export const http = axios.create({
   headers: { "Content-Type": "application/json" },
 }) as HttpInstance;
 
+const AUTH_BYPASS_PATHS = ["/login/", "/auth/login/"];
+
+const isAuthBypassRequest = (url?: string): boolean => {
+  if (!url) return false;
+  return AUTH_BYPASS_PATHS.some((path) => url.includes(path));
+};
+
 http.redirect = (path: string): void => {
   const baseURL = http.defaults.baseURL ?? "";
   window.location.href = `${baseURL}${path}`;
@@ -23,7 +30,7 @@ http.redirect = (path: string): void => {
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem("auth_token");
 
-  if (token) {
+  if (token && !isAuthBypassRequest(config.url)) {
     config.headers.set("Authorization", `Bearer ${token}`);
   }
 
@@ -34,8 +41,11 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    const requestUrl = error.config?.url;
+
+    if (error.response?.status === 401 && !isAuthBypassRequest(requestUrl)) {
       localStorage.removeItem("auth_token");
+      localStorage.removeItem("authToken");
       // App will decide what to do (redirect, logout, etc.)
       window.dispatchEvent(new Event("auth:logout"));
     }

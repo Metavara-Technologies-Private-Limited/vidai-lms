@@ -185,6 +185,22 @@ const normalizeUser = (
   raw: UserApiRecord,
   source: "local" | "client" = "local",
 ): UserRecord => {
+  const roleFromObject =
+    raw.role && typeof raw.role === "object"
+      ? (raw.role as { id?: unknown; name?: unknown })
+      : null;
+
+  const resolvedRoleId =
+    roleFromObject && roleFromObject.id != null
+      ? Number(roleFromObject.id) || null
+      : raw.role === null || raw.role === undefined
+        ? null
+        : Number(raw.role) || null;
+
+  const resolvedRoleName =
+    (roleFromObject ? toSafeString(roleFromObject.name) : "") ||
+    toSafeString(raw.role_name ?? raw.user_role ?? raw.role);
+
   const firstName =
     toSafeString(raw.first_name) ||
     toSafeString(raw.firstName) ||
@@ -204,11 +220,8 @@ const normalizeUser = (
     gender: toGender(raw.gender),
     dateOfJoining: toSafeString(raw.date_of_joining ?? raw.dateOfJoining),
     dateOfBirth: toSafeString(raw.date_of_birth ?? raw.dateOfBirth),
-    roleId:
-      raw.role === null || raw.role === undefined
-        ? null
-        : Number(raw.role) || null,
-    role: toSafeString(raw.role_name ?? raw.role ?? raw.user_role),
+    roleId: resolvedRoleId,
+    role: resolvedRoleName,
     username: toSafeString(raw.username ?? raw.user_name ?? raw.email),
     mobileNumber: toSafeString(
       raw.mobile_no ?? raw.mobile_number ?? raw.mobileNo,
