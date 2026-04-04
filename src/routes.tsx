@@ -10,11 +10,18 @@ import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
 import { APP_CONDITION, DEMO_ALLOWED_KEYS } from "./config/sidebar.menu";
 import { useDispatch, useSelector } from "react-redux";
-import { selectAuthed, selectToken, setAuth } from "./store/authSlice";
+import { selectAuthed, selectToken, selectUser, setAuth } from "./store/authSlice";
+import type { AuthUser } from "./store/authSlice";
 import type { AppDispatch } from "./store";
 import { authApi } from "./services/auth.api";
 import { Box, CircularProgress } from "@mui/material";
-import { syncClinic } from "./store/clinicSlice";
+import { fetchClinic, syncClinic } from "./store/clinicSlice";
+import {
+  canAccessMenuKey,
+  canAccessSubMenuKey,
+  defaultPathForRole,
+  resolveUserRole,
+} from "./utils/roleAccess";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
@@ -46,22 +53,47 @@ export default function AppRoutes() {
   const dispatch = useDispatch<AppDispatch>();
   const authed = useSelector(selectAuthed);
   const token = useSelector(selectToken);
+  const user = useSelector(selectUser);
+  const role = resolveUserRole(user as Record<string, unknown> | null);
+  const roleDefaultPath = defaultPathForRole(role);
 
   useEffect(() => {
     const restoreUser = async () => {
       if (!token) return;
 
       try {
-        const profile = await authApi.getProfile();
+        const profile = (await authApi.getProfile()) as
+          | (Partial<AuthUser> & {
+              clinics?: Array<{
+                clinic_id: number;
+                clinic__name: string;
+                is_default: boolean;
+              }>;
+              email?: string;
+            })
+          | null;
+
+        if (!profile || typeof profile !== "object") return;
 
         dispatch(
           setAuth({
             access: token,
             ...profile,
-          }),
+          } as AuthUser),
         );
-        if (profile?.clinics?.length) {
-          await syncClinic(profile.clinics[0], profile.email);
+
+        const clinics = Array.isArray(profile.clinics) ? profile.clinics : [];
+        if (clinics.length > 0) {
+          const defaultClinic =
+            clinics.find((clinic) => clinic.is_default) ?? clinics[0];
+
+          if (defaultClinic?.clinic_id) {
+            await dispatch(fetchClinic(defaultClinic.clinic_id));
+          }
+
+          if (defaultClinic?.clinic__name && typeof profile.email === "string") {
+            await syncClinic(defaultClinic, profile.email);
+          }
         }
       } catch (err: unknown) {
         console.error("Failed to restore user", err);
@@ -121,7 +153,7 @@ export default function AppRoutes() {
           )
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<Navigate to={roleDefaultPath} replace />} />
 
         {/* ✅ Sidebar routes — filtered by demo condition */}
         {SIDEBAR_TABS.flatMap((tab) =>
@@ -134,6 +166,10 @@ export default function AppRoutes() {
               return [];
             }
 
+            if (!canAccessMenuKey(role, item.key)) {
+              return [];
+            }
+
             return [
               item.page && (
                 <Route
@@ -142,7 +178,9 @@ export default function AppRoutes() {
                   element={<LoadedComponent Comp={item.page} />}
                 />
               ),
-              item.subMenu?.map((sub) =>
+              item.subMenu
+                ?.filter((sub) => canAccessSubMenuKey(role, item.key, sub.key))
+                .map((sub) =>
                 sub.page ? (
                   <Route
                     key={sub.key}
@@ -164,7 +202,7 @@ export default function AppRoutes() {
           />
         ))}
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to={roleDefaultPath} replace />} />
       </Route>
     </Routes>
   );

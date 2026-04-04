@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import EditIcon from "@mui/icons-material/Edit";
 import CancelIcon from "@mui/icons-material/Cancel";
 import { LEADS_MENU } from "../../../../config/sidebar.menu";
 import {
@@ -18,6 +18,7 @@ import {
   type RolePermissionPayload,
   type RoleRead,
 } from "../../../../services/role.api.ts";
+import { usersApi, type UserRecord } from "../../../../services/users.api";
 
 type RoleName = "Super Admin" | "Admin" | "User";
 
@@ -168,6 +169,9 @@ const initialRoles: RoleEntry[] = [
   buildDefaultRole("User", 25, 5),
 ];
 
+const normalizeRoleLabel = (value: string): string =>
+  value.trim().toLowerCase();
+
 const Tick = ({ checked, onClick }: { checked: boolean; onClick?: () => void }) => (
   <Box
     onClick={onClick}
@@ -270,6 +274,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   // ── Fetch roles from backend ──────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
+
     roleApi.list()
       .then((apiRoles: RoleRead[]) => {
         if (cancelled) return;
@@ -291,6 +296,34 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
       })
       .catch(() => {/* silently fall back to defaults */})
       .finally(() => { if (!cancelled) setLoadingRoles(false); });
+
+    usersApi
+      .listLocal()
+      .then((users: UserRecord[]) => {
+        if (cancelled) return;
+
+        const roleCounts = users.reduce<Record<string, number>>((acc, user) => {
+          const roleKey = normalizeRoleLabel(user.role || "");
+          if (!roleKey) return acc;
+          acc[roleKey] = (acc[roleKey] ?? 0) + 1;
+          return acc;
+        }, {});
+
+        setRoles((prev) =>
+          prev.map((entry) => {
+            const count = roleCounts[normalizeRoleLabel(entry.name)] ?? 0;
+            return {
+              ...entry,
+              count,
+              badge: count,
+            };
+          }),
+        );
+      })
+      .catch(() => {
+        // Keep defaults if user list fails.
+      });
+
     return () => { cancelled = true; };
   }, []);
 
@@ -548,7 +581,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
             >
               <Typography sx={{ fontSize: 18, fontWeight: 700 }}>{activeRole.name.toUpperCase()}</Typography>
               <IconButton onClick={handleEditClick} sx={{ color: "#6D9CF1" }}>
-                <EditOutlinedIcon />
+                <EditIcon />
               </IconButton>
             </Box>
 

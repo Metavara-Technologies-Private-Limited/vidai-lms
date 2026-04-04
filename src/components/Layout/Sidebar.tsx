@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   Drawer,
   Box,
@@ -17,10 +18,18 @@ import VidaiLogo from "../../assets/icons/Vidai-logo.svg";
 import DashboardCardBg from "../../assets/icons/dashboard_card_bg.svg";
 
 import styles from "../../styles/sidebar.module.css";
+import { selectUser } from "../../store/authSlice";
+import {
+  canAccessMenuKey,
+  canAccessSubMenuKey,
+  resolveUserRole,
+} from "../../utils/roleAccess";
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const user = useSelector(selectUser);
+  const role = resolveUserRole(user as Record<string, unknown> | null);
   const [activeTab, setActiveTab] = useState(0);
   const showSettingsMenu = location.pathname.startsWith("/settings");
 
@@ -111,6 +120,10 @@ export default function Sidebar() {
                 return null;
               }
 
+              if (!canAccessMenuKey(role, item.key)) {
+                return null;
+              }
+
               const isSettings = item.key === "settings";
               const isActive =
                 location.pathname.startsWith(item.path) ||
@@ -132,7 +145,9 @@ export default function Sidebar() {
 
                   {isSettings && item.subMenu && (
                     <Collapse in={showSettingsMenu}>
-                      {item.subMenu.map((sub) => {
+                      {item.subMenu
+                        .filter((sub) => canAccessSubMenuKey(role, item.key, sub.key))
+                        .map((sub) => {
                         const isSubActive = location.pathname === sub.path;
 
                         return (
