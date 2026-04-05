@@ -18,7 +18,7 @@ import VidaiLogo from "../../assets/icons/Vidai-logo.svg";
 import DashboardCardBg from "../../assets/icons/dashboard_card_bg.svg";
 
 import styles from "../../styles/sidebar.module.css";
-import { selectUser } from "../../store/authSlice";
+import { selectToken, selectUser } from "../../store/authSlice";
 import {
   canAccessMenuKey,
   canAccessSubMenuKey,
@@ -29,7 +29,11 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector(selectUser);
-  const role = resolveUserRole(user as Record<string, unknown> | null);
+  const token = useSelector(selectToken);
+  const roleContext =
+    (user as Record<string, unknown> | null) ??
+    (token ? ({ access: token } as Record<string, unknown>) : null);
+  const role = resolveUserRole(roleContext);
   const [activeTab, setActiveTab] = useState(0);
   const showSettingsMenu = location.pathname.startsWith("/settings");
 
@@ -120,7 +124,7 @@ export default function Sidebar() {
                 return null;
               }
 
-              if (!canAccessMenuKey(role, item.key)) {
+              if (!canAccessMenuKey(role, item.key, roleContext)) {
                 return null;
               }
 
@@ -146,7 +150,7 @@ export default function Sidebar() {
                   {isSettings && item.subMenu && (
                     <Collapse in={showSettingsMenu}>
                       {item.subMenu
-                        .filter((sub) => canAccessSubMenuKey(role, item.key, sub.key))
+                        .filter((sub) => canAccessSubMenuKey(role, item.key, sub.key, roleContext))
                         .map((sub) => {
                         const isSubActive = location.pathname === sub.path;
 

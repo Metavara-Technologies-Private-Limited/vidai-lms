@@ -19,7 +19,7 @@ import { fetchClinic, syncClinic } from "./store/clinicSlice";
 import {
   canAccessMenuKey,
   canAccessSubMenuKey,
-  defaultPathForRole,
+  defaultPathForUser,
   resolveUserRole,
 } from "./utils/roleAccess";
 
@@ -54,12 +54,18 @@ export default function AppRoutes() {
   const authed = useSelector(selectAuthed);
   const token = useSelector(selectToken);
   const user = useSelector(selectUser);
-  const role = resolveUserRole(user as Record<string, unknown> | null);
-  const roleDefaultPath = defaultPathForRole(role);
+  const roleContext =
+    (user as Record<string, unknown> | null) ??
+    (token ? ({ access: token } as Record<string, unknown>) : null);
+  const role = resolveUserRole(roleContext);
+  const roleDefaultPath = defaultPathForUser(role, roleContext);
 
   useEffect(() => {
     const restoreUser = async () => {
       if (!token) return;
+
+      // If user is already hydrated from persisted auth state, do not call profile proxy again.
+      if (user && typeof user === "object") return;
 
       try {
         const profile = (await authApi.getProfile()) as
@@ -96,12 +102,15 @@ export default function AppRoutes() {
           }
         }
       } catch (err: unknown) {
-        console.error("Failed to restore user", err);
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status !== 401 && status !== 403) {
+          console.error("Failed to restore user", err);
+        }
       }
     };
 
     restoreUser();
-  }, [token, authed, dispatch]);
+  }, [token, authed, dispatch, user]);
 
   return (
     <Routes>
@@ -166,7 +175,7 @@ export default function AppRoutes() {
               return [];
             }
 
-            if (!canAccessMenuKey(role, item.key)) {
+            if (!canAccessMenuKey(role, item.key, roleContext)) {
               return [];
             }
 
@@ -179,7 +188,7 @@ export default function AppRoutes() {
                 />
               ),
               item.subMenu
-                ?.filter((sub) => canAccessSubMenuKey(role, item.key, sub.key))
+                ?.filter((sub) => canAccessSubMenuKey(role, item.key, sub.key, roleContext))
                 .map((sub) =>
                 sub.page ? (
                   <Route

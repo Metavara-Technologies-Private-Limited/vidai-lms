@@ -18,12 +18,15 @@ type LoginResponse = {
     refresh?: string;
     refresh_token?: string;
     user?: {
+      id?: number;
       username: string;
       first_name: string;
       last_name: string;
       email: string;
       designation: string;
     };
+    role?: string;
+    permissions?: Record<string, unknown>;
   };
   result?: Record<string, unknown>;
   payload?: Record<string, unknown>;
@@ -38,18 +41,23 @@ type LoginResponse = {
   refresh?: string;
   refresh_token?: string;
   user?: {
+    id?: number;
     username: string;
     first_name: string;
     last_name: string;
     email: string;
     designation: string;
   };
+  role?: string;
+  permissions?: Record<string, unknown>;
 };
 
 type NormalizedLoginResponse = {
   token: string;
   refresh?: string;
   user?: LoginResponse["user"];
+  role?: string;
+  permissions?: Record<string, unknown>;
 };
 
 type UserSearchParams = {
@@ -117,6 +125,16 @@ export const authApi = {
       (nestedDataObj?.user as LoginResponse["user"]) ??
       (body?.user as LoginResponse["user"]);
 
+    const role =
+      (dataObj?.role as string | undefined) ??
+      (nestedDataObj?.role as string | undefined) ??
+      (body?.role as string | undefined);
+
+    const permissions =
+      (dataObj?.permissions as Record<string, unknown> | undefined) ??
+      (nestedDataObj?.permissions as Record<string, unknown> | undefined) ??
+      (body?.permissions as Record<string, unknown> | undefined);
+
     return {
       token,
       refresh:
@@ -126,6 +144,8 @@ export const authApi = {
         pickRefresh(resultObj) ??
         pickRefresh(payloadObj),
       user,
+      role,
+      permissions,
     };
   },
 
@@ -138,6 +158,20 @@ export const authApi = {
       (body?.profile as Record<string, unknown> | undefined) ??
       (body?.user as Record<string, unknown> | undefined) ??
       body;
+
+    const nestedUser =
+      profile?.user && typeof profile.user === "object"
+        ? (profile.user as Record<string, unknown>)
+        : null;
+
+    if (nestedUser) {
+      return {
+        ...profile,
+        ...nestedUser,
+        clinics: profile.clinics ?? nestedUser.clinics,
+        permissions: profile.permissions ?? nestedUser.permissions,
+      };
+    }
 
     return profile;
   },
