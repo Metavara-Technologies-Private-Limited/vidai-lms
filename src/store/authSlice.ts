@@ -3,6 +3,7 @@ import type { RootState } from ".";
 
 const AUTH_TOKEN_KEY = "auth_token";
 const AUTH_TOKEN_ALT_KEY = "authToken";
+const AUTH_USER_KEY = "auth_user";
 const UI_AUTH_KEY = "vidai_ui_logged_in";
 
 interface Clinic {
@@ -60,10 +61,25 @@ interface AuthState {
   authed: boolean;
 }
 
+const readPersistedUser = (): AuthUser | null => {
+  const raw = localStorage.getItem(AUTH_USER_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    localStorage.removeItem(AUTH_USER_KEY);
+    return null;
+  }
+};
+
+const persistedToken =
+  localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_TOKEN_ALT_KEY);
+
 const initialState: AuthState = {
-  user: null,
-  token: localStorage.getItem(AUTH_TOKEN_KEY),
-  authed: !!localStorage.getItem(AUTH_TOKEN_KEY),
+  user: readPersistedUser(),
+  token: persistedToken,
+  authed: !!persistedToken,
 };
 
 const authSlice = createSlice({
@@ -76,6 +92,7 @@ const authSlice = createSlice({
       state.authed = true;
       localStorage.setItem(AUTH_TOKEN_KEY, action.payload.access);
       localStorage.setItem(AUTH_TOKEN_ALT_KEY, action.payload.access);
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(action.payload));
       localStorage.setItem(UI_AUTH_KEY, "1");
     },
     clearAuth(state) {
@@ -84,6 +101,7 @@ const authSlice = createSlice({
       state.authed = false;
       localStorage.removeItem(AUTH_TOKEN_KEY);
       localStorage.removeItem(AUTH_TOKEN_ALT_KEY);
+      localStorage.removeItem(AUTH_USER_KEY);
       localStorage.removeItem(UI_AUTH_KEY);
     },
   },

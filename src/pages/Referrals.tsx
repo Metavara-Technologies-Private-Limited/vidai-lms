@@ -25,7 +25,14 @@ const Referrals = () => {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const token = localStorage.getItem("access_token") || "";
+        const token =
+          localStorage.getItem("auth_token") ||
+          localStorage.getItem("authToken") ||
+          "";
+        if (!token) {
+          setDoctorCount(0);
+          return;
+        }
         const headers = { Authorization: `Bearer ${token}` };
         // Count unique doctors from leads (assigned_to)
         const res = await fetch("http://127.0.0.1:8000/api/leads/list/", { headers });

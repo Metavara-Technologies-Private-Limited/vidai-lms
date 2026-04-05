@@ -15,10 +15,16 @@ export const http = axios.create({
 }) as HttpInstance;
 
 const AUTH_BYPASS_PATHS = ["/login/", "/auth/login/"];
+const AUTH_SOFT_FAIL_PATHS = ["/me/profile/", "/users-search/"];
 
 const isAuthBypassRequest = (url?: string): boolean => {
   if (!url) return false;
   return AUTH_BYPASS_PATHS.some((path) => url.includes(path));
+};
+
+const isAuthSoftFailRequest = (url?: string): boolean => {
+  if (!url) return false;
+  return AUTH_SOFT_FAIL_PATHS.some((path) => url.includes(path));
 };
 
 http.redirect = (path: string): void => {
@@ -43,7 +49,11 @@ http.interceptors.response.use(
   (error: AxiosError) => {
     const requestUrl = error.config?.url;
 
-    if (error.response?.status === 401 && !isAuthBypassRequest(requestUrl)) {
+    if (
+      error.response?.status === 401 &&
+      !isAuthBypassRequest(requestUrl) &&
+      !isAuthSoftFailRequest(requestUrl)
+    ) {
       localStorage.removeItem("auth_token");
       localStorage.removeItem("authToken");
       // App will decide what to do (redirect, logout, etc.)

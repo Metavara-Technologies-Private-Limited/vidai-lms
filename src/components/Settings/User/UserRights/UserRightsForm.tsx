@@ -164,9 +164,9 @@ const buildDefaultRole = (name: RoleName, count: number, badge: number): RoleEnt
 };
 
 const initialRoles: RoleEntry[] = [
-  buildDefaultRole("Super Admin", 1, 1),
-  buildDefaultRole("Admin", 43, 8),
-  buildDefaultRole("User", 25, 5),
+  buildDefaultRole("Super Admin", 0, 0),
+  buildDefaultRole("Admin", 0, 0),
+  buildDefaultRole("User", 0, 0),
 ];
 
 const normalizeRoleLabel = (value: string): string =>
@@ -298,11 +298,23 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
       .finally(() => { if (!cancelled) setLoadingRoles(false); });
 
     usersApi
-      .listLocal()
+      .list()
       .then((users: UserRecord[]) => {
         if (cancelled) return;
 
-        const roleCounts = users.reduce<Record<string, number>>((acc, user) => {
+        // Merge by source-independent identity so local/client datasets do not double-count.
+        const seen = new Set<string>();
+        const mergedUsers = users.filter((user) => {
+          const key =
+            (user.email || "").trim().toLowerCase() ||
+            (user.username || "").trim().toLowerCase() ||
+            `id:${user.id}`;
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        const roleCounts = mergedUsers.reduce<Record<string, number>>((acc, user) => {
           const roleKey = normalizeRoleLabel(user.role || "");
           if (!roleKey) return acc;
           acc[roleKey] = (acc[roleKey] ?? 0) + 1;

@@ -8,7 +8,6 @@ import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../store";
 import { setAuth, type AuthUser } from "../store/authSlice";
 import { authApi } from "../services/auth.api";
-import { usersApi } from "../services/users.api";
 import {
   LANGUAGE_OPTIONS,
   STORAGE_LANGUAGE_KEY,
@@ -45,27 +44,46 @@ const buildAuthUserFromLogin = (
   token: string,
   loginIdentifier: string,
   resolvedRole?: string,
-  user?: {
-    username?: string;
-    first_name?: string;
-    last_name?: string;
-    email?: string;
-    designation?: string;
-  },
+  permissions?: Record<string, unknown>,
+  user?: Record<string, unknown>,
 ): AuthUser => {
-  const designation = (resolvedRole || user?.designation || "").trim();
+  const nestedRole =
+    user?.role && typeof user.role === "object"
+      ? (user.role as { name?: unknown }).name
+      : undefined;
+
+  const designation = String(
+    resolvedRole ??
+      user?.role ??
+      user?.designation ??
+      user?.designation_label ??
+      user?.role_name ??
+      user?.user_role ??
+      nestedRole ??
+      "",
+  ).trim();
   const designationLower = designation.toLowerCase();
 
-  const isSuperAdmin = designationLower === "super admin";
-  const isAdmin = designationLower === "admin" || isSuperAdmin;
+  const hasSuperFlag =
+    user?.is_superuser === true || String(user?.is_superuser || "").toLowerCase() === "true";
+  const hasAdminFlag =
+    user?.is_staff === true || String(user?.is_staff || "").toLowerCase() === "true";
+
+  const isSuperAdmin =
+    hasSuperFlag ||
+    designationLower === "super admin" ||
+    designationLower === "super_admin" ||
+    designationLower === "super-admin" ||
+    designationLower === "superadmin";
+  const isAdmin = hasAdminFlag || designationLower === "admin" || isSuperAdmin;
 
   return {
     access: token,
-    user_id: 0,
-    username: user?.username || loginIdentifier,
-    first_name: user?.first_name || "",
-    last_name: user?.last_name || "",
-    email: user?.email || "",
+    user_id: Number(user?.user_id ?? user?.id ?? 0) || 0,
+    username: String(user?.username ?? loginIdentifier),
+    first_name: String(user?.first_name ?? ""),
+    last_name: String(user?.last_name ?? ""),
+    email: String(user?.email ?? ""),
     designation,
     designation_label: designation,
     tenant: "",
@@ -75,27 +93,10 @@ const buildAuthUserFromLogin = (
     language_id: 0,
     language_code: "",
     language_name: "",
-    permissions: { modules: [] },
+    permissions: (permissions as AuthUser["permissions"]) ?? { modules: [] },
     clinics: [],
     photo: "",
   };
-};
-
-const resolveRoleFromUserList = async (
-  loginIdentifier: string,
-): Promise<string | undefined> => {
-  try {
-    const users = await usersApi.listLocal();
-    const idKey = loginIdentifier.trim().toLowerCase();
-    const match = users.find((u) => {
-      const usernameKey = (u.username || "").trim().toLowerCase();
-      const emailKey = (u.email || "").trim().toLowerCase();
-      return usernameKey === idKey || emailKey === idKey;
-    });
-    return match?.role?.trim() || undefined;
-  } catch {
-    return undefined;
-  }
 };
 
 export default function VidaiLogin() {
@@ -136,32 +137,17 @@ export default function VidaiLogin() {
         password: password.trim(),
       });
 
-      const resolvedRole = await resolveRoleFromUserList(loginIdentifier);
-
       dispatch(
         setAuth(
           buildAuthUserFromLogin(
             loginRes.token,
             loginIdentifier,
-            resolvedRole,
+            loginRes.role,
+            loginRes.permissions,
             loginRes.user,
           ),
         ),
       );
-
-      try {
-        const profile = await authApi.getProfile();
-        if (profile && typeof profile === "object") {
-          dispatch(
-            setAuth({
-              access: loginRes.token,
-              ...(profile as Record<string, unknown>),
-            } as AuthUser),
-          );
-        }
-      } catch {
-        // Keep login successful even if profile hydration is delayed.
-      }
 
       localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
       toast.success("Login successful!");

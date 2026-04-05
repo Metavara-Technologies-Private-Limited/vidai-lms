@@ -322,24 +322,75 @@ const extractRoleArray = (payload: RoleListResponse): RoleApiRecord[] => {
 
 export const usersApi = {
   listLocal: async (): Promise<UserRecord[]> => {
-    const response = await http.get<UserListResponse>("/users/list/");
-    return extractUserArray(response.data).map((user) =>
-      normalizeUser(user, "local"),
-    );
+    const token =
+      localStorage.getItem("auth_token") || localStorage.getItem("authToken");
+    if (!token) {
+      return [];
+    }
+
+    if (sessionStorage.getItem("users_list_denied") === "1") {
+      return [];
+    }
+
+    try {
+      const response = await http.get<UserListResponse>("/users/list/");
+      sessionStorage.removeItem("users_list_denied");
+      return extractUserArray(response.data).map((user) =>
+        normalizeUser(user, "local"),
+      );
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) {
+        // Some roles cannot access this endpoint. Treat as empty dataset.
+        sessionStorage.setItem("users_list_denied", "1");
+        return [];
+      }
+      throw error;
+    }
   },
 
   listClient: async (): Promise<UserRecord[]> => {
-    const response = await http.get<UserSearchResponse>("/users-search/", {
-      params: {
-        limit: 200,
-        offset: 0,
-        search: "",
-      },
-    });
+    const token =
+      localStorage.getItem("auth_token") || localStorage.getItem("authToken");
+    if (!token) {
+      return [];
+    }
 
-    return extractUserSearchArray(response.data).map((user) =>
-      normalizeUser(user, "client"),
-    );
+    const enableUsersProxy =
+      (import.meta.env.VITE_ENABLE_STAGE_USERS_PROXY ?? "false")
+        .toLowerCase() === "true";
+
+    if (!enableUsersProxy) {
+      return [];
+    }
+
+    if (sessionStorage.getItem("users_search_denied") === "1") {
+      return [];
+    }
+
+    try {
+      const response = await http.get<UserSearchResponse>("/users-search/", {
+        params: {
+          limit: 200,
+          offset: 0,
+          search: "",
+        },
+      });
+
+      sessionStorage.removeItem("users_search_denied");
+
+      return extractUserSearchArray(response.data).map((user) =>
+        normalizeUser(user, "client"),
+      );
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) {
+        // Some roles cannot access this endpoint. Treat as empty dataset.
+        sessionStorage.setItem("users_search_denied", "1");
+        return [];
+      }
+      throw error;
+    }
   },
 
   list: async (): Promise<UserRecord[]> => {
