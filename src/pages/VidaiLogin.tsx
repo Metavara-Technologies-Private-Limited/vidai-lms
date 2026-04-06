@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, User } from "lucide-react";
 import logo from "../assets/icons/Vidai-logo.svg";
@@ -6,7 +6,7 @@ import loginLogo from "../assets/icons/Login_Logo_Vidai.webp";
 import styles from "../styles/VidaiLogin.module.css";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../store";
-import { setAuth, type AuthUser } from "../store/authSlice";
+import { mapLoginToAuthUser, setAuth } from "../store/authSlice";
 import { authApi } from "../services/auth.api";
 import {
   LANGUAGE_OPTIONS,
@@ -15,14 +15,17 @@ import {
   type LanguageCode,
 } from "../utils/languages";
 import {
+  Checkbox,
   CircularProgress,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
   type SelectChangeEvent,
 } from "@mui/material";
 import { toast } from "react-toastify";
+import { AxiosError } from "axios";
 
 function resolveInitialLanguage(): LanguageCode {
   const raw = (localStorage.getItem(STORAGE_LANGUAGE_KEY) || "").trim();
@@ -114,18 +117,18 @@ export default function VidaiLogin() {
     resolveInitialLanguage,
   );
   const [error, setError] = useState("");
+  const [isExternalLogin, setIsExternalLogin] = useState<boolean>(false);
   const t = TRANSLATIONS[language];
 
-  const canSubmit = useMemo(
-    () => username.trim().length > 0 && password.trim().length > 0,
-    [username, password],
-  );
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: SyntheticEvent) => {
+    // Sanitize
+    if (loading) return;
     event.preventDefault();
     setError("");
-    if (!canSubmit) {
-      const msg = t.validationError;
+
+    // Validations
+    if (!username.trim() || !password.trim()) {
+      const msg = t.emptyFields;
       setError(msg);
       toast.error(msg);
       return;
@@ -133,23 +136,21 @@ export default function VidaiLogin() {
 
     try {
       setLoading(true);
-      const loginIdentifier = username.trim();
-      const loginRes = await authApi.login({
-        username: loginIdentifier,
-        email: loginIdentifier,
-        password: password.trim(),
-      });
+      const mode = isExternalLogin ? "EXT" : "INT";
+      const loginRes = await authApi.login(
+        { username: username.trim(), password: password.trim() },
+        mode,
+      );
+
+      const authUser = mapLoginToAuthUser(loginRes);
 
       dispatch(
-        setAuth(
-          buildAuthUserFromLogin(
-            loginRes.token,
-            loginIdentifier,
-            loginRes.role,
-            loginRes.permissions,
-            loginRes.user,
-          ),
-        ),
+        setAuth({
+          token: loginRes.token,
+          refresh: loginRes.refresh,
+          user: authUser,
+          loginType: mode,
+        }),
       );
 
       localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
@@ -187,11 +188,14 @@ export default function VidaiLogin() {
       } else if (err instanceof Error) {
         msg = err.message;
       }
-
-      toast.error(msg);
+      console.log(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAuthModeToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsExternalLogin(e.target.checked);
   };
 
   const handleLanguageChange = (event: SelectChangeEvent<LanguageCode>) => {
@@ -280,6 +284,17 @@ export default function VidaiLogin() {
             </div>
 
             {error ? <p className={styles.errorText}>{error}</p> : null}
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isExternalLogin}
+                  onChange={handleAuthModeToggle}
+                  size="small"
+                />
+              }
+              label="Use client portal login"
+            />
 
             <button
               className={styles.loginButton}

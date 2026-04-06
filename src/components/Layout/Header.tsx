@@ -25,7 +25,7 @@ import {
 } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
 import { clearAuth, selectUser } from "../../store/authSlice";
-import { fetchCampaign } from "../../store/campaignSlice";
+// import { fetchCampaign } from "../../store/campaignSlice";
 import { fetchAllTemplates } from "../../store/templateSlice";
 import PersonIcon from "@mui/icons-material/Person";
 import EmailIcon from "@mui/icons-material/Email";
@@ -162,7 +162,7 @@ const Header = () => {
   }, [dispatch, selectedClinicId]);
 
   useEffect(() => {
-    dispatch(fetchCampaign());
+    // dispatch(fetchCampaign());
     dispatch(fetchAllTemplates());
   }, [dispatch]);
 
@@ -331,10 +331,12 @@ const Header = () => {
           {displayClinicName}
         </MenuItem>
 
-        <MenuItem disabled>
-          <WorkIcon sx={{ mr: 1 }} />
-          {user?.designation_label || "-"}
-        </MenuItem>
+        {(user?.designation_label || user?.designation) && (
+          <MenuItem disabled>
+            <WorkIcon sx={{ mr: 1 }} />
+            {user?.designation_label || "-"}
+          </MenuItem>
+        )}
 
         <MenuItem onClick={handleLogout} sx={{ color: "red", fontWeight: 600 }}>
           <LogoutIcon sx={{ mr: 1 }} />

@@ -27,6 +27,9 @@ import {
   defaultPathForUser,
   resolveUserRole,
 } from "./utils/roleAccess";
+import type { AuthUser, UserClinic } from "./types/auth.types";
+import { fetchLeads } from "./store/leadSlice";
+// import type { Clinic } from "./types/clinic.types";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
@@ -137,6 +140,7 @@ export default function AppRoutes() {
   const authed = useSelector(selectAuthed);
   const token = useSelector(selectToken);
   const user = useSelector(selectUser);
+  // const loginType = useSelector(selectLoginType);
   const roleContext =
     (user as Record<string, unknown> | null) ??
     (token ? ({ access: token } as Record<string, unknown>) : null);
@@ -151,17 +155,7 @@ export default function AppRoutes() {
       if (user && typeof user === "object" && user.profile_loaded) return;
 
       try {
-        const profile = (await authApi.getProfile()) as
-          | (Partial<AuthUser> & {
-              clinics?: Array<{
-                clinic_id: number;
-                clinic__name: string;
-                is_default: boolean;
-              }>;
-              email?: string;
-            })
-          | null;
-
+        const profile = await authApi.getProfile();
         if (!profile || typeof profile !== "object") return;
 
         const normalizedClinics = normalizeClinics(
@@ -192,7 +186,12 @@ export default function AppRoutes() {
           ) {
             await syncClinic(defaultClinic, profile.email);
           }
+        } else {
+          // EXT users or INT users with no clinics
+          await dispatch(fetchClinic(1));
         }
+
+        await dispatch(fetchLeads());
       } catch (err: unknown) {
         const status = (err as { response?: { status?: number } })?.response
           ?.status;
@@ -203,7 +202,8 @@ export default function AppRoutes() {
     };
 
     restoreUser();
-  }, [token, authed, dispatch, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, authed, dispatch]);
 
   return (
     <Routes>
