@@ -22,11 +22,11 @@ import {
   // selectClinic,
   // setSelectedClinic,
   syncClinic,
-  // selectClinic
+  selectClinic
 } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
 import { clearAuth, selectUser } from "../../store/authSlice";
-import { fetchCampaign } from "../../store/campaignSlice";
+// import { fetchCampaign } from "../../store/campaignSlice";
 import { fetchAllTemplates } from "../../store/templateSlice";
 import PersonIcon from "@mui/icons-material/Person";
 import EmailIcon from "@mui/icons-material/Email";
@@ -42,12 +42,20 @@ const Header = () => {
   const navigate = useNavigate();
   const user = useSelector(selectUser);
   const clinics = useMemo(() => user?.clinics ?? [], [user]);
-  // const dbClinic = useSelector(selectClinic);
+  const selectedClinic = useMemo(() => clinics[0] ?? null, [clinics]);
+  const dbClinic = useSelector(selectClinic);
 
-  const selectedClinic = useMemo(() => clinics[0], [clinics]);
+  // const selectedClinic = useMemo(() => clinics[0], [clinics]);
   const [manualClinic, setManualClinic] = useState<(typeof clinics)[0] | null>(
     null,
   );
+  const displayClinicName = useMemo(() => {
+    if (manualClinic) return manualClinic.clinic__name;
+    if (selectedClinic) return selectedClinic.clinic__name;
+    if (dbClinic) return dbClinic.name;
+    return null;
+  }, [manualClinic, selectedClinic, dbClinic]);
+
 
   const [clinicAnchor, setClinicAnchor] = useState<null | HTMLElement>(null);
 
@@ -62,13 +70,9 @@ const Header = () => {
     "calendar" | "notification" | "help" | null
   >(null);
 
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const initClinic = async (current:any) => {
+  const initClinic = async (current: NonNullable<typeof selectedClinic>) => {
     await syncClinic(current, user?.email || "");
-
     const res = await clinicApi.searchByName(current.clinic__name);
-    // dispatch(fetchLeads());
 
     if (res.data.length > 0) {
       const matchedClinic = res.data.find(
@@ -76,25 +80,26 @@ const Header = () => {
           clinic.name.toLowerCase() === current.clinic__name.toLowerCase(),
       );
 
-      if (matchedClinic) {
-        await dispatch(fetchClinic(matchedClinic.id));
-        
-    await dispatch(fetchLeads());
-      }
+      const clinicId = matchedClinic?.id ?? 1; // ✅ fallback to 1
+      await dispatch(fetchClinic(clinicId));
+      await dispatch(fetchLeads());
     }
   };
   // fire-and-forget on mount only; avoid looping when server returns empty arrays
   useEffect(() => {
-    const current = manualClinic || selectedClinic;
+    const current = manualClinic ?? selectedClinic;
 
-    if (!current) return;
-
-    initClinic(current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (current) {
+      initClinic(current);
+    } else {
+      dispatch(fetchClinic(1));
+      dispatch(fetchLeads());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClinic?.clinic_id, manualClinic]);
 
   useEffect(() => {
-    dispatch(fetchCampaign());
+    // dispatch(fetchCampaign());
     dispatch(fetchAllTemplates());
   }, [dispatch]);
 
@@ -145,45 +150,49 @@ const Header = () => {
 
         {/* RIGHT */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box>
-            <Box
-              onClick={handleClinicOpen}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                cursor: "pointer",
-                background: "#f3f4f6",
-                px: 2,
-                py: 1,
-                borderRadius: 2,
-              }}
-            >
-              <Typography variant="body2">
-                Clinic:{" "}
-                <b>{(manualClinic || selectedClinic)?.clinic__name || "-"}</b>
-              </Typography>
-              <ArrowDropDownIcon />
-            </Box>
+          {/* Only show switcher if there are named clinics to switch between */}
+          {displayClinicName && (
+            <Box>
+              <Box
+                onClick={clinics.length > 1 ? handleClinicOpen : undefined}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  cursor: clinics.length > 1 ? "pointer" : "default",
+                  background: "#f3f4f6",
+                  px: 2,
+                  py: 1,
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="body2">
+                  Clinic: <b>{displayClinicName}</b>
+                </Typography>
+                {clinics.length > 1 && <ArrowDropDownIcon />}
+              </Box>
 
-            <Menu
-              anchorEl={clinicAnchor}
-              open={Boolean(clinicAnchor)}
-              onClose={handleClinicClose}
-            >
-              {clinics.map((c) => (
-                <MenuItem
-                  key={c.clinic_id}
-                  onClick={async () => {
-                    setManualClinic(c);
-                    handleClinicClose();
-                  }}
+              {clinics.length > 1 && (
+                <Menu
+                  anchorEl={clinicAnchor}
+                  open={Boolean(clinicAnchor)}
+                  onClose={handleClinicClose}
                 >
-                  {c.clinic__name}
-                </MenuItem>
-              ))}
-            </Menu>
-          </Box>
+                  {clinics.map((c) => (
+                    <MenuItem
+                      key={c.clinic_id}
+                      onClick={() => {
+                        setManualClinic(c);
+                        handleClinicClose();
+                      }}
+                    >
+                      {c.clinic__name}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              )}
+            </Box>
+          )}
 
           {iconMenus.map(({ icon, type }) => (
             <IconButton
@@ -259,15 +268,19 @@ const Header = () => {
           {user?.email || "-"}
         </MenuItem>
 
-        <MenuItem disabled>
-          <BusinessIcon sx={{ mr: 1 }} />
-          {user?.clinics?.[0]?.clinic__name || "-"}
-        </MenuItem>
+        {(user?.clinics?.[0]?.clinic__name || dbClinic?.name) && (
+          <MenuItem disabled>
+            <BusinessIcon sx={{ mr: 1 }} />
+            {user?.clinics?.[0]?.clinic__name || dbClinic?.name}
+          </MenuItem>
+        )}
 
-        <MenuItem disabled>
-          <WorkIcon sx={{ mr: 1 }} />
-          {user?.designation_label || "-"}
-        </MenuItem>
+        {(user?.designation_label || user?.designation) && (
+          <MenuItem disabled>
+            <WorkIcon sx={{ mr: 1 }} />
+            {user?.designation_label || "-"}
+          </MenuItem>
+        )}
 
         <MenuItem onClick={handleLogout} sx={{ color: "red", fontWeight: 600 }}>
           <LogoutIcon sx={{ mr: 1 }} />

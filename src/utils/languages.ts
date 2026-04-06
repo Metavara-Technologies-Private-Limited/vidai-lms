@@ -24,7 +24,7 @@ export const TRANSLATIONS: Record<
     passwordPlaceholder: string;
     loginButton: string;
     forgotPassword: string;
-    validationError: string;
+    emptyFields: string;
     loginFailed: string;
     genericError: string;
     showPassword: string;
@@ -45,7 +45,7 @@ export const TRANSLATIONS: Record<
     passwordPlaceholder: "Password",
     loginButton: "Login",
     forgotPassword: "Forgot Password?",
-    validationError: "Please enter username and password.",
+    emptyFields: "Please enter username and password.",
     loginFailed: "Invalid credentials",
     genericError: "Something went wrong",
     showPassword: "Show password",
@@ -65,7 +65,7 @@ export const TRANSLATIONS: Record<
     passwordPlaceholder: "पासवर्ड",
     loginButton: "लॉगिन",
     forgotPassword: "पासवर्ड भूल गए?",
-    validationError: "कृपया यूजरनेम और पासवर्ड दर्ज करें।",
+    emptyFields: "कृपया यूजरनेम और पासवर्ड दर्ज करें।",
     loginFailed: "अमान्य क्रेडेंशियल्स",
     genericError: "कुछ गलत हो गया",
     showPassword: "पासवर्ड दिखाएं",
@@ -85,7 +85,7 @@ export const TRANSLATIONS: Record<
     passwordPlaceholder: "Contrasena",
     loginButton: "Iniciar sesion",
     forgotPassword: "Olvidaste tu contrasena?",
-    validationError: "Ingresa usuario y contrasena.",
+    emptyFields: "Ingresa usuario y contrasena.",
     loginFailed: "Credenciales inválidas",
     genericError: "Algo salio mal",
     showPassword: "Mostrar contrasena",
@@ -105,7 +105,7 @@ export const TRANSLATIONS: Record<
     passwordPlaceholder: "Senha",
     loginButton: "Entrar",
     forgotPassword: "Esqueceu a senha?",
-    validationError: "Informe usuario e senha.",
+    emptyFields: "Informe usuario e senha.",
     loginFailed: "Credenciais inválidas",
     genericError: "Algo deu errado",
     showPassword: "Mostrar senha",

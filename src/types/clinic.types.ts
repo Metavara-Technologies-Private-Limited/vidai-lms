@@ -3,6 +3,7 @@ export interface Clinic {
   name: string;
   email: string;
   department: Department[];
+  is_default?: boolean;
 }
 
 export interface Department {

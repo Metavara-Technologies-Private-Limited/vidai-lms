@@ -10,8 +10,7 @@ import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
 import { APP_CONDITION, DEMO_ALLOWED_KEYS } from "./config/sidebar.menu";
 import { useDispatch, useSelector } from "react-redux";
-import { selectAuthed, selectToken, selectUser, setAuth } from "./store/authSlice";
-import type { AuthUser } from "./store/authSlice";
+import { selectAuthed, selectToken, selectUser, setUser } from "./store/authSlice";
 import type { AppDispatch } from "./store";
 import { authApi } from "./services/auth.api";
 import { Box, CircularProgress } from "@mui/material";
@@ -22,6 +21,9 @@ import {
   defaultPathForUser,
   resolveUserRole,
 } from "./utils/roleAccess";
+import type { AuthUser, UserClinic } from "./types/auth.types";
+import { fetchLeads } from "./store/leadSlice";
+// import type { Clinic } from "./types/clinic.types";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
@@ -54,6 +56,7 @@ export default function AppRoutes() {
   const authed = useSelector(selectAuthed);
   const token = useSelector(selectToken);
   const user = useSelector(selectUser);
+  // const loginType = useSelector(selectLoginType);
   const roleContext =
     (user as Record<string, unknown> | null) ??
     (token ? ({ access: token } as Record<string, unknown>) : null);
@@ -64,45 +67,50 @@ export default function AppRoutes() {
     const restoreUser = async () => {
       if (!token) return;
 
-      // If user is already hydrated from persisted auth state, do not call profile proxy again.
-      if (user && typeof user === "object") return;
-
       try {
-        const profile = (await authApi.getProfile()) as
-          | (Partial<AuthUser> & {
-              clinics?: Array<{
-                clinic_id: number;
-                clinic__name: string;
-                is_default: boolean;
-              }>;
-              email?: string;
-            })
-          | null;
-
+        const profile = await authApi.getProfile();
         if (!profile || typeof profile !== "object") return;
 
-        dispatch(
-          setAuth({
-            access: token,
-            ...profile,
-          } as AuthUser),
-        );
+        const clinics: UserClinic[] = Array.isArray(profile.clinics)
+          ? profile.clinics
+          : [];
 
-        const clinics = Array.isArray(profile.clinics) ? profile.clinics : [];
+        const authUser: AuthUser = {
+          id: profile.id ?? user?.id ?? 0,
+          username: profile.username ?? user?.username ?? "",
+          email: profile.email ?? user?.email ?? "",
+          role: profile.role ?? user?.role ?? "",
+          permissions: profile.permissions ??
+            user?.permissions ?? { modules: [] },
+          first_name: profile.first_name ?? user?.first_name,
+          last_name: profile.last_name ?? user?.last_name,
+          designation: profile.designation ?? user?.designation,
+          designation_label:
+            profile.designation_label ?? user?.designation_label,
+          clinics: clinics.length > 0 ? clinics : undefined,
+        };
+
+        dispatch(setUser(authUser));
+
         if (clinics.length > 0) {
-          const defaultClinic =
-            clinics.find((clinic) => clinic.is_default) ?? clinics[0];
-
-          if (defaultClinic?.clinic_id) {
-            await dispatch(fetchClinic(defaultClinic.clinic_id));
-          }
-
-          if (defaultClinic?.clinic__name && typeof profile.email === "string") {
+          const defaultClinic = clinics.find((c) => c.is_default) ?? clinics[0];
+          const clinicId = defaultClinic?.clinic_id ?? 1;
+          await dispatch(fetchClinic(clinicId));
+          if (
+            defaultClinic?.clinic__name &&
+            typeof profile.email === "string"
+          ) {
             await syncClinic(defaultClinic, profile.email);
           }
+        } else {
+          // EXT users or INT users with no clinics
+          await dispatch(fetchClinic(1));
         }
+
+        await dispatch(fetchLeads());
       } catch (err: unknown) {
-        const status = (err as { response?: { status?: number } })?.response?.status;
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status;
         if (status !== 401 && status !== 403) {
           console.error("Failed to restore user", err);
         }
@@ -110,7 +118,8 @@ export default function AppRoutes() {
     };
 
     restoreUser();
-  }, [token, authed, dispatch, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, authed, dispatch]);
 
   return (
     <Routes>
@@ -188,16 +197,18 @@ export default function AppRoutes() {
                 />
               ),
               item.subMenu
-                ?.filter((sub) => canAccessSubMenuKey(role, item.key, sub.key, roleContext))
+                ?.filter((sub) =>
+                  canAccessSubMenuKey(role, item.key, sub.key, roleContext),
+                )
                 .map((sub) =>
-                sub.page ? (
-                  <Route
-                    key={sub.key}
-                    path={sub.path.replace(/^\//, "")}
-                    element={<LoadedComponent Comp={sub.page} />}
-                  />
-                ) : null,
-              ),
+                  sub.page ? (
+                    <Route
+                      key={sub.key}
+                      path={sub.path.replace(/^\//, "")}
+                      element={<LoadedComponent Comp={sub.page} />}
+                    />
+                  ) : null,
+                ),
             ];
           }),
         )}

@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, User } from "lucide-react";
 import logo from "../assets/icons/Vidai-logo.svg";
@@ -6,7 +6,7 @@ import loginLogo from "../assets/icons/Login_Logo_Vidai.webp";
 import styles from "../styles/VidaiLogin.module.css";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../store";
-import { setAuth, type AuthUser } from "../store/authSlice";
+import { mapLoginToAuthUser, setAuth } from "../store/authSlice";
 import { authApi } from "../services/auth.api";
 import {
   LANGUAGE_OPTIONS,
@@ -15,14 +15,17 @@ import {
   type LanguageCode,
 } from "../utils/languages";
 import {
+  Checkbox,
   CircularProgress,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
   type SelectChangeEvent,
 } from "@mui/material";
 import { toast } from "react-toastify";
+import { AxiosError } from "axios";
 
 function resolveInitialLanguage(): LanguageCode {
   const raw = (localStorage.getItem(STORAGE_LANGUAGE_KEY) || "").trim();
@@ -40,65 +43,6 @@ function resolveInitialLanguage(): LanguageCode {
   return legacyMap[normalized] || "en";
 }
 
-const buildAuthUserFromLogin = (
-  token: string,
-  loginIdentifier: string,
-  resolvedRole?: string,
-  permissions?: Record<string, unknown>,
-  user?: Record<string, unknown>,
-): AuthUser => {
-  const nestedRole =
-    user?.role && typeof user.role === "object"
-      ? (user.role as { name?: unknown }).name
-      : undefined;
-
-  const designation = String(
-    resolvedRole ??
-      user?.role ??
-      user?.designation ??
-      user?.designation_label ??
-      user?.role_name ??
-      user?.user_role ??
-      nestedRole ??
-      "",
-  ).trim();
-  const designationLower = designation.toLowerCase();
-
-  const hasSuperFlag =
-    user?.is_superuser === true || String(user?.is_superuser || "").toLowerCase() === "true";
-  const hasAdminFlag =
-    user?.is_staff === true || String(user?.is_staff || "").toLowerCase() === "true";
-
-  const isSuperAdmin =
-    hasSuperFlag ||
-    designationLower === "super admin" ||
-    designationLower === "super_admin" ||
-    designationLower === "super-admin" ||
-    designationLower === "superadmin";
-  const isAdmin = hasAdminFlag || designationLower === "admin" || isSuperAdmin;
-
-  return {
-    access: token,
-    user_id: Number(user?.user_id ?? user?.id ?? 0) || 0,
-    username: String(user?.username ?? loginIdentifier),
-    first_name: String(user?.first_name ?? ""),
-    last_name: String(user?.last_name ?? ""),
-    email: String(user?.email ?? ""),
-    designation,
-    designation_label: designation,
-    tenant: "",
-    tenant_id: 0,
-    is_staff: isAdmin,
-    is_superuser: isSuperAdmin,
-    language_id: 0,
-    language_code: "",
-    language_name: "",
-    permissions: (permissions as AuthUser["permissions"]) ?? { modules: [] },
-    clinics: [],
-    photo: "",
-  };
-};
-
 export default function VidaiLogin() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
@@ -111,18 +55,18 @@ export default function VidaiLogin() {
     resolveInitialLanguage,
   );
   const [error, setError] = useState("");
+  const [isExternalLogin, setIsExternalLogin] = useState<boolean>(false);
   const t = TRANSLATIONS[language];
 
-  const canSubmit = useMemo(
-    () => username.trim().length > 0 && password.trim().length > 0,
-    [username, password],
-  );
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: SyntheticEvent) => {
+    // Sanitize
+    if (loading) return;
     event.preventDefault();
     setError("");
-    if (!canSubmit) {
-      const msg = t.validationError;
+
+    // Validations
+    if (!username.trim() || !password.trim()) {
+      const msg = t.emptyFields;
       setError(msg);
       toast.error(msg);
       return;
@@ -130,63 +74,44 @@ export default function VidaiLogin() {
 
     try {
       setLoading(true);
-      const loginIdentifier = username.trim();
-      const loginRes = await authApi.login({
-        username: loginIdentifier,
-        email: loginIdentifier,
-        password: password.trim(),
-      });
+      const mode = isExternalLogin ? "EXT" : "INT";
+      const loginRes = await authApi.login(
+        { username: username.trim(), password: password.trim() },
+        mode,
+      );
+
+      const authUser = mapLoginToAuthUser(loginRes);
 
       dispatch(
-        setAuth(
-          buildAuthUserFromLogin(
-            loginRes.token,
-            loginIdentifier,
-            loginRes.role,
-            loginRes.permissions,
-            loginRes.user,
-          ),
-        ),
+        setAuth({
+          token: loginRes.token,
+          refresh: loginRes.refresh,
+          user: authUser,
+          loginType: mode,
+        }),
       );
 
       localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
       toast.success("Login successful!");
 
       navigate("/dashboard", { replace: true });
-    } catch (err: unknown) {
-      let msg = t.genericError;
-
-      const responseData = (err as {
-        response?: {
-          data?: {
-            message?: string;
-            detail?: string;
-            errors?: Array<{
-              code?: string;
-              detail?: string;
-            }>;
-          };
-        };
-      })?.response?.data;
-
-      const error = responseData?.errors?.[0];
-
-      const code = error?.code;
-
-      if (code === "no_active_account") {
-        msg = t.loginFailed;
-      } else if (responseData?.message) {
-        msg = responseData.message;
-      } else if (responseData?.detail) {
-        msg = responseData.detail;
-      } else if (err instanceof Error) {
-        msg = err.message;
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.data?.detail ||
+          err?.message ||
+          t.genericError;
+        toast.error(msg);
       }
-
-      toast.error(msg);
+      console.log(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAuthModeToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsExternalLogin(e.target.checked);
   };
 
   const handleLanguageChange = (event: SelectChangeEvent<LanguageCode>) => {
@@ -275,6 +200,17 @@ export default function VidaiLogin() {
             </div>
 
             {error ? <p className={styles.errorText}>{error}</p> : null}
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isExternalLogin}
+                  onChange={handleAuthModeToggle}
+                  size="small"
+                />
+              }
+              label="Use client portal login"
+            />
 
             <button
               className={styles.loginButton}
