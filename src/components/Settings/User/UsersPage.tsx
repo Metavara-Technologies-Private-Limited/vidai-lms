@@ -3,7 +3,7 @@ import React, { lazy, Suspense, useEffect, useState } from "react";
 import { Box, CircularProgress, Tab, Tabs } from "@mui/material";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 const UsersList = lazy(() => import("./UserDetails/UsersList"));
 const UserDetailsForm = lazy(() => import("./UserDetails/UserDetailsForm.tsx"));
@@ -16,6 +16,8 @@ import {
   type UserRecord as User,
 } from "../../../services/users.api";
 import { selectLoginType, selectUser } from "../../../store/authSlice";
+import { fetchUsers } from "../../../store/userSlice";
+import type { AppDispatch, RootState } from "../../../store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabKey = "details" | "rights";
@@ -43,35 +45,6 @@ const normalizeRoleName = (value: unknown): string =>
     .toLowerCase()
     .replace(/[-_]+/g, " ")
     .replace(/\s+/g, " ");
-
-const dedupeUsers = (inputUsers: User[]): User[] => {
-  const byKey = new Map<string, User>();
-
-//   inputUsers.forEach((user) => {
-//     const emailKey = normalizeText(user.email);
-//     const usernameKey = normalizeText(user.username);
-//     const baseKey = emailKey || usernameKey || `id:${user.id}`;
-
-//     const existing = byKey.get(baseKey);
-//     if (!existing) {
-//       byKey.set(baseKey, user);
-//       return;
-//     }
-
-//     // Prefer local DB record over client proxy record for same identity.
-//     if (existing.source === "client" && user.source === "local") {
-//       byKey.set(baseKey, user);
-//       return;
-//     }
-
-//     // Keep the latest object when source is same.
-//     if (existing.source === user.source) {
-//       byKey.set(baseKey, user);
-//     }
-//   });
-
-//   return Array.from(byKey.values());
-// };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -264,7 +237,7 @@ const UsersPage: React.FC = () => {
   const token = useSelector((state: RootState) => state.auth.token);
 
   useEffect(() => {
-    console.log("cc:users fetching", token)
+    console.log("cc:users fetching", token);
     if (token) {
       dispatch(fetchUsers());
     }
@@ -486,9 +459,7 @@ const UsersPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       await usersApi.remove(editingUser.id);
-      setUsers((currentUsers) =>
-        currentUsers.filter((user) => user.id !== editingUser.id),
-      );
+      dispatch(fetchUsers());
       setEditingUser(null);
       setDetailsView("list");
       setActiveTab("details");
@@ -627,5 +598,4 @@ const UsersPage: React.FC = () => {
     </Box>
   );
 };
-
 export default UsersPage;
