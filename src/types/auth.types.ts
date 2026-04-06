@@ -83,20 +83,36 @@ export interface UserClinic {
 }
 
 export interface AuthUser {
-  id: number;
+  // Core identity
+  id?: number;
+  user_id?: number;
   username: string;
   email: string;
-  role: string;
-  permissions: {
-    modules: Module[];
-  };
-  // Profile fields (populated after getProfile())
-  first_name?: string;
-  last_name?: string;
-  photo?: string;
+  // Role / designation
+  role?: string;
   designation?: string;
   designation_label?: string;
+  // Names
+  first_name?: string;
+  last_name?: string;
+  // Legacy auth token field
+  access?: string;
+  // Tenant
+  tenant?: string;
+  tenant_id?: number;
+  // Staff flags
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  // Language
+  language_id?: number;
+  language_code?: string;
+  language_name?: string;
+  // Permissions & clinics
+  permissions: { modules: Module[] };
   clinics?: UserClinic[];
+  photo?: string;
+  // Profile hydration state
+  profile_loaded?: boolean;
 }
 
 export interface AuthState {

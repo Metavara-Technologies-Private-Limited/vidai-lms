@@ -14,9 +14,8 @@ import {
   selectAuthed,
   selectToken,
   selectUser,
-  setAuth,
+  setUser,
 } from "./store/authSlice";
-import type { AuthUser } from "./store/authSlice";
 import type { AppDispatch } from "./store";
 import { authApi } from "./services/auth.api";
 import { Box, CircularProgress } from "@mui/material";
@@ -27,7 +26,7 @@ import {
   defaultPathForUser,
   resolveUserRole,
 } from "./utils/roleAccess";
-import type { AuthUser, UserClinic } from "./types/auth.types";
+import type { AuthUser } from "./types/auth.types";
 import { fetchLeads } from "./store/leadSlice";
 // import type { Clinic } from "./types/clinic.types";
 
@@ -107,7 +106,7 @@ const normalizeClinics = (
       : [];
 
   return asArray
-    .map((entry, index) => {
+    .map((entry) => {
       const clinicId = getClinicId(entry);
       const clinicName = getClinicName(entry, fallbackName);
       if (!clinicId || !clinicName) return null;
@@ -120,7 +119,7 @@ const normalizeClinics = (
       return {
         clinic_id: clinicId,
         clinic__name: clinicName,
-        is_default: index === 0 ? true : isDefault,
+        is_default: isDefault,
       };
     })
     .filter((clinic): clinic is ProfileClinic => clinic !== null);
@@ -163,9 +162,9 @@ export default function AppRoutes() {
         );
 
         dispatch(
-          setAuth({
-            access: token,
-            ...profile,
+          setUser({
+            ...(user as AuthUser | null),
+            ...(profile as AuthUser),
             clinics: normalizedClinics,
             profile_loaded: true,
           } as AuthUser),
