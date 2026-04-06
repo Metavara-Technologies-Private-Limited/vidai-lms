@@ -23,8 +23,6 @@ import { usersApi, type UserRecord } from "../../../../services/users.api";
 type RoleName = "Super Admin" | "Admin" | "User";
 
 type PermissionFlags = {
-  male: boolean;
-  female: boolean;
   add: boolean;
   edit: boolean;
   view: boolean;
@@ -54,8 +52,6 @@ type RoleEntry = {
 // SubCats   → module_key = "_", category_key = "_", subcategory_key = item
 // ──────────────────────────────────────────────────────────────────────────────
 const flagsFromApiPerm = (p: RolePermissionPayload): PermissionFlags => ({
-  male: false,
-  female: false,
   add: p.can_add,
   edit: p.can_edit,
   view: p.can_view,
@@ -132,8 +128,6 @@ const STEP_LABELS = ["Module", "Category", "Sub Category"];
 const MODULE_OPTIONS = ["Vidai Leads"];
 
 const fullPerm = (): PermissionFlags => ({
-  male: true,
-  female: true,
   add: true,
   edit: true,
   view: true,
@@ -597,18 +591,16 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
               </IconButton>
             </Box>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "260px repeat(6, 1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "8px", px: 1.2, py: 1.2, mb: 0.8 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "260px repeat(4, 1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "8px", px: 1.2, py: 1.2, mb: 0.8 }}>
               <Box />
-              {["Male", "Female", "Add", "Edit", "View", "Print"].map((h) => (
+              {["Add", "Edit", "View", "Print"].map((h) => (
                 <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
               ))}
             </Box>
 
             {summaryRows.map((row) => (
-              <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "260px repeat(6, 1fr)", alignItems: "center", px: 1.2, py: 1 }}>
+              <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "260px repeat(4, 1fr)", alignItems: "center", px: 1.2, py: 1 }}>
                 <Box sx={{ borderLeft: "6px solid #3A7BD5", bgcolor: "#EDF2F8", borderRadius: "4px", px: 1.3, py: 0.8, fontSize: 13 }}>{row.label}</Box>
-                <Tick checked={row.perm.male} />
-                <Tick checked={row.perm.female} />
                 <Tick checked={row.perm.add} />
                 <Tick checked={row.perm.edit} />
                 <Tick checked={row.perm.view} />
@@ -672,9 +664,8 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
               <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={!hasStepSelection} sx={{ textTransform: "none", minWidth: 110, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
             </Box>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "220px 190px repeat(5,1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "10px", px: 1.2, py: 1 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "220px repeat(5,1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "10px", px: 1.2, py: 1 }}>
               <Box />
-              <Typography sx={{ fontSize: 13 }}>Gender</Typography>
               {["All", "Add", "Edit", "View", "Print"].map((h) => (
                 <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
               ))}
@@ -682,22 +673,11 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
             <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
               {editRows.map((row, idx) => (
-                <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "220px 190px repeat(5,1fr)", alignItems: "center", px: 1, py: 0.8 }}>
+                <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "220px repeat(5,1fr)", alignItems: "center", px: 1, py: 0.8 }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
                     <Box sx={{ border: `1px solid ${chipBorderColor[idx % chipBorderColor.length]}`, borderRadius: "8px", px: 1.1, py: 0.5, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 0.8 }}>
                       {row.label}
-                      <CancelIcon sx={{ fontSize: 15, color: "#FF6666", cursor: "pointer" }} onClick={() => removeRow(row.label)} />
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ display: "flex", gap: 1.2 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
-                      <Tick checked={row.perm.male} onClick={() => togglePerm(row.label, "male")} />
-                      <Typography sx={{ fontSize: 12 }}>Male</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
-                      <Tick checked={row.perm.female} onClick={() => togglePerm(row.label, "female")} />
-                      <Typography sx={{ fontSize: 12 }}>Female</Typography>
+                      <CancelIcon sx={{ fontSize: 15, color: "#E17E61", cursor: "pointer" }} onClick={() => removeRow(row.label)} />
                     </Box>
                   </Box>
 

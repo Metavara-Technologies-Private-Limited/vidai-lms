@@ -320,6 +320,15 @@ const extractRoleArray = (payload: RoleListResponse): RoleApiRecord[] => {
   return [];
 };
 
+const getAuthToken = (): string | null =>
+  localStorage.getItem("auth_token") || localStorage.getItem("authToken");
+
+const ensureAuthToken = (): void => {
+  if (!getAuthToken()) {
+    throw new Error("Session expired. Please login again.");
+  }
+};
+
 export const usersApi = {
   listLocal: async (): Promise<UserRecord[]> => {
     const token =
@@ -422,6 +431,7 @@ export const usersApi = {
 
   create: async (payload: UserCreateUpdatePayload): Promise<UserRecord> => {
     try {
+      ensureAuthToken();
       const response = await http.post<UserSingleResponse>("/users/", payload);
       return normalizeUser(extractSingleRecord(response.data));
     } catch (error) {
@@ -434,6 +444,7 @@ export const usersApi = {
     payload: UserCreateUpdatePayload,
   ): Promise<UserRecord> => {
     try {
+      ensureAuthToken();
       const response = await http.put<UserSingleResponse>(
         `/users/${userId}/update/`,
         payload,
@@ -445,8 +456,14 @@ export const usersApi = {
   },
 
   patchStatus: async (userId: number, isActive: boolean): Promise<void> => {
+    ensureAuthToken();
     await http.patch(`/users/${userId}/status/`, {
       is_active: isActive,
     });
+  },
+
+  remove: async (userId: number): Promise<void> => {
+    ensureAuthToken();
+    await http.delete(`/users/${userId}/delete/`);
   },
 };

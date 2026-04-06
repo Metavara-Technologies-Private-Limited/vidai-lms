@@ -1,15 +1,12 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from ".";
-import type {
-  AuthState,
-  AuthUser,
-  LoginType,
-} from "../types/auth.types";
+import type { AuthState, AuthUser, LoginType } from "../types/auth.types";
 
 export type { AuthUser };
 
 const AUTH_TOKEN_KEY = "auth_token";
+const AUTH_TOKEN_LEGACY_KEY = "authToken";
 const AUTH_USER_KEY = "auth_user";
 const AUTH_MODE_KEY = "auth_mode";
 
@@ -41,7 +38,9 @@ const readPersistedUser = (): AuthUser | null => {
   }
 };
 
-const persistedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+const persistedToken =
+  localStorage.getItem(AUTH_TOKEN_KEY) ||
+  localStorage.getItem(AUTH_TOKEN_LEGACY_KEY);
 const persistedMode =
   (localStorage.getItem(AUTH_MODE_KEY) as LoginType) ?? "INT";
 const persistedUser = readPersistedUser();
@@ -65,6 +64,7 @@ const authSlice = createSlice({
       state.loginType = action.payload.loginType;
 
       localStorage.setItem(AUTH_TOKEN_KEY, action.payload.token);
+      localStorage.setItem(AUTH_TOKEN_LEGACY_KEY, action.payload.token);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(action.payload.user));
       localStorage.setItem(AUTH_MODE_KEY, action.payload.loginType);
     },
@@ -81,6 +81,7 @@ const authSlice = createSlice({
       state.authed = false;
       state.loginType = "INT";
       localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_TOKEN_LEGACY_KEY);
       localStorage.removeItem(AUTH_USER_KEY);
       localStorage.removeItem(AUTH_MODE_KEY);
     },
