@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from "./http";
 
 export type UserGender = "Male" | "Female" | "Other";
@@ -243,30 +244,45 @@ const extractSingleRecord = (payload: UserSingleResponse): UserApiRecord => {
 };
 
 const extractUserArray = (payload: UserListResponse): UserApiRecord[] => {
-  if (payload && typeof payload === "object" && "data" in payload) {
-    const wrapped = payload as ApiWrapped<UserApiRecord[]>;
-    if (Array.isArray(wrapped.data)) {
-      return wrapped.data;
-    }
+  console.log("Extracting users from:", payload);
+
+  if (!payload) return [];
+
+  // Case 1: wrapped { data: [...] }
+  if (
+    typeof payload === "object" &&
+    "data" in payload &&
+    Array.isArray((payload as any).data)
+  ) {
+    return (payload as any).data;
   }
 
+  // Case 2: nested { data: { users: [...] } }
+  if (
+    typeof payload === "object" &&
+    "data" in payload &&
+    payload.data &&
+    typeof payload.data === "object" &&
+    Array.isArray((payload.data as any).users)
+  ) {
+    return (payload.data as any).users;
+  }
+
+  // Case 3: direct array
   if (Array.isArray(payload)) {
     return payload;
   }
 
-  if (Array.isArray(payload.data)) {
-    return payload.data;
-  }
-
+  // Case 4: DRF pagination
   if (
-    payload &&
     typeof payload === "object" &&
     "results" in payload &&
-    Array.isArray(payload.results)
+    Array.isArray((payload as any).results)
   ) {
-    return payload.results;
+    return (payload as any).results;
   }
 
+  console.warn("No users found in payload shape:", payload);
   return [];
 };
 
@@ -337,12 +353,14 @@ export const usersApi = {
       return [];
     }
 
-    if (sessionStorage.getItem("users_list_denied") === "1") {
-      return [];
-    }
+    // if (sessionStorage.getItem("users_list_denied") === "1") {
+    //   return [];
+    // }
 
     try {
       const response = await http.get<UserListResponse>("/users/list/");
+      
+          console.log("RAW RESPONSE:", response.data);
       sessionStorage.removeItem("users_list_denied");
       return extractUserArray(response.data).map((user) =>
         normalizeUser(user, "local"),

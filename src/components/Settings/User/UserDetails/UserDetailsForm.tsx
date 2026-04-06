@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Box,
@@ -200,10 +200,19 @@ const UserDetailsForm: React.FC<Props> = ({
   onCancel,
   isSubmitting = false,
 }) => {
-  const [form, setForm] = useState<UserFormData>(initialData ?? defaultForm);
+  const [form, setForm] = useState<UserFormData>(defaultForm);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  useEffect(() => {
+    const loadData = () => {
+      if (initialData) {
+        setForm(initialData);
+      }
+    };
+    loadData();
+  }, [initialData]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

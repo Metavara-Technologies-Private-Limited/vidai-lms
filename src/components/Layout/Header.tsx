@@ -149,6 +149,7 @@ const Header = () => {
       allowedClinics[0]?.id ||
       null;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedClinicId(validStored || defaultClinicId);
   }, [clinics, selectedClinicId, userClinics]);
 
