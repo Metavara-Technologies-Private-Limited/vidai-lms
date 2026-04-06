@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AppBar,
@@ -19,9 +19,8 @@ import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchClinic,
-  // selectClinic,
+  selectClinic,
   // setSelectedClinic,
-  syncClinic,
   // selectClinic
 } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
@@ -41,13 +40,42 @@ const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const user = useSelector(selectUser);
-  const clinics = useMemo(() => user?.clinics ?? [], [user]);
-  // const dbClinic = useSelector(selectClinic);
+  const dbClinic = useSelector(selectClinic);
+  type DropdownClinic = { id: number; name: string; isDefault: boolean };
 
-  const selectedClinic = useMemo(() => clinics[0], [clinics]);
-  const [manualClinic, setManualClinic] = useState<(typeof clinics)[0] | null>(
-    null,
-  );
+  const [dbClinics, setDbClinics] = useState<DropdownClinic[]>([]);
+  const [selectedClinicId, setSelectedClinicId] = useState<number | null>(null);
+  const lastFetchedClinicIdRef = useRef<number | null>(null);
+
+  const userClinics = useMemo<DropdownClinic[]>(() => {
+    const raw = Array.isArray(user?.clinics) ? user.clinics : [];
+    return raw
+      .map((clinic) => {
+        const clinicId =
+          typeof clinic?.clinic_id === "number"
+            ? clinic.clinic_id
+            : (clinic as { id?: unknown })?.id;
+        const clinicName =
+          clinic?.clinic__name ||
+          (clinic as { clinic_name?: string })?.clinic_name ||
+          (clinic as { name?: string })?.name;
+        if (typeof clinicId !== "number" || !clinicName) return null;
+
+        return {
+          id: clinicId,
+          name: clinicName,
+          isDefault: clinic.is_default === true,
+        };
+      })
+      .filter((clinic): clinic is DropdownClinic => clinic !== null);
+  }, [user]);
+
+  const clinics = dbClinics.length > 0 ? dbClinics : userClinics;
+
+  const displayClinicName =
+    clinics.find((clinic) => clinic.id === selectedClinicId)?.name ||
+    dbClinic?.name ||
+    "-";
 
   const [clinicAnchor, setClinicAnchor] = useState<null | HTMLElement>(null);
 
@@ -62,36 +90,76 @@ const Header = () => {
     "calendar" | "notification" | "help" | null
   >(null);
 
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const initClinic = async (current:any) => {
-    await syncClinic(current, user?.email || "");
-
-    const res = await clinicApi.searchByName(current.clinic__name);
-    // dispatch(fetchLeads());
-
-    if (res.data.length > 0) {
-      const matchedClinic = res.data.find(
-        (clinic) =>
-          clinic.name.toLowerCase() === current.clinic__name.toLowerCase(),
-      );
-
-      if (matchedClinic) {
-        await dispatch(fetchClinic(matchedClinic.id));
-        
-    await dispatch(fetchLeads());
-      }
-    }
-  };
-  // fire-and-forget on mount only; avoid looping when server returns empty arrays
   useEffect(() => {
-    const current = manualClinic || selectedClinic;
+    const loadClinics = async () => {
+      try {
+        const res = await clinicApi.list();
+        const payload = res.data as
+          | {
+              results?: Array<{ id: number; name: string }>;
+              data?: Array<{ id: number; name: string }>;
+            }
+          | Array<{ id: number; name: string }>;
 
-    if (!current) return;
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.results)
+            ? payload.results
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : [];
 
-    initClinic(current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClinic?.clinic_id, manualClinic]);
+        const normalized = list
+          .map((clinic) => {
+            if (typeof clinic?.id !== "number" || !clinic?.name) return null;
+            return { id: clinic.id, name: clinic.name, isDefault: false };
+          })
+          .filter((clinic): clinic is DropdownClinic => clinic !== null);
+
+        if (normalized.length > 0) {
+          setDbClinics(normalized);
+        }
+      } catch {
+        // Keep fallback to profile clinics if list endpoint is unavailable.
+      }
+    };
+
+    loadClinics();
+  }, []);
+
+  useEffect(() => {
+    if (clinics.length === 0) return;
+    if (
+      selectedClinicId &&
+      clinics.some((clinic) => clinic.id === selectedClinicId)
+    ) {
+      return;
+    }
+
+    const storedClinicId =
+      Number(localStorage.getItem("clinic_id") || 0) || null;
+    const validStored =
+      storedClinicId && clinics.some((clinic) => clinic.id === storedClinicId)
+        ? storedClinicId
+        : null;
+    const defaultClinicId =
+      clinics.find((clinic) => clinic.isDefault)?.id || clinics[0]?.id || null;
+
+    setSelectedClinicId(validStored || defaultClinicId);
+  }, [clinics, selectedClinicId]);
+
+  useEffect(() => {
+    const hydrateClinic = async () => {
+      if (!selectedClinicId) return;
+      if (lastFetchedClinicIdRef.current === selectedClinicId) return;
+
+      lastFetchedClinicIdRef.current = selectedClinicId;
+      await dispatch(fetchClinic(selectedClinicId));
+      await dispatch(fetchLeads());
+    };
+
+    hydrateClinic();
+  }, [dispatch, selectedClinicId]);
 
   useEffect(() => {
     dispatch(fetchCampaign());
@@ -160,8 +228,7 @@ const Header = () => {
               }}
             >
               <Typography variant="body2">
-                Clinic:{" "}
-                <b>{(manualClinic || selectedClinic)?.clinic__name || "-"}</b>
+                Clinic: <b>{displayClinicName}</b>
               </Typography>
               <ArrowDropDownIcon />
             </Box>
@@ -173,13 +240,13 @@ const Header = () => {
             >
               {clinics.map((c) => (
                 <MenuItem
-                  key={c.clinic_id}
+                  key={c.id}
                   onClick={async () => {
-                    setManualClinic(c);
+                    setSelectedClinicId(c.id);
                     handleClinicClose();
                   }}
                 >
-                  {c.clinic__name}
+                  {c.name || "-"}
                 </MenuItem>
               ))}
             </Menu>
@@ -261,7 +328,7 @@ const Header = () => {
 
         <MenuItem disabled>
           <BusinessIcon sx={{ mr: 1 }} />
-          {user?.clinics?.[0]?.clinic__name || "-"}
+          {displayClinicName}
         </MenuItem>
 
         <MenuItem disabled>

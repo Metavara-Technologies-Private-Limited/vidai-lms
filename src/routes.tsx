@@ -10,7 +10,12 @@ import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
 import { APP_CONDITION, DEMO_ALLOWED_KEYS } from "./config/sidebar.menu";
 import { useDispatch, useSelector } from "react-redux";
-import { selectAuthed, selectToken, selectUser, setAuth } from "./store/authSlice";
+import {
+  selectAuthed,
+  selectToken,
+  selectUser,
+  setAuth,
+} from "./store/authSlice";
 import type { AuthUser } from "./store/authSlice";
 import type { AppDispatch } from "./store";
 import { authApi } from "./services/auth.api";
@@ -40,10 +45,88 @@ const Spinner = () => (
   </Box>
 );
 
+type ProfileClinic = {
+  clinic_id: number;
+  clinic__name: string;
+  is_default: boolean;
+};
+
+const getClinicId = (clinic: unknown): number | null => {
+  if (!clinic || typeof clinic !== "object") {
+    return typeof clinic === "number" ? clinic : null;
+  }
+
+  const record = clinic as Record<string, unknown>;
+  const id = record.clinic_id ?? record.id;
+  return typeof id === "number" ? id : null;
+};
+
+const getClinicName = (
+  clinic: unknown,
+  fallbackName?: string,
+): string | null => {
+  if (!clinic || typeof clinic !== "object") {
+    return fallbackName || null;
+  }
+
+  const record = clinic as Record<string, unknown>;
+  const name =
+    record.clinic__name ?? record.clinic_name ?? record.name ?? fallbackName;
+
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+};
+
+const normalizeClinics = (
+  profile: Record<string, unknown>,
+): ProfileClinic[] => {
+  const nestedUser =
+    profile.user && typeof profile.user === "object"
+      ? (profile.user as Record<string, unknown>)
+      : null;
+
+  const fallbackName =
+    (typeof profile.clinic__name === "string" && profile.clinic__name) ||
+    (typeof profile.clinic_name === "string" && profile.clinic_name) ||
+    undefined;
+
+  const rawClinics =
+    profile.clinics ??
+    nestedUser?.clinics ??
+    profile.clinic ??
+    nestedUser?.clinic ??
+    profile.clinic_id ??
+    nestedUser?.clinic_id;
+
+  const asArray = Array.isArray(rawClinics)
+    ? rawClinics
+    : rawClinics != null
+      ? [rawClinics]
+      : [];
+
+  return asArray
+    .map((entry, index) => {
+      const clinicId = getClinicId(entry);
+      const clinicName = getClinicName(entry, fallbackName);
+      if (!clinicId || !clinicName) return null;
+
+      const isDefault =
+        typeof entry === "object" &&
+        entry !== null &&
+        (entry as Record<string, unknown>).is_default === true;
+
+      return {
+        clinic_id: clinicId,
+        clinic__name: clinicName,
+        is_default: index === 0 ? true : isDefault,
+      };
+    })
+    .filter((clinic): clinic is ProfileClinic => clinic !== null);
+};
+
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
   return (
-    <Suspense fallback={<Spinner/>}>
+    <Suspense fallback={<Spinner />}>
       <Comp />
     </Suspense>
   );
@@ -64,8 +147,8 @@ export default function AppRoutes() {
     const restoreUser = async () => {
       if (!token) return;
 
-      // If user is already hydrated from persisted auth state, do not call profile proxy again.
-      if (user && typeof user === "object") return;
+      // Skip profile call only when we've explicitly hydrated profile before.
+      if (user && typeof user === "object" && user.profile_loaded) return;
 
       try {
         const profile = (await authApi.getProfile()) as
@@ -81,28 +164,38 @@ export default function AppRoutes() {
 
         if (!profile || typeof profile !== "object") return;
 
+        const normalizedClinics = normalizeClinics(
+          profile as Record<string, unknown>,
+        );
+
         dispatch(
           setAuth({
             access: token,
             ...profile,
+            clinics: normalizedClinics,
+            profile_loaded: true,
           } as AuthUser),
         );
 
-        const clinics = Array.isArray(profile.clinics) ? profile.clinics : [];
-        if (clinics.length > 0) {
+        if (normalizedClinics.length > 0) {
           const defaultClinic =
-            clinics.find((clinic) => clinic.is_default) ?? clinics[0];
+            normalizedClinics.find((clinic) => clinic.is_default) ??
+            normalizedClinics[0];
 
           if (defaultClinic?.clinic_id) {
             await dispatch(fetchClinic(defaultClinic.clinic_id));
           }
 
-          if (defaultClinic?.clinic__name && typeof profile.email === "string") {
+          if (
+            defaultClinic?.clinic__name &&
+            typeof profile.email === "string"
+          ) {
             await syncClinic(defaultClinic, profile.email);
           }
         }
       } catch (err: unknown) {
-        const status = (err as { response?: { status?: number } })?.response?.status;
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status;
         if (status !== 401 && status !== 403) {
           console.error("Failed to restore user", err);
         }
@@ -188,16 +281,18 @@ export default function AppRoutes() {
                 />
               ),
               item.subMenu
-                ?.filter((sub) => canAccessSubMenuKey(role, item.key, sub.key, roleContext))
+                ?.filter((sub) =>
+                  canAccessSubMenuKey(role, item.key, sub.key, roleContext),
+                )
                 .map((sub) =>
-                sub.page ? (
-                  <Route
-                    key={sub.key}
-                    path={sub.path.replace(/^\//, "")}
-                    element={<LoadedComponent Comp={sub.page} />}
-                  />
-                ) : null,
-              ),
+                  sub.page ? (
+                    <Route
+                      key={sub.key}
+                      path={sub.path.replace(/^\//, "")}
+                      element={<LoadedComponent Comp={sub.page} />}
+                    />
+                  ) : null,
+                ),
             ];
           }),
         )}

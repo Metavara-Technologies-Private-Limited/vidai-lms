@@ -8,9 +8,11 @@ export const styles = {
 
   gridWrapper: {
     display: "grid",
+    width: "100%",
+    minWidth: 0,
     gridTemplateColumns: {
       xs: "1fr",
-      md: "1fr 1fr 1fr",
+      md: "repeat(3, minmax(0, 1fr))",
     },
     gap: 3,
   },
@@ -19,6 +21,9 @@ export const styles = {
     p: 2,
     borderRadius: 2,
     border: "none",
+    width: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
 
   header: (bgColor: string) => ({

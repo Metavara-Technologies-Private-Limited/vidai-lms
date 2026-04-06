@@ -53,6 +53,7 @@ export interface AuthUser {
   permissions: { modules: Module[] };
   clinics?: Clinic[];
   photo?: string;
+  profile_loaded?: boolean;
 }
 
 interface AuthState {
@@ -66,7 +67,20 @@ const readPersistedUser = (): AuthUser | null => {
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as AuthUser;
+    const parsed = JSON.parse(raw) as AuthUser;
+    const hasClinics =
+      Array.isArray(parsed.clinics) && parsed.clinics.length > 0;
+
+    // Force one profile re-hydration when an older cache marked profile loaded
+    // without clinic data.
+    if (parsed.profile_loaded && !hasClinics) {
+      return {
+        ...parsed,
+        profile_loaded: false,
+      };
+    }
+
+    return parsed;
   } catch {
     localStorage.removeItem(AUTH_USER_KEY);
     return null;
@@ -74,7 +88,8 @@ const readPersistedUser = (): AuthUser | null => {
 };
 
 const persistedToken =
-  localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_TOKEN_ALT_KEY);
+  localStorage.getItem(AUTH_TOKEN_KEY) ||
+  localStorage.getItem(AUTH_TOKEN_ALT_KEY);
 
 const initialState: AuthState = {
   user: readPersistedUser(),

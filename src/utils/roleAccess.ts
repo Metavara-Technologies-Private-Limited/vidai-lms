@@ -6,7 +6,9 @@ const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
 
 const isTrueFlag = (value: unknown): boolean => {
   if (value === true || value === 1) return true;
@@ -57,6 +59,13 @@ const SUB_LABEL_BY_KEY: Record<string, string> = {
   tickets: "tickets",
   templates: "templates",
   users: "user",
+};
+
+const SUB_LABEL_ALIASES: Record<string, string[]> = {
+  integration: ["integration", "integrations"],
+  tickets: ["tickets", "ticket"],
+  templates: ["templates", "template"],
+  users: ["user", "users"],
 };
 
 const KNOWN_MENU_LABELS = new Set(Object.values(MENU_LABEL_BY_KEY));
@@ -139,12 +148,29 @@ const hasMenuPermission = (user: UserLike, key: string): boolean | null => {
   return labels.has(label);
 };
 
-const hasSubMenuPermission = (user: UserLike, subKey: string): boolean | null => {
+const hasSubMenuPermission = (
+  user: UserLike,
+  subKey: string,
+): boolean | null => {
   const labels = collectPermissionLabels(user);
   if (labels.size === 0) return null;
-  const label = SUB_LABEL_BY_KEY[subKey];
-  if (!label) return false;
-  return labels.has(label);
+
+  const hasKnownSignals = [...labels].some(
+    (label) => KNOWN_MENU_LABELS.has(label) || KNOWN_SUB_LABELS.has(label),
+  );
+
+  if (!hasKnownSignals) {
+    // Permission payload exists but does not map cleanly to sidebar taxonomy.
+    return null;
+  }
+
+  const aliases = SUB_LABEL_ALIASES[subKey];
+  if (!aliases || aliases.length === 0) {
+    const label = SUB_LABEL_BY_KEY[subKey];
+    return label ? labels.has(label) : false;
+  }
+
+  return aliases.some((alias) => labels.has(alias));
 };
 
 const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
@@ -299,7 +325,10 @@ export const defaultPathForRole = (role: KnownRole): string => {
   return "/dashboard";
 };
 
-export const defaultPathForUser = (role: KnownRole, user?: UserLike): string => {
+export const defaultPathForUser = (
+  role: KnownRole,
+  user?: UserLike,
+): string => {
   const orderedKeys = [
     "dashboard",
     "reports",

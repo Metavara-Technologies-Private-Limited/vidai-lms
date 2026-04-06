@@ -65,9 +65,11 @@ const buildAuthUserFromLogin = (
   const designationLower = designation.toLowerCase();
 
   const hasSuperFlag =
-    user?.is_superuser === true || String(user?.is_superuser || "").toLowerCase() === "true";
+    user?.is_superuser === true ||
+    String(user?.is_superuser || "").toLowerCase() === "true";
   const hasAdminFlag =
-    user?.is_staff === true || String(user?.is_staff || "").toLowerCase() === "true";
+    user?.is_staff === true ||
+    String(user?.is_staff || "").toLowerCase() === "true";
 
   const isSuperAdmin =
     hasSuperFlag ||
@@ -96,6 +98,7 @@ const buildAuthUserFromLogin = (
     permissions: (permissions as AuthUser["permissions"]) ?? { modules: [] },
     clinics: [],
     photo: "",
+    profile_loaded: false,
   };
 };
 
@@ -156,18 +159,20 @@ export default function VidaiLogin() {
     } catch (err: unknown) {
       let msg = t.genericError;
 
-      const responseData = (err as {
-        response?: {
-          data?: {
-            message?: string;
-            detail?: string;
-            errors?: Array<{
-              code?: string;
+      const responseData = (
+        err as {
+          response?: {
+            data?: {
+              message?: string;
               detail?: string;
-            }>;
+              errors?: Array<{
+                code?: string;
+                detail?: string;
+              }>;
+            };
           };
-        };
-      })?.response?.data;
+        }
+      )?.response?.data;
 
       const error = responseData?.errors?.[0];
 

@@ -42,20 +42,19 @@ export const createTicketButtonSx = {
   },
 };
 
-
 /* Tabs */
 export const ticketsTabsSx = {
   mb: 0,
   minHeight: 36,
   height: 36,
 
-  width: "fit-content",        // ✅ KEY: stop Tabs from stretching
-  flexShrink: 0,               // ✅ prevent flex expanding
+  width: "fit-content", // ✅ KEY: stop Tabs from stretching
+  flexShrink: 0, // ✅ prevent flex expanding
 
   "& .MuiTabs-flexContainer": {
     height: 36,
     alignItems: "center",
-    gap: "10px",               // ✅ controls spacing BETWEEN tabs
+    gap: "10px", // ✅ controls spacing BETWEEN tabs
   },
 
   "& .MuiTab-root": {
@@ -83,7 +82,6 @@ export const ticketsTabsSx = {
   },
 };
 
-
 /* Table header */
 export const ticketsTableHeaderSx = {
   fontWeight: 400,
@@ -107,7 +105,6 @@ export const priorityChipSx = (priority: string) => {
   const isHigh = value === "high";
   const isMedium = value === "medium";
 
-
   return {
     borderRadius: "999px",
     fontWeight: 500,
@@ -117,11 +114,7 @@ export const priorityChipSx = (priority: string) => {
     border: "1.5px solid",
 
     // ✅ Force styles so MUI default color doesn't override
-    borderColor: isHigh
-      ? "#FF4D4F"
-      : isMedium
-        ? "#FFC53D"
-        : "#5B8FF9",
+    borderColor: isHigh ? "#FF4D4F" : isMedium ? "#FFC53D" : "#5B8FF9",
 
     backgroundColor: isHigh
       ? "rgba(255,77,79,0.08)"
@@ -129,11 +122,7 @@ export const priorityChipSx = (priority: string) => {
         ? "rgba(255,197,61,0.10)"
         : "rgba(91,143,249,0.10)",
 
-    color: isHigh
-      ? "#FF4D4F"
-      : isMedium
-        ? "#FFC53D"
-        : "#5B8FF9",
+    color: isHigh ? "#FF4D4F" : isMedium ? "#FFC53D" : "#5B8FF9",
 
     // 👇 ensures text uses our color, not MUI default
     "& .MuiChip-label": {
@@ -164,6 +153,10 @@ export const ticketsTitleSx = {
 /* Tabs + actions container */
 export const ticketsActionsRowSx = {
   width: "100%",
+  minWidth: 0,
+  flexWrap: "wrap",
+  rowGap: 1,
+  columnGap: 1,
 };
 
 /*  Column header text */
@@ -282,7 +275,6 @@ export const createTicketFocusedFieldSx = {
   },
 };
 
-
 export const createTicketDialogPaperSx = {
   width: 700,
   borderRadius: 3,
@@ -345,7 +337,6 @@ export const createTicketCancelButtonSx = {
   },
 };
 
-
 export const createTicketSaveButtonSx = {
   backgroundColor: "#505050",
   color: "#FFFFFF",
@@ -363,7 +354,6 @@ export const createTicketSaveButtonSx = {
     color: "#FFFFFF",
   },
 };
-
 
 //#########################################################
 
@@ -488,7 +478,6 @@ export const ticketDetailsTabsSx = {
   },
 };
 
-
 export const propertyContainerSx = {
   display: "flex",
   flexDirection: "column",
@@ -558,7 +547,6 @@ export const statusChipSx = (status: string) => {
   const isNew = value === "new";
   const isPending = value === "pending";
   const isResolved = value === "resolved";
-
 
   return {
     borderRadius: "999px",
@@ -632,7 +620,6 @@ export const ticketBackButtonSx = {
     height: 42,
   },
 };
-
 
 /* Reply toolbar icon (used across reply editor) */
 export const replyToolbarIconSx = {
