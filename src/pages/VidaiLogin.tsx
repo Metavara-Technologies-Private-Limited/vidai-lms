@@ -6,7 +6,8 @@ import loginLogo from "../assets/icons/Login_Logo_Vidai.webp";
 import styles from "../styles/VidaiLogin.module.css";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../store";
-import { mapLoginToAuthUser, setAuth } from "../store/authSlice";
+import { setAuth } from "../store/authSlice";
+import type { AuthUser } from "../types/auth.types";
 import { authApi } from "../services/auth.api";
 import {
   LANGUAGE_OPTIONS,
@@ -25,7 +26,6 @@ import {
   type SelectChangeEvent,
 } from "@mui/material";
 import { toast } from "react-toastify";
-import { AxiosError } from "axios";
 
 function resolveInitialLanguage(): LanguageCode {
   const raw = (localStorage.getItem(STORAGE_LANGUAGE_KEY) || "").trim();
@@ -142,12 +142,17 @@ export default function VidaiLogin() {
         mode,
       );
 
-      const authUser = mapLoginToAuthUser(loginRes);
+      const authUser = buildAuthUserFromLogin(
+        loginRes.token,
+        username,
+        loginRes.role,
+        loginRes.permissions,
+        loginRes.user as Record<string, unknown>,
+      );
 
       dispatch(
         setAuth({
           token: loginRes.token,
-          refresh: loginRes.refresh,
           user: authUser,
           loginType: mode,
         }),
@@ -188,6 +193,8 @@ export default function VidaiLogin() {
       } else if (err instanceof Error) {
         msg = err.message;
       }
+      setError(msg);
+      toast.error(msg);
       console.log(err);
     } finally {
       setLoading(false);

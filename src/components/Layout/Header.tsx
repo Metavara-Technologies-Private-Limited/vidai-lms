@@ -138,15 +138,19 @@ const Header = () => {
 
     const storedClinicId =
       Number(localStorage.getItem("clinic_id") || 0) || null;
+    const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
     const validStored =
-      storedClinicId && clinics.some((clinic) => clinic.id === storedClinicId)
+      storedClinicId &&
+      allowedClinics.some((clinic) => clinic.id === storedClinicId)
         ? storedClinicId
         : null;
     const defaultClinicId =
-      clinics.find((clinic) => clinic.isDefault)?.id || clinics[0]?.id || null;
+      allowedClinics.find((clinic) => clinic.isDefault)?.id ||
+      allowedClinics[0]?.id ||
+      null;
 
     setSelectedClinicId(validStored || defaultClinicId);
-  }, [clinics, selectedClinicId]);
+  }, [clinics, selectedClinicId, userClinics]);
 
   useEffect(() => {
     const hydrateClinic = async () => {
