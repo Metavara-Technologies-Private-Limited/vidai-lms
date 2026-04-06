@@ -521,7 +521,7 @@ const Leads: React.FC = () => {
 
   React.useEffect(() => {
     dispatch(fetchLeads());
-  }, [dispatch, clinic?.id, user?.user_id]);
+  }, [dispatch, clinic?.id, user?.id]);
 
   React.useEffect(() => {
     // Warm up Calendar chunk so tab switch is instant on first open.
