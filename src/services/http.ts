@@ -19,10 +19,17 @@ http.redirect = (path: string): void => {
 
 // Add auth token to every request if it exists
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem("auth_token");
+  const token =
+    localStorage.getItem("auth_token") || localStorage.getItem("authToken");
 
   if (token) {
-    config.headers.set("Authorization", `Bearer ${token}`);
+    if (typeof config.headers?.set === "function") {
+      config.headers.set("Authorization", `Bearer ${token}`);
+    } else {
+      const headers = (config.headers ?? {}) as Record<string, string>;
+      headers.Authorization = `Bearer ${token}`;
+      config.headers = headers as typeof config.headers;
+    }
   }
 
   return config;
@@ -31,12 +38,5 @@ http.interceptors.request.use((config) => {
 // Handle auth errors in one place
 http.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // localStorage.removeItem("auth_token");
-      // App will decide what to do (redirect, logout, etc.)
-      window.dispatchEvent(new Event("auth:logout"));
-    }
-    return Promise.reject(error);
-  },
+  (error: AxiosError) => Promise.reject(error),
 );

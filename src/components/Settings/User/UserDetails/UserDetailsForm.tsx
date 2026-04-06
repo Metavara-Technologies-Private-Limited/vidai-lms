@@ -43,7 +43,10 @@ interface Props {
   mode?: "create" | "edit";
   initialData?: UserFormData | null;
   roleOptions?: { value: string; label: string }[];
+  requireRole?: boolean;
+  disableRoleSelection?: boolean;
   onSave: (data: UserFormData) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -85,11 +88,13 @@ const SelectField = ({
   value,
   onChange,
   options,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
+  disabled?: boolean;
 }) => (
   <FormControl fullWidth sx={inputSx}>
     <InputLabel shrink>{label}</InputLabel>
@@ -98,6 +103,7 @@ const SelectField = ({
       label={label}
       displayEmpty
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       renderValue={(v) => v || <span style={{ color: "#9E9E9E" }}>Select</span>}
       sx={{ height: 40, fontSize: 13 }}
@@ -187,7 +193,10 @@ const UserDetailsForm: React.FC<Props> = ({
   mode = "create",
   initialData = null,
   roleOptions = [],
+  requireRole = true,
+  disableRoleSelection = false,
   onSave,
+  onDelete,
   onCancel,
   isSubmitting = false,
 }) => {
@@ -225,7 +234,7 @@ const UserDetailsForm: React.FC<Props> = ({
   };
 
   const validateForm = (): boolean => {
-    if (!form.userRole.trim()) {
+    if (requireRole && !form.userRole.trim()) {
       toast.error("User Role is required", {
         toastId: "user-role-required",
       });
@@ -394,6 +403,7 @@ const UserDetailsForm: React.FC<Props> = ({
               value={form.userRole}
               onChange={(v) => setForm((prev) => ({ ...prev, userRole: v }))}
               options={roleOptions}
+              disabled={disableRoleSelection}
             />
           </FieldGrid>
 
@@ -524,6 +534,24 @@ const UserDetailsForm: React.FC<Props> = ({
           >
             {mode === "edit" ? "Update User" : "Create New User"}
           </Button>
+          {mode === "edit" && onDelete && (
+            <Button
+              variant="contained"
+              onClick={() => void onDelete()}
+              disabled={isSubmitting}
+              sx={{
+                bgcolor: "#505050",
+                color: "#ffffff",
+                textTransform: "none",
+                fontSize: 13,
+                borderRadius: "6px",
+                px: 3,
+                "&:hover": { bgcolor: "#D32F2F" },
+              }}
+            >
+              Delete
+            </Button>
+          )}
         </Box>
       </Box>
     </LocalizationProvider>

@@ -3,6 +3,7 @@ import React, { lazy, Suspense, useEffect, useState } from "react";
 import { Box, CircularProgress, Tab, Tabs } from "@mui/material";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
+import { useSelector } from "react-redux";
 
 const UsersList = lazy(() => import("./UserDetails/UsersList"));
 const UserDetailsForm = lazy(() => import("./UserDetails/UserDetailsForm.tsx"));
@@ -14,9 +15,7 @@ import {
   // type RoleRecord,
   type UserRecord as User,
 } from "../../../services/users.api";
-import { useDispatch, useSelector } from "react-redux";
-import { type AppDispatch, type RootState } from "../../../store/index.ts";
-import { fetchUsers } from "../../../store/userSlice.ts";
+import { selectLoginType, selectUser } from "../../../store/authSlice";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabKey = "details" | "rights";
@@ -38,8 +37,15 @@ const FALLBACK_ROLE_OPTIONS: Array<{ value: string; label: string }> = [
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
 
-// const dedupeUsers = (inputUsers: User[]): User[] => {
-//   const byKey = new Map<string, User>();
+const normalizeRoleName = (value: unknown): string =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
+
+const dedupeUsers = (inputUsers: User[]): User[] => {
+  const byKey = new Map<string, User>();
 
 //   inputUsers.forEach((user) => {
 //     const emailKey = normalizeText(user.email);
@@ -70,6 +76,8 @@ const normalizeText = (value: string): string => value.trim().toLowerCase();
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const UsersPage: React.FC = () => {
+  const authUser = useSelector(selectUser);
+  const loginType = useSelector(selectLoginType);
   const [activeTab, setActiveTab] = useState<TabKey>("details");
   const [detailsView, setDetailsView] = useState<DetailsView>("list");
   // const [users, setUsers] = useState<User[]>([]);
@@ -79,6 +87,14 @@ const UsersPage: React.FC = () => {
   // const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pinnedUserId, setPinnedUserId] = useState<number | null>(null);
+
+  const currentRoleName =
+    normalizeRoleName(authUser?.designation_label) ||
+    normalizeRoleName(authUser?.designation) ||
+    normalizeRoleName(authUser?.role);
+  const canAssignRoles =
+    loginType === "INT" &&
+    (currentRoleName === "super admin" || currentRoleName === "superadmin");
 
   const extractApiErrorMessage = (error: unknown): string => {
     const payload =
@@ -288,7 +304,7 @@ const UsersPage: React.FC = () => {
       ? { date_of_birth: data.dateOfBirth.format("YYYY-MM-DD") }
       : {}),
     role:
-      data.userRole && Number.isFinite(Number(data.userRole))
+      canAssignRoles && data.userRole && Number.isFinite(Number(data.userRole))
         ? Number(data.userRole)
         : undefined,
     mobile_no: data.mobileNo.trim() || undefined,
@@ -362,6 +378,12 @@ const UsersPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      if (!canAssignRoles) {
+        toast.info(
+          "Role assignment is restricted. Login with Internal Super Admin to assign roles.",
+        );
+      }
+
       const payload = buildPayload(data);
       // const selectedRoleLabel =
       //   resolvedRoleOptions.find(
@@ -391,6 +413,13 @@ const UsersPage: React.FC = () => {
       setActiveTab("details");
     } catch (error) {
       console.error("Failed to save user", error);
+      const rawMessage =
+        error instanceof Error ? error.message.toLowerCase() : "";
+      if (rawMessage.includes("only super admin can assign roles")) {
+        toast.error(
+          "Current session cannot assign roles. Login with Internal Super Admin account.",
+        );
+      }
       const fallbackMessage =
         error instanceof Error && error.message
           ? error.message
@@ -417,16 +446,59 @@ const UsersPage: React.FC = () => {
     setActiveTab("details");
   };
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = async (user: User) => {
     if (user.source === "client") {
       toast.error("Client DB users are read-only in this app");
       return;
     }
 
     setPinnedUserId(null);
-    setEditingUser(user);
+    try {
+      const fullUser = await usersApi.getById(user.id);
+      setEditingUser({ ...user, ...fullUser });
+    } catch (error) {
+      console.error("Failed to fetch user details", error);
+      toast.error("Failed to load user details");
+      return;
+    }
+
     setDetailsView("form");
     setActiveTab("details");
+  };
+
+  const handleDeleteUser = async () => {
+    if (!editingUser) {
+      return;
+    }
+
+    if (editingUser.source === "client") {
+      toast.error("Client DB users are read-only in this app");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete user ${editingUser.username}? This action cannot be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await usersApi.remove(editingUser.id);
+      setUsers((currentUsers) =>
+        currentUsers.filter((user) => user.id !== editingUser.id),
+      );
+      setEditingUser(null);
+      setDetailsView("list");
+      setActiveTab("details");
+      toast.success("User deleted successfully");
+    } catch (error) {
+      console.error("Failed to delete user", error);
+      toast.error("Failed to delete user");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleToggleUserStatus = async (userId: number) => {
@@ -536,7 +608,10 @@ const UsersPage: React.FC = () => {
               mode={editingUser ? "edit" : "create"}
               initialData={editingUser ? mapUserToFormData(editingUser) : null}
               roleOptions={resolvedRoleOptions}
+              requireRole={canAssignRoles}
+              disableRoleSelection={!canAssignRoles}
               onSave={handleSaveUser}
+              onDelete={editingUser ? handleDeleteUser : undefined}
               onCancel={handleCancelDetails}
               isSubmitting={isSubmitting}
             />
