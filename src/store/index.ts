@@ -1,5 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./authSlice";
+import usersReducer from "./userSlice";
 import clinicReducer from "./clinicSlice";
 import leadReducer from "./leadSlice";
 import emailTemplateReducer from "./emailTemplateSlice";
@@ -14,6 +15,7 @@ import pipelineReducer from "./pipelineSlice";
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    users: usersReducer,
     clinic: clinicReducer,
     leads: leadReducer,
     emailTemplate: emailTemplateReducer,

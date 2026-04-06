@@ -28,6 +28,7 @@ import {
 } from "./utils/roleAccess";
 import type { AuthUser } from "./types/auth.types";
 import { fetchLeads } from "./store/leadSlice";
+import { fetchUsers } from "./store/userSlice";
 // import type { Clinic } from "./types/clinic.types";
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
@@ -191,6 +192,7 @@ export default function AppRoutes() {
         }
 
         await dispatch(fetchLeads());
+        await dispatch(fetchUsers());
       } catch (err: unknown) {
         const status = (err as { response?: { status?: number } })?.response
           ?.status;

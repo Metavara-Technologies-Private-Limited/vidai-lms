@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import { Box, CircularProgress, Tab, Tabs } from "@mui/material";
 import dayjs from "dayjs";
@@ -10,9 +11,12 @@ import type { UserFormData } from "./UserDetails/UserDetailsForm";
 import {
   usersApi,
   type UserCreateUpdatePayload,
-  type RoleRecord,
+  // type RoleRecord,
   type UserRecord as User,
 } from "../../../services/users.api";
+import { useDispatch, useSelector } from "react-redux";
+import { type AppDispatch, type RootState } from "../../../store/index.ts";
+import { fetchUsers } from "../../../store/userSlice.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabKey = "details" | "rights";
@@ -26,52 +30,53 @@ const FALLBACK_ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "User", label: "User" },
 ];
 
-const FALLBACK_ROLE_BY_ID: Record<number, string> = {
-  1: "SuperAdmin",
-  2: "Admin",
-  3: "User",
-};
+// const FALLBACK_ROLE_BY_ID: Record<number, string> = {
+//   1: "SuperAdmin",
+//   2: "Admin",
+//   3: "User",
+// };
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
 
-const dedupeUsers = (inputUsers: User[]): User[] => {
-  const byKey = new Map<string, User>();
+// const dedupeUsers = (inputUsers: User[]): User[] => {
+//   const byKey = new Map<string, User>();
 
-  inputUsers.forEach((user) => {
-    const emailKey = normalizeText(user.email);
-    const usernameKey = normalizeText(user.username);
-    const baseKey = emailKey || usernameKey || `id:${user.id}`;
+//   inputUsers.forEach((user) => {
+//     const emailKey = normalizeText(user.email);
+//     const usernameKey = normalizeText(user.username);
+//     const baseKey = emailKey || usernameKey || `id:${user.id}`;
 
-    const existing = byKey.get(baseKey);
-    if (!existing) {
-      byKey.set(baseKey, user);
-      return;
-    }
+//     const existing = byKey.get(baseKey);
+//     if (!existing) {
+//       byKey.set(baseKey, user);
+//       return;
+//     }
 
-    // Prefer local DB record over client proxy record for same identity.
-    if (existing.source === "client" && user.source === "local") {
-      byKey.set(baseKey, user);
-      return;
-    }
+//     // Prefer local DB record over client proxy record for same identity.
+//     if (existing.source === "client" && user.source === "local") {
+//       byKey.set(baseKey, user);
+//       return;
+//     }
 
-    // Keep the latest object when source is same.
-    if (existing.source === user.source) {
-      byKey.set(baseKey, user);
-    }
-  });
+//     // Keep the latest object when source is same.
+//     if (existing.source === user.source) {
+//       byKey.set(baseKey, user);
+//     }
+//   });
 
-  return Array.from(byKey.values());
-};
+//   return Array.from(byKey.values());
+// };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const UsersPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("details");
   const [detailsView, setDetailsView] = useState<DetailsView>("list");
-  const [users, setUsers] = useState<User[]>([]);
+  // const [users, setUsers] = useState<User[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [roles, setRoles] = useState<RoleRecord[]>([]);
-  const [isUsersLoading, setIsUsersLoading] = useState(false);
+  // const [roles, setRoles] = useState<RoleRecord[]>([]);
+  const resolvedRoleOptions = FALLBACK_ROLE_OPTIONS;
+  // const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pinnedUserId, setPinnedUserId] = useState<number | null>(null);
 
@@ -148,116 +153,125 @@ const UsersPage: React.FC = () => {
     return normalize(payload);
   };
 
-  const resolveRoleLabel = (
-    user: User,
-    roleById: Map<number, string>,
-    selectedRoleLabel?: string,
-  ): string => {
-    if (user.roleId && roleById.has(user.roleId)) {
-      return roleById.get(user.roleId) ?? user.role;
-    }
+  // const resolveRoleLabel = (
+  //   user: User,
+  //   roleById: Map<number, string>,
+  //   selectedRoleLabel?: string,
+  // ): string => {
+  //   if (user.roleId && roleById.has(user.roleId)) {
+  //     return roleById.get(user.roleId) ?? user.role;
+  //   }
 
-    const trimmedRole = user.role.trim();
-    if (trimmedRole && Number.isNaN(Number(trimmedRole))) {
-      return trimmedRole;
-    }
+  //   const trimmedRole = user.role.trim();
+  //   if (trimmedRole && Number.isNaN(Number(trimmedRole))) {
+  //     return trimmedRole;
+  //   }
 
-    const numericRoleId = user.roleId ?? Number(trimmedRole);
-    if (Number.isFinite(numericRoleId) && FALLBACK_ROLE_BY_ID[numericRoleId]) {
-      return FALLBACK_ROLE_BY_ID[numericRoleId];
-    }
+  //   const numericRoleId = user.roleId ?? Number(trimmedRole);
+  //   if (Number.isFinite(numericRoleId) && FALLBACK_ROLE_BY_ID[numericRoleId]) {
+  //     return FALLBACK_ROLE_BY_ID[numericRoleId];
+  //   }
 
-    if (selectedRoleLabel) {
-      return selectedRoleLabel;
-    }
+  //   if (selectedRoleLabel) {
+  //     return selectedRoleLabel;
+  //   }
 
-    return "User";
-  };
+  //   return "User";
+  // };
+
+  // useEffect(() => {
+  //   const fetchUserMasterData = async () => {
+  //     setIsUsersLoading(true);
+  //     try {
+  //       const [localUsersResult, clientUsersResult, rolesResult] =
+  //         await Promise.allSettled([
+  //           usersApi.listLocal(),
+  //           usersApi.listClient(),
+  //           usersApi.listRoles(),
+  //         ]);
+
+  //       const localUsersData =
+  //         localUsersResult.status === "fulfilled" ? localUsersResult.value : [];
+  //       const clientUsersData =
+  //         clientUsersResult.status === "fulfilled"
+  //           ? clientUsersResult.value
+  //           : [];
+  //       const usersData = [...localUsersData, ...clientUsersData];
+  //       const rolesData =
+  //         rolesResult.status === "fulfilled" ? rolesResult.value : [];
+
+  //       if (localUsersResult.status === "rejected") {
+  //         console.error("Failed to fetch local users", localUsersResult.reason);
+  //       }
+
+  //       if (clientUsersResult.status === "rejected") {
+  //         console.error(
+  //           "Failed to fetch client users",
+  //           clientUsersResult.reason,
+  //         );
+  //       }
+
+  //       if (
+  //         localUsersResult.status === "rejected" &&
+  //         clientUsersResult.status === "rejected"
+  //       ) {
+  //         toast.error("Failed to load users");
+  //       }
+
+  //       if (rolesResult.status === "rejected") {
+  //         console.error("Failed to fetch roles", rolesResult.reason);
+  //       }
+
+  //       const roleById = new Map(rolesData.map((role) => [role.id, role.name]));
+  //       setRoles(rolesData);
+  //       setUsers(
+  //         dedupeUsers(
+  //           usersData.map((user) => ({
+  //             ...user,
+  //             role: resolveRoleLabel(user, roleById),
+  //           })),
+  //         ),
+  //       );
+  //     } finally {
+  //       setIsUsersLoading(false);
+  //     }
+  //   };
+
+  //   void fetchUserMasterData();
+  // }, []);
+
+  const dispatch = useDispatch<AppDispatch>();
+  const { data: users, loading: isUsersLoading } = useSelector(
+    (state: RootState) => state.users,
+  );
+
+  const token = useSelector((state: RootState) => state.auth.token);
 
   useEffect(() => {
-    const fetchUserMasterData = async () => {
-      setIsUsersLoading(true);
-      try {
-        const [localUsersResult, clientUsersResult, rolesResult] =
-          await Promise.allSettled([
-            usersApi.listLocal(),
-            usersApi.listClient(),
-            usersApi.listRoles(),
-          ]);
-
-        const localUsersData =
-          localUsersResult.status === "fulfilled" ? localUsersResult.value : [];
-        const clientUsersData =
-          clientUsersResult.status === "fulfilled"
-            ? clientUsersResult.value
-            : [];
-        const usersData = [...localUsersData, ...clientUsersData];
-        const rolesData =
-          rolesResult.status === "fulfilled" ? rolesResult.value : [];
-
-        if (localUsersResult.status === "rejected") {
-          console.error("Failed to fetch local users", localUsersResult.reason);
-        }
-
-        if (clientUsersResult.status === "rejected") {
-          console.error(
-            "Failed to fetch client users",
-            clientUsersResult.reason,
-          );
-        }
-
-        if (
-          localUsersResult.status === "rejected" &&
-          clientUsersResult.status === "rejected"
-        ) {
-          toast.error("Failed to load users");
-        }
-
-        if (rolesResult.status === "rejected") {
-          console.error("Failed to fetch roles", rolesResult.reason);
-        }
-
-        const roleById = new Map(rolesData.map((role) => [role.id, role.name]));
-        setRoles(rolesData);
-        setUsers(
-          dedupeUsers(
-            usersData.map((user) => ({
-              ...user,
-              role: resolveRoleLabel(user, roleById),
-            })),
-          ),
-        );
-      } finally {
-        setIsUsersLoading(false);
-      }
-    };
-
-    void fetchUserMasterData();
-  }, []);
+    console.log("cc:users fetching", token)
+    if (token) {
+      dispatch(fetchUsers());
+    }
+  }, [dispatch, token]);
 
   const mapUserToFormData = (user: User): UserFormData => {
-    const roleValueFromId = user.roleId ? String(user.roleId) : "";
-    const roleOptionById = resolvedRoleOptions.find(
-      (option) => option.value === roleValueFromId,
-    );
-    const roleOptionByLabel = resolvedRoleOptions.find(
-      (option) => normalizeText(option.label) === normalizeText(user.role),
-    );
+    const profile = (user as any).profile || {};
 
     return {
-      firstName: user.firstName,
-      lastName: user.lastName,
-      gender: user.gender,
-      dateOfJoining: user.dateOfJoining ? dayjs(user.dateOfJoining) : null,
-      dateOfBirth: user.dateOfBirth ? dayjs(user.dateOfBirth) : null,
-      userRole:
-        roleOptionById?.value ?? roleOptionByLabel?.value ?? roleValueFromId,
-      userName: user.username,
-      mobileNo: user.mobileNumber,
-      emailId: user.email,
+      firstName: profile.first_name || "",
+      lastName: profile.last_name || "",
+      gender: profile.gender || "",
+      dateOfJoining: profile.date_of_joining
+        ? dayjs(profile.date_of_joining)
+        : null,
+      dateOfBirth: profile.date_of_birth ? dayjs(profile.date_of_birth) : null,
+      userRole: profile.role ? String(profile.role) : "",
+      userName: user.username || "",
+      mobileNo: profile.mobile_no || "",
+      emailId: user.email || "",
       password: EDIT_PASSWORD_PLACEHOLDER,
       confirmPassword: EDIT_PASSWORD_PLACEHOLDER,
-      profilePhoto: null,
+      profilePhoto: profile.photo || null,
     };
   };
 
@@ -287,13 +301,13 @@ const UsersPage: React.FC = () => {
       : {}),
   });
 
-  const resolvedRoleOptions =
-    roles.length > 0
-      ? roles.map((role) => ({
-          value: String(role.id),
-          label: role.name,
-        }))
-      : FALLBACK_ROLE_OPTIONS;
+  // const resolvedRoleOptions =
+  //   roles.length > 0
+  //     ? roles.map((role) => ({
+  //         value: String(role.id),
+  //         label: role.name,
+  //       }))
+  //     : FALLBACK_ROLE_OPTIONS;
 
   const handleSaveUser = async (data: UserFormData) => {
     if (isSubmitting) {
@@ -337,7 +351,8 @@ const UsersPage: React.FC = () => {
       (user) =>
         user.id !== editingUser?.id &&
         normalizedMobile &&
-        normalizeText(user.mobileNumber) === normalizedMobile,
+        normalizeText((user as any).profile?.mobile_no || "") ===
+          normalizedMobile,
     );
 
     if (duplicateMobile) {
@@ -348,32 +363,26 @@ const UsersPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       const payload = buildPayload(data);
-      const selectedRoleLabel =
-        resolvedRoleOptions.find(
-          (roleOption) => roleOption.value === data.userRole,
-        )?.label ?? undefined;
-      const roleById = new Map(roles.map((role) => [role.id, role.name]));
+      // const selectedRoleLabel =
+      //   resolvedRoleOptions.find(
+      //     (roleOption) => roleOption.value === data.userRole,
+      //   )?.label ?? undefined;
+      // const roleById = new Map(roles.map((role) => [role.id, role.name]));
 
       if (editingUser) {
         const updatedUser = await usersApi.update(editingUser.id, payload);
-        const roleName = resolveRoleLabel(
-          updatedUser,
-          roleById,
-          selectedRoleLabel,
-        );
-        const patchedUser = { ...updatedUser, role: roleName };
-        setUsers((currentUsers) =>
-          currentUsers.map((user) =>
-            user.id === editingUser.id ? patchedUser : user,
-          ),
-        );
+        // const roleName = resolveRoleLabel(
+        //   updatedUser,
+        //   roleById,
+        //   selectedRoleLabel,
+        // );
+        // const patchedUser = { ...updatedUser, role: roleName };
+        dispatch(fetchUsers());
         setPinnedUserId(updatedUser.id);
       } else {
         const newUser = await usersApi.create(payload);
-        const roleName = resolveRoleLabel(newUser, roleById, selectedRoleLabel);
-        setUsers((currentUsers) => [
-          ...dedupeUsers([{ ...newUser, role: roleName }, ...currentUsers]),
-        ]);
+        // const roleName = resolveRoleLabel(newUser, roleById, selectedRoleLabel);
+        dispatch(fetchUsers());
         setPinnedUserId(newUser.id);
       }
 
@@ -432,22 +441,23 @@ const UsersPage: React.FC = () => {
     }
 
     const optimisticStatus = !targetUser.status;
-
-    setUsers((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === userId ? { ...user, status: optimisticStatus } : user,
-      ),
-    );
+    // setUsers((currentUsers) =>
+    //   currentUsers.map((user) =>
+    //     user.id === userId ? { ...user, status: optimisticStatus } : user,
+    //   ),
+    // );
 
     try {
       await usersApi.patchStatus(userId, optimisticStatus);
+      dispatch(fetchUsers());
     } catch (error) {
       console.error("Failed to update user status", error);
-      setUsers((currentUsers) =>
-        currentUsers.map((user) =>
-          user.id === userId ? { ...user, status: targetUser.status } : user,
-        ),
-      );
+      dispatch(fetchUsers());
+      // setUsers((currentUsers) =>
+      //   currentUsers.map((user) =>
+      //     user.id === userId ? { ...user, status: targetUser.status } : user,
+      //   ),
+      // );
       toast.error("Failed to update user status");
     }
   };

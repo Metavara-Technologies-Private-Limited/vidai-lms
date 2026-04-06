@@ -33,7 +33,7 @@ http.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("auth_token");
+      // localStorage.removeItem("auth_token");
       // App will decide what to do (redirect, logout, etc.)
       window.dispatchEvent(new Event("auth:logout"));
     }
