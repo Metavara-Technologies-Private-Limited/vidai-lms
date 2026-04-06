@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AppBar,
@@ -19,10 +19,9 @@ import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchClinic,
-  // selectClinic,
+  selectClinic,
   // setSelectedClinic,
-  syncClinic,
-  selectClinic
+  // selectClinic
 } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
 import { clearAuth, selectUser } from "../../store/authSlice";
@@ -41,21 +40,42 @@ const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const user = useSelector(selectUser);
-  const clinics = useMemo(() => user?.clinics ?? [], [user]);
-  const selectedClinic = useMemo(() => clinics[0] ?? null, [clinics]);
   const dbClinic = useSelector(selectClinic);
+  type DropdownClinic = { id: number; name: string; isDefault: boolean };
 
-  // const selectedClinic = useMemo(() => clinics[0], [clinics]);
-  const [manualClinic, setManualClinic] = useState<(typeof clinics)[0] | null>(
-    null,
-  );
-  const displayClinicName = useMemo(() => {
-    if (manualClinic) return manualClinic.clinic__name;
-    if (selectedClinic) return selectedClinic.clinic__name;
-    if (dbClinic) return dbClinic.name;
-    return null;
-  }, [manualClinic, selectedClinic, dbClinic]);
+  const [dbClinics, setDbClinics] = useState<DropdownClinic[]>([]);
+  const [selectedClinicId, setSelectedClinicId] = useState<number | null>(null);
+  const lastFetchedClinicIdRef = useRef<number | null>(null);
 
+  const userClinics = useMemo<DropdownClinic[]>(() => {
+    const raw = Array.isArray(user?.clinics) ? user.clinics : [];
+    return raw
+      .map((clinic) => {
+        const clinicId =
+          typeof clinic?.clinic_id === "number"
+            ? clinic.clinic_id
+            : (clinic as { id?: unknown })?.id;
+        const clinicName =
+          clinic?.clinic__name ||
+          (clinic as { clinic_name?: string })?.clinic_name ||
+          (clinic as { name?: string })?.name;
+        if (typeof clinicId !== "number" || !clinicName) return null;
+
+        return {
+          id: clinicId,
+          name: clinicName,
+          isDefault: clinic.is_default === true,
+        };
+      })
+      .filter((clinic): clinic is DropdownClinic => clinic !== null);
+  }, [user]);
+
+  const clinics = dbClinics.length > 0 ? dbClinics : userClinics;
+
+  const displayClinicName =
+    clinics.find((clinic) => clinic.id === selectedClinicId)?.name ||
+    dbClinic?.name ||
+    "-";
 
   const [clinicAnchor, setClinicAnchor] = useState<null | HTMLElement>(null);
 
@@ -70,33 +90,76 @@ const Header = () => {
     "calendar" | "notification" | "help" | null
   >(null);
 
-  const initClinic = async (current: NonNullable<typeof selectedClinic>) => {
-    await syncClinic(current, user?.email || "");
-    const res = await clinicApi.searchByName(current.clinic__name);
-
-    if (res.data.length > 0) {
-      const matchedClinic = res.data.find(
-        (clinic) =>
-          clinic.name.toLowerCase() === current.clinic__name.toLowerCase(),
-      );
-
-      const clinicId = matchedClinic?.id ?? 1; // ✅ fallback to 1
-      await dispatch(fetchClinic(clinicId));
-      await dispatch(fetchLeads());
-    }
-  };
-  // fire-and-forget on mount only; avoid looping when server returns empty arrays
   useEffect(() => {
-    const current = manualClinic ?? selectedClinic;
+    const loadClinics = async () => {
+      try {
+        const res = await clinicApi.list();
+        const payload = res.data as
+          | {
+              results?: Array<{ id: number; name: string }>;
+              data?: Array<{ id: number; name: string }>;
+            }
+          | Array<{ id: number; name: string }>;
 
-    if (current) {
-      initClinic(current);
-    } else {
-      dispatch(fetchClinic(1));
-      dispatch(fetchLeads());
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.results)
+            ? payload.results
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : [];
+
+        const normalized = list
+          .map((clinic) => {
+            if (typeof clinic?.id !== "number" || !clinic?.name) return null;
+            return { id: clinic.id, name: clinic.name, isDefault: false };
+          })
+          .filter((clinic): clinic is DropdownClinic => clinic !== null);
+
+        if (normalized.length > 0) {
+          setDbClinics(normalized);
+        }
+      } catch {
+        // Keep fallback to profile clinics if list endpoint is unavailable.
+      }
+    };
+
+    loadClinics();
+  }, []);
+
+  useEffect(() => {
+    if (clinics.length === 0) return;
+    if (
+      selectedClinicId &&
+      clinics.some((clinic) => clinic.id === selectedClinicId)
+    ) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClinic?.clinic_id, manualClinic]);
+
+    const storedClinicId =
+      Number(localStorage.getItem("clinic_id") || 0) || null;
+    const validStored =
+      storedClinicId && clinics.some((clinic) => clinic.id === storedClinicId)
+        ? storedClinicId
+        : null;
+    const defaultClinicId =
+      clinics.find((clinic) => clinic.isDefault)?.id || clinics[0]?.id || null;
+
+    setSelectedClinicId(validStored || defaultClinicId);
+  }, [clinics, selectedClinicId]);
+
+  useEffect(() => {
+    const hydrateClinic = async () => {
+      if (!selectedClinicId) return;
+      if (lastFetchedClinicIdRef.current === selectedClinicId) return;
+
+      lastFetchedClinicIdRef.current = selectedClinicId;
+      await dispatch(fetchClinic(selectedClinicId));
+      await dispatch(fetchLeads());
+    };
+
+    hydrateClinic();
+  }, [dispatch, selectedClinicId]);
 
   useEffect(() => {
     // dispatch(fetchCampaign());
@@ -150,49 +213,44 @@ const Header = () => {
 
         {/* RIGHT */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {/* Only show switcher if there are named clinics to switch between */}
-          {displayClinicName && (
-            <Box>
-              <Box
-                onClick={clinics.length > 1 ? handleClinicOpen : undefined}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  cursor: clinics.length > 1 ? "pointer" : "default",
-                  background: "#f3f4f6",
-                  px: 2,
-                  py: 1,
-                  borderRadius: 2,
-                }}
-              >
-                <Typography variant="body2">
-                  Clinic: <b>{displayClinicName}</b>
-                </Typography>
-                {clinics.length > 1 && <ArrowDropDownIcon />}
-              </Box>
-
-              {clinics.length > 1 && (
-                <Menu
-                  anchorEl={clinicAnchor}
-                  open={Boolean(clinicAnchor)}
-                  onClose={handleClinicClose}
-                >
-                  {clinics.map((c) => (
-                    <MenuItem
-                      key={c.clinic_id}
-                      onClick={() => {
-                        setManualClinic(c);
-                        handleClinicClose();
-                      }}
-                    >
-                      {c.clinic__name}
-                    </MenuItem>
-                  ))}
-                </Menu>
-              )}
+          <Box>
+            <Box
+              onClick={handleClinicOpen}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                cursor: "pointer",
+                background: "#f3f4f6",
+                px: 2,
+                py: 1,
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="body2">
+                Clinic: <b>{displayClinicName}</b>
+              </Typography>
+              <ArrowDropDownIcon />
             </Box>
-          )}
+
+            <Menu
+              anchorEl={clinicAnchor}
+              open={Boolean(clinicAnchor)}
+              onClose={handleClinicClose}
+            >
+              {clinics.map((c) => (
+                <MenuItem
+                  key={c.id}
+                  onClick={async () => {
+                    setSelectedClinicId(c.id);
+                    handleClinicClose();
+                  }}
+                >
+                  {c.name || "-"}
+                </MenuItem>
+              ))}
+            </Menu>
+          </Box>
 
           {iconMenus.map(({ icon, type }) => (
             <IconButton
@@ -268,12 +326,10 @@ const Header = () => {
           {user?.email || "-"}
         </MenuItem>
 
-        {(user?.clinics?.[0]?.clinic__name || dbClinic?.name) && (
-          <MenuItem disabled>
-            <BusinessIcon sx={{ mr: 1 }} />
-            {user?.clinics?.[0]?.clinic__name || dbClinic?.name}
-          </MenuItem>
-        )}
+        <MenuItem disabled>
+          <BusinessIcon sx={{ mr: 1 }} />
+          {displayClinicName}
+        </MenuItem>
 
         {(user?.designation_label || user?.designation) && (
           <MenuItem disabled>

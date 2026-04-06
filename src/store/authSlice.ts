@@ -12,31 +12,93 @@ const AUTH_TOKEN_KEY = "auth_token";
 const AUTH_USER_KEY = "auth_user";
 const AUTH_MODE_KEY = "auth_mode";
 
-export const mapLoginToAuthUser = (res: NormalizedLoginResponse): AuthUser => {
-  return {
-    id: res.user.id,
-    username: res.user.username,
-    email: res.user.email,
-    role: res.role,
-    permissions: res.permissions as { modules: Module[] },
-    // Profile fields from external login
-    first_name: res.user.first_name,
-    last_name: res.user.last_name,
-    designation: res.user.designation,
-  };
-};
+interface Clinic {
+  clinic__name: string;
+  clinic_id: number;
+  is_default: boolean;
+}
+interface Permission {
+  access: "view" | "add" | "edit" | "print";
+  male: boolean;
+  female: boolean;
+}
+interface PermissionType {
+  name: string;
+  featureEnabled: boolean;
+  permissions: Permission[];
+  male: boolean;
+  female: boolean;
+}
+interface Submodule {
+  name: string;
+  featureEnabled: boolean;
+  type: PermissionType[];
+}
+interface Module {
+  name: string;
+  featureEnabled: boolean;
+  submodules: Submodule[];
+}
+
+export interface AuthUser {
+  access: string;
+  user_id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  designation: string;
+  designation_label: string;
+  tenant: string;
+  tenant_id: number;
+  is_staff: boolean;
+  is_superuser: boolean;
+  language_id: number;
+  language_code: string;
+  language_name: string;
+  permissions: { modules: Module[] };
+  clinics?: Clinic[];
+  photo?: string;
+  profile_loaded?: boolean;
+}
+
+interface AuthState {
+  user: AuthUser | null;
+  token: string | null;
+  authed: boolean;
+}
+
+const readPersistedUser = (): AuthUser | null => {
+  const raw = localStorage.getItem(AUTH_USER_KEY);
+  if (!raw) return null;
 
 const persistedToken = localStorage.getItem(AUTH_TOKEN_KEY);
 const persistedMode =
   (localStorage.getItem(AUTH_MODE_KEY) as LoginType) ?? "INT";
 const persistedUser = (() => {
   try {
-    const raw = localStorage.getItem(AUTH_USER_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    const parsed = JSON.parse(raw) as AuthUser;
+    const hasClinics =
+      Array.isArray(parsed.clinics) && parsed.clinics.length > 0;
+
+    // Force one profile re-hydration when an older cache marked profile loaded
+    // without clinic data.
+    if (parsed.profile_loaded && !hasClinics) {
+      return {
+        ...parsed,
+        profile_loaded: false,
+      };
+    }
+
+    return parsed;
   } catch {
     return null;
   }
-})();
+};
+
+const persistedToken =
+  localStorage.getItem(AUTH_TOKEN_KEY) ||
+  localStorage.getItem(AUTH_TOKEN_ALT_KEY);
 
 const initialState: AuthState = {
   user: persistedUser,

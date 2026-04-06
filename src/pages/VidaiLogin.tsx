@@ -43,6 +43,68 @@ function resolveInitialLanguage(): LanguageCode {
   return legacyMap[normalized] || "en";
 }
 
+const buildAuthUserFromLogin = (
+  token: string,
+  loginIdentifier: string,
+  resolvedRole?: string,
+  permissions?: Record<string, unknown>,
+  user?: Record<string, unknown>,
+): AuthUser => {
+  const nestedRole =
+    user?.role && typeof user.role === "object"
+      ? (user.role as { name?: unknown }).name
+      : undefined;
+
+  const designation = String(
+    resolvedRole ??
+      user?.role ??
+      user?.designation ??
+      user?.designation_label ??
+      user?.role_name ??
+      user?.user_role ??
+      nestedRole ??
+      "",
+  ).trim();
+  const designationLower = designation.toLowerCase();
+
+  const hasSuperFlag =
+    user?.is_superuser === true ||
+    String(user?.is_superuser || "").toLowerCase() === "true";
+  const hasAdminFlag =
+    user?.is_staff === true ||
+    String(user?.is_staff || "").toLowerCase() === "true";
+
+  const isSuperAdmin =
+    hasSuperFlag ||
+    designationLower === "super admin" ||
+    designationLower === "super_admin" ||
+    designationLower === "super-admin" ||
+    designationLower === "superadmin";
+  const isAdmin = hasAdminFlag || designationLower === "admin" || isSuperAdmin;
+
+  return {
+    access: token,
+    user_id: Number(user?.user_id ?? user?.id ?? 0) || 0,
+    username: String(user?.username ?? loginIdentifier),
+    first_name: String(user?.first_name ?? ""),
+    last_name: String(user?.last_name ?? ""),
+    email: String(user?.email ?? ""),
+    designation,
+    designation_label: designation,
+    tenant: "",
+    tenant_id: 0,
+    is_staff: isAdmin,
+    is_superuser: isSuperAdmin,
+    language_id: 0,
+    language_code: "",
+    language_name: "",
+    permissions: (permissions as AuthUser["permissions"]) ?? { modules: [] },
+    clinics: [],
+    photo: "",
+    profile_loaded: false,
+  };
+};
+
 export default function VidaiLogin() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
@@ -95,14 +157,36 @@ export default function VidaiLogin() {
       toast.success("Login successful!");
 
       navigate("/dashboard", { replace: true });
-    } catch (err) {
-      if (err instanceof AxiosError) {
-        const msg =
-          err?.response?.data?.message ||
-          err?.response?.data?.detail ||
-          err?.message ||
-          t.genericError;
-        toast.error(msg);
+    } catch (err: unknown) {
+      let msg = t.genericError;
+
+      const responseData = (
+        err as {
+          response?: {
+            data?: {
+              message?: string;
+              detail?: string;
+              errors?: Array<{
+                code?: string;
+                detail?: string;
+              }>;
+            };
+          };
+        }
+      )?.response?.data;
+
+      const error = responseData?.errors?.[0];
+
+      const code = error?.code;
+
+      if (code === "no_active_account") {
+        msg = t.loginFailed;
+      } else if (responseData?.message) {
+        msg = responseData.message;
+      } else if (responseData?.detail) {
+        msg = responseData.detail;
+      } else if (err instanceof Error) {
+        msg = err.message;
       }
       console.log(err);
     } finally {

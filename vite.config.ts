@@ -3,6 +3,14 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+const apiProxy = {
+  "/api": {
+    target: "http://localhost:8000",
+    changeOrigin: true,
+    secure: false,
+  },
+};
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -24,6 +32,8 @@ export default defineConfig({
     ],
   },
   server: {
+    port: 5173,
+    strictPort: true,
     warmup: {
       clientFiles: [
         "./src/main.tsx",
@@ -36,13 +46,12 @@ export default defineConfig({
     // All requests to /api/* are forwarded to Django (localhost:8000)
     // This means you NEVER need to update a URL when Cloudflare tunnel changes.
     // Your axios calls stay as:  axios.get("/api/mail-insights/get/")
-    proxy: {
-      "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    proxy: apiProxy,
+  },
+  preview: {
+    port: 5173,
+    strictPort: true,
+    proxy: apiProxy,
   },
   test: {
     environment: "jsdom",

@@ -1,6 +1,17 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import {
-  Box, Button, Chip, IconButton, InputBase, Stack, Tab, Tabs, Typography, Avatar, CircularProgress, Alert,
+  Box,
+  Button,
+  Chip,
+  IconButton,
+  InputBase,
+  Stack,
+  Tab,
+  Tabs,
+  Typography,
+  Avatar,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -10,7 +21,11 @@ import AddIcon from "@mui/icons-material/Add";
 import dayjs from "dayjs";
 
 // Types & Styles
-import type { TicketListItem, TicketFilters, FilterTicketsPayload } from "../../../types/tickets.types";
+import type {
+  TicketListItem,
+  TicketFilters,
+  FilterTicketsPayload,
+} from "../../../types/tickets.types";
 import {
   ticketsSearchBoxSx,
   createTicketButtonSx,
@@ -30,7 +45,6 @@ import {
   ticketsPaginationNumberOverrideSx,
 } from "../../../styles/Settings/Tickets.styles";
 
-
 // Redux & API
 import {
   fetchTickets,
@@ -38,7 +52,7 @@ import {
   selectAllTickets,
   selectTicketsLoading,
   selectTicketsError,
-  selectTicketDashboard
+  selectTicketDashboard,
 } from "../../../store/ticketSlice";
 import type { AppDispatch } from "../../../store";
 import type { Employee } from "../../../services/leads.api";
@@ -68,34 +82,25 @@ const Tickets = () => {
   console.log(employees);
 
   useEffect(() => {
-
-
     const loadData = async () => {
-
       try {
         const results = await Promise.allSettled([
-
           clinicsApi.getClinicEmployees(1),
         ]);
 
+        if (results[0].status === "fulfilled") {
+          const value = results[0].value as
+            | Employee[]
+            | { results: Employee[] };
 
-if (results[0].status === "fulfilled") {
-  const value = results[0].value as
-    | Employee[]
-    | { results: Employee[] };
-
-  setEmployees(
-    Array.isArray(value) ? value : value.results ?? []
-  );
-}
+          setEmployees(Array.isArray(value) ? value : (value.results ?? []));
+        }
       } catch (err) {
         console.error("Error loading data:", err);
       }
     };
     loadData();
-
   }, []);
-
 
   // 1. Initial Data Fetch from DB
   useEffect(() => {
@@ -103,42 +108,38 @@ if (results[0].status === "fulfilled") {
     dispatch(fetchTicketDashboard());
   }, [dispatch]);
 
-const ticketsFromDb = useMemo((): TicketListItem[] => {
-  if (Array.isArray(rawTickets)) return rawTickets;
+  const ticketsFromDb = useMemo((): TicketListItem[] => {
+    if (Array.isArray(rawTickets)) return rawTickets;
 
-  if (
-    rawTickets &&
-    typeof rawTickets === "object" &&
-    "results" in rawTickets
-  ) {
-    const data = rawTickets as { results: TicketListItem[] };
-    return data.results ?? [];
-  }
+    if (
+      rawTickets &&
+      typeof rawTickets === "object" &&
+      "results" in rawTickets
+    ) {
+      const data = rawTickets as { results: TicketListItem[] };
+      return data.results ?? [];
+    }
 
-  return [];
-}, [rawTickets]);
+    return [];
+  }, [rawTickets]);
 
-const getTicketSortTime = (ticket: TicketListItem): number => {
-  const raw =
-    ticket.created_at ||
-    ticket.due_date;
+  const getTicketSortTime = (ticket: TicketListItem): number => {
+    const raw = ticket.created_at || ticket.due_date;
 
-  if (!raw) return 0;
-  const ts = new Date(String(raw)).getTime();
-  return Number.isNaN(ts) ? 0 : ts;
-};
+    if (!raw) return 0;
+    const ts = new Date(String(raw)).getTime();
+    return Number.isNaN(ts) ? 0 : ts;
+  };
 
-const getCount = (status: string): number => {
-  const key = status.toLowerCase() as keyof typeof dashboardCounts;
+  const getCount = (status: string): number => {
+    const key = status.toLowerCase() as keyof typeof dashboardCounts;
 
-  if (dashboardCounts && key in dashboardCounts) {
-    return dashboardCounts[key] ?? 0;
-  }
+    if (dashboardCounts && key in dashboardCounts) {
+      return dashboardCounts[key] ?? 0;
+    }
 
-  return ticketsFromDb.filter(
-    (t) => t.status?.toLowerCase() === key
-  ).length;
-};
+    return ticketsFromDb.filter((t) => t.status?.toLowerCase() === key).length;
+  };
 
   // 3. Filtering and Search Logic
   const filteredTickets = useMemo(() => {
@@ -147,16 +148,27 @@ const getCount = (status: string): number => {
       if (t.status?.toLowerCase() !== tab.toLowerCase()) return false;
 
       // Search Filter (Ticket Number)
-      if (search && !t.ticket_no?.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !t.ticket_no?.toLowerCase().includes(search.toLowerCase()))
+        return false;
 
       // Advanced Filters from FilterTickets component
       if (filters) {
-        if (filters.priority && t.priority?.toLowerCase() !== filters.priority.toLowerCase()) return false;
-        if (filters.department_id && Number(t.department) !== Number(filters.department_id)) return false;
+        if (
+          filters.priority &&
+          t.priority?.toLowerCase() !== filters.priority.toLowerCase()
+        )
+          return false;
+        if (
+          filters.department_id &&
+          Number(t.department) !== Number(filters.department_id)
+        )
+          return false;
 
         const ticketDate = dayjs(t.created_at);
-        if (filters.from_date && ticketDate.isBefore(filters.from_date, "day")) return false;
-        if (filters.to_date && ticketDate.isAfter(filters.to_date, "day")) return false;
+        if (filters.from_date && ticketDate.isBefore(filters.from_date, "day"))
+          return false;
+        if (filters.to_date && ticketDate.isAfter(filters.to_date, "day"))
+          return false;
       }
       return true;
     });
@@ -169,10 +181,17 @@ const getCount = (status: string): number => {
   const totalEntries = filteredTickets.length;
   const totalPages = Math.ceil(totalEntries / ROWS_PER_PAGE);
   const startIndex = (page - 1) * ROWS_PER_PAGE;
-  const paginatedTickets = filteredTickets.slice(startIndex, startIndex + ROWS_PER_PAGE);
+  const paginatedTickets = filteredTickets.slice(
+    startIndex,
+    startIndex + ROWS_PER_PAGE,
+  );
 
   if (loading && ticketsFromDb.length === 0) {
-    return <Box display="flex" justifyContent="center" mt={10}><CircularProgress /></Box>;
+    return (
+      <Box display="flex" justifyContent="center" mt={10}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   const columns = [
@@ -187,18 +206,28 @@ const getCount = (status: string): number => {
     { key: "assigned_to", label: "Assigned To", flex: 1.5 },
   ];
 
-
   return (
-    <Box pt={2} px={0.1}>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+    <Box pt={2} px={0.1} sx={{ width: "100%", minWidth: 0 }}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       <Typography sx={ticketsTitleSx}>Tickets</Typography>
 
-      <Stack direction="row" alignItems="center" sx={ticketsActionsRowSx} mb={1.5}>
-
+      <Stack
+        direction="row"
+        alignItems="center"
+        sx={ticketsActionsRowSx}
+        mb={1.5}
+      >
         <Tabs
           value={tab}
-          onChange={(_, v) => { setTab(v); setPage(1); }}
+          onChange={(_, v) => {
+            setTab(v);
+            setPage(1);
+          }}
           TabIndicatorProps={{ style: { display: "none" } }}
           sx={ticketsTabsSx}
         >
@@ -209,18 +238,29 @@ const getCount = (status: string): number => {
         </Tabs>
 
         {/* RIGHT → Actions */}
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: "auto" }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          sx={{ ml: "auto", flexWrap: "wrap", justifyContent: "flex-end" }}
+        >
           <Box sx={ticketsSearchBoxSx}>
             <SearchIcon fontSize="small" />
             <InputBase
               placeholder="Search by Ticket no."
               sx={{ ml: 1, flex: 1 }}
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
             />
           </Box>
 
-          <IconButton onClick={() => setOpenFilter(true)} sx={{ width: 50, height: 50 }}>
+          <IconButton
+            onClick={() => setOpenFilter(true)}
+            sx={{ width: 50, height: 50 }}
+          >
             <Box component="img" src={Filter_Leads} />
           </IconButton>
 
@@ -233,9 +273,7 @@ const getCount = (status: string): number => {
             Create New
           </Button>
         </Stack>
-
       </Stack>
-
 
       {/* Table Section */}
       <Box sx={{ overflowX: "auto" }}>
@@ -247,10 +285,11 @@ const getCount = (status: string): number => {
           ))}
         </Stack>
 
-
         {paginatedTickets.length === 0 ? (
           <Box p={6} textAlign="center">
-            <Typography color="text.secondary">No tickets found in the database.</Typography>
+            <Typography color="text.secondary">
+              No tickets found in the database.
+            </Typography>
           </Box>
         ) : (
           paginatedTickets.map((t: TicketListItem) => (
@@ -261,7 +300,11 @@ const getCount = (status: string): number => {
               py={2}
               alignItems="center"
               onClick={() => navigate(`/settings/tickets/${t.id}`)}
-              sx={{ ...ticketsRowSx, cursor: "pointer", borderBottom: "1px solid #f1f1f1" }}
+              sx={{
+                ...ticketsRowSx,
+                cursor: "pointer",
+                borderBottom: "1px solid #f1f1f1",
+              }}
             >
               <Box flex={columns[0].flex} sx={ticketsNumberCellSx}>
                 {t.ticket_no?.replace("TICKET-", "TN-")}
@@ -291,39 +334,65 @@ const getCount = (status: string): number => {
                 {t.department_name}
               </Box>
 
-              <Box flex={columns[7].flex} display="flex" justifyContent="flex-start">
+              <Box
+                flex={columns[7].flex}
+                display="flex"
+                justifyContent="flex-start"
+              >
                 <Chip
-                  label={t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1).toLowerCase() : ""}
+                  label={
+                    t.priority
+                      ? t.priority.charAt(0).toUpperCase() +
+                        t.priority.slice(1).toLowerCase()
+                      : ""
+                  }
                   sx={priorityChipSx(t.priority)}
                 />
               </Box>
 
-
-              <Box flex={columns[8].flex} display="flex" alignItems="center" gap={1}>
+              <Box
+                flex={columns[8].flex}
+                display="flex"
+                alignItems="center"
+                gap={1}
+              >
                 <Avatar sx={ticketsAvatarSx}>
                   {t.assigned_to_id
-                    ? (employees.find(item => item.id === t.assigned_to_id)?.emp_name?.trim()?.charAt(0) ||
-                      t.assigned_to_name?.trim()?.charAt(0) ||
-                      "?").toUpperCase()
+                    ? (
+                        employees
+                          .find((item) => item.id === t.assigned_to_id)
+                          ?.emp_name?.trim()
+                          ?.charAt(0) ||
+                        t.assigned_to_name?.trim()?.charAt(0) ||
+                        "?"
+                      ).toUpperCase()
                     : "?"}
                 </Avatar>
 
                 <Typography sx={ticketsAssigneeTextSx}>
-
-                  {employees.find(item => item.id === t.assigned_to_id)?.emp_name || t.assigned_to_name || "Unassigned"}
+                  {employees.find((item) => item.id === t.assigned_to_id)
+                    ?.emp_name ||
+                    t.assigned_to_name ||
+                    "Unassigned"}
                 </Typography>
               </Box>
-
             </Stack>
-
           ))
         )}
       </Box>
 
       {/* Pagination View */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mt={3} px={0.5}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        mt={3}
+        px={0.5}
+      >
         <Typography fontSize={13} color="text.secondary">
-          Showing {totalEntries === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + ROWS_PER_PAGE, totalEntries)} of {totalEntries} entries
+          Showing {totalEntries === 0 ? 0 : startIndex + 1} to{" "}
+          {Math.min(startIndex + ROWS_PER_PAGE, totalEntries)} of {totalEntries}{" "}
+          entries
         </Typography>
 
         <Stack direction="row" alignItems="center" spacing={1}>
@@ -352,10 +421,10 @@ const getCount = (status: string): number => {
             disabled={page === totalPages || totalPages === 0}
             onClick={() => setPage((p) => p + 1)}
             sx={{
-              padding: '4px',
+              padding: "4px",
               fontWeight: "600",
-              minWidth: '32px',
-              height: '32px'
+              minWidth: "32px",
+              height: "32px",
             }}
           >
             ›
@@ -365,7 +434,10 @@ const getCount = (status: string): number => {
 
       {openCreate && (
         <Suspense fallback={null}>
-          <CreateTicket open={openCreate} onClose={() => setOpenCreate(false)} />
+          <CreateTicket
+            open={openCreate}
+            onClose={() => setOpenCreate(false)}
+          />
         </Suspense>
       )}
 
@@ -375,7 +447,6 @@ const getCount = (status: string): number => {
             open={openFilter}
             onClose={() => setOpenFilter(false)}
             onApply={(appliedFilters: FilterTicketsPayload | null) => {
-
               if (!appliedFilters) {
                 setFilters(null);
                 setPage(1);
@@ -399,7 +470,6 @@ const getCount = (status: string): number => {
           />
         </Suspense>
       )}
-
     </Box>
   );
 };

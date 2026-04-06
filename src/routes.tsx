@@ -10,7 +10,13 @@ import { SIDEBAR_TABS } from "./config/sidebar.tabs";
 import { EXTRA_ROUTES } from "./config/extra.routes";
 import { APP_CONDITION, DEMO_ALLOWED_KEYS } from "./config/sidebar.menu";
 import { useDispatch, useSelector } from "react-redux";
-import { selectAuthed, selectToken, selectUser, setUser } from "./store/authSlice";
+import {
+  selectAuthed,
+  selectToken,
+  selectUser,
+  setAuth,
+} from "./store/authSlice";
+import type { AuthUser } from "./store/authSlice";
 import type { AppDispatch } from "./store";
 import { authApi } from "./services/auth.api";
 import { Box, CircularProgress } from "@mui/material";
@@ -42,10 +48,88 @@ const Spinner = () => (
   </Box>
 );
 
+type ProfileClinic = {
+  clinic_id: number;
+  clinic__name: string;
+  is_default: boolean;
+};
+
+const getClinicId = (clinic: unknown): number | null => {
+  if (!clinic || typeof clinic !== "object") {
+    return typeof clinic === "number" ? clinic : null;
+  }
+
+  const record = clinic as Record<string, unknown>;
+  const id = record.clinic_id ?? record.id;
+  return typeof id === "number" ? id : null;
+};
+
+const getClinicName = (
+  clinic: unknown,
+  fallbackName?: string,
+): string | null => {
+  if (!clinic || typeof clinic !== "object") {
+    return fallbackName || null;
+  }
+
+  const record = clinic as Record<string, unknown>;
+  const name =
+    record.clinic__name ?? record.clinic_name ?? record.name ?? fallbackName;
+
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+};
+
+const normalizeClinics = (
+  profile: Record<string, unknown>,
+): ProfileClinic[] => {
+  const nestedUser =
+    profile.user && typeof profile.user === "object"
+      ? (profile.user as Record<string, unknown>)
+      : null;
+
+  const fallbackName =
+    (typeof profile.clinic__name === "string" && profile.clinic__name) ||
+    (typeof profile.clinic_name === "string" && profile.clinic_name) ||
+    undefined;
+
+  const rawClinics =
+    profile.clinics ??
+    nestedUser?.clinics ??
+    profile.clinic ??
+    nestedUser?.clinic ??
+    profile.clinic_id ??
+    nestedUser?.clinic_id;
+
+  const asArray = Array.isArray(rawClinics)
+    ? rawClinics
+    : rawClinics != null
+      ? [rawClinics]
+      : [];
+
+  return asArray
+    .map((entry, index) => {
+      const clinicId = getClinicId(entry);
+      const clinicName = getClinicName(entry, fallbackName);
+      if (!clinicId || !clinicName) return null;
+
+      const isDefault =
+        typeof entry === "object" &&
+        entry !== null &&
+        (entry as Record<string, unknown>).is_default === true;
+
+      return {
+        clinic_id: clinicId,
+        clinic__name: clinicName,
+        is_default: index === 0 ? true : isDefault,
+      };
+    })
+    .filter((clinic): clinic is ProfileClinic => clinic !== null);
+};
+
 type LoaderProps = { Comp: LazyExoticComponent<ComponentType<object>> };
 function LoadedComponent({ Comp }: LoaderProps) {
   return (
-    <Suspense fallback={<Spinner/>}>
+    <Suspense fallback={<Spinner />}>
       <Comp />
     </Suspense>
   );
@@ -67,35 +151,35 @@ export default function AppRoutes() {
     const restoreUser = async () => {
       if (!token) return;
 
+      // Skip profile call only when we've explicitly hydrated profile before.
+      if (user && typeof user === "object" && user.profile_loaded) return;
+
       try {
         const profile = await authApi.getProfile();
         if (!profile || typeof profile !== "object") return;
 
-        const clinics: UserClinic[] = Array.isArray(profile.clinics)
-          ? profile.clinics
-          : [];
+        const normalizedClinics = normalizeClinics(
+          profile as Record<string, unknown>,
+        );
 
-        const authUser: AuthUser = {
-          id: profile.id ?? user?.id ?? 0,
-          username: profile.username ?? user?.username ?? "",
-          email: profile.email ?? user?.email ?? "",
-          role: profile.role ?? user?.role ?? "",
-          permissions: profile.permissions ??
-            user?.permissions ?? { modules: [] },
-          first_name: profile.first_name ?? user?.first_name,
-          last_name: profile.last_name ?? user?.last_name,
-          designation: profile.designation ?? user?.designation,
-          designation_label:
-            profile.designation_label ?? user?.designation_label,
-          clinics: clinics.length > 0 ? clinics : undefined,
-        };
+        dispatch(
+          setAuth({
+            access: token,
+            ...profile,
+            clinics: normalizedClinics,
+            profile_loaded: true,
+          } as AuthUser),
+        );
 
-        dispatch(setUser(authUser));
+        if (normalizedClinics.length > 0) {
+          const defaultClinic =
+            normalizedClinics.find((clinic) => clinic.is_default) ??
+            normalizedClinics[0];
 
-        if (clinics.length > 0) {
-          const defaultClinic = clinics.find((c) => c.is_default) ?? clinics[0];
-          const clinicId = defaultClinic?.clinic_id ?? 1;
-          await dispatch(fetchClinic(clinicId));
+          if (defaultClinic?.clinic_id) {
+            await dispatch(fetchClinic(defaultClinic.clinic_id));
+          }
+
           if (
             defaultClinic?.clinic__name &&
             typeof profile.email === "string"
