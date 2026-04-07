@@ -6,6 +6,7 @@ export const integrationApi = {
   connectGoogle: () => http.redirect("/google/login/"),
   getLinkedInStatus: () =>
     http.get<{ connected: boolean }>("/linkedin/status/"),
+  disconnectFacebook: () => http.post("/facebook/disconnect/"),
   disconnectLinkedIn: () => http.post("/linkedin/disconnect/"),
 
   getSocialAccounts: (clinicId: number) =>

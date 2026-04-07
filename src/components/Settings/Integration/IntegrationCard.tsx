@@ -57,8 +57,25 @@ const IntegrationCard = ({
     // setConnected(true);
   };
 
-  const handleDisconnect = () => {
-    console.log("Disconnect API not implemented yet");
+  const handleDisconnect = async () => {
+    try {
+      if (name === "LinkedIn") {
+        await integrationApi.disconnectLinkedIn();
+      }
+
+      if (name === "Facebook" || name === "Instagram") {
+        await integrationApi.disconnectFacebook();
+      }
+
+      if (name === "Google Calendar" || name === "Google Ads") {
+        console.log("Google disconnect not implemented");
+        return;
+      }
+
+      window.location.reload();
+    } catch (err) {
+      console.error("Disconnect failed", err);
+    }
   };
 
   const isGoogleCalendar = name === "Google Calendar";
