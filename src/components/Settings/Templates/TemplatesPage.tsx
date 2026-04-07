@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Box, CircularProgress } from '@mui/material';
+import { Box, CircularProgress, Alert } from '@mui/material';
+import { useSelector } from 'react-redux';
 import TemplateService, { type APITemplateType } from "../../../services/templates.api";
 import styles from "../../../styles/Template/TemplatesPage.module.css";
 import type { EmailTemplate, SMSTemplate, WhatsAppTemplate, Template, TemplatesState, TemplateFilters } from '../../../types/templates.types';
+import { selectUser } from '../../../store/authSlice';
+import {
+  hasAnySubcategoryActionPermission,
+  resolveUserRole,
+} from '../../../utils/roleAccess';
 
 const TemplateHeader = lazy(() =>
   import('./TemplateHeader').then((module) => ({ default: module.TemplateHeader }))
@@ -29,6 +35,22 @@ const CopyDetailsModal = lazy(() =>
 );
 
 const TemplatesPage: React.FC = () => {
+  const user = useSelector(selectUser);
+  const authUser = user as unknown as Record<string, unknown> | null;
+  const role = resolveUserRole(authUser);
+  const permissions = authUser?.permissions;
+  const templateAliases = ['templates', 'template'];
+  const canViewTemplates =
+    role === 'super_admin' ||
+    hasAnySubcategoryActionPermission(permissions, templateAliases, 'view') ||
+    hasAnySubcategoryActionPermission(permissions, templateAliases, 'print');
+  const canAddTemplates =
+    role === 'super_admin' ||
+    hasAnySubcategoryActionPermission(permissions, templateAliases, 'add');
+  const canEditTemplates =
+    role === 'super_admin' ||
+    hasAnySubcategoryActionPermission(permissions, templateAliases, 'edit');
+
   const [activeTab, setActiveTab] = useState('Email');
   const [isModalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,6 +97,10 @@ const TemplatesPage: React.FC = () => {
 
   // ✅ UPDATED: Fetch everything at once
   const loadTemplates = useCallback(async () => {
+    if (!canViewTemplates) {
+      setTemplates({ mail: [], sms: [], whatsapp: [] });
+      return;
+    }
     setLoading(true);
     try {
       const [mailData, smsData, waData] = await Promise.all([
@@ -94,7 +120,7 @@ const TemplatesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canViewTemplates]);
 
   useEffect(() => {
     loadTemplates();
@@ -124,6 +150,11 @@ const TemplatesPage: React.FC = () => {
   };
 
   const handleAction = (type: 'view' | 'edit' | 'copy' | 'delete', template: EmailTemplate | SMSTemplate | WhatsAppTemplate) => {
+    if ((type === 'edit' || type === 'delete') && !canEditTemplates) {
+      toast.warning('You do not have permission to edit templates.');
+      return;
+    }
+
     const typeMapping: Record<string, string> = { 'Email': 'email', 'SMS': 'sms', 'WhatsApp': 'whatsapp' };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tAny = template as any;
@@ -154,6 +185,7 @@ const TemplatesPage: React.FC = () => {
   };
 
   const handleConfirmDelete = async () => {
+    if (!canEditTemplates) return;
     if (!templateInAction) return;
     try {
       await TemplateService.deleteTemplate(getApiType(activeTab), templateInAction.id);
@@ -179,6 +211,11 @@ const TemplatesPage: React.FC = () => {
         flexDirection: "column",
       }}
     >
+      {!canViewTemplates && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          You do not have permission to view templates.
+        </Alert>
+      )}
       <Suspense fallback={<Box sx={{ p: 2 }} />}>
         <TemplateHeader
           onTabChange={(tab) => { setActiveTab(tab); }}
@@ -186,6 +223,7 @@ const TemplatesPage: React.FC = () => {
           onSearch={setSearchQuery}
           onApplyFilters={(filters) => setActiveFilters(filters as TemplateFilters | null)}
           useCaseOptions={useCaseOptions}
+          canAddTemplate={canAddTemplates}
           counts={{
             email: templates.mail.length,
             sms: templates.sms.length,
@@ -195,14 +233,14 @@ const TemplatesPage: React.FC = () => {
       </Suspense>
 
       <Box className={styles.tableWrapper} sx={{ flexGrow: 1, overflowY: 'auto', p: 0, position: 'relative' }}>
-        {loading && templates.mail.length === 0 ? (
+        {!canViewTemplates ? null : loading && templates.mail.length === 0 ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>
         ) : (
           <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}><CircularProgress size={24} /></Box>}>
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {activeTab === 'Email' && <EmailTemplateTable data={getFilteredData()} onAction={handleAction as any} />}
-            {activeTab === 'SMS' && <SmsTemplateTable data={getFilteredData()} onAction={handleAction} />}
-            {activeTab === 'WhatsApp' && <WhatsAppTemplateTable data={getFilteredData()} onAction={handleAction} />}
+            {activeTab === 'Email' && <EmailTemplateTable data={getFilteredData()} onAction={handleAction as any} canEditTemplate={canEditTemplates} />}
+            {activeTab === 'SMS' && <SmsTemplateTable data={getFilteredData()} onAction={handleAction} canEditTemplate={canEditTemplates} />}
+            {activeTab === 'WhatsApp' && <WhatsAppTemplateTable data={getFilteredData()} onAction={handleAction} canEditTemplate={canEditTemplates} />}
           </Suspense>
         )}
       </Box>

@@ -12,10 +12,11 @@ interface TemplateHeaderProps {
   onApplyFilters: (filters: Filters | null) => void;
   counts: { email: number; sms: number; whatsapp: number };
   useCaseOptions?: string[];
+  canAddTemplate?: boolean;
 }
 
 export const TemplateHeader: React.FC<TemplateHeaderProps> = ({ 
-  onTabChange, onNewTemplate, onSearch, onApplyFilters, counts, useCaseOptions = [] 
+  onTabChange, onNewTemplate, onSearch, onApplyFilters, counts, useCaseOptions = [], canAddTemplate = true 
 }) => {
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   // 🆕 Changed from anchorEl to a simple boolean for centered display
@@ -68,6 +69,8 @@ export const TemplateHeader: React.FC<TemplateHeaderProps> = ({
             startIcon={<Add />} 
             className={styles.newTemplateBtn}
             onClick={onNewTemplate}
+            disabled={!canAddTemplate}
+            title={!canAddTemplate ? "No permission to add templates" : undefined}
           >
             New Template
           </Button>

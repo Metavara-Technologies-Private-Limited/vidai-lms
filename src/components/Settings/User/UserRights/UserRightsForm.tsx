@@ -12,6 +12,8 @@ import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import EditIcon from "@mui/icons-material/Edit";
 import CancelIcon from "@mui/icons-material/Cancel";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { LEADS_MENU } from "../../../../config/sidebar.menu";
 import {
   roleApi,
@@ -126,34 +128,26 @@ type ViewMode = "empty" | "summary" | "edit";
 
 const STEP_LABELS = ["Module", "Category", "Sub Category"];
 const MODULE_OPTIONS = ["Vidai Leads"];
+const FALLBACK_SUBCATEGORY_OPTIONS = ["Integration", "Tickets", "Templates", "User"];
 
-const fullPerm = (): PermissionFlags => ({
-  add: true,
-  edit: true,
-  view: true,
-  print: true,
+const emptyPerm = (): PermissionFlags => ({
+  add: false,
+  edit: false,
+  view: false,
+  print: false,
 });
 
 const emptyRights = (): RoleRights => ({ modules: [], categories: [], subCategories: [] });
 
 const buildDefaultRole = (name: RoleName, count: number, badge: number): RoleEntry => {
-  const permissions: Record<string, PermissionFlags> = {};
-  MODULE_OPTIONS.forEach((item) => {
-    permissions[item] = fullPerm();
-  });
-
   return {
     apiId: null,
     name,
     count,
     badge,
     checked: false,
-    rights: {
-      modules: [...MODULE_OPTIONS],
-      categories: [],
-      subCategories: [],
-    },
-    permissions,
+    rights: emptyRights(),
+    permissions: {},
   };
 };
 
@@ -165,6 +159,20 @@ const initialRoles: RoleEntry[] = [
 
 const normalizeRoleLabel = (value: string): string =>
   value.trim().toLowerCase();
+
+const normalizeRoleKey = (value: string): string =>
+  value.trim().toLowerCase().replace(/[-_\s]+/g, "");
+
+const roleMatches = (roleName: string, userRole: string): boolean => {
+  const roleKey = normalizeRoleKey(roleName);
+  const userRoleKey = normalizeRoleKey(userRole);
+
+  if (roleKey === "superadmin") {
+    return userRoleKey === "superadmin";
+  }
+
+  return roleKey === userRoleKey;
+};
 
 const Tick = ({ checked, onClick }: { checked: boolean; onClick?: () => void }) => (
   <Box
@@ -253,10 +261,25 @@ const StepConnector = ({ done }: { done: boolean }) => (
   />
 );
 
-const chipBorderColor = ["#5B8FF9", "#5EBB63", "#5EBB63", "#F0C247", "#E8A16D"];
+const getItemType = (label: string, rights: RoleRights): "module" | "category" | "subcategory" => {
+  if (rights.modules.includes(label)) return "module";
+  if (rights.categories.includes(label)) return "category";
+  return "subcategory";
+};
+
+const chipStyleByType: Record<"module" | "category" | "subcategory", { border: string; bg: string }> = {
+  module: { border: "#6E97F7", bg: "#F4F8FF" },
+  category: { border: "#6CC27D", bg: "#F2FBF4" },
+  subcategory: { border: "#F0A36A", bg: "#FFF8F2" },
+};
 
 const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   const [roles, setRoles] = useState<RoleEntry[]>(initialRoles);
+  const [roleUsersMap, setRoleUsersMap] = useState<Record<RoleName, UserRecord[]>>({
+    "Super Admin": [],
+    Admin: [],
+    User: [],
+  });
   const [selectedRoleIdx, setSelectedRoleIdx] = useState<number | null>(null);
   const [mode, setMode] = useState<ViewMode>("empty");
   const [activeStep, setActiveStep] = useState(0);
@@ -264,6 +287,14 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   const [draftPerms, setDraftPerms] = useState<Record<string, PermissionFlags>>({});
   const [loadingRoles, setLoadingRoles] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [expandedRoleName, setExpandedRoleName] = useState<RoleName | null>(null);
+  const [selectedUserIdsByRole, setSelectedUserIdsByRole] = useState<
+    Record<RoleName, Set<number>>
+  >({
+    "Super Admin": new Set<number>(),
+    Admin: new Set<number>(),
+    User: new Set<number>(),
+  });
 
   // ── Fetch roles from backend ──────────────────────────────────────────────
   useEffect(() => {
@@ -315,6 +346,18 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
           return acc;
         }, {});
 
+        const groupedUsers: Record<RoleName, UserRecord[]> = {
+          "Super Admin": mergedUsers.filter((u) =>
+            roleMatches("Super Admin", String(u.role || "")),
+          ),
+          Admin: mergedUsers.filter((u) =>
+            roleMatches("Admin", String(u.role || "")),
+          ),
+          User: mergedUsers.filter((u) => roleMatches("User", String(u.role || ""))),
+        };
+
+        setRoleUsersMap(groupedUsers);
+
         setRoles((prev) =>
           prev.map((entry) => {
             const count = roleCounts[normalizeRoleLabel(entry.name)] ?? 0;
@@ -336,7 +379,9 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   const categories = useMemo(() => LEADS_MENU.map((item) => item.label), []);
   const subCategories = useMemo(() => {
     const settings = LEADS_MENU.find((item) => item.key === "settings");
-    return settings?.subMenu?.map((item) => item.label) ?? [];
+    const dynamic = settings?.subMenu?.map((item) => item.label) ?? [];
+    const merged = [...dynamic, ...FALLBACK_SUBCATEGORY_OPTIONS];
+    return Array.from(new Set(merged));
   }, []);
 
   const activeRole = selectedRoleIdx !== null ? roles[selectedRoleIdx] : null;
@@ -346,6 +391,10 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
   const allSelected = optionList.length > 0 && draftRights[rightsKey].length === optionList.length;
   const hasStepSelection = draftRights[rightsKey].length > 0;
+  const hasAnySelection =
+    draftRights.modules.length > 0 ||
+    draftRights.categories.length > 0 ||
+    draftRights.subCategories.length > 0;
 
   const summaryRows = useMemo(() => {
     if (!activeRole) return [] as { label: string; perm: PermissionFlags }[];
@@ -356,12 +405,12 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
         ...activeRole.rights.subCategories,
       ]),
     );
-    return labels.map((label) => ({ label, perm: activeRole.permissions[label] ?? fullPerm() }));
+    return labels.map((label) => ({ label, perm: activeRole.permissions[label] ?? emptyPerm() }));
   }, [activeRole]);
 
   const editRows = useMemo(() => {
     const labels = Array.from(new Set([...draftRights.modules, ...draftRights.categories, ...draftRights.subCategories]));
-    return labels.map((label) => ({ label, perm: draftPerms[label] ?? fullPerm() }));
+    return labels.map((label) => ({ label, perm: draftPerms[label] ?? emptyPerm() }));
   }, [draftRights, draftPerms]);
 
   const selectRole = (idx: number) => {
@@ -383,7 +432,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     });
 
     if (checked) {
-      setDraftPerms((prev) => ({ ...prev, [label]: prev[label] ?? fullPerm() }));
+      setDraftPerms((prev) => ({ ...prev, [label]: prev[label] ?? emptyPerm() }));
     }
   };
 
@@ -397,7 +446,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
       setDraftPerms((prev) => {
         const next = { ...prev };
         optionList.forEach((item) => {
-          next[item] = next[item] ?? fullPerm();
+          next[item] = next[item] ?? emptyPerm();
         });
         return next;
       });
@@ -406,7 +455,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
   const togglePerm = (label: string, key: keyof PermissionFlags) => {
     setDraftPerms((prev) => {
-      const base = prev[label] ?? fullPerm();
+      const base = prev[label] ?? emptyPerm();
       return { ...prev, [label]: { ...base, [key]: !base[key] } };
     });
   };
@@ -483,6 +532,18 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
           i === selectedRoleIdx ? { ...r, apiId: saved.id } : r,
         ),
       );
+
+      const selectedIds = Array.from(selectedUserIdsByRole[name]);
+      if (selectedIds.length > 0) {
+        await Promise.all(
+          selectedIds.map((userId) =>
+            usersApi.update(userId, {
+              role: saved.id,
+            }),
+          ),
+        );
+      }
+
       setMode("summary");
       onSave();
     } catch (err: unknown) {
@@ -496,6 +557,39 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleRoleUsersExpand = (
+    event: React.MouseEvent<HTMLElement>,
+    roleName: RoleName,
+  ) => {
+    event.stopPropagation();
+    setExpandedRoleName((prev) => (prev === roleName ? null : roleName));
+  };
+
+  const toggleUserSelection = (roleName: RoleName, userId: number) => {
+    setSelectedUserIdsByRole((prev) => {
+      const nextSet = new Set(prev[roleName]);
+      if (nextSet.has(userId)) {
+        nextSet.delete(userId);
+      } else {
+        nextSet.add(userId);
+      }
+      return {
+        ...prev,
+        [roleName]: nextSet,
+      };
+    });
+  };
+
+  const toggleAllUsersSelection = (roleName: RoleName, checked: boolean) => {
+    setSelectedUserIdsByRole((prev) => {
+      const users = roleUsersMap[roleName] ?? [];
+      return {
+        ...prev,
+        [roleName]: checked ? new Set(users.map((u) => u.id)) : new Set<number>(),
+      };
+    });
   };
 
   return (
@@ -516,37 +610,118 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
             <CircularProgress size={20} />
           </Box>
         ) : (
-          roles.map((role, idx) => (
-            <Box
-              key={role.name}
-              onClick={() => selectRole(idx)}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                py: 0.65,
-                px: 0.4,
-                borderRadius: "6px",
-                cursor: "pointer",
-                bgcolor: role.checked ? "#FFF3EE" : "transparent",
-                "&:hover": { bgcolor: "#FFF8F5" },
-              }}
-            >
-              <Checkbox
-                size="small"
-                checked={role.checked}
-                onClick={(e) => e.stopPropagation()}
-                onChange={() => selectRole(idx)}
-                sx={{ p: 0, mr: 0.9, color: "#909090", "&.Mui-checked": { color: "#1F1F1F" } }}
-              />
-              <Typography sx={{ fontSize: 14, flex: 1, color: "#1F1F1F" }}>
-                {role.name} <Box component="span" sx={{ color: "#738091", fontSize: 13 }}>({role.count})</Box>
-              </Typography>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#FF8181", mr: 0.8 }}>{String(role.badge).padStart(2, "0")}</Typography>
-              <IconButton size="small" sx={{ p: 0.1, bgcolor: "#F2F2F2", borderRadius: "4px" }}>
-                <AddIcon sx={{ fontSize: 16, color: "#A3A3A3" }} />
-              </IconButton>
-            </Box>
-          ))
+          roles.map((role, idx) => {
+            const isExpanded = expandedRoleName === role.name;
+            const roleUsers = roleUsersMap[role.name] ?? [];
+            const selectedIds = selectedUserIdsByRole[role.name] ?? new Set<number>();
+            const allChecked =
+              roleUsers.length > 0 && roleUsers.every((u) => selectedIds.has(u.id));
+
+            return (
+              <Box key={role.name} sx={{ borderRadius: "8px", mb: 0.4 }}>
+                <Box
+                  onClick={() => selectRole(idx)}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    py: 0.65,
+                    px: 0.4,
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    bgcolor: role.checked ? "#FFF3EE" : "transparent",
+                    "&:hover": { bgcolor: "#FFF8F5" },
+                  }}
+                >
+                  <Checkbox
+                    size="small"
+                    checked={role.checked}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => selectRole(idx)}
+                    sx={{ p: 0, mr: 0.9, color: "#909090", "&.Mui-checked": { color: "#1F1F1F" } }}
+                  />
+                  <Typography sx={{ fontSize: 14, flex: 1, color: "#1F1F1F" }}>
+                    {role.name} <Box component="span" sx={{ color: "#738091", fontSize: 13 }}>({role.count})</Box>
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#FF8181", mr: 0.8 }}>{String(role.badge).padStart(2, "0")}</Typography>
+                  <IconButton
+                    size="small"
+                    sx={{ p: 0.1, bgcolor: "#F2F2F2", borderRadius: "4px" }}
+                    onClick={(e) => toggleRoleUsersExpand(e, role.name)}
+                  >
+                    {isExpanded ? (
+                      <KeyboardArrowUpIcon sx={{ fontSize: 16, color: "#A3A3A3" }} />
+                    ) : (
+                      <AddIcon sx={{ fontSize: 16, color: "#A3A3A3" }} />
+                    )}
+                  </IconButton>
+                </Box>
+
+                {isExpanded ? (
+                  <Box
+                    sx={{
+                      bgcolor: "#F8F8F8",
+                      borderRadius: "8px",
+                      px: 1,
+                      py: 0.8,
+                      ml: 3.2,
+                      mr: 0.6,
+                      mb: 0.5,
+                    }}
+                  >
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={allChecked}
+                          onChange={(e) => toggleAllUsersSelection(role.name, e.target.checked)}
+                          sx={{ p: 0, mr: 0.8 }}
+                        />
+                      }
+                      label={<Typography sx={{ fontSize: 12 }}>Select All</Typography>}
+                      sx={{ m: 0, mb: 0.6 }}
+                    />
+
+                    {roleUsers.length === 0 ? (
+                      <Typography sx={{ fontSize: 12, color: "#8A8A8A", py: 0.4 }}>
+                        No users found.
+                      </Typography>
+                    ) : (
+                      <Box sx={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 0.5 }}>
+                        {roleUsers.map((user) => (
+                          <Box
+                            key={user.id}
+                            onClick={() => toggleUserSelection(role.name, user.id)}
+                            sx={{
+                              px: 1,
+                              py: 0.6,
+                              borderRadius: "6px",
+                              bgcolor: "#FFFFFF",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.8,
+                              cursor: "pointer",
+                            }}
+                          >
+                            <Checkbox
+                              size="small"
+                              checked={selectedIds.has(user.id)}
+                              onChange={() => toggleUserSelection(role.name, user.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              sx={{ p: 0 }}
+                            />
+                            <Typography sx={{ fontSize: 12, color: "#2F2F2F", flex: 1 }}>
+                              {user.username || user.email || `User ${user.id}`}
+                            </Typography>
+                            <PersonOutlineIcon sx={{ fontSize: 16, color: "#E17E61" }} />
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                ) : null}
+              </Box>
+            );
+          })
         )}
       </Box>
 
@@ -661,7 +836,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                 sx={{ m: 0 }}
               />
               <Box sx={{ flex: 1 }} />
-              <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={!hasStepSelection} sx={{ textTransform: "none", minWidth: 110, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
+              <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={activeStep < 2 ? !hasStepSelection : !hasAnySelection} sx={{ textTransform: "none", minWidth: 110, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
             </Box>
 
             <Box sx={{ display: "grid", gridTemplateColumns: "220px repeat(5,1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "10px", px: 1.2, py: 1 }}>
@@ -672,10 +847,14 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
             </Box>
 
             <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
-              {editRows.map((row, idx) => (
+              {editRows.map((row) => {
+                const itemType = getItemType(row.label, draftRights);
+                const chipColors = chipStyleByType[itemType];
+
+                return (
                 <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "220px repeat(5,1fr)", alignItems: "center", px: 1, py: 0.8 }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
-                    <Box sx={{ border: `1px solid ${chipBorderColor[idx % chipBorderColor.length]}`, borderRadius: "8px", px: 1.1, py: 0.5, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 0.8 }}>
+                    <Box sx={{ border: `1px solid ${chipColors.border}`, bgcolor: chipColors.bg, borderRadius: "8px", px: 1.1, py: 0.5, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 0.8 }}>
                       {row.label}
                       <CancelIcon sx={{ fontSize: 15, color: "#E17E61", cursor: "pointer" }} onClick={() => removeRow(row.label)} />
                     </Box>
@@ -699,7 +878,8 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                   <Tick checked={row.perm.view} onClick={() => togglePerm(row.label, "view")} />
                   <Tick checked={row.perm.print} onClick={() => togglePerm(row.label, "print")} />
                 </Box>
-              ))}
+                );
+              })}
             </Box>
 
             <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.2 }}>
@@ -708,7 +888,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                 variant="contained"
                 onClick={handleSaveGrant}
                 disabled={saving}
-                sx={{ textTransform: "none", minWidth: 240, borderRadius: "12px", bgcolor: "#545454", fontSize: 14 }}
+                sx={{ textTransform: "none", minWidth: 240, borderRadius: "12px", bgcolor: "#545454", fontSize: 14, "&:hover": { bgcolor: "#232323" } }}
               >
                 {saving ? <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} /> : null}
                 Save &amp; Grant Access

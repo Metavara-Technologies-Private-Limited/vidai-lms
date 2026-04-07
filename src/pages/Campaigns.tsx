@@ -1,4 +1,5 @@
 import { useMemo, useState, lazy, Suspense } from "react";
+import { Alert } from "@mui/material";
 import "../styles/Campaign/campaigns.css";
 import searchIcon from "../components/Campaign/Icons/search.png";
 import CampaignHeader from "../components/Campaign/CampaignHeader";
@@ -10,7 +11,12 @@ import {
   selectCampaignLoading,
   updateCampaignStatus,
 } from "../store/campaignSlice";
+import { selectUser } from "../store/authSlice";
 import type { AppDispatch } from "../store";
+import {
+  hasAnySubcategoryActionPermission,
+  resolveUserRole,
+} from "../utils/roleAccess";
 import {
   CAMPAIGN_MODE,
   CAMPAIGN_STATUS,
@@ -48,6 +54,21 @@ export default function CampaignsScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const rawCampaigns = useSelector(selectCampaign);
   const campaignLoading = useSelector(selectCampaignLoading);
+  const user = useSelector(selectUser);
+  const authUser = user as unknown as Record<string, unknown> | null;
+  const role = resolveUserRole(authUser);
+  const permissions = authUser?.permissions;
+  const campaignAliases = ["campaigns", "campaign"];
+  const canViewCampaigns =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, campaignAliases, "view") ||
+    hasAnySubcategoryActionPermission(permissions, campaignAliases, "print");
+  const canAddCampaigns =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, campaignAliases, "add");
+  const canEditCampaigns =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, campaignAliases, "edit");
 
   const campaigns = useMemo<Campaign[]>(() => {
     return (rawCampaigns || []).map((api: CampaignAPIType) => {
@@ -138,11 +159,13 @@ export default function CampaignsScreen() {
   };
 
   const handleEdit = (campaign: Campaign) => {
+    if (!canEditCampaigns) return;
     setEditingCampaign(campaign);
     setShowEditModal(true);
   };
 
   const handleDuplicate = (campaign: Campaign) => {
+    if (!canEditCampaigns) return;
     setDuplicatingCampaign(campaign);
   };
 
@@ -181,7 +204,15 @@ export default function CampaignsScreen() {
 
   return (
     <div className="campaigns-page">
-      <CampaignHeader onAddNew={() => setShowAddCampaign(true)} />
+      {!canViewCampaigns && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          You do not have permission to view campaigns.
+        </Alert>
+      )}
+      <CampaignHeader
+        onAddNew={() => setShowAddCampaign(true)}
+        canAddCampaign={canAddCampaigns}
+      />
       <div className="filters-row">
         {/* Header Filter */}
         <div className="tabs">
@@ -257,7 +288,7 @@ export default function CampaignsScreen() {
       </div>
 
       <div className="campaign-grid">
-        {campaignLoading ? (
+        {!canViewCampaigns ? null : campaignLoading ? (
           <div className="empty-state">Loading campaigns...</div>
         ) : filteredCampaigns.length === 0 ? (
           <div className="empty-state">No campaigns found</div>
@@ -272,6 +303,7 @@ export default function CampaignsScreen() {
               onStatusChange={handleStatusChange}
               onEdit={handleEdit}
               onDuplicate={handleDuplicate}
+              canEditCampaign={canEditCampaigns}
             />
           ))
         )}

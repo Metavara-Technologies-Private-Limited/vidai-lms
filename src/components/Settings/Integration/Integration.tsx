@@ -3,6 +3,11 @@ import { useEffect, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import { useSelector } from "react-redux";
 import dayjs from "dayjs";
+import { selectUser } from "../../../store/authSlice";
+import {
+  hasAnySubcategoryActionPermission,
+  resolveUserRole,
+} from "../../../utils/roleAccess";
 
 import Facebook from "../../../assets/icons/Facebook.svg";
 import Instagram from "../../../assets/icons/Instagram.svg";
@@ -28,6 +33,19 @@ type SocialAccount = {
 const Integration = () => {
   // const location = useLocation();
   const [integrations, setIntegrations] = useState<IntegrationMap>({});
+  const user = useSelector(selectUser);
+  const authUser = user as unknown as Record<string, unknown> | null;
+  const role = resolveUserRole(authUser);
+  const permissions = authUser?.permissions;
+  const integrationAliases = ["integration", "integrations"];
+  const canViewIntegration =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, integrationAliases, "view") ||
+    hasAnySubcategoryActionPermission(permissions, integrationAliases, "print");
+  const canManageIntegration =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, integrationAliases, "add") ||
+    hasAnySubcategoryActionPermission(permissions, integrationAliases, "edit");
 
   // Pull leads from Redux to show upcoming appointment count on Google Calendar card
   const rawLeads = useSelector(selectLeads) as
@@ -60,6 +78,11 @@ const Integration = () => {
   })();
 
   useEffect(() => {
+    if (!canViewIntegration) {
+      setIntegrations({});
+      return;
+    }
+
     const fetchIntegrations = async () => {
       try {
         const clinicId = 1;
@@ -86,7 +109,7 @@ const Integration = () => {
     };
 
     fetchIntegrations();
-  }, []);
+  }, [canViewIntegration]);
 
   // useEffect(() => {
   //   const params = new URLSearchParams(location.search);
@@ -111,10 +134,17 @@ const Integration = () => {
     <Box>
       <Typography sx={styles.pageTitle}>Integration</Typography>
 
+      {!canViewIntegration ? (
+        <Typography sx={{ color: "#B45309", mb: 2 }}>
+          You do not have permission to view integrations.
+        </Typography>
+      ) : null}
+
       <Box sx={styles.gridWrapper}>
         <IntegrationCard
           name="Facebook"
           isConnected={!!integrations.facebook}
+          canManage={canManageIntegration}
           description="For Run campaigns, publish posts"
           icon={Facebook}
           headerBgColor="rgba(45, 107, 240, 0.04)"
@@ -123,6 +153,7 @@ const Integration = () => {
         <IntegrationCard
           name="Instagram"
           isConnected={!!integrations.instagram}
+          canManage={canManageIntegration}
           description="For Run campaigns, publish posts"
           icon={Instagram}
           headerBgColor="rgba(243, 118, 79, 0.06)"
@@ -130,6 +161,7 @@ const Integration = () => {
 
         <IntegrationCard
           isConnected={!!integrations.linkedin}
+          canManage={canManageIntegration}
           name="LinkedIn"
           description="For Publish"
           icon={Linkedin}
@@ -138,6 +170,7 @@ const Integration = () => {
 
         <IntegrationCard
           isConnected={!!integrations.google}
+          canManage={canManageIntegration}
           name="Google Ads"
           description="Google Ads Account"
           icon={GoogleAds}
@@ -146,6 +179,7 @@ const Integration = () => {
 
         <IntegrationCard
           isConnected={!!integrations.google}
+          canManage={canManageIntegration}
           name="Google Calendar"
           description="For appointments, calls, meets.."
           icon={GoogleCalender}

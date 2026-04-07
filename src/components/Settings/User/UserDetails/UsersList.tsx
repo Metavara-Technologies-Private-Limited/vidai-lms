@@ -34,6 +34,9 @@ interface Props {
   onToggleUserStatus: (userId: number) => Promise<void> | void;
   onNewUser: () => void;
   onEditUser?: (user: User) => void;
+  canViewUsers?: boolean;
+  canAddUsers?: boolean;
+  canEditUsers?: boolean;
   pinnedUserId?: number | null;
 }
 
@@ -166,6 +169,9 @@ const UsersList: React.FC<Props> = ({
   onToggleUserStatus,
   onNewUser,
   onEditUser,
+  canViewUsers = true,
+  canAddUsers = true,
+  canEditUsers = true,
   pinnedUserId,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -346,6 +352,7 @@ const UsersList: React.FC<Props> = ({
           <Button
             variant="contained"
             onClick={onNewUser}
+            disabled={!canAddUsers}
             startIcon={<AddCircleOutlineIcon sx={{ fontSize: 16 }} />}
             sx={{
               bgcolor: "#505050",
@@ -489,7 +496,7 @@ const UsersList: React.FC<Props> = ({
                   <Checkbox
                     checked={user.status}
                     onChange={() => onToggleUserStatus(user.id)}
-                    disabled={isLoading}
+                    disabled={isLoading || !canEditUsers}
                     icon={checkboxIcon}
                     checkedIcon={checkedCheckboxIcon}
                     sx={checkboxSx}
@@ -499,12 +506,14 @@ const UsersList: React.FC<Props> = ({
                   />
                 </TableCell>
                 <TableCell sx={{ ...bodyCellSx, minWidth: 48 }} align="right">
-                  <Button
-                    onClick={() => onEditUser?.(user)}
-                    sx={{ minWidth: "auto", p: 0 }}
-                  >
-                    <EditActionIcon />
-                  </Button>
+                  {canEditUsers ? (
+                    <Button
+                      onClick={() => onEditUser?.(user)}
+                      sx={{ minWidth: "auto", p: 0 }}
+                    >
+                      <EditActionIcon />
+                    </Button>
+                  ) : null}
                 </TableCell>
               </TableRow>
             ))}
@@ -515,7 +524,11 @@ const UsersList: React.FC<Props> = ({
                   colSpan={5 + activeOptionalColumns.length}
                   sx={{ ...bodyCellSx, textAlign: "center", py: 4 }}
                 >
-                  {isLoading ? "Loading users..." : "No users found."}
+                  {isLoading
+                    ? "Loading users..."
+                    : !canViewUsers
+                      ? "No view permission for users."
+                      : "No users found."}
                 </TableCell>
               </TableRow>
             )}

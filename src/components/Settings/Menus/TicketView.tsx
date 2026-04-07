@@ -35,6 +35,11 @@ import { toast } from "react-toastify";
 import TicketPropertiesSidebar from "../Menus/TicketPropertiesSidebar";
 import { selectClinic } from "../../../store/clinicSlice";
 import { useSelector } from "react-redux";
+import { selectUser } from "../../../store/authSlice";
+import {
+  resolveUserRole,
+  hasSubcategoryActionPermission,
+} from "../../../utils/roleAccess";
 
 const FILE_BASE_URL = "http://127.0.0.1:8000";
 
@@ -163,6 +168,7 @@ const TicketView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const clinic = useSelector(selectClinic);
+  const authUser = useSelector(selectUser);
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [leads, setLeads] = useState<Array<{ id: string; email?: string }>>([]);
@@ -200,6 +206,19 @@ const TicketView = () => {
   const [viewTemplateOpen, setViewTemplateOpen] = useState(false);
   const [viewTemplateData, setViewTemplateData] =
     useState<EmailTemplate | null>(null);
+
+  const role = resolveUserRole(authUser as Record<string, unknown> | null);
+  const isSuperAdmin = role === "super_admin";
+  const permissions = (authUser as Record<string, unknown> | null)?.permissions;
+  const canViewTickets =
+    isSuperAdmin ||
+    hasSubcategoryActionPermission(permissions, "tickets", "view");
+  const canAddTickets =
+    isSuperAdmin ||
+    hasSubcategoryActionPermission(permissions, "tickets", "add");
+  const canEditTickets =
+    isSuperAdmin ||
+    hasSubcategoryActionPermission(permissions, "tickets", "edit");
 
   type TicketEmployeeApi = {
     id: number;
@@ -344,6 +363,11 @@ const TicketView = () => {
 
   // Handle saving all changes to the Database
   const handleUpdate = async () => {
+    if (!canEditTickets) {
+      toast.error("You do not have permission to edit tickets.");
+      return;
+    }
+
     if (!id) return;
 
     if (!ticket) {
@@ -392,6 +416,11 @@ const TicketView = () => {
   };
 
   const handleSendReply = async () => {
+    if (!canAddTickets) {
+      toast.error("You do not have permission to reply on tickets.");
+      return;
+    }
+
     if (!id) return;
 
     // No recipients selected
@@ -668,6 +697,14 @@ const TicketView = () => {
       </Alert>
     );
 
+  if (!canViewTickets) {
+    return (
+      <Alert severity="warning" sx={{ m: 3 }}>
+        You do not have permission to view tickets.
+      </Alert>
+    );
+  }
+
   const currentAssigneeName =
     assigneeName ||
     employees.find((emp) => emp.id === ticket.assigned_to_id)?.emp_name ||
@@ -712,6 +749,8 @@ const TicketView = () => {
         <TicketContentPanel
           ticket={ticket}
           description={description}
+          canEdit={canEditTickets}
+          canReply={canAddTickets}
           setDescription={setDescription}
           handlePreviewOpen={handlePreviewOpen}
           openReply={openReply}
@@ -766,6 +805,7 @@ const TicketView = () => {
           setAssignTo={setAssignTo}
           setAssigneeName={setDraftAssigneeName}
           selectedAssigneeEmail={currentAssigneeEmail}
+          canEdit={canEditTickets}
           handleUpdate={handleUpdate}
           updating={updating}
           ticketTypes={ticketTypes}

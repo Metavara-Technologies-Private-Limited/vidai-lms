@@ -59,7 +59,7 @@ type RoleListResponse = RoleApiRecord[] | ApiWrapped<RoleApiRecord[]>;
 
 export type UserCreateUpdatePayload = {
   username?: string;
-  email: string;
+  email?: string;
   password?: string;
   confirm_password?: string;
   first_name?: string;
@@ -70,6 +70,21 @@ export type UserCreateUpdatePayload = {
   mobile_no?: string;
   role?: number;
   photo?: string | null;
+};
+
+type UserCreateFallbackPayload = UserCreateUpdatePayload & {
+  mobile_number?: string;
+  confirmPassword?: string;
+  profile?: {
+    first_name?: string;
+    last_name?: string;
+    gender?: string;
+    date_of_joining?: string | null;
+    date_of_birth?: string | null;
+    mobile_no?: string;
+    photo?: string | null;
+    role?: number;
+  };
 };
 
 const extractApiErrorMessage = (error: unknown): string => {
@@ -337,12 +352,63 @@ const extractRoleArray = (payload: RoleListResponse): RoleApiRecord[] => {
 };
 
 const getAuthToken = (): string | null =>
-  localStorage.getItem("auth_token") || localStorage.getItem("authToken");
+  localStorage.getItem("auth_token") ||
+  localStorage.getItem("authToken") ||
+  sessionStorage.getItem("auth_token") ||
+  sessionStorage.getItem("authToken");
 
 const ensureAuthToken = (): void => {
   if (!getAuthToken()) {
     throw new Error("Session expired. Please login again.");
   }
+};
+
+const toFallbackCreatePayload = (
+  payload: UserCreateUpdatePayload,
+): UserCreateFallbackPayload => {
+  const profile = {
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    gender: payload.gender,
+    date_of_joining: payload.date_of_joining,
+    date_of_birth: payload.date_of_birth,
+    mobile_no: payload.mobile_no,
+    photo: payload.photo,
+    role: payload.role,
+  };
+
+  return {
+    ...payload,
+    mobile_number: payload.mobile_no,
+    confirmPassword: payload.confirm_password,
+    profile,
+  };
+};
+
+const shouldRetryCreateWithFallback = (error: unknown): boolean => {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  if (status === 404 || status === 405) {
+    return true;
+  }
+
+  if (status !== 400) {
+    return false;
+  }
+
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  if (!data || typeof data !== "object") {
+    return false;
+  }
+
+  const keys = Object.keys(data as Record<string, unknown>);
+  return keys.some((key) =>
+    [
+      "profile",
+      "mobile_number",
+      "non_field_errors",
+      "confirmPassword",
+    ].includes(key),
+  );
 };
 
 export const usersApi = {
@@ -453,6 +519,19 @@ export const usersApi = {
       const response = await http.post<UserSingleResponse>("/users/", payload);
       return normalizeUser(extractSingleRecord(response.data));
     } catch (error) {
+      if (shouldRetryCreateWithFallback(error)) {
+        try {
+          const fallbackPayload = toFallbackCreatePayload(payload);
+          const fallbackResponse = await http.post<UserSingleResponse>(
+            "/users/create/",
+            fallbackPayload,
+          );
+          return normalizeUser(extractSingleRecord(fallbackResponse.data));
+        } catch (fallbackError) {
+          throw new Error(extractApiErrorMessage(fallbackError));
+        }
+      }
+
       throw new Error(extractApiErrorMessage(error));
     }
   },

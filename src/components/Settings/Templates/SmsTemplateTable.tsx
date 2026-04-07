@@ -12,9 +12,14 @@ type TableTemplate = EmailTemplate | SMSTemplate | WhatsAppTemplate;
 interface Props {
   data: TableTemplate[];
   onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: TableTemplate) => void;
+  canEditTemplate?: boolean;
 }
 
-export const SmsTemplateTable: React.FC<Props> = ({ data = [], onAction }) => {
+export const SmsTemplateTable: React.FC<Props> = ({
+  data = [],
+  onAction,
+  canEditTemplate = true,
+}) => {
   const [page, setPage] = useState(0); 
   const rowsPerPage = 10;
 
@@ -125,13 +130,13 @@ export const SmsTemplateTable: React.FC<Props> = ({ data = [], onAction }) => {
                         <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('view', row)}>
                           <Visibility fontSize="inherit" />
                         </IconButton>
-                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('edit', row)}>
+                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('edit', row)} disabled={!canEditTemplate}>
                           <Edit fontSize="inherit" />
                         </IconButton>
                         <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('copy', row)}>
                           <ContentCopy fontSize="inherit" />
                         </IconButton>
-                        <IconButton size="small" onClick={() => onAction('delete', row)} sx={{ p: 0.5 }}>
+                        <IconButton size="small" onClick={() => onAction('delete', row)} sx={{ p: 0.5 }} disabled={!canEditTemplate}>
                           <img src={TrashIcon} alt="Delete" style={{ width: '18px', height: '18px' }} />
                         </IconButton>
                       </Box>

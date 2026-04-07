@@ -36,7 +36,7 @@ const SafeResponsiveContainer = ({
   return (
     <Box ref={containerRef} sx={{ width: "100%", height: "100%", minWidth: 0, minHeight }}>
       {canRenderChart ? (
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
           {children}
         </ResponsiveContainer>
       ) : null}

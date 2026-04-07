@@ -36,6 +36,8 @@ interface Props {
   replyProps?: TicketReplyEditorProps | null;
   assigneeName?: string;
   assigneeEmail?: string;
+  canEdit?: boolean;
+  canReply?: boolean;
 
   setDescription: (v: string) => void;
 
@@ -55,6 +57,8 @@ const TicketContentPanel = ({
   replyProps,
   assigneeName,
   assigneeEmail,
+  canEdit = true,
+  canReply = true,
 }: Props) => {
   const dispatch = useDispatch<AppDispatch>();
   const leadsFromStore = useSelector(selectLeads);
@@ -144,6 +148,7 @@ const TicketContentPanel = ({
           multiline
           rows={6}
           value={description}
+          disabled={!canEdit}
           onChange={(e) => setDescription(e.target.value)}
           variant="standard"
           placeholder="Describe the issue in detail..."
@@ -193,7 +198,7 @@ const TicketContentPanel = ({
       </Box>
 
       {/* Reply Button */}
-      {!openReply && (
+      {canReply && !openReply && (
         <Button
           onClick={() => setOpenReply(true)}
           sx={{ textTransform: "none", mt: 2 }}

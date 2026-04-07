@@ -26,9 +26,9 @@ type DetailsView = "list" | "form";
 const EDIT_PASSWORD_PLACEHOLDER = "********";
 
 const FALLBACK_ROLE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "SuperAdmin", label: "SuperAdmin" },
-  { value: "Admin", label: "Admin" },
-  { value: "User", label: "User" },
+  { value: "1", label: "SuperAdmin" },
+  { value: "2", label: "Admin" },
+  { value: "3", label: "User" },
 ];
 
 // const FALLBACK_ROLE_BY_ID: Record<number, string> = {
@@ -45,6 +45,53 @@ const normalizeRoleName = (value: unknown): string =>
     .toLowerCase()
     .replace(/[-_]+/g, " ")
     .replace(/\s+/g, " ");
+
+const hasUsersActionPermission = (
+  permissions: unknown,
+  action: "view" | "add" | "edit" | "print",
+): boolean => {
+  if (!permissions || typeof permissions !== "object") {
+    return false;
+  }
+
+  const actionKey = `can_${action}`;
+  const root = permissions as Record<string, unknown>;
+
+  const legacyRows =
+    root.user_management && typeof root.user_management === "object"
+      ? (root.user_management as Record<string, unknown>).users
+      : null;
+
+  if (Array.isArray(legacyRows)) {
+    const allowed = legacyRows.some((row) => {
+      if (!row || typeof row !== "object") return false;
+      return Boolean((row as Record<string, unknown>)[actionKey]);
+    });
+    if (allowed) return true;
+  }
+
+  for (const moduleValue of Object.values(root)) {
+    if (!moduleValue || typeof moduleValue !== "object") continue;
+
+    for (const categoryValue of Object.values(
+      moduleValue as Record<string, unknown>,
+    )) {
+      if (!Array.isArray(categoryValue)) continue;
+
+      const allowed = categoryValue.some((row) => {
+        if (!row || typeof row !== "object") return false;
+        const rec = row as Record<string, unknown>;
+        const subcategory = normalizeRoleName(rec.subcategory);
+        if (subcategory !== "user" && subcategory !== "users") return false;
+        return Boolean(rec[actionKey]);
+      });
+
+      if (allowed) return true;
+    }
+  }
+
+  return false;
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -68,6 +115,15 @@ const UsersPage: React.FC = () => {
   const canAssignRoles =
     loginType === "INT" &&
     (currentRoleName === "super admin" || currentRoleName === "superadmin");
+  const isSuperAdmin =
+    currentRoleName === "super admin" || currentRoleName === "superadmin";
+  const usersPermissions = (authUser as Record<string, unknown> | null)?.permissions;
+  const canViewUsers =
+    isSuperAdmin || hasUsersActionPermission(usersPermissions, "view");
+  const canAddUsers =
+    isSuperAdmin || hasUsersActionPermission(usersPermissions, "add");
+  const canEditUsers =
+    isSuperAdmin || hasUsersActionPermission(usersPermissions, "edit");
 
   const extractApiErrorMessage = (error: unknown): string => {
     const payload =
@@ -237,30 +293,46 @@ const UsersPage: React.FC = () => {
   const token = useSelector((state: RootState) => state.auth.token);
 
   useEffect(() => {
-    console.log("cc:users fetching", token);
-    if (token) {
+    if (token && canViewUsers) {
       dispatch(fetchUsers());
     }
-  }, [dispatch, token]);
+  }, [dispatch, token, canViewUsers]);
 
   const mapUserToFormData = (user: User): UserFormData => {
-    const profile = (user as any).profile || {};
+    const record = user as any;
+    const profile = record.profile || {};
+    const roleFromProfile =
+      typeof profile.role === "object" && profile.role
+        ? profile.role.id
+        : profile.role;
+    const roleFromRecord =
+      typeof record.role === "object" && record.role
+        ? record.role.id
+        : record.roleId ?? record.role;
 
     return {
-      firstName: profile.first_name || "",
-      lastName: profile.last_name || "",
-      gender: profile.gender || "",
-      dateOfJoining: profile.date_of_joining
-        ? dayjs(profile.date_of_joining)
+      firstName:
+        profile.first_name || record.first_name || record.firstName || "",
+      lastName: profile.last_name || record.last_name || record.lastName || "",
+      gender: profile.gender || record.gender || "",
+      dateOfJoining: profile.date_of_joining || record.date_of_joining || record.dateOfJoining
+        ? dayjs(profile.date_of_joining || record.date_of_joining || record.dateOfJoining)
         : null,
-      dateOfBirth: profile.date_of_birth ? dayjs(profile.date_of_birth) : null,
-      userRole: profile.role ? String(profile.role) : "",
-      userName: user.username || "",
-      mobileNo: profile.mobile_no || "",
-      emailId: user.email || "",
+      dateOfBirth: profile.date_of_birth || record.date_of_birth || record.dateOfBirth
+        ? dayjs(profile.date_of_birth || record.date_of_birth || record.dateOfBirth)
+        : null,
+      userRole:
+        roleFromProfile != null
+          ? String(roleFromProfile)
+          : roleFromRecord != null
+            ? String(roleFromRecord)
+            : "",
+      userName: record.username || "",
+      mobileNo: profile.mobile_no || record.mobile_no || record.mobileNumber || "",
+      emailId: record.email || "",
       password: EDIT_PASSWORD_PLACEHOLDER,
       confirmPassword: EDIT_PASSWORD_PLACEHOLDER,
-      profilePhoto: profile.photo || null,
+      profilePhoto: profile.photo || record.photo || null,
     };
   };
 
@@ -413,6 +485,10 @@ const UsersPage: React.FC = () => {
   };
 
   const handleOpenNewUser = () => {
+    if (!canAddUsers) {
+      toast.error("You do not have add permission for users");
+      return;
+    }
     setPinnedUserId(null);
     setEditingUser(null);
     setDetailsView("form");
@@ -420,6 +496,11 @@ const UsersPage: React.FC = () => {
   };
 
   const handleEditUser = async (user: User) => {
+    if (!canEditUsers) {
+      toast.error("You do not have edit permission for users");
+      return;
+    }
+
     if (user.source === "client") {
       toast.error("Client DB users are read-only in this app");
       return;
@@ -439,40 +520,12 @@ const UsersPage: React.FC = () => {
     setActiveTab("details");
   };
 
-  const handleDeleteUser = async () => {
-    if (!editingUser) {
-      return;
-    }
-
-    if (editingUser.source === "client") {
-      toast.error("Client DB users are read-only in this app");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Delete user ${editingUser.username}? This action cannot be undone.`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await usersApi.remove(editingUser.id);
-      dispatch(fetchUsers());
-      setEditingUser(null);
-      setDetailsView("list");
-      setActiveTab("details");
-      toast.success("User deleted successfully");
-    } catch (error) {
-      console.error("Failed to delete user", error);
-      toast.error("Failed to delete user");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleToggleUserStatus = async (userId: number) => {
+    if (!canEditUsers) {
+      toast.error("You do not have edit permission for users");
+      return;
+    }
+
     const targetUser = users.find((user) => user.id === userId);
     if (!targetUser) {
       return;
@@ -570,6 +623,9 @@ const UsersPage: React.FC = () => {
               onToggleUserStatus={handleToggleUserStatus}
               onNewUser={handleOpenNewUser}
               onEditUser={handleEditUser}
+              canAddUsers={canAddUsers}
+              canEditUsers={canEditUsers}
+              canViewUsers={canViewUsers}
               pinnedUserId={pinnedUserId}
             />
           )}
@@ -582,7 +638,6 @@ const UsersPage: React.FC = () => {
               requireRole={canAssignRoles}
               disableRoleSelection={!canAssignRoles}
               onSave={handleSaveUser}
-              onDelete={editingUser ? handleDeleteUser : undefined}
               onCancel={handleCancelDetails}
               isSubmitting={isSubmitting}
             />

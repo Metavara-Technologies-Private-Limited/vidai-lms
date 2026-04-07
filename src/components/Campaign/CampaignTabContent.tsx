@@ -190,7 +190,7 @@ const CampaignTabContent: React.FC<Props> = ({
             </label>
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={210}>
+        <ResponsiveContainer width="100%" height={210} minWidth={0}>
           <LineChart
             data={performanceData}
             margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
@@ -285,7 +285,7 @@ const CampaignTabContent: React.FC<Props> = ({
         <div className="cd-platform-divider"></div>
         <div className="cd-platform-main">
           <div className="cd-pie-wrapper">
-            <ResponsiveContainer width="100%" height={320}>
+            <ResponsiveContainer width="100%" height={320} minWidth={0}>
               <PieChart>
                 <Pie
                   data={pieData}
