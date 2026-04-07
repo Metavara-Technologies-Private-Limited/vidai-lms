@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Box,
+  Alert,
   Stack,
   Typography,
   IconButton,
@@ -29,6 +30,10 @@ import {
 } from "../store/clinicSlice";
 import { selectAuthed, selectUser } from "../store/authSlice";
 import type { AppDispatch } from "../store";
+import {
+  hasAnySubcategoryActionPermission,
+  resolveUserRole,
+} from "../utils/roleAccess";
 import "../styles/Leads/leads.css";
 
 const STORAGE_KEY_FILTERS = "leads_filters";
@@ -312,6 +317,20 @@ const Leads: React.FC = () => {
   const clinicLoading = useSelector(selectClinicLoading);
   const user = useSelector(selectUser);
   const authed = useSelector(selectAuthed);
+  const authUser = user as unknown as Record<string, unknown> | null;
+  const role = resolveUserRole(authUser);
+  const permissions = authUser?.permissions;
+  const leadAliases = ["leads hub", "leads", "lead"];
+  const canViewLeads =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, leadAliases, "view") ||
+    hasAnySubcategoryActionPermission(permissions, leadAliases, "print");
+  const canAddLeads =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, leadAliases, "add");
+  const canEditLeads =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
 
   const loadSavedFilters = (): FilterValues => {
     try {
@@ -520,8 +539,9 @@ const Leads: React.FC = () => {
   }, [authed, user, clinic, clinicLoading, clinicIdsToHydrate, dispatch]);
 
   React.useEffect(() => {
+    if (!canViewLeads) return;
     dispatch(fetchLeads());
-  }, [dispatch, clinic?.id, user?.id]);
+  }, [canViewLeads, dispatch, clinic?.id, user?.id]);
 
   React.useEffect(() => {
     // Warm up Calendar chunk so tab switch is instant on first open.
@@ -898,6 +918,11 @@ const Leads: React.FC = () => {
 
   return (
     <Box className="leads-page">
+      {!canViewLeads && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          You do not have permission to view leads.
+        </Alert>
+      )}
       {/* HEADER */}
       <Stack
         className="leads-header"
@@ -1048,7 +1073,7 @@ const Leads: React.FC = () => {
           <React.Suspense fallback={null}>
             <LeadsImportButton
               onClick={() => setIsImportModalOpen(true)}
-              disabled={isSavingImport}
+              disabled={isSavingImport || !canAddLeads}
             />
           </React.Suspense>
 
@@ -1056,6 +1081,7 @@ const Leads: React.FC = () => {
           <Button
             className="add-lead-btn"
             onClick={() => navigate("/leads/add")}
+            disabled={!canAddLeads}
             sx={{ flexShrink: 0 }}
           >
             + Add New Lead
@@ -1078,7 +1104,7 @@ const Leads: React.FC = () => {
       </Stack>
 
       {/* CONTENT */}
-      {waitingForContext ? (
+      {!canViewLeads ? null : waitingForContext ? (
         <Box
           sx={{
             minHeight: 260,
@@ -1126,6 +1152,7 @@ const Leads: React.FC = () => {
                 tab={tab === 2 ? "archived" : "active"}
                 filters={activeFilters}
                 importedLeads={tab === 0 ? importedLeads : []}
+                canEditLeads={canEditLeads}
               />
             ) : (
               <LeadsBoard search={search} filters={activeFilters} />

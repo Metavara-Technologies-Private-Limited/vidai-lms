@@ -29,7 +29,10 @@ import {
 import type { AuthUser } from "./types/auth.types";
 import { fetchLeads } from "./store/leadSlice";
 import { fetchUsers } from "./store/userSlice";
+import { selectLoginType } from "./store/authSlice";
 // import type { Clinic } from "./types/clinic.types";
+
+let profileRestoreTokenInFlight: string | null = null;
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
@@ -140,7 +143,7 @@ export default function AppRoutes() {
   const authed = useSelector(selectAuthed);
   const token = useSelector(selectToken);
   const user = useSelector(selectUser);
-  // const loginType = useSelector(selectLoginType);
+  const loginType = useSelector(selectLoginType);
   const roleContext =
     (user as Record<string, unknown> | null) ??
     (token ? ({ access: token } as Record<string, unknown>) : null);
@@ -151,8 +154,26 @@ export default function AppRoutes() {
     const restoreUser = async () => {
       if (!token) return;
 
+      if (profileRestoreTokenInFlight === token) return;
+      profileRestoreTokenInFlight = token;
+
       // Skip profile call only when we've explicitly hydrated profile before.
       if (user && typeof user === "object" && user.profile_loaded) return;
+
+      if (loginType !== "EXT") {
+        if (user && typeof user === "object" && !user.profile_loaded) {
+          dispatch(
+            setUser({
+              ...(user as AuthUser),
+              profile_loaded: true,
+            }),
+          );
+        }
+
+        await dispatch(fetchLeads());
+        await dispatch(fetchUsers());
+        return;
+      }
 
       try {
         const profile = await authApi.getProfile();
@@ -196,15 +217,26 @@ export default function AppRoutes() {
       } catch (err: unknown) {
         const status = (err as { response?: { status?: number } })?.response
           ?.status;
-        if (status !== 401 && status !== 403) {
+        if (status === 401 || status === 403) {
+          if (user && typeof user === "object" && !user.profile_loaded) {
+            dispatch(
+              setUser({
+                ...(user as AuthUser),
+                profile_loaded: true,
+              }),
+            );
+          }
+        } else {
           console.error("Failed to restore user", err);
         }
+      } finally {
+        profileRestoreTokenInFlight = null;
       }
     };
 
     restoreUser();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, authed, dispatch]);
+  }, [token, authed, dispatch, loginType]);
 
   return (
     <Routes>

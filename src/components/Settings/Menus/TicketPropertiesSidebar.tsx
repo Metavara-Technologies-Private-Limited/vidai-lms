@@ -120,6 +120,7 @@ interface Props {
   handleUpdate: () => void;
   setAssigneeName?: (name: string) => void;
   setAssigneeEmail?: (email: string) => void;
+  canEdit?: boolean;
 
   updating: boolean;
 
@@ -143,6 +144,7 @@ const TicketPropertiesSidebar = ({
   setAssignTo,
   setAssigneeName,
   setAssigneeEmail,
+  canEdit = true,
   handleUpdate,
   updating,
   ticketTypes,
@@ -286,6 +288,7 @@ const TicketPropertiesSidebar = ({
                 select
                 label="Type"
                 value={type}
+                disabled={!canEdit}
                 onChange={(e) => setType(e.target.value)}
                 fullWidth
                 size="small"
@@ -306,6 +309,7 @@ const TicketPropertiesSidebar = ({
                 select
                 label="Status"
                 value={status}
+                disabled={!canEdit}
                 onChange={(e) => setStatus(e.target.value as TicketStatus)}
                 fullWidth
                 size="small"
@@ -325,6 +329,7 @@ const TicketPropertiesSidebar = ({
                 select
                 label="Priority"
                 value={priority}
+                disabled={!canEdit}
                 onChange={(e) => setPriority(e.target.value as TicketPriority)}
                 fullWidth
                 size="small"
@@ -342,6 +347,7 @@ const TicketPropertiesSidebar = ({
               <Autocomplete
                 options={assigneeOptions}
                 loading={assigneeLoading}
+                disabled={!canEdit}
                 value={selectedAssigneeOption}
                 onInputChange={(_, value) => setAssigneeSearch(value)}
                 onChange={(_, value) => {
@@ -393,7 +399,7 @@ const TicketPropertiesSidebar = ({
             variant="contained"
             fullWidth
             onClick={handleUpdateWithTimeline}
-            disabled={updating}
+            disabled={updating || !canEdit}
             sx={{
               bgcolor: "#505050",
               py: 1.5,

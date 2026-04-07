@@ -46,7 +46,6 @@ interface Props {
   requireRole?: boolean;
   disableRoleSelection?: boolean;
   onSave: (data: UserFormData) => Promise<void> | void;
-  onDelete?: () => Promise<void> | void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -196,7 +195,6 @@ const UserDetailsForm: React.FC<Props> = ({
   requireRole = true,
   disableRoleSelection = false,
   onSave,
-  onDelete,
   onCancel,
   isSubmitting = false,
 }) => {
@@ -234,6 +232,41 @@ const UserDetailsForm: React.FC<Props> = ({
   };
 
   const validateForm = (): boolean => {
+    if (!form.firstName.trim()) {
+      toast.error("First Name is required");
+      return false;
+    }
+
+    if (!form.lastName.trim()) {
+      toast.error("Last Name is required");
+      return false;
+    }
+
+    if (!form.userName.trim()) {
+      toast.error("User Name is required");
+      return false;
+    }
+
+    if (!form.emailId.trim()) {
+      toast.error("Email is required");
+      return false;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.emailId.trim())) {
+      toast.error("Enter a valid email address");
+      return false;
+    }
+
+    if (mode === "create" && !form.password.trim()) {
+      toast.error("Password is required");
+      return false;
+    }
+
+    if (mode === "create" && !form.confirmPassword.trim()) {
+      toast.error("Confirm Password is required");
+      return false;
+    }
+
     if (requireRole && !form.userRole.trim()) {
       toast.error("User Role is required", {
         toastId: "user-role-required",
@@ -534,24 +567,6 @@ const UserDetailsForm: React.FC<Props> = ({
           >
             {mode === "edit" ? "Update User" : "Create New User"}
           </Button>
-          {mode === "edit" && onDelete && (
-            <Button
-              variant="contained"
-              onClick={() => void onDelete()}
-              disabled={isSubmitting}
-              sx={{
-                bgcolor: "#505050",
-                color: "#ffffff",
-                textTransform: "none",
-                fontSize: 13,
-                borderRadius: "6px",
-                px: 3,
-                "&:hover": { bgcolor: "#D32F2F" },
-              }}
-            >
-              Delete
-            </Button>
-          )}
         </Box>
       </Box>
     </LocalizationProvider>

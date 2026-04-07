@@ -43,6 +43,7 @@ export interface Props {
   tab: "active" | "archived";
   filters?: FilterValues;
   importedLeads?: RawLead[];
+  canEditLeads?: boolean;
 }
 
 export interface ApiErrorShape {

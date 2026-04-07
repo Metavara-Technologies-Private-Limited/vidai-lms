@@ -71,7 +71,24 @@ const SUB_LABEL_ALIASES: Record<string, string[]> = {
 const KNOWN_MENU_LABELS = new Set(Object.values(MENU_LABEL_BY_KEY));
 const KNOWN_SUB_LABELS = new Set(Object.values(SUB_LABEL_BY_KEY));
 
-const collectPermissionLabels = (user: UserLike): Set<string> => {
+type PermissionState = {
+  labels: Set<string>;
+  hasPermissionContainer: boolean;
+  hasPermissionPayload: boolean;
+};
+
+const rowCanView = (value: unknown): boolean => {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return isTrueFlag(row.can_view) || isTrueFlag(row.canView);
+};
+
+const rowsContainView = (value: unknown): boolean => {
+  if (!Array.isArray(value)) return false;
+  return value.some((row) => rowCanView(row));
+};
+
+const collectPermissionState = (user: UserLike): PermissionState => {
   const labels = new Set<string>();
   const nestedUser = asRecord(user?.user);
   const permissions = user?.permissions ?? nestedUser?.permissions;
@@ -82,10 +99,22 @@ const collectPermissionLabels = (user: UserLike): Set<string> => {
     if (label && label !== "_") labels.add(label);
   };
 
-  if (!permsRecord) return labels;
+  if (!permsRecord) {
+    return {
+      labels,
+      hasPermissionContainer: false,
+      hasPermissionPayload: false,
+    };
+  }
+
+  const hasPermissionContainer = true;
+  let hasPermissionPayload = false;
 
   // Shape A: permissions.modules = [{name, submodules:[{name, type:[{name}]}]}]
   if (Array.isArray(permsRecord.modules)) {
+    if (permsRecord.modules.length > 0) {
+      hasPermissionPayload = true;
+    }
     for (const mod of permsRecord.modules as Array<Record<string, unknown>>) {
       addLabel(mod.name);
       if (Array.isArray(mod.submodules)) {
@@ -103,33 +132,67 @@ const collectPermissionLabels = (user: UserLike): Set<string> => {
 
   // Shape B: permission map object from users/list
   for (const [moduleKey, categoriesVal] of Object.entries(permsRecord)) {
-    if (moduleKey !== "modules") addLabel(moduleKey);
+    if (moduleKey === "modules") continue;
+
     const categories = asRecord(categoriesVal);
-    if (!categories) continue;
+    if (!categories) {
+      if (Array.isArray(categoriesVal) && categoriesVal.length > 0) {
+        hasPermissionPayload = true;
+      }
+      continue;
+    }
+
+    if (Object.keys(categories).length > 0) {
+      hasPermissionPayload = true;
+    }
+
+    if (
+      moduleKey !== "_" &&
+      Object.values(categories).some((value) => rowsContainView(value))
+    ) {
+      addLabel(moduleKey);
+    }
 
     for (const [categoryKey, subVal] of Object.entries(categories)) {
-      addLabel(categoryKey);
-      if (categoryKey === "_" && Array.isArray(subVal)) {
-        for (const row of subVal as Array<Record<string, unknown>>) {
-          addLabel(row.subcategory);
+      if (categoryKey !== "_" && rowsContainView(subVal)) {
+        addLabel(categoryKey);
+      }
+
+      // Subcategory permissions are often sent under "_" category; honor
+      // explicit can_view on each subcategory row even if parent category
+      // was not selected.
+      if (Array.isArray(subVal)) {
+        for (const row of subVal) {
+          if (!rowCanView(row)) continue;
+          if (!row || typeof row !== "object") continue;
+          const rec = row as Record<string, unknown>;
+          const subcategory = rec.subcategory ?? rec.subcategory_key;
+          addLabel(subcategory);
         }
       }
     }
   }
 
-  return labels;
+  return { labels, hasPermissionContainer, hasPermissionPayload };
 };
 
 const hasMenuPermission = (user: UserLike, key: string): boolean | null => {
-  const labels = collectPermissionLabels(user);
-  if (labels.size === 0) return null;
+  const { labels, hasPermissionContainer } = collectPermissionState(user);
+  if (!hasPermissionContainer) return null;
+
+  // When a permissions container exists, always use it deterministically.
+  // If no labels could be parsed, deny instead of role fallback to avoid
+  // show/hide glitches.
+  if (labels.size === 0) {
+    return false;
+  }
 
   const hasKnownMenuSignals = [...labels].some(
     (label) => KNOWN_MENU_LABELS.has(label) || KNOWN_SUB_LABELS.has(label),
   );
   if (!hasKnownMenuSignals) {
-    // Permission payload exists but does not match menu taxonomy; fall back to role.
-    return null;
+    // Explicit permissions exist; deny by default when no known grants are present.
+    return false;
   }
 
   if (key === "settings") {
@@ -152,8 +215,12 @@ const hasSubMenuPermission = (
   user: UserLike,
   subKey: string,
 ): boolean | null => {
-  const labels = collectPermissionLabels(user);
-  if (labels.size === 0) return null;
+  const { labels, hasPermissionContainer } = collectPermissionState(user);
+  if (!hasPermissionContainer) return null;
+
+  if (labels.size === 0) {
+    return false;
+  }
 
   const hasKnownSignals = [...labels].some(
     (label) => KNOWN_MENU_LABELS.has(label) || KNOWN_SUB_LABELS.has(label),
@@ -161,7 +228,7 @@ const hasSubMenuPermission = (
 
   if (!hasKnownSignals) {
     // Permission payload exists but does not map cleanly to sidebar taxonomy.
-    return null;
+    return false;
   }
 
   const aliases = SUB_LABEL_ALIASES[subKey];
@@ -354,4 +421,95 @@ export const defaultPathForUser = (
   }
 
   return defaultPathForRole(role);
+};
+
+const hasActionFlag = (
+  row: Record<string, unknown>,
+  action: "view" | "add" | "edit" | "print",
+): boolean => {
+  const key = `can_${action}`;
+  return isTrueFlag(row[key]) || isTrueFlag(row[key.replace("_", "")]);
+};
+
+export const hasSubcategoryActionPermission = (
+  permissions: unknown,
+  subcategory: string,
+  action: "view" | "add" | "edit" | "print",
+): boolean => {
+  if (!permissions || typeof permissions !== "object") return false;
+
+  const normalized = normalize(subcategory);
+  const aliases = new Set<string>([normalized]);
+  if (normalized.endsWith("s")) aliases.add(normalized.slice(0, -1));
+  else aliases.add(`${normalized}s`);
+
+  const root = permissions as Record<string, unknown>;
+
+  const rowMatchesSubcategory = (row: Record<string, unknown>): boolean => {
+    const subValue = normalize(row.subcategory ?? row.subcategory_key);
+    const categoryValue = normalize(row.category ?? row.category_key);
+    const moduleValue = normalize(row.module ?? row.module_key);
+    if (subValue && aliases.has(subValue)) return true;
+    if (!subValue && aliases.has(categoryValue)) return true;
+    return !subValue && !categoryValue && aliases.has(moduleValue);
+  };
+
+  const rowsAllowAction = (value: unknown): boolean => {
+    if (!Array.isArray(value)) return false;
+    return value.some((row) => {
+      if (!row || typeof row !== "object") return false;
+      const rec = row as Record<string, unknown>;
+      return rowMatchesSubcategory(rec) && hasActionFlag(rec, action);
+    });
+  };
+
+  for (const moduleValue of Object.values(root)) {
+    if (!moduleValue || typeof moduleValue !== "object") continue;
+    for (const categoryValue of Object.values(
+      moduleValue as Record<string, unknown>,
+    )) {
+      if (rowsAllowAction(categoryValue)) return true;
+    }
+  }
+
+  if (rowsAllowAction(root[normalized])) return true;
+
+  if (Array.isArray(root.modules)) {
+    for (const moduleItem of root.modules as Array<Record<string, unknown>>) {
+      const submodules = Array.isArray(moduleItem.submodules)
+        ? (moduleItem.submodules as Array<Record<string, unknown>>)
+        : [];
+
+      for (const sub of submodules) {
+        const subName = normalize(sub.name);
+        if (!aliases.has(subName)) continue;
+
+        const permissionRows = Array.isArray(sub.permissions)
+          ? (sub.permissions as Array<Record<string, unknown>>)
+          : Array.isArray(sub.type)
+            ? (sub.type as Array<Record<string, unknown>>)
+            : [];
+
+        if (
+          permissionRows.some(
+            (row) => row && typeof row === "object" && hasActionFlag(row, action),
+          )
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+};
+
+export const hasAnySubcategoryActionPermission = (
+  permissions: unknown,
+  subcategories: string[],
+  action: "view" | "add" | "edit" | "print",
+): boolean => {
+  return subcategories.some((subcategory) =>
+    hasSubcategoryActionPermission(permissions, subcategory, action),
+  );
 };

@@ -30,6 +30,7 @@ interface CampaignCardProps {
   onStatusChange: (id: string, status: CampaignStatus) => void;
   onEdit?: (campaign: Campaign) => void;
   onDuplicate?: (campaign: Campaign) => void;
+  canEditCampaign?: boolean;
 }
 
 const campaignTypeIconMap: Record<Campaign["type"], string> = {
@@ -45,6 +46,7 @@ export default function CampaignCard({
   onStatusChange,
   onEdit,
   onDuplicate,
+  canEditCampaign = true,
 }: CampaignCardProps) {
   const isMenuOpen = openMenuId === c.id;
   const menuRef = useRef<HTMLDivElement>(null);
@@ -148,8 +150,11 @@ export default function CampaignCard({
 
           <button
             className="action-btn pause-btn"
+            disabled={!canEditCampaign}
+            title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
             onClick={(e) => {
               e.stopPropagation();
+              if (!canEditCampaign) return;
               if (c.status === CAMPAIGN_STATUS.STOPPED) {
                 onStatusChange(c.id, CAMPAIGN_STATUS.LIVE);
                 toast.success("Campaign is Live now");
@@ -167,7 +172,12 @@ export default function CampaignCard({
           </button>
 
           <div className="more-container" ref={menuRef}>
-            <button className="action-btn more-btn" onClick={toggleMenu}>
+            <button
+              className="action-btn more-btn"
+              onClick={toggleMenu}
+              disabled={!canEditCampaign}
+              title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+            >
               <img src={moreIcon} alt="More" width={20} height={20} />
             </button>
 
@@ -181,6 +191,7 @@ export default function CampaignCard({
                   className="menu-item"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (!canEditCampaign) return;
                     setOpenMenuId(null);
                     onEdit?.(c);
                   }}
@@ -192,6 +203,7 @@ export default function CampaignCard({
                   className="menu-item"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (!canEditCampaign) return;
                     setOpenMenuId(null);
                     onDuplicate?.(c);
                   }}
@@ -208,6 +220,7 @@ export default function CampaignCard({
                     className="menu-item stop-item"
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!canEditCampaign) return;
                       setOpenMenuId(null);
                       setShowStopModal(true);
                     }}

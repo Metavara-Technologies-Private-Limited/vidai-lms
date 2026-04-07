@@ -14,9 +14,14 @@ interface Props {
   data: any[]; 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: any) => void;
+  canEditTemplate?: boolean;
 }
 
-export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => {
+export const EmailTemplateTable: React.FC<Props> = ({
+  data = [],
+  onAction,
+  canEditTemplate = true,
+}) => {
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
 
@@ -119,9 +124,9 @@ export const EmailTemplateTable: React.FC<Props> = ({ data = [], onAction }) => 
                     <TableCell align="right">
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('view', row)}><Visibility fontSize="inherit" /></IconButton>
-                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('edit', row)}><Edit fontSize="inherit" /></IconButton>
+                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('edit', row)} disabled={!canEditTemplate}><Edit fontSize="inherit" /></IconButton>
                         <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('copy', row)}><ContentCopy fontSize="inherit" /></IconButton>
-                        <IconButton size="small" onClick={() => onAction('delete', row)} sx={{ p: 0.5 }}>
+                        <IconButton size="small" onClick={() => onAction('delete', row)} sx={{ p: 0.5 }} disabled={!canEditTemplate}>
                           <img src={TrashIcon} alt="Delete" style={{ width: '18px', height: '18px' }} />
                         </IconButton>
                       </Box>

@@ -153,6 +153,7 @@ export default function VidaiLogin() {
       dispatch(
         setAuth({
           token: loginRes.token,
+          refresh: loginRes.refresh,
           user: authUser,
           loginType: mode,
         }),

@@ -200,6 +200,12 @@ const Header = () => {
     { icon: MessageQuestionIcon, type: "help" },
   ] as const;
 
+  const displayUserName =
+    `${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim() ||
+    user?.username ||
+    user?.email ||
+    "-";
+
   return (
     <AppBar
       position="static"
@@ -284,7 +290,7 @@ const Header = () => {
             />
             <Box sx={{ display: { xs: "none", sm: "block" } }}>
               <Typography fontWeight={600}>
-                {user ? `${user.first_name} ${user.last_name}` : "—"}
+                {displayUserName}
               </Typography>
 
               <Typography fontSize={12} color="#6b7280">
@@ -323,7 +329,7 @@ const Header = () => {
       >
         <MenuItem disabled>
           <PersonIcon sx={{ mr: 1 }} />
-          {user ? `${user.first_name} ${user.last_name}` : "-"}
+          {displayUserName}
         </MenuItem>
 
         <MenuItem disabled>

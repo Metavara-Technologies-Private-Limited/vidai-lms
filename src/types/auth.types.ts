@@ -118,6 +118,7 @@ export interface AuthUser {
 export interface AuthState {
   user: AuthUser | null;
   token: string | null;
+  refreshToken: string | null;
   authed: boolean;
   loginType: LoginType;
 }

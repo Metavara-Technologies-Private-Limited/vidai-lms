@@ -351,6 +351,7 @@ const LeadsTable: React.FC<Props> = ({
   tab,
   filters,
   importedLeads = [],
+  canEditLeads = true,
 }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -443,6 +444,7 @@ const LeadsTable: React.FC<Props> = ({
   // handleEditStatusOpen — cast ProcessedLead to LeadItem:
   const handleEditStatusOpen = (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
+    if (!canEditLeads) return;
     setEditStatusLead(lead as unknown as LeadItem);
   };
 
@@ -1272,6 +1274,7 @@ const LeadsTable: React.FC<Props> = ({
                       <IconButton
                         size="small"
                         onClick={(e) => handleEditStatusOpen(e, lead)}
+                        disabled={!canEditLeads}
                         sx={{
                           p: 0.25,
                           color: "text.secondary",

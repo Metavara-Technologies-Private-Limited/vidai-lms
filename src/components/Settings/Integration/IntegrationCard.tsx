@@ -15,6 +15,7 @@ import { integrationApi } from "../../../services/integration.api";
 type ExtendedIntegrationCardProps = IntegrationCardProps & {
   isConnected?: boolean;
   upcomingAppointments?: number;
+  canManage?: boolean;
 };
 
 const IntegrationCard = ({
@@ -24,6 +25,7 @@ const IntegrationCard = ({
   headerBgColor,
   isConnected = false,
   upcomingAppointments,
+  canManage = true,
 }: ExtendedIntegrationCardProps) => {
   // const storageKey = `integration_${name}`;
   // const [connected, setConnected] = useState(false);
@@ -35,6 +37,7 @@ const IntegrationCard = ({
   // }, [storageKey]);
 
   const handleConnect = () => {
+    if (!canManage) return;
     if (name === "LinkedIn") {
       integrationApi.connectLinkedIn();
       return;
@@ -58,6 +61,7 @@ const IntegrationCard = ({
   };
 
   const handleDisconnect = async () => {
+    if (!canManage) return;
     try {
       if (name === "LinkedIn") {
         await integrationApi.disconnectLinkedIn();
@@ -167,7 +171,9 @@ const IntegrationCard = ({
           variant="outlined"
           sx={styles.actionButton(connected)}
           onClick={connected ? handleDisconnect : handleConnect}
+          disabled={!canManage}
           startIcon={<Box component="img" src={icon} sx={styles.buttonIcon} />}
+          title={!canManage ? "No permission to manage integrations" : undefined}
         >
           {connected ? "Disconnect" : "Connect"}
         </Button>

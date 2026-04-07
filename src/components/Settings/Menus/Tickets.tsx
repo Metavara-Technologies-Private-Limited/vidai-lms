@@ -57,6 +57,11 @@ import {
 import type { AppDispatch } from "../../../store";
 import type { Employee } from "../../../services/leads.api";
 import { clinicsApi } from "../../../services/tickets.api";
+import { selectUser } from "../../../store/authSlice";
+import {
+  resolveUserRole,
+  hasSubcategoryActionPermission,
+} from "../../../utils/roleAccess";
 
 const CreateTicket = lazy(() => import("./CreateTicket"));
 const FilterTickets = lazy(() => import("./FilterTicket"));
@@ -70,6 +75,7 @@ const Tickets = () => {
   const dashboardCounts = useSelector(selectTicketDashboard);
   const loading = useSelector(selectTicketsLoading);
   const error = useSelector(selectTicketsError);
+  const authUser = useSelector(selectUser);
   const [employees, setEmployees] = useState<Employee[]>([]);
   // --- Local UI State ---
   const [tab, setTab] = useState<string>("New");
@@ -79,7 +85,18 @@ const Tickets = () => {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<TicketFilters | null>(null);
 
-  console.log(employees);
+  const role = resolveUserRole(authUser as Record<string, unknown> | null);
+  const isSuperAdmin = role === "super_admin";
+  const permissions = (authUser as Record<string, unknown> | null)?.permissions;
+  const canViewTickets =
+    isSuperAdmin ||
+    hasSubcategoryActionPermission(permissions, "tickets", "view");
+  const canAddTickets =
+    isSuperAdmin ||
+    hasSubcategoryActionPermission(permissions, "tickets", "add");
+  const hasTicketView403 =
+    typeof error === "string" &&
+    (error.includes("403") || error.toLowerCase().includes("permission denied"));
 
   useEffect(() => {
     const loadData = async () => {
@@ -104,9 +121,10 @@ const Tickets = () => {
 
   // 1. Initial Data Fetch from DB
   useEffect(() => {
+    if (!canViewTickets) return;
     dispatch(fetchTickets());
     dispatch(fetchTicketDashboard());
-  }, [dispatch]);
+  }, [dispatch, canViewTickets]);
 
   const ticketsFromDb = useMemo((): TicketListItem[] => {
     if (Array.isArray(rawTickets)) return rawTickets;
@@ -194,6 +212,22 @@ const Tickets = () => {
     );
   }
 
+  if (!canViewTickets) {
+    return (
+      <Box pt={2} px={0.1}>
+        <Alert severity="warning">You do not have permission to view tickets.</Alert>
+      </Box>
+    );
+  }
+
+  if (hasTicketView403) {
+    return (
+      <Box pt={2} px={0.1}>
+        <Alert severity="warning">You do not have permission to view tickets.</Alert>
+      </Box>
+    );
+  }
+
   const columns = [
     { key: "ticket_no", label: "Ticket No", flex: 1 },
     { key: "lab_name", label: "Lab Name", flex: 1.4 },
@@ -268,6 +302,7 @@ const Tickets = () => {
             variant="contained"
             startIcon={<AddIcon />}
             sx={createTicketButtonSx}
+            disabled={!canAddTickets}
             onClick={() => setOpenCreate(true)}
           >
             Create New
@@ -432,7 +467,7 @@ const Tickets = () => {
         </Stack>
       </Stack>
 
-      {openCreate && (
+      {openCreate && canAddTickets && (
         <Suspense fallback={null}>
           <CreateTicket
             open={openCreate}

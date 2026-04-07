@@ -29,6 +29,11 @@ import {
 } from "../../services/pipeline.api";
 import type { AppDispatch } from "../../store";
 import { selectClinic } from "../../store/clinicSlice";
+import { selectUser } from "../../store/authSlice";
+import {
+	hasAnySubcategoryActionPermission,
+	resolveUserRole,
+} from "../../utils/roleAccess";
 import {
 	createPipeline,
 	createPipelineStage,
@@ -68,6 +73,19 @@ const SalesPipelineDashboard = () => {
 	const theme = useTheme();
 	const dispatch = useDispatch<AppDispatch>();
 	const clinic = useSelector(selectClinic);
+	const user = useSelector(selectUser);
+	const authUser = user as unknown as Record<string, unknown> | null;
+	const role = resolveUserRole(authUser);
+	const permissions = authUser?.permissions;
+	const pipelineAliases = ["sales pipeline configuration", "pipeline", "sales pipeline"];
+	const canViewPipeline =
+		role === "super_admin" ||
+		hasAnySubcategoryActionPermission(permissions, pipelineAliases, "view") ||
+		hasAnySubcategoryActionPermission(permissions, pipelineAliases, "print");
+	const canEditPipeline =
+		role === "super_admin" ||
+		hasAnySubcategoryActionPermission(permissions, pipelineAliases, "add") ||
+		hasAnySubcategoryActionPermission(permissions, pipelineAliases, "edit");
 	const pipelines = useSelector(selectPipelines);
 	const selectedPipeline = useSelector(selectSelectedPipeline);
 	const pipelineLoading = useSelector(selectPipelineLoading);
@@ -96,14 +114,16 @@ const SalesPipelineDashboard = () => {
 	];
 
 	useEffect(() => {
+		if (!canViewPipeline) return;
 		if (!clinic?.id) return;
 		dispatch(fetchPipelines(clinic.id));
-	}, [clinic?.id, dispatch]);
+	}, [canViewPipeline, clinic?.id, dispatch]);
 
 	useEffect(() => {
+		if (!canViewPipeline) return;
 		if (pipelineLoading || selectedPipeline || pipelines.length === 0) return;
 		dispatch(fetchPipelineDetail(pipelines[0].id));
-	}, [dispatch, pipelineLoading, pipelines, selectedPipeline]);
+	}, [canViewPipeline, dispatch, pipelineLoading, pipelines, selectedPipeline]);
 
 	useEffect(() => {
 		if (!actionMenuAnchor) return;
@@ -120,6 +140,7 @@ const SalesPipelineDashboard = () => {
 		pipelineName: string;
 		industry: string;
 	}) => {
+		if (!canEditPipeline) return;
 		if (!clinic?.id) return;
 
 		if (editPipelineData) {
@@ -150,6 +171,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleOpenCreatePipeline = () => {
+		if (!canEditPipeline) return;
 		setEditPipelineData(null);
 		setIsCreateModalOpen(true);
 	};
@@ -158,6 +180,7 @@ const SalesPipelineDashboard = () => {
 		event: React.MouseEvent<HTMLElement>,
 		pipelineId: string,
 	) => {
+		if (!canEditPipeline) return;
 		event.stopPropagation();
 		setActionMenuPipelineId(pipelineId);
 		setActionMenuAnchor(event.currentTarget);
@@ -180,6 +203,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleEditPipeline = () => {
+		if (!canEditPipeline) return;
 		const pipeline = getActionPipeline();
 		if (!pipeline) return;
 		handleCloseActionMenu();
@@ -194,6 +218,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleDuplicatePipeline = async () => {
+		if (!canEditPipeline) return;
 		if (!actionMenuPipelineId) return;
 		try {
 			setActionInProgress(true);
@@ -207,6 +232,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleArchivePipeline = () => {
+		if (!canEditPipeline) return;
 		if (!actionMenuPipelineId) return;
 		handleCloseActionMenu();
 		setConfirmPipelineId(actionMenuPipelineId);
@@ -216,6 +242,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleDeletePipeline = () => {
+		if (!canEditPipeline) return;
 		if (!actionMenuPipelineId) return;
 		handleCloseActionMenu();
 		setConfirmPipelineId(actionMenuPipelineId);
@@ -231,6 +258,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleConfirmPipelineAction = async () => {
+		if (!canEditPipeline) return;
 		if (!confirmAction || !confirmPipelineId) return;
 		try {
 			setActionInProgress(true);
@@ -258,6 +286,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const createStageByName = async (stageName: string): Promise<boolean> => {
+		if (!canEditPipeline) return false;
 		if (!selectedPipelineId) return false;
 		const trimmedStage = stageName.trim();
 		if (!trimmedStage) return false;
@@ -298,6 +327,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleReorderStages = async (fromIndex: number, toIndex: number) => {
+		if (!canEditPipeline) return;
 		if (!selectedPipelineId || !selectedPipeline || fromIndex === toIndex) return;
 		if (
 			fromIndex < 0 ||
@@ -335,6 +365,7 @@ const SalesPipelineDashboard = () => {
 		stageIndex: number,
 		updatedStageName: string,
 	): Promise<boolean> => {
+		if (!canEditPipeline) return false;
 		if (!selectedPipelineId || !selectedPipeline) return false;
 		if (stageIndex < 0 || stageIndex >= selectedPipeline.stages.length) return false;
 
@@ -370,6 +401,11 @@ const SalesPipelineDashboard = () => {
 
 	return (
 		<Box sx={{ p: 0.5, overflow: "hidden" }}>
+			{!canViewPipeline ? (
+				<Typography sx={{ color: "#B45309", mb: 1.5 }}>
+					You do not have permission to view sales pipeline.
+				</Typography>
+			) : null}
 			<Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
 				Sales Pipeline Configuration
 			</Typography>
@@ -406,6 +442,7 @@ const SalesPipelineDashboard = () => {
 						startIcon={<AddIcon fontSize="small" />}
 						variant="outlined"
 						onClick={handleOpenCreatePipeline}
+						disabled={!canEditPipeline}
 						sx={{
 							justifyContent: "center",
 							color: "text.primary",
@@ -512,6 +549,7 @@ const SalesPipelineDashboard = () => {
 											onClick={(event) =>
 												handleOpenActionMenu(event, pipeline.id)
 											}
+											disabled={!canEditPipeline}
 										>
 											<MoreVertIcon fontSize="small" />
 										</IconButton>
