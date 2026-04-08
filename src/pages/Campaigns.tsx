@@ -1,4 +1,4 @@
-import { useMemo, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Alert } from "@mui/material";
 import "../styles/Campaign/campaigns.css";
 import searchIcon from "../components/Campaign/Icons/search.png";
@@ -56,8 +56,12 @@ export default function CampaignsScreen() {
   const campaignLoading = useSelector(selectCampaignLoading);
   const user = useSelector(selectUser);
   const authUser = user as unknown as Record<string, unknown> | null;
+  const nestedAuthUser =
+    authUser?.user && typeof authUser.user === "object"
+      ? (authUser.user as Record<string, unknown>)
+      : null;
   const role = resolveUserRole(authUser);
-  const permissions = authUser?.permissions;
+  const permissions = authUser?.permissions ?? nestedAuthUser?.permissions;
   const campaignAliases = ["campaigns", "campaign"];
   const canViewCampaigns =
     role === "super_admin" ||
@@ -69,6 +73,11 @@ export default function CampaignsScreen() {
   const canEditCampaigns =
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, campaignAliases, "edit");
+
+  useEffect(() => {
+    if (!canViewCampaigns) return;
+    dispatch(fetchCampaign());
+  }, [dispatch, canViewCampaigns]);
 
   const campaigns = useMemo<Campaign[]>(() => {
     return (rawCampaigns || []).map((api: CampaignAPIType) => {

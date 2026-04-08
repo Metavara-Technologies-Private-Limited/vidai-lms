@@ -47,6 +47,7 @@ interface MenuProps<T extends Lead> {
   lead: T;
   setLeads: React.Dispatch<React.SetStateAction<T[]>>;
   tab: "active" | "archived";
+  canEditLeads?: boolean;
 }
 
 let openCallSetter: ((name: string) => void) | null = null;
@@ -63,6 +64,7 @@ export function MenuButton<T extends Lead>({
   lead,
   setLeads,
   tab,
+  canEditLeads = true,
 }: MenuProps<T>) {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
@@ -142,7 +144,11 @@ export function MenuButton<T extends Lead>({
 
   return (
     <>
-      <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
+      <IconButton
+        onClick={(e) => setAnchorEl(e.currentTarget)}
+        disabled={!canEditLeads}
+        title={!canEditLeads ? "No permission to edit leads" : undefined}
+      >
         <MoreVertIcon fontSize="small" />
       </IconButton>
 
@@ -161,7 +167,7 @@ export function MenuButton<T extends Lead>({
                   });
                   setAnchorEl(null);
                 }}
-                disabled={isDeleting || isArchiving}
+                disabled={!canEditLeads || isDeleting || isArchiving}
               >
                 <ListItemIcon>
                   <EditOutlinedIcon fontSize="small" />
@@ -174,7 +180,7 @@ export function MenuButton<T extends Lead>({
                   setOpenReassign(true);
                   setAnchorEl(null);
                 }}
-                disabled={isDeleting || isArchiving}
+                disabled={!canEditLeads || isDeleting || isArchiving}
               >
                 <ListItemIcon>
                   <PersonAddAltOutlinedIcon fontSize="small" />
@@ -188,7 +194,7 @@ export function MenuButton<T extends Lead>({
                   setArchiveError(null);
                   setAnchorEl(null);
                 }}
-                disabled={isDeleting || isArchiving}
+                disabled={!canEditLeads || isDeleting || isArchiving}
               >
                 <ListItemIcon>
                   <ArchiveOutlinedIcon fontSize="small" />
@@ -203,7 +209,7 @@ export function MenuButton<T extends Lead>({
                   setDeleteError(null);
                   setAnchorEl(null);
                 }}
-                disabled={isDeleting || isArchiving}
+                disabled={!canEditLeads || isDeleting || isArchiving}
               >
                 <ListItemIcon>
                   <DeleteOutlineOutlinedIcon
@@ -221,7 +227,7 @@ export function MenuButton<T extends Lead>({
               <MenuItem
                 key="lead-unarchive"
                 onClick={handleUnarchiveConfirm}
-                disabled={isDeleting || isArchiving}
+                disabled={!canEditLeads || isDeleting || isArchiving}
               >
                 <ListItemIcon>
                   <UnarchiveOutlinedIcon fontSize="small" />
@@ -236,7 +242,7 @@ export function MenuButton<T extends Lead>({
                   setDeleteError(null);
                   setAnchorEl(null);
                 }}
-                disabled={isDeleting || isArchiving}
+                disabled={!canEditLeads || isDeleting || isArchiving}
               >
                 <ListItemIcon>
                   <DeleteOutlineOutlinedIcon

@@ -1398,7 +1398,12 @@ const LeadsTable: React.FC<Props> = ({
                   sx={stickyMenuStyle}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MenuButton lead={lead} setLeads={setLocalLeads} tab={tab} />
+                  <MenuButton
+                    lead={lead}
+                    setLeads={setLocalLeads}
+                    tab={tab}
+                    canEditLeads={canEditLeads}
+                  />
                 </TableCell>
               </TableRow>
             ))}

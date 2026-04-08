@@ -12,10 +12,15 @@ import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import { fetchLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
+import { selectUser } from "../../store/authSlice";
 import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import type { NextActionStatus } from "../../types/leads.types";
 import { TASK_STATUS_FOR_TYPE, getAutoNextActionStatus } from "./LeadTaskConfig";
+import {
+  hasAnySubcategoryActionPermission,
+  resolveUserRole,
+} from "../../utils/roleAccess";
 
 // ====================== App-type config import ======================
 import {
@@ -245,6 +250,17 @@ export function useEditLead() {
   const navigate = useNavigate();
   const { id } = useParams();
   const dispatch = useDispatch<AppDispatch>();
+  const authUser = useSelector(selectUser) as Record<string, unknown> | null;
+  const role = resolveUserRole(authUser);
+  const nestedAuthUser =
+    authUser?.user && typeof authUser.user === "object"
+      ? (authUser.user as Record<string, unknown>)
+      : null;
+  const permissions = authUser?.permissions ?? nestedAuthUser?.permissions;
+  const leadAliases = ["leads hub"];
+  const canEditLeads =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
 
   // ── Campaigns from Redux store ──
   const rawCampaigns = useSelector(selectCampaign);
@@ -679,6 +695,17 @@ export function useEditLead() {
   const handleSave = () => {
     if (!leadData || !id || saving) return;
 
+    if (!canEditLeads) {
+      const msg = "You do not have permission to edit leads.";
+      setError(msg);
+      toast.error(msg, {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return;
+    }
+
     const bookingActive = wantAppointment === "yes";
 
     if (bookingActive) {
@@ -825,6 +852,7 @@ export function useEditLead() {
     loading,
     error, setError,
     saving,
+    canEditLeads,
     showSuccess,
     campaigns,
     departments,

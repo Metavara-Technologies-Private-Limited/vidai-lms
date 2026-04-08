@@ -75,6 +75,7 @@ import {
 interface Props {
   search: string;
   filters?: FilterValues;
+  canEditLeads?: boolean;
 }
 
 // ====================== Phone normalizer ======================
@@ -616,7 +617,11 @@ const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
 };
 
 // ====================== Main LeadsBoard Component ======================
-const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
+const LeadsBoard: React.FC<Props> = ({
+  search,
+  filters,
+  canEditLeads = true,
+}) => {
   const dispatch   = useDispatch<AppDispatch>();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
@@ -808,6 +813,7 @@ const LeadsBoard: React.FC<Props> = ({ search, filters }) => {
               onOpenMail={(lead) => setEmailLead(lead)}
               onOpenBook={handleOpenBookModal}
               onOpenCall={handleCallOpen}
+              canEditLeads={canEditLeads}
               setLeads={setLeads}
             />
           );

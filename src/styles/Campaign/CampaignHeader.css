@@ -54,6 +54,23 @@
   background: #3f3f3f;
 }
 
+.primary-btn:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+}
+
+.primary-btn:disabled::before {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  color: #9ca3af;
+}
+
+.primary-btn:disabled:hover {
+  background: #e5e7eb;
+}
+
 /* ================= ACTIVE ================= */
 .primary-btn:active {
   background: black;

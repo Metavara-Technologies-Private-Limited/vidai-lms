@@ -191,13 +191,14 @@ interface LeadCardProps {
   onOpenMail: (lead: LeadItem) => void;
   onOpenBook: (lead: LeadItem) => void;
   onOpenCall: (lead: LeadItem) => void;
+  canEditLeads?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setLeads: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const LeadCard: React.FC<LeadCardProps> = ({
   lead, columnLabel, columnColor, isHovered,
-  onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, setLeads,
+  onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, canEditLeads = true, setLeads,
 }) => {
   const navigate = useNavigate();
 
@@ -271,7 +272,12 @@ export const LeadCard: React.FC<LeadCardProps> = ({
             }}
           />
           <Box onClick={(e) => e.stopPropagation()}>
-            <MenuButton lead={lead} setLeads={setLeads} tab="active" />
+            <MenuButton
+              lead={lead}
+              setLeads={setLeads}
+              tab="active"
+              canEditLeads={canEditLeads}
+            />
           </Box>
         </Stack>
       </Stack>
@@ -299,12 +305,13 @@ export interface LeadColumnProps {
   onOpenMail: (lead: LeadItem) => void;
   onOpenBook: (lead: LeadItem) => void;
   onOpenCall: (lead: LeadItem) => void;
+  canEditLeads?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setLeads: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const LeadColumn: React.FC<LeadColumnProps> = ({
-  col, leads, hoveredId, onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, setLeads,
+  col, leads, hoveredId, onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, canEditLeads = true, setLeads,
 }) => (
   <Box
     sx={{
@@ -362,6 +369,7 @@ export const LeadColumn: React.FC<LeadColumnProps> = ({
           onOpenMail={onOpenMail}
           onOpenBook={onOpenBook}
           onOpenCall={onOpenCall}
+          canEditLeads={canEditLeads}
           setLeads={setLeads}
         />
       ))}

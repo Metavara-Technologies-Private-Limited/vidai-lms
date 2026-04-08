@@ -6,13 +6,17 @@ import {
   Paper,
   CircularProgress,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Dayjs } from "dayjs";
 
 import { useSelector } from "react-redux";
 import { selectCampaign } from "../../store/campaignSlice";
 import { selectUser } from "../../store/authSlice";
+import {
+  resolveUserRole,
+  hasAnySubcategoryActionPermission,
+} from "../../utils/roleAccess";
 
 import type { FormState } from "../../types/leads.types";
 import { LeadAPI, DepartmentAPI, LeadEmailAPI } from "../../services/leads.api";
@@ -162,6 +166,20 @@ export default function AddNewLead() {
 
   const rawCampaigns = useSelector(selectCampaign);
   const authedUser = useSelector(selectUser);
+
+  // ── Permission guard ─────────────────────────────────────────────────────────
+  const _authUserRaw = authedUser as unknown as Record<string, unknown> | null;
+  const _nestedUser =
+    _authUserRaw?.user && typeof _authUserRaw.user === "object"
+      ? (_authUserRaw.user as Record<string, unknown>)
+      : null;
+  const _role = resolveUserRole(_authUserRaw);
+  const _perms = _authUserRaw?.permissions ?? _nestedUser?.permissions;
+  const _leadAliases = ["leads hub"] as const;
+  const canAddLeads =
+    _role === "super_admin" ||
+    hasAnySubcategoryActionPermission(_perms, [..._leadAliases], "add");
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const campaigns = React.useMemo(
     () =>
@@ -654,6 +672,11 @@ export default function AddNewLead() {
     { label: ACTIVE_FLOW_COPY.medicalStep, step: 2 },    // "Product Details" or "Medical Details"
     { label: ACTIVE_FLOW_COPY.step3, step: 3 },          // "Book Appointment" (same for both)
   ];
+
+  // ── Permission redirect ───────────────────────────────────────────
+  if (!canAddLeads) {
+    return <Navigate to="/leads" replace />;
+  }
 
   // ── Render ───────────────────────────────────────────────────────
   return (

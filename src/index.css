@@ -84,3 +84,44 @@ code {
   background: #d86650;
   color: #ffffff;
 }
+
+/* Keep disabled actions visible but clearly inactive across the app. */
+button:disabled,
+input[type="button"]:disabled,
+input[type="submit"]:disabled,
+input[type="reset"]:disabled {
+  background: #e5e7eb !important;
+  color: #9ca3af !important;
+  border-color: #e5e7eb !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+button:disabled:hover,
+input[type="button"]:disabled:hover,
+input[type="submit"]:disabled:hover,
+input[type="reset"]:disabled:hover {
+  background: #e5e7eb !important;
+}
+
+.MuiButton-root.Mui-disabled {
+  background-color: #e5e7eb !important;
+  color: #9ca3af !important;
+  border-color: #e5e7eb !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.MuiIconButton-root.Mui-disabled {
+  background-color: #e5e7eb !important;
+  color: #9ca3af !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.MuiButton-root.Mui-disabled .MuiButton-startIcon,
+.MuiButton-root.Mui-disabled .MuiButton-endIcon,
+.MuiIconButton-root.Mui-disabled svg {
+  color: #9ca3af !important;
+}

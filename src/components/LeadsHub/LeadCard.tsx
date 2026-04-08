@@ -173,6 +173,7 @@ interface LeadCardProps {
   onOpenSms: (lead: MappedLead) => void;
   onOpenMail: (lead: MappedLead) => void;
   onOpenBook: (lead: MappedLead) => void;
+  canEditLeads?: boolean;
   // FIX: any[] matches MenuButton's setLeads type — avoids MappedLead[] vs LeadItem[] mismatch
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setLeads: React.Dispatch<React.SetStateAction<any[]>>;
@@ -181,7 +182,7 @@ interface LeadCardProps {
 export const LeadCard: React.FC<LeadCardProps> = ({
   lead, columnLabel, columnColor, isHovered,
   onMouseEnter, onMouseLeave, onClick,
-  onOpenSms, onOpenMail, onOpenBook, setLeads,
+  onOpenSms, onOpenMail, onOpenBook, canEditLeads = true, setLeads,
 }) => (
   <Paper
     onMouseEnter={onMouseEnter}
@@ -231,7 +232,12 @@ export const LeadCard: React.FC<LeadCardProps> = ({
           }}
         />
         <Box onClick={(e) => e.stopPropagation()}>
-          <MenuButton lead={lead} setLeads={setLeads} tab="active" />
+          <MenuButton
+            lead={lead}
+            setLeads={setLeads}
+            tab="active"
+            canEditLeads={canEditLeads}
+          />
         </Box>
       </Stack>
     </Stack>

@@ -427,8 +427,16 @@ const hasActionFlag = (
   row: Record<string, unknown>,
   action: "view" | "add" | "edit" | "print",
 ): boolean => {
-  const key = `can_${action}`;
-  return isTrueFlag(row[key]) || isTrueFlag(row[key.replace("_", "")]);
+  const snakeKey = `can_${action}`;
+  const compactKey = `can${action}`;
+  const camelKey = `can${action.charAt(0).toUpperCase()}${action.slice(1)}`;
+
+  return (
+    isTrueFlag(row[snakeKey]) ||
+    isTrueFlag(row[compactKey]) ||
+    isTrueFlag(row[camelKey]) ||
+    isTrueFlag(row[action])
+  );
 };
 
 export const hasSubcategoryActionPermission = (
@@ -438,41 +446,72 @@ export const hasSubcategoryActionPermission = (
 ): boolean => {
   if (!permissions || typeof permissions !== "object") return false;
 
-  const normalized = normalize(subcategory);
+  const normalizePermissionKey = (value: unknown): string =>
+    normalize(value).replace(/[^a-z0-9]/g, "");
+
+  const normalized = normalizePermissionKey(subcategory);
   const aliases = new Set<string>([normalized]);
   if (normalized.endsWith("s")) aliases.add(normalized.slice(0, -1));
   else aliases.add(`${normalized}s`);
 
   const root = permissions as Record<string, unknown>;
 
-  const rowMatchesSubcategory = (row: Record<string, unknown>): boolean => {
-    const subValue = normalize(row.subcategory ?? row.subcategory_key);
-    const categoryValue = normalize(row.category ?? row.category_key);
-    const moduleValue = normalize(row.module ?? row.module_key);
+  const rowMatchesSubcategory = (
+    row: Record<string, unknown>,
+    fallbackLabel?: string,
+  ): boolean => {
+    const subValue = normalizePermissionKey(row.subcategory ?? row.subcategory_key);
+    const categoryValue = normalizePermissionKey(
+      row.category ?? row.category_key,
+    );
+    const moduleValue = normalizePermissionKey(row.module ?? row.module_key);
+    const fallbackValue = normalizePermissionKey(fallbackLabel);
+
     if (subValue && aliases.has(subValue)) return true;
     if (!subValue && aliases.has(categoryValue)) return true;
-    return !subValue && !categoryValue && aliases.has(moduleValue);
+
+    if (!subValue && !categoryValue && aliases.has(moduleValue)) return true;
+
+    // Some API shapes store the permission label in the parent object key
+    // and keep row fields null (subcategory/category/module missing).
+    return !subValue && !categoryValue && !moduleValue && aliases.has(fallbackValue);
   };
 
-  const rowsAllowAction = (value: unknown): boolean => {
+  const rowsAllowAction = (value: unknown, fallbackLabel?: string): boolean => {
     if (!Array.isArray(value)) return false;
     return value.some((row) => {
       if (!row || typeof row !== "object") return false;
       const rec = row as Record<string, unknown>;
-      return rowMatchesSubcategory(rec) && hasActionFlag(rec, action);
+      return rowMatchesSubcategory(rec, fallbackLabel) && hasActionFlag(rec, action);
     });
   };
 
-  for (const moduleValue of Object.values(root)) {
+  for (const [moduleKey, moduleValue] of Object.entries(root)) {
     if (!moduleValue || typeof moduleValue !== "object") continue;
-    for (const categoryValue of Object.values(
+    for (const [categoryKey, categoryValue] of Object.entries(
       moduleValue as Record<string, unknown>,
     )) {
-      if (rowsAllowAction(categoryValue)) return true;
+      if (rowsAllowAction(categoryValue, categoryKey)) return true;
+
+      // If category key is wildcard-like, fall back to module key label.
+      if (
+        rowsAllowAction(categoryValue, categoryKey === "_" ? moduleKey : categoryKey)
+      ) {
+        return true;
+      }
     }
   }
 
-  if (rowsAllowAction(root[normalized])) return true;
+  if (rowsAllowAction(root[normalized], normalized)) return true;
+
+  for (const [rootKey, rootValue] of Object.entries(root)) {
+    if (
+      aliases.has(normalizePermissionKey(rootKey)) &&
+      rowsAllowAction(rootValue, rootKey)
+    ) {
+      return true;
+    }
+  }
 
   if (Array.isArray(root.modules)) {
     for (const moduleItem of root.modules as Array<Record<string, unknown>>) {
@@ -481,7 +520,7 @@ export const hasSubcategoryActionPermission = (
         : [];
 
       for (const sub of submodules) {
-        const subName = normalize(sub.name);
+        const subName = normalizePermissionKey(sub.name);
         if (!aliases.has(subName)) continue;
 
         const permissionRows = Array.isArray(sub.permissions)

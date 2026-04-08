@@ -318,9 +318,16 @@ const Leads: React.FC = () => {
   const user = useSelector(selectUser);
   const authed = useSelector(selectAuthed);
   const authUser = user as unknown as Record<string, unknown> | null;
+  const nestedAuthUser =
+    authUser?.user && typeof authUser.user === "object"
+      ? (authUser.user as Record<string, unknown>)
+      : null;
   const role = resolveUserRole(authUser);
-  const permissions = authUser?.permissions;
-  const leadAliases = ["leads hub", "leads", "lead"];
+  const permissions = authUser?.permissions ?? nestedAuthUser?.permissions;
+  const leadAliases = React.useMemo(
+    () => ["leads hub"],
+    [],
+  );
   const canViewLeads =
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, leadAliases, "view") ||
@@ -331,6 +338,31 @@ const Leads: React.FC = () => {
   const canEditLeads =
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
+
+  React.useEffect(() => {
+    if (canViewLeads) return;
+
+    // Helps verify the live payload shape when a user can see sidebar but cannot view leads.
+    console.warn("Leads permission debug", {
+      role,
+      hasTopLevelPermissions: Boolean(authUser?.permissions),
+      hasNestedPermissions: Boolean(nestedAuthUser?.permissions),
+      aliases: leadAliases,
+      canViewLeads,
+      canAddLeads,
+      canEditLeads,
+      permissions,
+    });
+  }, [
+    canViewLeads,
+    role,
+    authUser?.permissions,
+    nestedAuthUser?.permissions,
+    leadAliases,
+    canAddLeads,
+    canEditLeads,
+    permissions,
+  ]);
 
   const loadSavedFilters = (): FilterValues => {
     try {
@@ -1131,7 +1163,11 @@ const Leads: React.FC = () => {
           }
         >
           {tab === 1 && (
-            <LeadsFollowUp search={search} filters={activeFilters} />
+            <LeadsFollowUp
+              search={search}
+              filters={activeFilters}
+              canEditLeads={canEditLeads}
+            />
           )}
           {tab === 3 && <LeadsConversation />}
           {tab === 4 && <Activity />}
@@ -1155,7 +1191,11 @@ const Leads: React.FC = () => {
                 canEditLeads={canEditLeads}
               />
             ) : (
-              <LeadsBoard search={search} filters={activeFilters} />
+              <LeadsBoard
+                search={search}
+                filters={activeFilters}
+                canEditLeads={canEditLeads}
+              />
             ))}
         </React.Suspense>
       )}
