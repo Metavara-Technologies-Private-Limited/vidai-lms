@@ -104,7 +104,18 @@ const SelectField = ({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      renderValue={(v) => v || <span style={{ color: "#9E9E9E" }}>Select</span>}
+      renderValue={(selected) => {
+        const selectedValue = String(selected ?? "").trim();
+        if (!selectedValue) {
+          return <span style={{ color: "#9E9E9E" }}>Select</span>;
+        }
+
+        const selectedOption = options.find(
+          (option) => String(option.value).trim() === selectedValue,
+        );
+
+        return selectedOption?.label ?? selectedValue;
+      }}
       sx={{ height: 40, fontSize: 13 }}
     >
       {options.map((o) => (
