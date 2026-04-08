@@ -188,25 +188,45 @@ export default function CampaignCard({
                 onClick={(e) => e.stopPropagation()}
               >
                 <div
-                  className="menu-item"
+                  className={`menu-item ${!canEditCampaign ? "disabled" : ""}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!canEditCampaign) return;
                     setOpenMenuId(null);
                     onEdit?.(c);
                   }}
+                  title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+                  style={
+                    !canEditCampaign
+                      ? {
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                          pointerEvents: "none",
+                        }
+                      : undefined
+                  }
                 >
                   <img src={editIcon} alt="Edit" className="menu-icon" />
                   Edit
                 </div>
                 <div
-                  className="menu-item"
+                  className={`menu-item ${!canEditCampaign ? "disabled" : ""}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!canEditCampaign) return;
                     setOpenMenuId(null);
                     onDuplicate?.(c);
                   }}
+                  title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+                  style={
+                    !canEditCampaign
+                      ? {
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                          pointerEvents: "none",
+                        }
+                      : undefined
+                  }
                 >
                   <img
                     src={duplicateIcon}
@@ -217,13 +237,23 @@ export default function CampaignCard({
                 </div>
                 {!INACTIVE_STATUSES.has(c.status) && (
                   <div
-                    className="menu-item stop-item"
+                    className={`menu-item stop-item ${!canEditCampaign ? "disabled" : ""}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!canEditCampaign) return;
                       setOpenMenuId(null);
                       setShowStopModal(true);
                     }}
+                    title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+                    style={
+                      !canEditCampaign
+                        ? {
+                            opacity: 0.5,
+                            cursor: "not-allowed",
+                            pointerEvents: "none",
+                          }
+                        : undefined
+                    }
                   >
                     <img src={stopIcon} alt="Stop" className="menu-icon" />
                     Stop

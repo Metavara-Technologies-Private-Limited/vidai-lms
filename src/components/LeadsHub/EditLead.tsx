@@ -49,6 +49,7 @@ export default function EditLead() {
     loading,
     error, setError,
     saving,
+    canEditLeads,
     campaigns,
     departments,
     loadingDepartments,
@@ -173,6 +174,11 @@ export default function EditLead() {
 
   return (
     <Box>
+      {!canEditLeads && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          You have view-only access. Lead edit is disabled for your role.
+        </Alert>
+      )}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
@@ -960,12 +966,15 @@ export default function EditLead() {
               </Button>
             ) : (
               <Button
-                onClick={handleSave} disabled={saving} variant="contained"
+                onClick={handleSave}
+                disabled={saving || !canEditLeads}
+                variant="contained"
                 sx={{
                   bgcolor: "#1E293B", textTransform: "none", fontWeight: 600,
                   px: 4, minWidth: 100, borderRadius: "8px", boxShadow: "none",
                   "&:hover": { bgcolor: "#0F172A", boxShadow: "none" },
                 }}
+                title={!canEditLeads ? "No permission to edit leads" : undefined}
               >
                 {saving ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Save"}
               </Button>

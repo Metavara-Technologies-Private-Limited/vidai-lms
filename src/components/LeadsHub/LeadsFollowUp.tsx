@@ -66,6 +66,7 @@ interface MappedFollowUpLead extends RawFollowUpLead {
 interface Props {
   search: string;
   filters?: FilterValues;
+  canEditLeads?: boolean;
 }
 
 const rowsPerPage = 10;
@@ -81,7 +82,11 @@ const deriveQuality = (lead: RawFollowUpLead): "Hot" | "Warm" | "Cold" => {
 };
 
 // ====================== Component ======================
-const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
+const LeadsFollowUp: React.FC<Props> = ({
+  search,
+  filters,
+  canEditLeads = true,
+}) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [page, setPage] = React.useState(1);
@@ -319,7 +324,12 @@ const LeadsFollowUp: React.FC<Props> = ({ search, filters }) => {
                 </TableCell>
 
                 <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                  <MenuButton lead={lead} setLeads={setLeads} tab="active" />
+                  <MenuButton
+                    lead={lead}
+                    setLeads={setLeads}
+                    tab="active"
+                    canEditLeads={canEditLeads}
+                  />
                 </TableCell>
               </TableRow>
             ))}

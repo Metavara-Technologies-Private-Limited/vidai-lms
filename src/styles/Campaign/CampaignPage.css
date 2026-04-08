@@ -42,6 +42,18 @@
   background: #D1D5DB;
 }
 
+.add-campaign-btn:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+}
+
+.add-campaign-btn:disabled:hover,
+.add-campaign-btn.secondary:disabled:hover {
+  background: #e5e7eb;
+}
+
 /* ================= CAMPAIGN GRID ================= */
 
 .campaign-grid {

@@ -57,6 +57,10 @@ import {
 } from "../../store/leadSlice";
 import { selectUser } from "../../store/authSlice";
 import {
+  hasAnySubcategoryActionPermission,
+  resolveUserRole,
+} from "../../utils/roleAccess";
+import {
   api,
   LeadAPI,
   LeadEmailAPI,
@@ -1439,6 +1443,17 @@ export default function LeadDetailView() {
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
   const authedUser = useSelector(selectUser);
+  const authUser = authedUser as Record<string, unknown> | null;
+  const nestedAuthUser =
+    authUser?.user && typeof authUser.user === "object"
+      ? (authUser.user as Record<string, unknown>)
+      : null;
+  const role = resolveUserRole(authUser);
+  const permissions = authUser?.permissions ?? nestedAuthUser?.permissions;
+  const leadAliases = ["leads hub"];
+  const canEditLeads =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
 
   const [activeTab, setActiveTab] = React.useState(TAB_LABELS[0]);
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
@@ -1987,7 +2002,7 @@ export default function LeadDetailView() {
   };
 
   const handleEdit = () => {
-    if (!activeLead) return;
+    if (!activeLead || !canEditLeads) return;
     navigate(`/leads/edit/${getCleanLeadId(activeLead.id)}`, {
       state: { lead: activeLead },
     });
@@ -2226,6 +2241,7 @@ export default function LeadDetailView() {
   };
 
   const openStatusDialog = () => {
+    if (!canEditLeads) return;
     setDraftLeadStatus(selectedLeadStatus);
     setStatusDialogOpen(true);
   };
@@ -2236,7 +2252,7 @@ export default function LeadDetailView() {
   };
 
   const saveLeadStatus = async () => {
-    if (!activeLead || statusSaving) return;
+    if (!activeLead || statusSaving || !canEditLeads) return;
     const nextLeadStatus = LEAD_STATUS_API_VALUES[draftLeadStatus];
     try {
       setStatusSaving(true);
@@ -2431,6 +2447,7 @@ export default function LeadDetailView() {
                 <IconButton
                   size="small"
                   onClick={openStatusDialog}
+                  disabled={!canEditLeads}
                   sx={{ p: 0.35 }}
                   aria-label="Edit lead status"
                 >
@@ -2653,6 +2670,7 @@ export default function LeadDetailView() {
             variant="outlined"
             startIcon={<EditOutlinedIcon />}
             onClick={handleEdit}
+            disabled={!canEditLeads}
             sx={{
               borderRadius: "8px",
               textTransform: "none",
@@ -2666,7 +2684,13 @@ export default function LeadDetailView() {
                 border: "none",
                 boxShadow: "none",
               },
+              "&:disabled": {
+                bgcolor: "#E5E7EB",
+                color: "#9CA3AF",
+                border: "none",
+              },
             }}
+            title={!canEditLeads ? "No permission to edit leads" : undefined}
           >
             Edit
           </Button>
