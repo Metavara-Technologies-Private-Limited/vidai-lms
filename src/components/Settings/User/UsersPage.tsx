@@ -12,7 +12,7 @@ import type { UserFormData } from "./UserDetails/UserDetailsForm";
 import {
   usersApi,
   type UserCreateUpdatePayload,
-  // type RoleRecord,
+  type RoleRecord,
   type UserRecord as User,
 } from "../../../services/users.api";
 import { selectLoginType, selectUser } from "../../../store/authSlice";
@@ -26,10 +26,18 @@ type DetailsView = "list" | "form";
 const EDIT_PASSWORD_PLACEHOLDER = "********";
 
 const FALLBACK_ROLE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "1", label: "SuperAdmin" },
+  { value: "1", label: "Super Admin" },
   { value: "2", label: "Admin" },
   { value: "3", label: "User" },
 ];
+
+const roleOrderPriority = (name: string): number => {
+  const normalized = normalizeRoleName(name);
+  if (normalized === "super admin" || normalized === "superadmin") return 0;
+  if (normalized === "admin") return 1;
+  if (normalized === "user") return 2;
+  return 99;
+};
 
 // const FALLBACK_ROLE_BY_ID: Record<number, string> = {
 //   1: "SuperAdmin",
@@ -102,8 +110,22 @@ const UsersPage: React.FC = () => {
   const [detailsView, setDetailsView] = useState<DetailsView>("list");
   // const [users, setUsers] = useState<User[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  // const [roles, setRoles] = useState<RoleRecord[]>([]);
-  const resolvedRoleOptions = FALLBACK_ROLE_OPTIONS;
+  const [roles, setRoles] = useState<RoleRecord[]>([]);
+  const resolvedRoleOptions =
+    roles.length > 0
+      ? [...roles]
+          .sort((a, b) => {
+            const byPriority = roleOrderPriority(a.name) - roleOrderPriority(b.name);
+            if (byPriority !== 0) return byPriority;
+            return a.name.localeCompare(b.name);
+          })
+          .map((role) => ({
+            value: String(role.id),
+            label: role.name,
+          }))
+      : [...FALLBACK_ROLE_OPTIONS].sort(
+          (a, b) => roleOrderPriority(a.label) - roleOrderPriority(b.label),
+        );
   // const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pinnedUserId, setPinnedUserId] = useState<number | null>(null);
@@ -291,6 +313,29 @@ const UsersPage: React.FC = () => {
   );
 
   const token = useSelector((state: RootState) => state.auth.token);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRoles = async () => {
+      try {
+        const roleList = await usersApi.listRoles();
+        if (!cancelled) {
+          setRoles(roleList);
+        }
+      } catch {
+        if (!cancelled) {
+          setRoles([]);
+        }
+      }
+    };
+
+    void loadRoles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (token && canViewUsers) {
