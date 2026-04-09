@@ -378,6 +378,8 @@ const UsersPage: React.FC = () => {
       password: EDIT_PASSWORD_PLACEHOLDER,
       confirmPassword: EDIT_PASSWORD_PLACEHOLDER,
       profilePhoto: profile.photo || record.photo || null,
+      profilePhotoFile: null,
+      removeProfilePhoto: false,
     };
   };
 
@@ -405,6 +407,8 @@ const UsersPage: React.FC = () => {
     data.confirmPassword !== EDIT_PASSWORD_PLACEHOLDER
       ? { confirm_password: data.confirmPassword.trim() }
       : {}),
+    ...(data.profilePhotoFile ? { photo: data.profilePhotoFile } : {}),
+    ...(data.removeProfilePhoto ? { remove_photo: true } : {}),
   });
 
   // const resolvedRoleOptions =

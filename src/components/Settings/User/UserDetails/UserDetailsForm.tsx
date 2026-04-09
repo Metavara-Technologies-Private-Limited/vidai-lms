@@ -37,6 +37,8 @@ export interface UserFormData {
   password: string;
   confirmPassword: string;
   profilePhoto: string | null;
+  profilePhotoFile: File | null;
+  removeProfilePhoto: boolean;
 }
 
 interface Props {
@@ -76,6 +78,8 @@ const defaultForm: UserFormData = {
   password: "",
   confirmPassword: "",
   profilePhoto: null,
+  profilePhotoFile: null,
+  removeProfilePhoto: false,
 };
 
 const FieldGrid = ({ children }: { children: React.ReactNode }) => (
@@ -252,14 +256,24 @@ const UserDetailsForm: React.FC<Props> = ({
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
-      setForm((prev) => ({ ...prev, profilePhoto: result }));
+      setForm((prev) => ({
+        ...prev,
+        profilePhoto: result,
+        profilePhotoFile: file,
+        removeProfilePhoto: false,
+      }));
       toast.success("Profile photo added successfully");
     };
     reader.readAsDataURL(file);
   };
 
   const handleRemovePhoto = () => {
-    setForm((prev) => ({ ...prev, profilePhoto: null }));
+    setForm((prev) => ({
+      ...prev,
+      profilePhoto: null,
+      profilePhotoFile: null,
+      removeProfilePhoto: true,
+    }));
     if (fileInputRef.current) fileInputRef.current.value = "";
     toast.success("Profile photo removed successfully");
   };

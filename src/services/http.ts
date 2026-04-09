@@ -70,6 +70,18 @@ http.redirect = (path: string): void => {
 
 // Add auth token to every request if it exists
 http.interceptors.request.use((config) => {
+  // Let Axios/browser set multipart boundary automatically for file uploads.
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    if (typeof config.headers?.delete === "function") {
+      config.headers.delete("Content-Type");
+    } else {
+      const headers = (config.headers ?? {}) as Record<string, unknown>;
+      delete headers["Content-Type"];
+      delete headers["content-type"];
+      config.headers = headers as typeof config.headers;
+    }
+  }
+
   const token = getAccessToken();
 
   if (token) {
