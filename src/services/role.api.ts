@@ -67,10 +67,19 @@ export const roleApi = {
 
   update: async (id: number, payload: RoleWrite): Promise<RoleRead> => {
     try {
-      const response = await http.put<RoleSingleResponse>(`/roles/${id}/update/`, payload);
-      return unwrapOne(response.data);
-    } catch {
+      // Prefer legacy route used by deployed backend.
       const response = await http.put<RoleSingleResponse>(`/roles/update/${id}/`, payload);
+      return unwrapOne(response.data);
+    } catch (error: unknown) {
+      const status =
+        (error as { response?: { status?: number } })?.response?.status ?? 0;
+
+      // Fallback only when route is missing, so real 400 payload errors are not masked.
+      if (status !== 404) {
+        throw error;
+      }
+
+      const response = await http.put<RoleSingleResponse>(`/roles/${id}/update/`, payload);
       return unwrapOne(response.data);
     }
   },
