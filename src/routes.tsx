@@ -33,6 +33,16 @@ import { selectLoginType } from "./store/authSlice";
 // import type { Clinic } from "./types/clinic.types";
 
 let profileRestoreTokenInFlight: string | null = null;
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
+const toAbsoluteMediaUrl = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
+  return `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
+};
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
@@ -161,13 +171,35 @@ export default function AppRoutes() {
       if (user && typeof user === "object" && user.profile_loaded) return;
 
       if (loginType !== "EXT") {
-        if (user && typeof user === "object" && !user.profile_loaded) {
-          dispatch(
-            setUser({
-              ...(user as AuthUser),
-              profile_loaded: true,
-            }),
-          );
+        if (user && typeof user === "object") {
+          try {
+            const profile = await authApi.getProfile();
+            const profileRecord =
+              profile && typeof profile === "object"
+                ? (profile as Record<string, unknown>)
+                : null;
+
+            const rawPhoto = toAbsoluteMediaUrl(profileRecord?.photo);
+
+            dispatch(
+              setUser({
+                ...(user as AuthUser),
+                ...(profileRecord as Partial<AuthUser>),
+                photo:
+                  rawPhoto ||
+                  String((user as AuthUser).photo ?? "").trim() ||
+                  undefined,
+                profile_loaded: true,
+              } as AuthUser),
+            );
+          } catch {
+            dispatch(
+              setUser({
+                ...(user as AuthUser),
+                profile_loaded: true,
+              }),
+            );
+          }
         }
 
         await dispatch(fetchLeads());
