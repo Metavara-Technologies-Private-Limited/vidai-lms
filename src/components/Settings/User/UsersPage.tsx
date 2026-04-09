@@ -499,6 +499,15 @@ const UsersPage: React.FC = () => {
         const authRecord = authUser as Record<string, unknown> | null;
         const authId = Number(authRecord?.id ?? authRecord?.user_id ?? 0);
         if (authId && updatedUser.id === authId && authRecord) {
+          const currentPhoto =
+            typeof authRecord.photo === "string" ? authRecord.photo : "";
+          const nextPhoto =
+            typeof updatedUser.photo === "string"
+              ? updatedUser.photo
+              : data.removeProfilePhoto
+                ? ""
+                : currentPhoto;
+
           dispatch(
             setUser({
               ...authRecord,
@@ -506,7 +515,7 @@ const UsersPage: React.FC = () => {
               email: updatedUser.email,
               first_name: updatedUser.firstName,
               last_name: updatedUser.lastName,
-              photo: updatedUser.photo ?? null,
+              photo: nextPhoto,
             } as never),
           );
         }
