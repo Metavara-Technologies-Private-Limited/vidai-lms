@@ -27,6 +27,17 @@ import {
 } from "@mui/material";
 import { toast } from "react-toastify";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
+const toAbsoluteMediaUrl = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
+  return `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
+};
+
 function resolveInitialLanguage(): LanguageCode {
   const raw = (localStorage.getItem(STORAGE_LANGUAGE_KEY) || "").trim();
   const byCode = LANGUAGE_OPTIONS.find((opt) => opt.code === raw)?.code;
@@ -82,6 +93,13 @@ const buildAuthUserFromLogin = (
     designationLower === "superadmin";
   const isAdmin = hasAdminFlag || designationLower === "admin" || isSuperAdmin;
 
+  const nestedProfile =
+    user?.profile && typeof user.profile === "object"
+      ? (user.profile as Record<string, unknown>)
+      : null;
+
+  const resolvedPhoto = toAbsoluteMediaUrl(user?.photo ?? nestedProfile?.photo);
+
   return {
     access: token,
     user_id: Number(user?.user_id ?? user?.id ?? 0) || 0,
@@ -100,7 +118,7 @@ const buildAuthUserFromLogin = (
     language_name: "",
     permissions: (permissions as AuthUser["permissions"]) ?? { modules: [] },
     clinics: [],
-    photo: "",
+    photo: resolvedPhoto,
     profile_loaded: false,
   };
 };

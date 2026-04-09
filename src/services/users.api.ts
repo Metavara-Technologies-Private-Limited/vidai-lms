@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from "./http";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
 export type UserGender = "Male" | "Female" | "Other";
 
 export type UserRecord = {
@@ -17,6 +20,7 @@ export type UserRecord = {
   mobileNumber: string;
   email: string;
   status: boolean;
+  photo?: string | null;
 };
 
 type UserApiRecord = Record<string, unknown>;
@@ -69,7 +73,8 @@ export type UserCreateUpdatePayload = {
   date_of_birth?: string | null;
   mobile_no?: string;
   role?: number;
-  photo?: string | null;
+  photo?: File | string | null;
+  remove_photo?: boolean;
 };
 
 type UserCreateFallbackPayload = UserCreateUpdatePayload & {
@@ -167,6 +172,13 @@ const toSafeString = (value: unknown): string => {
   return "";
 };
 
+const toAbsoluteMediaUrl = (value: unknown): string | null => {
+  const raw = toSafeString(value).trim();
+  if (!raw) return null;
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
+  return `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
+};
+
 const toBoolean = (value: unknown): boolean => {
   if (typeof value === "boolean") {
     return value;
@@ -244,7 +256,32 @@ const normalizeUser = (
     ),
     email: toSafeString(raw.email ?? raw.email_id),
     status: toBoolean(raw.is_active ?? raw.status),
+    photo: toAbsoluteMediaUrl(raw.photo),
   };
+};
+
+const buildUserRequestBody = (payload: UserCreateUpdatePayload): UserCreateUpdatePayload | FormData => {
+  const shouldUseFormData =
+    payload.photo instanceof File || payload.remove_photo === true;
+
+  if (!shouldUseFormData) {
+    return payload;
+  }
+
+  const formData = new FormData();
+
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined || value === null) continue;
+
+    if (value instanceof File) {
+      formData.append(key, value);
+      continue;
+    }
+
+    formData.append(key, typeof value === "boolean" ? String(value) : String(value));
+  }
+
+  return formData;
 };
 
 const extractSingleRecord = (payload: UserSingleResponse): UserApiRecord => {
@@ -366,6 +403,9 @@ const ensureAuthToken = (): void => {
 const toFallbackCreatePayload = (
   payload: UserCreateUpdatePayload,
 ): UserCreateFallbackPayload => {
+  const fallbackPhoto =
+    payload.photo instanceof File ? undefined : payload.photo;
+
   const profile = {
     first_name: payload.first_name,
     last_name: payload.last_name,
@@ -373,12 +413,24 @@ const toFallbackCreatePayload = (
     date_of_joining: payload.date_of_joining,
     date_of_birth: payload.date_of_birth,
     mobile_no: payload.mobile_no,
-    photo: payload.photo,
+    photo: fallbackPhoto,
     role: payload.role,
   };
 
   return {
-    ...payload,
+    username: payload.username,
+    email: payload.email,
+    password: payload.password,
+    confirm_password: payload.confirm_password,
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    gender: payload.gender,
+    date_of_joining: payload.date_of_joining,
+    date_of_birth: payload.date_of_birth,
+    mobile_no: payload.mobile_no,
+    role: payload.role,
+    photo: fallbackPhoto,
+    remove_photo: payload.remove_photo,
     mobile_number: payload.mobile_no,
     confirmPassword: payload.confirm_password,
     profile,
@@ -516,12 +568,16 @@ export const usersApi = {
   create: async (payload: UserCreateUpdatePayload): Promise<UserRecord> => {
     try {
       ensureAuthToken();
-      const response = await http.post<UserSingleResponse>("/users/", payload);
+      const requestBody = buildUserRequestBody(payload);
+      const response = await http.post<UserSingleResponse>("/users/", requestBody);
       return normalizeUser(extractSingleRecord(response.data));
     } catch (error) {
       if (shouldRetryCreateWithFallback(error)) {
         try {
-          const fallbackPayload = toFallbackCreatePayload(payload);
+          const fallbackPayload =
+            payload.photo instanceof File || payload.remove_photo === true
+              ? buildUserRequestBody(payload)
+              : toFallbackCreatePayload(payload);
           const fallbackResponse = await http.post<UserSingleResponse>(
             "/users/create/",
             fallbackPayload,
@@ -542,9 +598,10 @@ export const usersApi = {
   ): Promise<UserRecord> => {
     try {
       ensureAuthToken();
+      const requestBody = buildUserRequestBody(payload);
       const response = await http.put<UserSingleResponse>(
         `/users/${userId}/update/`,
-        payload,
+        requestBody,
       );
       return normalizeUser(extractSingleRecord(response.data));
     } catch (error) {

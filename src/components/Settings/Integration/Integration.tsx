@@ -79,6 +79,7 @@ const Integration = () => {
 
   useEffect(() => {
     if (!canViewIntegration) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIntegrations({});
       return;
     }
