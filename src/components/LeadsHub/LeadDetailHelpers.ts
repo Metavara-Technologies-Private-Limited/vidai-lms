@@ -15,15 +15,20 @@ const toAbsoluteUrl = (raw: string): string => {
 };
 
 // ====================== Format Lead ID ======================
-export const formatLeadId = (id: string): string => {
-  if (id.match(/^#?LN-\d+$/i)) {
-    return id.startsWith("#") ? id : `#${id}`;
+export const formatLeadId = (id: string | number | null | undefined): string => {
+  const safeId = id == null ? "" : String(id);
+  if (!safeId) return "#LN-000";
+
+  if (safeId.match(/^#?LN-\d+$/i)) {
+    return safeId.startsWith("#") ? safeId : `#${safeId}`;
   }
-  const lnMatch = id.match(/#?LN-(\d+)/i);
+  const lnMatch = safeId.match(/#?LN-(\d+)/i);
   if (lnMatch) return `#LN-${lnMatch[1]}`;
-  const numMatch = id.match(/\d+/);
+  const numMatch = safeId.match(/\d+/);
   if (numMatch) return `#LN-${numMatch[0]}`;
-  const hash = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hash = safeId
+    .split("")
+    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return `#LN-${(hash % 900) + 100}`;
 };
 

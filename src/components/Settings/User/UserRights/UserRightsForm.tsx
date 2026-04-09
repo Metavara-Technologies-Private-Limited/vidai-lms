@@ -60,6 +60,25 @@ const flagsFromApiPerm = (p: RolePermissionPayload): PermissionFlags => ({
   print: p.can_print,
 });
 
+const normalizePermissionLabel = (value: string): string =>
+  value.trim().toLowerCase();
+
+const compactUnique = (items: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const raw of items) {
+    const item = String(raw ?? "").trim();
+    if (!item || item === "_") continue;
+    const key = normalizePermissionLabel(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+
+  return result;
+};
+
 const fromApiRole = (r: RoleRead): Partial<RoleEntry> => {
   const rights: RoleRights = { modules: [], categories: [], subCategories: [] };
   const permissions: Record<string, PermissionFlags> = {};
@@ -77,6 +96,10 @@ const fromApiRole = (r: RoleRead): Partial<RoleEntry> => {
     }
   }
 
+  rights.modules = compactUnique(rights.modules);
+  rights.categories = compactUnique(rights.categories);
+  rights.subCategories = compactUnique(rights.subCategories);
+
   return { apiId: r.id, rights, permissions };
 };
 
@@ -85,21 +108,34 @@ const toApiPermissions = (
   perms: Record<string, PermissionFlags>,
   existingApiPerms: RolePermissionPayload[] = [],
 ): RolePermissionPayload[] => {
-  // Build a map of existing perm ids by label for updates
+  // Build a map of existing perm ids by permission type + normalized label.
+  // This avoids collisions when labels repeat across different levels.
   const existingById: Record<string, number> = {};
   for (const p of existingApiPerms) {
-    const label =
-      p.module_key !== "_" ? p.module_key :
-      p.category_key !== "_" ? p.category_key :
-      (p.subcategory_key ?? "");
-    if (label && p.id !== undefined) existingById[label] = p.id as number;
+    if (p.id === undefined) continue;
+
+    if (p.module_key !== "_") {
+      existingById[`module:${normalizePermissionLabel(p.module_key)}`] = p.id;
+      continue;
+    }
+
+    if (p.category_key !== "_") {
+      existingById[`category:${normalizePermissionLabel(p.category_key)}`] = p.id;
+      continue;
+    }
+
+    const sub = (p.subcategory_key ?? "").trim();
+    if (sub) {
+      existingById[`subcategory:${normalizePermissionLabel(sub)}`] = p.id;
+    }
   }
 
   const build = (
+    kind: "module" | "category" | "subcategory",
     items: string[],
     toObj: (item: string) => Omit<RolePermissionPayload, "id" | "can_view" | "can_add" | "can_edit" | "can_print">,
   ): RolePermissionPayload[] =>
-    items.map((item) => {
+    compactUnique(items).map((item) => {
       const flags = perms[item] ?? { add: false, edit: false, view: false, print: false };
       const base: RolePermissionPayload = {
         ...toObj(item),
@@ -108,14 +144,15 @@ const toApiPermissions = (
         can_edit: flags.edit,
         can_print: flags.print,
       };
-      if (existingById[item] !== undefined) base.id = existingById[item];
+      const idKey = `${kind}:${normalizePermissionLabel(item)}`;
+      if (existingById[idKey] !== undefined) base.id = existingById[idKey];
       return base;
     });
 
   return [
-    ...build(rights.modules, (item) => ({ module_key: item, category_key: "_", subcategory_key: null })),
-    ...build(rights.categories, (item) => ({ module_key: "_", category_key: item, subcategory_key: null })),
-    ...build(rights.subCategories, (item) => ({ module_key: "_", category_key: "_", subcategory_key: item })),
+    ...build("module", rights.modules, (item) => ({ module_key: item, category_key: "_", subcategory_key: null })),
+    ...build("category", rights.categories, (item) => ({ module_key: "_", category_key: item, subcategory_key: null })),
+    ...build("subcategory", rights.subCategories, (item) => ({ module_key: "_", category_key: "_", subcategory_key: item })),
   ];
 };
 
@@ -550,6 +587,8 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
       const msg =
         (err as { response?: { data?: { name?: string[]; detail?: string; non_field_errors?: string[] } } })
           ?.response?.data?.name?.[0] ??
+        (err as { response?: { data?: { non_field_errors?: string[] } } })
+          ?.response?.data?.non_field_errors?.[0] ??
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
         "Failed to save role. Please try again.";
       const { toast } = await import("react-toastify");
