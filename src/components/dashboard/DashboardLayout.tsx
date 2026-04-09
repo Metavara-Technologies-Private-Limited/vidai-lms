@@ -32,7 +32,7 @@ const DashboardLayout = () => {
   const campaigns = useSelector(selectCampaign);
   const leadsLoading = useSelector(selectLeadsLoading);
   // const clinic = useSelector(selectClinic);
-  const [timeRange, setTimeRange] = useState<TimeRange>("month");
+  const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [activeTab, setActiveTab] = useState<OverviewTab>("source");
 
   // load leads and campaigns once when the dashboard mounts

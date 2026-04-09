@@ -140,11 +140,33 @@ const DateField = ({
     label={label}
     value={value}
     onChange={(v) => onChange(v as Dayjs | null)}
+    format="DD/MM/YYYY"
     slotProps={{
       textField: {
         fullWidth: true,
-        placeholder: "Select Date",
         InputLabelProps: { shrink: true },
+        InputProps: {
+          sx: {
+            height: 40,
+            display: "flex",
+            alignItems: "center",
+
+            "& input": {
+              padding: "10px 12px",
+              fontSize: "13px",
+            },
+
+            "& .MuiInputAdornment-root": {
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+            },
+
+            "& .MuiIconButton-root": {
+              padding: "6px",
+            },
+          },
+        },
         sx: inputSx,
       },
     }}
