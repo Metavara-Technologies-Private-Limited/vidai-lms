@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from "./http";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
 export type UserGender = "Male" | "Female" | "Other";
 
 export type UserRecord = {
@@ -169,6 +172,13 @@ const toSafeString = (value: unknown): string => {
   return "";
 };
 
+const toAbsoluteMediaUrl = (value: unknown): string | null => {
+  const raw = toSafeString(value).trim();
+  if (!raw) return null;
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
+  return `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
+};
+
 const toBoolean = (value: unknown): boolean => {
   if (typeof value === "boolean") {
     return value;
@@ -246,7 +256,7 @@ const normalizeUser = (
     ),
     email: toSafeString(raw.email ?? raw.email_id),
     status: toBoolean(raw.is_active ?? raw.status),
-    photo: (raw.photo as string | null | undefined) ?? null,
+    photo: toAbsoluteMediaUrl(raw.photo),
   };
 };
 

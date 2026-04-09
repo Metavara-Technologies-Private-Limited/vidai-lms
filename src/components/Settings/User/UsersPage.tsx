@@ -15,7 +15,7 @@ import {
   type RoleRecord,
   type UserRecord as User,
 } from "../../../services/users.api";
-import { selectLoginType, selectUser } from "../../../store/authSlice";
+import { selectLoginType, selectUser, setUser } from "../../../store/authSlice";
 import { fetchUsers } from "../../../store/userSlice";
 import type { AppDispatch, RootState } from "../../../store";
 
@@ -495,6 +495,21 @@ const UsersPage: React.FC = () => {
         // const patchedUser = { ...updatedUser, role: roleName };
         dispatch(fetchUsers());
         setPinnedUserId(updatedUser.id);
+
+        const authRecord = authUser as Record<string, unknown> | null;
+        const authId = Number(authRecord?.id ?? authRecord?.user_id ?? 0);
+        if (authId && updatedUser.id === authId && authRecord) {
+          dispatch(
+            setUser({
+              ...authRecord,
+              username: updatedUser.username,
+              email: updatedUser.email,
+              first_name: updatedUser.firstName,
+              last_name: updatedUser.lastName,
+              photo: updatedUser.photo ?? null,
+            } as never),
+          );
+        }
       } else {
         const newUser = await usersApi.create(payload);
         // const roleName = resolveRoleLabel(newUser, roleById, selectedRoleLabel);
