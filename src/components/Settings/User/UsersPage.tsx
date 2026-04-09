@@ -590,6 +590,7 @@ const UsersPage: React.FC = () => {
 
     try {
       await usersApi.patchStatus(userId, optimisticStatus);
+      toast.success(optimisticStatus ? "User activated" : "User deactivated");
       dispatch(fetchUsers());
     } catch (error) {
       console.error("Failed to update user status", error);
