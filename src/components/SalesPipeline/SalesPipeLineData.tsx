@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
+import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import EastRoundedIcon from "@mui/icons-material/EastRounded";
 import Groups2OutlinedIcon from "@mui/icons-material/Groups2Outlined";
 import PublishedWithChangesOutlinedIcon from "@mui/icons-material/PublishedWithChangesOutlined";
 import WestRoundedIcon from "@mui/icons-material/WestRounded";
-import { Box, CircularProgress, IconButton, Typography } from "@mui/material";
+import { Box, CircularProgress, IconButton, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useDispatch, useSelector } from "react-redux";
 import type { Lead as ApiLead } from "../../services/leads.api";
@@ -14,12 +17,28 @@ import {
   selectLeads,
   selectLeadsLoading,
 } from "../../store/leadSlice";
-import StageConfiguration from "./StageConfiguration";
+import StageConfiguration, { type StageConfigPayload } from "./StageConfiguration";
+
+type StageCard = {
+  id: string;
+  stageName: string;
+  stageColor?: string;
+  stageType?: string;
+  stageStatus?: string;
+  entryRule?: string;
+};
 
 type SalesPipeLineDataProps = {
-  stages: string[];
-  onAddStage: (stageName?: string) => Promise<boolean> | boolean;
-  onEditStage: (stageIndex: number, stageName: string) => Promise<boolean> | boolean;
+  stages: StageCard[];
+  onAddStage: (stageName?: string, stageConfig?: StageConfigPayload) => Promise<boolean> | boolean;
+  onEditStage: (
+    stageIndex: number,
+    stageName: string,
+    stageConfig?: StageConfigPayload,
+  ) => Promise<boolean> | boolean;
+  onDuplicateStage: (stageIndex: number) => Promise<boolean> | boolean;
+  onArchiveStage: (stageIndex: number) => void;
+  onDeleteStage: (stageIndex: number) => void;
   onReorderStages: (fromIndex: number, toIndex: number) => void;
 };
 
@@ -67,10 +86,18 @@ const stageToStatusCandidates = (stageName: string): string[] => {
   return ["new"];
 };
 
+const toStageLabel = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+};
+
 const SalesPipeLineData = ({
   stages,
   onAddStage,
   onEditStage,
+  onDuplicateStage,
+  onArchiveStage,
+  onDeleteStage,
   onReorderStages,
 }: SalesPipeLineDataProps) => {
   const theme = useTheme();
@@ -80,6 +107,7 @@ const SalesPipeLineData = ({
 
   const [selectedStageName, setSelectedStageName] = useState<string | null>(null);
   const [selectedStageIndex, setSelectedStageIndex] = useState<number | null>(null);
+  const [selectedStageConfig, setSelectedStageConfig] = useState<Partial<StageConfigPayload>>({});
   const [configurationMode, setConfigurationMode] = useState<"create" | "edit">("create");
   const [draggedStageIndex, setDraggedStageIndex] = useState<number | null>(
     null,
@@ -97,12 +125,12 @@ const SalesPipeLineData = ({
   });
 
   const stageHeaderColors = [
-    alpha(theme.palette.primary.main, 0.16),
-    alpha(theme.palette.warning.main, 0.14),
-    alpha(theme.palette.info.main, 0.18),
-    alpha(theme.palette.success.main, 0.16),
-    alpha(theme.palette.secondary.main, 0.16),
-    alpha(theme.palette.grey[500], 0.16),
+    "#F6E4E1",
+    "#F5E9D2",
+    "#DCE7FB",
+    "#D9EFE7",
+    "#E8DFF4",
+    "#E6E9EF",
   ];
 
   useEffect(() => {
@@ -115,8 +143,8 @@ const SalesPipeLineData = ({
 
   const stageMetrics = useMemo(() => {
     const activeLeads = leads.filter((lead) => lead.is_active !== false);
-    return stages.map((rawStage, index) => {
-      const stageName = rawStage.replace(/^\d+\.\s*/, "");
+    return stages.map((stage, index) => {
+      const stageName = stage.stageName.replace(/^\d+\.\s*/, "");
       const statusCandidates = stageToStatusCandidates(stageName);
       const leadCount = activeLeads.filter((lead) =>
         statusCandidates.includes(normalizeLeadStatus(lead)),
@@ -127,7 +155,7 @@ const SalesPipeLineData = ({
 
       if (nextStage) {
         const nextCandidates = stageToStatusCandidates(
-          nextStage.replace(/^\d+\.\s*/, ""),
+          nextStage.stageName.replace(/^\d+\.\s*/, ""),
         );
         const nextCount = activeLeads.filter((lead) =>
           nextCandidates.includes(normalizeLeadStatus(lead)),
@@ -136,7 +164,12 @@ const SalesPipeLineData = ({
           leadCount > 0 ? Math.round((nextCount / leadCount) * 100) : 0;
       }
 
-      return { rawStage, stageName, leadCount, conversionValue };
+      return {
+        stage,
+        stageName,
+        leadCount,
+        conversionValue,
+      };
     });
   }, [leads, stages]);
 
@@ -176,24 +209,42 @@ const SalesPipeLineData = ({
     setConfigurationMode("create");
     setSelectedStageIndex(null);
     setSelectedStageName("New Stage");
+    setSelectedStageConfig({
+      stageType: "Lead",
+      stageStatus: "Open",
+      colorCode: "#EBFAEF",
+      entryRule: "Manual",
+    });
   };
 
-  const handleStageCardClick = (stageName: string, stageIndex: number) => {
+  const handleStageCardClick = (stage: StageCard, stageIndex: number) => {
     if (isDragging) return;
     setConfigurationMode("edit");
     setSelectedStageIndex(stageIndex);
-    setSelectedStageName(stageName);
+    setSelectedStageName(stage.stageName);
+    const resolvedStageColor =
+      stage.stageColor ?? stageHeaderColors[stageIndex % stageHeaderColors.length];
+    setSelectedStageConfig({
+      stageType: toStageLabel(stage.stageType) ?? "Lead",
+      stageStatus: toStageLabel(stage.stageStatus) ?? "Open",
+      colorCode: resolvedStageColor,
+      entryRule: toStageLabel(stage.entryRule) ?? "Manual",
+    });
   };
 
-  const handleSaveStageConfiguration = async (stageName: string) => {
+  const handleSaveStageConfiguration = async (
+    stageName: string,
+    stageConfig?: StageConfigPayload,
+  ) => {
     const isEditMode = configurationMode === "edit" && selectedStageIndex !== null;
     const saved = isEditMode
-      ? await Promise.resolve(onEditStage(selectedStageIndex, stageName))
-      : await Promise.resolve(onAddStage(stageName));
+      ? await Promise.resolve(onEditStage(selectedStageIndex, stageName, stageConfig))
+      : await Promise.resolve(onAddStage(stageName, stageConfig));
 
     if (saved !== false) {
       setSelectedStageIndex(null);
       setSelectedStageName(null);
+      setSelectedStageConfig({});
     }
   };
 
@@ -213,6 +264,7 @@ const SalesPipeLineData = ({
       const targetNode = event.target as Node;
       if (rootRef.current?.contains(targetNode)) return;
       setSelectedStageName(null);
+      setSelectedStageConfig({});
     };
 
     document.addEventListener("mousedown", handleOutsideClick);
@@ -230,6 +282,17 @@ const SalesPipeLineData = ({
     onReorderStages(draggedStageIndex, dropIndex);
     setDraggedStageIndex(null);
   };
+
+  const stageActionButtonSx = {
+    width: 28,
+    height: 28,
+    borderRadius: 1.2,
+    border: `1px solid ${theme.palette.grey[200]}`,
+    backgroundColor: theme.palette.background.paper,
+    "&:hover": {
+      backgroundColor: alpha(theme.palette.grey[200], 0.5),
+    },
+  } as const;
 
   return (
     <Box
@@ -278,10 +341,10 @@ const SalesPipeLineData = ({
         }}
       >
         {stageMetrics.map(
-          ({ rawStage, stageName, leadCount, conversionValue }, index) => {
+          ({ stage, stageName, leadCount, conversionValue }, index) => {
             return (
               <Box
-                key={`${rawStage}-${index}`}
+                key={`${stage.id}-${index}`}
                 draggable
                 onDragStart={() => handleStageDragStart(index)}
                 onDragOver={(event) => event.preventDefault()}
@@ -289,14 +352,14 @@ const SalesPipeLineData = ({
                 onDragEnd={() => setDraggedStageIndex(null)}
                 sx={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   gap: 0.9,
                   flexShrink: 0,
                 }}
               >
                 <Box sx={{ position: "relative" }}>
                   <Box
-                    onClick={() => handleStageCardClick(stageName, index)}
+                    onClick={() => handleStageCardClick(stage, index)}
                     sx={{
                       width: 176,
                       borderRadius: 2,
@@ -311,11 +374,18 @@ const SalesPipeLineData = ({
                         px: 1.4,
                         py: 1,
                         backgroundColor:
-                          stageHeaderColors[index % stageHeaderColors.length],
+                          stage.stageColor ?? stageHeaderColors[index % stageHeaderColors.length],
                       }}
                     >
                       <Typography
-                        sx={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}
+                        sx={{
+                          fontSize: 16,
+                          fontWeight: 700,
+                          lineHeight: 1.2,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
                       >
                         {stageName}
                       </Typography>
@@ -417,9 +487,45 @@ const SalesPipeLineData = ({
                       )}
                     </Box>
                   </Box>
+
+              <Stack direction="row" spacing={0.8} sx={{ mt: 0.9, justifyContent: "center" }}>
+                <IconButton
+                  size="small"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void onDuplicateStage(index);
+                  }}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  sx={stageActionButtonSx}
+                >
+                  <ContentCopyOutlinedIcon sx={{ fontSize: 16, color: "#5A88E8" }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onArchiveStage(index);
+                  }}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  sx={stageActionButtonSx}
+                >
+                  <ArchiveOutlinedIcon sx={{ fontSize: 16, color: "#E29B55" }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDeleteStage(index);
+                  }}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  sx={stageActionButtonSx}
+                >
+                  <DeleteOutlineOutlinedIcon sx={{ fontSize: 16, color: "#CF3D3D" }} />
+                </IconButton>
+              </Stack>
                 </Box>
                 <EastRoundedIcon
-                  sx={{ color: theme.palette.grey[400], fontSize: 18 }}
+                  sx={{ color: theme.palette.grey[400], fontSize: 18, mt: 10 }}
                 />
               </Box>
             );
@@ -536,9 +642,11 @@ const SalesPipeLineData = ({
         open={Boolean(selectedStageName)}
         stageName={selectedStageName ?? ""}
         onStageNameChange={(stageName) => setSelectedStageName(stageName)}
+        initialValues={selectedStageConfig}
         onClose={() => {
           setSelectedStageIndex(null);
           setSelectedStageName(null);
+          setSelectedStageConfig({});
         }}
         onSave={handleSaveStageConfiguration}
         mode={configurationMode}

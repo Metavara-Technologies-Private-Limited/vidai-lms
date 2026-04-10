@@ -4,7 +4,7 @@ import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import { useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import {
 	Box,
 	Button,
@@ -23,7 +23,8 @@ type StageConfigurationProps = {
 	stageName: string;
 	onStageNameChange?: (stageName: string) => void;
 	onClose: () => void;
-	onSave?: (stageName: string) => void | Promise<boolean | void>;
+	onSave?: (stageName: string, stageConfig?: StageConfigPayload) => void | Promise<boolean | void>;
+	initialValues?: Partial<StageConfigPayload>;
 	mode?: "create" | "edit";
 };
 
@@ -34,21 +35,60 @@ type DataCaptureField = {
 	isMandatory: boolean;
 };
 
+type StageAction = {
+	id: string;
+	label: string;
+	checked: boolean;
+};
+
+export type StageConfigPayload = {
+	stageType: string;
+	stageStatus: string;
+	colorCode: string;
+	entryRule: string;
+	actions: StageAction[];
+};
+
+const DEFAULT_STAGE_ACTIONS: StageAction[] = [
+	{ id: "manual-move", label: "Allow manual move via drag & drop", checked: true },
+	{
+		id: "auto-move",
+		label: "Auto-move lead to next stage after actions are completed",
+		checked: true,
+	},
+	{ id: "call", label: "Call", checked: true },
+	{ id: "proposal-email", label: "Proposal - Email", checked: false },
+	{ id: "whatsapp", label: "WhatsApp", checked: false },
+	{ id: "sms", label: "SMS", checked: false },
+	{ id: "appointment", label: "Appointment", checked: false },
+];
+
+const normalizeHexColorInput = (value: string): string => {
+	const onlyHex = value.replace(/[^0-9a-fA-F]/g, "").slice(0, 6).toUpperCase();
+	return `#${onlyHex}`;
+};
+
+const isValidHexColor = (value: string): boolean => /^#[0-9A-F]{6}$/.test(value.toUpperCase());
+
 const StageConfiguration = ({
 	open,
 	stageName,
 	onStageNameChange,
 	onClose,
 	onSave,
+	initialValues,
 	mode = "create",
 }: StageConfigurationProps) => {
 	const theme = useTheme();
 	const [activeTab, setActiveTab] = useState<"stage-rules" | "data-capture">("stage-rules");
 	const [stageType, setStageType] = useState("Lead");
 	const [stageStatus, setStageStatus] = useState("Open");
-	const [colorCode, setColorCode] = useState("#EBFAEF");
+	const [colorCode, setColorCode] = useState("#EEE788");
 	const [entryRule, setEntryRule] = useState("Manual");
 	const [isSaving, setIsSaving] = useState(false);
+	const [showValidation, setShowValidation] = useState(false);
+	const [stageActions, setStageActions] = useState<StageAction[]>(DEFAULT_STAGE_ACTIONS);
+	const colorPickerRef = useRef<HTMLInputElement | null>(null);
 	const [dataCaptureFields, setDataCaptureFields] = useState<DataCaptureField[]>([
 		{
 			id: "field-1",
@@ -121,13 +161,60 @@ const StageConfiguration = ({
 		);
 	};
 
+	const handleToggleStageAction = (actionId: string) => {
+		setStageActions((previous) =>
+			previous.map((action) =>
+				action.id === actionId ? { ...action, checked: !action.checked } : action,
+			),
+		);
+	};
+
+	const handleColorPickerChange = (event: ChangeEvent<HTMLInputElement>) => {
+		setColorCode(normalizeHexColorInput(event.target.value));
+	};
+
+	useEffect(() => {
+		if (!open) return;
+		setStageType(initialValues?.stageType ?? "Lead");
+		setStageStatus(initialValues?.stageStatus ?? "Open");
+		setColorCode(normalizeHexColorInput(initialValues?.colorCode ?? "#EEE788"));
+		setEntryRule(initialValues?.entryRule ?? "Manual");
+		setStageActions(
+			initialValues?.actions && initialValues.actions.length > 0
+				? initialValues.actions
+				: DEFAULT_STAGE_ACTIONS,
+		);
+		setShowValidation(false);
+	}, [open, initialValues, mode, stageName]);
+
 	const handleSave = async () => {
 		const trimmedStageName = stageName.trim();
-		if (!trimmedStageName) return;
+		const trimmedStageType = stageType.trim();
+		const trimmedStageStatus = stageStatus.trim();
+		const trimmedColorCode = colorCode.trim();
+		const trimmedEntryRule = entryRule.trim();
+
+		const hasValidationError =
+			!trimmedStageName ||
+			!trimmedStageType ||
+			!trimmedStageStatus ||
+			!isValidHexColor(trimmedColorCode) ||
+			!trimmedEntryRule;
+
+		if (hasValidationError) {
+			setShowValidation(true);
+			return;
+		}
 		if (typeof onSave !== "function") return;
 		try {
 			setIsSaving(true);
-			await onSave(trimmedStageName);
+			await onSave(trimmedStageName, {
+				stageType: trimmedStageType,
+				stageStatus: trimmedStageStatus,
+				colorCode: trimmedColorCode.toUpperCase(),
+				entryRule: trimmedEntryRule,
+				actions: stageActions,
+			});
 		} finally {
 			setIsSaving(false);
 		}
@@ -143,56 +230,64 @@ const StageConfiguration = ({
 				right: 8,
 				bottom: 8,
 				width: 352,
-				borderRadius: 2,
+				borderRadius: 3,
 				border: `1px solid ${theme.palette.grey[200]}`,
-				backgroundColor: alpha(theme.palette.background.paper, 0.97),
+				backgroundColor: "#FBFBFC",
 				display: "flex",
 				flexDirection: "column",
 				zIndex: 4,
+				overflow: "hidden",
 			}}
 		>
 			<Box
 				sx={{
 					px: 2,
-					py: 1.4,
+					py: 1.7,
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "space-between",
 				}}
 			>
-				<Typography sx={{ fontSize: 26, fontWeight: 700 }}>Stage Configuration</Typography>
+				<Typography sx={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.2 }}>
+					Stage Configuration
+				</Typography>
 				<IconButton
 					size="small"
 					onClick={onClose}
-					sx={{ backgroundColor: alpha(theme.palette.grey[300], 0.3) }}
+					sx={{
+						backgroundColor: "#F2F2F2",
+						width: 30,
+						height: 30,
+						"&:hover": { backgroundColor: "#EAEAEA" },
+					}}
 				>
 					<CloseIcon fontSize="small" />
 				</IconButton>
 			</Box>
 
-			<Box sx={{ px: 2, pb: 1.4 }}>
+			<Box sx={{ px: 2, pb: 1.5 }}>
 				<Stack direction="row" spacing={1}>
 					<Box
 						onClick={() => setActiveTab("stage-rules")}
 						sx={{
 							flex: 1,
-							py: 0.6,
+							py: 0.85,
 							borderRadius: 2,
 							textAlign: "center",
 							fontSize: 14,
-							fontWeight: activeTab === "stage-rules" ? 700 : 500,
+							fontWeight: activeTab === "stage-rules" ? 600 : 500,
 							color:
 								activeTab === "stage-rules"
-									? theme.palette.primary.main
+									? "#EA7C5A"
 									: "text.primary",
 							border:
 								activeTab === "stage-rules"
-									? `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
+									? "1px solid #ECECEC"
 									: "1px solid transparent",
-							backgroundColor: alpha(theme.palette.background.paper, 0.96),
+							backgroundColor: "#FFFFFF",
 							boxShadow:
 								activeTab === "stage-rules"
-									? "0 4px 12px rgba(15, 23, 42, 0.08)"
+									? "0 2px 10px rgba(15, 23, 42, 0.08)"
 									: "none",
 							cursor: "pointer",
 						}}
@@ -203,23 +298,23 @@ const StageConfiguration = ({
 						onClick={() => setActiveTab("data-capture")}
 						sx={{
 							flex: 1,
-							py: 0.6,
+							py: 0.85,
 							borderRadius: 2,
 							textAlign: "center",
 							fontSize: 14,
-							fontWeight: activeTab === "data-capture" ? 700 : 500,
+							fontWeight: activeTab === "data-capture" ? 600 : 500,
 							color:
 								activeTab === "data-capture"
-									? theme.palette.primary.main
+									? "#EA7C5A"
 									: "text.primary",
 							border:
 								activeTab === "data-capture"
-									? `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
+									? "1px solid #ECECEC"
 									: "1px solid transparent",
-							backgroundColor: alpha(theme.palette.background.paper, 0.96),
+							backgroundColor: "#FFFFFF",
 							boxShadow:
 								activeTab === "data-capture"
-									? "0 4px 12px rgba(15, 23, 42, 0.08)"
+									? "0 2px 10px rgba(15, 23, 42, 0.08)"
 									: "none",
 							cursor: "pointer",
 						}}
@@ -236,32 +331,51 @@ const StageConfiguration = ({
 							sx={{
 								border: `1px solid ${theme.palette.grey[200]}`,
 								borderRadius: 2,
-								p: 1.4,
+								backgroundColor: "#FAFAFB",
+								p: 1.5,
 								mb: 1.4,
 							}}
 						>
-							<Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1.2 }}>
-								BASIC SETTINGS
-							</Typography>
-
-							<Stack spacing={1.1}>
+							<Stack spacing={1.05}>
 								<TextField
 									size="small"
 									label="Stage Name"
 									value={stageName}
 									onChange={(event) => onStageNameChange?.(event.target.value)}
+									error={showValidation && !stageName.trim()}
+									helperText={
+										showValidation && !stageName.trim() ? "Stage name is required" : " "
+									}
+									sx={{
+										"& .MuiOutlinedInput-root": {
+											borderRadius: 1.4,
+											backgroundColor: "#FFFFFF",
+										},
+										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
+									}}
 								/>
 								<TextField
 									size="small"
 									label="Stage Type"
 									value={stageType}
 									onChange={(event) => setStageType(event.target.value)}
+									error={showValidation && !stageType.trim()}
+									helperText={
+										showValidation && !stageType.trim() ? "Stage type is required" : " "
+									}
 									InputProps={{
 										endAdornment: (
 											<InputAdornment position="end">
-												<KeyboardArrowDownRoundedIcon />
+												<KeyboardArrowDownRoundedIcon sx={{ color: "#484848" }} />
 											</InputAdornment>
 										),
+									}}
+									sx={{
+										"& .MuiOutlinedInput-root": {
+											borderRadius: 1.4,
+											backgroundColor: "#FFFFFF",
+										},
+										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
 								/>
 								<TextField
@@ -269,12 +383,23 @@ const StageConfiguration = ({
 									label="Stage Status"
 									value={stageStatus}
 									onChange={(event) => setStageStatus(event.target.value)}
+									error={showValidation && !stageStatus.trim()}
+									helperText={
+										showValidation && !stageStatus.trim() ? "Stage status is required" : " "
+									}
 									InputProps={{
 										endAdornment: (
 											<InputAdornment position="end">
-												<KeyboardArrowDownRoundedIcon />
+												<KeyboardArrowDownRoundedIcon sx={{ color: "#484848" }} />
 											</InputAdornment>
 										),
+									}}
+									sx={{
+										"& .MuiOutlinedInput-root": {
+											borderRadius: 1.4,
+											backgroundColor: "#FFFFFF",
+										},
+										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
 								/>
 
@@ -282,21 +407,55 @@ const StageConfiguration = ({
 									size="small"
 									label="Color Code"
 									value={colorCode}
-									onChange={(event) => setColorCode(event.target.value)}
+									onChange={(event) =>
+										setColorCode(normalizeHexColorInput(event.target.value))
+									}
+									error={showValidation && !isValidHexColor(colorCode)}
+									helperText={
+										showValidation && !isValidHexColor(colorCode)
+											? "Use valid hex color (example: #EEE788)"
+											: " "
+									}
 									InputProps={{
 										endAdornment: (
 											<InputAdornment position="end">
-												<Box
-													sx={{
-														width: 22,
-														height: 22,
-														borderRadius: 1,
-														border: `1px solid ${theme.palette.grey[300]}`,
-														backgroundColor: "#B6E9C6",
-													}}
-												/>
+												<>
+													<input
+														type="color"
+														ref={colorPickerRef}
+														value={isValidHexColor(colorCode) ? colorCode : "#EEE788"}
+														onChange={handleColorPickerChange}
+														style={{
+															position: "absolute",
+															opacity: 0,
+															pointerEvents: "none",
+															width: 0,
+															height: 0,
+														}}
+													/>
+													<Box
+														onClick={() => colorPickerRef.current?.click()}
+														sx={{
+															width: 28,
+															height: 28,
+															borderRadius: 1,
+															border: "1px solid #DDE3DD",
+															backgroundColor: isValidHexColor(colorCode)
+																? colorCode
+																: "#EEE788",
+															cursor: "pointer",
+														}}
+													/>
+												</>
 											</InputAdornment>
 										),
+									}}
+									sx={{
+										"& .MuiOutlinedInput-root": {
+											borderRadius: 1.4,
+											backgroundColor: "#FFFFFF",
+										},
+										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
 								/>
 
@@ -305,12 +464,23 @@ const StageConfiguration = ({
 									label="Entry Rule"
 									value={entryRule}
 									onChange={(event) => setEntryRule(event.target.value)}
+									error={showValidation && !entryRule.trim()}
+									helperText={
+										showValidation && !entryRule.trim() ? "Entry rule is required" : " "
+									}
 									InputProps={{
 										endAdornment: (
 											<InputAdornment position="end">
-												<KeyboardArrowDownRoundedIcon />
+												<KeyboardArrowDownRoundedIcon sx={{ color: "#484848" }} />
 											</InputAdornment>
 										),
+									}}
+									sx={{
+										"& .MuiOutlinedInput-root": {
+											borderRadius: 1.4,
+											backgroundColor: "#FFFFFF",
+										},
+										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
 								/>
 							</Stack>
@@ -320,47 +490,89 @@ const StageConfiguration = ({
 							sx={{
 								border: `1px solid ${theme.palette.grey[200]}`,
 								borderRadius: 2,
-								p: 1.4,
+								backgroundColor: "#FAFAFB",
+								overflow: "hidden",
 							}}
 						>
-							<Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1.2 }}>
+							<Typography
+								sx={{
+									fontSize: 14,
+									fontWeight: 700,
+									px: 1.4,
+									pt: 1.2,
+									pb: 1,
+									borderBottom: `1px solid ${theme.palette.grey[200]}`,
+								}}
+							>
 								ACTIONS
 							</Typography>
-							<Typography sx={{ fontSize: 12, color: "#E9A67A", mb: 1.2 }}>
+							<Typography sx={{ fontSize: 12, color: "#E9A67A", px: 1.4, pt: 1.2, mb: 1.2 }}>
 								*Define actions that must be completed before a lead moves to the
 								next stage.
 							</Typography>
 
-							<Stack spacing={1}>
-								{[
-									"Allow manual move via drag & drop",
-									"Auto-move lead to next stage after actions are completed",
-									"Call",
-									"Send Follow-Up",
-								].map((item) => (
+							<Stack spacing={1.05} sx={{ px: 1.4, pb: 1.3 }}>
+								{stageActions.map((item) => (
 									<Box
-										key={item}
-										sx={{ display: "flex", alignItems: "center", gap: 0.9 }}
+										key={item.id}
+										onClick={() => handleToggleStageAction(item.id)}
+										onKeyDown={(event) => {
+											if (event.key === "Enter" || event.key === " ") {
+												event.preventDefault();
+												handleToggleStageAction(item.id);
+											}
+										}}
+										role="checkbox"
+										aria-checked={item.checked}
+										tabIndex={0}
+										sx={{
+											display: "flex",
+											alignItems: "center",
+											gap: 0.9,
+											cursor: "pointer",
+										}}
 									>
 										<Box
 											sx={{
-												width: 16,
-												height: 16,
+												width: 18,
+												height: 18,
 												borderRadius: 0.8,
+												border: `1px solid ${item.checked ? "#B8DCBE" : "#CFCFCF"}`,
 												display: "flex",
 												alignItems: "center",
 												justifyContent: "center",
-												backgroundColor: "#C2E7C8",
-												color: "#1E7A3B",
+												backgroundColor: item.checked ? "#D8F0DC" : "#FFFFFF",
+												color: "#4D9E5E",
 											}}
 										>
-											<CheckRoundedIcon sx={{ fontSize: 12 }} />
+											{item.checked ? <CheckRoundedIcon sx={{ fontSize: 13 }} /> : null}
 										</Box>
-										<Typography sx={{ fontSize: 13, color: "text.primary" }}>
-											{item}
+										<Typography
+											sx={{
+												fontSize: 13,
+												lineHeight: 1.35,
+												fontWeight: 400,
+												color: item.checked ? "#252525" : "#A4A4A4",
+											}}
+										>
+											{item.label}
 										</Typography>
 									</Box>
 								))}
+
+								<Box
+									sx={{
+										display: "flex",
+										alignItems: "center",
+										gap: 0.7,
+										color: "#4584FF",
+										cursor: "pointer",
+										pt: 0.8,
+									}}
+								>
+									<AddBoxOutlinedIcon sx={{ fontSize: 18 }} />
+									<Typography sx={{ fontSize: 13, fontWeight: 500 }}>Add Custom Action</Typography>
+								</Box>
 							</Stack>
 						</Box>
 					</>
