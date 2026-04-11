@@ -1,9 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from "./http";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
-const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+import { toSafePhotoUrl } from "../utils/mediaUrl";
 
 export type UserGender = "Male" | "Female" | "Other";
 
@@ -173,27 +170,6 @@ const toSafeString = (value: unknown): string => {
   return "";
 };
 
-const upgradeToHttpsIfNeeded = (url: string): string => {
-  if (
-    url.startsWith("http://") &&
-    typeof window !== "undefined" &&
-    window.location.protocol === "https:"
-  ) {
-    return url.replace(/^http:\/\//, "https://");
-  }
-  return url;
-};
-
-const toAbsoluteMediaUrl = (value: unknown): string | null => {
-  const raw = toSafeString(value).trim();
-  if (!raw) return null;
-  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) {
-    return upgradeToHttpsIfNeeded(raw);
-  }
-  const absoluteUrl = `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
-  return upgradeToHttpsIfNeeded(absoluteUrl);
-};
-
 const toBoolean = (value: unknown): boolean => {
   if (typeof value === "boolean") {
     return value;
@@ -271,7 +247,7 @@ const normalizeUser = (
     ),
     email: toSafeString(raw.email ?? raw.email_id),
     status: toBoolean(raw.is_active ?? raw.status),
-    photo: toAbsoluteMediaUrl(raw.photo),
+    photo: toSafePhotoUrl(raw.photo),
   };
 };
 

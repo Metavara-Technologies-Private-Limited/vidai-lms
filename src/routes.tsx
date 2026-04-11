@@ -30,33 +30,10 @@ import type { AuthUser } from "./types/auth.types";
 import { fetchLeads } from "./store/leadSlice";
 import { fetchUsers } from "./store/userSlice";
 import { selectLoginType } from "./store/authSlice";
+import { toSafePhotoUrl } from "./utils/mediaUrl";
 // import type { Clinic } from "./types/clinic.types";
 
 let profileRestoreTokenInFlight: string | null = null;
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
-const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
-
-const upgradeToHttpsIfNeeded = (url: string): string => {
-  if (
-    url.startsWith("http://") &&
-    typeof window !== "undefined" &&
-    window.location.protocol === "https:"
-  ) {
-    return url.replace(/^http:\/\//, "https://");
-  }
-  return url;
-};
-
-const toAbsoluteMediaUrl = (value: unknown): string => {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) {
-    return upgradeToHttpsIfNeeded(raw);
-  }
-  const absoluteUrl = `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
-  return upgradeToHttpsIfNeeded(absoluteUrl);
-};
 
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
@@ -247,9 +224,7 @@ export default function AppRoutes() {
                   ? currentUser.clinics
                   : normalizedClinics,
               photo:
-                (profileRecord?.photo
-                  ? toAbsoluteMediaUrl(profileRecord.photo)
-                  : undefined) ??
+                toSafePhotoUrl(profileRecord?.photo) ??
                 currentUser?.photo ??
                 undefined,
               profile_loaded: true,
