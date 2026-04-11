@@ -1,4 +1,6 @@
 import axios, { AxiosError, type AxiosInstance } from "axios";
+import { store, type AppDispatch } from "../store";
+import { setExternalToken } from "../store/authSlice";
 
 // Base axios instance used everywhere in the app.
 // Keep all network + auth related setup here.
@@ -12,7 +14,35 @@ export const http = axios.create({
   headers: { "Content-Type": "application/json" },
 }) as HttpInstance;
 
-const getAccessToken = (): string | null =>
+let extTokenPromise: Promise<string> | null = null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const getExtToken = async (dispatch: AppDispatch, getState: any) => {
+  const state = getState();
+
+  if (state.auth.extToken) {
+    return state.auth.extToken;
+  }
+
+  if (!extTokenPromise) {
+    extTokenPromise = (async () => {
+      const res = await http.post("/proxy/login/", {
+        username: "Admin",
+        password: "vidai_admin@2023",
+      });
+
+      const token = res.data.token;
+      dispatch(setExternalToken(token));
+
+      extTokenPromise = null;
+      return token;
+    })();
+  }
+
+  return extTokenPromise;
+};
+
+export const getAccessToken = (): string | null =>
   localStorage.getItem("auth_token") ||
   localStorage.getItem("authToken") ||
   sessionStorage.getItem("auth_token") ||
@@ -74,20 +104,15 @@ http.redirect = (path: string): void => {
 };
 
 // Add auth token to every request if it exists
-http.interceptors.request.use((config) => {
-  // Let Axios/browser set multipart boundary automatically for file uploads.
-  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
-    if (typeof config.headers?.delete === "function") {
-      config.headers.delete("Content-Type");
-    } else {
-      const headers = (config.headers ?? {}) as Record<string, unknown>;
-      delete headers["Content-Type"];
-      delete headers["content-type"];
-      config.headers = headers as typeof config.headers;
-    }
-  }
+http.interceptors.request.use(async (config) => {
+  const state = store.getState();
 
-  const token = getAccessToken();
+  let token = state.auth.token; // default INT
+
+  // 🔥 Detect external API
+  if (config.url?.includes("/users-search/")) {
+    token = await getExtToken(store.dispatch, store.getState);
+  }
 
   if (token) {
     if (typeof config.headers?.set === "function") {

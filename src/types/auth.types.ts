@@ -119,6 +119,7 @@ export interface AuthState {
   user: AuthUser | null;
   token: string | null;
   refreshToken: string | null;
+  extToken: string | null;
   authed: boolean;
   loginType: LoginType;
 }

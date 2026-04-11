@@ -10,6 +10,9 @@ const AUTH_TOKEN_LEGACY_KEY = "authToken";
 const AUTH_REFRESH_TOKEN_KEY = "refresh_token";
 const AUTH_USER_KEY = "auth_user";
 const AUTH_MODE_KEY = "auth_mode";
+const AUTH_EXT_TOKEN_KEY = "ext_token";
+
+const persistedExtToken = localStorage.getItem(AUTH_EXT_TOKEN_KEY);
 
 // ✅ FIX: extracted type (important for older TS)
 type SetAuthPayload = {
@@ -42,6 +45,7 @@ const persistedUser = readPersistedUser();
 const initialState: AuthState = {
   user: persistedUser,
   token: persistedToken,
+  extToken: persistedExtToken,
   refreshToken: persistedRefreshToken,
   authed: !!persistedToken,
   loginType: persistedMode,
@@ -91,10 +95,14 @@ const authSlice = createSlice({
       localStorage.removeItem(AUTH_USER_KEY);
       localStorage.removeItem(AUTH_MODE_KEY);
     },
+    setExternalToken(state, action: PayloadAction<string>) {
+      state.extToken = action.payload;
+      localStorage.setItem(AUTH_EXT_TOKEN_KEY, action.payload);
+    },
   },
 });
 
-export const { setAuth, setUser, clearAuth } = authSlice.actions;
+export const { setAuth, setUser, clearAuth, setExternalToken } = authSlice.actions;
 export default authSlice.reducer;
 
 // Selectors
