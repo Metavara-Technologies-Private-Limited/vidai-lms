@@ -46,6 +46,7 @@ import { fetchUsers } from "../../store/userSlice";
 import { authApi } from "../../services/auth.api";
 import { toast } from "react-toastify";
 import { getAvatarLetter } from "../../utils/avatar";
+import { toSafePhotoUrl } from "../../utils/mediaUrl";
 
 const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
 
@@ -387,7 +388,7 @@ const Header = () => {
           {/* USER */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Avatar
-              src={user?.photo || undefined}
+              src={toSafePhotoUrl(user?.photo) || undefined}
               onClick={handlePhotoPopoverOpen}
               sx={{
                 width: 36,
@@ -494,7 +495,7 @@ const Header = () => {
       >
         <Stack spacing={1.5} alignItems="center">
           <Avatar
-            src={user?.photo || undefined}
+            src={toSafePhotoUrl(user?.photo) || undefined}
             onClick={() => {
               if (user?.photo) {
                 setIsPreviewOpen(true);
@@ -543,7 +544,7 @@ const Header = () => {
       >
         <DialogContent sx={{ p: 1.5 }}>
           <Avatar
-            src={user?.photo || undefined}
+            src={toSafePhotoUrl(user?.photo) || undefined}
             sx={{
               width: 320,
               height: 320,

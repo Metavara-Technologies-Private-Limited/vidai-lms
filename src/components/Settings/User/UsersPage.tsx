@@ -17,6 +17,7 @@ import {
 } from "../../../services/users.api";
 import { selectLoginType, selectUser, setUser } from "../../../store/authSlice";
 import { fetchUsers } from "../../../store/userSlice";
+import { toSafePhotoUrl } from "../../../utils/mediaUrl";
 import type { AppDispatch, RootState } from "../../../store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -408,7 +409,7 @@ const UsersPage: React.FC = () => {
       emailId: record.email || "",
       password: EDIT_PASSWORD_PLACEHOLDER,
       confirmPassword: EDIT_PASSWORD_PLACEHOLDER,
-      profilePhoto: profile.photo || record.photo || null,
+      profilePhoto: toSafePhotoUrl(profile.photo || record.photo) ?? null,
       profilePhotoFile: null,
       removeProfilePhoto: false,
     };
