@@ -173,6 +173,17 @@ const toSafeString = (value: unknown): string => {
   return "";
 };
 
+const upgradeToHttpsIfNeeded = (url: string): string => {
+  if (
+    url.startsWith("http://") &&
+    typeof window !== "undefined" &&
+    window.location.protocol === "https:"
+  ) {
+    return url.replace(/^http:\/\//, "https://");
+  }
+  return url;
+};
+
 const toAbsoluteMediaUrl = (value: unknown): string | null => {
   const raw = toSafeString(value).trim();
   if (!raw) return null;
@@ -495,14 +506,12 @@ export const usersApi = {
       return [];
     }
 
-    // if (sessionStorage.getItem("users_list_denied") === "1") {
-    //   return [];
-    // }
+    if (sessionStorage.getItem("users_list_denied") === "1") {
+      return [];
+    }
 
     try {
       const response = await http.get<UserListResponse>("/users/list/");
-
-      console.log("RAW RESPONSE:", response.data);
       sessionStorage.removeItem("users_list_denied");
       return extractUserArray(response.data).map((user) =>
         normalizeUser(user, "local"),
@@ -515,6 +524,33 @@ export const usersApi = {
         sessionStorage.setItem("users_list_denied", "1");
         return [];
       }
+
+      if (status === 404 || status === 405 || status === 500) {
+        try {
+          const fallbackResponse = await http.get<UserListResponse>("/users/");
+          sessionStorage.removeItem("users_list_denied");
+          return extractUserArray(fallbackResponse.data).map((user) =>
+            normalizeUser(user, "local"),
+          );
+        } catch (fallbackError) {
+          const fallbackStatus = (
+            fallbackError as { response?: { status?: number } }
+          )?.response?.status;
+
+          if (
+            fallbackStatus === 401 ||
+            fallbackStatus === 403 ||
+            fallbackStatus === 404 ||
+            fallbackStatus === 405 ||
+            fallbackStatus === 500
+          ) {
+            return [];
+          }
+
+          throw fallbackError;
+        }
+      }
+
       throw error;
     }
   },
