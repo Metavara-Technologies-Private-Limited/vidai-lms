@@ -2,19 +2,27 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AppBar,
-  Toolbar,
-  Typography,
+  Avatar,
   Box,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  Divider,
   IconButton,
   Menu,
   MenuItem,
+  Popover,
+  Stack,
+  Toolbar,
+  Typography,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import NotificationIcon from "@/assets/icons/notification.svg";
 import MessageQuestionIcon from "@/assets/icons/message-question.svg";
-import UserAvatarIcon from "@/assets/icons/Ellipse_12.svg";
 import { DynamicBreadcrumbs } from "../../utils/BreadCrumbs";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -24,7 +32,7 @@ import {
   // selectClinic
 } from "../../store/clinicSlice";
 import type { AppDispatch } from "../../store";
-import { clearAuth, selectUser } from "../../store/authSlice";
+import { clearAuth, selectUser, setUser } from "../../store/authSlice";
 // import { fetchCampaign } from "../../store/campaignSlice";
 import { fetchAllTemplates } from "../../store/templateSlice";
 import PersonIcon from "@mui/icons-material/Person";
@@ -34,17 +42,26 @@ import WorkIcon from "@mui/icons-material/Work";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { clinicApi } from "../../services/clinic.api";
 import { fetchLeads } from "../../store/leadSlice";
-// import { fetchLeads } from "../../store/leadSlice";
+import { fetchUsers } from "../../store/userSlice";
+import { authApi } from "../../services/auth.api";
+import { toast } from "react-toastify";
+import { getAvatarLetter } from "../../utils/avatar";
+
+const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
 
 const Header = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const user = useSelector(selectUser);
   const dbClinic = useSelector(selectClinic);
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
   type DropdownClinic = { id: number; name: string; isDefault: boolean };
 
   const [dbClinics, setDbClinics] = useState<DropdownClinic[]>([]);
   const [selectedClinicId, setSelectedClinicId] = useState<number | null>(null);
+  const [photoAnchorEl, setPhotoAnchorEl] = useState<HTMLElement | null>(null);
+  const [isPhotoUpdating, setIsPhotoUpdating] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const lastFetchedClinicIdRef = useRef<number | null>(null);
 
   const userClinics = useMemo<DropdownClinic[]>(() => {
@@ -188,6 +205,11 @@ const Header = () => {
   const handleUserMenuOpen = (e: React.MouseEvent<HTMLElement>) =>
     setUserAnchorEl(e.currentTarget);
   const handleUserMenuClose = () => setUserAnchorEl(null);
+  const handlePhotoPopoverOpen = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setPhotoAnchorEl(e.currentTarget);
+  };
+  const handlePhotoPopoverClose = () => setPhotoAnchorEl(null);
   const handleLogout = () => {
     handleUserMenuClose();
     dispatch(clearAuth());
@@ -205,6 +227,90 @@ const Header = () => {
     user?.username ||
     user?.email ||
     "-";
+  const avatarLetter = getAvatarLetter(
+    user?.first_name,
+    user?.username,
+    user?.email,
+  );
+  const canManageOwnPhoto = Boolean(user?.id || user?.user_id);
+
+  const applyUpdatedProfile = (updatedProfile: Record<string, unknown>) => {
+    if (!user) return;
+
+    dispatch(
+      setUser({
+        ...user,
+        first_name:
+          typeof updatedProfile.first_name === "string"
+            ? updatedProfile.first_name
+            : user.first_name,
+        last_name:
+          typeof updatedProfile.last_name === "string"
+            ? updatedProfile.last_name
+            : user.last_name,
+        photo:
+          typeof updatedProfile.photo === "string" && updatedProfile.photo
+            ? updatedProfile.photo
+            : user.photo,
+      }),
+    );
+  };
+
+  const handleProfilePhotoFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_PHOTO_SIZE) {
+      toast.error("Profile photo must be 20MB or smaller");
+      e.target.value = "";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    setIsPhotoUpdating(true);
+    try {
+      const updatedProfile = await authApi.updateMyPhoto(formData);
+      applyUpdatedProfile(updatedProfile as Record<string, unknown>);
+      toast.success("Profile photo updated successfully");
+      await dispatch(fetchUsers());
+      handlePhotoPopoverClose();
+    } catch (error) {
+      console.error("Failed to update profile photo", error);
+      toast.error("Failed to update profile photo");
+    } finally {
+      setIsPhotoUpdating(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDeleteProfilePhoto = async () => {
+    setIsPhotoUpdating(true);
+    try {
+      const formData = new FormData();
+      formData.append("remove_photo", "true");
+      const updatedProfile = await authApi.updateMyPhoto(formData);
+      applyUpdatedProfile(updatedProfile as Record<string, unknown>);
+      toast.success("Profile photo removed successfully");
+      await dispatch(fetchUsers());
+      handlePhotoPopoverClose();
+      setIsPreviewOpen(false);
+    } catch (error) {
+      console.error("Failed to remove profile photo", error);
+      toast.error("Failed to remove profile photo");
+    } finally {
+      setIsPhotoUpdating(false);
+    }
+  };
 
   return (
     <AppBar
@@ -279,27 +385,43 @@ const Header = () => {
           ))}
 
           {/* USER */}
-          <Box
-            sx={{ display: "flex", alignItems: "center", gap: 1 }}
-            onClick={handleUserMenuOpen}
-          >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Avatar
+              src={user?.photo || undefined}
+              onClick={handlePhotoPopoverOpen}
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: "10px",
+                bgcolor: "#F3E8E2",
+                color: "#A4471C",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {avatarLetter}
+            </Avatar>
             <Box
-              component="img"
-              src={user?.photo || UserAvatarIcon}
-              sx={{ width: 36, height: 36, borderRadius: "10px" }}
-            />
-            <Box sx={{ display: { xs: "none", sm: "block" } }}>
-              <Typography fontWeight={600}>
-                {displayUserName}
-              </Typography>
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                cursor: "pointer",
+              }}
+              onClick={handleUserMenuOpen}
+            >
+              <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                <Typography fontWeight={600}>{displayUserName}</Typography>
 
-              <Typography fontSize={12} color="#6b7280">
-                {user?.designation_label || user?.designation || "—"}
-              </Typography>
+                <Typography fontSize={12} color="#6b7280">
+                  {user?.designation_label || user?.designation || "—"}
+                </Typography>
+              </Box>
+              <IconButton size="small">
+                <ArrowDropDownIcon />
+              </IconButton>
             </Box>
-            <IconButton size="small">
-              <ArrowDropDownIcon />
-            </IconButton>
           </Box>
         </Box>
       </Toolbar>
@@ -354,6 +476,97 @@ const Header = () => {
           Logout
         </MenuItem>
       </Menu>
+
+      <Popover
+        open={Boolean(photoAnchorEl)}
+        anchorEl={photoAnchorEl}
+        onClose={handlePhotoPopoverClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        PaperProps={{
+          sx: {
+            mt: 1,
+            p: 1.5,
+            borderRadius: 3,
+            width: 260,
+          },
+        }}
+      >
+        <Stack spacing={1.5} alignItems="center">
+          <Avatar
+            src={user?.photo || undefined}
+            onClick={() => {
+              if (user?.photo) {
+                setIsPreviewOpen(true);
+              }
+            }}
+            sx={{
+              width: 180,
+              height: 180,
+              fontSize: 56,
+              fontWeight: 700,
+              bgcolor: "#F3E8E2",
+              color: "#A4471C",
+              cursor: user?.photo ? "zoom-in" : "default",
+            }}
+          >
+            {avatarLetter}
+          </Avatar>
+          <Typography fontWeight={600} textAlign="center">
+            {displayUserName}
+          </Typography>
+          <Divider flexItem />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <IconButton
+              onClick={() => profilePhotoInputRef.current?.click()}
+              disabled={!canManageOwnPhoto || isPhotoUpdating}
+              sx={{ bgcolor: "#F6F6F6" }}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              onClick={handleDeleteProfilePhoto}
+              disabled={!user?.photo || !canManageOwnPhoto || isPhotoUpdating}
+              sx={{ bgcolor: "#FFF1F1", color: "#D32F2F" }}
+            >
+              <DeleteOutlineIcon fontSize="small" />
+            </IconButton>
+            {isPhotoUpdating && <CircularProgress size={22} />}
+          </Stack>
+        </Stack>
+      </Popover>
+
+      <Dialog
+        open={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        maxWidth="xs"
+      >
+        <DialogContent sx={{ p: 1.5 }}>
+          <Avatar
+            src={user?.photo || undefined}
+            sx={{
+              width: 320,
+              height: 320,
+              maxWidth: "80vw",
+              maxHeight: "80vw",
+              bgcolor: "#F3E8E2",
+              color: "#A4471C",
+              fontSize: 96,
+              fontWeight: 700,
+            }}
+          >
+            {avatarLetter}
+          </Avatar>
+        </DialogContent>
+      </Dialog>
+
+      <input
+        ref={profilePhotoInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={handleProfilePhotoFileChange}
+      />
     </AppBar>
   );
 };

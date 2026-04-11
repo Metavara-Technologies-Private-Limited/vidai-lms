@@ -58,6 +58,11 @@ export const authApi = {
     return res.data.data;
   },
 
+  updateMyPhoto: async (payload: FormData) => {
+    const res = await http.patch("/me/photo/", payload);
+    return res.data.data;
+  },
+
   searchUsers: async (params: UserSearchParams) => {
     const res = await http.get("/users-search/", {
       params: {

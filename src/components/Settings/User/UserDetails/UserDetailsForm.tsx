@@ -21,6 +21,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import type { Dayjs } from "dayjs";
 import { toast } from "react-toastify";
+import { getAvatarLetter } from "../../../../utils/avatar";
 
 export type UserType = "employee";
 
@@ -52,6 +53,35 @@ interface Props {
   isSubmitting?: boolean;
 }
 
+// Utility function to log photo loading issues for debugging
+const logPhotoDebug = (
+  photoUrl: string | null | undefined,
+  status: "loading" | "loaded" | "failed",
+) => {
+  const timestamp = new Date().toISOString();
+  const message = `[${timestamp}] Photo ${status}: ${photoUrl || "null"}`;
+
+  if (status === "failed") {
+    console.error(message);
+  } else {
+    console.log(message);
+  }
+};
+
+// Utility to add cache-busting param for remote URLs
+const getCacheBustedUrl = (
+  url: string | null | undefined,
+): string | undefined => {
+  if (!url) return undefined;
+  // Don't add cache-busting to data URLs or blob URLs
+  if (url.startsWith("data:") || url.startsWith("blob:")) {
+    return url;
+  }
+  // Add cache-busting timestamp to remote URLs
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}t=${Date.now()}`;
+};
+
 const inputSx = {
   "& .MuiOutlinedInput-root": {
     borderRadius: "6px",
@@ -81,6 +111,8 @@ const defaultForm: UserFormData = {
   profilePhotoFile: null,
   removeProfilePhoto: false,
 };
+
+const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
 
 const FieldGrid = ({ children }: { children: React.ReactNode }) => (
   <Grid size={{ xs: 12, sm: 3 }}>{children}</Grid>
@@ -238,12 +270,15 @@ const UserDetailsForm: React.FC<Props> = ({
   const [form, setForm] = useState<UserFormData>(defaultForm);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   useEffect(() => {
     const loadData = () => {
       if (initialData) {
         setForm(initialData);
+        setPhotoLoadFailed(false);
+        logPhotoDebug(initialData.profilePhoto, "loading");
       }
     };
     loadData();
@@ -252,6 +287,18 @@ const UserDetailsForm: React.FC<Props> = ({
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_PHOTO_SIZE) {
+      toast.error("Profile photo must be 20MB or smaller");
+      e.target.value = "";
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -262,6 +309,7 @@ const UserDetailsForm: React.FC<Props> = ({
         profilePhotoFile: file,
         removeProfilePhoto: false,
       }));
+      setPhotoLoadFailed(false);
       toast.success("Profile photo added successfully");
     };
     reader.readAsDataURL(file);
@@ -274,6 +322,7 @@ const UserDetailsForm: React.FC<Props> = ({
       profilePhotoFile: null,
       removeProfilePhoto: true,
     }));
+    setPhotoLoadFailed(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     toast.success("Profile photo removed successfully");
   };
@@ -360,27 +409,67 @@ const UserDetailsForm: React.FC<Props> = ({
       <Box>
         <Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 2 }}>
           <Box sx={{ position: "relative", width: 64, height: 64 }}>
+            {form.profilePhoto && !photoLoadFailed && (
+              <Box
+                component="img"
+                src={getCacheBustedUrl(form.profilePhoto)}
+                onError={() => {
+                  logPhotoDebug(form.profilePhoto, "failed");
+                  setPhotoLoadFailed(true);
+                }}
+                onLoad={() => {
+                  logPhotoDebug(form.profilePhoto, "loaded");
+                }}
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  backgroundColor: "#EEEEEE",
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  zIndex: 1,
+                }}
+                alt="User profile"
+              />
+            )}
             <Avatar
-              src={form.profilePhoto ?? undefined}
-              sx={{ width: 64, height: 64, bgcolor: "#EEEEEE" }}
-            />
+              src={
+                form.profilePhoto && !photoLoadFailed
+                  ? form.profilePhoto
+                  : undefined
+              }
+              sx={{
+                width: 64,
+                height: 64,
+                bgcolor: "#EEEEEE",
+                color: "#616161",
+                fontWeight: 700,
+                position: "relative",
+                zIndex: form.profilePhoto && !photoLoadFailed ? 0 : 1,
+              }}
+            >
+              {getAvatarLetter(form.firstName, form.userName)}
+            </Avatar>
             <IconButton
               size="small"
               onClick={() => fileInputRef.current?.click()}
               sx={{
                 position: "absolute",
                 bottom: 0,
-                right: form.profilePhoto ? 22 : -4,
+                right: form.profilePhoto && !photoLoadFailed ? 22 : -4,
                 bgcolor: "#D32F2F",
                 color: "#fff",
                 width: 20,
                 height: 20,
                 "&:hover": { bgcolor: "#B71C1C" },
+                zIndex: 2,
               }}
             >
               <EditIcon sx={{ fontSize: 12 }} />
             </IconButton>
-            {form.profilePhoto && (
+            {form.profilePhoto && !photoLoadFailed && (
               <IconButton
                 size="small"
                 onClick={handleRemovePhoto}
@@ -396,6 +485,30 @@ const UserDetailsForm: React.FC<Props> = ({
                 }}
               >
                 <DeleteOutlineIcon sx={{ fontSize: 12 }} />
+              </IconButton>
+            )}
+            {form.profilePhoto && photoLoadFailed && (
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setPhotoLoadFailed(false);
+                  toast.info("Retrying to load photo...");
+                }}
+                title="Photo failed to load. Click to retry."
+                sx={{
+                  position: "absolute",
+                  bottom: 0,
+                  right: -4,
+                  bgcolor: "#FF9800",
+                  color: "#fff",
+                  width: 20,
+                  height: 20,
+                  fontSize: 10,
+                  "&:hover": { bgcolor: "#F57C00" },
+                  zIndex: 2,
+                }}
+              >
+                ⟲
               </IconButton>
             )}
             <input
