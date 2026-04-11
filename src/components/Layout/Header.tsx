@@ -250,8 +250,8 @@ const Header = () => {
             ? updatedProfile.last_name
             : user.last_name,
         photo:
-          typeof updatedProfile.photo === "string" && updatedProfile.photo
-            ? updatedProfile.photo
+          "photo" in updatedProfile
+            ? ((updatedProfile.photo as string | null | undefined) ?? undefined)
             : user.photo,
       }),
     );
