@@ -177,12 +177,19 @@ const collectPermissionState = (user: UserLike): PermissionState => {
 };
 
 const hasMenuPermission = (user: UserLike, key: string): boolean | null => {
-  const { labels, hasPermissionContainer } = collectPermissionState(user);
+  const { labels, hasPermissionContainer, hasPermissionPayload } =
+    collectPermissionState(user);
   if (!hasPermissionContainer) return null;
 
   // When a permissions container exists, always use it deterministically.
-  // If no labels could be parsed, deny instead of role fallback to avoid
-  // show/hide glitches.
+  // But if it is only an empty shell (for example after partial profile
+  // hydration), fall back to role-based access instead of hiding the app.
+  if (!hasPermissionPayload) {
+    return null;
+  }
+
+  // If a real payload exists but no labels could be parsed, deny instead of
+  // role fallback to avoid show/hide glitches.
   if (labels.size === 0) {
     return false;
   }
@@ -215,8 +222,13 @@ const hasSubMenuPermission = (
   user: UserLike,
   subKey: string,
 ): boolean | null => {
-  const { labels, hasPermissionContainer } = collectPermissionState(user);
+  const { labels, hasPermissionContainer, hasPermissionPayload } =
+    collectPermissionState(user);
   if (!hasPermissionContainer) return null;
+
+  if (!hasPermissionPayload) {
+    return null;
+  }
 
   if (labels.size === 0) {
     return false;

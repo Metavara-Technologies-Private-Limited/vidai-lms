@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from "./http";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
 export type UserGender = "Male" | "Female" | "Other";
@@ -176,7 +177,9 @@ const toAbsoluteMediaUrl = (value: unknown): string | null => {
   const raw = toSafeString(value).trim();
   if (!raw) return null;
   if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
-  return `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
+  const absoluteUrl = `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
+  console.debug("[API] Media URL converted:", { raw, absoluteUrl });
+  return absoluteUrl;
 };
 
 const toBoolean = (value: unknown): boolean => {
@@ -260,7 +263,9 @@ const normalizeUser = (
   };
 };
 
-const buildUserRequestBody = (payload: UserCreateUpdatePayload): UserCreateUpdatePayload | FormData => {
+const buildUserRequestBody = (
+  payload: UserCreateUpdatePayload,
+): UserCreateUpdatePayload | FormData => {
   const shouldUseFormData =
     payload.photo instanceof File || payload.remove_photo === true;
 
@@ -278,7 +283,10 @@ const buildUserRequestBody = (payload: UserCreateUpdatePayload): UserCreateUpdat
       continue;
     }
 
-    formData.append(key, typeof value === "boolean" ? String(value) : String(value));
+    formData.append(
+      key,
+      typeof value === "boolean" ? String(value) : String(value),
+    );
   }
 
   return formData;
@@ -438,7 +446,8 @@ const toFallbackCreatePayload = (
 };
 
 const shouldRetryCreateWithFallback = (error: unknown): boolean => {
-  const status = (error as { response?: { status?: number } })?.response?.status;
+  const status = (error as { response?: { status?: number } })?.response
+    ?.status;
   if (status === 404 || status === 405) {
     return true;
   }
@@ -477,14 +486,15 @@ export const usersApi = {
 
     try {
       const response = await http.get<UserListResponse>("/users/list/");
-      
-          console.log("RAW RESPONSE:", response.data);
+
+      console.log("RAW RESPONSE:", response.data);
       sessionStorage.removeItem("users_list_denied");
       return extractUserArray(response.data).map((user) =>
         normalizeUser(user, "local"),
       );
     } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
       if (status === 401 || status === 403) {
         // Some roles cannot access this endpoint. Treat as empty dataset.
         sessionStorage.setItem("users_list_denied", "1");
@@ -502,8 +512,9 @@ export const usersApi = {
     }
 
     const enableUsersProxy =
-      (import.meta.env.VITE_ENABLE_STAGE_USERS_PROXY ?? "false")
-        .toLowerCase() === "true";
+      (
+        import.meta.env.VITE_ENABLE_STAGE_USERS_PROXY ?? "false"
+      ).toLowerCase() === "true";
 
     if (!enableUsersProxy) {
       return [];
@@ -528,7 +539,8 @@ export const usersApi = {
         normalizeUser(user, "client"),
       );
     } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
       if (status === 401 || status === 403) {
         // Some roles cannot access this endpoint. Treat as empty dataset.
         sessionStorage.setItem("users_search_denied", "1");
@@ -569,7 +581,10 @@ export const usersApi = {
     try {
       ensureAuthToken();
       const requestBody = buildUserRequestBody(payload);
-      const response = await http.post<UserSingleResponse>("/users/", requestBody);
+      const response = await http.post<UserSingleResponse>(
+        "/users/",
+        requestBody,
+      );
       return normalizeUser(extractSingleRecord(response.data));
     } catch (error) {
       if (shouldRetryCreateWithFallback(error)) {

@@ -167,47 +167,86 @@ export default function AppRoutes() {
       if (profileRestoreTokenInFlight === token) return;
       profileRestoreTokenInFlight = token;
 
-      // Skip profile call only when we've explicitly hydrated profile before.
-      if (user && typeof user === "object" && user.profile_loaded) return;
+      try {
+        if (loginType !== "EXT") {
+          const profile = await authApi.getProfile();
+          const profileRecord =
+            profile && typeof profile === "object"
+              ? (profile as Record<string, unknown>)
+              : null;
 
-      if (loginType !== "EXT") {
-        if (user && typeof user === "object") {
-          try {
-            const profile = await authApi.getProfile();
-            const profileRecord =
-              profile && typeof profile === "object"
-                ? (profile as Record<string, unknown>)
-                : null;
+          const currentUser =
+            user && typeof user === "object" ? (user as AuthUser) : null;
+          const profileRole =
+            profileRecord?.role && typeof profileRecord.role === "object"
+              ? (profileRecord.role as Record<string, unknown>)
+              : null;
+          const profileRoleName = String(profileRole?.name ?? "").trim();
+          const normalizedClinics = profileRecord
+            ? normalizeClinics(profileRecord)
+            : [];
 
-            const rawPhoto = toAbsoluteMediaUrl(profileRecord?.photo);
-
-            dispatch(
-              setUser({
-                ...(user as AuthUser),
-                ...(profileRecord as Partial<AuthUser>),
-                photo:
-                  rawPhoto ||
-                  String((user as AuthUser).photo ?? "").trim() ||
-                  undefined,
-                profile_loaded: true,
-              } as AuthUser),
-            );
-          } catch {
-            dispatch(
-              setUser({
-                ...(user as AuthUser),
-                profile_loaded: true,
+          dispatch(
+            setUser({
+              ...(currentUser ?? {
+                username: String(profileRecord?.username ?? ""),
+                email: String(profileRecord?.email ?? ""),
+                access: token,
+                permissions: { modules: [] },
               }),
-            );
-          }
+              access: currentUser?.access ?? token,
+              id:
+                typeof profileRecord?.id === "number"
+                  ? profileRecord.id
+                  : currentUser?.id,
+              user_id:
+                typeof profileRecord?.id === "number"
+                  ? profileRecord.id
+                  : currentUser?.user_id,
+              username:
+                String(profileRecord?.username ?? "").trim() ||
+                currentUser?.username ||
+                "",
+              email:
+                String(profileRecord?.email ?? "").trim() ||
+                currentUser?.email ||
+                "",
+              first_name:
+                String(profileRecord?.first_name ?? "").trim() ||
+                currentUser?.first_name,
+              last_name:
+                String(profileRecord?.last_name ?? "").trim() ||
+                currentUser?.last_name,
+              designation_label:
+                currentUser?.designation_label ||
+                currentUser?.designation ||
+                profileRoleName ||
+                undefined,
+              designation:
+                currentUser?.designation ||
+                currentUser?.designation_label ||
+                profileRoleName ||
+                undefined,
+              role: currentUser?.role || profileRoleName || undefined,
+              clinics:
+                currentUser?.clinics && currentUser.clinics.length > 0
+                  ? currentUser.clinics
+                  : normalizedClinics,
+              photo:
+                (profileRecord?.photo
+                  ? toAbsoluteMediaUrl(profileRecord.photo)
+                  : undefined) ??
+                currentUser?.photo ??
+                undefined,
+              profile_loaded: true,
+            } as AuthUser),
+          );
+
+          await dispatch(fetchLeads());
+          await dispatch(fetchUsers());
+          return;
         }
 
-        await dispatch(fetchLeads());
-        await dispatch(fetchUsers());
-        return;
-      }
-
-      try {
         const profile = await authApi.getProfile();
         if (!profile || typeof profile !== "object") return;
 
@@ -267,7 +306,7 @@ export default function AppRoutes() {
     };
 
     restoreUser();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, authed, dispatch, loginType]);
 
   return (

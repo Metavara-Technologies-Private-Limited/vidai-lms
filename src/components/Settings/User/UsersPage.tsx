@@ -343,6 +343,37 @@ const UsersPage: React.FC = () => {
     }
   }, [dispatch, token, canViewUsers]);
 
+  useEffect(() => {
+    if (!editingUser || !authUser) return;
+
+    const authId = Number(authUser.id ?? authUser.user_id ?? 0);
+
+    if (!authId || editingUser.id !== authId) return;
+
+    setEditingUser((current) => {
+      if (!current) return current;
+
+      const nextFirstName = authUser.first_name || current.firstName;
+      const nextLastName = authUser.last_name || current.lastName;
+      const nextPhoto = authUser.photo || null;
+
+      if (
+        current.firstName === nextFirstName &&
+        current.lastName === nextLastName &&
+        (current.photo || null) === nextPhoto
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        firstName: nextFirstName,
+        lastName: nextLastName,
+        photo: nextPhoto,
+      };
+    });
+  }, [authUser, editingUser?.id]);
+
   const mapUserToFormData = (user: User): UserFormData => {
     const record = user as any;
     const profile = record.profile || {};
