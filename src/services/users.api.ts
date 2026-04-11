@@ -176,10 +176,25 @@ const toSafeString = (value: unknown): string => {
 const toAbsoluteMediaUrl = (value: unknown): string | null => {
   const raw = toSafeString(value).trim();
   if (!raw) return null;
-  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.protocol === "https:" &&
+      /^http:\/\//i.test(raw)
+    ) {
+      return raw.replace(/^http:\/\//i, "https://");
+    }
+    return raw;
+  }
   const absoluteUrl = `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
-  console.debug("[API] Media URL converted:", { raw, absoluteUrl });
-  return absoluteUrl;
+  const secureUrl =
+    typeof window !== "undefined" &&
+    window.location.protocol === "https:" &&
+    /^http:\/\//i.test(absoluteUrl)
+      ? absoluteUrl.replace(/^http:\/\//i, "https://")
+      : absoluteUrl;
+  console.debug("[API] Media URL converted:", { raw, absoluteUrl: secureUrl });
+  return secureUrl;
 };
 
 const toBoolean = (value: unknown): boolean => {
