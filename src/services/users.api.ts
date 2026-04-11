@@ -480,14 +480,12 @@ export const usersApi = {
       return [];
     }
 
-    // if (sessionStorage.getItem("users_list_denied") === "1") {
-    //   return [];
-    // }
+    if (sessionStorage.getItem("users_list_denied") === "1") {
+      return [];
+    }
 
     try {
       const response = await http.get<UserListResponse>("/users/list/");
-
-      console.log("RAW RESPONSE:", response.data);
       sessionStorage.removeItem("users_list_denied");
       return extractUserArray(response.data).map((user) =>
         normalizeUser(user, "local"),
@@ -500,6 +498,33 @@ export const usersApi = {
         sessionStorage.setItem("users_list_denied", "1");
         return [];
       }
+
+      if (status === 404 || status === 405 || status === 500) {
+        try {
+          const fallbackResponse = await http.get<UserListResponse>("/users/");
+          sessionStorage.removeItem("users_list_denied");
+          return extractUserArray(fallbackResponse.data).map((user) =>
+            normalizeUser(user, "local"),
+          );
+        } catch (fallbackError) {
+          const fallbackStatus = (
+            fallbackError as { response?: { status?: number } }
+          )?.response?.status;
+
+          if (
+            fallbackStatus === 401 ||
+            fallbackStatus === 403 ||
+            fallbackStatus === 404 ||
+            fallbackStatus === 405 ||
+            fallbackStatus === 500
+          ) {
+            return [];
+          }
+
+          throw fallbackError;
+        }
+      }
+
       throw error;
     }
   },
