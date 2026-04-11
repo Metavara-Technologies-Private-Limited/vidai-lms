@@ -173,13 +173,25 @@ const toSafeString = (value: unknown): string => {
   return "";
 };
 
+const upgradeToHttpsIfNeeded = (url: string): string => {
+  if (
+    url.startsWith("http://") &&
+    typeof window !== "undefined" &&
+    window.location.protocol === "https:"
+  ) {
+    return url.replace(/^http:\/\//, "https://");
+  }
+  return url;
+};
+
 const toAbsoluteMediaUrl = (value: unknown): string | null => {
   const raw = toSafeString(value).trim();
   if (!raw) return null;
-  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) {
+    return upgradeToHttpsIfNeeded(raw);
+  }
   const absoluteUrl = `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
-  console.debug("[API] Media URL converted:", { raw, absoluteUrl });
-  return absoluteUrl;
+  return upgradeToHttpsIfNeeded(absoluteUrl);
 };
 
 const toBoolean = (value: unknown): boolean => {

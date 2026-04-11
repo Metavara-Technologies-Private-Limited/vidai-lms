@@ -31,11 +31,25 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
+const upgradeToHttpsIfNeeded = (url: string): string => {
+  if (
+    url.startsWith("http://") &&
+    typeof window !== "undefined" &&
+    window.location.protocol === "https:"
+  ) {
+    return url.replace(/^http:\/\//, "https://");
+  }
+  return url;
+};
+
 const toAbsoluteMediaUrl = (value: unknown): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
-  return `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) {
+    return upgradeToHttpsIfNeeded(raw);
+  }
+  const absoluteUrl = `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
+  return upgradeToHttpsIfNeeded(absoluteUrl);
 };
 
 function resolveInitialLanguage(): LanguageCode {
