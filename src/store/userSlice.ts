@@ -18,14 +18,16 @@ const initialState: UsersState = {
 export const fetchUsers = createAsyncThunk(
   "users/fetch",
   async (_, { rejectWithValue }) => {
-      try {
-          const users = await usersApi.list();
+    try {
+      const users = await usersApi.list();
       return users;
     } catch (err: unknown) {
-        console.log("User fetch error:", err);
-      if (err instanceof AxiosError)
+      console.log("User fetch error:", err);
+      if (err instanceof AxiosError) {
         return rejectWithValue(err.message || "Failed to fetch users");
-        throw Error;
+      }
+
+      return rejectWithValue("Failed to fetch users");
     }
   },
 );

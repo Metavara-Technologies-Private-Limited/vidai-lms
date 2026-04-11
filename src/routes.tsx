@@ -257,7 +257,7 @@ export default function AppRoutes() {
         dispatch(
           setUser({
             ...(user as AuthUser | null),
-            ...(profile as AuthUser),
+            ...(profile as unknown as AuthUser),
             clinics: normalizedClinics,
             profile_loaded: true,
           } as AuthUser),

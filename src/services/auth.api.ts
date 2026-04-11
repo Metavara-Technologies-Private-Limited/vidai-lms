@@ -27,6 +27,22 @@ const normalizeExternalResponse = (
   permissions: {},
 });
 
+const unwrapResponseData = <T>(payload: unknown): T => {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in (payload as Record<string, unknown>)
+  ) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+};
+
+const isNotFoundError = (error: unknown): boolean => {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  return status === 404;
+};
+
 export const authApi = {
   login: async (
     data: LoginPayload,
@@ -54,13 +70,31 @@ export const authApi = {
   },
 
   getProfile: async () => {
-    const res = await http.get("/me/profile/");
-    return res.data.data;
+    try {
+      const res = await http.get("/me/profile/");
+      return unwrapResponseData<Record<string, unknown>>(res.data);
+    } catch (error) {
+      if (!isNotFoundError(error)) {
+        throw error;
+      }
+
+      const fallbackRes = await http.get("/profile/");
+      return unwrapResponseData<Record<string, unknown>>(fallbackRes.data);
+    }
   },
 
   updateMyPhoto: async (payload: FormData) => {
-    const res = await http.patch("/me/photo/", payload);
-    return res.data.data;
+    try {
+      const res = await http.patch("/me/photo/", payload);
+      return unwrapResponseData<Record<string, unknown>>(res.data);
+    } catch (error) {
+      if (!isNotFoundError(error)) {
+        throw error;
+      }
+
+      const fallbackRes = await http.patch("/me/profile/", payload);
+      return unwrapResponseData<Record<string, unknown>>(fallbackRes.data);
+    }
   },
 
   searchUsers: async (params: UserSearchParams) => {

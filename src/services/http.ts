@@ -47,10 +47,15 @@ const refreshAccessToken = async (): Promise<string | null> => {
 
   try {
     const response = await axios.post(`${API_BASE_URL}/token/refresh/`, {
+      refresh: refreshToken,
       refresh_token: refreshToken,
     });
 
-    const nextToken = response.data?.data?.access_token;
+    const nextToken =
+      response.data?.data?.access_token ||
+      response.data?.data?.access ||
+      response.data?.access_token ||
+      response.data?.access;
     if (!nextToken || typeof nextToken !== "string") {
       return null;
     }
