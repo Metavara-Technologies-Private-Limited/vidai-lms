@@ -552,13 +552,6 @@ const ReputationDashboard = () => {
   useEffect(() => {
     dispatch(fetchLeads());
     dispatch(fetchReviewRequests());
-
-    const POLL_INTERVAL_MS = 5_000; // 5 seconds
-    const intervalId = setInterval(() => {
-      void dispatch(fetchReviewRequests());
-    }, POLL_INTERVAL_MS);
-
-    return () => clearInterval(intervalId);
   }, [dispatch]);
 
   return (

@@ -11,6 +11,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { reputationApi } from "../../services/reputation.api";
+import { clinicsApi } from "../../services/tickets.api";
 import type { Lead } from "../../services/leads.api";
 import { fetchLeads, selectLeads } from "../../store/leadSlice";
 import {
@@ -69,7 +70,11 @@ const getBackendErrorMessage = (error: unknown): string => {
 
       const fallbackError = record.error;
       if (typeof fallbackError === "string" && fallbackError.trim()) {
-        return fallbackError;
+        const requestId =
+          typeof record.request_id === "string" ? record.request_id : "";
+        return requestId
+          ? `${fallbackError} (request id: ${requestId})`
+          : fallbackError;
       }
 
       const firstEntry = Object.values(record).find((value) => {
@@ -117,6 +122,13 @@ const normalizeReviewLinkPlaceholder = (message: string) => {
   return `${normalized.trim()}\n\n{review_link}`;
 };
 
+const normalizeMessageForRequest = (message: string) => {
+  return message
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
 const GOOGLE_REVIEW_PLACEHOLDER_URL = "https://g.page/review/your-clinic";
 
 const getConfiguredGoogleReviewUrl = () =>
@@ -138,6 +150,40 @@ const isValidEmailAddress = (value?: string) => {
   }
 
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+const getString = (value: unknown) =>
+  typeof value === "string" ? value.trim() : "";
+
+const extractClinicEmails = (clinicData: unknown): string[] => {
+  const record = asRecord(clinicData);
+  const dataRecord = asRecord(record.data);
+
+  const directCandidates = [
+    getString(record.email),
+    getString(record.clinic_email),
+    getString(record.reply_email),
+    getString(record.contact_email),
+    getString(dataRecord.email),
+    getString(dataRecord.clinic_email),
+    getString(dataRecord.reply_email),
+    getString(dataRecord.contact_email),
+  ].filter((mail) => mail && isValidEmailAddress(mail));
+
+  const nestedEmailArray = [record.emails, dataRecord.emails].find((emails) =>
+    Array.isArray(emails),
+  );
+
+  const nestedCandidates = Array.isArray(nestedEmailArray)
+    ? nestedEmailArray
+        .map((item) => getString(item))
+        .filter((mail) => mail && isValidEmailAddress(mail))
+    : [];
+
+  return Array.from(new Set([...directCandidates, ...nestedCandidates]));
 };
 
 const isValidPhoneNumber = (value?: string) => {
@@ -213,7 +259,9 @@ type FailedLead = {
 type DeliveryReport = {
   total_leads: number;
   success_count: number;
+  queued_count?: number;
   failed_count: number;
+  queued_leads?: FailedLead[];
   failed_leads: FailedLead[];
 };
 
@@ -234,6 +282,7 @@ const getCategoryToastMessage = (category: string): string => {
     provider_error:
       "Failed to send message. Please verify the number and try again.",
     configuration_error: "Review link configuration is missing",
+    queued_external: "Delivery queued via external integration",
   };
 
   return categoryMap[category] || category;
@@ -250,7 +299,28 @@ const handleDeliveryReport = (
   }
 
   if (responseStatus === "partial_success" && deliveryReport) {
-    const { failed_count, failed_leads } = deliveryReport;
+    const {
+      failed_count,
+      failed_leads,
+      queued_count = 0,
+      queued_leads = [],
+    } = deliveryReport;
+
+    if (queued_count > 0 && failed_count === 0) {
+      showToast(
+        `${queued_count} ${queued_count === 1 ? "email is" : "emails are"} queued for external delivery. Please verify recipient inbox.`,
+        "warning",
+      );
+
+      queued_leads.slice(0, 2).forEach((queuedLead) => {
+        const message =
+          queuedLead.user_message ||
+          getCategoryToastMessage(queuedLead.category);
+        showToast(message, "warning");
+      });
+
+      return;
+    }
 
     showToast(
       `${failed_count} ${failed_count === 1 ? "number" : "numbers"} failed`,
@@ -299,6 +369,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
   );
   const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
   const [fileName, setFileName] = useState("");
+  const [defaultClinicEmail, setDefaultClinicEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const [formData, setFormData] = useState<ReviewRequestFormData>(() =>
@@ -310,6 +381,53 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       dispatch(fetchLeads());
     }
   }, [open, allLeads.length, dispatch]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const clinicIdFromStorage = Number(localStorage.getItem("clinic_id") || 0);
+    const clinicIdFromLeads = Number(allLeads[0]?.clinic_id || 0);
+    const resolvedClinicId = clinicIdFromStorage || clinicIdFromLeads;
+
+    if (!resolvedClinicId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadClinicSenderEmail = async () => {
+      try {
+        const clinicData = await clinicsApi.getClinicDetail(resolvedClinicId);
+        const clinicEmails = extractClinicEmails(clinicData);
+        const fallbackEmail = clinicEmails[0] || "";
+
+        if (!isMounted || !fallbackEmail) {
+          return;
+        }
+
+        setDefaultClinicEmail(fallbackEmail);
+        setFormData((prev) => {
+          if (prev.from_email.trim()) {
+            return prev;
+          }
+
+          return { ...prev, from_email: fallbackEmail };
+        });
+      } catch {
+        if (isMounted) {
+          setDefaultClinicEmail("");
+        }
+      }
+    };
+
+    loadClinicSenderEmail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, allLeads]);
 
   const filteredLeads = useMemo(() => {
     if (!leadActionFilter) {
@@ -383,6 +501,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     setLeadSelectionType("all");
     setSelectedLeads([]);
     setFileName("");
+    setDefaultClinicEmail("");
     setIsSubmitting(false);
     isSubmittingRef.current = false;
     setFormData(createInitialReviewRequestFormData());
@@ -513,6 +632,33 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       return false;
     }
 
+    if (formData.mode === "email") {
+      if (!validateMandatoryField(formData.from_email, "From")) {
+        return false;
+      }
+
+      if (!isValidEmailAddress(formData.from_email)) {
+        showErrorToast("Enter valid sender email in From");
+        return false;
+      }
+
+      const ccHasInvalid = formData.cc_emails.some(
+        (email) => !isValidEmailAddress(email),
+      );
+      if (ccHasInvalid) {
+        showErrorToast("One or more CC emails are invalid");
+        return false;
+      }
+
+      const bccHasInvalid = formData.bcc_emails.some(
+        (email) => !isValidEmailAddress(email),
+      );
+      if (bccHasInvalid) {
+        showErrorToast("One or more BCC emails are invalid");
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -620,7 +766,27 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
         );
       }
 
-      const leadIds = validLeads.map((lead) => String(lead.id));
+      const clinicId =
+        validLeads[0]?.clinic_id ??
+        (leadSelectionType === "manual"
+          ? selectedLeads[0]?.clinic_id
+          : filteredLeads[0]?.clinic_id) ??
+        (Number(localStorage.getItem("clinic_id") || 0) || null) ??
+        1;
+
+      const clinicScopedLeads = validLeads.filter(
+        (lead) => Number(lead.clinic_id) === Number(clinicId),
+      );
+
+      const skippedClinicMismatchCount =
+        validLeads.length - clinicScopedLeads.length;
+      if (skippedClinicMismatchCount > 0) {
+        showWarningToast(
+          `Skipped ${skippedClinicMismatchCount} lead(s) that belong to a different clinic.`,
+        );
+      }
+
+      const leadIds = clinicScopedLeads.map((lead) => String(lead.id));
 
       if (leadIds.length === 0) {
         const recipientType = formData.mode === "email" ? "email" : "phone";
@@ -636,16 +802,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
         return;
       }
 
-      const clinicId =
-        validLeads[0]?.clinic_id ??
-        (leadSelectionType === "manual"
-          ? selectedLeads[0]?.clinic_id
-          : filteredLeads[0]?.clinic_id) ??
-        1;
-
-      const normalizedMessage = normalizeReviewLinkPlaceholder(
-        formData.message.trim(),
-      );
+      const normalizedMessage = normalizeMessageForRequest(formData.message);
 
       const configuredGoogleReviewUrl = getConfiguredGoogleReviewUrl();
 
@@ -668,7 +825,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
 
       const resolvedMessage =
         formData.collect_on === "google"
-          ? normalizedMessage.replace(
+          ? normalizeReviewLinkPlaceholder(normalizedMessage).replace(
               /\{review_link\}/gi,
               configuredGoogleReviewUrl,
             )
@@ -682,6 +839,14 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
         mode: formData.mode,
         subject: formData.subject.trim(),
         message: resolvedMessage,
+        ...(formData.mode === "email" && {
+          sender_email:
+            formData.from_email.trim() ||
+            defaultClinicEmail.trim() ||
+            undefined,
+          cc: formData.cc_emails,
+          bcc: formData.bcc_emails,
+        }),
         status,
         lead_ids: leadIds,
         ...(formData.is_scheduled === "yes" && {
@@ -884,7 +1049,22 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
             fileName={fileName}
             coralRadio={coralRadio}
             onModeChange={(value) => {
-              setFormData((prev) => ({ ...prev, mode: value }));
+              setFormData((prev) => ({
+                ...prev,
+                mode: value,
+                ...(value === "email" && !prev.from_email && defaultClinicEmail
+                  ? { from_email: defaultClinicEmail }
+                  : {}),
+              }));
+            }}
+            onFromEmailChange={(value) => {
+              setFormData((prev) => ({ ...prev, from_email: value }));
+            }}
+            onCcChange={(value) => {
+              setFormData((prev) => ({ ...prev, cc_emails: value }));
+            }}
+            onBccChange={(value) => {
+              setFormData((prev) => ({ ...prev, bcc_emails: value }));
             }}
             onSubjectChange={(value) => {
               setFormData((prev) => ({ ...prev, subject: value }));

@@ -1,15 +1,23 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
+  Dialog,
+  DialogContent,
   Divider,
   FormControlLabel,
   IconButton,
   InputAdornment,
+  Menu,
+  MenuItem,
   Radio,
   RadioGroup,
+  Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
@@ -35,13 +43,29 @@ import InsertPhotoIcon from "@mui/icons-material/InsertPhoto";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
 import AddIcon from "@mui/icons-material/Add";
+import TemplateService from "../../services/templates.api";
+import { NewTemplateModal } from "../Settings/Templates/NewTemplateModal";
+import AI_Suggest, { type AiSuggestionItem } from "./AI_Suggest";
+import { toast } from "react-toastify";
 import type { ReviewRequestFormData } from "./reviewRequest.utils";
+
+type TemplateListItem = {
+  id: string | number;
+  audience_name?: string;
+  name?: string;
+  subject?: string;
+  email_body?: string;
+  body?: string;
+};
 
 type ReviewRequestStepContentProps = {
   formData: ReviewRequestFormData;
   fileName: string;
   coralRadio: Record<string, unknown>;
   onModeChange: (value: "email" | "sms" | "whatsapp") => void;
+  onFromEmailChange: (value: string) => void;
+  onCcChange: (value: string[]) => void;
+  onBccChange: (value: string[]) => void;
   onSubjectChange: (value: string) => void;
   onSubjectBlur: () => void;
   onMessageChange: (value: string) => void;
@@ -49,273 +73,1014 @@ type ReviewRequestStepContentProps = {
   onFileSelect: (file: File) => void;
 };
 
+const parseEmailList = (value: string): string[] =>
+  value
+    .split(/[;,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const getTemplateTypeLabel = (mode: "email" | "sms" | "whatsapp") => {
+  if (mode === "email") return "Email";
+  if (mode === "sms") return "SMS";
+  return "WhatsApp";
+};
+
+const getTemplateApiType = (mode: "email" | "sms" | "whatsapp") =>
+  mode === "email" ? "mail" : mode;
+
+const normalizeTemplateContent = (value: string) => {
+  const html = value.trim();
+  if (!html) return "";
+
+  if (typeof document === "undefined") {
+    return html.replace(/<[^>]+>/g, "").trim();
+  }
+
+  const container = document.createElement("div");
+  container.innerHTML = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|tr)>/gi, "\n")
+    .replace(/<(ul|ol)>/gi, "\n")
+    .replace(/<li>/gi, "- ");
+
+  const decoded = container.textContent || container.innerText || "";
+
+  return decoded
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+const getTemplateTitle = (tpl: TemplateListItem) =>
+  (tpl.audience_name || tpl.name || "Untitled Template").trim();
+
+const getTemplateSubText = (
+  tpl: TemplateListItem,
+  mode: "email" | "sms" | "whatsapp",
+) => {
+  if (mode === "email") {
+    return (tpl.subject || "No subject").trim();
+  }
+
+  const body = normalizeTemplateContent(tpl.body || tpl.email_body || "");
+
+  if (!body) return "No content";
+  return body.length > 60 ? `${body.slice(0, 60)}...` : body;
+};
+
 const ReviewRequestStepContent = ({
   formData,
   fileName,
   coralRadio,
   onModeChange,
+  onFromEmailChange,
+  onCcChange,
+  onBccChange,
   onSubjectChange,
   onSubjectBlur,
   onMessageChange,
   onMessageBlur,
   onFileSelect,
 }: ReviewRequestStepContentProps) => {
-  return (
-    <Box>
-      <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-        Select Mode
-      </Typography>
-      <RadioGroup
-        row
-        value={formData.mode}
-        onChange={(e) =>
-          onModeChange(e.target.value as "email" | "sms" | "whatsapp")
-        }
-        sx={{ mb: 1.5 }}
-      >
-        <FormControlLabel
-          value="email"
-          control={<Radio sx={coralRadio} size="small" />}
-          label={<Typography variant="body2">Email</Typography>}
-        />
-        <FormControlLabel
-          value="sms"
-          control={<Radio sx={coralRadio} size="small" />}
-          label={<Typography variant="body2">SMS</Typography>}
-        />
-        <FormControlLabel
-          value="whatsapp"
-          control={<Radio sx={coralRadio} size="small" />}
-          label={<Typography variant="body2">WhatsApp</Typography>}
-        />
-      </RadioGroup>
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+  const [showCc, setShowCc] = useState(formData.cc_emails.length > 0);
+  const [showBcc, setShowBcc] = useState(formData.bcc_emails.length > 0);
+  const [ccInput, setCcInput] = useState(formData.cc_emails.join(", "));
+  const [bccInput, setBccInput] = useState(formData.bcc_emails.join(", "));
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [fontMenuAnchor, setFontMenuAnchor] = useState<null | HTMLElement>(
+    null,
+  );
+  const [styleMenuAnchor, setStyleMenuAnchor] = useState<null | HTMLElement>(
+    null,
+  );
+  const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
+  const [templates, setTemplates] = useState<TemplateListItem[]>([]);
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<TemplateListItem | null>(null);
+  const [viewTemplateOpen, setViewTemplateOpen] = useState(false);
+  const [viewTemplateData, setViewTemplateData] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [aiSuggestOpen, setAiSuggestOpen] = useState(false);
+  const [aiSuggestField, setAiSuggestField] = useState<"subject" | "body">(
+    "subject",
+  );
 
-      <TextField
-        size="small"
-        fullWidth
-        label="Subject"
-        placeholder="Type Here"
-        value={formData.subject}
-        onChange={(e) => onSubjectChange(e.target.value)}
-        onBlur={onSubjectBlur}
-        InputProps={
-          formData.mode === "email"
-            ? {
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Button
-                      startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-                      sx={{
-                        color: "#A855F7",
-                        textTransform: "none",
-                        fontWeight: 700,
-                      }}
-                    >
-                      AI Suggest
-                    </Button>
-                    <Typography
-                      variant="caption"
-                      sx={{ ml: 1, color: "#9CA3AF" }}
-                    >
-                      Cc | Bcc
-                    </Typography>
-                  </InputAdornment>
-                ),
-              }
-            : undefined
-        }
-        sx={{ mb: 1.75 }}
-      />
+  const templateTypeLabel = useMemo(
+    () => getTemplateTypeLabel(formData.mode),
+    [formData.mode],
+  );
 
-      <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-        Body
-      </Typography>
-      <Box
-        sx={{
-          border: "1px solid #E5E7EB",
-          borderRadius: "12px",
-          overflow: "hidden",
-          mb: 1.5,
-        }}
-      >
-        <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
-          <Button
-            startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-            sx={{ color: "#A855F7", textTransform: "none", fontWeight: 700 }}
-          >
-            AI Suggest
-          </Button>
+  useEffect(() => {
+    if (!openTemplateDialog) return;
+
+    const loadTemplates = async () => {
+      try {
+        const response = await TemplateService.getTemplates(
+          getTemplateApiType(formData.mode),
+        );
+
+        const list = Array.isArray(response)
+          ? response
+          : (response?.results ?? []);
+
+        setTemplates(Array.isArray(list) ? (list as TemplateListItem[]) : []);
+      } catch {
+        setTemplates([]);
+      }
+    };
+
+    loadTemplates();
+  }, [openTemplateDialog, formData.mode]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    if ((editor.innerHTML || "") !== (formData.message || "")) {
+      editor.innerHTML = formData.message || "";
+    }
+  }, [formData.message]);
+
+  const handleInsertTemplate = () => {
+    if (!selectedTemplate) return;
+
+    const body = normalizeTemplateContent(
+      selectedTemplate.body || selectedTemplate.email_body || "",
+    );
+
+    if (body) {
+      const prefix = (editorRef.current?.textContent || "").trim()
+        ? "\n\n"
+        : "";
+      insertTextAtCursor(`${prefix}${body}`);
+    }
+
+    if (formData.mode === "email" && !formData.subject.trim()) {
+      onSubjectChange((selectedTemplate.subject || "").trim());
+    }
+
+    setOpenTemplateDialog(false);
+    setSelectedTemplate(null);
+  };
+
+  const openAiSuggestions = (field: "subject" | "body") => {
+    setAiSuggestField(field);
+    setAiSuggestOpen(true);
+  };
+
+  const handleApplyAiSuggestion = (
+    value: string,
+    suggestion: AiSuggestionItem,
+  ) => {
+    if (aiSuggestField === "subject") {
+      onSubjectChange(value);
+      return;
+    }
+
+    onMessageChange(value);
+
+    if (
+      formData.mode === "email" &&
+      !formData.subject.trim() &&
+      suggestion.subject.trim()
+    ) {
+      onSubjectChange(suggestion.subject);
+    }
+  };
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+    }
+  };
+
+  const restoreSelection = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const sel = window.getSelection();
+    if (sel && savedRangeRef.current) {
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+    }
+  };
+
+  const syncEditorToState = () => {
+    if (!editorRef.current) return;
+    onMessageChange(editorRef.current.innerHTML);
+  };
+
+  const applyEditorCommand = (command: string, value?: string) => {
+    restoreSelection();
+    document.execCommand(command, false, value);
+    syncEditorToState();
+  };
+
+  const insertTextAtCursor = (text: string) => {
+    const html = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br/>");
+
+    applyEditorCommand("insertHTML", html);
+  };
+
+  const handleUndo = () => applyEditorCommand("undo");
+  const handleRedo = () => applyEditorCommand("redo");
+  const handleBold = () => applyEditorCommand("bold");
+  const handleItalic = () => applyEditorCommand("italic");
+  const handleUnderline = () => applyEditorCommand("underline");
+  const handleHighlight = () => applyEditorCommand("hiliteColor", "#fff2a8");
+  const handleTextColor = () => applyEditorCommand("foreColor", "#2563eb");
+  const handleAlignLeft = () => applyEditorCommand("justifyLeft");
+  const handleNumberedList = () => applyEditorCommand("insertOrderedList");
+  const handleBulletedList = () => applyEditorCommand("insertUnorderedList");
+  const handleIndent = () => applyEditorCommand("indent");
+  const handleOutdent = () => applyEditorCommand("outdent");
+  const handleQuote = () => applyEditorCommand("formatBlock", "blockquote");
+  const handleClearFormatting = () => applyEditorCommand("removeFormat");
+
+  const handleInsertLink = () => {
+    let inputValue = "";
+
+    toast(
+      ({ closeToast }) => (
+        <Box>
+          <Typography fontSize={13} mb={1}>
+            Enter URL
+          </Typography>
+
+          <input
+            type="text"
+            placeholder="https://example.com"
+            onChange={(e) => {
+              inputValue = e.target.value;
+            }}
+            style={{
+              width: "100%",
+              padding: "6px 8px",
+              border: "1px solid #E0E0E0",
+              borderRadius: "4px",
+              marginBottom: "8px",
+            }}
+          />
+
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            <Button size="small" onClick={() => closeToast?.()}>
+              Cancel
+            </Button>
+
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => {
+                const url = inputValue.trim();
+                if (url) {
+                  restoreSelection();
+                  document.execCommand("createLink", false, url);
+                  syncEditorToState();
+                }
+                closeToast?.();
+              }}
+              sx={{ bgcolor: "#505050", "&:hover": { bgcolor: "#232323" } }}
+            >
+              Insert
+            </Button>
+          </Stack>
         </Box>
-        <TextField
-          fullWidth
-          multiline
-          rows={formData.mode === "email" ? 7 : 5}
-          placeholder="Type your message here..."
-          variant="standard"
-          InputProps={{
-            disableUnderline: true,
-            sx: { px: 1.75, pb: 1.5, fontSize: 14 },
-          }}
-          value={formData.message}
-          onChange={(e) => onMessageChange(e.target.value)}
-          onBlur={onMessageBlur}
-        />
+      ),
+      {
+        autoClose: false,
+        closeOnClick: false,
+        draggable: false,
+      },
+    );
+  };
 
-        {formData.mode === "email" && (
-          <>
-            <Divider />
-            <Box sx={{ p: 1, bgcolor: "#FAFAFA" }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 0.5,
-                  mb: 1,
-                }}
-              >
-                <IconButton size="small">
-                  <UndoIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <RedoIcon fontSize="inherit" />
-                </IconButton>
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                <Typography variant="caption" sx={{ mx: 1, fontWeight: 600 }}>
-                  Nunito
+  const handleAttachFile = () => {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.onchange = () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      onFileSelect(file);
+      insertTextAtCursor(`\nAttached file: ${file.name}`);
+    };
+    fileInput.click();
+  };
+
+  const handleInsertDriveLink = () => {
+    let inputValue = "";
+
+    toast(
+      ({ closeToast }) => (
+        <Box>
+          <Typography fontSize={13} mb={1}>
+            Paste Google Drive Link
+          </Typography>
+
+          <input
+            type="text"
+            placeholder="https://drive.google.com/..."
+            onChange={(e) => {
+              inputValue = e.target.value;
+            }}
+            style={{
+              width: "100%",
+              padding: "6px 8px",
+              border: "1px solid #E0E0E0",
+              borderRadius: "4px",
+              marginBottom: "8px",
+            }}
+          />
+
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            <Button size="small" onClick={() => closeToast?.()}>
+              Cancel
+            </Button>
+
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => {
+                if (inputValue.trim()) {
+                  insertTextAtCursor(`\nDrive: ${inputValue.trim()}`);
+                }
+                closeToast?.();
+              }}
+              sx={{ bgcolor: "#505050", "&:hover": { bgcolor: "#232323" } }}
+            >
+              Insert
+            </Button>
+          </Stack>
+        </Box>
+      ),
+      {
+        autoClose: false,
+        closeOnClick: false,
+        draggable: false,
+      },
+    );
+  };
+
+  const handleInsertImage = () => {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.onchange = () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      const blobUrl = URL.createObjectURL(file);
+      restoreSelection();
+      document.execCommand("insertImage", false, blobUrl);
+      syncEditorToState();
+    };
+    fileInput.click();
+  };
+
+  const handleInsertSchedule = () => {
+    insertTextAtCursor(`\nScheduled: ${new Date().toLocaleString()}`);
+  };
+
+  const handleInsertSignature = () => {
+    const signer = formData.from_email?.trim() || "Clinic Team";
+    insertTextAtCursor(`\n\nBest regards,\n${signer}`);
+  };
+
+  const applyFontFamily = (font: string) => {
+    applyEditorCommand("fontName", font);
+    setFontMenuAnchor(null);
+  };
+
+  const applyTextStyle = (style: string) => {
+    applyEditorCommand("formatBlock", style);
+    setStyleMenuAnchor(null);
+  };
+
+  const handleInsertEmoji = (emoji: string) => {
+    insertTextAtCursor(emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const renderEditorToolbar = () => (
+    <>
+      <Divider />
+      <Box
+        onMouseDown={(e) => e.preventDefault()}
+        sx={{ p: 1, bgcolor: "#FAFAFA" }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 0.5,
+            mb: 1,
+          }}
+        >
+          <Tooltip title="Undo">
+            <IconButton size="small" onClick={handleUndo}>
+              <UndoIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Redo">
+            <IconButton size="small" onClick={handleRedo}>
+              <RedoIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          <Tooltip title="Font Family">
+            <Button
+              size="small"
+              onClick={(e) => setFontMenuAnchor(e.currentTarget)}
+              sx={{
+                minWidth: "auto",
+                px: 0.5,
+                color: "#232323",
+                textTransform: "none",
+              }}
+            >
+              <Typography variant="caption" sx={{ mx: 0.5, fontWeight: 600 }}>
+                Nunito
+              </Typography>
+              <KeyboardArrowDownIcon fontSize="inherit" />
+            </Button>
+          </Tooltip>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          <Tooltip title="Text Style">
+            <Button
+              size="small"
+              onClick={(e) => setStyleMenuAnchor(e.currentTarget)}
+              sx={{ minWidth: "auto", px: 0.5, color: "#232323" }}
+            >
+              <TitleIcon fontSize="inherit" />
+              <KeyboardArrowDownIcon fontSize="inherit" />
+            </Button>
+          </Tooltip>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          <Tooltip title="Bold">
+            <IconButton size="small" onClick={handleBold}>
+              <FormatBoldIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Italic">
+            <IconButton size="small" onClick={handleItalic}>
+              <FormatItalicIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Underline">
+            <IconButton size="small" onClick={handleUnderline}>
+              <FormatUnderlinedIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Text Color">
+            <IconButton size="small" onClick={handleTextColor}>
+              <FormatColorTextIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          <Tooltip title="Align Left">
+            <IconButton size="small" onClick={handleAlignLeft}>
+              <FormatAlignLeftIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Numbered List">
+            <IconButton size="small" onClick={handleNumberedList}>
+              <FormatListNumberedIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Bulleted List">
+            <IconButton size="small" onClick={handleBulletedList}>
+              <FormatListBulletedIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Decrease Indent">
+            <IconButton size="small" onClick={handleOutdent}>
+              <FormatIndentDecreaseIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Increase Indent">
+            <IconButton size="small" onClick={handleIndent}>
+              <FormatIndentIncreaseIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Quote">
+            <IconButton size="small" onClick={handleQuote}>
+              <FormatQuoteIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          <Tooltip title="Insert Link">
+            <IconButton size="small" onClick={handleInsertLink}>
+              <LinkIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Clear Formatting">
+            <IconButton size="small" onClick={handleClearFormatting}>
+              <FormatClearIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <Tooltip title="Highlight">
+            <IconButton size="small" onClick={handleHighlight}>
+              <FormatColorFillIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Attach File">
+            <IconButton size="small" onClick={handleAttachFile}>
+              <AttachFileIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Insert Link">
+            <IconButton size="small" onClick={handleInsertLink}>
+              <LinkIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Emoji">
+            <IconButton
+              size="small"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+            >
+              <EmojiEmotionsIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Drive Link">
+            <IconButton size="small" onClick={handleInsertDriveLink}>
+              <AddToDriveIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Insert Image">
+            <IconButton size="small" onClick={handleInsertImage}>
+              <InsertPhotoIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Schedule">
+            <IconButton size="small" onClick={handleInsertSchedule}>
+              <ScheduleIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Signature">
+            <IconButton size="small" onClick={handleInsertSignature}>
+              <HistoryEduIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={`Insert ${templateTypeLabel} Template`}>
+            <IconButton
+              size="small"
+              onClick={() => setOpenTemplateDialog(true)}
+            >
+              <AddIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {showEmojiPicker && (
+          <Box
+            mt={1}
+            p={1}
+            border="1px solid #E0E0E0"
+            borderRadius={2}
+            display="flex"
+            gap={1}
+            flexWrap="wrap"
+            maxWidth="320px"
+          >
+            {["🙂", "👍", "🙏", "😊", "✔️", "🎉", "📩", "⭐", "🔥", "💯"].map(
+              (emoji) => (
+                <Typography
+                  key={emoji}
+                  sx={{ cursor: "pointer", fontSize: 20 }}
+                  onClick={() => handleInsertEmoji(emoji)}
+                >
+                  {emoji}
                 </Typography>
-                <KeyboardArrowDownIcon fontSize="inherit" />
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                <TitleIcon fontSize="inherit" />
-                <KeyboardArrowDownIcon fontSize="inherit" />
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                <IconButton size="small">
-                  <FormatBoldIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatItalicIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatUnderlinedIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatColorTextIcon fontSize="inherit" />
-                </IconButton>
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                <IconButton size="small">
-                  <FormatAlignLeftIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatListNumberedIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatListBulletedIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatIndentDecreaseIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatIndentIncreaseIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatQuoteIcon fontSize="inherit" />
-                </IconButton>
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                <IconButton size="small">
-                  <LinkIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <FormatClearIcon fontSize="inherit" />
-                </IconButton>
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <IconButton size="small">
-                  <FormatColorFillIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <AttachFileIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <LinkIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <EmojiEmotionsIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <AddToDriveIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <InsertPhotoIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <ScheduleIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <HistoryEduIcon fontSize="inherit" />
-                </IconButton>
-                <IconButton size="small">
-                  <AddIcon fontSize="inherit" />
-                </IconButton>
-              </Box>
-            </Box>
-          </>
+              ),
+            )}
+          </Box>
         )}
       </Box>
 
-      {(formData.mode === "sms" || formData.mode === "whatsapp") && (
-        <Box sx={{ mt: 2 }}>
-          <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-            Upload Documents
-          </Typography>
-          <Box
-            sx={{
-              border: "1px solid #E5E7EB",
-              borderRadius: "8px",
-              p: "8px 12px",
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
+      <Menu
+        anchorEl={fontMenuAnchor}
+        open={Boolean(fontMenuAnchor)}
+        onClose={() => setFontMenuAnchor(null)}
+      >
+        <MenuItem onClick={() => applyFontFamily("Nunito")}>Nunito</MenuItem>
+        <MenuItem onClick={() => applyFontFamily("Arial")}>Arial</MenuItem>
+        <MenuItem onClick={() => applyFontFamily("Georgia")}>Georgia</MenuItem>
+        <MenuItem onClick={() => applyFontFamily("Tahoma")}>Tahoma</MenuItem>
+      </Menu>
+
+      <Menu
+        anchorEl={styleMenuAnchor}
+        open={Boolean(styleMenuAnchor)}
+        onClose={() => setStyleMenuAnchor(null)}
+      >
+        <MenuItem onClick={() => applyTextStyle("p")}>Paragraph</MenuItem>
+        <MenuItem onClick={() => applyTextStyle("h1")}>Heading 1</MenuItem>
+        <MenuItem onClick={() => applyTextStyle("h2")}>Heading 2</MenuItem>
+        <MenuItem onClick={() => applyTextStyle("h3")}>Heading 3</MenuItem>
+      </Menu>
+    </>
+  );
+
+  return (
+    <>
+      <Box>
+        <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+          Select Mode
+        </Typography>
+        <RadioGroup
+          row
+          value={formData.mode}
+          onChange={(e) =>
+            onModeChange(e.target.value as "email" | "sms" | "whatsapp")
+          }
+          sx={{ mb: 1.5 }}
+        >
+          <FormControlLabel
+            value="email"
+            control={<Radio sx={coralRadio} size="small" />}
+            label={<Typography variant="body2">Email</Typography>}
+          />
+          <FormControlLabel
+            value="sms"
+            control={<Radio sx={coralRadio} size="small" />}
+            label={<Typography variant="body2">SMS</Typography>}
+          />
+          <FormControlLabel
+            value="whatsapp"
+            control={<Radio sx={coralRadio} size="small" />}
+            label={<Typography variant="body2">WhatsApp</Typography>}
+          />
+        </RadioGroup>
+
+        {formData.mode === "email" && (
+          <TextField
+            size="small"
+            fullWidth
+            label="From"
+            placeholder="Enter sender email"
+            value={formData.from_email}
+            onChange={(e) => onFromEmailChange(e.target.value)}
+            sx={{ mb: 1.5 }}
+          />
+        )}
+
+        <TextField
+          size="small"
+          fullWidth
+          label="Subject"
+          placeholder="Type Here"
+          value={formData.subject}
+          onChange={(e) => onSubjectChange(e.target.value)}
+          onBlur={onSubjectBlur}
+          InputProps={
+            formData.mode === "email"
+              ? {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Button
+                        startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => openAiSuggestions("subject")}
+                        sx={{
+                          color: "#A855F7",
+                          textTransform: "none",
+                          fontWeight: 700,
+                        }}
+                      >
+                        AI Suggest
+                      </Button>
+                      <Box
+                        sx={{
+                          ml: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                        }}
+                      >
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: showCc ? "#232323" : "#BBBBBB",
+                            fontWeight: showCc ? 600 : 400,
+                            cursor: "pointer",
+                          }}
+                          onClick={() => setShowCc((prev) => !prev)}
+                        >
+                          Cc
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#505050" }}>
+                          |
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: showBcc ? "#232323" : "#BBBBBB",
+                            fontWeight: showBcc ? 600 : 400,
+                            cursor: "pointer",
+                          }}
+                          onClick={() => setShowBcc((prev) => !prev)}
+                        >
+                          Bcc
+                        </Typography>
+                      </Box>
+                    </InputAdornment>
+                  ),
+                }
+              : undefined
+          }
+          sx={{ mb: 1.25 }}
+        />
+
+        {formData.mode === "email" && showCc && (
+          <TextField
+            size="small"
+            fullWidth
+            label="Cc"
+            placeholder="Enter CC emails separated by comma"
+            value={ccInput}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCcInput(value);
+              onCcChange(parseEmailList(value));
             }}
-          >
+            sx={{ mb: 1.25 }}
+          />
+        )}
+
+        {formData.mode === "email" && showBcc && (
+          <TextField
+            size="small"
+            fullWidth
+            label="Bcc"
+            placeholder="Enter BCC emails separated by comma"
+            value={bccInput}
+            onChange={(e) => {
+              const value = e.target.value;
+              setBccInput(value);
+              onBccChange(parseEmailList(value));
+            }}
+            sx={{ mb: 1.75 }}
+          />
+        )}
+
+        <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+          Body
+        </Typography>
+        <Box
+          sx={{
+            border: "1px solid #E5E7EB",
+            borderRadius: "12px",
+            overflow: "hidden",
+            mb: 1.5,
+          }}
+        >
+          <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
             <Button
-              variant="contained"
-              component="label"
+              startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+              onClick={() => openAiSuggestions("body")}
+              sx={{ color: "#A855F7", textTransform: "none", fontWeight: 700 }}
+            >
+              AI Suggest
+            </Button>
+          </Box>
+          <Box
+            ref={editorRef}
+            contentEditable
+            role="textbox"
+            aria-label="Type your message here"
+            suppressContentEditableWarning
+            onInput={syncEditorToState}
+            onMouseUp={saveSelection}
+            onKeyUp={saveSelection}
+            onBlur={() => {
+              saveSelection();
+              onMessageBlur();
+            }}
+            sx={{
+              px: 1.75,
+              pb: 1.5,
+              minHeight: formData.mode === "email" ? 180 : 130,
+              fontSize: 14,
+              lineHeight: 1.7,
+              outline: "none",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              "&:empty:before": {
+                content: '"Type your message here..."',
+                color: "#A0A0A0",
+              },
+            }}
+          />
+
+          {renderEditorToolbar()}
+        </Box>
+
+        {(formData.mode === "sms" || formData.mode === "whatsapp") && (
+          <Box sx={{ mt: 2 }}>
+            <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+              Upload Documents
+            </Typography>
+            <Box
               sx={{
-                bgcolor: "#9CA3AF",
-                "&:hover": { bgcolor: "#6B7280" },
-                textTransform: "none",
-                fontSize: 12,
-                boxShadow: "none",
-                borderRadius: "4px",
+                border: "1px solid #E5E7EB",
+                borderRadius: "8px",
+                p: "8px 12px",
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
               }}
             >
-              Choose File
-              <input
-                type="file"
-                hidden
-                accept="*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  onFileSelect(file);
-                  e.target.value = "";
+              <Button
+                variant="contained"
+                component="label"
+                sx={{
+                  bgcolor: "#9CA3AF",
+                  "&:hover": { bgcolor: "#6B7280" },
+                  textTransform: "none",
+                  fontSize: 12,
+                  boxShadow: "none",
+                  borderRadius: "4px",
                 }}
-              />
-            </Button>
-            <Typography variant="body2" color="textSecondary">
-              {fileName || "No File Chosen"}
+              >
+                Choose File
+                <input
+                  type="file"
+                  hidden
+                  accept="*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    onFileSelect(file);
+                    e.target.value = "";
+                  }}
+                />
+              </Button>
+              <Typography variant="body2" color="textSecondary">
+                {fileName || "No File Chosen"}
+              </Typography>
+            </Box>
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              sx={{ mt: 0.5, display: "block" }}
+            >
+              Accepted formats: Any | Max size: 25MB
             </Typography>
           </Box>
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ mt: 0.5, display: "block" }}
-          >
-            Accepted formats: Any | Max size: 25MB
+        )}
+      </Box>
+
+      <AI_Suggest
+        open={aiSuggestOpen}
+        mode={formData.mode}
+        field={aiSuggestField}
+        onClose={() => setAiSuggestOpen(false)}
+        onApply={handleApplyAiSuggestion}
+      />
+
+      <Dialog
+        open={openTemplateDialog}
+        onClose={() => setOpenTemplateDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogContent sx={{ p: 3 }}>
+          <Typography fontWeight={700} fontSize={16} mb={2}>
+            Insert {templateTypeLabel} Template
           </Typography>
-        </Box>
-      )}
-    </Box>
+
+          <Typography fontSize={13} color="#8A8A8A" mb={2}>
+            Select {templateTypeLabel} Template
+          </Typography>
+
+          <Stack spacing={1.5}>
+            {templates.map((tpl) => {
+              const isSelected = selectedTemplate?.id === tpl.id;
+
+              return (
+                <Box
+                  key={tpl.id}
+                  sx={{
+                    border: isSelected
+                      ? "1px solid #E97B5A"
+                      : "1px solid #E6E6E6",
+                    borderRadius: "10px",
+                    p: 2,
+                    cursor: "pointer",
+                    backgroundColor: isSelected ? "#FFF7F4" : "#FAFAFA",
+                  }}
+                  onClick={() => setSelectedTemplate(tpl)}
+                >
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <Box
+                      sx={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        border: "2px solid #E97B5A",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {isSelected && (
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            backgroundColor: "#E97B5A",
+                          }}
+                        />
+                      )}
+                    </Box>
+
+                    <Box flex={1}>
+                      <Typography fontWeight={600} fontSize={14}>
+                        {getTemplateTitle(tpl)}
+                      </Typography>
+
+                      <Typography fontSize={12} color="#8A8A8A">
+                        {getTemplateSubText(tpl, formData.mode)}
+                      </Typography>
+                    </Box>
+
+                    <IconButton
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const fullTemplate =
+                          await TemplateService.getTemplateById(
+                            getTemplateApiType(formData.mode),
+                            String(tpl.id),
+                          );
+
+                        setViewTemplateData({
+                          ...fullTemplate,
+                          id: String(tpl.id),
+                          type: formData.mode,
+                        });
+                        setViewTemplateOpen(true);
+                      }}
+                    >
+                      <VisibilityIcon
+                        fontSize="small"
+                        sx={{ color: "#5A8AEA" }}
+                      />
+                    </IconButton>
+                  </Stack>
+                </Box>
+              );
+            })}
+
+            {templates.length === 0 && (
+              <Typography fontSize={13} color="#8A8A8A">
+                No {templateTypeLabel} templates found.
+              </Typography>
+            )}
+          </Stack>
+
+          <Stack direction="row" justifyContent="flex-end" spacing={1.5} mt={3}>
+            <Button
+              variant="outlined"
+              onClick={() => setOpenTemplateDialog(false)}
+              sx={{ color: "#505050", borderColor: "#505050" }}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              variant="contained"
+              disabled={!selectedTemplate}
+              sx={{
+                bgcolor: "#505050",
+                "&:hover": { bgcolor: "#232323" },
+              }}
+              onClick={handleInsertTemplate}
+            >
+              Insert
+            </Button>
+          </Stack>
+        </DialogContent>
+      </Dialog>
+
+      <NewTemplateModal
+        open={viewTemplateOpen}
+        onClose={() => setViewTemplateOpen(false)}
+        onSave={() => {}}
+        initialData={viewTemplateData as never}
+        mode="view"
+      />
+    </>
   );
 };
 
