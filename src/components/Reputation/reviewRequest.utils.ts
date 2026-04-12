@@ -5,6 +5,9 @@ export type ReviewRequestFormData = {
   description: string;
   collect_on: "google" | "form" | "both";
   mode: "email" | "sms" | "whatsapp";
+  from_email: string;
+  cc_emails: string[];
+  bcc_emails: string[];
   subject: string;
   message: string;
   schedule_date: string;
@@ -30,6 +33,9 @@ export const createInitialReviewRequestFormData = (): ReviewRequestFormData => {
     description: "",
     collect_on: "form",
     mode: "email",
+    from_email: "",
+    cc_emails: [],
+    bcc_emails: [],
     subject: "",
     message: "",
     schedule_date: formatDisplayDate(defaultScheduledAt),

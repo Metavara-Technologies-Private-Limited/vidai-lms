@@ -4,7 +4,8 @@ import { setExternalToken } from "../store/authSlice";
 
 // Base axios instance used everywhere in the app.
 // Keep all network + auth related setup here.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 interface HttpInstance extends AxiosInstance {
   redirect: (path: string) => void;
 }
@@ -15,6 +16,21 @@ export const http = axios.create({
 }) as HttpInstance;
 
 let extTokenPromise: Promise<string> | null = null;
+
+// Add interceptor to handle FormData properly
+// When FormData is sent, remove the Content-Type header to allow browser/axios
+// to automatically set multipart/form-data with the correct boundary
+http.interceptors.request.use((config) => {
+  if (config.data instanceof FormData) {
+    // Remove Content-Type header for FormData - let the browser set it automatically
+    if (config.headers && typeof config.headers.delete === "function") {
+      config.headers.delete("Content-Type");
+    } else if (config.headers) {
+      delete config.headers["Content-Type"];
+    }
+  }
+  return config;
+});
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getExtToken = async (dispatch: AppDispatch, getState: any) => {
@@ -49,7 +65,8 @@ export const getAccessToken = (): string | null =>
   sessionStorage.getItem("authToken");
 
 const getRefreshToken = (): string | null =>
-  localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh_token");
+  localStorage.getItem("refresh_token") ||
+  sessionStorage.getItem("refresh_token");
 
 const setAccessToken = (token: string): void => {
   localStorage.setItem("auth_token", token);
@@ -142,7 +159,12 @@ http.interceptors.response.use(
       url.includes("/proxy/login/") ||
       url.includes("/token/refresh/");
 
-    if (!originalRequest || status !== 401 || originalRequest._retry || isAuthRoute) {
+    if (
+      !originalRequest ||
+      status !== 401 ||
+      originalRequest._retry ||
+      isAuthRoute
+    ) {
       return Promise.reject(error);
     }
 
