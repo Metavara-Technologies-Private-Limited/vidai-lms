@@ -710,7 +710,26 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
                   <Stack
                     spacing={0}
                     divider={<Divider />}
-                    sx={{ maxHeight: 340, overflowY: "auto" }}
+                    sx={{
+                      maxHeight: 340,
+                      overflowY: "auto",
+                      paddingRight: "4px",
+                      "&::-webkit-scrollbar": {
+                        width: "6px",
+                      },
+                      "&::-webkit-scrollbar-track": {
+                        backgroundColor: "#F5F5F5",
+                        borderRadius: "4px",
+                      },
+                      "&::-webkit-scrollbar-thumb": {
+                        backgroundColor: "#D0D0D0",
+                        borderRadius: "4px",
+                        transition: "backgroundColor 0.2s",
+                        "&:hover": {
+                          backgroundColor: "#B0B0B0",
+                        },
+                      },
+                    }}
                   >
                     {emailTemplates.map((template) => (
                       <Box
@@ -968,7 +987,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
                         fontWeight={500}
                         minWidth={52}
                       >
-                       From:
+                        From:
                       </Typography>
                       <Typography fontSize="12px" color="#374151">
                         {fromEmail}
@@ -2015,53 +2034,59 @@ export default function LeadDetailView() {
     setBookApptOpen(true);
   }, [activeLead]);
 
-  const handleAppointmentSaved = React.useCallback((result: AppointmentResult) => {
-    setBookApptOpen(false);
+  const handleAppointmentSaved = React.useCallback(
+    (result: AppointmentResult) => {
+      setBookApptOpen(false);
 
-    const mailLeadData = {
-      ...(activeLead ?? {}),
-      book_appointment: true,
-      lead_status: "Appointment",
-      status: "Appointment",
-      appointment_date: result.appointment_date,
-      slot: result.slot,
-      remark: result.remark,
-      personal_name: result.personnelName || activeLead?.personal_name,
-      department_id: result.department_id ?? activeLead?.department_id,
-      department_name: result.departmentName || activeLead?.department_name,
-    } as LeadRecord;
-
-    void sendLeadSummaryEmail({
-      leadData: mailLeadData,
-      eventType: "appointment",
-      appointmentResult: result,
-      statusLabel: "Appointment",
-    }).catch(() => {
-      toast.warning("Appointment saved, but confirmation email could not be sent.", toastOptions);
-    });
-
-    // Keep detail pane in sync immediately after booking from this view.
-    setFullLead((prev) => {
-      const base = prev ?? activeLead ?? null;
-      if (!base) return prev;
-
-      return {
-        ...base,
+      const mailLeadData = {
+        ...(activeLead ?? {}),
         book_appointment: true,
         lead_status: "Appointment",
         status: "Appointment",
         appointment_date: result.appointment_date,
         slot: result.slot,
         remark: result.remark,
-        personal_id: result.personal_id,
-        personal_name: result.personnelName || base.personal_name,
-        department_id: result.department_id ?? base.department_id,
-        department_name: result.departmentName || base.department_name,
+        personal_name: result.personnelName || activeLead?.personal_name,
+        department_id: result.department_id ?? activeLead?.department_id,
+        department_name: result.departmentName || activeLead?.department_name,
       } as LeadRecord;
-    });
 
-    dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-  }, [activeLead, dispatch, sendLeadSummaryEmail]);
+      void sendLeadSummaryEmail({
+        leadData: mailLeadData,
+        eventType: "appointment",
+        appointmentResult: result,
+        statusLabel: "Appointment",
+      }).catch(() => {
+        toast.warning(
+          "Appointment saved, but confirmation email could not be sent.",
+          toastOptions,
+        );
+      });
+
+      // Keep detail pane in sync immediately after booking from this view.
+      setFullLead((prev) => {
+        const base = prev ?? activeLead ?? null;
+        if (!base) return prev;
+
+        return {
+          ...base,
+          book_appointment: true,
+          lead_status: "Appointment",
+          status: "Appointment",
+          appointment_date: result.appointment_date,
+          slot: result.slot,
+          remark: result.remark,
+          personal_id: result.personal_id,
+          personal_name: result.personnelName || base.personal_name,
+          department_id: result.department_id ?? base.department_id,
+          department_name: result.departmentName || base.department_name,
+        } as LeadRecord;
+      });
+
+      dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+    },
+    [activeLead, dispatch, sendLeadSummaryEmail],
+  );
 
   if (loading && !activeLead)
     return (
@@ -2200,10 +2225,10 @@ export default function LeadDetailView() {
   const appointmentPersonnel = hasAppointment
     ? capitalizeWords(
         activeLead.personal_name ||
-        activeLead.personnel ||
-        activeLead.assigned_to_name ||
-        activeLead.assigned ||
-        "N/A",
+          activeLead.personnel ||
+          activeLead.assigned_to_name ||
+          activeLead.assigned ||
+          "N/A",
       )
     : "N/A";
   const appointmentDate =
@@ -2290,7 +2315,10 @@ export default function LeadDetailView() {
         eventType: "update",
         statusLabel: draftLeadStatus,
       }).catch(() => {
-        toast.warning("Lead status updated, but email could not be sent.", toastOptions);
+        toast.warning(
+          "Lead status updated, but email could not be sent.",
+          toastOptions,
+        );
       });
 
       toast.success("Lead status updated.", toastOptions);

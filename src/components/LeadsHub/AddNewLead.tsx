@@ -43,6 +43,7 @@ import {
   IS_CONTRACTS_APP,
   ACTIVE_FLOW_COPY,
 } from "../../config/appType";
+import { sanitizeNameInput } from "../../utils/nameValidation";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const capitalizeFirst = (value: string) =>
@@ -51,7 +52,8 @@ const capitalizeFirst = (value: string) =>
 const toReadableError = (value: unknown): string => {
   if (value == null) return "Unknown error";
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   if (Array.isArray(value)) {
     const first = value[0];
     return first == null ? "Unknown error" : toReadableError(first);
@@ -120,7 +122,9 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
           typeof record.username === "string" ? record.username : undefined,
         role: typeof record.role === "string" ? record.role : undefined,
         designation:
-          typeof record.designation === "string" ? record.designation : undefined,
+          typeof record.designation === "string"
+            ? record.designation
+            : undefined,
         email: typeof record.email === "string" ? record.email : undefined,
       };
     })
@@ -128,13 +132,29 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
 };
 
 const assigneeLabel = (option: AssigneeOption): string => {
-  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const fullName =
+    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
   const secondary = option.role || option.designation;
   return secondary ? `${primary} (${secondary})` : primary;
 };
 
-const personnelLabel = (option: AssigneeOption): string => assigneeLabel(option);
+const personnelLabel = (option: AssigneeOption): string =>
+  assigneeLabel(option);
+
+const INPUT_TOAST_OPTIONS = {
+  position: "top-right" as const,
+  autoClose: 1400,
+};
+
+const showInputToast = (toastId: string, message: string) => {
+  if (!toast.isActive(toastId)) {
+    toast.error(message, { ...INPUT_TOAST_OPTIONS, toastId });
+  }
+};
+
+const sanitizeEmailInput = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9@._%+-]/g, "");
 
 // ====================== Component ======================
 export default function AddNewLead() {
@@ -150,15 +170,23 @@ export default function AddNewLead() {
   const [clinicId] = React.useState(1);
   const [assigneeName, setAssigneeName] = React.useState("");
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
-  const [assigneeOptions, setAssigneeOptions] = React.useState<AssigneeOption[]>([]);
+  const [assigneeOptions, setAssigneeOptions] = React.useState<
+    AssigneeOption[]
+  >([]);
   const [assigneeLoading, setAssigneeLoading] = React.useState(false);
   const [leadGeneratedBySearch, setLeadGeneratedBySearch] = React.useState("");
   const [leadGeneratedById, setLeadGeneratedById] = React.useState("");
-  const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<AssigneeOption[]>([]);
-  const [leadGeneratedByLoading, setLeadGeneratedByLoading] = React.useState(false);
-  const [appointmentPersonnelInput, setAppointmentPersonnelInput] = React.useState("");
-  const [appointmentPersonnelOptions, setAppointmentPersonnelOptions] = React.useState<AssigneeOption[]>([]);
-  const [appointmentPersonnelLoading, setAppointmentPersonnelLoading] = React.useState(false);
+  const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<
+    AssigneeOption[]
+  >([]);
+  const [leadGeneratedByLoading, setLeadGeneratedByLoading] =
+    React.useState(false);
+  const [appointmentPersonnelInput, setAppointmentPersonnelInput] =
+    React.useState("");
+  const [appointmentPersonnelOptions, setAppointmentPersonnelOptions] =
+    React.useState<AssigneeOption[]>([]);
+  const [appointmentPersonnelLoading, setAppointmentPersonnelLoading] =
+    React.useState(false);
 
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
   const [docDragOver, setDocDragOver] = React.useState(false);
@@ -331,16 +359,14 @@ export default function AddNewLead() {
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [
-    appointmentPersonnelInput,
-    form.department,
-    form.wantAppointment,
-  ]);
+  }, [appointmentPersonnelInput, form.department, form.wantAppointment]);
 
   const selectedAppointmentPersonnel = React.useMemo(() => {
     const selectedId = Number(form.personnel);
     if (Number.isFinite(selectedId)) {
-      const matched = appointmentPersonnelOptions.find((option) => option.id === selectedId);
+      const matched = appointmentPersonnelOptions.find(
+        (option) => option.id === selectedId,
+      );
       if (matched) return matched;
     }
 
@@ -360,7 +386,12 @@ export default function AddNewLead() {
   // ── Auto-fill source from campaign ──────────────────────────────
   React.useEffect(() => {
     if (!form.campaign) {
-      setForm((prev) => ({ ...prev, campaignName: "", source: "", subSource: "" }));
+      setForm((prev) => ({
+        ...prev,
+        campaignName: "",
+        source: "",
+        subSource: "",
+      }));
       return;
     }
     const matched = campaigns.find((c) => c.id === form.campaign);
@@ -375,8 +406,45 @@ export default function AddNewLead() {
 
   // ── Handlers ────────────────────────────────────────────────────
   const handleChange =
-    (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((prev) => ({ ...prev, [field]: capitalizeFirst(e.target.value) }));
+    (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const rawValue = e.target.value;
+
+      if (field === "full_name") {
+        const sanitizedValue = sanitizeNameInput(rawValue);
+        if (sanitizedValue !== rawValue) {
+          showInputToast("add-lead-name-invalid", "enter only alphanumeric");
+        }
+        setForm((prev) => ({ ...prev, full_name: sanitizedValue }));
+        return;
+      }
+
+      if (field === "contact") {
+        const rawDigits = rawValue.replace(/\D/g, "");
+        const digitsOnly = rawDigits.slice(0, 10);
+        if (/\D/.test(rawValue)) {
+          showInputToast("add-lead-contact-invalid", "only digits are allowd");
+        }
+        if (rawDigits.length > 10) {
+          showInputToast("add-lead-contact-length", "only 10 digits allowed");
+        }
+        setForm((prev) => ({ ...prev, contact: digitsOnly }));
+        return;
+      }
+
+      if (field === "email") {
+        const sanitizedEmail = sanitizeEmailInput(rawValue);
+        if (sanitizedEmail !== rawValue.toLowerCase()) {
+          showInputToast(
+            "add-lead-email-invalid",
+            "enter valid email characters only",
+          );
+        }
+        setForm((prev) => ({ ...prev, email: sanitizedEmail }));
+        return;
+      }
+
+      setForm((prev) => ({ ...prev, [field]: capitalizeFirst(rawValue) }));
+    };
 
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, campaign: e.target.value }));
@@ -399,14 +467,21 @@ export default function AddNewLead() {
   const addFiles = (files: File[]) => {
     files.forEach((file) => {
       if (!ALLOWED_DOC_TYPES.includes(file.type)) {
-        toast.error(`"${file.name}" — unsupported type. Use PDF, Word, JPG or PNG.`, {
-          position: "top-right", autoClose: 3000, theme: "colored",
-        });
+        toast.error(
+          `"${file.name}" — unsupported type. Use PDF, Word, JPG or PNG.`,
+          {
+            position: "top-right",
+            autoClose: 3000,
+            theme: "colored",
+          },
+        );
         return;
       }
       if (file.size > MAX_DOC_SIZE_MB * 1024 * 1024) {
         toast.error(`"${file.name}" — exceeds ${MAX_DOC_SIZE_MB}MB limit.`, {
-          position: "top-right", autoClose: 3000, theme: "colored",
+          position: "top-right",
+          autoClose: 3000,
+          theme: "colored",
         });
         return;
       }
@@ -428,7 +503,12 @@ export default function AddNewLead() {
 
   // ── Navigation ───────────────────────────────────────────────────
   const handleNext = async () => {
-    const isValid = await validateStep(currentStep, form, isCouple, pendingFiles.length > 0);
+    const isValid = await validateStep(
+      currentStep,
+      form,
+      isCouple,
+      pendingFiles.length > 0,
+    );
     if (!isValid) return;
     if (currentStep === 3) {
       await submitForm();
@@ -474,7 +554,8 @@ export default function AddNewLead() {
     const generatedByOption = leadGeneratedByOptions.find(
       (option) => assigneeLabel(option) === (form.leadGeneratedBy ?? "").trim(),
     );
-    const resolvedGeneratedById = intOrNull(leadGeneratedById) ?? generatedByOption?.id ?? null;
+    const resolvedGeneratedById =
+      intOrNull(leadGeneratedById) ?? generatedByOption?.id ?? null;
 
     return {
       clinic_id: clinicId,
@@ -485,7 +566,9 @@ export default function AddNewLead() {
       sub_source: form.subSource || "",
       treatment_interest:
         form.treatments.join(",") || form.treatmentInterest || "General",
-      appointment_date: shouldBookAppointment ? (form.appointmentDate ?? null) : null,
+      appointment_date: shouldBookAppointment
+        ? (form.appointmentDate ?? null)
+        : null,
       slot: shouldBookAppointment ? (form.slot ?? "") : "",
       campaign_id: strOrNull(form.campaign),
       email: strOrNull(form.email || form.contactEmail) ?? null,
@@ -510,7 +593,7 @@ export default function AddNewLead() {
         ? resolvedGeneratedById
         : (intOrNull(form.personnel) ?? null),
       personal_name: IS_CONTRACTS_APP
-        ? (form.leadGeneratedBy?.trim() || null)
+        ? form.leadGeneratedBy?.trim() || null
         : null,
       age: IS_MEDICAL_APP ? (intOrNull(form.age) ?? null) : null,
       partner_age: IS_MEDICAL_APP ? (intOrNull(form.partnerAge) ?? null) : null,
@@ -544,22 +627,26 @@ export default function AddNewLead() {
             full_name: response.full_name || payload.full_name,
             contact_no: response.contact_no || payload.contact_no,
             source: response.source || payload.source,
-            treatment_interest: response.treatment_interest || payload.treatment_interest,
+            treatment_interest:
+              response.treatment_interest || payload.treatment_interest,
             lead_status: "appointment",
             book_appointment: true,
             appointment_date: payload.appointment_date,
             slot: payload.slot,
-            partner_inquiry: response.partner_inquiry ?? payload.partner_inquiry,
+            partner_inquiry:
+              response.partner_inquiry ?? payload.partner_inquiry,
             is_active: response.is_active !== false,
           });
         } catch {
-          toast.warning("Lead was created, but appointment status update failed.", {
-            position: "top-right",
-            autoClose: 2500,
-            theme: "colored",
-          });
+          toast.warning(
+            "Lead was created, but appointment status update failed.",
+            {
+              position: "top-right",
+              autoClose: 2500,
+              theme: "colored",
+            },
+          );
         }
-
       }
 
       const recipientEmail =
@@ -568,17 +655,21 @@ export default function AddNewLead() {
         form.contactEmail.trim() ||
         "";
       if (recipientEmail) {
-        const leadFirstName = (response.full_name || payload.full_name || "Patient")
-          .trim()
-          .split(/\s+/)[0] || "Patient";
+        const leadFirstName =
+          (response.full_name || payload.full_name || "Patient")
+            .trim()
+            .split(/\s+/)[0] || "Patient";
 
         const appointmentDateText = payload.appointment_date || "-";
         const appointmentSlotText = payload.slot || "-";
         const appointmentBookedText = payload.book_appointment ? "Yes" : "No";
-        const senderName = [authedUser?.first_name, authedUser?.last_name]
-          .filter(Boolean)
-          .join(" ")
-          .trim() || authedUser?.username || "Team";
+        const senderName =
+          [authedUser?.first_name, authedUser?.last_name]
+            .filter(Boolean)
+            .join(" ")
+            .trim() ||
+          authedUser?.username ||
+          "Team";
         const senderEmail = authedUser?.email?.trim() || undefined;
 
         const subject = payload.book_appointment
@@ -638,17 +729,22 @@ export default function AddNewLead() {
             email_body: emailBody,
           });
         } catch {
-          toast.warning("Lead was created, but confirmation email could not be sent.", {
-            position: "top-right",
-            autoClose: 2500,
-            theme: "colored",
-          });
+          toast.warning(
+            "Lead was created, but confirmation email could not be sent.",
+            {
+              position: "top-right",
+              autoClose: 2500,
+              theme: "colored",
+            },
+          );
         }
       }
 
       console.log("✅ Lead created:", response);
       toast.success("Lead saved successfully!", {
-        position: "top-right", autoClose: 1500, theme: "colored",
+        position: "top-right",
+        autoClose: 1500,
+        theme: "colored",
       });
       navigate("/leads", { replace: true });
     } catch (err) {
@@ -660,7 +756,11 @@ export default function AddNewLead() {
       } else {
         msg = error?.message || msg;
       }
-      toast.error(msg, { position: "top-right", autoClose: 3000, theme: "colored" });
+      toast.error(msg, {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -668,9 +768,9 @@ export default function AddNewLead() {
 
   // ── Step indicator config — labels from appType config ───────────
   const steps = [
-    { label: ACTIVE_FLOW_COPY.detailsStep, step: 1 },   // "Lead Details" or "Patient Details"
-    { label: ACTIVE_FLOW_COPY.medicalStep, step: 2 },    // "Product Details" or "Medical Details"
-    { label: ACTIVE_FLOW_COPY.step3, step: 3 },          // "Book Appointment" (same for both)
+    { label: ACTIVE_FLOW_COPY.detailsStep, step: 1 }, // "Lead Details" or "Patient Details"
+    { label: ACTIVE_FLOW_COPY.medicalStep, step: 2 }, // "Product Details" or "Medical Details"
+    { label: ACTIVE_FLOW_COPY.step3, step: 3 }, // "Book Appointment" (same for both)
   ];
 
   // ── Permission redirect ───────────────────────────────────────────
@@ -845,7 +945,10 @@ export default function AddNewLead() {
               setForm((prev) => ({ ...prev, personnel: "" }));
             }}
             handlePersonnelChange={(value) => {
-              setForm((prev) => ({ ...prev, personnel: value ? String(value.id) : "" }));
+              setForm((prev) => ({
+                ...prev,
+                personnel: value ? String(value.id) : "",
+              }));
               setAppointmentPersonnelInput(value ? personnelLabel(value) : "");
             }}
             handleChange={handleChange}

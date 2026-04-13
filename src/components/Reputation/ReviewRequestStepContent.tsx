@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Box,
   Button,
-  Dialog,
-  DialogContent,
   Divider,
   FormControlLabel,
   IconButton,
@@ -17,7 +15,6 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
@@ -43,20 +40,12 @@ import InsertPhotoIcon from "@mui/icons-material/InsertPhoto";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
 import AddIcon from "@mui/icons-material/Add";
-import TemplateService from "../../services/templates.api";
-import { NewTemplateModal } from "../Settings/Templates/NewTemplateModal";
 import AI_Suggest, { type AiSuggestionItem } from "./AI_Suggest";
 import { toast } from "react-toastify";
 import type { ReviewRequestFormData } from "./reviewRequest.utils";
-
-type TemplateListItem = {
-  id: string | number;
-  audience_name?: string;
-  name?: string;
-  subject?: string;
-  email_body?: string;
-  body?: string;
-};
+import ReviewRequestTemplateDialog, {
+  type TemplateListItem,
+} from "./ReviewRequestTemplateDialog";
 
 type ReviewRequestStepContentProps = {
   formData: ReviewRequestFormData;
@@ -78,15 +67,6 @@ const parseEmailList = (value: string): string[] =>
     .split(/[;,\n]/)
     .map((item) => item.trim())
     .filter(Boolean);
-
-const getTemplateTypeLabel = (mode: "email" | "sms" | "whatsapp") => {
-  if (mode === "email") return "Email";
-  if (mode === "sms") return "SMS";
-  return "WhatsApp";
-};
-
-const getTemplateApiType = (mode: "email" | "sms" | "whatsapp") =>
-  mode === "email" ? "mail" : mode;
 
 const normalizeTemplateContent = (value: string) => {
   const html = value.trim();
@@ -110,23 +90,6 @@ const normalizeTemplateContent = (value: string) => {
     .replace(/\r\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-};
-
-const getTemplateTitle = (tpl: TemplateListItem) =>
-  (tpl.audience_name || tpl.name || "Untitled Template").trim();
-
-const getTemplateSubText = (
-  tpl: TemplateListItem,
-  mode: "email" | "sms" | "whatsapp",
-) => {
-  if (mode === "email") {
-    return (tpl.subject || "No subject").trim();
-  }
-
-  const body = normalizeTemplateContent(tpl.body || tpl.email_body || "");
-
-  if (!body) return "No content";
-  return body.length > 60 ? `${body.slice(0, 60)}...` : body;
 };
 
 const ReviewRequestStepContent = ({
@@ -157,45 +120,17 @@ const ReviewRequestStepContent = ({
     null,
   );
   const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
-  const [templates, setTemplates] = useState<TemplateListItem[]>([]);
-  const [selectedTemplate, setSelectedTemplate] =
-    useState<TemplateListItem | null>(null);
-  const [viewTemplateOpen, setViewTemplateOpen] = useState(false);
-  const [viewTemplateData, setViewTemplateData] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
   const [aiSuggestOpen, setAiSuggestOpen] = useState(false);
   const [aiSuggestField, setAiSuggestField] = useState<"subject" | "body">(
     "subject",
   );
 
-  const templateTypeLabel = useMemo(
-    () => getTemplateTypeLabel(formData.mode),
-    [formData.mode],
-  );
-
-  useEffect(() => {
-    if (!openTemplateDialog) return;
-
-    const loadTemplates = async () => {
-      try {
-        const response = await TemplateService.getTemplates(
-          getTemplateApiType(formData.mode),
-        );
-
-        const list = Array.isArray(response)
-          ? response
-          : (response?.results ?? []);
-
-        setTemplates(Array.isArray(list) ? (list as TemplateListItem[]) : []);
-      } catch {
-        setTemplates([]);
-      }
-    };
-
-    loadTemplates();
-  }, [openTemplateDialog, formData.mode]);
+  const templateTypeLabel =
+    formData.mode === "email"
+      ? "Email"
+      : formData.mode === "sms"
+        ? "SMS"
+        : "WhatsApp";
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -206,9 +141,7 @@ const ReviewRequestStepContent = ({
     }
   }, [formData.message]);
 
-  const handleInsertTemplate = () => {
-    if (!selectedTemplate) return;
-
+  const handleInsertTemplate = (selectedTemplate: TemplateListItem) => {
     const body = normalizeTemplateContent(
       selectedTemplate.body || selectedTemplate.email_body || "",
     );
@@ -223,9 +156,6 @@ const ReviewRequestStepContent = ({
     if (formData.mode === "email" && !formData.subject.trim()) {
       onSubjectChange((selectedTemplate.subject || "").trim());
     }
-
-    setOpenTemplateDialog(false);
-    setSelectedTemplate(null);
   };
 
   const openAiSuggestions = (field: "subject" | "body") => {
@@ -735,71 +665,69 @@ const ReviewRequestStepContent = ({
           />
         )}
 
-        <TextField
-          size="small"
-          fullWidth
-          label="Subject"
-          placeholder="Type Here"
-          value={formData.subject}
-          onChange={(e) => onSubjectChange(e.target.value)}
-          onBlur={onSubjectBlur}
-          InputProps={
-            formData.mode === "email"
-              ? {
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Button
-                        startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-                        onClick={() => openAiSuggestions("subject")}
-                        sx={{
-                          color: "#A855F7",
-                          textTransform: "none",
-                          fontWeight: 700,
-                        }}
-                      >
-                        AI Suggest
-                      </Button>
-                      <Box
-                        sx={{
-                          ml: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: showCc ? "#232323" : "#BBBBBB",
-                            fontWeight: showCc ? 600 : 400,
-                            cursor: "pointer",
-                          }}
-                          onClick={() => setShowCc((prev) => !prev)}
-                        >
-                          Cc
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "#505050" }}>
-                          |
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: showBcc ? "#232323" : "#BBBBBB",
-                            fontWeight: showBcc ? 600 : 400,
-                            cursor: "pointer",
-                          }}
-                          onClick={() => setShowBcc((prev) => !prev)}
-                        >
-                          Bcc
-                        </Typography>
-                      </Box>
-                    </InputAdornment>
-                  ),
-                }
-              : undefined
-          }
-          sx={{ mb: 1.25 }}
-        />
+        {formData.mode === "email" && (
+          <TextField
+            size="small"
+            fullWidth
+            label="Subject"
+            placeholder="Type Here"
+            value={formData.subject}
+            onChange={(e) => onSubjectChange(e.target.value)}
+            onBlur={onSubjectBlur}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Button
+                    startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                    onClick={() => openAiSuggestions("subject")}
+                    sx={{
+                      color: "#A855F7",
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    AI Suggest
+                  </Button>
+                  <Box
+                    sx={{
+                      ml: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: showCc ? "#232323" : "#BBBBBB",
+                        fontWeight: showCc ? 600 : 400,
+                        cursor: "pointer",
+                      }}
+                      onClick={() => setShowCc((prev) => !prev)}
+                    >
+                      Cc
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "#505050" }}>
+                      |
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: showBcc ? "#232323" : "#BBBBBB",
+                        fontWeight: showBcc ? 600 : 400,
+                        cursor: "pointer",
+                      }}
+                      onClick={() => setShowBcc((prev) => !prev)}
+                    >
+                      Bcc
+                    </Typography>
+                  </Box>
+                </InputAdornment>
+              ),
+            }}
+            sx={{ mb: 1.25 }}
+          />
+        )}
 
         {formData.mode === "email" && showCc && (
           <TextField
@@ -948,137 +876,11 @@ const ReviewRequestStepContent = ({
         onApply={handleApplyAiSuggestion}
       />
 
-      <Dialog
+      <ReviewRequestTemplateDialog
         open={openTemplateDialog}
+        mode={formData.mode}
         onClose={() => setOpenTemplateDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogContent sx={{ p: 3 }}>
-          <Typography fontWeight={700} fontSize={16} mb={2}>
-            Insert {templateTypeLabel} Template
-          </Typography>
-
-          <Typography fontSize={13} color="#8A8A8A" mb={2}>
-            Select {templateTypeLabel} Template
-          </Typography>
-
-          <Stack spacing={1.5}>
-            {templates.map((tpl) => {
-              const isSelected = selectedTemplate?.id === tpl.id;
-
-              return (
-                <Box
-                  key={tpl.id}
-                  sx={{
-                    border: isSelected
-                      ? "1px solid #E97B5A"
-                      : "1px solid #E6E6E6",
-                    borderRadius: "10px",
-                    p: 2,
-                    cursor: "pointer",
-                    backgroundColor: isSelected ? "#FFF7F4" : "#FAFAFA",
-                  }}
-                  onClick={() => setSelectedTemplate(tpl)}
-                >
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <Box
-                      sx={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        border: "2px solid #E97B5A",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {isSelected && (
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
-                            backgroundColor: "#E97B5A",
-                          }}
-                        />
-                      )}
-                    </Box>
-
-                    <Box flex={1}>
-                      <Typography fontWeight={600} fontSize={14}>
-                        {getTemplateTitle(tpl)}
-                      </Typography>
-
-                      <Typography fontSize={12} color="#8A8A8A">
-                        {getTemplateSubText(tpl, formData.mode)}
-                      </Typography>
-                    </Box>
-
-                    <IconButton
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const fullTemplate =
-                          await TemplateService.getTemplateById(
-                            getTemplateApiType(formData.mode),
-                            String(tpl.id),
-                          );
-
-                        setViewTemplateData({
-                          ...fullTemplate,
-                          id: String(tpl.id),
-                          type: formData.mode,
-                        });
-                        setViewTemplateOpen(true);
-                      }}
-                    >
-                      <VisibilityIcon
-                        fontSize="small"
-                        sx={{ color: "#5A8AEA" }}
-                      />
-                    </IconButton>
-                  </Stack>
-                </Box>
-              );
-            })}
-
-            {templates.length === 0 && (
-              <Typography fontSize={13} color="#8A8A8A">
-                No {templateTypeLabel} templates found.
-              </Typography>
-            )}
-          </Stack>
-
-          <Stack direction="row" justifyContent="flex-end" spacing={1.5} mt={3}>
-            <Button
-              variant="outlined"
-              onClick={() => setOpenTemplateDialog(false)}
-              sx={{ color: "#505050", borderColor: "#505050" }}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              variant="contained"
-              disabled={!selectedTemplate}
-              sx={{
-                bgcolor: "#505050",
-                "&:hover": { bgcolor: "#232323" },
-              }}
-              onClick={handleInsertTemplate}
-            >
-              Insert
-            </Button>
-          </Stack>
-        </DialogContent>
-      </Dialog>
-
-      <NewTemplateModal
-        open={viewTemplateOpen}
-        onClose={() => setViewTemplateOpen(false)}
-        onSave={() => {}}
-        initialData={viewTemplateData as never}
-        mode="view"
+        onInsert={handleInsertTemplate}
       />
     </>
   );
