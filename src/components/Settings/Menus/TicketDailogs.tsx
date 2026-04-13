@@ -36,7 +36,6 @@ interface TicketDailogProps {
   setViewTemplateData: (d: EmailTemplate) => void;
 }
 
-
 const TicketDailog = ({
   previewOpen,
   previewFile,
@@ -54,21 +53,25 @@ const TicketDailog = ({
   setViewTemplateOpen,
   setViewTemplateData,
 }: TicketDailogProps) => {
-
-const formattedTemplate = viewTemplateData
-  ? {
-      id: String(viewTemplateData.id), 
-      audience_name: viewTemplateData.audience_name,
-      subject: viewTemplateData.subject,
-      email_body: viewTemplateData.body ?? "", 
-      type: "mail",
-    }
-  : undefined;
+  const formattedTemplate = viewTemplateData
+    ? {
+        id: String(viewTemplateData.id),
+        audience_name: viewTemplateData.audience_name,
+        subject: viewTemplateData.subject,
+        email_body: viewTemplateData.body ?? "",
+        type: "mail",
+      }
+    : undefined;
 
   return (
     <>
       {/* ================= FILE PREVIEW DIALOG ================= */}
-      <Dialog open={previewOpen} onClose={handlePreviewClose} maxWidth="md" fullWidth>
+      <Dialog
+        open={previewOpen}
+        onClose={handlePreviewClose}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogContent sx={{ position: "relative", p: 2 }}>
           <IconButton
             onClick={handlePreviewClose}
@@ -80,9 +83,17 @@ const formattedTemplate = viewTemplateData
           {previewFile && (
             <>
               {previewFile.match(/\.(jpeg|jpg|png|gif)$/i) ? (
-                <Box component="img" src={previewFile} sx={{ width: "100%", borderRadius: 1 }} />
+                <Box
+                  component="img"
+                  src={previewFile}
+                  sx={{ width: "100%", borderRadius: 1 }}
+                />
               ) : (
-                <Box component="iframe" src={previewFile} sx={{ width: "100%", height: "70vh", border: "none" }} />
+                <Box
+                  component="iframe"
+                  src={previewFile}
+                  sx={{ width: "100%", height: "70vh", border: "none" }}
+                />
               )}
             </>
           )}
@@ -105,15 +116,39 @@ const formattedTemplate = viewTemplateData
             Select Email Template
           </Typography>
 
-          <Stack spacing={1.5}>
-{templates.map((tpl) => {
+          <Stack
+            spacing={1.5}
+            sx={{
+              maxHeight: "280px",
+              overflowY: "auto",
+              paddingRight: "4px",
+              "&::-webkit-scrollbar": {
+                width: "6px",
+              },
+              "&::-webkit-scrollbar-track": {
+                backgroundColor: "#F5F5F5",
+                borderRadius: "4px",
+              },
+              "&::-webkit-scrollbar-thumb": {
+                backgroundColor: "#D0D0D0",
+                borderRadius: "4px",
+                transition: "backgroundColor 0.2s",
+                "&:hover": {
+                  backgroundColor: "#B0B0B0",
+                },
+              },
+            }}
+          >
+            {templates.map((tpl) => {
               const isSelected = selectedTemplate?.id === tpl.id;
 
               return (
                 <Box
                   key={tpl.id}
                   sx={{
-                    border: isSelected ? "1px solid #E97B5A" : "1px solid #E6E6E6",
+                    border: isSelected
+                      ? "1px solid #E97B5A"
+                      : "1px solid #E6E6E6",
                     borderRadius: "10px",
                     p: 2,
                     cursor: "pointer",
@@ -158,10 +193,11 @@ const formattedTemplate = viewTemplateData
                     <IconButton
                       onClick={async (e) => {
                         e.stopPropagation();
-                        const fullTemplate = await TemplateService.getTemplateById(
-                          "mail",
-                          String(tpl.id)
-                        );
+                        const fullTemplate =
+                          await TemplateService.getTemplateById(
+                            "mail",
+                            String(tpl.id),
+                          );
 
                         setViewTemplateData({ ...fullTemplate, type: "mail" });
                         setViewTemplateOpen(true);
@@ -184,21 +220,20 @@ const formattedTemplate = viewTemplateData
               Cancel
             </Button>
 
-<Button
-  variant="contained"
-  disabled={!selectedTemplate}
-  sx={{
-    bgcolor: "#505050",
-    "&:hover": { bgcolor: "#232323" }
-  }}
-  onClick={() => {
-    if (!selectedTemplate) return;
-    onInsertTemplate(selectedTemplate);
-  }}
->
-  Insert
-</Button>
-
+            <Button
+              variant="contained"
+              disabled={!selectedTemplate}
+              sx={{
+                bgcolor: "#505050",
+                "&:hover": { bgcolor: "#232323" },
+              }}
+              onClick={() => {
+                if (!selectedTemplate) return;
+                onInsertTemplate(selectedTemplate);
+              }}
+            >
+              Insert
+            </Button>
           </Stack>
         </DialogContent>
       </Dialog>
@@ -208,7 +243,7 @@ const formattedTemplate = viewTemplateData
         open={viewTemplateOpen}
         onClose={() => setViewTemplateOpen(false)}
         onSave={() => {}}
-initialData={formattedTemplate}
+        initialData={formattedTemplate}
         mode="view"
       />
     </>

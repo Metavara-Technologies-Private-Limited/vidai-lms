@@ -35,14 +35,16 @@ import {
   IS_CONTRACTS_APP,
   ACTIVE_FLOW_COPY,
 } from "../../config/appType";
+import { sanitizeNameInput } from "../../utils/nameValidation";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 const API_BASE_URL: string =
-  (import.meta as unknown as { env: Record<string, string> }).env?.VITE_API_BASE_URL?.replace("/api", "") ??
-  "http://127.0.0.1:8000";
+  (
+    import.meta as unknown as { env: Record<string, string> }
+  ).env?.VITE_API_BASE_URL?.replace("/api", "") ?? "http://127.0.0.1:8000";
 
 function resolveDocUrl(url: string): string {
   if (!url) return "";
@@ -78,7 +80,8 @@ type DocType = "pdf" | "image" | "word" | "other";
 function getDocType(url: string): DocType {
   const ext = getFileExt(url);
   if (ext === "pdf") return "pdf";
-  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext)) return "image";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext))
+    return "image";
   if (["doc", "docx"].includes(ext)) return "word";
   return "other";
 }
@@ -86,9 +89,12 @@ function getDocType(url: string): DocType {
 function DocTypeIcon({ url, size = 22 }: { url: string; size?: number }) {
   const type = getDocType(url);
   const sx = { fontSize: size };
-  if (type === "pdf")   return <PictureAsPdfOutlinedIcon sx={{ ...sx, color: "#EF4444" }} />;
-  if (type === "image") return <ImageOutlinedIcon sx={{ ...sx, color: "#3B82F6" }} />;
-  if (type === "word")  return <DescriptionOutlinedIcon sx={{ ...sx, color: "#2563EB" }} />;
+  if (type === "pdf")
+    return <PictureAsPdfOutlinedIcon sx={{ ...sx, color: "#EF4444" }} />;
+  if (type === "image")
+    return <ImageOutlinedIcon sx={{ ...sx, color: "#3B82F6" }} />;
+  if (type === "word")
+    return <DescriptionOutlinedIcon sx={{ ...sx, color: "#2563EB" }} />;
   return <InsertDriveFileOutlinedIcon sx={{ ...sx, color: "#64748B" }} />;
 }
 
@@ -102,7 +108,12 @@ interface InfoCellProps {
   truncate?: boolean;
 }
 
-const InfoCell: React.FC<InfoCellProps> = ({ label, value, isAvatar, truncate = true }) => (
+const InfoCell: React.FC<InfoCellProps> = ({
+  label,
+  value,
+  isAvatar,
+  truncate = true,
+}) => (
   <Box sx={{ minWidth: 0 }}>
     <Typography
       variant="caption"
@@ -154,7 +165,10 @@ const InfoCell: React.FC<InfoCellProps> = ({ label, value, isAvatar, truncate = 
 // ─────────────────────────────────────────────────────────────────────────────
 // InfoGrid
 // ─────────────────────────────────────────────────────────────────────────────
-const InfoGrid: React.FC<{ children: React.ReactNode; sx?: object }> = ({ children, sx }) => (
+const InfoGrid: React.FC<{ children: React.ReactNode; sx?: object }> = ({
+  children,
+  sx,
+}) => (
   <Box
     sx={{
       display: "grid",
@@ -173,21 +187,30 @@ const InfoGrid: React.FC<{ children: React.ReactNode; sx?: object }> = ({ childr
 function useBlobUrl(remoteUrl: string, enabled: boolean) {
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
-  const [error, setError]     = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!enabled || !remoteUrl) return;
     let objectUrl: string | null = null;
-    setLoading(true); setError(null); setBlobUrl(null);
+    setLoading(true);
+    setError(null);
+    setBlobUrl(null);
     fetch(remoteUrl)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status} — file not found`);
         return res.blob();
       })
-      .then((blob) => { objectUrl = URL.createObjectURL(blob); setBlobUrl(objectUrl); })
-      .catch((err: unknown) => setError((err as Error).message || "Failed to load file"))
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+      })
+      .catch((err: unknown) =>
+        setError((err as Error).message || "Failed to load file"),
+      )
       .finally(() => setLoading(false));
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [remoteUrl, enabled]);
 
   return { blobUrl, loading, error };
@@ -197,20 +220,31 @@ function useBlobUrl(remoteUrl: string, enabled: boolean) {
 // DocumentViewer Dialog
 // ─────────────────────────────────────────────────────────────────────────────
 interface DocumentViewerProps {
-  open: boolean; url: string; name: string; onClose: () => void;
+  open: boolean;
+  url: string;
+  name: string;
+  onClose: () => void;
 }
 
-const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClose }) => {
+const DocumentViewer: React.FC<DocumentViewerProps> = ({
+  open,
+  url,
+  name,
+  onClose,
+}) => {
   const resolvedUrl = resolveDocUrl(url);
-  const type        = getDocType(resolvedUrl);
+  const type = getDocType(resolvedUrl);
   const displayName = getFileName(resolvedUrl, name);
   const { blobUrl, loading, error } = useBlobUrl(resolvedUrl, open);
 
   const handleDownload = () => {
     const src = blobUrl || resolvedUrl;
     const a = document.createElement("a");
-    a.href = src; a.download = displayName;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    a.href = src;
+    a.download = displayName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -242,7 +276,13 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
       >
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <DocTypeIcon url={resolvedUrl} size={20} />
-          <Typography fontWeight={600} fontSize="14px" color="#1E293B" noWrap maxWidth={400}>
+          <Typography
+            fontWeight={600}
+            fontSize="14px"
+            color="#1E293B"
+            noWrap
+            maxWidth={400}
+          >
             {displayName}
           </Typography>
         </Stack>
@@ -259,7 +299,9 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
           <Tooltip title="Open in new tab">
             <IconButton
               size="small"
-              onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")}
+              onClick={() =>
+                window.open(resolvedUrl, "_blank", "noopener,noreferrer")
+              }
               sx={{ color: "#475569", "&:hover": { bgcolor: "#F1F5F9" } }}
             >
               <OpenInNewOutlinedIcon fontSize="small" />
@@ -274,12 +316,23 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
           </IconButton>
         </Stack>
       </DialogTitle>
-      <DialogContent sx={{ p: 0, flex: 1, overflow: "hidden", bgcolor: "#F8FAFC" }}>
+      <DialogContent
+        sx={{ p: 0, flex: 1, overflow: "hidden", bgcolor: "#F8FAFC" }}
+      >
         {loading && (
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "60vh",
+            }}
+          >
             <Stack alignItems="center" spacing={1.5}>
               <CircularProgress size={36} />
-              <Typography fontSize="13px" color="text.secondary">Loading file…</Typography>
+              <Typography fontSize="13px" color="text.secondary">
+                Loading file…
+              </Typography>
             </Stack>
           </Box>
         )}
@@ -296,16 +349,33 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
             }}
           >
             <PictureAsPdfOutlinedIcon sx={{ fontSize: 56, color: "#CBD5E1" }} />
-            <Typography fontWeight={600} color="#475569">Could not load file</Typography>
-            <Typography fontSize="13px" color="text.secondary" textAlign="center">{error}</Typography>
+            <Typography fontWeight={600} color="#475569">
+              Could not load file
+            </Typography>
+            <Typography
+              fontSize="13px"
+              color="text.secondary"
+              textAlign="center"
+            >
+              {error}
+            </Typography>
             <Stack direction="row" spacing={1.5} mt={1}>
               <Box
                 component="button"
                 onClick={handleDownload}
                 sx={{
-                  display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25,
-                  borderRadius: "8px", border: "none", cursor: "pointer",
-                  bgcolor: "#1F2937", color: "white", fontWeight: 600, fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  px: 3,
+                  py: 1.25,
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                  bgcolor: "#1F2937",
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: "14px",
                   "&:hover": { bgcolor: "#111827" },
                 }}
               >
@@ -313,11 +383,22 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
               </Box>
               <Box
                 component="button"
-                onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")}
+                onClick={() =>
+                  window.open(resolvedUrl, "_blank", "noopener,noreferrer")
+                }
                 sx={{
-                  display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25,
-                  borderRadius: "8px", cursor: "pointer", border: "1px solid #E5E7EB",
-                  bgcolor: "white", color: "#374151", fontWeight: 600, fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  px: 3,
+                  py: 1.25,
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  border: "1px solid #E5E7EB",
+                  bgcolor: "white",
+                  color: "#374151",
+                  fontWeight: 600,
+                  fontSize: "14px",
                   "&:hover": { bgcolor: "#F9FAFB" },
                 }}
               >
@@ -330,11 +411,24 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
           <iframe
             src={blobUrl}
             title={displayName}
-            style={{ width: "100%", height: "78vh", border: "none", display: "block" }}
+            style={{
+              width: "100%",
+              height: "78vh",
+              border: "none",
+              display: "block",
+            }}
           />
         )}
         {!loading && !error && blobUrl && type === "image" && (
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", p: 3, minHeight: 300 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              p: 3,
+              minHeight: 300,
+            }}
+          >
             <Box
               component="img"
               src={blobUrl}
@@ -361,7 +455,9 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
             }}
           >
             <DocTypeIcon url={resolvedUrl} size={56} />
-            <Typography fontWeight={600} color="#1E293B" fontSize="15px">{displayName}</Typography>
+            <Typography fontWeight={600} color="#1E293B" fontSize="15px">
+              {displayName}
+            </Typography>
             <Typography fontSize="13px" color="text.secondary">
               This file type cannot be previewed in the browser.
             </Typography>
@@ -370,9 +466,18 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
                 component="button"
                 onClick={handleDownload}
                 sx={{
-                  display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25,
-                  borderRadius: "8px", border: "none", cursor: "pointer",
-                  bgcolor: "#1F2937", color: "white", fontWeight: 600, fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  px: 3,
+                  py: 1.25,
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                  bgcolor: "#1F2937",
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: "14px",
                   "&:hover": { bgcolor: "#111827" },
                 }}
               >
@@ -380,11 +485,22 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({ open, url, name, onClos
               </Box>
               <Box
                 component="button"
-                onClick={() => window.open(resolvedUrl, "_blank", "noopener,noreferrer")}
+                onClick={() =>
+                  window.open(resolvedUrl, "_blank", "noopener,noreferrer")
+                }
                 sx={{
-                  display: "flex", alignItems: "center", gap: 0.75, px: 3, py: 1.25,
-                  borderRadius: "8px", cursor: "pointer", border: "1px solid #E5E7EB",
-                  bgcolor: "white", color: "#374151", fontWeight: 600, fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  px: 3,
+                  py: 1.25,
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  border: "1px solid #E5E7EB",
+                  bgcolor: "white",
+                  color: "#374151",
+                  fontWeight: 600,
+                  fontSize: "14px",
                   "&:hover": { bgcolor: "#F9FAFB" },
                 }}
               >
@@ -410,13 +526,13 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
   const [viewerOpen, setViewerOpen] = React.useState(false);
   const resolvedUrl = resolveDocUrl(url);
   const displayName = getFileName(resolvedUrl, name);
-  const ext  = getFileExt(resolvedUrl).toUpperCase();
+  const ext = getFileExt(resolvedUrl).toUpperCase();
   const type = getDocType(resolvedUrl);
 
   const extColors: Record<DocType, { bg: string; color: string }> = {
-    pdf:   { bg: "#FEF2F2", color: "#EF4444" },
+    pdf: { bg: "#FEF2F2", color: "#EF4444" },
     image: { bg: "#EFF6FF", color: "#3B82F6" },
-    word:  { bg: "#EFF6FF", color: "#2563EB" },
+    word: { bg: "#EFF6FF", color: "#2563EB" },
     other: { bg: "#F8FAFC", color: "#64748B" },
   };
   const { bg, color } = extColors[type];
@@ -429,8 +545,11 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = blobUrl; a.download = displayName;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      a.href = blobUrl;
+      a.download = displayName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
     } catch {
       window.open(resolvedUrl, "_blank", "noopener,noreferrer");
@@ -473,7 +592,13 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
           <DocTypeIcon url={resolvedUrl} size={20} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography fontWeight={600} fontSize="13px" color="#1E293B" noWrap title={displayName}>
+          <Typography
+            fontWeight={600}
+            fontSize="13px"
+            color="#1E293B"
+            noWrap
+            title={displayName}
+          >
             {displayName}
           </Typography>
           {ext && (
@@ -502,8 +627,14 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
           <Tooltip title="Preview">
             <IconButton
               size="small"
-              onClick={(e) => { e.stopPropagation(); setViewerOpen(true); }}
-              sx={{ color: "#64748B", "&:hover": { color: "#1E293B", bgcolor: "#F1F5F9" } }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewerOpen(true);
+              }}
+              sx={{
+                color: "#64748B",
+                "&:hover": { color: "#1E293B", bgcolor: "#F1F5F9" },
+              }}
             >
               <VisibilityOutlinedIcon sx={{ fontSize: 16 }} />
             </IconButton>
@@ -512,7 +643,10 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
             <IconButton
               size="small"
               onClick={handleDownload}
-              sx={{ color: "#64748B", "&:hover": { color: "#1E293B", bgcolor: "#F1F5F9" } }}
+              sx={{
+                color: "#64748B",
+                "&:hover": { color: "#1E293B", bgcolor: "#F1F5F9" },
+              }}
             >
               <DownloadOutlinedIcon sx={{ fontSize: 16 }} />
             </IconButton>
@@ -524,7 +658,10 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
                 e.stopPropagation();
                 window.open(resolvedUrl, "_blank", "noopener,noreferrer");
               }}
-              sx={{ color: "#64748B", "&:hover": { color: "#1E293B", bgcolor: "#F1F5F9" } }}
+              sx={{
+                color: "#64748B",
+                "&:hover": { color: "#1E293B", bgcolor: "#F1F5F9" },
+              }}
             >
               <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />
             </IconButton>
@@ -544,7 +681,9 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ url, name }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Section label
 // ─────────────────────────────────────────────────────────────────────────────
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => (
   <Typography
     variant="caption"
     fontWeight={600}
@@ -625,7 +764,6 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
   onBookAppointment,
 }) => (
   <Stack direction="row" spacing={3} alignItems="flex-start">
-
     {/* ── LEFT PANEL ────────────────────────────────────────────────────────── */}
     <Box sx={{ flex: 2, minWidth: 0 }}>
       <Card
@@ -639,7 +777,9 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
           mt: -1,
         }}
       >
-        <Typography variant="subtitle1" fontWeight={700} mb={2}>Basic Information</Typography>
+        <Typography variant="subtitle1" fontWeight={700} mb={2}>
+          Basic Information
+        </Typography>
         <Divider sx={{ mb: 2, mx: -3 }} />
 
         {/* ── LEAD INFORMATION — same for both app types ── */}
@@ -678,8 +818,10 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
               <InfoCell
                 label="LEAD GENERATED BY"
                 value={
-                  (lead as unknown as Record<string, string>).lead_generated_by_name ||
-                  (lead as unknown as Record<string, string>).lead_generated_by ||
+                  (lead as unknown as Record<string, string>)
+                    .lead_generated_by_name ||
+                  (lead as unknown as Record<string, string>)
+                    .lead_generated_by ||
                   (lead as unknown as Record<string, string>).personal_name ||
                   "N/A"
                 }
@@ -700,7 +842,10 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
           <>
             <SectionLabel>Partner Information</SectionLabel>
             <InfoGrid sx={{ mb: 2 }}>
-              <InfoCell label="FULL NAME" value={partnerName} />
+              <InfoCell
+                label="FULL NAME"
+                value={sanitizeNameInput(partnerName)}
+              />
               <InfoCell label="AGE" value={partnerAge} />
               <InfoCell label="GENDER" value={partnerGender} />
             </InfoGrid>
@@ -715,8 +860,10 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
               <InfoCell
                 label="FULL NAME"
                 value={
-                  (lead as unknown as Record<string, string>).contact_full_name ||
-                  "N/A"
+                  sanitizeNameInput(
+                    (lead as unknown as Record<string, string>)
+                      .contact_full_name || "",
+                  ) || "N/A"
                 }
               />
               <InfoCell
@@ -760,7 +907,6 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
 
     {/* ── RIGHT PANEL ───────────────────────────────────────────────────────── */}
     <Stack spacing={3} sx={{ flex: 1, minWidth: 0 }}>
-
       {/* APPOINTMENT CARD */}
       {hasAppointment ? (
         <Card
@@ -773,7 +919,12 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
             mt: -1,
           }}
         >
-          <Typography color="#16A34A" fontWeight={700} variant="subtitle2" mb={1.5}>
+          <Typography
+            color="#16A34A"
+            fontWeight={700}
+            variant="subtitle2"
+            mb={1.5}
+          >
             Appointment
           </Typography>
           <Divider sx={{ mb: 2, mx: -3 }} />
@@ -804,7 +955,11 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
               <InfoCell label="DATE" value={appointmentDate} />
               <InfoCell label="SLOT" value={appointmentSlot} />
             </Box>
-            <InfoCell label="REMARK" value={appointmentRemark} truncate={false} />
+            <InfoCell
+              label="REMARK"
+              value={appointmentRemark}
+              truncate={false}
+            />
           </Stack>
         </Card>
       ) : (
@@ -823,12 +978,19 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
             mt: -1,
           }}
         >
-          <Typography color="#94A3B8" fontWeight={700} variant="subtitle2" mb={1.5}>
+          <Typography
+            color="#94A3B8"
+            fontWeight={700}
+            variant="subtitle2"
+            mb={1.5}
+          >
             Appointment
           </Typography>
           <Divider sx={{ mb: 2, mx: -3, borderStyle: "dashed" }} />
           <Stack alignItems="center" spacing={1.5} py={1.5}>
-            <CalendarTodayOutlinedIcon sx={{ fontSize: 32, color: "#CBD5E1" }} />
+            <CalendarTodayOutlinedIcon
+              sx={{ fontSize: 32, color: "#CBD5E1" }}
+            />
             <Typography fontSize="14px" fontWeight={600} color="#64748B">
               No Appointment Booked
             </Typography>
@@ -876,20 +1038,20 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
         </Typography>
         <Divider sx={{ mb: 2, mx: -3 }} />
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {treatmentInterest.length > 0
-            ? treatmentInterest.map((t, i) => (
-                <Chip
-                  key={i}
-                  label={t}
-                  size="small"
-                  sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", fontWeight: 500 }}
-                />
-              ))
-            : (
-              <Typography variant="body2" color="text.secondary">
-                No {IS_MEDICAL_APP ? "treatments" : "products"} selected
-              </Typography>
-            )}
+          {treatmentInterest.length > 0 ? (
+            treatmentInterest.map((t, i) => (
+              <Chip
+                key={i}
+                label={t}
+                size="small"
+                sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", fontWeight: 500 }}
+              />
+            ))
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No {IS_MEDICAL_APP ? "treatments" : "products"} selected
+            </Typography>
+          )}
         </Stack>
       </Card>
 
@@ -904,8 +1066,15 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
           boxShadow: "none",
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
-          <Typography fontWeight={700} variant="subtitle2">Documents</Typography>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          mb={1.5}
+        >
+          <Typography fontWeight={700} variant="subtitle2">
+            Documents
+          </Typography>
           {documents.length > 0 && (
             <Chip
               label={`${documents.length} file${documents.length > 1 ? "s" : ""}`}
@@ -926,7 +1095,9 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
           <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
             <Stack alignItems="center" spacing={1}>
               <CircularProgress size={22} />
-              <Typography variant="caption" color="text.secondary">Loading documents…</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Loading documents…
+              </Typography>
             </Stack>
           </Box>
         ) : docsError ? (
@@ -939,8 +1110,14 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
           </Alert>
         ) : documents.length === 0 ? (
           <Box sx={{ textAlign: "center", py: 3 }}>
-            <InsertDriveFileOutlinedIcon sx={{ fontSize: 36, color: "#CBD5E1", mb: 0.5 }} />
-            <Typography variant="caption" color="text.secondary" display="block">
+            <InsertDriveFileOutlinedIcon
+              sx={{ fontSize: 36, color: "#CBD5E1", mb: 0.5 }}
+            />
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+            >
               No documents uploaded
             </Typography>
           </Box>
@@ -953,7 +1130,6 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
         )}
       </Card>
     </Stack>
-
   </Stack>
 );
 

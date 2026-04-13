@@ -1180,7 +1180,28 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
             )}
 
           {!loadingTemplates && emailTemplates.length > 0 && (
-            <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+            <Box
+              sx={{
+                maxHeight: 300,
+                overflowY: "auto",
+                paddingRight: "4px",
+                "&::-webkit-scrollbar": {
+                  width: "6px",
+                },
+                "&::-webkit-scrollbar-track": {
+                  backgroundColor: "#F5F5F5",
+                  borderRadius: "4px",
+                },
+                "&::-webkit-scrollbar-thumb": {
+                  backgroundColor: "#D0D0D0",
+                  borderRadius: "4px",
+                  transition: "backgroundColor 0.2s",
+                  "&:hover": {
+                    backgroundColor: "#B0B0B0",
+                  },
+                },
+              }}
+            >
               {emailTemplates.map((t) => (
                 <Box
                   key={t.id}
