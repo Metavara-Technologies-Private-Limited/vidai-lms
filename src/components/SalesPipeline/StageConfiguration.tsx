@@ -2,7 +2,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import {
@@ -745,13 +744,6 @@ const StageConfiguration = ({
 											},
 										}}
 										fullWidth
-										InputProps={{
-											endAdornment: (
-												<InputAdornment position="end">
-													<KeyboardArrowDownRoundedIcon />
-												</InputAdornment>
-											),
-										}}
 										sx={{ mb: 1.1 }}
 									>
 										<MenuItem value="text">Text</MenuItem>
