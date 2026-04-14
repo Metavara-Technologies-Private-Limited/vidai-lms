@@ -198,15 +198,6 @@ const stripStageRelations = <TPayload extends StageMutationPayload>(payload: TPa
 const shouldRetryWithoutRelations = (status?: number): boolean =>
   status === 400 || status === 422 || status === 500;
 
-const tryAlternativePayload = (payload: UpdatePipelineStagePayload): UpdatePipelineStagePayload => {
-  const alternative = { ...payload };
-  if (payload.stage_color) {
-    (alternative as Record<string, unknown>).color_code = payload.stage_color;
-    delete alternative.stage_color;
-  }
-  return alternative;
-};
-
 const removeRelationsForBackend = <TPayload extends StageMutationPayload>(
   payload: TPayload,
 ): Omit<TPayload, "rules" | "fields"> => {
@@ -292,11 +283,11 @@ export const pipelineApi = {
   },
 
   async createStage(payload: CreatePipelineStagePayload): Promise<PipelineStage> {
-    const convertColorCode = (
-      p: Record<string, unknown>,
+    const convertColorCode = <TPayload extends object>(
+      p: TPayload,
     ): Record<string, unknown> => {
-      const result = { ...p };
-      if (result.stage_color) {
+      const result: Record<string, unknown> = { ...(p as Record<string, unknown>) };
+      if ("stage_color" in result && result.stage_color) {
         result.color_code = result.stage_color;
         delete result.stage_color;
       }
@@ -304,7 +295,7 @@ export const pipelineApi = {
     };
 
     try {
-      const converted = convertColorCode(payload as Record<string, unknown>);
+      const converted = convertColorCode(payload);
       const response = await http.post(
         "/pipelines/stages/create/",
         converted,
@@ -325,7 +316,7 @@ export const pipelineApi = {
 
       if (candidate?.response?.status === 400) {
         try {
-          const converted = convertColorCode(fallbackPayload as Record<string, unknown>);
+          const converted = convertColorCode(fallbackPayload);
           const response = await http.post(
             "/pipelines/stages/create/",
             converted,
@@ -340,7 +331,7 @@ export const pipelineApi = {
           }
 
           const strippedFallbackPayload = stripStageRelations(fallbackPayload);
-          const converted = convertColorCode(strippedFallbackPayload as Record<string, unknown>);
+          const converted = convertColorCode(strippedFallbackPayload);
           const response = await http.post(
             "/pipelines/stages/create/",
             converted,
@@ -354,7 +345,7 @@ export const pipelineApi = {
       }
 
       const strippedPayload = stripStageRelations(payload);
-      const converted = convertColorCode(strippedPayload as Record<string, unknown>);
+      const converted = convertColorCode(strippedPayload);
       const response = await http.post(
         "/pipelines/stages/create/",
         converted,
@@ -367,11 +358,11 @@ export const pipelineApi = {
     stageId: string,
     payload: UpdatePipelineStagePayload,
   ): Promise<PipelineStage> {
-    const convertColorCode = (
-      p: Record<string, unknown>,
+    const convertColorCode = <TPayload extends object>(
+      p: TPayload,
     ): Record<string, unknown> => {
-      const result = { ...p };
-      if (result.stage_color) {
+      const result: Record<string, unknown> = { ...(p as Record<string, unknown>) };
+      if ("stage_color" in result && result.stage_color) {
         result.color_code = result.stage_color;
         delete result.stage_color;
       }
@@ -398,7 +389,7 @@ export const pipelineApi = {
 
     try {
       const cleanPayload = removeRelationsForBackend(payload);
-      const converted = convertColorCode(cleanPayload as Record<string, unknown>);
+      const converted = convertColorCode(cleanPayload);
       return await tryUpdate(`/pipelines/stages/${stageId}/update/`, converted);
     } catch (error) {
       const candidate = error as { response?: { status?: number } };
@@ -407,7 +398,7 @@ export const pipelineApi = {
       if (status === 404) {
         try {
           const cleanPayload = removeRelationsForBackend(payload);
-          const converted = convertColorCode(cleanPayload as Record<string, unknown>);
+          const converted = convertColorCode(cleanPayload);
           return await tryUpdate(`/pipelines/stages/${stageId}/`, converted);
         } catch (fallbackError) {
           const fallbackStatus = (fallbackError as { response?: { status?: number } })?.response?.status;
