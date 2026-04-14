@@ -250,6 +250,7 @@ const StageConfiguration = ({
 
 	return (
 		<Box
+			data-stage-config-keep-open="true"
 			sx={{
 				position: "absolute",
 				top: 8,
@@ -386,6 +387,12 @@ const StageConfiguration = ({
 																		select
 									value={stageType}
 									onChange={(event) => setStageType(event.target.value)}
+									SelectProps={{
+										MenuProps: {
+											disablePortal: true,
+											PaperProps: { "data-stage-config-keep-open": "true" },
+										},
+									}}
 									error={showValidation && !stageType.trim()}
 									helperText={
 										showValidation && !stageType.trim() ? "Stage type is required" : " "
@@ -409,6 +416,12 @@ const StageConfiguration = ({
 																		select
 									value={stageStatus}
 									onChange={(event) => setStageStatus(event.target.value)}
+									SelectProps={{
+										MenuProps: {
+											disablePortal: true,
+											PaperProps: { "data-stage-config-keep-open": "true" },
+										},
+									}}
 									error={showValidation && !stageStatus.trim()}
 									helperText={
 										showValidation && !stageStatus.trim() ? "Stage status is required" : " "
@@ -488,6 +501,12 @@ const StageConfiguration = ({
 																		select
 									value={entryRule}
 									onChange={(event) => setEntryRule(event.target.value)}
+									SelectProps={{
+										MenuProps: {
+											disablePortal: true,
+											PaperProps: { "data-stage-config-keep-open": "true" },
+										},
+									}}
 									error={showValidation && !entryRule.trim()}
 									helperText={
 										showValidation && !entryRule.trim() ? "Entry rule is required" : " "
@@ -719,6 +738,12 @@ const StageConfiguration = ({
 											handleUpdateField(field.id, "fieldType", event.target.value)
 										}
 										select
+										SelectProps={{
+											MenuProps: {
+												disablePortal: true,
+												PaperProps: { "data-stage-config-keep-open": "true" },
+											},
+										}}
 										fullWidth
 										InputProps={{
 											endAdornment: (

@@ -272,6 +272,15 @@ const SalesPipeLineData = ({
     const handleOutsideClick = (event: MouseEvent) => {
       if (!selectedStageName) return;
       const targetNode = event.target as Node;
+      const targetElement = event.target as HTMLElement | null;
+      if (
+        targetElement?.closest("[data-stage-config-keep-open='true']") ||
+        targetElement?.closest("[role='listbox']") ||
+        targetElement?.closest(".MuiMenu-paper") ||
+        targetElement?.closest(".MuiMenuItem-root")
+      ) {
+        return;
+      }
       if (rootRef.current?.contains(targetNode)) return;
       setSelectedStageName(null);
       setSelectedStageConfig({});
