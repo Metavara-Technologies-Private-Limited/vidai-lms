@@ -27,6 +27,7 @@ export type PipelineFieldType = "text" | "number" | "date" | "dropdown";
 export interface PipelineStageRule {
   id?: string;
   action_type: PipelineRuleActionType;
+  custom_label?: string;
   is_enabled: boolean;
   is_required: boolean;
   auto_move: boolean;
@@ -83,6 +84,8 @@ export interface CreatePipelineStagePayload {
   stage_order?: number;
   stage_color?: string;
   entry_rule?: "manual" | "auto";
+  rules?: PipelineStageRule[];
+  fields?: PipelineStageField[];
 }
 
 export interface UpdatePipelineStagePayload {
@@ -92,7 +95,11 @@ export interface UpdatePipelineStagePayload {
   stage_order: number;
   stage_color?: string;
   entry_rule?: "manual" | "auto";
+  rules?: PipelineStageRule[];
+  fields?: PipelineStageField[];
 }
+
+type StageMutationPayload = CreatePipelineStagePayload | UpdatePipelineStagePayload;
 
 type PipelineStageApiResponse = Partial<PipelineStage> & {
   id?: string;
@@ -143,6 +150,70 @@ const normalizeStage = (
   fields: Array.isArray(stage.fields) ? stage.fields : [],
 });
 
+const unwrapListData = (data: unknown): PipelineApiResponse[] => {
+  if (Array.isArray(data)) return data as PipelineApiResponse[];
+  if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.results)) return obj.results as PipelineApiResponse[];
+    if (Array.isArray(obj.data)) return obj.data as PipelineApiResponse[];
+    if (Array.isArray(obj.pipelines)) return obj.pipelines as PipelineApiResponse[];
+  }
+  return [];
+};
+
+const unwrapItemData = (data: unknown): PipelineApiResponse => {
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const obj = data as Record<string, unknown>;
+    if (obj.data && typeof obj.data === "object" && !Array.isArray(obj.data)) {
+      return obj.data as PipelineApiResponse;
+    }
+    if (obj.pipeline && typeof obj.pipeline === "object" && !Array.isArray(obj.pipeline)) {
+      return obj.pipeline as PipelineApiResponse;
+    }
+  }
+  return data as PipelineApiResponse;
+};
+
+const unwrapStageData = (data: unknown): PipelineStageApiResponse => {
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const obj = data as Record<string, unknown>;
+    if (obj.data && typeof obj.data === "object" && !Array.isArray(obj.data)) {
+      return obj.data as PipelineStageApiResponse;
+    }
+    if (obj.stage && typeof obj.stage === "object" && !Array.isArray(obj.stage)) {
+      return obj.stage as PipelineStageApiResponse;
+    }
+  }
+  return data as PipelineStageApiResponse;
+};
+
+const hasStageRelations = (payload: StageMutationPayload): boolean =>
+  Array.isArray(payload.rules) || Array.isArray(payload.fields);
+
+const stripStageRelations = <TPayload extends StageMutationPayload>(payload: TPayload): TPayload => {
+  const { rules: _rules, fields: _fields, ...rest } = payload;
+  return rest as TPayload;
+};
+
+const shouldRetryWithoutRelations = (status?: number): boolean =>
+  status === 400 || status === 422 || status === 500;
+
+const tryAlternativePayload = (payload: UpdatePipelineStagePayload): UpdatePipelineStagePayload => {
+  const alternative = { ...payload };
+  if (payload.stage_color) {
+    (alternative as Record<string, unknown>).color_code = payload.stage_color;
+    delete alternative.stage_color;
+  }
+  return alternative;
+};
+
+const removeRelationsForBackend = <TPayload extends StageMutationPayload>(
+  payload: TPayload,
+): Omit<TPayload, "rules" | "fields"> => {
+  const { rules: _rules, fields: _fields, ...rest } = payload;
+  return rest as Omit<TPayload, "rules" | "fields">;
+};
+
 const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
   const stages = Array.isArray(pipeline.stages)
     ? pipeline.stages.map((stage, index) => normalizeStage(stage, index))
@@ -161,76 +232,134 @@ const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
 
 export const pipelineApi = {
   async list(clinicId: number): Promise<Pipeline[]> {
-    const response = await http.get<PipelineApiResponse[]>("/pipelines/", {
+    const response = await http.get("/pipelines/", {
       params: { clinic_id: clinicId },
     });
-    return Array.isArray(response.data)
-      ? response.data.map(normalizePipeline)
-      : [];
+    return unwrapListData(response.data).map(normalizePipeline);
   },
 
   async create(payload: CreatePipelinePayload): Promise<Pipeline> {
-    const response = await http.post<PipelineApiResponse>("/pipelines/create/", payload);
-    return normalizePipeline(response.data);
+    const response = await http.post("/pipelines/create/", payload);
+    return normalizePipeline(unwrapItemData(response.data));
   },
 
   async getById(pipelineId: string): Promise<Pipeline> {
-    const response = await http.get<PipelineApiResponse>(`/pipelines/${pipelineId}/`);
-    return normalizePipeline(response.data);
+    const response = await http.get(`/pipelines/${pipelineId}/`);
+    return normalizePipeline(unwrapItemData(response.data));
   },
 
   async update(pipelineId: string, payload: UpdatePipelinePayload): Promise<Pipeline> {
-    const response = await http.put<PipelineApiResponse>(`/pipelines/${pipelineId}/`, payload);
-    return normalizePipeline(response.data);
+    const response = await http.put(`/pipelines/${pipelineId}/`, payload);
+    return normalizePipeline(unwrapItemData(response.data));
   },
 
   async duplicate(pipelineId: string): Promise<Pipeline> {
-    const response = await http.post<PipelineApiResponse>(
-      `/pipelines/${pipelineId}/duplicate/`,
-      {},
-    );
-    return normalizePipeline(response.data);
+    try {
+      const response = await http.post(`/pipelines/${pipelineId}/duplicate/`);
+      return normalizePipeline(unwrapItemData(response.data));
+    } catch (error) {
+      const candidate = error as { response?: { status?: number } };
+      if (candidate?.response?.status === 404) {
+        throw new Error("Duplicate endpoint not yet implemented on the backend. Please contact support.");
+      }
+      throw error;
+    }
   },
 
   async archive(pipelineId: string): Promise<Pipeline> {
-    const response = await http.post<PipelineApiResponse>(
-      `/pipelines/${pipelineId}/archive/`,
-      {},
-    );
-    return normalizePipeline(response.data);
+    try {
+      const response = await http.post(`/pipelines/${pipelineId}/archive/`);
+      return normalizePipeline(unwrapItemData(response.data));
+    } catch (error) {
+      const candidate = error as { response?: { status?: number } };
+      if (candidate?.response?.status === 404) {
+        throw new Error("Archive endpoint not yet implemented on the backend. Please contact support.");
+      }
+      throw error;
+    }
   },
 
   async remove(pipelineId: string): Promise<void> {
-    await http.delete(`/pipelines/${pipelineId}/delete/`);
+    try {
+      await http.delete(`/pipelines/${pipelineId}/delete/`);
+    } catch (error) {
+      const candidate = error as { response?: { status?: number } };
+      if (candidate?.response?.status === 404) {
+        throw new Error("Delete endpoint not yet implemented on the backend. Please contact support.");
+      }
+      throw error;
+    }
   },
 
   async createStage(payload: CreatePipelineStagePayload): Promise<PipelineStage> {
+    const convertColorCode = (
+      p: Record<string, unknown>,
+    ): Record<string, unknown> => {
+      const result = { ...p };
+      if (result.stage_color) {
+        result.color_code = result.stage_color;
+        delete result.stage_color;
+      }
+      return result;
+    };
+
     try {
-      const response = await http.post<PipelineStageApiResponse>(
+      const converted = convertColorCode(payload as Record<string, unknown>);
+      const response = await http.post(
         "/pipelines/stages/create/",
-        payload,
+        converted,
       );
-      return normalizeStage(response.data, 0);
+      return normalizeStage(unwrapStageData(response.data), 0);
     } catch (error) {
       const candidate = error as {
         response?: { status?: number };
       };
 
-      if (candidate?.response?.status !== 400) {
-        throw error;
-      }
-
-      const fallbackPayload: Record<string, unknown> = {
+      const fallbackPayload: CreatePipelineStagePayload & {
+        pipeline?: string;
+      } = {
         ...payload,
         pipeline: payload.pipeline_id,
         stage_status: payload.stage_status ?? "open",
       };
 
-      const response = await http.post<PipelineStageApiResponse>(
+      if (candidate?.response?.status === 400) {
+        try {
+          const converted = convertColorCode(fallbackPayload as Record<string, unknown>);
+          const response = await http.post(
+            "/pipelines/stages/create/",
+            converted,
+          );
+          return normalizeStage(unwrapStageData(response.data), 0);
+        } catch (fallbackError) {
+          const fallbackStatus = (fallbackError as { response?: { status?: number } })?.response
+            ?.status;
+
+          if (!hasStageRelations(fallbackPayload) || !shouldRetryWithoutRelations(fallbackStatus)) {
+            throw fallbackError;
+          }
+
+          const strippedFallbackPayload = stripStageRelations(fallbackPayload);
+          const converted = convertColorCode(strippedFallbackPayload as Record<string, unknown>);
+          const response = await http.post(
+            "/pipelines/stages/create/",
+            converted,
+          );
+          return normalizeStage(unwrapStageData(response.data), 0);
+        }
+      }
+
+      if (!hasStageRelations(payload) || !shouldRetryWithoutRelations(candidate?.response?.status)) {
+        throw error;
+      }
+
+      const strippedPayload = stripStageRelations(payload);
+      const converted = convertColorCode(strippedPayload as Record<string, unknown>);
+      const response = await http.post(
         "/pipelines/stages/create/",
-        fallbackPayload,
+        converted,
       );
-      return normalizeStage(response.data, 0);
+      return normalizeStage(unwrapStageData(response.data), 0);
     }
   },
 
@@ -238,36 +367,83 @@ export const pipelineApi = {
     stageId: string,
     payload: UpdatePipelineStagePayload,
   ): Promise<PipelineStage> {
+    const convertColorCode = (
+      p: Record<string, unknown>,
+    ): Record<string, unknown> => {
+      const result = { ...p };
+      if (result.stage_color) {
+        result.color_code = result.stage_color;
+        delete result.stage_color;
+      }
+      return result;
+    };
+
+    const stripOptionalFields = (p: UpdatePipelineStagePayload) => {
+      const result = {
+        stage_name: p.stage_name,
+        stage_type: p.stage_type,
+        stage_status: p.stage_status,
+        stage_order: p.stage_order,
+      } as Record<string, unknown>;
+      if (p.stage_color) {
+        result.color_code = p.stage_color;
+      }
+      return result;
+    };
+
+    const tryUpdate = async (url: string, data: unknown) => {
+      const response = await http.put(url, data);
+      return normalizeStage(unwrapStageData(response.data), payload.stage_order);
+    };
+
     try {
-      const response = await http.put<PipelineStageApiResponse>(
-        `/pipelines/stages/${stageId}/update/`,
-        payload,
-      );
-      return normalizeStage(response.data, payload.stage_order);
+      const cleanPayload = removeRelationsForBackend(payload);
+      const converted = convertColorCode(cleanPayload as Record<string, unknown>);
+      return await tryUpdate(`/pipelines/stages/${stageId}/update/`, converted);
     } catch (error) {
       const candidate = error as { response?: { status?: number } };
-      if (candidate?.response?.status !== 404) {
-        throw error;
+      const status = candidate?.response?.status;
+
+      if (status === 404) {
+        try {
+          const cleanPayload = removeRelationsForBackend(payload);
+          const converted = convertColorCode(cleanPayload as Record<string, unknown>);
+          return await tryUpdate(`/pipelines/stages/${stageId}/`, converted);
+        } catch (fallbackError) {
+          const fallbackStatus = (fallbackError as { response?: { status?: number } })?.response?.status;
+          if (fallbackStatus !== 404) {
+            throw fallbackError;
+          }
+        }
       }
 
-      const response = await http.put<PipelineStageApiResponse>(
-        `/pipelines/stages/${stageId}/`,
-        payload,
-      );
-      return normalizeStage(response.data, payload.stage_order);
+      try {
+        const minimalPayload = stripOptionalFields(payload);
+        return await tryUpdate(`/pipelines/stages/${stageId}/update/`, minimalPayload);
+      } catch (minimalError) {
+        const minimalStatus = (minimalError as { response?: { status?: number } })?.response?.status;
+        if (minimalStatus === 404) {
+          try {
+            const minimalPayload = stripOptionalFields(payload);
+            return await tryUpdate(`/pipelines/stages/${stageId}/`, minimalPayload);
+          } catch {
+            throw minimalError;
+          }
+        }
+        throw minimalError;
+      }
     }
   },
 
   async archiveStage(stageId: string): Promise<void> {
     try {
-      await http.post(`/pipelines/stages/${stageId}/archive/`, {});
+      await http.put(`/pipelines/stages/${stageId}/archive/`);
     } catch (error) {
       const candidate = error as { response?: { status?: number } };
-      if (candidate?.response?.status !== 404) {
-        throw error;
+      if (candidate?.response?.status === 404) {
+        throw new Error("Archive endpoint not yet implemented on the backend. Please contact support.");
       }
-
-      await http.post(`/pipelines/stages/${stageId}/archive`, {});
+      throw error;
     }
   },
 
@@ -276,11 +452,40 @@ export const pipelineApi = {
       await http.delete(`/pipelines/stages/${stageId}/delete/`);
     } catch (error) {
       const candidate = error as { response?: { status?: number } };
-      if (candidate?.response?.status !== 404) {
+      if (candidate?.response?.status === 404) {
+        try {
+          await http.delete(`/pipelines/stages/${stageId}/`);
+        } catch (fallbackError) {
+          const fallbackStatus = (fallbackError as { response?: { status?: number } })?.response?.status;
+          if (fallbackStatus === 404) {
+            throw new Error("Delete endpoint not yet implemented on the backend. Please contact support.");
+          }
+          throw fallbackError;
+        }
+      } else {
         throw error;
       }
-
-      await http.delete(`/pipelines/stages/${stageId}/`);
     }
+  },
+
+  async duplicateStage(stageId: string): Promise<PipelineStage> {
+    try {
+      const response = await http.post(`/pipelines/stages/${stageId}/duplicate/`);
+      return normalizeStage(unwrapStageData(response.data), 0);
+    } catch (error) {
+      const candidate = error as { response?: { status?: number } };
+      if (candidate?.response?.status === 404) {
+        throw new Error("Duplicate endpoint not yet implemented on the backend. Please contact support.");
+      }
+      throw error;
+    }
+  },
+
+  async saveStageRules(stageId: string, rules: PipelineStageRule[]): Promise<void> {
+    await http.post(`/pipelines/stages/${stageId}/rules/`, { rules });
+  },
+
+  async saveStageFields(stageId: string, fields: PipelineStageField[]): Promise<void> {
+    await http.post(`/pipelines/stages/${stageId}/fields/`, { fields });
   },
 };

@@ -10,6 +10,7 @@ import WestRoundedIcon from "@mui/icons-material/WestRounded";
 import { Box, CircularProgress, IconButton, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useDispatch, useSelector } from "react-redux";
+import type { PipelineStageField, PipelineStageRule } from "../../services/pipeline.api";
 import type { Lead as ApiLead } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import {
@@ -18,6 +19,7 @@ import {
   selectLeadsLoading,
 } from "../../store/leadSlice";
 import StageConfiguration, { type StageConfigPayload } from "./StageConfiguration";
+import { mapRulesToActions } from "./salesPipeline.utils";
 
 type StageCard = {
   id: string;
@@ -26,6 +28,8 @@ type StageCard = {
   stageType?: string;
   stageStatus?: string;
   entryRule?: string;
+  rules?: PipelineStageRule[];
+  fields?: PipelineStageField[];
 };
 
 type SalesPipeLineDataProps = {
@@ -229,6 +233,12 @@ const SalesPipeLineData = ({
       stageStatus: toStageLabel(stage.stageStatus) ?? "Open",
       colorCode: resolvedStageColor,
       entryRule: toStageLabel(stage.entryRule) ?? "Manual",
+      actions: stage.rules && stage.rules.length > 0 ? mapRulesToActions(stage.rules) : [],
+      dataCaptureFields: stage.fields?.map((f) => ({
+        fieldName: f.field_name,
+        fieldType: f.field_type,
+        isMandatory: f.is_mandatory,
+      })),
     });
   };
 

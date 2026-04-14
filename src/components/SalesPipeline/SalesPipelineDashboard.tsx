@@ -41,7 +41,8 @@ import SalesPipelineActionConfirmDialog from "./SalesPipelineActionConfirmDialog
 import SalesPipelineSidebar from "./SalesPipelineSidebar";
 import type { StageConfigPayload } from "./StageConfiguration";
 import {
-	buildDuplicateStageName,
+	mapActionsToRules,
+	mapDataCaptureToFields,
 	normalizeEntryRule,
 	normalizeStageStatus,
 	normalizeStageType,
@@ -141,18 +142,29 @@ const SalesPipelineDashboard = () => {
 				if (selectedPipelineId === editPipelineData.id) {
 					await dispatch(fetchPipelineDetail(editPipelineData.id));
 				}
+				toast.success("Pipeline updated successfully.");
+			} catch {
+				toast.error("Failed to update pipeline.");
 			} finally {
 				setActionInProgress(false);
 				setEditPipelineData(null);
 			}
 		} else {
-			dispatch(
-				createPipeline({
-					clinic_id: clinic.id,
-					pipeline_name: pipelineName,
-					industry_type: industry as PipelineIndustryType,
-				}),
-			);
+			try {
+				setActionInProgress(true);
+				await dispatch(
+					createPipeline({
+						clinic_id: clinic.id,
+						pipeline_name: pipelineName,
+						industry_type: industry as PipelineIndustryType,
+					}),
+				).unwrap();
+				toast.success("Pipeline created successfully.");
+			} catch {
+				toast.error("Failed to create pipeline.");
+			} finally {
+				setActionInProgress(false);
+			}
 		}
 	};
 
@@ -205,12 +217,17 @@ const SalesPipelineDashboard = () => {
 
 	const handleDuplicatePipeline = async () => {
 		if (!canEditPipeline) return;
-		if (!actionMenuPipelineId) return;
+		const pipeline = getActionPipeline();
+		if (!pipeline) return;
+
 		try {
 			setActionInProgress(true);
-			const duplicated = await pipelineApi.duplicate(actionMenuPipelineId);
+			await pipelineApi.duplicate(pipeline.id);
 			await refreshPipelines();
-			await dispatch(fetchPipelineDetail(duplicated.id));
+			toast.success("Pipeline duplicated successfully.");
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : "Failed to duplicate pipeline.";
+			toast.error(errorMsg);
 		} finally {
 			setActionInProgress(false);
 			handleCloseActionMenu();
@@ -219,22 +236,20 @@ const SalesPipelineDashboard = () => {
 
 	const handleArchivePipeline = () => {
 		if (!canEditPipeline) return;
-		if (!actionMenuPipelineId) return;
+		const pipeline = getActionPipeline();
+		if (!pipeline) return;
+		setConfirmAction("archive");
+		setConfirmPipelineId(pipeline.id);
 		handleCloseActionMenu();
-		setConfirmPipelineId(actionMenuPipelineId);
-		window.setTimeout(() => {
-			setConfirmAction("archive");
-		}, 0);
 	};
 
 	const handleDeletePipeline = () => {
 		if (!canEditPipeline) return;
-		if (!actionMenuPipelineId) return;
+		const pipeline = getActionPipeline();
+		if (!pipeline) return;
+		setConfirmAction("delete");
+		setConfirmPipelineId(pipeline.id);
 		handleCloseActionMenu();
-		setConfirmPipelineId(actionMenuPipelineId);
-		window.setTimeout(() => {
-			setConfirmAction("delete");
-		}, 0);
 	};
 
 	const handleCloseConfirmAction = () => {
@@ -300,7 +315,7 @@ const SalesPipelineDashboard = () => {
 		}
 
 		try {
-			await dispatch(
+			const createdStage = await dispatch(
 				createPipelineStage({
 					pipeline_id: selectedPipelineId,
 					stage_name: trimmedStage,
@@ -311,8 +326,19 @@ const SalesPipelineDashboard = () => {
 					stage_order: (selectedPipeline?.stages.length ?? 0) + 1,
 					entry_rule: normalizeEntryRule(stageConfig?.entryRule),
 					stage_color: stageConfig?.colorCode,
+					rules: stageConfig?.actions ? mapActionsToRules(stageConfig.actions) : undefined,
+					fields: mapDataCaptureToFields(stageConfig?.dataCaptureFields),
 				}),
 			).unwrap();
+			const newStageId = createdStage?.stage?.id ? String(createdStage.stage.id) : null;
+			if (newStageId) {
+				const mappedRules = stageConfig?.actions ? mapActionsToRules(stageConfig.actions) : null;
+				const mappedFields = mapDataCaptureToFields(stageConfig?.dataCaptureFields);
+				await Promise.all([
+					mappedRules ? pipelineApi.saveStageRules(newStageId, mappedRules) : Promise.resolve(),
+					mappedFields.length > 0 ? pipelineApi.saveStageFields(newStageId, mappedFields) : Promise.resolve(),
+				]);
+			}
 			if (stageConfig?.colorCode) {
 				setStageColorOverrides((previous) => ({
 					...previous,
@@ -320,8 +346,10 @@ const SalesPipelineDashboard = () => {
 				}));
 			}
 			await dispatch(fetchPipelineDetail(selectedPipelineId));
+			toast.success("Stage created successfully.");
 			return true;
 		} catch {
+			toast.error("Failed to create stage.");
 			return false;
 		}
 	};
@@ -445,9 +473,17 @@ const SalesPipelineDashboard = () => {
 						stage_order: currentStage.stage_order,
 						stage_color: stageConfig?.colorCode ?? currentStage.stage_color,
 						entry_rule: normalizeEntryRule(stageConfig?.entryRule ?? currentStage.entry_rule),
+						rules: stageConfig?.actions ? mapActionsToRules(stageConfig.actions) : undefined,
+						fields: mapDataCaptureToFields(stageConfig?.dataCaptureFields),
 					},
 				}),
 			).unwrap();
+			const mappedRules = stageConfig?.actions ? mapActionsToRules(stageConfig.actions) : null;
+			const mappedFields = mapDataCaptureToFields(stageConfig?.dataCaptureFields);
+			await Promise.all([
+				mappedRules ? pipelineApi.saveStageRules(currentStageId, mappedRules) : Promise.resolve(),
+				mappedFields.length > 0 ? pipelineApi.saveStageFields(currentStageId, mappedFields) : Promise.resolve(),
+			]);
 			if (stageConfig?.colorCode) {
 				setStageColorOverrides((previous) => ({
 					...previous,
@@ -456,50 +492,56 @@ const SalesPipelineDashboard = () => {
 				}));
 			}
 			await dispatch(fetchPipelineDetail(selectedPipelineId));
+			toast.success("Stage updated successfully.");
 			return true;
 		} catch {
+			toast.error("Failed to update stage.");
 			return false;
 		}
 	};
 
 	const handleDuplicateStage = async (stageIndex: number): Promise<boolean> => {
-		if (!canEditPipeline || !selectedPipeline) return false;
-		const sourceStage = selectedPipeline.stages[stageIndex];
-		if (!sourceStage) return false;
+		if (!canEditPipeline) return false;
+		if (!selectedPipelineId || !selectedPipeline) return false;
+		if (stageIndex < 0 || stageIndex >= selectedPipeline.stages.length) return false;
 
-		const nextStageName = buildDuplicateStageName(
-			sourceStage.stage_name,
-			selectedPipeline.stages,
-		);
-		const saved = await createStageByName(nextStageName, {
-			stageType: sourceStage.stage_type,
-			stageStatus: sourceStage.stage_status,
-			colorCode: sourceStage.stage_color ?? "#EEE788",
-			entryRule: sourceStage.entry_rule ?? "manual",
-			actions: [],
-		});
-
-		if (saved) {
-			toast.success("Stage duplicated successfully.");
+		const stageId = await resolveStageId(stageIndex);
+		if (!stageId) {
+			toast.error("Stage duplication failed because backend stage id was not found.");
+			return false;
 		}
 
-		return saved;
+		try {
+			setActionInProgress(true);
+			await pipelineApi.duplicateStage(stageId);
+			await dispatch(fetchPipelineDetail(selectedPipelineId));
+			toast.success("Stage duplicated successfully.");
+			return true;
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : "Failed to duplicate stage";
+			toast.error(errorMsg);
+			return false;
+		} finally {
+			setActionInProgress(false);
+		}
 	};
 
 	const handleArchiveStageRequest = (stageIndex: number) => {
 		if (!canEditPipeline) return;
+		if (!selectedPipelineId || !selectedPipeline) return;
+		if (stageIndex < 0 || stageIndex >= selectedPipeline.stages.length) return;
+
+		setStageConfirmAction("archive");
 		setConfirmStageIndex(stageIndex);
-		window.setTimeout(() => {
-			setStageConfirmAction("archive");
-		}, 0);
 	};
 
 	const handleDeleteStageRequest = (stageIndex: number) => {
 		if (!canEditPipeline) return;
+		if (!selectedPipelineId || !selectedPipeline) return;
+		if (stageIndex < 0 || stageIndex >= selectedPipeline.stages.length) return;
+
+		setStageConfirmAction("delete");
 		setConfirmStageIndex(stageIndex);
-		window.setTimeout(() => {
-			setStageConfirmAction("delete");
-		}, 0);
 	};
 
 	const handleConfirmStageAction = async () => {
@@ -622,6 +664,8 @@ const SalesPipelineDashboard = () => {
 									stageType: stage.stage_type,
 									stageStatus: stage.stage_status,
 									entryRule: stage.entry_rule,
+									rules: stage.rules,
+									fields: stage.fields,
 								}))}
 								onAddStage={handleOpenAddStage}
 								onEditStage={handleEditStage}
