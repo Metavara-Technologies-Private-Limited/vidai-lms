@@ -13,10 +13,11 @@ import {
 	InputAdornment,
 	MenuItem,
 	Stack,
+	Switch,
 	TextField,
 	Typography,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 
 type StageConfigurationProps = {
 	open: boolean;
@@ -35,7 +36,7 @@ type DataCaptureField = {
 	isMandatory: boolean;
 };
 
-type StageAction = {
+export type StageAction = {
 	id: string;
 	label: string;
 	checked: boolean;
@@ -47,6 +48,11 @@ export type StageConfigPayload = {
 	colorCode: string;
 	entryRule: string;
 	actions: StageAction[];
+	dataCaptureFields?: Array<{
+		fieldName: string;
+		fieldType: "text" | "number" | "date" | "dropdown";
+		isMandatory: boolean;
+	}>;
 };
 
 const DEFAULT_STAGE_ACTIONS: StageAction[] = [
@@ -88,20 +94,10 @@ const StageConfiguration = ({
 	const [isSaving, setIsSaving] = useState(false);
 	const [showValidation, setShowValidation] = useState(false);
 	const [stageActions, setStageActions] = useState<StageAction[]>(DEFAULT_STAGE_ACTIONS);
+	const [showCustomActionForm, setShowCustomActionForm] = useState(false);
+	const [customActionText, setCustomActionText] = useState("");
 	const colorPickerRef = useRef<HTMLInputElement | null>(null);
 	const [dataCaptureFields, setDataCaptureFields] = useState<DataCaptureField[]>([
-		{
-			id: "field-1",
-			fieldName: "Appointment date",
-			fieldType: "date",
-			isMandatory: true,
-		},
-		{
-			id: "field-2",
-			fieldName: "No. of samples",
-			fieldType: "number",
-			isMandatory: true,
-		},
 	]);
 
 	const createEmptyField = (): DataCaptureField => ({
@@ -169,6 +165,19 @@ const StageConfiguration = ({
 		);
 	};
 
+	const handleSaveCustomAction = () => {
+		const trimmed = customActionText.trim();
+		if (!trimmed) return;
+		const newAction: StageAction = {
+			id: `custom-${Date.now()}`,
+			label: trimmed,
+			checked: true,
+		};
+		setStageActions((previous) => [...previous, newAction]);
+		setCustomActionText("");
+		setShowCustomActionForm(false);
+	};
+
 	const handleColorPickerChange = (event: ChangeEvent<HTMLInputElement>) => {
 		setColorCode(normalizeHexColorInput(event.target.value));
 	};
@@ -184,6 +193,18 @@ const StageConfiguration = ({
 				? initialValues.actions
 				: DEFAULT_STAGE_ACTIONS,
 		);
+		setShowCustomActionForm(false);
+		setCustomActionText("");
+		if (initialValues?.dataCaptureFields !== undefined) {
+			setDataCaptureFields(
+				initialValues.dataCaptureFields.map((field, i) => ({
+					id: `field-${Date.now()}-${i}`,
+					fieldName: field.fieldName,
+					fieldType: field.fieldType,
+					isMandatory: field.isMandatory,
+				})),
+			);
+		}
 		setShowValidation(false);
 	}, [open, initialValues, mode, stageName]);
 
@@ -214,6 +235,11 @@ const StageConfiguration = ({
 				colorCode: trimmedColorCode.toUpperCase(),
 				entryRule: trimmedEntryRule,
 				actions: stageActions,
+				dataCaptureFields: dataCaptureFields.map(({ fieldName, fieldType, isMandatory }) => ({
+					fieldName,
+					fieldType,
+					isMandatory,
+				})),
 			});
 		} finally {
 			setIsSaving(false);
@@ -357,19 +383,13 @@ const StageConfiguration = ({
 								<TextField
 									size="small"
 									label="Stage Type"
+																		select
 									value={stageType}
 									onChange={(event) => setStageType(event.target.value)}
 									error={showValidation && !stageType.trim()}
 									helperText={
 										showValidation && !stageType.trim() ? "Stage type is required" : " "
 									}
-									InputProps={{
-										endAdornment: (
-											<InputAdornment position="end">
-												<KeyboardArrowDownRoundedIcon sx={{ color: "#484848" }} />
-											</InputAdornment>
-										),
-									}}
 									sx={{
 										"& .MuiOutlinedInput-root": {
 											borderRadius: 1.4,
@@ -377,23 +397,22 @@ const StageConfiguration = ({
 										},
 										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
-								/>
+								>
+									<MenuItem value="Lead">Lead</MenuItem>
+									<MenuItem value="Engagement">Engagement</MenuItem>
+									<MenuItem value="Conversion">Conversion</MenuItem>
+									<MenuItem value="Closure">Closure</MenuItem>
+								</TextField>
 								<TextField
 									size="small"
 									label="Stage Status"
+																		select
 									value={stageStatus}
 									onChange={(event) => setStageStatus(event.target.value)}
 									error={showValidation && !stageStatus.trim()}
 									helperText={
 										showValidation && !stageStatus.trim() ? "Stage status is required" : " "
 									}
-									InputProps={{
-										endAdornment: (
-											<InputAdornment position="end">
-												<KeyboardArrowDownRoundedIcon sx={{ color: "#484848" }} />
-											</InputAdornment>
-										),
-									}}
 									sx={{
 										"& .MuiOutlinedInput-root": {
 											borderRadius: 1.4,
@@ -401,7 +420,11 @@ const StageConfiguration = ({
 										},
 										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
-								/>
+								>
+									<MenuItem value="Open">Open</MenuItem>
+									<MenuItem value="Won">Won</MenuItem>
+									<MenuItem value="Lost">Lost</MenuItem>
+								</TextField>
 
 								<TextField
 									size="small"
@@ -462,19 +485,13 @@ const StageConfiguration = ({
 								<TextField
 									size="small"
 									label="Entry Rule"
+																		select
 									value={entryRule}
 									onChange={(event) => setEntryRule(event.target.value)}
 									error={showValidation && !entryRule.trim()}
 									helperText={
 										showValidation && !entryRule.trim() ? "Entry rule is required" : " "
 									}
-									InputProps={{
-										endAdornment: (
-											<InputAdornment position="end">
-												<KeyboardArrowDownRoundedIcon sx={{ color: "#484848" }} />
-											</InputAdornment>
-										),
-									}}
 									sx={{
 										"& .MuiOutlinedInput-root": {
 											borderRadius: 1.4,
@@ -482,7 +499,10 @@ const StageConfiguration = ({
 										},
 										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
-								/>
+								>
+									<MenuItem value="Manual">Manual</MenuItem>
+									<MenuItem value="Auto">Auto</MenuItem>
+								</TextField>
 							</Stack>
 						</Box>
 
@@ -560,19 +580,74 @@ const StageConfiguration = ({
 									</Box>
 								))}
 
-								<Box
-									sx={{
-										display: "flex",
-										alignItems: "center",
-										gap: 0.7,
-										color: "#4584FF",
-										cursor: "pointer",
-										pt: 0.8,
-									}}
-								>
-									<AddBoxOutlinedIcon sx={{ fontSize: 18 }} />
-									<Typography sx={{ fontSize: 13, fontWeight: 500 }}>Add Custom Action</Typography>
-								</Box>
+								{showCustomActionForm ? (
+									<Box sx={{ pt: 0.8 }}>
+										<TextField
+											size="small"
+											placeholder="Enter action name"
+											value={customActionText}
+											autoFocus
+											onChange={(event) => setCustomActionText(event.target.value)}
+											onKeyDown={(event) => {
+												if (event.key === "Enter") handleSaveCustomAction();
+												if (event.key === "Escape") {
+													setShowCustomActionForm(false);
+													setCustomActionText("");
+												}
+											}}
+											fullWidth
+											sx={{
+												mb: 0.8,
+												"& .MuiOutlinedInput-root": {
+													borderRadius: 1.4,
+													backgroundColor: "#FFFFFF",
+												},
+											}}
+										/>
+										<Stack direction="row" spacing={0.8}>
+											<Button
+												size="small"
+												variant="contained"
+												onClick={handleSaveCustomAction}
+												disabled={!customActionText.trim()}
+												sx={{
+													backgroundColor: "#545454",
+													fontSize: 12,
+													px: 1.4,
+													"&:hover": { backgroundColor: "#3F3F3F" },
+												}}
+											>
+												Add
+											</Button>
+											<Button
+												size="small"
+												variant="outlined"
+												onClick={() => {
+													setShowCustomActionForm(false);
+													setCustomActionText("");
+												}}
+												sx={{ fontSize: 12, px: 1.4 }}
+											>
+												Cancel
+											</Button>
+										</Stack>
+									</Box>
+								) : (
+									<Box
+										onClick={() => setShowCustomActionForm(true)}
+										sx={{
+											display: "flex",
+											alignItems: "center",
+											gap: 0.7,
+											color: "#4584FF",
+											cursor: "pointer",
+											pt: 0.8,
+										}}
+									>
+										<AddBoxOutlinedIcon sx={{ fontSize: 18 }} />
+										<Typography sx={{ fontSize: 13, fontWeight: 500 }}>Add Custom Action</Typography>
+									</Box>
+								)}
 							</Stack>
 						</Box>
 					</>
@@ -664,22 +739,13 @@ const StageConfiguration = ({
 										onClick={() => handleToggleMandatory(field.id)}
 										sx={{ display: "flex", alignItems: "center", gap: 0.9, cursor: "pointer" }}
 									>
-										<Box
-											sx={{
-												width: 18,
-												height: 18,
-												borderRadius: 1,
-												display: "flex",
-												alignItems: "center",
-												justifyContent: "center",
-												backgroundColor: field.isMandatory
-													? "#C2E7C8"
-													: alpha(theme.palette.grey[400], 0.18),
-												color: field.isMandatory ? "#1E7A3B" : theme.palette.grey[500],
-											}}
-										>
-											{field.isMandatory && <CheckRoundedIcon sx={{ fontSize: 12 }} />}
-										</Box>
+										<Switch
+											size="small"
+											checked={field.isMandatory}
+											onChange={() => handleToggleMandatory(field.id)}
+											color="success"
+											sx={{ m: 0 }}
+										/>
 										<Typography sx={{ fontSize: 13, color: "text.primary" }}>
 											Mandatory
 										</Typography>
