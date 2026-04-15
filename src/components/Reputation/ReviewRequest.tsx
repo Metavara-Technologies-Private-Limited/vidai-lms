@@ -46,7 +46,6 @@ import {
   isValidEmailAddress,
   isValidPhoneNumber,
   normalizeMessageForRequest,
-  normalizeReviewLinkPlaceholder,
 } from "./reviewRequest.helpers";
 
 type ReviewRequestProps = {
@@ -265,7 +264,8 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
   };
 
   const validateStep2 = () => {
-    const subjectEmpty = !isFieldFilled(formData.subject);
+    const isEmailMode = formData.mode === "email";
+    const subjectEmpty = isEmailMode && !isFieldFilled(formData.subject);
     const messageEmpty = !isFieldFilled(formData.message);
 
     if (subjectEmpty && messageEmpty) {
@@ -273,7 +273,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       return false;
     }
 
-    if (!validateMandatoryField(formData.subject, "Subject")) {
+    if (isEmailMode && !validateMandatoryField(formData.subject, "Subject")) {
       return false;
     }
 
@@ -452,6 +452,18 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       }
 
       const normalizedMessage = normalizeMessageForRequest(formData.message);
+      const reviewFooter = `
+
+---
+
+Please share your valuable feedback here:
+
+{review_link}`;
+      let messageWithFooter = normalizedMessage.replace(
+        /\{review_link\}|Share Review:\s*\{review_link\}|\[review_link\]/gi,
+        "",
+      );
+      const messageWithReviewToken = messageWithFooter.trim() + reviewFooter;
 
       const configuredGoogleReviewUrl = getConfiguredGoogleReviewUrl();
 
@@ -470,11 +482,11 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
 
       const resolvedMessage =
         formData.collect_on === "google"
-          ? normalizeReviewLinkPlaceholder(normalizedMessage).replace(
+          ? messageWithReviewToken.replace(
               /\{review_link\}/gi,
               configuredGoogleReviewUrl,
             )
-          : normalizedMessage;
+          : messageWithReviewToken;
 
       const payload = {
         clinic: clinicId,
@@ -715,7 +727,9 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
               setFormData((prev) => ({ ...prev, subject: value }));
             }}
             onSubjectBlur={() => {
-              validateMandatoryField(formData.subject, "Subject");
+              if (formData.mode === "email") {
+                validateMandatoryField(formData.subject, "Subject");
+              }
             }}
             onMessageChange={(value) => {
               setFormData((prev) => ({ ...prev, message: value }));

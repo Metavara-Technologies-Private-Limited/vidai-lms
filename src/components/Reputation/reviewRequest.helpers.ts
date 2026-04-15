@@ -33,6 +33,28 @@ export type CreateRequestResponse = {
 
 export const getBackendErrorMessage = (error: unknown): string => {
   if (typeof error === "object" && error !== null) {
+    const networkError = error as {
+      code?: string;
+      message?: string;
+      response?: unknown;
+      request?: unknown;
+    };
+
+    const isNetworkFailure =
+      !networkError.response &&
+      !!networkError.request &&
+      (networkError.code === "ERR_NETWORK" ||
+        networkError.code === "ECONNREFUSED" ||
+        /network error|failed to fetch|connection refused|unable to connect/i.test(
+          networkError.message ?? "",
+        ));
+
+    if (isNetworkFailure) {
+      return "Unable to reach the backend server. Please ensure the API is running and VITE_API_BASE_URL is correct.";
+    }
+  }
+
+  if (typeof error === "object" && error !== null) {
     const axiosLikeError = error as {
       response?: {
         data?: unknown;
@@ -93,11 +115,17 @@ export const getBackendErrorMessage = (error: unknown): string => {
 export const normalizeReviewLinkPlaceholder = (message: string) => {
   const brokenGoogleReviewUrlPattern =
     /https?:\/\/g\.page\/review\/your-clinic/gi;
+  const legacyFeedbackLinkPattern =
+    /https?:\/\/[^\s<>"']+\/feedback\?[^\s<>"']*/gi;
+  const legacyReviewPathPattern =
+    /https?:\/\/[^\s<>"']+\/(?:settings\/integration\/)?review\/[^\s<>"']+/gi;
   const flexibleReviewLinkTokenPattern =
     /(\{\{\s*review[_\s-]*link\s*\}\}|\{\s*review[_\s-]*link\s*\}|\[\s*review[_\s-]*link\s*\]|<\s*review[_\s-]*link\s*>)/gi;
 
   const normalized = message
     .replace(brokenGoogleReviewUrlPattern, "{review_link}")
+    .replace(legacyFeedbackLinkPattern, "{review_link}")
+    .replace(legacyReviewPathPattern, "{review_link}")
     .replace(flexibleReviewLinkTokenPattern, "{review_link}");
 
   if (normalized.includes("{review_link}")) {
@@ -105,6 +133,20 @@ export const normalizeReviewLinkPlaceholder = (message: string) => {
   }
 
   return `${normalized.trim()}\n\n{review_link}`;
+};
+
+export const ensureReviewLinkCallToAction = (
+  message: string,
+  mode: "email" | "sms" | "whatsapp",
+) => {
+  const normalized = normalizeReviewLinkPlaceholder(message);
+
+  const hasShareReviewLine = /share\s*review\s*:/i.test(normalized);
+  if (hasShareReviewLine) {
+    return normalized;
+  }
+
+  return `${normalized.trim()}\n\nShare Review: {review_link}`;
 };
 
 export const normalizeMessageForRequest = (message: string) => {

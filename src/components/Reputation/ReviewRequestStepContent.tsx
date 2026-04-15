@@ -150,7 +150,11 @@ const ReviewRequestStepContent = ({
       const prefix = (editorRef.current?.textContent || "").trim()
         ? "\n\n"
         : "";
+
       insertTextAtCursor(`${prefix}${body}`);
+
+      const currentHtml = editorRef.current?.innerHTML || body;
+      onMessageChange(currentHtml);
     }
 
     if (formData.mode === "email" && !formData.subject.trim()) {
