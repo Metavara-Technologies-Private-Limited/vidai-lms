@@ -41,6 +41,31 @@ apiClient.interceptors.request.use((config) => {
 
 type Dict = Record<string, unknown>;
 
+const getStoredClinicId = (): number | null => {
+  const parsed = Number(localStorage.getItem("clinic_id") || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const compactRecord = (value: Dict): Dict => {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => {
+      if (entry == null) {
+        return false;
+      }
+
+      if (typeof entry === "string") {
+        return entry.trim().length > 0;
+      }
+
+      if (Array.isArray(entry)) {
+        return entry.length > 0;
+      }
+
+      return true;
+    }),
+  );
+};
+
 const asRecord = (value: unknown): Dict =>
   typeof value === "object" && value !== null ? (value as Dict) : {};
 
@@ -158,14 +183,50 @@ export const reputationApi = {
   },
 
   // List all review requests
-  getRequests: async () => {
-    const response = await apiClient.get("/reputation/requests/");
-    return extractList(response.data);
+  getRequests: async (clinicId?: number | null) => {
+    const resolvedClinicId = clinicId ?? getStoredClinicId();
+    const variants = resolvedClinicId
+      ? [
+          { params: { clinic: resolvedClinicId } },
+          { params: { clinic_id: resolvedClinicId } },
+          undefined,
+        ]
+      : [undefined];
+
+    let lastError: unknown;
+
+    for (let index = 0; index < variants.length; index += 1) {
+      try {
+        const response = await apiClient.get(
+          "/reputation/requests/",
+          variants[index],
+        );
+        return extractList(response.data);
+      } catch (error) {
+        lastError = error;
+
+        const status = axios.isAxiosError(error)
+          ? (error.response?.status ?? 0)
+          : 0;
+        const shouldRetry = status === 400 || status === 422 || status === 500;
+
+        if (!shouldRetry || index === variants.length - 1) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   },
 
   // Create review request
   createRequest: async (data: CreateReviewRequestPayload) => {
-    const response = await apiClient.post("/reputation/requests/create/", {
+    const scheduleAt =
+      data.schedule_date && data.schedule_time
+        ? `${data.schedule_date}T${data.schedule_time}`
+        : undefined;
+
+    const primaryPayload = compactRecord({
       clinic: data.clinic,
       request_name: data.request_name,
       description: data.description,
@@ -182,7 +243,47 @@ export const reputationApi = {
       lead_ids: data.lead_ids,
     });
 
-    return response.data;
+    const alternatePayload = compactRecord({
+      clinic_id: data.clinic,
+      request_name: data.request_name,
+      description: data.description,
+      collect_on: data.collect_on,
+      mode: data.mode,
+      from_email: data.sender_email,
+      cc: data.cc,
+      bcc: data.bcc,
+      subject: data.subject,
+      message: data.message,
+      schedule_at: scheduleAt,
+      status: data.status,
+      selected_leads: data.lead_ids,
+    });
+
+    const variants = [primaryPayload, alternatePayload];
+    let lastError: unknown;
+
+    for (let index = 0; index < variants.length; index += 1) {
+      try {
+        const response = await apiClient.post(
+          "/reputation/requests/create/",
+          variants[index],
+        );
+        return response.data;
+      } catch (error) {
+        lastError = error;
+
+        const status = axios.isAxiosError(error)
+          ? (error.response?.status ?? 0)
+          : 0;
+        const shouldRetry = status === 400 || status === 422 || status === 500;
+
+        if (!shouldRetry || index === variants.length - 1) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   },
 
   // Get request detail
