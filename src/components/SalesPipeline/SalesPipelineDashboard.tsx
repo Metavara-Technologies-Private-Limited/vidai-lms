@@ -41,8 +41,10 @@ import SalesPipelineActionConfirmDialog from "./SalesPipelineActionConfirmDialog
 import SalesPipelineSidebar from "./SalesPipelineSidebar";
 import type { StageConfigPayload } from "./StageConfiguration";
 import {
+	isAlphabeticName,
 	mapActionsToRules,
 	mapDataCaptureToFields,
+	normalizeNameForCompare,
 	normalizeEntryRule,
 	normalizeStageStatus,
 	normalizeStageType,
@@ -126,15 +128,37 @@ const SalesPipelineDashboard = () => {
 	}: {
 		pipelineName: string;
 		industry: string;
-	}) => {
-		if (!canEditPipeline) return;
-		if (!clinic?.id) return;
+	}): Promise<boolean> => {
+		if (!canEditPipeline) return false;
+		if (!clinic?.id) return false;
+
+		const trimmedPipelineName = pipelineName.trim();
+		if (!isAlphabeticName(trimmedPipelineName)) {
+			toast.error("Pipeline name can contain only letters and spaces.");
+			return false;
+		}
+
+		const normalizedName = normalizeNameForCompare(trimmedPipelineName);
+		const duplicatePipeline = pipelines.some((pipeline) => {
+			const isSameIndustry = pipeline.industry_type === industry;
+			const isSameName = normalizeNameForCompare(pipeline.pipeline_name) === normalizedName;
+			if (!isSameIndustry || !isSameName) return false;
+			if (editPipelineData) {
+				return pipeline.id !== editPipelineData.id;
+			}
+			return true;
+		});
+
+		if (duplicatePipeline) {
+			toast.error("A pipeline with this name already exists for the selected industry.");
+			return false;
+		}
 
 		if (editPipelineData) {
 			try {
 				setActionInProgress(true);
 				await pipelineApi.update(editPipelineData.id, {
-					pipeline_name: pipelineName,
+					pipeline_name: trimmedPipelineName,
 					industry_type: industry as PipelineIndustryType,
 					is_active: true,
 				});
@@ -143,8 +167,10 @@ const SalesPipelineDashboard = () => {
 					await dispatch(fetchPipelineDetail(editPipelineData.id));
 				}
 				toast.success("Pipeline updated successfully.");
+				return true;
 			} catch {
 				toast.error("Failed to update pipeline.");
+				return false;
 			} finally {
 				setActionInProgress(false);
 				setEditPipelineData(null);
@@ -155,13 +181,15 @@ const SalesPipelineDashboard = () => {
 				await dispatch(
 					createPipeline({
 						clinic_id: clinic.id,
-						pipeline_name: pipelineName,
+						pipeline_name: trimmedPipelineName,
 						industry_type: industry as PipelineIndustryType,
 					}),
 				).unwrap();
 				toast.success("Pipeline created successfully.");
+				return true;
 			} catch {
 				toast.error("Failed to create pipeline.");
+				return false;
 			} finally {
 				setActionInProgress(false);
 			}
@@ -300,6 +328,10 @@ const SalesPipelineDashboard = () => {
 		if (!selectedPipelineId) return false;
 		const trimmedStage = stageName.trim();
 		if (!trimmedStage) return false;
+		if (!isAlphabeticName(trimmedStage)) {
+			toast.error("Stage name can contain only letters and spaces.");
+			return false;
+		}
 
 		const nextStageType =
 			STAGE_TYPE_SEQUENCE[
@@ -307,7 +339,7 @@ const SalesPipelineDashboard = () => {
 			] ?? "lead";
 
 		const stageExists = selectedPipeline?.stages.some(
-			(stage) => stage.stage_name.toLowerCase() === trimmedStage.toLowerCase(),
+			(stage) => normalizeNameForCompare(stage.stage_name) === normalizeNameForCompare(trimmedStage),
 		);
 		if (stageExists) {
 			toast.error("Stage name already exists.");
@@ -441,6 +473,10 @@ const SalesPipelineDashboard = () => {
 
 		const trimmedStageName = updatedStageName.trim();
 		if (!trimmedStageName) return false;
+		if (!isAlphabeticName(trimmedStageName)) {
+			toast.error("Stage name can contain only letters and spaces.");
+			return false;
+		}
 
 		const currentStage = selectedPipeline.stages[stageIndex];
 		const currentStageId = await resolveStageId(stageIndex);
@@ -452,7 +488,7 @@ const SalesPipelineDashboard = () => {
 		const duplicateName = selectedPipeline.stages.some(
 			(stage, index) =>
 				index !== stageIndex &&
-				stage.stage_name.toLowerCase() === trimmedStageName.toLowerCase(),
+				normalizeNameForCompare(stage.stage_name) === normalizeNameForCompare(trimmedStageName),
 		);
 		if (duplicateName) {
 			toast.error("Stage name already exists.");

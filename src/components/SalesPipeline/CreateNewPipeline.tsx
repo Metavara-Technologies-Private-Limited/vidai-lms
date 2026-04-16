@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
 import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
+import { isAlphabeticName } from "./salesPipeline.utils";
 
 type IndustryOption = {
 	id: string;
@@ -32,7 +33,7 @@ type IndustryOption = {
 type CreateNewPipelineProps = {
 	open: boolean;
 	onClose: () => void;
-	onSave?: (payload: { pipelineName: string; industry: string }) => void;
+	onSave?: (payload: { pipelineName: string; industry: string }) => void | boolean | Promise<void | boolean>;
 	mode?: "create" | "edit";
 	initialPipelineName?: string;
 	initialIndustry?: string;
@@ -126,23 +127,39 @@ const tileBaseSx: SxProps<Theme> = {
 const Createnewpipeline = ({ open, onClose, onSave, mode = "create", initialPipelineName, initialIndustry }: CreateNewPipelineProps) => {
 	const [pipelineName, setPipelineName] = useState(initialPipelineName ?? "Student Enrollment Pipeline");
 	const [selectedIndustry, setSelectedIndustry] = useState<string>(initialIndustry ?? "education");
+	const [showValidation, setShowValidation] = useState(false);
+
+	useEffect(() => {
+		if (!open) return;
+		setPipelineName(initialPipelineName ?? "Student Enrollment Pipeline");
+		setSelectedIndustry(initialIndustry ?? "education");
+		setShowValidation(false);
+	}, [open, initialIndustry, initialPipelineName]);
+
+	const isNameValid = useMemo(() => isAlphabeticName(pipelineName), [pipelineName]);
+	const showNameError =
+		(showValidation && pipelineName.trim().length === 0) ||
+		(pipelineName.trim().length > 0 && !isNameValid);
 
 	const canSave = useMemo(
-		() => pipelineName.trim().length > 0 && selectedIndustry.length > 0,
-		[pipelineName, selectedIndustry],
+		() => pipelineName.trim().length > 0 && selectedIndustry.length > 0 && isNameValid,
+		[pipelineName, selectedIndustry, isNameValid],
 	);
 
-	const handleSave = () => {
+	const handleSave = async () => {
 		if (!canSave) return;
-		onSave?.({ pipelineName: pipelineName.trim(), industry: selectedIndustry });
+		const saveResult = await onSave?.({ pipelineName: pipelineName.trim(), industry: selectedIndustry });
+		if (saveResult === false) return;
 		setPipelineName("Student Enrollment Pipeline");
 		setSelectedIndustry("education");
+		setShowValidation(false);
 		onClose();
 	};
 
 	const handleClose = () => {
 		setPipelineName("Student Enrollment Pipeline");
 		setSelectedIndustry("education");
+		setShowValidation(false);
 		onClose();
 	};
 
@@ -216,7 +233,18 @@ const Createnewpipeline = ({ open, onClose, onSave, mode = "create", initialPipe
 					fullWidth
 					label="Pipeline Name"
 					value={pipelineName}
-					onChange={(event) => setPipelineName(event.target.value)}
+					onChange={(event) => {
+						setPipelineName(event.target.value);
+						if (showValidation) setShowValidation(false);
+					}}
+					error={showNameError}
+					helperText={
+						showNameError
+							? pipelineName.trim().length === 0
+								? "Pipeline name is required"
+								: "Only letters and spaces are allowed"
+							: " "
+					}
 					variant="outlined"
 					InputProps={{
 						sx: {
@@ -353,7 +381,10 @@ const Createnewpipeline = ({ open, onClose, onSave, mode = "create", initialPipe
 					<Button
 						fullWidth
 						variant="contained"
-						onClick={handleSave}
+							onClick={() => {
+								setShowValidation(true);
+								void handleSave();
+							}}
 						disabled={!canSave}
 						sx={{
 							py: 1.45,
