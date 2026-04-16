@@ -53,6 +53,14 @@ const ReviewCardDetailedView = ({ requestId }: Props) => {
   useEffect(() => {
     if (requestId) {
       dispatch(fetchReviews(requestId));
+
+      // ✅ NEW: Poll every 30 seconds so new review submissions appear in the UI
+      // without requiring a manual page refresh.
+      const interval = setInterval(() => {
+        dispatch(fetchReviews(requestId));
+      }, 30_000);
+
+      return () => clearInterval(interval);
     }
   }, [dispatch, requestId]);
 
