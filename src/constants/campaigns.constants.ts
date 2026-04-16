@@ -2,12 +2,14 @@ import instagramIcon from "../components/Campaign/Icons/instagram.png";
 import facebookIcon from "../components/Campaign/Icons/facebook.png";
 import linkedinIcon from "../components/Campaign/Icons/linkedin.png";
 import emailIcon from "../components/Campaign/Icons/Email.png";
+import googleAdsIcon from "../components/Campaign/Icons/google-ads.png"; // ✅ ADDED
 
 export const PLATFORMS = {
   INSTAGRAM: "instagram",
   FACEBOOK: "facebook",
   LINKEDIN: "linkedin",
   GMAIL: "gmail",
+  GOOGLE_ADS: "google_ads", // ✅ ADDED
 } as const;
 
 export type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS];
@@ -47,6 +49,7 @@ export const STATUS_TO_API: Record<CampaignStatus, string> = {
   [CAMPAIGN_STATUS.COMPLETED]: "completed",
   [CAMPAIGN_STATUS.FAILED]: "failed",
 };
+
 export const CAMPAIGN_TYPE = {
   SOCIAL: "social",
   EMAIL: "email",
@@ -75,6 +78,7 @@ export const platformIcons: Record<Platform, string> = {
   instagram: instagramIcon,
   linkedin: linkedinIcon,
   gmail: emailIcon,
+  google_ads: googleAdsIcon, // ✅ ADDED
 };
 
 export const CAMPAIGN_OBJECTIVES = {

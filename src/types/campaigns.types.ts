@@ -173,7 +173,7 @@ export interface EmailCampaignPayload {
 
 
 export interface SocialCampaignPayload {
-  clinic: number;
+  clinic?: number;
 
   campaign_name: string;
   campaign_description: string;

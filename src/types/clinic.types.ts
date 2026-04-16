@@ -2,6 +2,8 @@ export interface Clinic {
   id: number;
   name: string;
   email: string;
+  website?: string;
+  google_ads_customer_id?: string;
   department: Department[];
   is_default?: boolean;
 }

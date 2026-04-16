@@ -4,6 +4,7 @@ import "../../styles/Campaign/CampaignTabContent.css";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
+import googleAdsIcon from "./Icons/google-ads.png";
 import { Sector } from "recharts";
 import type { Campaign } from "../../types/campaigns.types";
 import {
@@ -46,6 +47,7 @@ const PIE_COLORS: Record<string, string> = {
   facebook: "#C5CAD8",
   linkedin: "#8D95A8",
   gmail: "#ECB856",
+  google_ads: "#4285F4",
 };
 
 // Kept as fallback for social (FB insights pending app review)
@@ -275,6 +277,7 @@ const CampaignTabContent: React.FC<Props> = ({
       instagram: instagramIcon,
       facebook: facebookIcon,
       linkedin: linkedinIcon,
+      google_ads: googleAdsIcon,
     };
 
     return (
@@ -395,7 +398,7 @@ const CampaignTabContent: React.FC<Props> = ({
                     style={{ background: p.color }}
                   />
                   <img
-                    src={platformIconMap[p.name.toLowerCase()] ?? instagramIcon}
+                    src={platformIconMap[p.name.toLowerCase().replace(" ", "_")] ?? instagramIcon}
                     alt={p.name}
                   />
                   {p.name}
@@ -408,7 +411,7 @@ const CampaignTabContent: React.FC<Props> = ({
               <PlatformCard
                 key={p}
                 icon={platformIconMap[p] ?? instagramIcon}
-                title={p.charAt(0).toUpperCase() + p.slice(1)}
+                title={p === "google_ads" ? "Google Ads" : p.charAt(0).toUpperCase() + p.slice(1)}
                 spend={`$${budgetRaw[p] ?? 0}`}
                 conversion={String(leadCount)}
               />
@@ -444,7 +447,7 @@ const CampaignTabContent: React.FC<Props> = ({
             <p>
               {isEmail
                 ? `Your email campaign achieved ${(campaign as any).impressions ?? 0} opens and ${(campaign as any).clicks ?? 0} clicks with a ${(campaign as any).conversion_rate ?? 0}% conversion rate.`
-                : `${topPlatform.charAt(0).toUpperCase() + topPlatform.slice(1)} has the highest budget allocation at $${budgetRaw[topPlatform] ?? 0}. Monitor leads closely from this platform.`}
+                : `${topPlatform === "google_ads" ? "Google Ads" : topPlatform.charAt(0).toUpperCase() + topPlatform.slice(1)} has the highest budget allocation at $${budgetRaw[topPlatform] ?? 0}. Monitor leads closely from this platform.`}
             </p>
           </div>
 
@@ -462,7 +465,7 @@ const CampaignTabContent: React.FC<Props> = ({
             <p>
               {isEmail
                 ? "Use personalized subject lines and strong CTAs to improve open rates. Consider A/B testing your email content."
-                : `${platforms.includes("instagram") ? "Add high-quality images for Instagram — image posts get 38% more engagement. " : ""}Video content generates 2.8x more engagement across social platforms.`}
+                : `${platforms.includes("instagram") ? "Add high-quality images for Instagram — image posts get 38% more engagement. " : ""}${platforms.includes("google_ads") ? "Use keyword-rich headlines for Google Ads to maximize search visibility. " : ""}Video content generates 2.8x more engagement across social platforms.`}
             </p>
           </div>
 
