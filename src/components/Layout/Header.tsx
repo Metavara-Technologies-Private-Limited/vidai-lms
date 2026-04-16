@@ -42,6 +42,7 @@ import WorkIcon from "@mui/icons-material/Work";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { clinicApi } from "../../services/clinic.api";
 import { fetchLeads } from "../../store/leadSlice";
+import { fetchCampaign } from "../../store/campaignSlice";
 import { fetchUsers } from "../../store/userSlice";
 import { authApi } from "../../services/auth.api";
 import { toast } from "react-toastify";
@@ -177,8 +178,11 @@ const Header = () => {
       if (lastFetchedClinicIdRef.current === selectedClinicId) return;
 
       lastFetchedClinicIdRef.current = selectedClinicId;
+      // Persist to localStorage FIRST so all service calls pick up the new clinic
+      localStorage.setItem("clinic_id", String(selectedClinicId));
       await dispatch(fetchClinic(selectedClinicId));
-      await dispatch(fetchLeads());
+      // Re-fetch all clinic-scoped data in parallel
+      await Promise.all([dispatch(fetchLeads()), dispatch(fetchCampaign())]);
     };
 
     hydrateClinic();
@@ -186,8 +190,9 @@ const Header = () => {
 
   useEffect(() => {
     // dispatch(fetchCampaign());
+    if (!selectedClinicId) return;
     dispatch(fetchAllTemplates());
-  }, [dispatch]);
+  }, [dispatch, selectedClinicId]);
 
   const handleIconClick = (
     event: React.MouseEvent<HTMLElement>,
@@ -235,8 +240,47 @@ const Header = () => {
   );
   const canManageOwnPhoto = Boolean(user?.id || user?.user_id);
 
-  const applyUpdatedProfile = (updatedProfile: Record<string, unknown>) => {
+  const extractProfilePhoto = (
+    payload: Record<string, unknown> | null | undefined,
+  ): string | undefined => {
+    if (!payload) return undefined;
+
+    const nestedProfile =
+      payload.profile && typeof payload.profile === "object"
+        ? (payload.profile as Record<string, unknown>)
+        : null;
+
+    const candidates: unknown[] = [
+      payload.photo,
+      payload.photo_url,
+      payload.profile_photo,
+      payload.avatar,
+      nestedProfile?.photo,
+      nestedProfile?.photo_url,
+      nestedProfile?.profile_photo,
+      nestedProfile?.avatar,
+    ];
+
+    for (const value of candidates) {
+      if (value == null) continue;
+      if (typeof value === "string" && value.trim() === "") return undefined;
+      const safeUrl = toSafePhotoUrl(value);
+      if (safeUrl) return safeUrl;
+      if (value === null) return undefined;
+    }
+
+    return undefined;
+  };
+
+  const applyUpdatedProfile = (
+    updatedProfile: Record<string, unknown>,
+    options?: { forceClearPhoto?: boolean },
+  ) => {
     if (!user) return;
+
+    const resolvedPhoto = options?.forceClearPhoto
+      ? undefined
+      : extractProfilePhoto(updatedProfile);
 
     dispatch(
       setUser({
@@ -249,10 +293,7 @@ const Header = () => {
           typeof updatedProfile.last_name === "string"
             ? updatedProfile.last_name
             : user.last_name,
-        photo:
-          "photo" in updatedProfile
-            ? ((updatedProfile.photo as string | null | undefined) ?? undefined)
-            : user.photo,
+        photo: resolvedPhoto !== undefined ? resolvedPhoto : user.photo,
       }),
     );
   };
@@ -282,6 +323,12 @@ const Header = () => {
     try {
       const updatedProfile = await authApi.updateMyPhoto(formData);
       applyUpdatedProfile(updatedProfile as Record<string, unknown>);
+      try {
+        const refreshedProfile = await authApi.getProfile();
+        applyUpdatedProfile(refreshedProfile as Record<string, unknown>);
+      } catch {
+        // Keep optimistic profile if refresh endpoint is unavailable.
+      }
       toast.success("Profile photo updated successfully");
       await dispatch(fetchUsers());
       handlePhotoPopoverClose();
@@ -300,7 +347,15 @@ const Header = () => {
       const formData = new FormData();
       formData.append("remove_photo", "true");
       const updatedProfile = await authApi.updateMyPhoto(formData);
-      applyUpdatedProfile(updatedProfile as Record<string, unknown>);
+      applyUpdatedProfile(updatedProfile as Record<string, unknown>, {
+        forceClearPhoto: true,
+      });
+      try {
+        const refreshedProfile = await authApi.getProfile();
+        applyUpdatedProfile(refreshedProfile as Record<string, unknown>);
+      } catch {
+        // Keep optimistic profile if refresh endpoint is unavailable.
+      }
       toast.success("Profile photo removed successfully");
       await dispatch(fetchUsers());
       handlePhotoPopoverClose();

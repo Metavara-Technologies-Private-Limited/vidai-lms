@@ -141,11 +141,13 @@ const DoctorReferrals: React.FC = () => {
         setLoading(true);
 
         // Use LeadAPI.list() — auth token handled automatically via axios interceptor
-        const allLeads: Lead[] = clinic?.id ? await LeadAPI.list(clinic?.id) : [];
+        const allLeads: Lead[] = clinic?.id
+          ? await LeadAPI.list(clinic?.id)
+          : [];
 
         // Filter leads assigned to this specific doctor
         const filtered = allLeads.filter(
-          (lead) => String(lead.assigned_to_id) === String(doctorId)
+          (lead) => String(lead.assigned_to_id) === String(doctorId),
         );
 
         const cards: PatientCard[] = filtered.map((lead) => {
@@ -172,12 +174,12 @@ const DoctorReferrals: React.FC = () => {
       }
     };
     fetchLeads();
-  }, [doctorId]);
+  }, [doctorId, clinic?.id]);
 
   const filtered = patients.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.mrn.toLowerCase().includes(search.toLowerCase())
+      p.mrn.toLowerCase().includes(search.toLowerCase()),
   );
 
   const sel = selected;
@@ -341,8 +343,7 @@ const DoctorReferrals: React.FC = () => {
                       borderBottom: "1px solid #F8F8F9",
                       transition: "all 0.12s",
                       "&:hover": {
-                        bgcolor:
-                          selected?.id === p.id ? "#EFF6FF" : "#FAFAFA",
+                        bgcolor: selected?.id === p.id ? "#EFF6FF" : "#FAFAFA",
                       },
                     }}
                   >
@@ -458,7 +459,12 @@ const DoctorReferrals: React.FC = () => {
               >
                 Patient Information
               </Typography>
-              <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2.5} mb={3}>
+              <Box
+                display="grid"
+                gridTemplateColumns="1fr 1fr"
+                gap={2.5}
+                mb={3}
+              >
                 <InfoField label="Contact No." value={sel.raw.contact_no} />
                 <InfoField label="Email" value={sel.raw.email} />
                 <InfoField label="Location" value={sel.raw.location} />
@@ -467,7 +473,10 @@ const DoctorReferrals: React.FC = () => {
                 <InfoField label="Address" value={sel.raw.address} />
                 <InfoField
                   label="Language Preference"
-                  value={(sel.raw as Lead & { language_preference?: string }).language_preference}
+                  value={
+                    (sel.raw as Lead & { language_preference?: string })
+                      .language_preference
+                  }
                 />
                 <InfoField
                   label="Created Date & Time"
@@ -488,8 +497,16 @@ const DoctorReferrals: React.FC = () => {
               >
                 Partner Information
               </Typography>
-              <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2.5} mb={3}>
-                <InfoField label="Full Name" value={sel.raw.partner_full_name} />
+              <Box
+                display="grid"
+                gridTemplateColumns="1fr 1fr"
+                gap={2.5}
+                mb={3}
+              >
+                <InfoField
+                  label="Full Name"
+                  value={sel.raw.partner_full_name}
+                />
                 <InfoField label="Age" value={sel.raw.partner_age} />
                 <InfoField label="Gender" value={sel.raw.partner_gender} />
               </Box>
@@ -548,8 +565,7 @@ const DoctorReferrals: React.FC = () => {
                   </Typography>
                   <Box display="flex" flexDirection="column" gap={1}>
                     {sel.raw.documents.map((doc: LeadDocument) => {
-                      const fileName =
-                        doc.file?.split("/").pop() ?? "Document";
+                      const fileName = doc.file?.split("/").pop() ?? "Document";
                       const fileUrl = doc.file?.startsWith("http")
                         ? doc.file
                         : `http://127.0.0.1:8000${doc.file}`;

@@ -178,7 +178,9 @@ const normalizeReviewRow = (raw: unknown): Dict => {
 export const reputationApi = {
   // Dashboard cards
   getDashboard: async () => {
-    const response = await apiClient.get("/reputation/dashboard/");
+    const response = await apiClient.get("/reputation/dashboard/", {
+      params: { clinic_id: getStoredClinicId() },
+    });
     return response.data;
   },
 
@@ -288,7 +290,9 @@ export const reputationApi = {
 
   // Get request detail
   getRequestById: async (requestId: string) => {
-    const response = await apiClient.get(`/reputation/requests/${requestId}/`);
+    const response = await apiClient.get(`/reputation/requests/${requestId}/`, {
+      params: { clinic_id: getStoredClinicId() },
+    });
     return response.data;
   },
 
@@ -296,6 +300,9 @@ export const reputationApi = {
   getReviews: async (requestId: string) => {
     const response = await apiClient.get(
       `/reputation/requests/${requestId}/reviews/`,
+      {
+        params: { clinic_id: getStoredClinicId() },
+      },
     );
 
     return extractList(response.data).map(normalizeReviewRow);

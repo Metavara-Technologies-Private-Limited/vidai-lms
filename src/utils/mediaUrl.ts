@@ -27,8 +27,23 @@ const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
 export const toSafePhotoUrl = (value: unknown): string | null => {
   if (!value) return null;
-  const raw = String(value).trim();
+  const raw = String(value).trim().replace(/\\/g, "/");
   if (!raw) return null;
+
+  // Protocol-relative absolute URL
+  if (raw.startsWith("//")) {
+    const protocol =
+      typeof window !== "undefined" && window.location.protocol === "https:"
+        ? "https:"
+        : "http:";
+    return upgradeToHttpsIfNeeded(`${protocol}${raw}`);
+  }
+
+  // Host/path without scheme (e.g. 127.0.0.1:8000/media/x.jpg)
+  if (/^[a-z0-9.-]+:\d+\//i.test(raw)) {
+    const prefixed = `http://${raw}`;
+    return upgradeToHttpsIfNeeded(prefixed);
+  }
 
   // Already absolute
   if (/^(https?:\/\/|blob:|data:)/i.test(raw)) {

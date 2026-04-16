@@ -58,12 +58,14 @@ const resolveAvgRating = (request: any): number => {
 };
 
 // Fetch review requests
-export const fetchReviewRequests = createAsyncThunk(
-  "reputation/fetchRequests",
-  async () => {
-    return await reputationApi.getRequests();
-  },
-);
+export const fetchReviewRequests = createAsyncThunk<
+  unknown[],
+  void,
+  { state: RootState }
+>("reputation/fetchRequests", async (_, { getState }) => {
+  const clinicId = getState().clinic.data?.id;
+  return await reputationApi.getRequests(clinicId);
+});
 
 // Fetch dashboard
 export const fetchReputationDashboard = createAsyncThunk(

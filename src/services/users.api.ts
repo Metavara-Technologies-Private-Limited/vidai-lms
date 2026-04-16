@@ -292,45 +292,46 @@ const extractSingleRecord = (payload: UserSingleResponse): UserApiRecord => {
 };
 
 const extractUserArray = (payload: UserListResponse): UserApiRecord[] => {
-  console.log("Extracting users from:", payload);
-
   if (!payload) return [];
 
-  // Case 1: wrapped { data: [...] }
-  if (
-    typeof payload === "object" &&
-    "data" in payload &&
-    Array.isArray((payload as any).data)
-  ) {
-    return (payload as any).data;
+  const tryExtractArray = (value: unknown): UserApiRecord[] | null => {
+    if (Array.isArray(value)) {
+      return value as UserApiRecord[];
+    }
+
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+
+    const obj = value as Record<string, unknown>;
+    const candidates = [obj.data, obj.results, obj.users, obj.objects];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate as UserApiRecord[];
+      }
+    }
+
+    return null;
+  };
+
+  const direct = tryExtractArray(payload);
+  if (direct) {
+    return direct;
   }
 
-  // Case 2: nested { data: { users: [...] } }
   if (
     typeof payload === "object" &&
+    payload &&
     "data" in payload &&
     payload.data &&
-    typeof payload.data === "object" &&
-    Array.isArray((payload.data as any).users)
+    typeof payload.data === "object"
   ) {
-    return (payload.data as any).users;
+    const nested = tryExtractArray(payload.data);
+    if (nested) {
+      return nested;
+    }
   }
 
-  // Case 3: direct array
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
-  // Case 4: DRF pagination
-  if (
-    typeof payload === "object" &&
-    "results" in payload &&
-    Array.isArray((payload as any).results)
-  ) {
-    return (payload as any).results;
-  }
-
-  console.warn("No users found in payload shape:", payload);
   return [];
 };
 
@@ -468,13 +469,8 @@ export const usersApi = {
       return [];
     }
 
-    if (sessionStorage.getItem("users_list_denied") === "1") {
-      return [];
-    }
-
     try {
       const response = await http.get<UserListResponse>("/users/list/");
-      sessionStorage.removeItem("users_list_denied");
       return extractUserArray(response.data).map((user) =>
         normalizeUser(user, "local"),
       );
@@ -483,14 +479,12 @@ export const usersApi = {
         ?.status;
       if (status === 401 || status === 403) {
         // Some roles cannot access this endpoint. Treat as empty dataset.
-        sessionStorage.setItem("users_list_denied", "1");
         return [];
       }
 
       if (status === 404 || status === 405 || status === 500) {
         try {
           const fallbackResponse = await http.get<UserListResponse>("/users/");
-          sessionStorage.removeItem("users_list_denied");
           return extractUserArray(fallbackResponse.data).map((user) =>
             normalizeUser(user, "local"),
           );
@@ -533,10 +527,6 @@ export const usersApi = {
       return [];
     }
 
-    if (sessionStorage.getItem("users_search_denied") === "1") {
-      return [];
-    }
-
     try {
       const response = await http.get<UserSearchResponse>("/users-search/", {
         params: {
@@ -546,8 +536,6 @@ export const usersApi = {
         },
       });
 
-      sessionStorage.removeItem("users_search_denied");
-
       return extractUserSearchArray(response.data).map((user) =>
         normalizeUser(user, "client"),
       );
@@ -556,7 +544,6 @@ export const usersApi = {
         ?.status;
       if (status === 401 || status === 403) {
         // Some roles cannot access this endpoint. Treat as empty dataset.
-        sessionStorage.setItem("users_search_denied", "1");
         return [];
       }
       throw error;

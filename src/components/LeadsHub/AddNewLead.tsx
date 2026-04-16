@@ -13,6 +13,7 @@ import { Dayjs } from "dayjs";
 import { useSelector } from "react-redux";
 import { selectCampaign } from "../../store/campaignSlice";
 import { selectUser } from "../../store/authSlice";
+import { selectClinic } from "../../store/clinicSlice";
 import {
   resolveUserRole,
   hasAnySubcategoryActionPermission,
@@ -167,7 +168,6 @@ export default function AddNewLead() {
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
   const loadingEmployees = false;
-  const [clinicId] = React.useState(1);
   const [assigneeName, setAssigneeName] = React.useState("");
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
   const [assigneeOptions, setAssigneeOptions] = React.useState<
@@ -194,6 +194,9 @@ export default function AddNewLead() {
 
   const rawCampaigns = useSelector(selectCampaign);
   const authedUser = useSelector(selectUser);
+  const selectedClinic = useSelector(selectClinic);
+  const clinicId =
+    selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
 
   // ── Permission guard ─────────────────────────────────────────────────────────
   const _authUserRaw = authedUser as unknown as Record<string, unknown> | null;
@@ -261,13 +264,25 @@ export default function AddNewLead() {
     leadGeneratedBy: "",
   });
 
-  // ── Fetch Departments ────────────────────────────────────────────
+  // ── Fetch Departments & reset dept selection on clinic change ──────
   React.useEffect(() => {
+    // Immediately clear stale departments + selections to prevent wrong clinic's IDs bleeding through
+    setDepartments([]);
+    setForm((prev) => ({ ...prev, department: "", personnel: "" }));
+
     const fetchDepartments = async () => {
       try {
         setLoadingDepartments(true);
-        const departments = await DepartmentAPI.listActiveByClinic(clinicId);
-        setDepartments(departments);
+        const fetched = await DepartmentAPI.listActiveByClinic(clinicId);
+        setDepartments(fetched);
+        // Auto-select first department so validation passes on first attempt
+        if (fetched.length > 0) {
+          setForm((prev) =>
+            prev.department
+              ? prev
+              : { ...prev, department: String(fetched[0].id) },
+          );
+        }
       } catch (err) {
         const error = err as ApiError;
         toast.error(
@@ -528,7 +543,7 @@ export default function AddNewLead() {
       Boolean(form.appointmentDate && form.slot);
 
     const selectedDepartmentId = intOrNull(form.department);
-    const fallbackDepartmentId = departments[0]?.id ?? 1;
+    const fallbackDepartmentId = departments[0]?.id ?? 0;
     const departmentId = selectedDepartmentId ?? fallbackDepartmentId;
 
     const genderRaw = form.gender ?? "";
