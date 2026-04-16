@@ -41,6 +41,7 @@ const PLATFORM_LIST: { id: Platform; label: string; cpc: number }[] = [
   { id: "instagram", label: "Instagram", cpc: 3.5 },
   { id: "facebook", label: "Facebook", cpc: 2.5 },
   { id: "linkedin", label: "LinkedIn", cpc: 1.5 },
+  { id: "google_ads", label: "Google Ads", cpc: 2.0 },
 ];
 
 const isPlainUrl = (str: string) =>
@@ -49,6 +50,7 @@ const isPlainUrl = (str: string) =>
 export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
+  const isGoogleAdsConnected = Boolean(clinic?.google_ads_customer_id?.trim());
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
 
@@ -79,6 +81,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     facebook: "",
     linkedin: "",
     gmail: "",
+    google_ads: "",
   });
 
   const [platformImageUrls, setPlatformImageUrls] = useState<
@@ -88,6 +91,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     facebook: "",
     linkedin: "",
     gmail: "",
+    google_ads: "",
   });
 
   const platformImageUrlsRef = useRef<Record<Platform, string>>({
@@ -95,6 +99,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     facebook: "",
     linkedin: "",
     gmail: "",
+    google_ads: "",
   });
 
   const handleEditorInput = (platform: Platform, value: string) => {
@@ -111,16 +116,19 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const facebookRef = useRef<HTMLDivElement>(null);
   const linkedinRef = useRef<HTMLDivElement>(null);
   const gmailRef = useRef<HTMLDivElement>(null);
+  const googleAdsRef = useRef<HTMLDivElement>(null);
 
   const instagramMediaRef = useRef<HTMLDivElement>(null);
   const facebookMediaRef = useRef<HTMLDivElement>(null);
   const linkedinMediaRef = useRef<HTMLDivElement>(null);
   const gmailMediaRef = useRef<HTMLDivElement>(null);
+  const googleAdsMediaRef = useRef<HTMLDivElement>(null);
 
   const instagramFileRef = useRef<HTMLInputElement>(null);
   const facebookFileRef = useRef<HTMLInputElement>(null);
   const linkedinFileRef = useRef<HTMLInputElement>(null);
   const gmailFileRef = useRef<HTMLInputElement>(null);
+  const googleAdsFileRef = useRef<HTMLInputElement>(null);
 
   const platformRefs: Record<
     Platform,
@@ -130,6 +138,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     facebook: facebookRef,
     linkedin: linkedinRef,
     gmail: gmailRef,
+    google_ads: googleAdsRef,
   };
 
   const mediaRefs: Record<Platform, React.RefObject<HTMLDivElement | null>> = {
@@ -137,6 +146,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     facebook: facebookMediaRef,
     linkedin: linkedinMediaRef,
     gmail: gmailMediaRef,
+    google_ads: googleAdsMediaRef,
   };
 
   const fileInputRefs: Record<
@@ -147,6 +157,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     facebook: facebookFileRef,
     linkedin: linkedinFileRef,
     gmail: gmailFileRef,
+    google_ads: googleAdsFileRef,
   };
 
   const [inlinePreview, setInlinePreview] = useState<{
@@ -164,6 +175,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     facebook: 250,
     linkedin: 150,
     gmail: 0,
+    google_ads: 200,
   });
 
   const setBudget = (platform: Platform, value: number) =>
@@ -172,12 +184,14 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const getEditorRef = (platform: string) => {
     if (platform === "instagram") return instagramRef;
     if (platform === "facebook") return facebookRef;
+    if (platform === "google_ads") return googleAdsRef;
     return linkedinRef;
   };
 
   const getMediaRef = (platform: string) => {
     if (platform === "instagram") return instagramMediaRef;
     if (platform === "facebook") return facebookMediaRef;
+    if (platform === "google_ads") return googleAdsMediaRef;
     return linkedinMediaRef;
   };
 
@@ -223,6 +237,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     if (platform === "instagram") instagramFileRef.current?.click();
     if (platform === "facebook") facebookFileRef.current?.click();
     if (platform === "linkedin") linkedinFileRef.current?.click();
+    if (platform === "google_ads") googleAdsFileRef.current?.click();
   };
 
   const handleFileInsert = (
@@ -253,6 +268,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   const toggleAccount = (id: Platform) => {
+    if (id === "google_ads" && !isGoogleAdsConnected) {
+      toast.warn("Connect Google Ads before selecting the Google Ads account.");
+      return;
+    }
+
     setAccounts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
@@ -294,6 +314,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         facebook: facebookRef,
         linkedin: linkedinRef,
         gmail: gmailRef,
+        google_ads: googleAdsRef,
       };
 
       const resolvedContent: Record<Platform, string> = {
@@ -301,6 +322,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         facebook: "",
         linkedin: "",
         gmail: "",
+        google_ads: "",
       };
 
       for (const platform of accounts) {
@@ -349,6 +371,17 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         mode === "paid" ? "paid_advertising" : "organic_posting",
       ];
 
+      const selectedAccounts = accounts.filter(
+        (platform) => platform !== "google_ads" || isGoogleAdsConnected,
+      );
+
+      const cleanedContent: Partial<Record<Platform, string>> = {
+        ...resolvedContent,
+      };
+      if (!isGoogleAdsConnected) {
+        delete cleanedContent.google_ads;
+      }
+
       const payload: SocialCampaignPayload = {
         clinic: clinicId,
         campaign_name: campaignName,
@@ -359,9 +392,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         end_date: endDate,
         campaign_mode: campaignMode,
         campaign_content: firstSelectedContent,
-        select_ad_accounts: accounts,
+        select_ad_accounts: selectedAccounts,
         enter_time: scheduleTime || null,
-        platform_data: resolvedContent,
+        platform_data: cleanedContent,
         budget_data: {
           ...Object.fromEntries(
             selectedPlatforms.map((p) => [p.id, budgets[p.id]]),
@@ -376,6 +409,53 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       };
 
       const createdRes = await CampaignAPI.createSocial(payload);
+
+      // -------------------------------------------------------
+      // Google Ads: fire the dedicated endpoint if selected
+      // -------------------------------------------------------
+      const shouldSendGoogleAds =
+        accounts.includes("google_ads") && isGoogleAdsConnected;
+
+      if (shouldSendGoogleAds) {
+        try {
+          const googleAdsImage =
+            platformImageUrlsRef.current["google_ads"]?.trim() ||
+            platformImageUrls["google_ads"]?.trim() ||
+            image_url ||
+            null;
+
+          await CampaignAPI.createGoogleAds({
+            clinic_id:        clinicId,
+            customer_id:      String(clinic?.google_ads_customer_id ?? ""),
+            campaign_name:    campaignName,
+            budget:           budgets["google_ads"],
+            bidding_strategy: "MANUAL_CPC",
+            locations:        [],
+            keywords:         [],
+            cpc_bid:          20,
+            ad_group_name:    `${campaignName} AdGroup`,
+            final_url:        clinic?.website ?? "https://example.com",
+            headline_1:       campaignName.slice(0, 30),
+            headline_2:       "Learn More",
+            headline_3:       "Contact Us Today",
+            description:      campaignDescription.slice(0, 90),
+            description_2:    "Call us now or visit our website.",
+            image_url:        googleAdsImage,
+            platform_data:    { google_ads: resolvedContent["google_ads"] },
+          });
+
+          console.log("[GoogleAds] Campaign sent to Zapier successfully");
+        } catch (googleAdsErr) {
+          console.error("[GoogleAds] Failed to trigger Google Ads:", googleAdsErr);
+          toast.warn("Campaign saved, but Google Ads trigger failed. Check logs.");
+        }
+      } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
+        toast.warn(
+          "Google Ads was not triggered because this clinic is not connected to Google Ads.",
+        );
+      }
+      // -------------------------------------------------------
+
       onSave(createdRes?.data ?? payload);
       toast.success("Campaign created successfully");
       onClose();
@@ -566,21 +646,24 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 Select your social media ad accounts
               </p>
               <div className="account-row">
-                {PLATFORM_LIST.map((acc) => (
-                  <div
-                    key={acc.id}
-                    className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
-                    onClick={() => toggleAccount(acc.id)}
-                  >
-                    <div className="account-left">
-                      <img src={platformIcons[acc.id]} alt={acc.label} />
-                      <span>{acc.label}</span>
-                    </div>
+                {PLATFORM_LIST.map((acc) => {
+                  const isDisabled = acc.id === "google_ads" && !isGoogleAdsConnected;
+                  return (
                     <div
-                      className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
-                    />
-                  </div>
-                ))}
+                      key={acc.id}
+                      className={`account-card ${accounts.includes(acc.id) ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
+                      onClick={() => !isDisabled && toggleAccount(acc.id)}
+                    >
+                      <div className="account-left">
+                        <img src={platformIcons[acc.id]} alt={acc.label} />
+                        <span>{acc.label}</span>
+                      </div>
+                      <div
+                        className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

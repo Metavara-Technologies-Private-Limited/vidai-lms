@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSelector } from "react-redux";
 import {
   Modal,
   Box,
@@ -19,6 +20,7 @@ import viewIcon from "./Icons/view.png";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
+import googleAdsIcon from "./Icons/google-ads.png";
 import { CampaignAPI } from "../../services/campaign.api";
 import "../../styles/Campaign/EmailCampaignModal.css";
 import EmailTemplateModal from "../../components/Campaign/EmailTemplateModal";
@@ -29,6 +31,7 @@ import {
   CAMPAIGN_OBJECTIVES,
   SENDER_EMAIL,
 } from "../../constants/campaigns.constants";
+import { selectClinic } from "../../store/clinicSlice";
 import TemplateService, {
   type TemplateDocument,
 } from "../../services/templates.api";
@@ -40,6 +43,8 @@ interface EditCampaignModalProps {
 }
 
 export default function EditCampaignModal({ campaign, onClose, onSave }: EditCampaignModalProps) {
+  const clinic = useSelector(selectClinic);
+  const clinicId = clinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 0);
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [fullCampaignData, setFullCampaignData] = useState<CampaignAPIType | null>(null);
@@ -74,6 +79,7 @@ export default function EditCampaignModal({ campaign, onClose, onSave }: EditCam
   const [instagramBudget, setInstagramBudget] = useState(350);
   const [facebookBudget, setFacebookBudget] = useState(250);
   const [linkedinBudget, setLinkedinBudget] = useState(150);
+  const [googleAdsBudget, setGoogleAdsBudget] = useState(200);
 
   const toggleAccount = (id: string) => {
     setAccounts((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -101,9 +107,16 @@ export default function EditCampaignModal({ campaign, onClose, onSave }: EditCam
           setScheduleDate(dayjs(data.selected_start).format("YYYY-MM-DD"));
         }
         if (data.enter_time) setScheduleTime(data.enter_time);
-        if (data.social_media?.length > 0) {
-          setAccounts(data.social_media.map((sm: { platform_name: string }) => sm.platform_name));
+        if (Array.isArray(data.select_ad_accounts) && data.select_ad_accounts.length > 0) {
+          setAccounts(data.select_ad_accounts.filter(Boolean));
+        } else if (data.social_media?.length > 0) {
+          setAccounts(
+            data.social_media
+              .filter((sm: { is_active?: boolean }) => sm.is_active !== false)
+              .map((sm: { platform_name: string }) => sm.platform_name),
+          );
         }
+
         // ← FIXED: use campaign_mode (numeric) not posting_mode/mode
         if (data.campaign_mode === 1) setMode("organic");
         if (data.campaign_mode === 2) setMode("paid");
@@ -147,15 +160,41 @@ export default function EditCampaignModal({ campaign, onClose, onSave }: EditCam
       const end = campaign.type === "email" ? scheduleRange[1]?.format("YYYY-MM-DD") : scheduleDate;
       const scheduledDateTime = dayjs(`${start} ${scheduleTime}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DDTHH:mm:ss");
 
+      const socialAccountData = campaign.type === "social"
+        ? accounts
+            .filter((platform) => platform !== "google_ads")
+            .map((platform) => {
+              const existing = fullCampaignData.social_media?.find(
+                (sm: { id: number; platform_name: string }) => sm.platform_name === platform,
+              );
+              return { id: existing?.id, platform_name: platform, is_active: true };
+            })
+        : [];
+
+      const socialPayload = campaign.type === "social"
+        ? {
+            social_media: socialAccountData,
+            select_ad_accounts: accounts,
+            campaign_content: fullCampaignData.campaign_content || campaignName,
+            platform_data: fullCampaignData.platform_data || {},
+            budget_data: fullCampaignData.budget_data || {},
+          }
+        : {};
+
       const payload = {
-        clinic: 1,
+        clinic: clinicId,
         campaign_name: campaignName,
         campaign_description: campaignDescription,
         campaign_objective: objective,
         target_audience: audience,
         start_date: startDate,
         end_date: endDate,
-        campaign_mode: campaign.type === "email" ? CAMPAIGN_MODE.EMAIL : CAMPAIGN_MODE.ORGANIC,
+        campaign_mode:
+          campaign.type === "email"
+            ? CAMPAIGN_MODE.EMAIL
+            : mode === "paid"
+              ? CAMPAIGN_MODE.PAID
+              : CAMPAIGN_MODE.ORGANIC,
         selected_start: start ?? null,
         selected_end: end ?? null,
         enter_time: scheduleTime,
@@ -170,12 +209,7 @@ export default function EditCampaignModal({ campaign, onClose, onSave }: EditCam
           scheduled_at: scheduledDateTime,
           is_active: true,
         }] : [],
-        social_media: campaign.type === "social" ? accounts.map((platform) => {
-          const existing = fullCampaignData.social_media?.find(
-            (sm: { id: number; platform_name: string }) => sm.platform_name === platform,
-          );
-          return { id: existing?.id, platform_name: platform, is_active: true };
-        }) : [],
+        ...socialPayload,
       };
 
       await CampaignAPI.update(campaign.id, payload);
@@ -357,7 +391,12 @@ onClose();
                 <h3>Select Ad Accounts</h3>
                 <p className="section-subtitle">Select your social media ad accounts</p>
                 <div className="account-row">
-                  {[{ id: "instagram", label: "Instagram", icon: instagramIcon }, { id: "facebook", label: "Facebook", icon: facebookIcon }, { id: "linkedin", label: "LinkedIn", icon: linkedinIcon }].map((acc) => (
+                  {[
+                    { id: "instagram", label: "Instagram", icon: instagramIcon },
+                    { id: "facebook", label: "Facebook", icon: facebookIcon },
+                    { id: "linkedin", label: "LinkedIn", icon: linkedinIcon },
+                    { id: "google_ads", label: "Google Ads", icon: googleAdsIcon },
+                  ].map((acc) => (
                     <div key={acc.id} className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`} onClick={() => toggleAccount(acc.id)}>
                       <div className="account-left"><img src={acc.icon} alt={acc.label} /><span>{acc.label}</span></div>
                       <div className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`} />
@@ -392,6 +431,7 @@ onClose();
                   <div className="content-row"><img src={instagramIcon} alt="Instagram" /><textarea placeholder="What would you like to share on Instagram?" disabled={!accounts.includes("instagram")} style={{ opacity: accounts.includes("instagram") ? 1 : 0.5, cursor: accounts.includes("instagram") ? "text" : "not-allowed" }} /></div>
                   <div className="content-row"><img src={facebookIcon} alt="Facebook" /><input placeholder="What would you like to share on Facebook?" disabled={!accounts.includes("facebook")} style={{ opacity: accounts.includes("facebook") ? 1 : 0.5, cursor: accounts.includes("facebook") ? "text" : "not-allowed" }} /></div>
                   <div className="content-row"><img src={linkedinIcon} alt="LinkedIn" /><input placeholder="What would you like to share on LinkedIn?" disabled={!accounts.includes("linkedin")} style={{ opacity: accounts.includes("linkedin") ? 1 : 0.5, cursor: accounts.includes("linkedin") ? "text" : "not-allowed" }} /></div>
+                  <div className="content-row"><img src={googleAdsIcon} alt="Google Ads" /><input placeholder="What would you like to share on Google Ads?" disabled={!accounts.includes("google_ads")} style={{ opacity: accounts.includes("google_ads") ? 1 : 0.5, cursor: accounts.includes("google_ads") ? "text" : "not-allowed" }} /></div>
                 </div>
               )}
             </div>
@@ -464,23 +504,67 @@ onClose();
                     <div className="budget-section">
                       <h3>Budget Allocation</h3>
                       <div className="budget-row">
-                        {accounts.includes("instagram") && <div className="budget-card"><div className="budget-title"> <img
-                              src={instagramIcon}
-                              alt="Instagram"
-                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
-                            /><span>Instagram (Estimate CPC : $3.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={instagramBudget} onChange={(e) => setInstagramBudget(Number(e.target.value))} className="budget-input" /></div></div>}
-                        {accounts.includes("facebook") && <div className="budget-card"><div className="budget-title"><img
-                              src={facebookIcon}
-                              alt="Facebook"
-                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
-                            /><span>Facebook (Estimate CPC : $2.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={facebookBudget} onChange={(e) => setFacebookBudget(Number(e.target.value))} className="budget-input" /></div></div>}
-                        {accounts.includes("linkedin") && <div className="budget-card"><div className="budget-title"><img
-                              src={linkedinIcon}
-                              alt="LinkedIn"
-                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
-                            /><span>LinkedIn (Estimate CPC : $1.5)</span></div><div className="budget-input-wrapper"><label>Enter Amount ($)</label><input type="number" min="0" step="10" value={linkedinBudget} onChange={(e) => setLinkedinBudget(Number(e.target.value))} className="budget-input" /></div></div>}
+                        {accounts.includes("instagram") && (
+                          <div className="budget-card">
+                            <div className="budget-title">
+                              <img src={instagramIcon} alt="Instagram" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
+                              <span>Instagram (Estimate CPC : $3.5)</span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input type="number" min="0" step="10" value={instagramBudget} onChange={(e) => setInstagramBudget(Number(e.target.value))} className="budget-input" />
+                            </div>
+                          </div>
+                        )}
+                        {accounts.includes("facebook") && (
+                          <div className="budget-card">
+                            <div className="budget-title">
+                              <img src={facebookIcon} alt="Facebook" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
+                              <span>Facebook (Estimate CPC : $2.5)</span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input type="number" min="0" step="10" value={facebookBudget} onChange={(e) => setFacebookBudget(Number(e.target.value))} className="budget-input" />
+                            </div>
+                          </div>
+                        )}
+                        {accounts.includes("linkedin") && (
+                          <div className="budget-card">
+                            <div className="budget-title">
+                              <img src={linkedinIcon} alt="LinkedIn" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
+                              <span>LinkedIn (Estimate CPC : $1.5)</span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input type="number" min="0" step="10" value={linkedinBudget} onChange={(e) => setLinkedinBudget(Number(e.target.value))} className="budget-input" />
+                            </div>
+                          </div>
+                        )}
+                        {accounts.includes("google_ads") && (
+                          <div className="budget-card">
+                            <div className="budget-title">
+                              <img src={googleAdsIcon} alt="Google Ads" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
+                              <span>Google Ads (Estimate CPC : $2.0)</span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input type="number" min="0" step="10" value={googleAdsBudget} onChange={(e) => setGoogleAdsBudget(Number(e.target.value))} className="budget-input" />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="total-budget"><div><h4>Total Budget: ${(accounts.includes("instagram") ? instagramBudget : 0) + (accounts.includes("facebook") ? facebookBudget : 0) + (accounts.includes("linkedin") ? linkedinBudget : 0)}</h4><p>Ad spend is charged directly by each connected social media platform. We don't handle payments.</p></div></div>
+                      <div className="total-budget">
+                        <div>
+                          <h4>
+                            Total Budget: $
+                            {(accounts.includes("instagram") ? instagramBudget : 0) +
+                              (accounts.includes("facebook") ? facebookBudget : 0) +
+                              (accounts.includes("linkedin") ? linkedinBudget : 0) +
+                              (accounts.includes("google_ads") ? googleAdsBudget : 0)}
+                          </h4>
+                          <p>Ad spend is charged directly by each connected social media platform. We don't handle payments.</p>
+                        </div>
+                      </div>
                     </div>
                   </>
                 )}

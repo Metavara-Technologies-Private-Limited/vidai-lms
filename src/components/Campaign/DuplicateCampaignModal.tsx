@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {useEffect,useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Modal,
   Box,
@@ -20,7 +20,14 @@ import viewIcon from "./Icons/view.png";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
 import linkedinIcon from "./Icons/linkedin.png";
+import googleAdsIcon from "./Icons/google-ads.png";
+import { useSelector } from "react-redux";
 import { CampaignAPI } from "../../services/campaign.api";
+import {
+  CAMPAIGN_MODE,
+  type Platform,
+} from "../../constants/campaigns.constants";
+import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Campaign/EmailCampaignModal.css";
 import "../../styles/Campaign/SocialCampaignModal.css"; 
 import EmailTemplateModal from "../../components/Campaign/EmailTemplateModal";
@@ -35,6 +42,9 @@ export default function DuplicateCampaignModal({
   onClose,
   onSave,
 }: DuplicateCampaignModalProps) {
+  const clinic = useSelector(selectClinic);
+  const isGoogleAdsConnected = Boolean(clinic?.google_ads_customer_id?.trim());
+
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
 //   const [fullCampaignData, setFullCampaignData] = useState<any>(null);
@@ -55,9 +65,9 @@ export default function DuplicateCampaignModal({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
 
- const [accounts, setAccounts] = useState<string[]>(
-  campaign.platforms || []
-);
+ const [accounts, setAccounts] = useState<Platform[]>(
+    campaign.platforms || [],
+  );
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
   const [scheduleDate, setScheduleDate] = useState(
@@ -75,51 +85,56 @@ export default function DuplicateCampaignModal({
   const [instagramBudget, setInstagramBudget] = useState(350);
   const [facebookBudget, setFacebookBudget] = useState(250);
   const [linkedinBudget, setLinkedinBudget] = useState(150);
+  const [googleAdsBudget, setGoogleAdsBudget] = useState(200);
 
-  const toggleAccount = (id: string) => {
+  const toggleAccount = (id: Platform) => {
     setAccounts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
 useEffect(() => {
-  const fetchCampaign = async () => {
-    try {
-      const response = await CampaignAPI.get(campaign.id);
-      const data = response.data;
+    const fetchCampaign = async () => {
+      try {
+        const response = await CampaignAPI.get(campaign.id);
+        const data = response.data;
 
-      // Basic
-      setObjective(data.campaign_objective || "");
-      setCampaignDescription(data.campaign_description || "");
-      setAudience(data.target_audience || "");
-      setStartDate(data.start_date || "");
-      setEndDate(data.end_date || "");
-      // setMode(data.posting_mode || data.mode || "");
-      // setMode(data.posting_mode || "");
+        // Basic
+        setObjective(data.campaign_objective || "");
+        setCampaignDescription(data.campaign_description || "");
+        setAudience(data.target_audience || "");
+        setStartDate(data.start_date || "");
+        setEndDate(data.end_date || "");
 
-      // Email
-      if (data.email?.length > 0) {
-        setSubject(data.email[0].subject || "");
-        setEmailBody(data.email[0].email_body || "");
-      }
+        // Email
+        if (data.email?.length > 0) {
+          setSubject(data.email[0].subject || "");
+          setEmailBody(data.email[0].email_body || "");
+        }
 
-      // Social
-      if (data.social_media?.length > 0) {
+        // Social account selection
+        const selectedPlatforms: Platform[] = Array.isArray(data.select_ad_accounts)
+          ? (data.select_ad_accounts.filter(Boolean) as Platform[])
+          : (data.social_media?.map((sm: any) => sm.platform_name).filter(Boolean) as Platform[]) ?? [];
+
+        const fallbackPlatforms = campaign.platforms || [];
+        const derivedAccounts = selectedPlatforms.length > 0 ? selectedPlatforms : fallbackPlatforms;
+
         setAccounts(
-          data.social_media.map((sm: any) => sm.platform_name)
+          derivedAccounts.filter(
+            (platform: Platform) => platform !== "google_ads" || isGoogleAdsConnected,
+          ),
         );
+
+        if (data.campaign_mode === 1) setMode("organic");
+        if (data.campaign_mode === 2) setMode("paid");
+      } catch (error) {
+        console.error("Failed to fetch campaign:", error);
       }
-      if (data.campaign_mode === 1) setMode("organic");
-if (data.campaign_mode === 2) setMode("paid");
+    };
 
-    } catch (error) {
-      console.error("Failed to fetch campaign:", error);
-    }
-  };
-
-  fetchCampaign();
-}, [campaign.id]);
-
+    fetchCampaign();
+  }, [campaign.id, campaign.platforms, isGoogleAdsConnected]);
   const step1Valid =
     campaignName.trim() &&
     campaignDescription.trim() &&
@@ -159,57 +174,103 @@ if (data.campaign_mode === 2) setMode("paid");
         "YYYY-MM-DD HH:mm",
       ).format("YYYY-MM-DDTHH:mm:ss");
 
-      const payload = {
-        clinic: 1,
-        campaign_name: campaignName,
-        campaign_description: campaignDescription,
-        campaign_objective: objective,
-        target_audience: audience,
-        start_date: startDate,
-        end_date: endDate,
-        campaign_mode: campaign.type === "email" ? 2 : 1,
-        selected_start: scheduledDateTime,
-        selected_end: scheduledDateTime,
-        enter_time: scheduleTime,
-        email:
-          campaign.type === "email"
-            ? [
-                {
-                //   id: fullCampaignData.email?.[0]?.id,
-                  audience_name: audience,
-                  subject: subject,
-                  email_body: emailBody,
-                  template_name: "EMAIL",
-                  sender_email: "noreply@clinic.com",
-                  scheduled_at: scheduledDateTime,
-                  is_active: true,
-                },
-              ]
-            : [],
-        social_media:
-  campaign.type === "social"
-    ? accounts.map((platform) => ({
-        platform_name: platform,
-        is_active: true,
-      }))
-    : [],
-                // const existing = fullCampaignData.social_media?.find(
-                //   (sm: any) => sm.platform_name === platform,
-                // );
-                // return {
-                //   id: existing?.id,
-                //   platform_name: platform,
-                //   is_active: true,
-                // };
-    //           })
-    //         : [],
-      };
+      if (campaign.type === "email") {
+        const emailPayload = {
+          campaign_name: campaignName,
+          campaign_description: campaignDescription,
+          campaign_objective: objective,
+          target_audience: audience,
+          start_date: startDate,
+          end_date: endDate,
+          campaign_mode: CAMPAIGN_MODE.EMAIL,
+          status: "Scheduled",
+          selected_start: scheduledDateTime,
+          selected_end: scheduledDateTime,
+          enter_time: scheduleTime || null,
+          email: [
+            {
+              audience_name: audience,
+              subject: subject,
+              email_body: emailBody,
+              template_name: "EMAIL",
+              sender_email: "noreply@clinic.com",
+              scheduled_at: scheduledDateTime,
+              is_active: true,
+            },
+          ],
+        };
 
-      const response = await CampaignAPI.create(payload);
-      onSave(response.data);
+        const response = await CampaignAPI.createEmail(emailPayload);
+        onSave(response.data);
+      } else {
+        const existingBudgetData = { ...(campaign.budget_data ?? {}) };
+        const platformData = {
+          instagram: "",
+          facebook: "",
+          linkedin: "",
+          gmail: "",
+          google_ads: "",
+          ...(campaign.platform_data ?? {}),
+        } as Partial<Record<Platform, string>>;
+
+        if (!isGoogleAdsConnected) {
+          delete platformData.google_ads;
+          delete existingBudgetData.google_ads;
+        }
+
+        const filteredBudgetData = { ...existingBudgetData };
+        const totalBudget =
+          filteredBudgetData.total ??
+          Object.values(filteredBudgetData).reduce(
+            (sum: number, value: unknown) => sum + Number(value || 0),
+            0,
+          );
+
+        const selectedAccounts = accounts.filter(
+          (platform) => platform !== "google_ads" || isGoogleAdsConnected,
+        );
+
+        const filteredPlatformData = { ...platformData };
+        if (!isGoogleAdsConnected) {
+          delete filteredPlatformData.google_ads;
+          delete filteredBudgetData.google_ads;
+        }
+
+        const socialPayload = {
+          campaign_name: campaignName,
+          campaign_description: campaignDescription,
+          campaign_objective: objective,
+          target_audience: audience,
+          start_date: startDate,
+          end_date: endDate,
+          campaign_mode:
+            mode === "paid"
+              ? (["paid_advertising"] as ("organic_posting" | "paid_advertising")[])
+              : (["organic_posting"] as ("organic_posting" | "paid_advertising")[]),
+          campaign_content:
+            campaign.campaign_content || filteredPlatformData.google_ads || campaignName,
+          select_ad_accounts: selectedAccounts,
+          platform_data: filteredPlatformData,
+          budget_data: {
+            ...filteredBudgetData,
+            total: totalBudget,
+          },
+          image_url: campaign.image_url ?? null,
+          selected_start: scheduleDate || null,
+          selected_end: scheduleDate || null,
+          enter_time: scheduleTime || null,
+          status: "Scheduled",
+          is_active: false,
+        };
+
+        const response = await CampaignAPI.createSocial(socialPayload);
+        onSave(response.data);
+      }
       onClose();
-    } catch (error) {
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: unknown; status?: number } };
       console.error("Update error:", error);
+      console.error("Duplicate social create response:", axiosError.response?.status, axiosError.response?.data);
     }
   };
 
@@ -500,11 +561,12 @@ if (data.campaign_mode === 2) setMode("paid");
               </p>
 
               <div className="account-row">
-                {[
-                  { id: "instagram", label: "Instagram", icon: instagramIcon },
-                  { id: "facebook", label: "Facebook", icon: facebookIcon },
-                  { id: "linkedin", label: "LinkedIn", icon: linkedinIcon },
-                ].map((acc) => (
+                {([
+                  { id: "instagram" as Platform, label: "Instagram", icon: instagramIcon },
+                  { id: "facebook" as Platform, label: "Facebook", icon: facebookIcon },
+                  { id: "linkedin" as Platform, label: "LinkedIn", icon: linkedinIcon },
+                  { id: "google_ads" as Platform, label: "Google Ads", icon: googleAdsIcon },
+                ] as const).map((acc) => (
                   <div
                     key={acc.id}
                     className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
@@ -612,6 +674,20 @@ if (data.campaign_mode === 2) setMode("paid");
                     style={{
                       opacity: accounts.includes("linkedin") ? 1 : 0.5,
                       cursor: accounts.includes("linkedin")
+                        ? "text"
+                        : "not-allowed",
+                    }}
+                  />
+                </div>
+
+                <div className="content-row">
+                  <img src={googleAdsIcon} alt="Google Ads" />
+                  <input
+                    placeholder="What would you like to share on Google Ads?"
+                    disabled={!accounts.includes("google_ads")}
+                    style={{
+                      opacity: accounts.includes("google_ads") ? 1 : 0.5,
+                      cursor: accounts.includes("google_ads")
                         ? "text"
                         : "not-allowed",
                     }}
@@ -820,21 +896,42 @@ if (data.campaign_mode === 2) setMode("paid");
                           </div>
                         </div>
                       )}
+
+                      {accounts.includes("google_ads") && (
+                        <div className="budget-card">
+                          <div className="budget-title">
+                            <img
+                              src={googleAdsIcon}
+                              alt="Google Ads"
+                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                            />
+                            <span>Google Ads (Estimate CPC : $2.0)</span>
+                          </div>
+                          <div className="budget-input-wrapper">
+                            <label>Enter Amount ($)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="10"
+                              value={googleAdsBudget}
+                              onChange={(e) =>
+                                setGoogleAdsBudget(Number(e.target.value))
+                              }
+                              className="budget-input"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="total-budget">
                       <div>
                         <h4>
                           Total Budget: $
-                          {(accounts.includes("instagram")
-                            ? instagramBudget
-                            : 0) +
-                            (accounts.includes("facebook")
-                              ? facebookBudget
-                              : 0) +
-                            (accounts.includes("linkedin")
-                              ? linkedinBudget
-                              : 0)}
+                          {(accounts.includes("instagram") ? instagramBudget : 0) +
+                            (accounts.includes("facebook") ? facebookBudget : 0) +
+                            (accounts.includes("linkedin") ? linkedinBudget : 0) +
+                            (accounts.includes("google_ads") ? googleAdsBudget : 0)}
                         </h4>
                         <p>
                           Ad spend is charged directly by each connected social

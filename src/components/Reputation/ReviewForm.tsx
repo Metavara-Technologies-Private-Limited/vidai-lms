@@ -6,7 +6,6 @@ import {
   Button,
   CircularProgress,
   Paper,
-  Rating,
   Stack,
   TextField,
   Typography,
