@@ -74,6 +74,12 @@ const normalizeHexColorInput = (value: string): string => {
 };
 
 const isValidHexColor = (value: string): boolean => /^#[0-9A-F]{6}$/.test(value.toUpperCase());
+const NAME_PATTERN = /^[A-Za-z ]+$/;
+const isAlphabeticName = (value?: string): boolean => {
+	if (!value) return false;
+	const normalized = value.trim().replace(/\s+/g, " ");
+	return normalized.length > 0 && NAME_PATTERN.test(normalized);
+};
 
 const StageConfiguration = ({
 	open,
@@ -166,7 +172,7 @@ const StageConfiguration = ({
 
 	const handleSaveCustomAction = () => {
 		const trimmed = customActionText.trim();
-		if (!trimmed) return;
+		if (!trimmed || !isAlphabeticName(trimmed)) return;
 		const newAction: StageAction = {
 			id: `custom-${Date.now()}`,
 			label: trimmed,
@@ -209,6 +215,7 @@ const StageConfiguration = ({
 
 	const handleSave = async () => {
 		const trimmedStageName = stageName.trim();
+		const normalizedStageName = trimmedStageName.replace(/\s+/g, " ");
 		const trimmedStageType = stageType.trim();
 		const trimmedStageStatus = stageStatus.trim();
 		const trimmedColorCode = colorCode.trim();
@@ -216,6 +223,7 @@ const StageConfiguration = ({
 
 		const hasValidationError =
 			!trimmedStageName ||
+			!isAlphabeticName(trimmedStageName) ||
 			!trimmedStageType ||
 			!trimmedStageStatus ||
 			!isValidHexColor(trimmedColorCode) ||
@@ -228,7 +236,7 @@ const StageConfiguration = ({
 		if (typeof onSave !== "function") return;
 		try {
 			setIsSaving(true);
-			await onSave(trimmedStageName, {
+			await onSave(normalizedStageName, {
 				stageType: trimmedStageType,
 				stageStatus: trimmedStageStatus,
 				colorCode: trimmedColorCode.toUpperCase(),
@@ -368,9 +376,13 @@ const StageConfiguration = ({
 									label="Stage Name"
 									value={stageName}
 									onChange={(event) => onStageNameChange?.(event.target.value)}
-									error={showValidation && !stageName.trim()}
+									error={showValidation && (!stageName.trim() || !isAlphabeticName(stageName))}
 									helperText={
-										showValidation && !stageName.trim() ? "Stage name is required" : " "
+										showValidation && !stageName.trim()
+											? "Stage name is required"
+											: showValidation && !isAlphabeticName(stageName)
+												? "Only letters and spaces are allowed"
+												: " "
 									}
 									sx={{
 										"& .MuiOutlinedInput-root": {
@@ -627,7 +639,7 @@ const StageConfiguration = ({
 												size="small"
 												variant="contained"
 												onClick={handleSaveCustomAction}
-												disabled={!customActionText.trim()}
+												disabled={!isAlphabeticName(customActionText)}
 												sx={{
 													backgroundColor: "#545454",
 													fontSize: 12,

@@ -27,6 +27,17 @@ export const STAGE_TYPE_SEQUENCE: PipelineStageType[] = [
 	"closure",
 ];
 
+const NAME_PATTERN = /^[A-Za-z ]+$/;
+
+export const normalizeNameForCompare = (value: string): string =>
+	value.trim().replace(/\s+/g, " ").toLowerCase();
+
+export const isAlphabeticName = (value?: string): boolean => {
+	if (!value) return false;
+	const normalized = value.trim().replace(/\s+/g, " ");
+	return normalized.length > 0 && NAME_PATTERN.test(normalized);
+};
+
 export const normalizeStageType = (value?: string): PipelineStageType => {
 	const normalized = value?.toLowerCase().trim();
 	if (normalized === "engagement") return "engagement";
