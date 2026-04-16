@@ -31,6 +31,20 @@ export const getAutoNextActionStatus = (
   return taskType === "Book Appointment" ? "completed" : "pending";
 };
 
+// ====================== Referral Department Options ======================
+export const REFERRAL_DEPARTMENT_OPTIONS = [
+  "Doctors",
+  "Corporate HR",
+  "Insurance Partner",
+  "Direct Walk-in",
+  "Online / Digital",
+  "NGO / Trust",
+  "Government Body",
+  "Other",
+] as const;
+
+export type ReferralDepartment = (typeof REFERRAL_DEPARTMENT_OPTIONS)[number];
+
 // ====================== Payload Type ======================
 export type LeadPayload = {
   clinic_id: number;
@@ -44,7 +58,7 @@ export type LeadPayload = {
   full_name: string;
   contact_no: string;
   age: number | null;
-  gender?: "male" | "female" | null;        // ✅ ADDED
+  gender?: "male" | "female" | null;
   marital_status: "single" | "married" | null;
   email: string | null;
   language_preference: string;
@@ -66,6 +80,8 @@ export type LeadPayload = {
   slot: string;
   remark: string;
   is_active: boolean;
+  // ✅ ADDED: Referral Department
+  referral_department?: string | null;
 };
 
 // ====================== Campaign Type ======================
@@ -180,7 +196,7 @@ export const readOnlyStyle = {
 export const labelStyle = {
   fontSize: "0.75rem",
   fontWeight: 600,
-  color: "#475569",
+  color: "#64748B",
   mb: 0.5,
   display: "block",
 };

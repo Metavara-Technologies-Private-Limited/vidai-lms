@@ -107,6 +107,9 @@ export type FormState = {
   appointmentDate: string;
   slot: string;
   remark: string;
+
+  // ✅ ADDED: Referral Department
+  referralDepartment: string;
 };
 
 export const steps = ["Patient Details", "Medical Details", "Book Appointment"];
