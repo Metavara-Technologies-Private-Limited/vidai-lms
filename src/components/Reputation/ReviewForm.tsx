@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
+import axios from "axios";
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
   Paper,
-  Rating,
   Stack,
   TextField,
   Typography,
@@ -20,6 +20,7 @@ type RequestRecord = {
   request_name?: string;
   description?: string;
   collect_on?: "google" | "form" | "both";
+  review_submitted?: boolean;
 };
 
 const resolveRequestRecord = (raw: unknown): RequestRecord => {
@@ -40,6 +41,7 @@ const resolveRequestRecord = (raw: unknown): RequestRecord => {
       record.collect_on === "both"
         ? record.collect_on
         : undefined,
+    review_submitted: record.review_submitted === true,
   };
 };
 
@@ -68,14 +70,14 @@ const ReviewForm = () => {
     if (params.requestId) return params.requestId;
     const segments = location.pathname.split("/").filter(Boolean);
     const idx = segments.findIndex((s) => s === "review");
-    return idx >= 0 ? segments[idx + 1] ?? "" : "";
+    return idx >= 0 ? (segments[idx + 1] ?? "") : "";
   }, [location.pathname, params.requestId]);
 
   const leadId = useMemo(() => {
     if (params.leadId) return params.leadId;
     const segments = location.pathname.split("/").filter(Boolean);
     const idx = segments.findIndex((s) => s === "review");
-    return idx >= 0 ? segments[idx + 2] ?? "" : "";
+    return idx >= 0 ? (segments[idx + 2] ?? "") : "";
   }, [location.pathname, params.leadId]);
 
   const [rating, setRating] = useState<number>(5);
@@ -94,26 +96,41 @@ const ReviewForm = () => {
       if (!requestId || !leadId) {
         if (isMounted) {
           setLoadingRequest(false);
-          setSubmitError("This review link is invalid. Please request a fresh link.");
+          setSubmitError(
+            "This review link is invalid. Please request a fresh link.",
+          );
         }
         return;
       }
 
       const storageKey = `review_submitted_${requestId}_${leadId}`;
       if (localStorage.getItem(storageKey)) {
-        if (isMounted) { setIsSubmitted(true); setLoadingRequest(false); }
+        if (isMounted) {
+          setIsSubmitted(true);
+          setLoadingRequest(false);
+        }
         return;
       }
 
       try {
-        const response = await reputationApi.getPublicRequestById(requestId);
+        const response = await reputationApi.getPublicRequestById(
+          requestId,
+          leadId,
+        );
         if (!isMounted) return;
         const meta = resolveRequestRecord(response);
         setRequestMeta(meta);
 
+        if (meta.review_submitted) {
+          setIsSubmitted(true);
+          return;
+        }
+
         // ── If collect_on === "google" → skip the form entirely, redirect now ──
         if (meta.collect_on === "google") {
-          const googleUrl = (import.meta.env.VITE_GOOGLE_REVIEW_URL as string | undefined)?.trim();
+          const googleUrl = (
+            import.meta.env.VITE_GOOGLE_REVIEW_URL as string | undefined
+          )?.trim();
           if (googleUrl) {
             window.location.href = googleUrl;
             return;
@@ -121,27 +138,37 @@ const ReviewForm = () => {
         }
       } catch {
         if (!isMounted) return;
-        setSubmitError("Unable to load review request details. Please try again.");
+        setSubmitError(
+          "Unable to load review request details. Please try again.",
+        );
       } finally {
         if (isMounted) setLoadingRequest(false);
       }
     };
     void loadRequest();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [requestId, leadId]);
 
   const displayRating = hoverRating > 0 ? hoverRating : rating;
   const starColor = ratingColors[displayRating] ?? "#EAB308";
 
   const canSubmit = useMemo(
-    () => rating >= 1 && rating <= 5 && reviewText.trim().length > 0 && !isSubmitting,
-    [rating, reviewText, isSubmitting]
+    () =>
+      rating >= 1 &&
+      rating <= 5 &&
+      reviewText.trim().length > 0 &&
+      !isSubmitting,
+    [rating, reviewText, isSubmitting],
   );
 
   const handleSubmit = async () => {
     setSubmitError("");
     if (!requestId || !leadId) {
-      setSubmitError("This review link is invalid. Please request a fresh link.");
+      setSubmitError(
+        "This review link is invalid. Please request a fresh link.",
+      );
       return;
     }
     if (rating < 1 || rating > 5) {
@@ -166,20 +193,37 @@ const ReviewForm = () => {
 
       // ── Rating gate: "both" + ≥4 stars → redirect to Google ──
       if (
-        (requestMeta.collect_on === "both" || requestMeta.collect_on === "google") &&
+        (requestMeta.collect_on === "both" ||
+          requestMeta.collect_on === "google") &&
         rating >= 4
       ) {
-        const googleUrl = (import.meta.env.VITE_GOOGLE_REVIEW_URL as string | undefined)?.trim();
+        const googleUrl = (
+          import.meta.env.VITE_GOOGLE_REVIEW_URL as string | undefined
+        )?.trim();
         if (googleUrl) {
           setRedirectingToGoogle(true);
-          setTimeout(() => { window.location.href = googleUrl; }, 1800);
+          setTimeout(() => {
+            window.location.href = googleUrl;
+          }, 1800);
           return;
         }
       }
 
       setIsSubmitted(true);
-    } catch {
-      setSubmitError("Unable to submit your review right now. Please try again.");
+    } catch (err) {
+      let message = "Unable to submit your review right now. Please try again.";
+      if (axios.isAxiosError(err)) {
+        const resp = err.response?.data as Record<string, unknown> | undefined;
+        const detail =
+          resp?.detail ??
+          resp?.error ??
+          resp?.message ??
+          (resp?.errors ? JSON.stringify(resp.errors) : undefined);
+        if (typeof detail === "string" && detail.trim()) {
+          message = detail;
+        }
+      }
+      setSubmitError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -205,18 +249,30 @@ const ReviewForm = () => {
       <Box sx={pageWrapSx}>
         <Paper elevation={0} sx={cardSx}>
           <Stack spacing={2.5} alignItems="center" sx={{ py: 3, px: 2 }}>
-            <Box sx={{
-              width: 64, height: 64, borderRadius: "50%",
-              background: "linear-gradient(135deg,#4285F4 0%,#34A853 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg,#4285F4 0%,#34A853 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <OpenInNewIcon sx={{ color: "#fff", fontSize: 28 }} />
             </Box>
-            <Typography variant="h6" fontWeight={700} align="center" color="#0F172A">
+            <Typography
+              variant="h6"
+              fontWeight={700}
+              align="center"
+              color="#0F172A"
+            >
               Thank you! Taking you to Google Reviews…
             </Typography>
             <Typography variant="body2" color="text.secondary" align="center">
-              Your internal feedback was saved. We'd love it if you shared your experience on Google too!
+              Your internal feedback was saved. We'd love it if you shared your
+              experience on Google too!
             </Typography>
             <CircularProgress size={22} sx={{ color: "#4285F4" }} />
           </Stack>
@@ -232,10 +288,19 @@ const ReviewForm = () => {
         <Paper elevation={0} sx={cardSx}>
           <Stack spacing={2} alignItems="center" sx={{ py: 4, px: 2 }}>
             <CheckCircleOutlineIcon sx={{ fontSize: 56, color: "#22C55E" }} />
-            <Typography variant="h5" fontWeight={700} color="#0F172A" align="center">
+            <Typography
+              variant="h5"
+              fontWeight={700}
+              color="#0F172A"
+              align="center"
+            >
               Thank You!
             </Typography>
-            <Typography align="center" color="text.secondary" sx={{ maxWidth: 320 }}>
+            <Typography
+              align="center"
+              color="text.secondary"
+              sx={{ maxWidth: 320 }}
+            >
               We have received your valuable feedback. We appreciate your time!
             </Typography>
           </Stack>
@@ -249,28 +314,55 @@ const ReviewForm = () => {
     <Box sx={pageWrapSx}>
       <Paper elevation={0} sx={cardSx}>
         <Stack spacing={3}>
-
           {/* Header banner */}
           <Box sx={headerBannerSx}>
             {/* Google-G icon top-right */}
-            {(requestMeta.collect_on === "google" || requestMeta.collect_on === "both") && (
+            {(requestMeta.collect_on === "google" ||
+              requestMeta.collect_on === "both") && (
               <Box sx={googleBadgeSx}>
                 <svg width="18" height="18" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.4 0 6.4 1.2 8.8 3.1l6.6-6.6C35.2 2.5 29.9 0 24 0 14.6 0 6.6 5.5 2.7 13.5l7.7 6C12.2 13.4 17.6 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8C43.8 37.5 46.5 31.4 46.5 24.5z"/>
-                  <path fill="#FBBC05" d="M10.4 28.5c-.6-1.6-.9-3.3-.9-5s.3-3.4.9-5l-7.7-6C.9 15.5 0 19.6 0 24s.9 8.5 2.7 12l7.7-7.5z"/>
-                  <path fill="#34A853" d="M24 48c5.9 0 10.9-2 14.5-5.4l-7.5-5.8c-2 1.4-4.6 2.2-7 2.2-6.4 0-11.8-3.9-13.6-9.5l-7.7 6C6.6 42.5 14.6 48 24 48z"/>
+                  <path
+                    fill="#EA4335"
+                    d="M24 9.5c3.4 0 6.4 1.2 8.8 3.1l6.6-6.6C35.2 2.5 29.9 0 24 0 14.6 0 6.6 5.5 2.7 13.5l7.7 6C12.2 13.4 17.6 9.5 24 9.5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8C43.8 37.5 46.5 31.4 46.5 24.5z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M10.4 28.5c-.6-1.6-.9-3.3-.9-5s.3-3.4.9-5l-7.7-6C.9 15.5 0 19.6 0 24s.9 8.5 2.7 12l7.7-7.5z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M24 48c5.9 0 10.9-2 14.5-5.4l-7.5-5.8c-2 1.4-4.6 2.2-7 2.2-6.4 0-11.8-3.9-13.6-9.5l-7.7 6C6.6 42.5 14.6 48 24 48z"
+                  />
                 </svg>
-                <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#1A73E8" }}>
+                <Typography
+                  sx={{ fontSize: 11, fontWeight: 600, color: "#1A73E8" }}
+                >
                   Google Review
                 </Typography>
               </Box>
             )}
 
-            <Typography variant="overline" sx={{ color: "#6366F1", fontWeight: 700, letterSpacing: 2, fontSize: 11 }}>
+            <Typography
+              variant="overline"
+              sx={{
+                color: "#6366F1",
+                fontWeight: 700,
+                letterSpacing: 2,
+                fontSize: 11,
+              }}
+            >
               Share Your Experience
             </Typography>
-            <Typography variant="h5" fontWeight={800} color="#0F172A" sx={{ mt: 0.5, lineHeight: 1.2 }}>
+            <Typography
+              variant="h5"
+              fontWeight={800}
+              color="#0F172A"
+              sx={{ mt: 0.5, lineHeight: 1.2 }}
+            >
               {requestMeta.request_name || "Review Request"}
             </Typography>
             {requestMeta.description && (
@@ -282,7 +374,12 @@ const ReviewForm = () => {
 
           {/* Star rating */}
           <Box>
-            <Typography variant="subtitle2" fontWeight={700} color="#0F172A" sx={{ mb: 1.5 }}>
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              color="#0F172A"
+              sx={{ mb: 1.5 }}
+            >
               How would you rate us?
             </Typography>
 
@@ -296,7 +393,8 @@ const ReviewForm = () => {
                   sx={{
                     cursor: "pointer",
                     transition: "transform 0.15s",
-                    transform: displayRating >= star ? "scale(1.15)" : "scale(1)",
+                    transform:
+                      displayRating >= star ? "scale(1.15)" : "scale(1)",
                   }}
                 >
                   <StarIcon
@@ -338,7 +436,11 @@ const ReviewForm = () => {
             }}
           />
 
-          {submitError && <Alert severity="error" sx={{ borderRadius: "10px" }}>{submitError}</Alert>}
+          {submitError && (
+            <Alert severity="error" sx={{ borderRadius: "10px" }}>
+              {submitError}
+            </Alert>
+          )}
 
           {/* Submit */}
           <Button
@@ -367,7 +469,12 @@ const ReviewForm = () => {
 
           {/* Google note for "both" mode */}
           {requestMeta.collect_on === "both" && (
-            <Typography variant="caption" color="text.secondary" align="center" display="block">
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              align="center"
+              display="block"
+            >
               ⭐ Rating 4+ stars? We'll also invite you to share on Google.
             </Typography>
           )}
