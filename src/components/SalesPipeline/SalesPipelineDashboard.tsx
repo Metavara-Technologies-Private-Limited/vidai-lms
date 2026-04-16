@@ -133,7 +133,13 @@ const SalesPipelineDashboard = () => {
 		if (!clinic?.id) return false;
 
 		const trimmedPipelineName = pipelineName.trim();
-		if (!isAlphabeticName(trimmedPipelineName)) {
+		const isEditing = Boolean(editPipelineData);
+		const isNameChanged =
+			!isEditing ||
+			normalizeNameForCompare(trimmedPipelineName) !==
+				normalizeNameForCompare(editPipelineData?.pipelineName ?? "");
+
+		if (isNameChanged && !isAlphabeticName(trimmedPipelineName)) {
 			toast.error("Pipeline name can contain only letters and spaces.");
 			return false;
 		}
@@ -198,6 +204,9 @@ const SalesPipelineDashboard = () => {
 
 	const handleOpenCreatePipeline = () => {
 		if (!canEditPipeline) return;
+		if (document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
 		setEditPipelineData(null);
 		setIsCreateModalOpen(true);
 	};
@@ -233,6 +242,9 @@ const SalesPipelineDashboard = () => {
 		const pipeline = getActionPipeline();
 		if (!pipeline) return;
 		handleCloseActionMenu();
+		if (document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
 		setEditPipelineData({
 			id: pipeline.id,
 			pipelineName: pipeline.pipeline_name,

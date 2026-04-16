@@ -255,10 +255,24 @@ export const pipelineApi = {
   },
 
   async getById(pipelineId: string): Promise<Pipeline> {
-    const response = await http.get(`/pipelines/${pipelineId}/`, {
-      params: { clinic_id: storedClinicId() },
-    });
-    return normalizePipeline(unwrapItemData(response.data));
+    try {
+      const response = await http.get(`/pipelines/${pipelineId}/`, {
+        params: { clinic_id: storedClinicId() },
+      });
+      return normalizePipeline(unwrapItemData(response.data));
+    } catch (error) {
+      const candidate = error as { response?: { status?: number } };
+      // Some backend deployments don't expose GET on /pipelines/{id}/
+      if (candidate?.response?.status === 405) {
+        const clinicId = storedClinicId();
+        if (clinicId > 0) {
+          const pipelines = await this.list(clinicId);
+          const fallbackPipeline = pipelines.find((pipeline) => pipeline.id === pipelineId);
+          if (fallbackPipeline) return fallbackPipeline;
+        }
+      }
+      throw error;
+    }
   },
 
   async update(
