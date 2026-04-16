@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { selectClinic } from "../store/clinicSlice";
 import { Alert } from "@mui/material";
 import "../styles/Campaign/campaigns.css";
 import searchIcon from "../components/Campaign/Icons/search.png";
 import CampaignHeader from "../components/Campaign/CampaignHeader";
 import CampaignCard from "../components/Campaign/CampaignCard";
-import { useSelector, useDispatch } from "react-redux";
 import {
   fetchCampaign,
   selectCampaign,
@@ -74,10 +75,12 @@ export default function CampaignsScreen() {
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, campaignAliases, "edit");
 
+  const _campaignClinic = useSelector(selectClinic);
+
   useEffect(() => {
     if (!canViewCampaigns) return;
     dispatch(fetchCampaign());
-  }, [dispatch, canViewCampaigns]);
+  }, [dispatch, canViewCampaigns, _campaignClinic?.id]);
 
   const campaigns = useMemo<Campaign[]>(() => {
     return (rawCampaigns || []).map((api: CampaignAPIType) => {
@@ -100,7 +103,7 @@ export default function CampaignsScreen() {
         if (Array.isArray(api.social_media) && api.social_media.length > 0) {
           platforms = api.social_media
             .filter((s) => s.is_active !== false)
-            .map((s) => (s.platform_name ?? ""))
+            .map((s) => s.platform_name ?? "")
             .filter(Boolean) as Platform[];
         }
       }

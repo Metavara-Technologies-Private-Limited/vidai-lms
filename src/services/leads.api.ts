@@ -120,8 +120,8 @@ export type LeadEmailPayload = {
   sender_email?: string | null;
   scheduled_at?: string | null;
   send_now?: boolean;
-  cc?: string[];           // ← FIXED: added for CC recipients
-  bcc?: string[];          // ← FIXED: added for BCC recipients
+  cc?: string[]; // ← FIXED: added for CC recipients
+  bcc?: string[]; // ← FIXED: added for BCC recipients
   additional_to?: string[]; // ← FIXED: added for extra To recipients
 };
 
@@ -182,7 +182,8 @@ api.interceptors.response.use(
     const url = error?.config?.url;
     const raw = error?.response?.data;
     const skipErrorLog = Boolean(
-      (error?.config as { __skipErrorLog?: boolean } | undefined)?.__skipErrorLog,
+      (error?.config as { __skipErrorLog?: boolean } | undefined)
+        ?.__skipErrorLog,
     );
     const normalizeError = (value: unknown): string => {
       if (value == null) return "Unknown error";
@@ -223,12 +224,18 @@ api.interceptors.response.use(
 );
 
 // ====================== Lead API ======================
+const storedClinicId = (): number =>
+  Number(localStorage.getItem("clinic_id") ?? 0);
+
 export const LeadAPI = {
   list: (clinicId: number) =>
-    api.get(`/leads/list/?clinic=${clinicId}`).then((res) => res.data),
+    api.get(`/leads/list/?clinic_id=${clinicId}`).then((res) => res.data),
 
   create: async (data: LeadPayload): Promise<Lead> => {
-    const response = await api.post<Lead>("/leads/", data);
+    const response = await api.post<Lead>(
+      `/leads/?clinic_id=${data.clinic_id}`,
+      data,
+    );
     console.log("✅ Lead created:", response.data);
     return response.data;
   },
@@ -247,20 +254,30 @@ export const LeadAPI = {
     files.forEach((file) => {
       formData.append("documents", file);
     });
-    const response = await api.post<Lead>("/leads/", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await api.post<Lead>(
+      `/leads/?clinic_id=${data.clinic_id}`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
     console.log("✅ Lead + documents created:", response.data);
     return response.data;
   },
 
   getById: async (leadId: string): Promise<Lead> => {
-    const response = await api.get<Lead>(`/leads/${leadId}/`);
+    const response = await api.get<Lead>(
+      `/leads/${leadId}/?clinic_id=${storedClinicId()}`,
+    );
     return response.data;
   },
 
   update: async (leadId: string, data: Partial<LeadPayload>): Promise<Lead> => {
-    const response = await api.put<Lead>(`/leads/${leadId}/update/`, data);
+    const clinicId = data.clinic_id ?? storedClinicId();
+    const response = await api.put<Lead>(
+      `/leads/${leadId}/update/?clinic_id=${clinicId}`,
+      data,
+    );
     return response.data;
   },
 
@@ -285,23 +302,31 @@ export const LeadAPI = {
       }
     });
     files.forEach((file) => formData.append("documents", file));
-    const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const clinicId =
+      (data as Partial<LeadPayload>).clinic_id ?? storedClinicId();
+    const response = await api.put<Lead>(
+      `/leads/${leadId}/update/?clinic_id=${clinicId}`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
     console.log("✅ Lead + documents updated:", response.data);
     return response.data;
   },
 
   activate: async (leadId: string): Promise<void> => {
-    await api.post(`/leads/${leadId}/activate/`);
+    await api.post(`/leads/${leadId}/activate/?clinic_id=${storedClinicId()}`);
   },
 
   inactivate: async (leadId: string): Promise<void> => {
-    await api.patch(`/leads/${leadId}/inactivate/`);
+    await api.patch(
+      `/leads/${leadId}/inactivate/?clinic_id=${storedClinicId()}`,
+    );
   },
 
   delete: async (leadId: string): Promise<void> => {
-    await api.patch(`/leads/${leadId}/delete/`);
+    await api.patch(`/leads/${leadId}/delete/?clinic_id=${storedClinicId()}`);
   },
 
   // Returns embedded documents from the lead object (no extra API call)
@@ -313,9 +338,13 @@ export const LeadAPI = {
   uploadDocument: async (leadId: string, file: File): Promise<Lead> => {
     const formData = new FormData();
     formData.append("documents", file);
-    const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await api.put<Lead>(
+      `/leads/${leadId}/update/?clinic_id=${storedClinicId()}`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
     return response.data;
   },
 
@@ -345,22 +374,28 @@ export const LeadAPI = {
     // Append new files
     files.forEach((file) => formData.append("documents", file));
 
-    const response = await api.put<Lead>(`/leads/${leadId}/update/`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await api.put<Lead>(
+      `/leads/${leadId}/update/?clinic_id=${current.clinic_id ?? storedClinicId()}`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
     return response.data;
   },
 };
 
 // ====================== Lead Email API ======================
+
 export const LeadEmailAPI = {
   create: async (
     data: LeadEmailPayload,
     options?: { suppressErrorLog?: boolean },
   ): Promise<LeadEmailResponse> => {
     const requestConfig: AxiosRequestConfig = {};
-    (requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }).__skipErrorLog =
-      options?.suppressErrorLog === true;
+    (
+      requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }
+    ).__skipErrorLog = options?.suppressErrorLog === true;
 
     const response = await api.post<LeadEmailResponse>(
       "/lead-email/",
@@ -525,8 +560,19 @@ export const ClinicAPI = {
 // ====================== Department API ======================
 export const DepartmentAPI = {
   listByClinic: async (clinicId: number): Promise<Department[]> => {
-    const clinic = await ClinicAPI.getById(clinicId);
-    return clinic.department || [];
+    // Use the dedicated departments endpoint for accurate per-clinic data
+    try {
+      const response = await api.get<Department[]>(
+        `/departments/?clinic_id=${clinicId}`,
+      );
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      return [];
+    } catch {
+      // Fallback: extract from clinic detail
+      const clinic = await ClinicAPI.getById(clinicId);
+      return clinic.department || [];
+    }
   },
 
   listActiveByClinic: async (clinicId: number): Promise<Department[]> => {

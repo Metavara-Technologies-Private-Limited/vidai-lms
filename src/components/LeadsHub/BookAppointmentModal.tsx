@@ -60,7 +60,7 @@ interface BookAppointmentModalProps {
 export interface AppointmentResult {
   leadId: number | string;
   book_appointment: true;
-  appointment_date: string;   // "YYYY-MM-DD"
+  appointment_date: string; // "YYYY-MM-DD"
   slot: string;
   remark: string;
   personal_id: number | null;
@@ -128,7 +128,6 @@ const floatLabelSx = {
   "&.Mui-focused": { color: "#374151" },
 };
 
-
 type AssigneeOption = {
   id: number;
   first_name?: string;
@@ -189,7 +188,8 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
 };
 
 const assigneeLabel = (option: AssigneeOption): string => {
-  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const fullName =
+    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   if (fullName) return fullName;
   if (option.username?.trim()) return option.username.trim();
   if (option.email?.trim()) return option.email.trim();
@@ -207,24 +207,26 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 }) => {
   // ── Form state ──
   const [department, setDepartment] = React.useState("");
-  const [personnel, setPersonnel]   = React.useState("");
+  const [personnel, setPersonnel] = React.useState("");
   const [selectedPersonnelOption, setSelectedPersonnelOption] =
     React.useState<AssigneeOption | null>(null);
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
-  const [slot, setSlot]             = React.useState("");
-  const [remark, setRemark]         = React.useState("");
-  const [saving, setSaving]         = React.useState(false);
-  const [error, setError]           = React.useState<string | null>(null);
+  const [slot, setSlot] = React.useState("");
+  const [remark, setRemark] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   // ── Lookup data ──
-  const [departments, setDepartments]       = React.useState<Department[]>([]);
-  const [personnelOptions, setPersonnelOptions] = React.useState<AssigneeOption[]>([]);
+  const [departments, setDepartments] = React.useState<Department[]>([]);
+  const [personnelOptions, setPersonnelOptions] = React.useState<
+    AssigneeOption[]
+  >([]);
   const [personnelSearch, setPersonnelSearch] = React.useState("");
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
-  const [loadingPersonnel, setLoadingPersonnel]     = React.useState(false);
+  const [loadingPersonnel, setLoadingPersonnel] = React.useState(false);
 
   const clinicId = lead?.clinic_id ?? 1;
-  const today    = dayjs().startOf("day");
+  const today = dayjs().startOf("day");
 
   // ── Reset form when modal opens ──
   React.useEffect(() => {
@@ -293,38 +295,54 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     if (!lead) return;
 
     // Validation
-    if (IS_MEDICAL_APP && !department) { setError("Please select a department."); return; }
-    if (!personnel)    { setError("Please select a personnel."); return; }
-    if (!selectedDate) { setError("Please select a date."); return; }
-    if (!slot)         { setError("Please select a time slot."); return; }
+    if (IS_MEDICAL_APP && !department) {
+      setError("Please select a department.");
+      return;
+    }
+    if (!personnel) {
+      setError("Please select a personnel.");
+      return;
+    }
+    if (!selectedDate) {
+      setError("Please select a date.");
+      return;
+    }
+    if (!slot) {
+      setError("Please select a time slot.");
+      return;
+    }
 
     const appointmentDateStr = selectedDate.format("YYYY-MM-DD");
-    const deptId      = IS_MEDICAL_APP ? Number(department) : (lead.department_id ?? 0);
+    const deptId = IS_MEDICAL_APP
+      ? Number(department)
+      : (lead.department_id ?? 0);
     const personnelId = Number(personnel);
 
     // Lookup display names for the optimistic update
     const selectedDept = departments.find((d) => d.id === deptId);
-    const selectedEmp = selectedPersonnelOption ?? personnelOptions.find((u) => u.id === personnelId);
+    const selectedEmp =
+      selectedPersonnelOption ??
+      personnelOptions.find((u) => u.id === personnelId);
 
     setSaving(true);
     setError(null);
 
     try {
-      await api.put(`/leads/${lead.id}/update/`, {
-        clinic_id:          clinicId,
-        department_id:      deptId,
-        full_name:          lead.full_name || lead.name,
-        contact_no:         lead.contact_no || lead.phone || lead.phone_number || "",
-        source:             lead.source || "Unknown",
+      await api.put(`/leads/${lead.id}/update/?clinic_id=${clinicId}`, {
+        clinic_id: clinicId,
+        department_id: deptId,
+        full_name: lead.full_name || lead.name,
+        contact_no: lead.contact_no || lead.phone || lead.phone_number || "",
+        source: lead.source || "Unknown",
         treatment_interest: lead.treatment_interest || "N/A",
-        lead_status:        "appointment",
-        book_appointment:   true,
-        appointment_date:   appointmentDateStr,
+        lead_status: "appointment",
+        book_appointment: true,
+        appointment_date: appointmentDateStr,
         slot,
-        remark:             remark.trim(),
-        is_active:          lead.is_active !== false,
-        partner_inquiry:    lead.partner_inquiry || false,
-        personal_id:        personnelId,
+        remark: remark.trim(),
+        is_active: lead.is_active !== false,
+        partner_inquiry: lead.partner_inquiry || false,
+        personal_id: personnelId,
       });
 
       toast.success("Appointment booked successfully!", {
@@ -335,20 +353,22 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 
       // ── Notify parent with full result — no page refresh needed ──
       onSaved?.({
-        leadId:           lead.id,
+        leadId: lead.id,
         book_appointment: true,
         appointment_date: appointmentDateStr,
         slot,
-        remark:           remark.trim(),
-        personal_id:      personnelId,
-        department_id:    deptId,
-        personnelName:    selectedEmp ? assigneeLabel(selectedEmp) : "",
-        departmentName:   selectedDept?.name ?? "",
+        remark: remark.trim(),
+        personal_id: personnelId,
+        department_id: deptId,
+        personnelName: selectedEmp ? assigneeLabel(selectedEmp) : "",
+        departmentName: selectedDept?.name ?? "",
       });
 
       onClose();
     } catch (err) {
-      setError(extractErr(err, "Failed to book appointment. Please try again."));
+      setError(
+        extractErr(err, "Failed to book appointment. Please try again."),
+      );
     } finally {
       setSaving(false);
     }
@@ -407,7 +427,6 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 
       {/* ══ Body ════════════════════════════════════════════════════════════ */}
       <DialogContent sx={{ px: 3, pt: 0, pb: 2 }}>
-
         {/* Error banner */}
         {error && (
           <Alert
@@ -455,14 +474,18 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
                 onChange={(e) => setDepartment(e.target.value)}
                 disabled={saving || loadingDepartments}
                 endAdornment={
-                  loadingDepartments
-                    ? <CircularProgress size={14} sx={{ mr: 2 }} />
-                    : null
+                  loadingDepartments ? (
+                    <CircularProgress size={14} sx={{ mr: 2 }} />
+                  ) : null
                 }
               >
-                <MenuItem value=""><em>Select Department</em></MenuItem>
+                <MenuItem value="">
+                  <em>Select Department</em>
+                </MenuItem>
                 {departments.map((d) => (
-                  <MenuItem key={d.id} value={String(d.id)}>{d.name}</MenuItem>
+                  <MenuItem key={d.id} value={String(d.id)}>
+                    {d.name}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -515,7 +538,9 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
                   ...params.InputProps,
                   endAdornment: (
                     <>
-                      {loadingPersonnel ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null}
+                      {loadingPersonnel ? (
+                        <CircularProgress size={14} sx={{ mr: 1 }} />
+                      ) : null}
                       {params.InputProps.endAdornment}
                     </>
                   ),
@@ -526,8 +551,14 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         </Box>
 
         {/* ── Row 2: Date + Slot ── */}
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mb: 2 }}>
-
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 2,
+            mb: 2,
+          }}
+        >
           {/* DatePicker — same as EditLead.tsx Step 3, floated label */}
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
@@ -563,13 +594,16 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
               onChange={(e) => setSlot(e.target.value)}
               disabled={saving}
             >
-              <MenuItem value=""><em>Select Time Slot</em></MenuItem>
+              <MenuItem value="">
+                <em>Select Time Slot</em>
+              </MenuItem>
               {SLOT_OPTIONS.map((s) => (
-                <MenuItem key={s} value={s}>{s}</MenuItem>
+                <MenuItem key={s} value={s}>
+                  {s}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
-
         </Box>
 
         {/* ── Remark ── */}
@@ -586,7 +620,6 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
           InputLabelProps={{ shrink: true, sx: floatLabelSx }}
           sx={modalFieldSx}
         />
-
       </DialogContent>
 
       {/* ══ Footer ══════════════════════════════════════════════════════════ */}
@@ -636,9 +669,11 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
             "&:hover": { bgcolor: "#111827", boxShadow: "none" },
           }}
         >
-          {saving
-            ? <CircularProgress size={16} sx={{ color: "#fff" }} />
-            : "Save"}
+          {saving ? (
+            <CircularProgress size={16} sx={{ color: "#fff" }} />
+          ) : (
+            "Save"
+          )}
         </Button>
       </DialogActions>
     </Dialog>

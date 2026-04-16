@@ -141,6 +141,29 @@ http.interceptors.request.use(async (config) => {
     }
   }
 
+  // Ensure active clinic context is sent across all clinic-scoped modules.
+  // Skip auth/proxy endpoints where clinic is not relevant.
+  const clinicId = Number(localStorage.getItem("clinic_id") ?? 0);
+  const shouldAttachClinic =
+    Number.isFinite(clinicId) &&
+    clinicId > 0 &&
+    !config.url?.includes("/auth/login/") &&
+    !config.url?.includes("/proxy/login/") &&
+    !config.url?.includes("/token/refresh/") &&
+    !config.url?.includes("/me/profile/") &&
+    !config.url?.includes("/me/photo/") &&
+    !config.url?.includes("/users-search/");
+
+  if (shouldAttachClinic) {
+    const params = (config.params ?? {}) as Record<string, unknown>;
+    if (params.clinic_id == null && params.clinic == null) {
+      config.params = {
+        ...params,
+        clinic_id: clinicId,
+      };
+    }
+  }
+
   return config;
 });
 

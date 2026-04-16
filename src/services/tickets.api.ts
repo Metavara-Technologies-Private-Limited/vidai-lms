@@ -28,20 +28,32 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+const storedClinicId = (): number =>
+  Number(localStorage.getItem("clinic_id") ?? 0);
+
 export const ticketsApi = {
   getTickets: async (filters?: TicketFilters): Promise<TicketListItem[]> => {
-    const response = await apiClient.get("/tickets/", { params: filters });
+    const response = await apiClient.get("/tickets/", {
+      params: {
+        ...(filters ?? {}),
+        clinic_id: storedClinicId(),
+      },
+    });
     // Defensive check for Django Rest Framework pagination
     return response.data?.results || response.data || [];
   },
 
   createTicket: async (data: CreateTicketRequest): Promise<TicketDetail> => {
-    const response = await apiClient.post("/tickets/create/", data);
+    const response = await apiClient.post("/tickets/create/", data, {
+      params: { clinic_id: storedClinicId() },
+    });
     return response.data;
   },
 
   getTicketById: async (ticketId: string): Promise<TicketDetail> => {
-    const response = await apiClient.get(`/tickets/${ticketId}/`);
+    const response = await apiClient.get(`/tickets/${ticketId}/`, {
+      params: { clinic_id: storedClinicId() },
+    });
     return response.data;
   },
 
@@ -49,7 +61,9 @@ export const ticketsApi = {
     ticketId: string,
     data: UpdateTicketRequest,
   ): Promise<TicketDetail> => {
-    const response = await apiClient.put(`/tickets/${ticketId}/update/`, data);
+    const response = await apiClient.put(`/tickets/${ticketId}/update/`, data, {
+      params: { clinic_id: storedClinicId() },
+    });
     return response.data;
   },
 
@@ -58,9 +72,15 @@ export const ticketsApi = {
     assignedToId: string | number,
   ): Promise<TicketDetail> => {
     // Note: Swagger definition says assigned_to_id is a string property in the body
-    const response = await apiClient.post(`/tickets/${ticketId}/assign/`, {
-      assigned_to_id: String(assignedToId),
-    });
+    const response = await apiClient.post(
+      `/tickets/${ticketId}/assign/`,
+      {
+        assigned_to_id: String(assignedToId),
+      },
+      {
+        params: { clinic_id: storedClinicId() },
+      },
+    );
     return response.data;
   },
 
@@ -71,6 +91,9 @@ export const ticketsApi = {
     const response = await apiClient.post(
       `/tickets/${ticketId}/status/`,
       payload,
+      {
+        params: { clinic_id: storedClinicId() },
+      },
     );
     return response.data;
   },
@@ -83,13 +106,16 @@ export const ticketsApi = {
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
+        params: { clinic_id: storedClinicId() },
       },
     );
     return response.data;
   },
 
   getDashboardCount: async (): Promise<TicketDashboardCount> => {
-    const response = await apiClient.get("/tickets/dashboard-count/");
+    const response = await apiClient.get("/tickets/dashboard-count/", {
+      params: { clinic_id: storedClinicId() },
+    });
     return response.data;
   },
 
@@ -100,6 +126,9 @@ export const ticketsApi = {
     const response = await apiClient.post(
       `/tickets/${ticketId}/reply/`,
       payload,
+      {
+        params: { clinic_id: storedClinicId() },
+      },
     );
     return response.data;
   },

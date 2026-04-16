@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { LeadAPI, api, type Lead, type LeadDocument } from "../services/leads.api";
+import {
+  LeadAPI,
+  api,
+  type Lead,
+  type LeadDocument,
+} from "../services/leads.api";
 import type { RootState } from ".";
 
 // ====================== API Error Type ======================
@@ -123,47 +128,57 @@ export const bookAppointment = createAsyncThunk<
   { leadId: string; appointmentData: any },
   { leadId: string; payload: any },
   { rejectValue: string; state: { leads: LeadState } }
->("leads/bookAppointment", async ({ leadId, payload }, { rejectWithValue, getState }) => {
-  const lead = getState().leads.leads.find((l) => l.id === leadId);
-  if (!lead) return rejectWithValue("Lead not found in state");
+>(
+  "leads/bookAppointment",
+  async ({ leadId, payload }, { rejectWithValue, getState }) => {
+    const lead = getState().leads.leads.find((l) => l.id === leadId);
+    if (!lead) return rejectWithValue("Lead not found in state");
 
-  const normalizedAppointmentDate = formatDateForApi(payload.appointment_date);
-  if (!normalizedAppointmentDate) {
-    return rejectWithValue("Invalid appointment date. Please select a valid date.");
-  }
+    const normalizedAppointmentDate = formatDateForApi(
+      payload.appointment_date,
+    );
+    if (!normalizedAppointmentDate) {
+      return rejectWithValue(
+        "Invalid appointment date. Please select a valid date.",
+      );
+    }
 
-  const apiPayload: any = {
-    clinic_id: lead.clinic_id,
-    department_id: lead.department_id,
-    full_name: lead.full_name,
-    contact_no: lead.contact_no,
-    source: lead.source || "Unknown",
-    treatment_interest: lead.treatment_interest || "N/A",
-    book_appointment: true,
-    appointment_date: normalizedAppointmentDate,
-    slot: payload.slot,
-    is_active: lead.is_active !== false,
-    partner_inquiry: lead.partner_inquiry || false,
-    lead_status: "appointment",
-    ...(payload.assigned_to_id && { assigned_to_id: payload.assigned_to_id }),
-    ...(payload.remark && { remark: payload.remark }),
-  };
+    const apiPayload: any = {
+      clinic_id: lead.clinic_id,
+      department_id: lead.department_id,
+      full_name: lead.full_name,
+      contact_no: lead.contact_no,
+      source: lead.source || "Unknown",
+      treatment_interest: lead.treatment_interest || "N/A",
+      book_appointment: true,
+      appointment_date: normalizedAppointmentDate,
+      slot: payload.slot,
+      is_active: lead.is_active !== false,
+      partner_inquiry: lead.partner_inquiry || false,
+      lead_status: "appointment",
+      ...(payload.assigned_to_id && { assigned_to_id: payload.assigned_to_id }),
+      ...(payload.remark && { remark: payload.remark }),
+    };
 
-  try {
-    await api.put(`/leads/${leadId}/update/`, apiPayload);
-    console.log("✅ Appointment saved to server:", leadId);
-  } catch (err) {
-    const error = err as ApiError;
-    const message =
-      error?.response?.data?.detail ||
-      (error?.response?.data as any)?.non_field_errors?.[0] ||
-      error?.message ||
-      "Failed to book appointment";
-    return rejectWithValue(message);
-  }
+    try {
+      await api.put(
+        `/leads/${leadId}/update/?clinic_id=${lead.clinic_id}`,
+        apiPayload,
+      );
+      console.log("✅ Appointment saved to server:", leadId);
+    } catch (err) {
+      const error = err as ApiError;
+      const message =
+        error?.response?.data?.detail ||
+        (error?.response?.data as any)?.non_field_errors?.[0] ||
+        error?.message ||
+        "Failed to book appointment";
+      return rejectWithValue(message);
+    }
 
-  return { leadId, appointmentData: payload };
-});
+    return { leadId, appointmentData: payload };
+  },
+);
 
 /** Convert Lead */
 export const convertLead = createAsyncThunk<
@@ -176,9 +191,11 @@ export const convertLead = createAsyncThunk<
     if (!lead) throw new Error("Lead not found in state");
 
     const normalizedAppointmentDate = formatDateForApi(lead.appointment_date);
-    const shouldKeepAppointment = Boolean(lead.book_appointment && normalizedAppointmentDate);
+    const shouldKeepAppointment = Boolean(
+      lead.book_appointment && normalizedAppointmentDate,
+    );
 
-    await api.put(`/leads/${leadUuid}/update/`, {
+    await api.put(`/leads/${leadUuid}/update/?clinic_id=${lead.clinic_id}`, {
       clinic_id: lead.clinic_id,
       department_id: lead.department_id,
       full_name: lead.full_name,
@@ -186,8 +203,10 @@ export const convertLead = createAsyncThunk<
       source: lead.source || "Unknown",
       treatment_interest: lead.treatment_interest || "N/A",
       book_appointment: shouldKeepAppointment,
-      appointment_date: shouldKeepAppointment ? normalizedAppointmentDate : null,
-      slot: shouldKeepAppointment ? (lead.slot || "") : "",
+      appointment_date: shouldKeepAppointment
+        ? normalizedAppointmentDate
+        : null,
+      slot: shouldKeepAppointment ? lead.slot || "" : "",
       is_active: lead.is_active !== false,
       partner_inquiry: lead.partner_inquiry || false,
       lead_status: "converted",
@@ -265,7 +284,9 @@ export const uploadLeadDocument = createAsyncThunk<
   } catch (err) {
     const error = err as ApiError;
     return rejectWithValue(
-      error?.response?.data?.detail || error?.message || "Failed to upload document"
+      error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to upload document",
     );
   }
 });
@@ -285,7 +306,9 @@ export const uploadLeadDocuments = createAsyncThunk<
   } catch (err) {
     const error = err as ApiError;
     return rejectWithValue(
-      error?.response?.data?.detail || error?.message || "Failed to upload documents"
+      error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to upload documents",
     );
   }
 });
@@ -298,7 +321,7 @@ export const uploadLeadDocuments = createAsyncThunk<
  * Lead.documents: LeadDocument[] after the API type was updated.
  */
 export const fetchLeadDocuments = createAsyncThunk<
-  { leadId: string; documents: LeadDocument[] },  // ← was string[], now LeadDocument[]
+  { leadId: string; documents: LeadDocument[] }, // ← was string[], now LeadDocument[]
   string,
   { rejectValue: string }
 >("leads/fetchDocuments", async (leadId, { rejectWithValue }) => {
@@ -308,7 +331,9 @@ export const fetchLeadDocuments = createAsyncThunk<
   } catch (err) {
     const error = err as ApiError;
     return rejectWithValue(
-      error?.response?.data?.detail || error?.message || "Failed to fetch documents"
+      error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to fetch documents",
     );
   }
 });
@@ -340,7 +365,7 @@ const leadSlice = createSlice({
         state.leads = action.payload.map((lead) => ({
           ...lead,
           status: normalizeStatus(
-            (lead as any).lead_status || (lead as any).status || "new"
+            (lead as any).lead_status || (lead as any).status || "new",
           ),
         }));
       })
@@ -361,11 +386,15 @@ const leadSlice = createSlice({
                 book_appointment: true,
                 appointment_date: payload.appointment_date,
                 slot: payload.slot,
-                ...(payload.department_id && { department_id: payload.department_id }),
-                ...(payload.assigned_to_id && { assigned_to_id: payload.assigned_to_id }),
+                ...(payload.department_id && {
+                  department_id: payload.department_id,
+                }),
+                ...(payload.assigned_to_id && {
+                  assigned_to_id: payload.assigned_to_id,
+                }),
                 ...(payload.remark && { remark: payload.remark }),
               }
-            : lead
+            : lead,
         );
       })
       .addCase(bookAppointment.fulfilled, () => {
@@ -381,7 +410,7 @@ const leadSlice = createSlice({
                 lead_status: "new" as any,
                 book_appointment: false,
               }
-            : lead
+            : lead,
         );
         state.error = action.payload ?? "Failed to book appointment";
       })
@@ -390,8 +419,12 @@ const leadSlice = createSlice({
       .addCase(convertLead.fulfilled, (state, action) => {
         state.leads = state.leads.map((lead) =>
           lead.id === action.payload
-            ? { ...lead, status: "Converted" as any, lead_status: "converted" as any }
-            : lead
+            ? {
+                ...lead,
+                status: "Converted" as any,
+                lead_status: "converted" as any,
+              }
+            : lead,
         );
       })
       .addCase(convertLead.rejected, (state, action) => {
@@ -404,11 +437,15 @@ const leadSlice = createSlice({
         state.error = null;
       })
       .addCase(deleteLead.fulfilled, (state, action) => {
-        state.deletingIds = state.deletingIds.filter((id) => id !== action.payload);
+        state.deletingIds = state.deletingIds.filter(
+          (id) => id !== action.payload,
+        );
         state.leads = state.leads.filter((lead) => lead.id !== action.payload);
       })
       .addCase(deleteLead.rejected, (state, action) => {
-        state.deletingIds = state.deletingIds.filter((id) => id !== action.meta.arg);
+        state.deletingIds = state.deletingIds.filter(
+          (id) => id !== action.meta.arg,
+        );
         state.error = action.payload ?? "Failed to delete lead";
       })
 
@@ -418,11 +455,17 @@ const leadSlice = createSlice({
         state.error = null;
       })
       .addCase(deleteLeads.fulfilled, (state, action) => {
-        state.deletingIds = state.deletingIds.filter((id) => !action.payload.includes(id));
-        state.leads = state.leads.filter((lead) => !action.payload.includes(lead.id));
+        state.deletingIds = state.deletingIds.filter(
+          (id) => !action.payload.includes(id),
+        );
+        state.leads = state.leads.filter(
+          (lead) => !action.payload.includes(lead.id),
+        );
       })
       .addCase(deleteLeads.rejected, (state, action) => {
-        state.deletingIds = state.deletingIds.filter((id) => !action.meta.arg.includes(id));
+        state.deletingIds = state.deletingIds.filter(
+          (id) => !action.meta.arg.includes(id),
+        );
         state.error = action.payload ?? "Failed to delete leads";
       })
 
@@ -437,7 +480,7 @@ const leadSlice = createSlice({
         state.leads = state.leads.map((lead) =>
           lead.id === leadId
             ? { ...lead, documents: updatedLead.documents ?? lead.documents }
-            : lead
+            : lead,
         );
       })
       .addCase(uploadLeadDocument.rejected, (state, action) => {
@@ -456,7 +499,7 @@ const leadSlice = createSlice({
         state.leads = state.leads.map((lead) =>
           lead.id === leadId
             ? { ...lead, documents: updatedLead.documents ?? lead.documents }
-            : lead
+            : lead,
         );
       })
       .addCase(uploadLeadDocuments.rejected, (state, action) => {
@@ -469,20 +512,24 @@ const leadSlice = createSlice({
       .addCase(fetchLeadDocuments.fulfilled, (state, action) => {
         const { leadId, documents } = action.payload;
         state.leads = state.leads.map((lead) =>
-          lead.id === leadId ? { ...lead, documents } : lead
+          lead.id === leadId ? { ...lead, documents } : lead,
         );
       });
   },
 });
 
-export const { clearLeads, clearError, clearDocumentsError } = leadSlice.actions;
+export const { clearLeads, clearError, clearDocumentsError } =
+  leadSlice.actions;
 export default leadSlice.reducer;
 
 // ====================== Selectors ======================
 export const selectLeads = (state: { leads: LeadState }) => state.leads.leads;
-export const selectLeadsLoading = (state: { leads: LeadState }) => state.leads.loading;
-export const selectLeadsError = (state: { leads: LeadState }) => state.leads.error;
-export const selectDeletingIds = (state: { leads: LeadState }) => state.leads.deletingIds;
+export const selectLeadsLoading = (state: { leads: LeadState }) =>
+  state.leads.loading;
+export const selectLeadsError = (state: { leads: LeadState }) =>
+  state.leads.error;
+export const selectDeletingIds = (state: { leads: LeadState }) =>
+  state.leads.deletingIds;
 export const selectIsLeadDeleting =
   (leadId: string) => (state: { leads: LeadState }) =>
     state.leads.deletingIds.includes(leadId);

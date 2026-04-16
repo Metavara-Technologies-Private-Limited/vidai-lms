@@ -1894,26 +1894,29 @@ export default function LeadDetailView() {
     if (!actionType.trim() || !actionDescription.trim() || !activeLead) return;
     try {
       setActionSubmitting(true);
-      await api.put(`/leads/${decodeURIComponent(id || "")}/update/`, {
-        clinic_id: activeLead.clinic_id,
-        department_id: activeLead.department_id,
-        full_name: activeLead.full_name || activeLead.name,
-        contact_no:
-          activeLead.contact_no ||
-          activeLead.phone ||
-          activeLead.phone_number ||
-          "",
-        source: activeLead.source || "Unknown",
-        treatment_interest: activeLead.treatment_interest || "N/A",
-        book_appointment: activeLead.book_appointment || false,
-        appointment_date: activeLead.appointment_date || "",
-        slot: activeLead.slot || "",
-        is_active: activeLead.is_active !== false,
-        partner_inquiry: activeLead.partner_inquiry || false,
-        next_action_type: actionType,
-        next_action_status: actionStatus,
-        next_action_description: actionDescription.trim(),
-      });
+      await api.put(
+        `/leads/${decodeURIComponent(id || "")}/update/?clinic_id=${activeLead.clinic_id ?? 0}`,
+        {
+          clinic_id: activeLead.clinic_id,
+          department_id: activeLead.department_id,
+          full_name: activeLead.full_name || activeLead.name,
+          contact_no:
+            activeLead.contact_no ||
+            activeLead.phone ||
+            activeLead.phone_number ||
+            "",
+          source: activeLead.source || "Unknown",
+          treatment_interest: activeLead.treatment_interest || "N/A",
+          book_appointment: activeLead.book_appointment || false,
+          appointment_date: activeLead.appointment_date || "",
+          slot: activeLead.slot || "",
+          is_active: activeLead.is_active !== false,
+          partner_inquiry: activeLead.partner_inquiry || false,
+          next_action_type: actionType,
+          next_action_status: actionStatus,
+          next_action_description: actionDescription.trim(),
+        },
+      );
       setOpenAddActionDialog(false);
       setActionType("");
       setActionStatus("pending");

@@ -1,10 +1,13 @@
 import { http } from "./http";
 
+const storedClinicId = (): number =>
+  Number(localStorage.getItem("clinic_id") ?? 0);
+
 /**
  * API Template Types (mail, sms, whatsapp)
  * Exported as a named export
  */
-export type APITemplateType = 'mail' | 'sms' | 'whatsapp';
+export type APITemplateType = "mail" | "sms" | "whatsapp";
 
 export interface TemplateDocument {
   id?: string | number;
@@ -38,8 +41,10 @@ export interface SMSTemplateRequest {
 
 type TemplatePayload = FormData | Record<string, unknown>;
 
-const extractDocumentsFromTemplate = (template: unknown): TemplateDocument[] => {
-  if (!template || typeof template !== 'object') {
+const extractDocumentsFromTemplate = (
+  template: unknown,
+): TemplateDocument[] => {
+  if (!template || typeof template !== "object") {
     return [];
   }
 
@@ -68,7 +73,9 @@ const TemplateService = {
    * GET /api/templates/{type}/
    */
   getTemplates: async (type: APITemplateType) => {
-    const response = await http.get(`/templates/${type}/`);
+    const response = await http.get(`/templates/${type}/`, {
+      params: { clinic_id: storedClinicId() },
+    });
     return response.data;
   },
 
@@ -77,7 +84,9 @@ const TemplateService = {
    * GET /api/templates/{type}/{templateId}/
    */
   getTemplateById: async (type: APITemplateType, templateId: string) => {
-    const response = await http.get(`/templates/${type}/${templateId}/`);
+    const response = await http.get(`/templates/${type}/${templateId}/`, {
+      params: { clinic_id: storedClinicId() },
+    });
     return response.data;
   },
 
@@ -86,7 +95,10 @@ const TemplateService = {
    * Reuses GET /api/templates/{type}/{templateId}/ and extracts document arrays
    * from known response shapes.
    */
-  getTemplateDocuments: async (type: APITemplateType, templateId: string): Promise<TemplateDocument[]> => {
+  getTemplateDocuments: async (
+    type: APITemplateType,
+    templateId: string,
+  ): Promise<TemplateDocument[]> => {
     const template = await TemplateService.getTemplateById(type, templateId);
     return extractDocumentsFromTemplate(template);
   },
@@ -99,10 +111,22 @@ const TemplateService = {
    * otherwise sends as JSON.
    */
   createTemplate: async (type: APITemplateType, data: TemplatePayload) => {
-    const config = data instanceof FormData
-      ? { headers: { "Content-Type": "multipart/form-data" } }
-      : undefined;
-    const response = await http.post(`/templates/${type}/create/`, data, config);
+    if (!(data instanceof FormData)) {
+      data = {
+        ...(data as Record<string, unknown>),
+        clinic: Number(
+          (data as Record<string, unknown>).clinic ?? storedClinicId(),
+        ),
+      };
+    }
+    const config =
+      data instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined;
+    const response = await http.post(`/templates/${type}/create/`, data, {
+      ...config,
+      params: { clinic_id: storedClinicId() },
+    });
     return response.data;
   },
 
@@ -110,11 +134,31 @@ const TemplateService = {
    * Update an existing template.
    * PUT /api/templates/{type}/{templateId}/update/
    */
-  updateTemplate: async (type: APITemplateType, templateId: string, data: TemplatePayload) => {
-    const config = data instanceof FormData
-      ? { headers: { "Content-Type": "multipart/form-data" } }
-      : undefined;
-    const response = await http.put(`/templates/${type}/${templateId}/update/`, data, config);
+  updateTemplate: async (
+    type: APITemplateType,
+    templateId: string,
+    data: TemplatePayload,
+  ) => {
+    if (!(data instanceof FormData)) {
+      data = {
+        ...(data as Record<string, unknown>),
+        clinic: Number(
+          (data as Record<string, unknown>).clinic ?? storedClinicId(),
+        ),
+      };
+    }
+    const config =
+      data instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined;
+    const response = await http.put(
+      `/templates/${type}/${templateId}/update/`,
+      data,
+      {
+        ...config,
+        params: { clinic_id: storedClinicId() },
+      },
+    );
     return response.data;
   },
 
@@ -138,19 +182,19 @@ const TemplateService = {
   uploadTemplateDocument: async (
     type: APITemplateType,
     templateId: string,
-    file: File | FormData
+    file: File | FormData,
   ) => {
     const payload = new FormData();
 
     if (file instanceof FormData) {
       // Extract the file from the incoming FormData and rebuild cleanly
-      const existingFile = file.get('file');
+      const existingFile = file.get("file");
       if (existingFile instanceof File) {
         payload.append("file", existingFile);
       } else {
         // Fallback: copy all entries
         file.forEach((value, key) => {
-          if (key !== 'template_id' && key !== 'template') {
+          if (key !== "template_id" && key !== "template") {
             payload.append(key, value);
           }
         });
@@ -169,7 +213,9 @@ const TemplateService = {
     console.group(`📎 uploadTemplateDocument [${type}] id=${templateId}`);
     payload.forEach((value, key) => {
       if (value instanceof File) {
-        console.log(`  ${key}: File(name=${value.name}, size=${value.size}, type=${value.type})`);
+        console.log(
+          `  ${key}: File(name=${value.name}, size=${value.size}, type=${value.type})`,
+        );
       } else {
         console.log(`  ${key}:`, value);
       }
@@ -179,7 +225,10 @@ const TemplateService = {
     const response = await http.post(
       `/templates/${type}/${templateId}/documents/`,
       payload,
-      { headers: { "Content-Type": "multipart/form-data" } }
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        params: { clinic_id: storedClinicId() },
+      },
     );
 
     return response.data;
@@ -190,15 +239,21 @@ const TemplateService = {
    * DELETE /api/templates/{type}/{templateId}/delete/
    */
   deleteTemplate: async (type: APITemplateType, templateId: string) => {
-    console.log('🗑️ Deleting template:', { type, templateId });
-    return await http.delete(`/templates/${type}/${templateId}/delete/`);
+    console.log("🗑️ Deleting template:", { type, templateId });
+    return await http.delete(`/templates/${type}/${templateId}/delete/`, {
+      params: { clinic_id: storedClinicId() },
+    });
   },
 
   /**
    * Delete a document from a template.
    * Backend route naming can vary, so this tries common endpoint patterns.
    */
-  deleteTemplateDocument: async (type: APITemplateType, templateId: string, documentId: string) => {
+  deleteTemplateDocument: async (
+    type: APITemplateType,
+    templateId: string,
+    documentId: string,
+  ) => {
     const deleteRoutes = [
       `/templates/${type}/${templateId}/documents/${documentId}/delete/`,
       `/templates/${type}/${templateId}/documents/${documentId}/`,
@@ -210,14 +265,16 @@ const TemplateService = {
 
     for (const route of deleteRoutes) {
       try {
-        const response = await http.delete(route);
+        const response = await http.delete(route, {
+          params: { clinic_id: storedClinicId() },
+        });
         return response.data;
       } catch (error) {
         lastError = error;
       }
     }
 
-    throw lastError ?? new Error('Unable to delete template document');
+    throw lastError ?? new Error("Unable to delete template document");
   },
 };
 

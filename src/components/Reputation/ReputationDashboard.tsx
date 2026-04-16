@@ -17,6 +17,7 @@ import {
   selectReputationRequests,
 } from "../../store/reputationSlice";
 import { fetchLeads } from "../../store/leadSlice";
+import { selectClinic } from "../../store/clinicSlice";
 import { reputationApi } from "../../services/reputation.api";
 
 import BackwardIcon from "../../assets/icons/Backward_icon.svg";
@@ -549,10 +550,12 @@ const ReputationDashboard = () => {
     });
   }, [requests, searchQuery, requestFilters]);
 
+  const _reputationClinic = useSelector(selectClinic);
+
   useEffect(() => {
     dispatch(fetchLeads());
     dispatch(fetchReviewRequests());
-  }, [dispatch]);
+  }, [dispatch, _reputationClinic?.id]);
 
   return (
     <Box sx={{ p: 0.5 }}>

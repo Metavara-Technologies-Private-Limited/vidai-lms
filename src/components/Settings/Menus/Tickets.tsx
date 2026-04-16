@@ -58,6 +58,7 @@ import type { AppDispatch } from "../../../store";
 import type { Employee } from "../../../services/leads.api";
 import { clinicsApi } from "../../../services/tickets.api";
 import { selectUser } from "../../../store/authSlice";
+import { selectClinic } from "../../../store/clinicSlice";
 import {
   resolveUserRole,
   hasSubcategoryActionPermission,
@@ -76,6 +77,7 @@ const Tickets = () => {
   const loading = useSelector(selectTicketsLoading);
   const error = useSelector(selectTicketsError);
   const authUser = useSelector(selectUser);
+  const clinic = useSelector(selectClinic);
   const [employees, setEmployees] = useState<Employee[]>([]);
   // --- Local UI State ---
   const [tab, setTab] = useState<string>("New");
@@ -96,13 +98,19 @@ const Tickets = () => {
     hasSubcategoryActionPermission(permissions, "tickets", "add");
   const hasTicketView403 =
     typeof error === "string" &&
-    (error.includes("403") || error.toLowerCase().includes("permission denied"));
+    (error.includes("403") ||
+      error.toLowerCase().includes("permission denied"));
 
   useEffect(() => {
+    if (!clinic?.id) {
+      setEmployees([]);
+      return;
+    }
+
     const loadData = async () => {
       try {
         const results = await Promise.allSettled([
-          clinicsApi.getClinicEmployees(1),
+          clinicsApi.getClinicEmployees(clinic.id),
         ]);
 
         if (results[0].status === "fulfilled") {
@@ -117,14 +125,14 @@ const Tickets = () => {
       }
     };
     loadData();
-  }, []);
+  }, [clinic?.id]);
 
   // 1. Initial Data Fetch from DB
   useEffect(() => {
     if (!canViewTickets) return;
     dispatch(fetchTickets());
     dispatch(fetchTicketDashboard());
-  }, [dispatch, canViewTickets]);
+  }, [dispatch, canViewTickets, clinic?.id]);
 
   const ticketsFromDb = useMemo((): TicketListItem[] => {
     if (Array.isArray(rawTickets)) return rawTickets;
@@ -215,7 +223,9 @@ const Tickets = () => {
   if (!canViewTickets) {
     return (
       <Box pt={2} px={0.1}>
-        <Alert severity="warning">You do not have permission to view tickets.</Alert>
+        <Alert severity="warning">
+          You do not have permission to view tickets.
+        </Alert>
       </Box>
     );
   }
@@ -223,7 +233,9 @@ const Tickets = () => {
   if (hasTicketView403) {
     return (
       <Box pt={2} px={0.1}>
-        <Alert severity="warning">You do not have permission to view tickets.</Alert>
+        <Alert severity="warning">
+          You do not have permission to view tickets.
+        </Alert>
       </Box>
     );
   }

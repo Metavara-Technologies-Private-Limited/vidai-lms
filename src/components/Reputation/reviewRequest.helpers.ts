@@ -146,7 +146,8 @@ export const ensureReviewLinkCallToAction = (
     return normalized;
   }
 
-  return `${normalized.trim()}\n\nShare Review: {review_link}`;
+  const ctaLabel = mode === "email" ? "Share Review" : "Review Link";
+  return `${normalized.trim()}\n\n${ctaLabel}: {review_link}`;
 };
 
 export const normalizeMessageForRequest = (message: string) => {

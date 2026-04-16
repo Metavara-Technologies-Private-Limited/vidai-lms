@@ -1,7 +1,10 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { CampaignAPI } from "../services/campaign.api";
 import type { RootState } from ".";
-import { CAMPAIGN_STATUS, STATUS_TO_API } from "../constants/campaigns.constants";
+import {
+  CAMPAIGN_STATUS,
+  STATUS_TO_API,
+} from "../constants/campaigns.constants";
 import type { CampaignAPIType } from "../types/campaigns.types";
 import type { CampaignStatus } from "../constants/campaigns.constants";
 
@@ -17,13 +20,24 @@ const initialState: CampaignState = {
   error: null,
 };
 
-export const fetchCampaign = createAsyncThunk<CampaignAPIType[]>(
-  "campaign/fetchCampaign",
-  async () => {
-    const res = await CampaignAPI.list();
+export const fetchCampaign = createAsyncThunk<
+  CampaignAPIType[],
+  void,
+  { state: RootState; rejectValue: string }
+>("campaign/fetchCampaign", async (_, { getState, rejectWithValue }) => {
+  try {
+    // Use Redux clinic state (same pattern as fetchLeads) so clinic
+    // switches in the header are immediately reflected
+    const clinicId = getState().clinic.data?.id;
+    if (!clinicId) return rejectWithValue("Clinic not selected");
+    const res = await CampaignAPI.list(clinicId);
     return res.data;
-  },
-);
+  } catch (error) {
+    return rejectWithValue(
+      error instanceof Error ? error.message : "Failed to fetch campaigns",
+    );
+  }
+});
 
 export const updateCampaignStatus = createAsyncThunk<
   { id: string; status: CampaignStatus },

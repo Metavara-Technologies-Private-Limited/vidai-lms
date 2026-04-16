@@ -59,10 +59,15 @@ const Doctors: React.FC = () => {
         setLoading(true);
 
         // Step 1: Fetch all leads via LeadAPI (uses auth_token automatically)
-        const allLeads: Lead[] = clinic?.id ? await LeadAPI.list(clinic?.id) : [];
+        const allLeads: Lead[] = clinic?.id
+          ? await LeadAPI.list(clinic?.id)
+          : [];
 
         // Step 2: Group leads by assigned_to — each unique assigned_to = a doctor
-        const doctorMap: Record<number, { id: number; name: string; referrals: number }> = {};
+        const doctorMap: Record<
+          number,
+          { id: number; name: string; referrals: number }
+        > = {};
         allLeads.forEach((lead) => {
           if (lead.assigned_to_id && lead.assigned_to_name) {
             if (doctorMap[lead.assigned_to_id]) {
@@ -79,13 +84,24 @@ const Doctors: React.FC = () => {
 
         // Step 3: Try to get employee details (email/phone/clinic) for each doctor
         // Use clinic_id from the first lead to fetch employees
-        const empById: Record<number, Employee & { email?: string; contact_no?: string; clinic_name?: string }> = {};
+        const empById: Record<
+          number,
+          Employee & {
+            email?: string;
+            contact_no?: string;
+            clinic_name?: string;
+          }
+        > = {};
         try {
           const clinicId = allLeads[0]?.clinic_id;
           if (clinicId) {
             const employees = await ClinicAPI.getEmployees(clinicId);
             employees.forEach((e) => {
-              empById[e.id] = e as Employee & { email?: string; contact_no?: string; clinic_name?: string };
+              empById[e.id] = e as Employee & {
+                email?: string;
+                contact_no?: string;
+                clinic_name?: string;
+              };
             });
           }
         } catch {
@@ -103,7 +119,8 @@ const Doctors: React.FC = () => {
             referrals: doc.referrals,
             clinicName:
               (emp as { clinic_name?: string })?.clinic_name ||
-              (allLeads.find((l) => l.assigned_to_id === doc.id)?.clinic_name ?? "—"),
+              (allLeads.find((l) => l.assigned_to_id === doc.id)?.clinic_name ??
+                "—"),
           };
         });
 
@@ -117,10 +134,10 @@ const Doctors: React.FC = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [clinic?.id]);
 
   const filteredDoctors = doctors.filter((doc) =>
-    doc.name.toLowerCase().includes(search.toLowerCase())
+    doc.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (

@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 
 import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
 import { clinicsApi } from "../../../services/tickets.api";
 import CloseIcon from "@mui/icons-material/Close";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -27,13 +28,17 @@ import {
   filterTicketsApplyButtonSx,
   filterTicketsSelectFieldSx,
 } from "../../../styles/Settings/Tickets.styles";
-import type { Department, TicketPriority, FilterTicketsProps } from "../../../types/tickets.types";
-// Component 
+import { selectClinic } from "../../../store/clinicSlice";
+import type {
+  Department,
+  TicketPriority,
+  FilterTicketsProps,
+} from "../../../types/tickets.types";
+// Component
 const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
   const [fromDate, setFromDate] = useState<Dayjs | null>(dayjs());
   const [toDate, setToDate] = useState<Dayjs | null>(dayjs().add(1, "day"));
-
-  const CLINIC_ID = "1";
+  const clinic = useSelector(selectClinic);
 
   const [priority, setPriority] = useState<string>("");
   const [department, setDepartment] = useState<number | "">("");
@@ -59,11 +64,11 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
   };
 
   useEffect(() => {
-    if (open) {
+    if (open && clinic?.id) {
       const loadDepartments = async () => {
         try {
-          const clinic = await clinicsApi.getClinicDetail(CLINIC_ID);
-          setDepartments(clinic?.department || []);
+          const clinicDetail = await clinicsApi.getClinicDetail(clinic.id);
+          setDepartments(clinicDetail?.department || []);
         } catch (err) {
           console.error("Failed to fetch departments", err);
           setDepartments([]);
@@ -72,7 +77,7 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
 
       loadDepartments();
     }
-  }, [open]);
+  }, [open, clinic?.id]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -134,7 +139,6 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
               <MenuItem value="low">Low</MenuItem>
               <MenuItem value="medium">Medium</MenuItem>
               <MenuItem value="high">High</MenuItem>
-
             </TextField>
 
             <TextField
@@ -143,7 +147,9 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
               fullWidth
               value={department}
               onChange={(e) =>
-                setDepartment(e.target.value === "" ? "" : Number(e.target.value))
+                setDepartment(
+                  e.target.value === "" ? "" : Number(e.target.value),
+                )
               }
               sx={filterTicketsSelectFieldSx}
             >
@@ -153,7 +159,6 @@ const FilterTickets = ({ open, onClose, onApply }: FilterTicketsProps) => {
                 </MenuItem>
               ))}
             </TextField>
-
           </Stack>
 
           {/* Actions */}
