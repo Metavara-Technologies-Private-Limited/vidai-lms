@@ -1,7 +1,8 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import "../../styles/Campaign/EmailCampaignModal.css";
 import "../../styles/Campaign/SocialCampaignModal.css";
 import { CampaignAPI } from "../../services/campaign.api";
+import { integrationApi } from "../../services/integration.api";
 import {
   FormControl,
   Select,
@@ -50,7 +51,40 @@ const isPlainUrl = (str: string) =>
 export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
-  const isGoogleAdsConnected = Boolean(clinic?.google_ads_customer_id?.trim());
+  const googleAdsCustomerId = clinic?.google_ads_customer_id;
+  const [googleAdsIntegrationConnected, setGoogleAdsIntegrationConnected] = useState(false);
+
+  // ── Fix: wrap the async fetch in useCallback so useEffect dependency is stable ──
+  const fetchGoogleAdsStatus = useCallback(async () => {
+    if (!clinic?.id) {
+      setGoogleAdsIntegrationConnected(false);
+      return;
+    }
+    try {
+      const res = await integrationApi.getSocialAccounts(clinic.id);
+      const accs = Array.isArray(res.data) ? res.data : [];
+      setGoogleAdsIntegrationConnected(
+        accs.some(
+          (acc) =>
+            typeof acc.platform === "string" &&
+            acc.platform.toLowerCase().includes("google"),
+        ),
+      );
+    } catch (err) {
+      console.error("Failed to fetch Google Ads integration status", err);
+      setGoogleAdsIntegrationConnected(false);
+    }
+  }, [clinic?.id]);
+
+  useEffect(() => {
+    fetchGoogleAdsStatus();
+  }, [fetchGoogleAdsStatus]);
+
+  const isGoogleAdsConnected = Boolean(
+    (googleAdsCustomerId && String(googleAdsCustomerId).trim().length) ||
+      googleAdsIntegrationConnected,
+  );
+
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
 
@@ -268,11 +302,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   const toggleAccount = (id: Platform) => {
-    if (id === "google_ads" && !isGoogleAdsConnected) {
-      toast.warn("Connect Google Ads before selecting the Google Ads account.");
-      return;
-    }
-
     setAccounts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
@@ -371,16 +400,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         mode === "paid" ? "paid_advertising" : "organic_posting",
       ];
 
-      const selectedAccounts = accounts.filter(
-        (platform) => platform !== "google_ads" || isGoogleAdsConnected,
-      );
+      const selectedAccounts = [...accounts];
 
       const cleanedContent: Partial<Record<Platform, string>> = {
         ...resolvedContent,
       };
-      if (!isGoogleAdsConnected) {
-        delete cleanedContent.google_ads;
-      }
 
       const payload: SocialCampaignPayload = {
         clinic: clinicId,
@@ -646,13 +670,12 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 Select your social media ad accounts
               </p>
               <div className="account-row">
-                {PLATFORM_LIST.map((acc) => {
-                  const isDisabled = acc.id === "google_ads" && !isGoogleAdsConnected;
-                  return (
+                {PLATFORM_LIST.map((acc) => (
                     <div
                       key={acc.id}
-                      className={`account-card ${accounts.includes(acc.id) ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
-                      onClick={() => !isDisabled && toggleAccount(acc.id)}
+                      className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
+                      onClick={() => toggleAccount(acc.id)}
+                      style={{ cursor: "pointer" }}
                     >
                       <div className="account-left">
                         <img src={platformIcons[acc.id]} alt={acc.label} />
@@ -662,8 +685,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                         className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
                       />
                     </div>
-                  );
-                })}
+                ))}
               </div>
             </div>
 
