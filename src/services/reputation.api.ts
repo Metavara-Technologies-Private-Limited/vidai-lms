@@ -24,8 +24,33 @@ type SubmitReviewPayload = {
   review_text: string;
 };
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+type PublicReviewRequestResponse = {
+  status?: string;
+  data?: {
+    id?: string;
+    request_name?: string;
+    description?: string;
+    collect_on?: "google" | "form" | "both";
+    lead_id?: string | null;
+    lead_name?: string | null;
+    review_submitted?: boolean;
+  };
+};
+
+const resolveApiBaseUrl = (): string => {
+  const configured = (
+    import.meta.env.VITE_API_BASE_URL as string | undefined
+  )?.trim();
+  if (configured) return configured;
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/api`;
+  }
+
+  return "http://127.0.0.1:8000/api";
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -306,9 +331,12 @@ export const reputationApi = {
   // ✅ NEW: Get request detail without auth — used by ReviewForm page
   // Leads open review links from email and are NOT logged in.
   // Hits /reputation/public/requests/<id>/ which has authentication_classes = [] permission_classes = []
-  getPublicRequestById: async (requestId: string) => {
-    const response = await publicApiClient.get(
+  getPublicRequestById: async (requestId: string, leadId?: string) => {
+    const response = await publicApiClient.get<PublicReviewRequestResponse>(
       `/reputation/public/requests/${requestId}/`,
+      {
+        params: leadId ? { lead: leadId } : undefined,
+      },
     );
     return response.data;
   },
@@ -325,53 +353,14 @@ export const reputationApi = {
     return extractList(response.data).map(normalizeReviewRow);
   },
 
-  // Submit review (PATIENT SIDE) — also hits a no-auth endpoint
+  // Submit review (PUBLIC — no auth required, called by leads opening review link)
   submitReview: async (data: SubmitReviewPayload) => {
-    const variants = [
-      {
-        review_request: data.review_request,
-        lead: data.lead,
-        rating: data.rating,
-        review_text: data.review_text,
-      },
-      {
-        review_request: data.review_request,
-        lead_id: data.lead,
-        rating: data.rating,
-        review_text: data.review_text,
-      },
-      {
-        request: data.review_request,
-        lead: data.lead,
-        rating: data.rating,
-        comment: data.review_text,
-      },
-    ];
-
-    let lastError: unknown;
-
-    for (let index = 0; index < variants.length; index += 1) {
-      try {
-        // ✅ Use publicApiClient so leads without auth tokens can submit
-        const response = await publicApiClient.post(
-          "/reputation/reviews/create/",
-          variants[index],
-        );
-        return response.data;
-      } catch (error) {
-        lastError = error;
-
-        const status = axios.isAxiosError(error)
-          ? (error.response?.status ?? 0)
-          : 0;
-        const shouldRetry = status === 400 || status === 422 || status === 500;
-
-        if (!shouldRetry || index === variants.length - 1) {
-          throw error;
-        }
-      }
-    }
-
-    throw lastError;
+    const response = await publicApiClient.post("/reputation/reviews/create/", {
+      review_request: data.review_request,
+      lead: data.lead,
+      rating: data.rating,
+      review_text: data.review_text,
+    });
+    return response.data;
   },
 };

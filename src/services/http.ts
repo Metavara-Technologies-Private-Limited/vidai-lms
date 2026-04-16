@@ -4,8 +4,20 @@ import { setExternalToken } from "../store/authSlice";
 
 // Base axios instance used everywhere in the app.
 // Keep all network + auth related setup here.
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const resolveApiBaseUrl = (): string => {
+  const configured = (
+    import.meta.env.VITE_API_BASE_URL as string | undefined
+  )?.trim();
+  if (configured) return configured;
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/api`;
+  }
+
+  return "http://127.0.0.1:8000/api";
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 interface HttpInstance extends AxiosInstance {
   redirect: (path: string) => void;
 }
