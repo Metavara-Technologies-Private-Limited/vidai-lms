@@ -138,6 +138,23 @@ const ReviewRequestStepDetails = ({
           disableCloseOnSelect
           options={allLeads}
           disabled={leadSelectionType === "all"}
+          slotProps={{
+            popper: {
+              placement: "bottom-start",
+              sx: {
+                width: "fit-content !important",
+                minWidth: 260,
+                maxWidth: 420,
+              },
+            },
+            paper: {
+              sx: {
+                width: "fit-content",
+                minWidth: 260,
+                maxWidth: 420,
+              },
+            },
+          }}
           isOptionEqualToValue={(option, value) =>
             String(option.id) === String(value.id)
           }
