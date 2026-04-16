@@ -39,6 +39,13 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// ✅ NEW: A second axios instance with NO auth interceptor — used for public endpoints
+// that leads access from their email without being logged in.
+const publicApiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { "Content-Type": "application/json" },
+});
+
 type Dict = Record<string, unknown>;
 
 const getStoredClinicId = (): number | null => {
@@ -288,11 +295,21 @@ export const reputationApi = {
     throw lastError;
   },
 
-  // Get request detail
+  // Get request detail (authenticated — used by the admin dashboard)
   getRequestById: async (requestId: string) => {
     const response = await apiClient.get(`/reputation/requests/${requestId}/`, {
       params: { clinic_id: getStoredClinicId() },
     });
+    return response.data;
+  },
+
+  // ✅ NEW: Get request detail without auth — used by ReviewForm page
+  // Leads open review links from email and are NOT logged in.
+  // Hits /reputation/public/requests/<id>/ which has authentication_classes = [] permission_classes = []
+  getPublicRequestById: async (requestId: string) => {
+    const response = await publicApiClient.get(
+      `/reputation/public/requests/${requestId}/`,
+    );
     return response.data;
   },
 
@@ -308,7 +325,7 @@ export const reputationApi = {
     return extractList(response.data).map(normalizeReviewRow);
   },
 
-  // Submit review (PATIENT SIDE)
+  // Submit review (PATIENT SIDE) — also hits a no-auth endpoint
   submitReview: async (data: SubmitReviewPayload) => {
     const variants = [
       {
@@ -335,7 +352,8 @@ export const reputationApi = {
 
     for (let index = 0; index < variants.length; index += 1) {
       try {
-        const response = await apiClient.post(
+        // ✅ Use publicApiClient so leads without auth tokens can submit
+        const response = await publicApiClient.post(
           "/reputation/reviews/create/",
           variants[index],
         );
