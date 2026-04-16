@@ -64,7 +64,9 @@ const Header = () => {
   const [photoAnchorEl, setPhotoAnchorEl] = useState<HTMLElement | null>(null);
   const [isPhotoUpdating, setIsPhotoUpdating] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [photoVersion, setPhotoVersion] = useState(() => Date.now());
   const lastFetchedClinicIdRef = useRef<number | null>(null);
+  const latestUserRef = useRef(user);
 
   const userClinics = useMemo<DropdownClinic[]>(() => {
     const raw = Array.isArray(user?.clinics) ? user.clinics : [];
@@ -228,6 +230,10 @@ const Header = () => {
     { icon: MessageQuestionIcon, type: "help" },
   ] as const;
 
+  useEffect(() => {
+    latestUserRef.current = user;
+  }, [user]);
+
   const displayUserName =
     `${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim() ||
     user?.username ||
@@ -242,7 +248,7 @@ const Header = () => {
 
   const extractProfilePhoto = (
     payload: Record<string, unknown> | null | undefined,
-  ): string | undefined => {
+  ): string | null | undefined => {
     if (!payload) return undefined;
 
     const nestedProfile =
@@ -262,39 +268,57 @@ const Header = () => {
     ];
 
     for (const value of candidates) {
-      if (value == null) continue;
-      if (typeof value === "string" && value.trim() === "") return undefined;
+      if (value === null) return null;
+      if (typeof value === "string" && value.trim() === "") return null;
       const safeUrl = toSafePhotoUrl(value);
       if (safeUrl) return safeUrl;
-      if (value === null) return undefined;
     }
 
     return undefined;
+  };
+
+  const getPhotoSrc = (value: unknown): string | undefined => {
+    const resolved = toSafePhotoUrl(value);
+    if (!resolved) return undefined;
+
+    const separator = resolved.includes("?") ? "&" : "?";
+    return `${resolved}${separator}v=${photoVersion}`;
   };
 
   const applyUpdatedProfile = (
     updatedProfile: Record<string, unknown>,
     options?: { forceClearPhoto?: boolean },
   ) => {
-    if (!user) return;
+    const currentUser = latestUserRef.current;
+    if (!currentUser) return;
 
     const resolvedPhoto = options?.forceClearPhoto
-      ? undefined
+      ? null
       : extractProfilePhoto(updatedProfile);
 
+    const nextUser = {
+      ...currentUser,
+      first_name:
+        typeof updatedProfile.first_name === "string"
+          ? updatedProfile.first_name
+          : currentUser.first_name,
+      last_name:
+        typeof updatedProfile.last_name === "string"
+          ? updatedProfile.last_name
+          : currentUser.last_name,
+      photo:
+        resolvedPhoto === undefined
+          ? currentUser.photo
+          : resolvedPhoto || undefined,
+    };
+
+    latestUserRef.current = nextUser;
+    if (resolvedPhoto !== undefined) {
+      setPhotoVersion(Date.now());
+    }
+
     dispatch(
-      setUser({
-        ...user,
-        first_name:
-          typeof updatedProfile.first_name === "string"
-            ? updatedProfile.first_name
-            : user.first_name,
-        last_name:
-          typeof updatedProfile.last_name === "string"
-            ? updatedProfile.last_name
-            : user.last_name,
-        photo: resolvedPhoto !== undefined ? resolvedPhoto : user.photo,
-      }),
+      setUser(nextUser),
     );
   };
 
@@ -443,7 +467,7 @@ const Header = () => {
           {/* USER */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Avatar
-              src={toSafePhotoUrl(user?.photo) || undefined}
+              src={getPhotoSrc(user?.photo)}
               onClick={handlePhotoPopoverOpen}
               sx={{
                 width: 36,
@@ -550,7 +574,7 @@ const Header = () => {
       >
         <Stack spacing={1.5} alignItems="center">
           <Avatar
-            src={toSafePhotoUrl(user?.photo) || undefined}
+            src={getPhotoSrc(user?.photo)}
             onClick={() => {
               if (user?.photo) {
                 setIsPreviewOpen(true);
@@ -599,7 +623,7 @@ const Header = () => {
       >
         <DialogContent sx={{ p: 1.5 }}>
           <Avatar
-            src={toSafePhotoUrl(user?.photo) || undefined}
+            src={getPhotoSrc(user?.photo)}
             sx={{
               width: 320,
               height: 320,
