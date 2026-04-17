@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -13,15 +13,32 @@ import {
   InputAdornment,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { zoyaMock } from "./zoya.mock";
 import BackwardIcon from "../../assets/icons/Backward_icon.svg";
-import {useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { loadReferralSources, selectSources } from "../../store/referralSlice";
+import type { AppDispatch } from "../../store";
 
 const Zoya: React.FC = () => {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const sources = useSelector(selectSources);
 
-  const filteredData = zoyaMock.filter((item) =>
+  useEffect(() => {
+    // Fetch Zoya referral sources (department_id for Zoya)
+    dispatch(loadReferralSources({ referral_department_id: 6 }));
+  }, [dispatch]);
+
+  const filteredData = sources.map((item) => ({
+    id: item.id,
+    partnerName: item.name,
+    coordinator: item.name,
+    email: item.email || "",
+    phone: item.phone || "",
+    referrals: item.referral_count,
+    region: item.external_clinic_name || "",
+  })).filter((item) =>
     item.partnerName.toLowerCase().includes(search.toLowerCase())
   );
 

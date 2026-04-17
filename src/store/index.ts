@@ -11,6 +11,7 @@ import emailHistoryReducer from "./emailHistorySlice";
 import mailInsightsReducer from "./mailInsightsSlice";
 import reputationReducer from "./reputationSlice";
 import pipelineReducer from "./pipelineSlice";
+import referralReducer from "./referralSlice";
 
 export const store = configureStore({
   reducer: {
@@ -26,6 +27,7 @@ export const store = configureStore({
     mailInsights: mailInsightsReducer, // ✅ mail insights KPI
     reputation: reputationReducer,
     pipeline: pipelineReducer,
+    referral: referralReducer,
   },
 });
 
