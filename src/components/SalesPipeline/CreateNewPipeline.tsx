@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
-import { isAlphabeticName } from "./salesPipeline.utils";
+import { isAlphabeticName, normalizeNameForCompare } from "./salesPipeline.utils";
 
 type IndustryOption = {
 	id: string;
@@ -125,39 +125,50 @@ const tileBaseSx: SxProps<Theme> = {
 };
 
 const Createnewpipeline = ({ open, onClose, onSave, mode = "create", initialPipelineName, initialIndustry }: CreateNewPipelineProps) => {
-	const [pipelineName, setPipelineName] = useState(initialPipelineName ?? "Student Enrollment Pipeline");
+	const [pipelineName, setPipelineName] = useState(initialPipelineName ?? "");
 	const [selectedIndustry, setSelectedIndustry] = useState<string>(initialIndustry ?? "education");
 	const [showValidation, setShowValidation] = useState(false);
 
 	useEffect(() => {
 		if (!open) return;
-		setPipelineName(initialPipelineName ?? "Student Enrollment Pipeline");
+		// eslint-disable-next-line react-hooks/set-state-in-effect
+		setPipelineName(initialPipelineName ?? "");
 		setSelectedIndustry(initialIndustry ?? "education");
 		setShowValidation(false);
 	}, [open, initialIndustry, initialPipelineName]);
 
 	const isNameValid = useMemo(() => isAlphabeticName(pipelineName), [pipelineName]);
+	const trimmedPipelineName = pipelineName.trim();
+	const isSingleLetterPipelineName =
+		trimmedPipelineName.length === 1 && /^[A-Za-z]$/.test(trimmedPipelineName);
+	const hasInitialName = (initialPipelineName ?? "").trim().length > 0;
+	const isNameChanged =
+		mode !== "edit" ||
+		!hasInitialName ||
+		normalizeNameForCompare(pipelineName) !== normalizeNameForCompare(initialPipelineName ?? "");
+	const isNameAcceptedForSave =
+		(isNameValid && !isSingleLetterPipelineName) || (mode === "edit" && !isNameChanged);
 	const showNameError =
 		(showValidation && pipelineName.trim().length === 0) ||
-		(pipelineName.trim().length > 0 && !isNameValid);
+		(pipelineName.trim().length > 0 && (!isNameValid || isSingleLetterPipelineName) && isNameChanged);
 
 	const canSave = useMemo(
-		() => pipelineName.trim().length > 0 && selectedIndustry.length > 0 && isNameValid,
-		[pipelineName, selectedIndustry, isNameValid],
+		() => pipelineName.trim().length > 0 && selectedIndustry.length > 0 && isNameAcceptedForSave,
+		[pipelineName, selectedIndustry, isNameAcceptedForSave],
 	);
 
 	const handleSave = async () => {
-		if (!canSave) return;
+		if (!canSave || !isNameAcceptedForSave) return;
 		const saveResult = await onSave?.({ pipelineName: pipelineName.trim(), industry: selectedIndustry });
 		if (saveResult === false) return;
-		setPipelineName("Student Enrollment Pipeline");
+		setPipelineName("");
 		setSelectedIndustry("education");
 		setShowValidation(false);
 		onClose();
 	};
 
 	const handleClose = () => {
-		setPipelineName("Student Enrollment Pipeline");
+		setPipelineName("");
 		setSelectedIndustry("education");
 		setShowValidation(false);
 		onClose();
@@ -230,8 +241,10 @@ const Createnewpipeline = ({ open, onClose, onSave, mode = "create", initialPipe
 				}}
 			>
 				<TextField
+					autoFocus
 					fullWidth
 					label="Pipeline Name"
+					placeholder="Enter pipeline name"
 					value={pipelineName}
 					onChange={(event) => {
 						setPipelineName(event.target.value);
@@ -242,6 +255,8 @@ const Createnewpipeline = ({ open, onClose, onSave, mode = "create", initialPipe
 						showNameError
 							? pipelineName.trim().length === 0
 								? "Pipeline name is required"
+									: isSingleLetterPipelineName
+										? "Pipeline name cannot be a single letter"
 								: "Only letters and spaces are allowed"
 							: " "
 					}

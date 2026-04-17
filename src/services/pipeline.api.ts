@@ -211,7 +211,9 @@ const hasStageRelations = (payload: StageMutationPayload): boolean =>
 const stripStageRelations = <TPayload extends StageMutationPayload>(
   payload: TPayload,
 ): TPayload => {
-  const { rules: _rules, fields: _fields, ...rest } = payload;
+  const rest = { ...payload } as StageMutationPayload;
+  delete rest.rules;
+  delete rest.fields;
   return rest as TPayload;
 };
 
@@ -221,8 +223,7 @@ const shouldRetryWithoutRelations = (status?: number): boolean =>
 const removeRelationsForBackend = <TPayload extends StageMutationPayload>(
   payload: TPayload,
 ): Omit<TPayload, "rules" | "fields"> => {
-  const { rules: _rules, fields: _fields, ...rest } = payload;
-  return rest as Omit<TPayload, "rules" | "fields">;
+  return stripStageRelations(payload) as Omit<TPayload, "rules" | "fields">;
 };
 
 const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
@@ -255,20 +256,67 @@ export const pipelineApi = {
   },
 
   async getById(pipelineId: string): Promise<Pipeline> {
-    const response = await http.get(`/pipelines/${pipelineId}/`, {
-      params: { clinic_id: storedClinicId() },
-    });
-    return normalizePipeline(unwrapItemData(response.data));
+    try {
+      const response = await http.get(`/pipelines/${pipelineId}/`, {
+        params: { clinic_id: storedClinicId() },
+      });
+      return normalizePipeline(unwrapItemData(response.data));
+    } catch (error) {
+      const candidate = error as { response?: { status?: number } };
+      // Some backend deployments don't expose GET on /pipelines/{id}/
+      if (candidate?.response?.status === 405) {
+        const clinicId = storedClinicId();
+        if (clinicId > 0) {
+          const pipelines = await this.list(clinicId);
+          const fallbackPipeline = pipelines.find((pipeline) => pipeline.id === pipelineId);
+          if (fallbackPipeline) return fallbackPipeline;
+        }
+      }
+      throw error;
+    }
   },
 
   async update(
     pipelineId: string,
     payload: UpdatePipelinePayload,
   ): Promise<Pipeline> {
-    const response = await http.put(`/pipelines/${pipelineId}/`, payload, {
-      params: { clinic_id: storedClinicId() },
-    });
-    return normalizePipeline(unwrapItemData(response.data));
+    const params = { clinic_id: storedClinicId() };
+    const attempts: Array<{ method: "put" | "patch"; url: string }> = [
+      { method: "put", url: `/pipelines/${pipelineId}/` },
+      { method: "patch", url: `/pipelines/${pipelineId}/` },
+      { method: "put", url: `/pipelines/${pipelineId}/update/` },
+      { method: "patch", url: `/pipelines/${pipelineId}/update/` },
+    ];
+
+    let lastError: unknown = null;
+    for (const attempt of attempts) {
+      try {
+        const response =
+          attempt.method === "put"
+            ? await http.put(attempt.url, payload, { params })
+            : await http.patch(attempt.url, payload, { params });
+        return normalizePipeline(unwrapItemData(response.data));
+      } catch (error) {
+        lastError = error;
+        const candidate = error as {
+          response?: { status?: number };
+          code?: string;
+          message?: string;
+        };
+        const status = candidate?.response?.status;
+        const shouldTryNext =
+          status === 404 ||
+          status === 405 ||
+          status === 500 ||
+          candidate?.code === "ERR_NETWORK" ||
+          candidate?.message?.includes("Parse Error") === true;
+        if (!shouldTryNext) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   },
 
   async duplicate(pipelineId: string): Promise<Pipeline> {
@@ -314,18 +362,57 @@ export const pipelineApi = {
   },
 
   async remove(pipelineId: string): Promise<void> {
-    try {
-      await http.delete(`/pipelines/${pipelineId}/delete/`, {
-        params: { clinic_id: storedClinicId() },
-      });
-    } catch (error) {
-      const candidate = error as { response?: { status?: number } };
-      if (candidate?.response?.status === 404) {
-        throw new Error(
-          "Delete endpoint not yet implemented on the backend. Please contact support.",
-        );
+    const clinicId = storedClinicId();
+    const params = { clinic_id: clinicId };
+    const wasDeleted = async (): Promise<boolean> => {
+      if (!Number.isFinite(clinicId) || clinicId <= 0) return false;
+      try {
+        const pipelines = await this.list(clinicId);
+        return !pipelines.some((pipeline) => pipeline.id === pipelineId);
+      } catch {
+        return false;
       }
-      throw error;
+    };
+
+    try {
+      // Prefer RESTful delete first when available.
+      await http.delete(`/pipelines/${pipelineId}/`, { params });
+      return;
+    } catch (restDeleteError) {
+      const candidate = restDeleteError as {
+        response?: { status?: number };
+        code?: string;
+        message?: string;
+      };
+
+      const shouldFallbackToActionDelete =
+        candidate?.response?.status === 404 ||
+        candidate?.response?.status === 405 ||
+        candidate?.code === "ERR_NETWORK" ||
+        candidate?.message?.includes("Parse Error") === true;
+
+      if (shouldFallbackToActionDelete) {
+        try {
+          // Use POST action fallback instead of DELETE /delete/ to avoid
+          // malformed upstream responses seen on some backend deployments.
+          await http.post(`/pipelines/${pipelineId}/delete/`, undefined, {
+            params,
+          });
+          return;
+        } catch (actionDeleteError) {
+          if (await wasDeleted()) {
+            return;
+          }
+
+          throw actionDeleteError;
+        }
+      }
+
+      if (await wasDeleted()) {
+        return;
+      }
+
+      throw restDeleteError;
     }
   },
 
@@ -446,10 +533,19 @@ export const pipelineApi = {
       return result;
     };
 
-    const tryUpdate = async (url: string, data: unknown) => {
-      const response = await http.put(url, data, {
-        params: { clinic_id: storedClinicId() },
-      });
+    const tryUpdate = async (
+      method: "put" | "patch",
+      url: string,
+      data: unknown,
+    ) => {
+      const response =
+        method === "put"
+          ? await http.put(url, data, {
+              params: { clinic_id: storedClinicId() },
+            })
+          : await http.patch(url, data, {
+              params: { clinic_id: storedClinicId() },
+            });
       return normalizeStage(
         unwrapStageData(response.data),
         payload.stage_order,
@@ -459,16 +555,16 @@ export const pipelineApi = {
     try {
       const cleanPayload = removeRelationsForBackend(payload);
       const converted = convertColorCode(cleanPayload);
-      return await tryUpdate(`/pipelines/stages/${stageId}/update/`, converted);
+      return await tryUpdate("put", `/pipelines/stages/${stageId}/update/`, converted);
     } catch (error) {
       const candidate = error as { response?: { status?: number } };
       const status = candidate?.response?.status;
 
-      if (status === 404) {
+      if (status === 404 || status === 405) {
         try {
           const cleanPayload = removeRelationsForBackend(payload);
           const converted = convertColorCode(cleanPayload);
-          return await tryUpdate(`/pipelines/stages/${stageId}/`, converted);
+          return await tryUpdate("put", `/pipelines/stages/${stageId}/`, converted);
         } catch (fallbackError) {
           const fallbackStatus = (
             fallbackError as { response?: { status?: number } }
@@ -482,6 +578,7 @@ export const pipelineApi = {
       try {
         const minimalPayload = stripOptionalFields(payload);
         return await tryUpdate(
+          "patch",
           `/pipelines/stages/${stageId}/update/`,
           minimalPayload,
         );
@@ -489,10 +586,11 @@ export const pipelineApi = {
         const minimalStatus = (
           minimalError as { response?: { status?: number } }
         )?.response?.status;
-        if (minimalStatus === 404) {
+        if (minimalStatus === 404 || minimalStatus === 405) {
           try {
             const minimalPayload = stripOptionalFields(payload);
             return await tryUpdate(
+              "patch",
               `/pipelines/stages/${stageId}/`,
               minimalPayload,
             );
@@ -523,14 +621,26 @@ export const pipelineApi = {
 
   async removeStage(stageId: string): Promise<void> {
     try {
-      await http.delete(`/pipelines/stages/${stageId}/delete/`, {
+      // Prefer RESTful delete first. Some /delete/ DELETE handlers return
+      // malformed responses through proxy.
+      await http.delete(`/pipelines/stages/${stageId}/`, {
         params: { clinic_id: storedClinicId() },
       });
     } catch (error) {
-      const candidate = error as { response?: { status?: number } };
-      if (candidate?.response?.status === 404) {
+      const candidate = error as {
+        response?: { status?: number };
+        code?: string;
+        message?: string;
+      };
+      const shouldFallbackToActionDelete =
+        candidate?.response?.status === 404 ||
+        candidate?.response?.status === 405 ||
+        candidate?.code === "ERR_NETWORK" ||
+        candidate?.message?.includes("Parse Error") === true;
+
+      if (shouldFallbackToActionDelete) {
         try {
-          await http.delete(`/pipelines/stages/${stageId}/`, {
+          await http.post(`/pipelines/stages/${stageId}/delete/`, undefined, {
             params: { clinic_id: storedClinicId() },
           });
         } catch (fallbackError) {

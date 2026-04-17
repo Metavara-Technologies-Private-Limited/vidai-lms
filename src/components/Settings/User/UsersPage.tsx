@@ -18,6 +18,9 @@ import {
 import { selectLoginType, selectUser, setUser } from "../../../store/authSlice";
 import { fetchUsers } from "../../../store/userSlice";
 import { toSafePhotoUrl } from "../../../utils/mediaUrl";
+import {
+  hasAnySubcategoryActionPermission,
+} from "../../../utils/roleAccess";
 import type { AppDispatch, RootState } from "../../../store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -55,53 +58,6 @@ const normalizeRoleName = (value: unknown): string =>
     .replace(/[-_]+/g, " ")
     .replace(/\s+/g, " ");
 
-const hasUsersActionPermission = (
-  permissions: unknown,
-  action: "view" | "add" | "edit" | "print",
-): boolean => {
-  if (!permissions || typeof permissions !== "object") {
-    return false;
-  }
-
-  const actionKey = `can_${action}`;
-  const root = permissions as Record<string, unknown>;
-
-  const legacyRows =
-    root.user_management && typeof root.user_management === "object"
-      ? (root.user_management as Record<string, unknown>).users
-      : null;
-
-  if (Array.isArray(legacyRows)) {
-    const allowed = legacyRows.some((row) => {
-      if (!row || typeof row !== "object") return false;
-      return Boolean((row as Record<string, unknown>)[actionKey]);
-    });
-    if (allowed) return true;
-  }
-
-  for (const moduleValue of Object.values(root)) {
-    if (!moduleValue || typeof moduleValue !== "object") continue;
-
-    for (const categoryValue of Object.values(
-      moduleValue as Record<string, unknown>,
-    )) {
-      if (!Array.isArray(categoryValue)) continue;
-
-      const allowed = categoryValue.some((row) => {
-        if (!row || typeof row !== "object") return false;
-        const rec = row as Record<string, unknown>;
-        const subcategory = normalizeRoleName(rec.subcategory);
-        if (subcategory !== "user" && subcategory !== "users") return false;
-        return Boolean(rec[actionKey]);
-      });
-
-      if (allowed) return true;
-    }
-  }
-
-  return false;
-};
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const UsersPage: React.FC = () => {
@@ -138,15 +94,15 @@ const UsersPage: React.FC = () => {
   const canAssignRoles =
     loginType === "INT" &&
     (currentRoleName === "super admin" || currentRoleName === "superadmin");
-  const isSuperAdmin =
-    currentRoleName === "super admin" || currentRoleName === "superadmin";
   const usersPermissions = (authUser as Record<string, unknown> | null)?.permissions;
+  const userAliases = ["user", "users"];
   const canViewUsers =
-    isSuperAdmin || hasUsersActionPermission(usersPermissions, "view");
+    hasAnySubcategoryActionPermission(usersPermissions, userAliases, "view") ||
+    hasAnySubcategoryActionPermission(usersPermissions, userAliases, "print");
   const canAddUsers =
-    isSuperAdmin || hasUsersActionPermission(usersPermissions, "add");
+    hasAnySubcategoryActionPermission(usersPermissions, userAliases, "add");
   const canEditUsers =
-    isSuperAdmin || hasUsersActionPermission(usersPermissions, "edit");
+    hasAnySubcategoryActionPermission(usersPermissions, userAliases, "edit");
 
   const extractApiErrorMessage = (error: unknown): string => {
     const payload =

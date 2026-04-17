@@ -14,7 +14,12 @@ import EditIcon from "@mui/icons-material/Edit";
 import CancelIcon from "@mui/icons-material/Cancel";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import { useSelector } from "react-redux";
 import { LEADS_MENU } from "../../../../config/sidebar.menu";
+import { selectUser } from "../../../../store/authSlice";
+import {
+  hasAnySubcategoryActionPermission,
+} from "../../../../utils/roleAccess";
 import {
   roleApi,
   type RolePermissionPayload,
@@ -194,9 +199,6 @@ const initialRoles: RoleEntry[] = [
   buildDefaultRole("User", 0, 0),
 ];
 
-const normalizeRoleLabel = (value: string): string =>
-  value.trim().toLowerCase();
-
 const normalizeRoleKey = (value: string): string =>
   value.trim().toLowerCase().replace(/[-_\s]+/g, "");
 
@@ -311,6 +313,17 @@ const chipStyleByType: Record<"module" | "category" | "subcategory", { border: s
 };
 
 const UserRightsForm: React.FC<Props> = ({ onSave }) => {
+  const user = useSelector(selectUser);
+  const authUser = user as unknown as Record<string, unknown> | null;
+  const permissions = authUser?.permissions;
+  const userRightsAliases = ["user", "users"];
+  const canViewUserRights =
+    hasAnySubcategoryActionPermission(permissions, userRightsAliases, "view") ||
+    hasAnySubcategoryActionPermission(permissions, userRightsAliases, "print");
+  const canManageUserRights =
+    hasAnySubcategoryActionPermission(permissions, userRightsAliases, "add") ||
+    hasAnySubcategoryActionPermission(permissions, userRightsAliases, "edit");
+
   const [roles, setRoles] = useState<RoleEntry[]>(initialRoles);
   const [roleUsersMap, setRoleUsersMap] = useState<Record<RoleName, UserRecord[]>>({
     "Super Admin": [],
@@ -343,7 +356,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
         setRoles((prev) =>
           prev.map((entry) => {
             const found = apiRoles.find(
-              (r: RoleRead) => r.name.toLowerCase() === entry.name.toLowerCase(),
+              (r: RoleRead) => normalizeRoleKey(r.name) === normalizeRoleKey(entry.name),
             );
             if (!found) return entry;
             const mapped = fromApiRole(found);
@@ -376,13 +389,6 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
           return true;
         });
 
-        const roleCounts = mergedUsers.reduce<Record<string, number>>((acc, user) => {
-          const roleKey = normalizeRoleLabel(user.role || "");
-          if (!roleKey) return acc;
-          acc[roleKey] = (acc[roleKey] ?? 0) + 1;
-          return acc;
-        }, {});
-
         const groupedUsers: Record<RoleName, UserRecord[]> = {
           "Super Admin": mergedUsers.filter((u) =>
             roleMatches("Super Admin", String(u.role || "")),
@@ -397,7 +403,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
         setRoles((prev) =>
           prev.map((entry) => {
-            const count = roleCounts[normalizeRoleLabel(entry.name)] ?? 0;
+            const count = groupedUsers[entry.name]?.length ?? 0;
             return {
               ...entry,
               count,
@@ -422,6 +428,13 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   }, []);
 
   const activeRole = selectedRoleIdx !== null ? roles[selectedRoleIdx] : null;
+
+  useEffect(() => {
+    if (canManageUserRights) return;
+    if (mode === "edit") {
+      setMode("summary");
+    }
+  }, [canManageUserRights, mode]);
 
   const optionList = activeStep === 0 ? MODULE_OPTIONS : activeStep === 1 ? categories : subCategories;
   const rightsKey: keyof RoleRights = activeStep === 0 ? "modules" : activeStep === 1 ? "categories" : "subCategories";
@@ -462,6 +475,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const toggleOption = (label: string, checked: boolean) => {
+    if (!canManageUserRights) return;
     setDraftRights((prev) => {
       const values = prev[rightsKey];
       const next = checked ? [...new Set([...values, label])] : values.filter((item) => item !== label);
@@ -474,6 +488,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const toggleSelectAll = (checked: boolean) => {
+    if (!canManageUserRights) return;
     setDraftRights((prev) => ({
       ...prev,
       [rightsKey]: checked ? [...optionList] : [],
@@ -491,6 +506,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const togglePerm = (label: string, key: keyof PermissionFlags) => {
+    if (!canManageUserRights) return;
     setDraftPerms((prev) => {
       const base = prev[label] ?? emptyPerm();
       return { ...prev, [label]: { ...base, [key]: !base[key] } };
@@ -498,6 +514,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const removeRow = (label: string) => {
+    if (!canManageUserRights) return;
     setDraftRights((prev) => ({
       modules: prev.modules.filter((item) => item !== label),
       categories: prev.categories.filter((item) => item !== label),
@@ -513,6 +530,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const handleEditClick = () => {
+    if (!canManageUserRights) return;
     if (!activeRole) return;
     setDraftRights(activeRole.rights);
     setDraftPerms(activeRole.permissions);
@@ -521,6 +539,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const handleNext = () => {
+    if (!canManageUserRights) return;
     if (activeStep < 2) {
       setActiveStep((prev) => prev + 1);
       return;
@@ -530,10 +549,12 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const handleSave = () => {
+    if (!canManageUserRights) return;
     persistRole();
   };
 
   const handleSaveGrant = async () => {
+    if (!canManageUserRights) return;
     if (selectedRoleIdx === null) return;
     persistRole();
 
@@ -607,6 +628,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const toggleUserSelection = (roleName: RoleName, userId: number) => {
+    if (!canManageUserRights) return;
     setSelectedUserIdsByRole((prev) => {
       const nextSet = new Set(prev[roleName]);
       if (nextSet.has(userId)) {
@@ -622,6 +644,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const toggleAllUsersSelection = (roleName: RoleName, checked: boolean) => {
+    if (!canManageUserRights) return;
     setSelectedUserIdsByRole((prev) => {
       const users = roleUsersMap[roleName] ?? [];
       return {
@@ -633,6 +656,24 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
   return (
     <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+      {!canViewUserRights ? (
+        <Box
+          sx={{
+            width: "100%",
+            border: "1px solid #E0E0E0",
+            borderRadius: "10px",
+            bgcolor: "#fff",
+            p: 3,
+          }}
+        >
+          <Typography sx={{ fontSize: 16, fontWeight: 600, color: "#B45309" }}>
+            You do not have permission to view User Rights.
+          </Typography>
+        </Box>
+      ) : null}
+
+      {canViewUserRights ? (
+      <>
       <Box
         sx={{
           width: 360,
@@ -800,7 +841,11 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
               }}
             >
               <Typography sx={{ fontSize: 18, fontWeight: 700 }}>{activeRole.name.toUpperCase()}</Typography>
-              <IconButton onClick={handleEditClick} sx={{ color: "#6D9CF1" }}>
+              <IconButton
+                onClick={handleEditClick}
+                disabled={!canManageUserRights}
+                sx={{ color: canManageUserRights ? "#6D9CF1" : "#BDBDBD" }}
+              >
                 <EditIcon />
               </IconButton>
             </Box>
@@ -852,6 +897,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                       size="small"
                       checked={draftRights[rightsKey].includes(label)}
                       onChange={(e) => toggleOption(label, e.target.checked)}
+                      disabled={!canManageUserRights}
                       sx={{ p: 0, mr: 0.8, color: "#CDCDCD", "&.Mui-checked": { color: "#4CAF50" } }}
                     />
                   }
@@ -868,6 +914,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                     size="small"
                     checked={allSelected}
                     onChange={(e) => toggleSelectAll(e.target.checked)}
+                    disabled={!canManageUserRights}
                     sx={{ p: 0, mr: 0.8, color: "#CDCDCD", "&.Mui-checked": { color: "#4CAF50" } }}
                   />
                 }
@@ -875,7 +922,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                 sx={{ m: 0 }}
               />
               <Box sx={{ flex: 1 }} />
-              <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={activeStep < 2 ? !hasStepSelection : !hasAnySelection} sx={{ textTransform: "none", minWidth: 110, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
+              <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={!canManageUserRights || (activeStep < 2 ? !hasStepSelection : !hasAnySelection)} sx={{ textTransform: "none", minWidth: 110, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
             </Box>
 
             <Box sx={{ display: "grid", gridTemplateColumns: "220px repeat(5,1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "10px", px: 1.2, py: 1 }}>
@@ -900,6 +947,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                   </Box>
 
                   <Tick checked={row.perm.add && row.perm.edit && row.perm.view && row.perm.print} onClick={() => {
+                    if (!canManageUserRights) return;
                     const allOn = row.perm.add && row.perm.edit && row.perm.view && row.perm.print;
                     setDraftPerms((prev) => ({
                       ...prev,
@@ -912,10 +960,10 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                       },
                     }));
                   }} />
-                  <Tick checked={row.perm.add} onClick={() => togglePerm(row.label, "add")} />
-                  <Tick checked={row.perm.edit} onClick={() => togglePerm(row.label, "edit")} />
-                  <Tick checked={row.perm.view} onClick={() => togglePerm(row.label, "view")} />
-                  <Tick checked={row.perm.print} onClick={() => togglePerm(row.label, "print")} />
+                  <Tick checked={row.perm.add} onClick={canManageUserRights ? () => togglePerm(row.label, "add") : undefined} />
+                  <Tick checked={row.perm.edit} onClick={canManageUserRights ? () => togglePerm(row.label, "edit") : undefined} />
+                  <Tick checked={row.perm.view} onClick={canManageUserRights ? () => togglePerm(row.label, "view") : undefined} />
+                  <Tick checked={row.perm.print} onClick={canManageUserRights ? () => togglePerm(row.label, "print") : undefined} />
                 </Box>
                 );
               })}
@@ -926,7 +974,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
               <Button
                 variant="contained"
                 onClick={handleSaveGrant}
-                disabled={saving}
+                disabled={saving || !canManageUserRights}
                 sx={{ textTransform: "none", minWidth: 240, borderRadius: "12px", bgcolor: "#545454", fontSize: 14, "&:hover": { bgcolor: "#232323" } }}
               >
                 {saving ? <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} /> : null}
@@ -936,6 +984,8 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
           </Box>
         )}
       </Box>
+      </>
+      ) : null}
     </Box>
   );
 };
