@@ -459,7 +459,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
 Please share your valuable feedback here:
 
 {review_link}`;
-      let messageWithFooter = normalizedMessage.replace(
+      const messageWithFooter = normalizedMessage.replace(
         /\{review_link\}|Share Review:\s*\{review_link\}|\[review_link\]/gi,
         "",
       );
