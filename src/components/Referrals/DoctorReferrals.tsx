@@ -145,9 +145,11 @@ const DoctorReferrals: React.FC = () => {
           ? await LeadAPI.list(clinic?.id)
           : [];
 
-        // Filter leads assigned to this specific doctor
+        // Filter leads assigned to this specific doctor AND from the Doctors referral department (id=1)
         const filtered = allLeads.filter(
-          (lead) => String(lead.assigned_to_id) === String(doctorId),
+          (lead) =>
+            String(lead.assigned_to_id) === String(doctorId) &&
+            lead.referral_department_name === "Doctors",
         );
 
         const cards: PatientCard[] = filtered.map((lead) => {

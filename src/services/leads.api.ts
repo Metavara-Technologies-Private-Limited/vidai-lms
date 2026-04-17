@@ -74,6 +74,8 @@ export type Lead = {
   is_active: boolean;
   created_at: string;
   modified_at: string;
+  referral_department_id?: number | null;
+  referral_department_name?: string | null;
 };
 
 // Type for creating/updating leads
@@ -110,9 +112,11 @@ export type LeadPayload = {
   slot: string;
   remark?: string;
   is_active: boolean;
+  referral_department_id?: number | null;
 };
 
 // ====================== Lead Email Types ======================
+
 export type LeadEmailPayload = {
   lead: string;
   subject: string;
