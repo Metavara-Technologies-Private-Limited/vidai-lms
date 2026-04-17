@@ -63,12 +63,18 @@ const Doctors: React.FC = () => {
           ? await LeadAPI.list(clinic?.id)
           : [];
 
-        // Step 2: Group leads by assigned_to — each unique assigned_to = a doctor
+        // Step 2: Filter only leads that have referral_department = "1" (Doctors)
+        const doctorLeads = allLeads.filter(
+          // referral_department_name is returned by the read serializer
+          (lead) => lead.referral_department_name === "Doctors",
+        );
+
+        // Step 3: Group filtered leads by assigned_to — each unique assigned_to = a doctor
         const doctorMap: Record<
           number,
           { id: number; name: string; referrals: number }
         > = {};
-        allLeads.forEach((lead) => {
+        doctorLeads.forEach((lead) => {
           if (lead.assigned_to_id && lead.assigned_to_name) {
             if (doctorMap[lead.assigned_to_id]) {
               doctorMap[lead.assigned_to_id].referrals += 1;
@@ -82,7 +88,7 @@ const Doctors: React.FC = () => {
           }
         });
 
-        // Step 3: Try to get employee details (email/phone/clinic) for each doctor
+        // Step 4: Try to get employee details (email/phone/clinic) for each doctor
         // Use clinic_id from the first lead to fetch employees
         const empById: Record<
           number,
@@ -93,7 +99,7 @@ const Doctors: React.FC = () => {
           }
         > = {};
         try {
-          const clinicId = allLeads[0]?.clinic_id;
+          const clinicId = doctorLeads[0]?.clinic_id ?? allLeads[0]?.clinic_id;
           if (clinicId) {
             const employees = await ClinicAPI.getEmployees(clinicId);
             employees.forEach((e) => {
@@ -119,7 +125,8 @@ const Doctors: React.FC = () => {
             referrals: doc.referrals,
             clinicName:
               (emp as { clinic_name?: string })?.clinic_name ||
-              (allLeads.find((l) => l.assigned_to_id === doc.id)?.clinic_name ??
+              (doctorLeads.find((l) => l.assigned_to_id === doc.id)
+                ?.clinic_name ??
                 "—"),
           };
         });

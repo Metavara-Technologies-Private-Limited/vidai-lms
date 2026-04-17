@@ -81,7 +81,7 @@ export type LeadPayload = {
   remark: string;
   is_active: boolean;
   // ✅ ADDED: Referral Department
-  referral_department?: string | null;
+  referral_department_id?: number | null;
 };
 
 // ====================== Campaign Type ======================

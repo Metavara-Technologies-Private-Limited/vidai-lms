@@ -313,22 +313,24 @@ export default function AddNewLead() {
     fetchDepartments();
   }, [clinicId]);
 
-  // ── Fetch Referral Departments from backend (once on mount) ───────────────
+  // ── Fetch Referral Departments from backend (falls back to static list) ─────
   React.useEffect(() => {
     const loadReferralDepts = async () => {
       try {
         setLoadingReferralDepts(true);
-        const data = await fetchReferralDepartments();
+        // fetchReferralDepartments() always returns data (falls back to
+        // STATIC_REFERRAL_DEPARTMENTS when /api/referral-departments/ is unavailable)
+        const data = await fetchReferralDepartments(clinicId);
         setReferralDepartments(data);
-      } catch (err) {
-        console.warn("Failed to load referral departments:", err);
-        // Non-critical — silently fail, dropdown will show "No departments available"
+      } catch {
+        // Should never reach here — fetchReferralDepartments swallows errors
+        setReferralDepartments([]);
       } finally {
         setLoadingReferralDepts(false);
       }
     };
     loadReferralDepts();
-  }, []);
+  }, [clinicId]);
 
   React.useEffect(() => {
     const timer = setTimeout(async () => {
@@ -647,8 +649,8 @@ export default function AddNewLead() {
       book_appointment: shouldBookAppointment,
       is_active: true,
       lead_status: "new",
-      // Store the numeric ID for the backend; name is resolved separately for display
-      referral_department: referralDeptId ? String(referralDeptId) : null,
+      // Backend serializer expects referral_department_id (integer FK field)
+      referral_department_id: referralDeptId ?? null,
     };
   };
 
@@ -796,21 +798,10 @@ export default function AddNewLead() {
       });
 
       // ✅ Refresh referral data if lead has a referral department
-      if (payload.referral_department) {
+      if (payload.referral_department_id) {
         try {
-          const deptId = intOrNull(String(payload.referral_department));
-          console.log(
-            "🔄 New lead created with referral_department:",
-            payload.referral_department,
-            "deptId:",
-            deptId,
-            "clinicId:",
-            clinicId,
-          );
+          const deptId = payload.referral_department_id;
           if (deptId) {
-            console.log(
-              "🔄 Dispatching loadReferralSources and loadDashboardCounts...",
-            );
             dispatch(
               loadReferralSources({
                 referral_department_id: deptId,
@@ -818,7 +809,6 @@ export default function AddNewLead() {
             );
             // Also refresh the dashboard counts so the new lead is reflected
             dispatch(loadDashboardCounts(clinicId));
-            console.log("🔄 Dispatched both thunks");
           }
         } catch (err) {
           console.warn("Failed to refresh referral data:", err);

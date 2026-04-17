@@ -1,11 +1,10 @@
 // src/services/referral.api.ts
-// (matches the import path used in AddNewLead.tsx and addNewLead.steps.tsx)
 
 import { http } from "./http";
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 
 export interface ReferralSource {
   id: number;
@@ -29,26 +28,23 @@ export interface ReferralSourcesParams {
   search?: string;
 }
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 // fetchDashboardCounts
-// GET /api/dashboard/
+// GET /api/dashboard/?clinic_id=<id>
 // Returns: { "Doctors": 12, "Corporate HR": 4, ... }
-// ─────────────────────────────────────────────────────────────
-
+// Counts leads per referral department, scoped to the clinic.
+// -------------------------------------------------------------
 export async function fetchDashboardCounts(
-  clinicId?: number
+  clinicId?: number,
 ): Promise<Record<string, number>> {
   const params: Record<string, number> = {};
   if (clinicId) params.clinic_id = clinicId;
 
   const response = await http.get("/dashboard/", { params });
 
-  // Response shape: { success: true, data: { "Doctors": 12, ... } }
   if (response.data?.success && typeof response.data.data === "object") {
     return response.data.data as Record<string, number>;
   }
-
-  // Fallback: plain dict returned directly
   if (typeof response.data === "object" && !Array.isArray(response.data)) {
     return response.data as Record<string, number>;
   }
@@ -56,14 +52,13 @@ export async function fetchDashboardCounts(
   return {};
 }
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 // fetchReferralSources
 // GET /api/sources/?referral_department_id=&search=
 // Returns: ReferralSource[]
-// ─────────────────────────────────────────────────────────────
-
+// -------------------------------------------------------------
 export async function fetchReferralSources(
-  params: ReferralSourcesParams = {}
+  params: ReferralSourcesParams = {},
 ): Promise<ReferralSource[]> {
   const queryParams: Record<string, string | number> = {};
 
@@ -76,7 +71,6 @@ export async function fetchReferralSources(
 
   const response = await http.get("/sources/", { params: queryParams });
 
-  // { success: true, data: [...] }
   if (response.data?.success && Array.isArray(response.data.data)) {
     return response.data.data;
   }
@@ -86,33 +80,51 @@ export async function fetchReferralSources(
   return [];
 }
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
+// STATIC_REFERRAL_DEPARTMENTS
+// Fallback used when /api/referral-departments/ returns empty or fails.
+// Names must exactly match what is seeded in the DB per clinic.
+// -------------------------------------------------------------
+export const STATIC_REFERRAL_DEPARTMENTS: ReferralDepartment[] = [
+  { id: 0, name: "Doctors" },
+  { id: 0, name: "Corporate HR" },
+  { id: 0, name: "Diagnostic Labs" },
+  { id: 0, name: "Insurance Partners" },
+  { id: 0, name: "Practo" },
+  { id: 0, name: "Zoya" },
+];
+
+// -------------------------------------------------------------
 // fetchReferralDepartments
-// GET /api/referral-departments/
-// Returns: ReferralDepartment[]   e.g. [{ id: 1, name: "Doctors" }, ...]
-//
-// ⚠️  ONE-TIME BACKEND SETUP REQUIRED:
-//     Your ReferralDepartmentListAPIView already exists in referral_view.py
-//     but is NOT registered in urls.py — that's why you see "No departments available".
-//
-//     Add these two lines to your urls.py:
-//
-//     # import at the top (with the other referral imports):
-//     from restapi.views.referral_view import ReferralDepartmentListAPIView
-//
-//     # inside urlpatterns:
-//     path("referral-departments/", ReferralDepartmentListAPIView.as_view(), name="referral-departments"),
-// ─────────────────────────────────────────────────────────────
+// GET /api/referral-departments/?clinic_id=<id>
+// Returns clinic-scoped ReferralDepartment[].
+// Falls back to STATIC_REFERRAL_DEPARTMENTS when unavailable.
+// -------------------------------------------------------------
+export async function fetchReferralDepartments(
+  clinicId?: number,
+): Promise<ReferralDepartment[]> {
+  try {
+    const params: Record<string, number> = {};
+    if (clinicId) params.clinic_id = clinicId;
+    const response = await http.get("/referral-departments/", { params });
 
-export async function fetchReferralDepartments(): Promise<ReferralDepartment[]> {
-  const response = await http.get("/referral-departments/");
+    if (
+      response.data?.success &&
+      Array.isArray(response.data.data) &&
+      response.data.data.length > 0
+    ) {
+      return response.data.data;
+    }
+    if (Array.isArray(response.data) && response.data.length > 0)
+      return response.data;
+    if (
+      Array.isArray(response.data?.results) &&
+      response.data.results.length > 0
+    )
+      return response.data.results;
 
-  // { success: true, data: [...] }
-  if (response.data?.success && Array.isArray(response.data.data)) {
-    return response.data.data;
+    return STATIC_REFERRAL_DEPARTMENTS;
+  } catch {
+    return STATIC_REFERRAL_DEPARTMENTS;
   }
-  if (Array.isArray(response.data)) return response.data;
-  if (Array.isArray(response.data?.results)) return response.data.results;
-
-  return [];
 }
