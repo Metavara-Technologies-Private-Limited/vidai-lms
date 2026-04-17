@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -13,15 +13,32 @@ import {
   InputAdornment,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { diagnosticMock } from "./diagnostic.mock";
 import BackwardIcon from "../../assets/icons/Backward_icon.svg";
-import {useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { loadReferralSources, selectSources } from "../../store/referralSlice";
+import type { AppDispatch } from "../../store";
 
 const Diagnostic: React.FC = () => {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const sources = useSelector(selectSources);
 
-  const filteredData = diagnosticMock.filter((item) =>
+  useEffect(() => {
+    // Fetch Diagnostic Labs referral sources (department_id for Diagnostic Labs)
+    dispatch(loadReferralSources({ referral_department_id: 3 }));
+  }, [dispatch]);
+
+  const filteredData = sources.map((item) => ({
+    id: item.id,
+    labName: item.name,
+    contactPerson: item.name,
+    email: item.email || "",
+    phone: item.phone || "",
+    referrals: item.referral_count,
+    city: item.external_clinic_name || "",
+  })).filter((item) =>
     item.labName.toLowerCase().includes(search.toLowerCase())
   );
 

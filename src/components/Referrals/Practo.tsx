@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -13,15 +13,32 @@ import {
   InputAdornment,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { practoMock } from "./practo.mock";
 import BackwardIcon from "../../assets/icons/Backward_icon.svg";
-import {useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { loadReferralSources, selectSources } from "../../store/referralSlice";
+import type { AppDispatch } from "../../store";
 
 const Practo: React.FC = () => {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const sources = useSelector(selectSources);
 
-  const filteredData = practoMock.filter((item) =>
+  useEffect(() => {
+    // Fetch Practo referral sources (department_id for Practo)
+    dispatch(loadReferralSources({ referral_department_id: 5 }));
+  }, [dispatch]);
+
+  const filteredData = sources.map((item) => ({
+    id: item.id,
+    accountManager: item.name,
+    email: item.email || "",
+    phone: item.phone || "",
+    referrals: item.referral_count,
+    campaign: item.external_clinic_name || "",
+    city: "",
+  })).filter((item) =>
     item.accountManager.toLowerCase().includes(search.toLowerCase())
   );
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -13,15 +13,31 @@ import {
   InputAdornment,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { corporateMock } from "./corporate.mock";
 import BackwardIcon from "../../assets/icons/Backward_icon.svg";
-import {useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { loadReferralSources, selectSources } from "../../store/referralSlice";
+import type { AppDispatch } from "../../store";
 
 const Corporate: React.FC = () => {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const sources = useSelector(selectSources);
 
-  const filteredData = corporateMock.filter((item) =>
+  useEffect(() => {
+    // Fetch Corporate HR referral sources (department_id for Corporate HR)
+    dispatch(loadReferralSources({ referral_department_id: 2 }));
+  }, [dispatch]);
+
+  const filteredData = sources.map((item) => ({
+    id: item.id,
+    name: item.name,
+    email: item.email || "",
+    phone: item.phone || "",
+    referrals: item.referral_count,
+    company: item.external_clinic_name || "",
+  })).filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
   );
 

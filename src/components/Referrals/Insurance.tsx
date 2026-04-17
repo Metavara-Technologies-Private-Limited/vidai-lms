@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -13,15 +13,31 @@ import {
   InputAdornment,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { insuranceMock } from "./insurance.mock";
 import BackwardIcon from "../../assets/icons/Backward_icon.svg";
-import {useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { loadReferralSources, selectSources } from "../../store/referralSlice";
+import type { AppDispatch } from "../../store";
 
 const Insurance: React.FC = () => {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const sources = useSelector(selectSources);
 
-  const filteredData = insuranceMock.filter((item) =>
+  useEffect(() => {
+    // Fetch Insurance referral sources (department_id for Insurance)
+    dispatch(loadReferralSources({ referral_department_id: 4 }));
+  }, [dispatch]);
+
+  const filteredData = sources.map((item) => ({
+    id: item.id,
+    provider: item.name,
+    manager: item.external_clinic_name || "",
+    email: item.email || "",
+    phone: item.phone || "",
+    referrals: item.referral_count,
+  })).filter((item) =>
     item.provider.toLowerCase().includes(search.toLowerCase())
   );
 

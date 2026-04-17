@@ -10,10 +10,12 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Dayjs } from "dayjs";
 
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { selectCampaign } from "../../store/campaignSlice";
 import { selectUser } from "../../store/authSlice";
 import { selectClinic } from "../../store/clinicSlice";
+import { loadReferralSources, loadDashboardCounts } from "../../store/referralSlice";
+import type { AppDispatch } from "../../store";
 import {
   resolveUserRole,
   hasAnySubcategoryActionPermission,
@@ -160,6 +162,7 @@ const sanitizeEmailInput = (value: string): string =>
 // ====================== Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -751,6 +754,28 @@ export default function AddNewLead() {
         autoClose: 1500,
         theme: "colored",
       });
+
+      // ✅ Refresh referral data if lead has a referral department
+      if (payload.referral_department) {
+        try {
+          const deptId = intOrNull(String(payload.referral_department));
+          console.log("🔄 New lead created with referral_department:", payload.referral_department, "deptId:", deptId, "clinicId:", clinicId);
+          if (deptId) {
+            console.log("🔄 Dispatching loadReferralSources and loadDashboardCounts...");
+            dispatch(
+              loadReferralSources({
+                referral_department_id: deptId,
+              })
+            );
+            // Also refresh the dashboard counts so the new lead is reflected
+            dispatch(loadDashboardCounts(clinicId));
+            console.log("🔄 Dispatched both thunks");
+          }
+        } catch (err) {
+          console.warn("Failed to refresh referral data:", err);
+        }
+      }
+
       navigate("/leads", { replace: true });
     } catch (err) {
       const error = err as ApiError;
