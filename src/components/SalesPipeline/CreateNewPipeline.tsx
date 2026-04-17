@@ -138,15 +138,19 @@ const Createnewpipeline = ({ open, onClose, onSave, mode = "create", initialPipe
 	}, [open, initialIndustry, initialPipelineName]);
 
 	const isNameValid = useMemo(() => isAlphabeticName(pipelineName), [pipelineName]);
+	const trimmedPipelineName = pipelineName.trim();
+	const isSingleLetterPipelineName =
+		trimmedPipelineName.length === 1 && /^[A-Za-z]$/.test(trimmedPipelineName);
 	const hasInitialName = (initialPipelineName ?? "").trim().length > 0;
 	const isNameChanged =
 		mode !== "edit" ||
 		!hasInitialName ||
 		normalizeNameForCompare(pipelineName) !== normalizeNameForCompare(initialPipelineName ?? "");
-	const isNameAcceptedForSave = isNameValid || (mode === "edit" && !isNameChanged);
+	const isNameAcceptedForSave =
+		(isNameValid && !isSingleLetterPipelineName) || (mode === "edit" && !isNameChanged);
 	const showNameError =
 		(showValidation && pipelineName.trim().length === 0) ||
-		(pipelineName.trim().length > 0 && !isNameValid && isNameChanged);
+		(pipelineName.trim().length > 0 && (!isNameValid || isSingleLetterPipelineName) && isNameChanged);
 
 	const canSave = useMemo(
 		() => pipelineName.trim().length > 0 && selectedIndustry.length > 0 && isNameAcceptedForSave,
@@ -251,6 +255,8 @@ const Createnewpipeline = ({ open, onClose, onSave, mode = "create", initialPipe
 						showNameError
 							? pipelineName.trim().length === 0
 								? "Pipeline name is required"
+									: isSingleLetterPipelineName
+										? "Pipeline name cannot be a single letter"
 								: "Only letters and spaces are allowed"
 							: " "
 					}

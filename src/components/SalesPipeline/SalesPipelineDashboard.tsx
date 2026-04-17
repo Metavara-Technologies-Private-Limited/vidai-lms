@@ -133,11 +133,18 @@ const SalesPipelineDashboard = () => {
 		if (!clinic?.id) return false;
 
 		const trimmedPipelineName = pipelineName.trim();
+		const isSingleLetterPipelineName =
+			trimmedPipelineName.length === 1 && /^[A-Za-z]$/.test(trimmedPipelineName);
 		const isEditing = Boolean(editPipelineData);
 		const isNameChanged =
 			!isEditing ||
 			normalizeNameForCompare(trimmedPipelineName) !==
 				normalizeNameForCompare(editPipelineData?.pipelineName ?? "");
+
+		if (isNameChanged && isSingleLetterPipelineName) {
+			toast.error("Pipeline name cannot be a single letter.");
+			return false;
+		}
 
 		if (isNameChanged && !isAlphabeticName(trimmedPipelineName)) {
 			toast.error("Pipeline name can contain only letters and spaces.");
@@ -339,10 +346,29 @@ const SalesPipelineDashboard = () => {
 		if (!canEditPipeline) return false;
 		if (!selectedPipelineId) return false;
 		const trimmedStage = stageName.trim();
-		if (!trimmedStage) return false;
-		if (!isAlphabeticName(trimmedStage)) {
+		const normalizedStageName = trimmedStage.replace(/\s+/g, " ");
+		const isSingleLetterStageName =
+			normalizedStageName.length === 1 && /^[A-Za-z]$/.test(normalizedStageName);
+		if (isSingleLetterStageName) {
+			toast.error("Stage name cannot be a single letter.");
+			return false;
+		}
+		if (normalizedStageName && !isAlphabeticName(normalizedStageName)) {
 			toast.error("Stage name can contain only letters and spaces.");
 			return false;
+		}
+
+		const existingNames = new Set(
+			(selectedPipeline?.stages ?? []).map((stage) => normalizeNameForCompare(stage.stage_name)),
+		);
+		let resolvedStageName = normalizedStageName;
+		if (!resolvedStageName) {
+			resolvedStageName = "New Stage";
+			let suffix = 2;
+			while (existingNames.has(normalizeNameForCompare(resolvedStageName))) {
+				resolvedStageName = `New Stage ${suffix}`;
+				suffix += 1;
+			}
 		}
 
 		const nextStageType =
@@ -351,7 +377,7 @@ const SalesPipelineDashboard = () => {
 			] ?? "lead";
 
 		const stageExists = selectedPipeline?.stages.some(
-			(stage) => normalizeNameForCompare(stage.stage_name) === normalizeNameForCompare(trimmedStage),
+			(stage) => normalizeNameForCompare(stage.stage_name) === normalizeNameForCompare(resolvedStageName),
 		);
 		if (stageExists) {
 			toast.error("Stage name already exists.");
@@ -362,7 +388,7 @@ const SalesPipelineDashboard = () => {
 			const createdStage = await dispatch(
 				createPipelineStage({
 					pipeline_id: selectedPipelineId,
-					stage_name: trimmedStage,
+					stage_name: resolvedStageName,
 					stage_type: stageConfig?.stageType
 						? normalizeStageType(stageConfig.stageType)
 						: nextStageType,
@@ -386,7 +412,7 @@ const SalesPipelineDashboard = () => {
 			if (stageConfig?.colorCode) {
 				setStageColorOverrides((previous) => ({
 					...previous,
-					[trimmedStage.toLowerCase()]: stageConfig.colorCode,
+					[resolvedStageName.toLowerCase()]: stageConfig.colorCode,
 				}));
 			}
 			await dispatch(fetchPipelineDetail(selectedPipelineId));
@@ -433,10 +459,7 @@ const SalesPipelineDashboard = () => {
 		stageConfig?: StageConfigPayload,
 	): Promise<boolean> => {
 		if (!selectedPipelineId) return false;
-		if (stageName && stageName.trim()) {
-			return createStageByName(stageName, stageConfig);
-		}
-		return false;
+		return createStageByName(stageName ?? "", stageConfig);
 	};
 
 	const handleReorderStages = async (fromIndex: number, toIndex: number) => {
@@ -484,13 +507,20 @@ const SalesPipelineDashboard = () => {
 		if (stageIndex < 0 || stageIndex >= selectedPipeline.stages.length) return false;
 
 		const trimmedStageName = updatedStageName.trim();
-		if (!trimmedStageName) return false;
-		if (!isAlphabeticName(trimmedStageName)) {
+		const normalizedStageName = trimmedStageName.replace(/\s+/g, " ");
+		const isSingleLetterStageName =
+			normalizedStageName.length === 1 && /^[A-Za-z]$/.test(normalizedStageName);
+		if (isSingleLetterStageName) {
+			toast.error("Stage name cannot be a single letter.");
+			return false;
+		}
+		if (normalizedStageName && !isAlphabeticName(normalizedStageName)) {
 			toast.error("Stage name can contain only letters and spaces.");
 			return false;
 		}
 
 		const currentStage = selectedPipeline.stages[stageIndex];
+		const resolvedStageName = normalizedStageName || currentStage.stage_name;
 		const currentStageId = await resolveStageId(stageIndex);
 
 		if (!currentStageId) {
@@ -500,7 +530,7 @@ const SalesPipelineDashboard = () => {
 		const duplicateName = selectedPipeline.stages.some(
 			(stage, index) =>
 				index !== stageIndex &&
-				normalizeNameForCompare(stage.stage_name) === normalizeNameForCompare(trimmedStageName),
+				normalizeNameForCompare(stage.stage_name) === normalizeNameForCompare(resolvedStageName),
 		);
 		if (duplicateName) {
 			toast.error("Stage name already exists.");
@@ -513,7 +543,7 @@ const SalesPipelineDashboard = () => {
 					pipelineId: selectedPipelineId,
 					stageId: currentStageId,
 					payload: {
-						stage_name: trimmedStageName,
+						stage_name: resolvedStageName,
 						stage_type: normalizeStageType(stageConfig?.stageType ?? currentStage.stage_type),
 						stage_status: normalizeStageStatus(
 							stageConfig?.stageStatus ?? currentStage.stage_status,
@@ -536,7 +566,7 @@ const SalesPipelineDashboard = () => {
 				setStageColorOverrides((previous) => ({
 					...previous,
 					[currentStageId]: stageConfig.colorCode,
-					[trimmedStageName.toLowerCase()]: stageConfig.colorCode,
+					[resolvedStageName.toLowerCase()]: stageConfig.colorCode,
 				}));
 			}
 			await dispatch(fetchPipelineDetail(selectedPipelineId));

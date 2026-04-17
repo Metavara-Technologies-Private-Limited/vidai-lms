@@ -92,8 +92,8 @@ const StageConfiguration = ({
 }: StageConfigurationProps) => {
 	const theme = useTheme();
 	const [activeTab, setActiveTab] = useState<"stage-rules" | "data-capture">("stage-rules");
-	const [stageType, setStageType] = useState("Lead");
-	const [stageStatus, setStageStatus] = useState("Open");
+	const [stageType, setStageType] = useState("");
+	const [stageStatus, setStageStatus] = useState("");
 	const [colorCode, setColorCode] = useState("#EEE788");
 	const [entryRule, setEntryRule] = useState("Manual");
 	const [isSaving, setIsSaving] = useState(false);
@@ -189,8 +189,8 @@ const StageConfiguration = ({
 
 	useEffect(() => {
 		if (!open) return;
-		setStageType(initialValues?.stageType ?? "Lead");
-		setStageStatus(initialValues?.stageStatus ?? "Open");
+		setStageType(initialValues?.stageType ?? "");
+		setStageStatus(initialValues?.stageStatus ?? "");
 		setColorCode(normalizeHexColorInput(initialValues?.colorCode ?? "#EEE788"));
 		setEntryRule(initialValues?.entryRule ?? "Manual");
 		setStageActions(
@@ -216,14 +216,16 @@ const StageConfiguration = ({
 	const handleSave = async () => {
 		const trimmedStageName = stageName.trim();
 		const normalizedStageName = trimmedStageName.replace(/\s+/g, " ");
+		const isSingleLetterStageName =
+			normalizedStageName.length === 1 && /^[A-Za-z]$/.test(normalizedStageName);
 		const trimmedStageType = stageType.trim();
 		const trimmedStageStatus = stageStatus.trim();
 		const trimmedColorCode = colorCode.trim();
 		const trimmedEntryRule = entryRule.trim();
 
 		const hasValidationError =
-			!trimmedStageName ||
-			!isAlphabeticName(trimmedStageName) ||
+			isSingleLetterStageName ||
+			(trimmedStageName.length > 0 && !isAlphabeticName(trimmedStageName)) ||
 			!trimmedStageType ||
 			!trimmedStageStatus ||
 			!isValidHexColor(trimmedColorCode) ||
@@ -254,6 +256,10 @@ const StageConfiguration = ({
 	};
 
 	if (!open) return null;
+
+	const normalizedTypedStageName = stageName.trim().replace(/\s+/g, " ");
+	const isSingleLetterTypedStageName =
+		normalizedTypedStageName.length === 1 && /^[A-Za-z]$/.test(normalizedTypedStageName);
 
 	return (
 		<Box
@@ -376,11 +382,16 @@ const StageConfiguration = ({
 									label="Stage Name"
 									value={stageName}
 									onChange={(event) => onStageNameChange?.(event.target.value)}
-									error={showValidation && (!stageName.trim() || !isAlphabeticName(stageName))}
+									error={
+										showValidation &&
+										(isSingleLetterTypedStageName ||
+											(stageName.trim().length > 0 && !isAlphabeticName(stageName)))
+									}
 									helperText={
-										showValidation && !stageName.trim()
-											? "Stage name is required"
+										showValidation && isSingleLetterTypedStageName
+												? "Stage name cannot be a single letter"
 											: showValidation && !isAlphabeticName(stageName)
+												&& stageName.trim().length > 0
 												? "Only letters and spaces are allowed"
 												: " "
 									}
@@ -416,6 +427,9 @@ const StageConfiguration = ({
 										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
 								>
+								<MenuItem value="">
+									<em>Select stage type</em>
+								</MenuItem>
 									<MenuItem value="Lead">Lead</MenuItem>
 									<MenuItem value="Engagement">Engagement</MenuItem>
 									<MenuItem value="Conversion">Conversion</MenuItem>
@@ -445,6 +459,9 @@ const StageConfiguration = ({
 										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
 									}}
 								>
+								<MenuItem value="">
+									<em>Select stage status</em>
+								</MenuItem>
 									<MenuItem value="Open">Open</MenuItem>
 									<MenuItem value="Won">Won</MenuItem>
 									<MenuItem value="Lost">Lost</MenuItem>

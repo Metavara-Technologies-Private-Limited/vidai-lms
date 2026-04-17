@@ -212,10 +212,10 @@ const SalesPipeLineData = ({
   const handleAddStageClick = () => {
     setConfigurationMode("create");
     setSelectedStageIndex(null);
-    setSelectedStageName("New Stage");
+    setSelectedStageName("");
     setSelectedStageConfig({
-      stageType: "Lead",
-      stageStatus: "Open",
+      stageType: "",
+      stageStatus: "",
       colorCode: "#EBFAEF",
       entryRule: "Manual",
     });
@@ -270,7 +270,7 @@ const SalesPipeLineData = ({
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
-      if (!selectedStageName) return;
+      if (selectedStageName === null) return;
       const targetNode = event.target as Node;
       const targetElement = event.target as HTMLElement | null;
       if (
@@ -658,7 +658,7 @@ const SalesPipeLineData = ({
       </Box>
 
       <StageConfiguration
-        open={Boolean(selectedStageName)}
+        open={selectedStageName !== null}
         stageName={selectedStageName ?? ""}
         onStageNameChange={(stageName) => setSelectedStageName(stageName)}
         initialValues={selectedStageConfig}
