@@ -88,6 +88,7 @@ const SalesPipelineDashboard = () => {
 	const [confirmStageIndex, setConfirmStageIndex] = useState<number | null>(null);
 	const [actionInProgress, setActionInProgress] = useState(false);
 	const [stageColorOverrides, setStageColorOverrides] = useState<Record<string, string>>({});
+	const [zoomPercent, setZoomPercent] = useState(100);
 
 	const chipBackgrounds = [
 		alpha(theme.palette.primary.main, 0.14),
@@ -121,6 +122,14 @@ const SalesPipelineDashboard = () => {
 	useEffect(() => {
 		setStageColorOverrides({});
 	}, [selectedPipelineId]);
+
+	const handleZoomOut = () => {
+		setZoomPercent((previous) => Math.max(50, previous - 10));
+	};
+
+	const handleZoomIn = () => {
+		setZoomPercent((previous) => Math.min(200, previous + 10));
+	};
 
 	const handleCreatePipelineSave = async ({
 		pipelineName,
@@ -375,6 +384,7 @@ const SalesPipelineDashboard = () => {
 			STAGE_TYPE_SEQUENCE[
 				Math.min(selectedPipeline?.stages.length ?? 0, STAGE_TYPE_SEQUENCE.length - 1)
 			] ?? "lead";
+		const nextStageOrder = (selectedPipeline?.stages.length ?? 0) + 1;
 
 		const stageExists = selectedPipeline?.stages.some(
 			(stage) => normalizeNameForCompare(stage.stage_name) === normalizeNameForCompare(resolvedStageName),
@@ -393,14 +403,31 @@ const SalesPipelineDashboard = () => {
 						? normalizeStageType(stageConfig.stageType)
 						: nextStageType,
 					stage_status: normalizeStageStatus(stageConfig?.stageStatus),
-					stage_order: (selectedPipeline?.stages.length ?? 0) + 1,
+					stage_order: nextStageOrder,
 					entry_rule: normalizeEntryRule(stageConfig?.entryRule),
 					stage_color: stageConfig?.colorCode,
 					rules: stageConfig?.actions ? mapActionsToRules(stageConfig.actions) : undefined,
 					fields: mapDataCaptureToFields(stageConfig?.dataCaptureFields),
 				}),
 			).unwrap();
-			const newStageId = createdStage?.stage?.id ? String(createdStage.stage.id) : null;
+			let newStageId = createdStage?.stage?.id ? String(createdStage.stage.id) : null;
+			if (!newStageId || newStageId.startsWith("stage-")) {
+				const refreshedPipeline = await dispatch(fetchPipelineDetail(selectedPipelineId)).unwrap();
+				const matchedStage =
+					refreshedPipeline.stages.find(
+						(stage) =>
+							stage.stage_order === nextStageOrder &&
+							normalizeNameForCompare(stage.stage_name) ===
+								normalizeNameForCompare(resolvedStageName),
+					) ??
+					refreshedPipeline.stages.find(
+						(stage) =>
+							normalizeNameForCompare(stage.stage_name) ===
+							normalizeNameForCompare(resolvedStageName),
+					) ??
+					null;
+				newStageId = matchedStage?.id ? String(matchedStage.id) : null;
+			}
 			if (newStageId) {
 				const mappedRules = stageConfig?.actions ? mapActionsToRules(stageConfig.actions) : null;
 				const mappedFields = mapDataCaptureToFields(stageConfig?.dataCaptureFields);
@@ -751,6 +778,7 @@ const SalesPipelineDashboard = () => {
 								onArchiveStage={handleArchiveStageRequest}
 								onDeleteStage={handleDeleteStageRequest}
 								onReorderStages={handleReorderStages}
+								zoomPercent={zoomPercent}
 							/>
 						) : pipelineLoading ? (
 							<CircularProgress size={28} />
@@ -791,6 +819,7 @@ const SalesPipelineDashboard = () => {
 					>
 						<IconButton
 							size="small"
+							onClick={handleZoomOut}
 							sx={{
 								width: 26,
 								height: 26,
@@ -811,10 +840,11 @@ const SalesPipelineDashboard = () => {
 								backgroundColor: theme.palette.background.paper,
 							}}
 						>
-							150%
+							{zoomPercent}%
 						</Box>
 						<IconButton
 							size="small"
+							onClick={handleZoomIn}
 							sx={{
 								width: 26,
 								height: 26,

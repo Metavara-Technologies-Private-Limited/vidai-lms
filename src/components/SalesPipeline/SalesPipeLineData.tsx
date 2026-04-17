@@ -44,6 +44,7 @@ type SalesPipeLineDataProps = {
   onArchiveStage: (stageIndex: number) => void;
   onDeleteStage: (stageIndex: number) => void;
   onReorderStages: (fromIndex: number, toIndex: number) => void;
+  zoomPercent?: number;
 };
 
 const normalizeLeadStatus = (lead: ApiLead): string => {
@@ -103,6 +104,7 @@ const SalesPipeLineData = ({
   onArchiveStage,
   onDeleteStage,
   onReorderStages,
+  zoomPercent = 100,
 }: SalesPipeLineDataProps) => {
   const theme = useTheme();
   const dispatch = useDispatch<AppDispatch>();
@@ -313,6 +315,8 @@ const SalesPipeLineData = ({
     },
   } as const;
 
+  const zoomScale = Math.max(50, Math.min(200, zoomPercent)) / 100;
+
   return (
     <Box
       ref={rootRef}
@@ -346,13 +350,15 @@ const SalesPipeLineData = ({
           justifyContent: stageMetrics.length === 0 ? "center" : "flex-start",
           flexWrap: "nowrap",
           gap: 0.9,
-          width: "100%",
+          width: `${100 / zoomScale}%`,
           overflowX: "auto",
           overflowY: "hidden",
           maxWidth: "100%",
           pb: 1,
           cursor: isDragging ? "grabbing" : "grab",
           userSelect: "none", // Prevents text selection while dragging
+          transform: `scale(${zoomScale})`,
+          transformOrigin: "left top",
           msOverflowStyle: "none",
           scrollbarWidth: "none",
           scrollBehavior: isDragging ? "auto" : "smooth",

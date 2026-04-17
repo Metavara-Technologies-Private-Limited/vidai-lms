@@ -227,8 +227,25 @@ const removeRelationsForBackend = <TPayload extends StageMutationPayload>(
 };
 
 const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
+  const isRenderableStage = (stage: PipelineStageApiResponse): boolean => {
+    if (!stage || typeof stage !== "object") return false;
+    if (Object.keys(stage).length === 0) return false;
+    return (
+      stage.id != null ||
+      stage.stage_id != null ||
+      stage.stage_uuid != null ||
+      stage.uuid != null ||
+      stage.pk != null ||
+      stage.stage_name != null ||
+      stage.stage_type != null ||
+      stage.stage_status != null
+    );
+  };
+
   const stages = Array.isArray(pipeline.stages)
-    ? pipeline.stages.map((stage, index) => normalizeStage(stage, index))
+    ? pipeline.stages
+        .filter(isRenderableStage)
+        .map((stage, index) => normalizeStage(stage, index))
     : [];
 
   return {
@@ -685,6 +702,10 @@ export const pipelineApi = {
     stageId: string,
     rules: PipelineStageRule[],
   ): Promise<void> {
+    if (!stageId || String(stageId).startsWith("stage-")) {
+      return;
+    }
+
     await http.post(
       `/pipelines/stages/${stageId}/rules/`,
       { rules },
@@ -698,6 +719,10 @@ export const pipelineApi = {
     stageId: string,
     fields: PipelineStageField[],
   ): Promise<void> {
+    if (!stageId || String(stageId).startsWith("stage-")) {
+      return;
+    }
+
     await http.post(
       `/pipelines/stages/${stageId}/fields/`,
       { fields },
