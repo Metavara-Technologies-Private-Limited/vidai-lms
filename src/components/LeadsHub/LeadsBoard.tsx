@@ -24,7 +24,7 @@ import {
   selectLeadsError,
 } from "../../store/leadSlice";
 import { selectClinic } from "../../store/clinicSlice";
-import { pipelineApi, type Pipeline, type PipelineStage } from "../../services/pipeline.api";
+import { pipelineApi, type PipelineStage } from "../../services/pipeline.api";
 import {
   DepartmentAPI,
   EmployeeAPI,
@@ -37,6 +37,7 @@ import {
   type LeadItem,
   type RawLead,
   type AppointmentState,
+  type ColumnConfig,
   mapRawToLeadItem,
 } from "./Leadsboardtypes";
 import { BookAppointmentModal } from "./Leadsboardmodals";
@@ -137,7 +138,7 @@ const BOARD_STATUSES = IS_CONTRACTS_APP
   ? ["New", "Follow Up", "Appointment", "Negotiation", "Proposal Sent", "Contract Signed", "Converted Lead", "Lost Lead"]
   : [...STATUS_OPTIONS_BY_APP[APP_TYPE]];
 
-const BOARD_COLUMNS = BOARD_STATUSES.map((status) => ({
+const BOARD_COLUMNS: ColumnConfig[] = BOARD_STATUSES.map((status) => ({
   label: status,
   statusKey: getStatusKeys(status),
   color:
@@ -692,7 +693,7 @@ const LeadsBoard: React.FC<Props> = ({
   const error      = useSelector(selectLeadsError);
 
   const [leads, setLeads] = React.useState<LeadItem[]>([]);
-  const [pipelineColumns, setPipelineColumns] = React.useState<typeof BOARD_COLUMNS>([]);
+  const [pipelineColumns, setPipelineColumns] = React.useState<ColumnConfig[]>([]);
 
   React.useEffect(() => { dispatch(fetchLeads()); }, [dispatch]);
 
