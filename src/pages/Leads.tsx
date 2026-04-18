@@ -436,7 +436,7 @@ const Leads: React.FC = () => {
         new Set(
           availablePipelines
             .map((pipeline) => pipeline.industry_type)
-            .filter((industry): industry is string => Boolean(industry)),
+            .filter(Boolean),
         ),
       ),
     [availablePipelines],
