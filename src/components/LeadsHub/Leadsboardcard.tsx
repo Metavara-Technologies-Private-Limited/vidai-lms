@@ -42,6 +42,7 @@ const iconBtnSx = {
 interface CardContentProps {
   lead: LeadItem;
   columnLabel: string;
+  stageActions?: ColumnConfig["uiActions"];
   isHovered: boolean;
   onOpenSms:  (lead: LeadItem) => void;
   onOpenMail: (lead: LeadItem) => void;
@@ -50,7 +51,7 @@ interface CardContentProps {
 }
 
 export const CardContent: React.FC<CardContentProps> = ({
-  lead, columnLabel, isHovered, onOpenSms, onOpenMail, onOpenBook, onOpenCall,
+  lead, columnLabel, stageActions, isHovered, onOpenSms, onOpenMail, onOpenBook, onOpenCall,
 }) => {
   // Collapsed view
   if (!isHovered) {
@@ -63,9 +64,14 @@ export const CardContent: React.FC<CardContentProps> = ({
     );
   }
 
-  // ✅ FIX: use BOOK_APPOINTMENT_STATUSES set (matches "New" and "Follow Up")
-  // Previously was checking "NEW LEADS" and "FOLLOW-UPS" which never matched
-  const showBookButton = BOOK_APPOINTMENT_STATUSES.has(columnLabel as "New" | "Follow Up") && isHovered;
+  const showCall = stageActions ? stageActions.showCall : true;
+  const showEmail = stageActions ? stageActions.showEmail : true;
+  const showSms = stageActions ? stageActions.showSms : true;
+  const customActions = stageActions?.customActions ?? [];
+  // If no stage-level rule exists yet, keep legacy behavior for New / Follow Up.
+  const showBookButton = stageActions
+    ? stageActions.showBookAppointment && isHovered
+    : BOOK_APPOINTMENT_STATUSES.has(columnLabel as "New" | "Follow Up") && isHovered;
 
   const formattedDate = lead.created_at
     ? new Date(lead.created_at as string).toLocaleDateString("en-GB")
@@ -134,28 +140,54 @@ export const CardContent: React.FC<CardContentProps> = ({
         CONTACT OPTION
       </Typography>
       <Stack direction="row" spacing={1.5} sx={{ mb: showBookButton ? 2 : 0 }}>
-        <IconButton
-          size="small"
-          sx={iconBtnSx}
-          onClick={(e) => { e.stopPropagation(); onOpenCall(lead); }}
-        >
-          <PhoneIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-        <IconButton
-          size="small"
-          sx={iconBtnSx}
-          onClick={(e) => { e.stopPropagation(); onOpenSms(lead); }}
-        >
-          <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-        <IconButton
-          size="small"
-          sx={iconBtnSx}
-          onClick={(e) => { e.stopPropagation(); onOpenMail(lead); }}
-        >
-          <MailOutlineIcon sx={{ fontSize: 16 }} />
-        </IconButton>
+        {showCall && (
+          <IconButton
+            size="small"
+            sx={iconBtnSx}
+            onClick={(e) => { e.stopPropagation(); onOpenCall(lead); }}
+          >
+            <PhoneIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        )}
+        {showSms && (
+          <IconButton
+            size="small"
+            sx={iconBtnSx}
+            onClick={(e) => { e.stopPropagation(); onOpenSms(lead); }}
+          >
+            <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        )}
+        {showEmail && (
+          <IconButton
+            size="small"
+            sx={iconBtnSx}
+            onClick={(e) => { e.stopPropagation(); onOpenMail(lead); }}
+          >
+            <MailOutlineIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        )}
       </Stack>
+
+      {customActions.length > 0 && (
+        <Stack direction="row" spacing={0.75} sx={{ mb: showBookButton ? 1.5 : 0, flexWrap: "wrap", rowGap: 0.75 }}>
+          {customActions.map((customActionLabel) => (
+            <Chip
+              key={customActionLabel}
+              label={customActionLabel}
+              size="small"
+              sx={{
+                height: 22,
+                fontSize: "0.66rem",
+                borderRadius: "999px",
+                bgcolor: "#EEF2FF",
+                color: "#3730A3",
+                fontWeight: 600,
+              }}
+            />
+          ))}
+        </Stack>
+      )}
 
       {showBookButton && (
         <Button
@@ -185,6 +217,7 @@ interface LeadCardProps {
   lead: LeadItem;
   columnLabel: string;
   columnColor: string;
+  stageActions?: ColumnConfig["uiActions"];
   isHovered: boolean;
   onHover:    (id: string | null) => void;
   onOpenSms:  (lead: LeadItem) => void;
@@ -197,7 +230,7 @@ interface LeadCardProps {
 }
 
 export const LeadCard: React.FC<LeadCardProps> = ({
-  lead, columnLabel, columnColor, isHovered,
+  lead, columnLabel, columnColor, stageActions, isHovered,
   onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, canEditLeads = true, setLeads,
 }) => {
   const navigate = useNavigate();
@@ -285,6 +318,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({
       <CardContent
         lead={lead}
         columnLabel={columnLabel}
+        stageActions={stageActions}
         isHovered={isHovered}
         onOpenSms={onOpenSms}
         onOpenMail={onOpenMail}
@@ -363,6 +397,7 @@ export const LeadColumn: React.FC<LeadColumnProps> = ({
           lead={lead}
           columnLabel={col.label}
           columnColor={col.color}
+          stageActions={col.uiActions}
           isHovered={hoveredId === lead.id}
           onHover={onHover}
           onOpenSms={onOpenSms}

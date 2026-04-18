@@ -23,6 +23,8 @@ import {
   selectLeadsLoading,
   selectLeadsError,
 } from "../../store/leadSlice";
+import { selectClinic } from "../../store/clinicSlice";
+import { pipelineApi, type Pipeline, type PipelineStage } from "../../services/pipeline.api";
 import {
   DepartmentAPI,
   EmployeeAPI,
@@ -148,6 +150,65 @@ const BOARD_COLUMNS = BOARD_STATUSES.map((status) => ({
     : status === "Converted Lead"  ? "#22C55E"
     : "#EF4444",
 }));
+
+const ACTION_LABEL_TO_COLOR: Record<string, string> = {
+  call: "#F97316",
+  email: "#3B82F6",
+  sms: "#10B981",
+  appointment: "#0F766E",
+  whatsapp: "#16A34A",
+};
+
+const fallbackColorByIndex = (index: number): string => {
+  const palette = ["#F97316", "#8B5CF6", "#3B82F6", "#10B981", "#06B6D4", "#F59E0B", "#EF4444"];
+  return palette[index % palette.length];
+};
+
+const getStageStatusKeys = (stage: PipelineStage): string[] => {
+  const stageName = stage.stage_name.toLowerCase().trim();
+  const byName = getStatusKeys(stage.stage_name);
+  const byType = stage.stage_type ? getStatusKeys(stage.stage_type) : [];
+  const byStatus = stage.stage_status ? getStatusKeys(stage.stage_status) : [];
+  const explicit = [stageName, stage.stage_name, stage.stage_status ?? "", stage.stage_type ?? ""];
+
+  return Array.from(
+    new Set(
+      [...byName, ...byType, ...byStatus, ...explicit]
+        .map((item) => item.toLowerCase().trim())
+        .filter(Boolean),
+    ),
+  );
+};
+
+const getStageUiActions = (stage: PipelineStage): {
+  showCall: boolean;
+  showEmail: boolean;
+  showSms: boolean;
+  showBookAppointment: boolean;
+  customActions: string[];
+} => {
+  if (!Array.isArray(stage.rules) || stage.rules.length === 0) {
+    return {
+      showCall: true,
+      showEmail: true,
+      showSms: true,
+      showBookAppointment: false,
+      customActions: [],
+    };
+  }
+
+  const activeRules = stage.rules.filter((rule) => rule.is_enabled);
+  return {
+    showCall: activeRules.some((rule) => rule.action_type === "call"),
+    showEmail: activeRules.some((rule) => rule.action_type === "email"),
+    showSms: activeRules.some((rule) => rule.action_type === "sms" || rule.action_type === "whatsapp"),
+    showBookAppointment: activeRules.some((rule) => rule.action_type === "appointment"),
+    customActions: activeRules
+      .filter((rule) => rule.action_type === "custom")
+      .map((rule) => rule.custom_label?.trim() ?? "")
+      .filter(Boolean),
+  };
+};
 
 const normalizeStatusKey = (value: string): string =>
   value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
@@ -624,12 +685,14 @@ const LeadsBoard: React.FC<Props> = ({
 }) => {
   const dispatch   = useDispatch<AppDispatch>();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
+  const clinic = useSelector(selectClinic);
 
   const reduxLeads = useSelector(selectLeads);
   const loading    = useSelector(selectLeadsLoading);
   const error      = useSelector(selectLeadsError);
 
   const [leads, setLeads] = React.useState<LeadItem[]>([]);
+  const [pipelineColumns, setPipelineColumns] = React.useState<typeof BOARD_COLUMNS>([]);
 
   React.useEffect(() => { dispatch(fetchLeads()); }, [dispatch]);
 
@@ -638,6 +701,57 @@ const LeadsBoard: React.FC<Props> = ({
       setLeads((reduxLeads as RawLead[]).map(mapRawToLeadItem));
     }
   }, [reduxLeads]);
+
+  React.useEffect(() => {
+    const fetchPipelineStages = async () => {
+      const clinicIdFromStore = Number(clinic?.id ?? 0);
+      const clinicIdFromStorage = Number(localStorage.getItem("clinic_id") ?? 0);
+      const clinicIdFromLeads = Number((reduxLeads[0] as RawLead | undefined)?.clinic_id ?? 0);
+      const clinicId = clinicIdFromStore || clinicIdFromStorage || clinicIdFromLeads;
+
+      if (!clinicId) {
+        setPipelineColumns([]);
+        return;
+      }
+
+      try {
+        const pipelines = await pipelineApi.list(clinicId);
+        const activePipeline = pipelines.find((pipeline) => pipeline.is_active) ?? pipelines[0];
+
+        if (!activePipeline || !Array.isArray(activePipeline.stages) || activePipeline.stages.length === 0) {
+          setPipelineColumns([]);
+          return;
+        }
+
+        const dynamicColumns = activePipeline.stages
+          .slice()
+          .sort((left, right) => left.stage_order - right.stage_order)
+          .map((stage, index) => {
+            const uiActions = getStageUiActions(stage);
+            const firstCustomAction = uiActions.customActions[0]?.toLowerCase() ?? "";
+            const firstActionType = stage.rules?.find((rule) => rule.is_enabled)?.action_type ?? "";
+            const actionHint = firstCustomAction || firstActionType;
+
+            return {
+              stageId: stage.id,
+              label: stage.stage_name,
+              statusKey: getStageStatusKeys(stage),
+              color:
+                stage.stage_color ??
+                ACTION_LABEL_TO_COLOR[actionHint] ??
+                fallbackColorByIndex(index),
+              uiActions,
+            };
+          });
+
+        setPipelineColumns(dynamicColumns);
+      } catch {
+        setPipelineColumns([]);
+      }
+    };
+
+    void fetchPipelineStages();
+  }, [clinic?.id, reduxLeads]);
 
   const [openBookModal, setOpenBookModal] = React.useState(false);
   const [selectedLead,  setSelectedLead ] = React.useState<LeadItem | null>(null);
@@ -712,6 +826,11 @@ const LeadsBoard: React.FC<Props> = ({
       return matchSearch && isActive;
     });
   }, [leads, search, filters]);
+
+  const activeBoardColumns = React.useMemo(
+    () => (pipelineColumns.length > 0 ? pipelineColumns : BOARD_COLUMNS),
+    [pipelineColumns],
+  );
 
   const handleBookAppointmentSubmit = async () => {
     if (!selectedLead?.id) { setAppointment((p) => ({ ...p, error: "Lead ID is missing." })); return; }
@@ -797,14 +916,17 @@ const LeadsBoard: React.FC<Props> = ({
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ display: "flex", overflowX: "auto", gap: 3, p: 4, bgcolor: "#F8FAFC", height: "calc(100vh - 64px)", alignItems: "flex-start", "&::-webkit-scrollbar": { height: "10px" }, "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "10px" } }}>
 
-        {BOARD_COLUMNS.map((col) => {
+        {activeBoardColumns.map((col) => {
           const leadsInCol = filteredLeads.filter((l) => {
             const leadStatus = (l.status || l.lead_status || "no status").toLowerCase().trim();
-            return col.statusKey.some((key) => leadStatus === (key || "no status").toLowerCase().trim());
+            return col.statusKey.some((key) => {
+              const normalizedKey = (key || "no status").toLowerCase().trim();
+              return leadStatus === normalizedKey;
+            });
           });
           return (
             <LeadColumn
-              key={col.label}
+              key={col.stageId ?? col.label}
               col={col}
               leads={leadsInCol}
               hoveredId={hoveredId}

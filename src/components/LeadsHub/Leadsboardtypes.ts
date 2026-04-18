@@ -163,9 +163,17 @@ export interface AppointmentState {
 
 // ====================== Column Config ======================
 export interface ColumnConfig {
+  stageId?: string;
   label: string;
   statusKey: string[];
   color: string;
+  uiActions?: {
+    showCall: boolean;
+    showEmail: boolean;
+    showSms: boolean;
+    showBookAppointment: boolean;
+    customActions: string[];
+  };
 }
 
 export const BOARD_COLUMNS: ColumnConfig[] = [
