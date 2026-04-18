@@ -95,6 +95,18 @@ const toStageLabel = (value?: string): string | undefined => {
   if (!value) return undefined;
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 };
+const toStageTypeLabel = (value?: string): string => {
+  const normalized = (value ?? "").toLowerCase().trim();
+  if (normalized === "closure") return "Final";
+  if (normalized === "engagement" || normalized === "conversion") return "Mid";
+  return "Entry";
+};
+
+const toStageStatusLabel = (value?: string): string => {
+  const normalized = (value ?? "").toLowerCase().trim();
+  if (normalized === "inactive") return "Inactive";
+  return "Active";
+};
 
 const SalesPipeLineData = ({
   stages,
@@ -217,7 +229,7 @@ const SalesPipeLineData = ({
     setSelectedStageName("");
     setSelectedStageConfig({
       stageType: "",
-      stageStatus: "",
+      stageStatus: "Active",
       colorCode: "#EBFAEF",
       entryRule: "Manual",
     });
@@ -231,8 +243,8 @@ const SalesPipeLineData = ({
     const resolvedStageColor =
       stage.stageColor ?? stageHeaderColors[stageIndex % stageHeaderColors.length];
     setSelectedStageConfig({
-      stageType: toStageLabel(stage.stageType) ?? "Lead",
-      stageStatus: toStageLabel(stage.stageStatus) ?? "Open",
+      stageType: toStageTypeLabel(stage.stageType),
+      stageStatus: toStageStatusLabel(stage.stageStatus),
       colorCode: resolvedStageColor,
       entryRule: toStageLabel(stage.entryRule) ?? "Manual",
       actions: stage.rules && stage.rules.length > 0 ? mapRulesToActions(stage.rules) : [],
@@ -414,6 +426,24 @@ const SalesPipeLineData = ({
                       >
                         {stageName}
                       </Typography>
+                      {(stage.stageStatus ?? "").toLowerCase().trim() === "inactive" && (
+                        <Box
+                          sx={{
+                            mt: 0.45,
+                            display: "inline-block",
+                            px: 0.7,
+                            py: 0.15,
+                            borderRadius: 1,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "#B42318",
+                            backgroundColor: "#FEE4E2",
+                            border: "1px solid #FDA29B",
+                          }}
+                        >
+                          Inactive
+                        </Box>
+                      )}
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.2 }}
                       >

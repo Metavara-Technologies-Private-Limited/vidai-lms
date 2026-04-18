@@ -21,7 +21,12 @@ export type PipelineStageType =
   | "engagement"
   | "conversion"
   | "closure";
-export type PipelineStageStatus = "open" | "won" | "lost";
+export type PipelineStageStatus =
+  | "active"
+  | "inactive"
+  | "open"
+  | "won"
+  | "lost";
 export type PipelineRuleActionType =
   | "call"
   | "email"
@@ -151,7 +156,7 @@ const normalizeStage = (
   ),
   stage_name: stage.stage_name ?? "Untitled Stage",
   stage_type: stage.stage_type ?? "lead",
-  stage_status: stage.stage_status ?? "open",
+  stage_status: stage.stage_status ?? "active",
   stage_order: stage.stage_order ?? index,
   stage_color: stage.stage_color ?? stage.color_code,
   entry_rule: stage.entry_rule,
@@ -465,7 +470,7 @@ export const pipelineApi = {
       } = {
         ...payload,
         pipeline: payload.pipeline_id,
-        stage_status: payload.stage_status ?? "open",
+        stage_status: payload.stage_status ?? "active",
       };
 
       if (candidate?.response?.status === 400) {

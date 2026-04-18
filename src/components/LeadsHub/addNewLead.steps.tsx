@@ -106,6 +106,7 @@ interface Step1Props {
   leadGeneratedByOptions: AssigneeOption[];
   leadGeneratedByLoading: boolean;
   campaigns: Campaign[];
+  nextActionTypeOptions?: string[];
   handleChange: (
     field: keyof FormState,
   ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -132,6 +133,7 @@ export function Step1({
   leadGeneratedByOptions,
   leadGeneratedByLoading,
   campaigns,
+  nextActionTypeOptions,
   handleChange,
   handleAssigneeInputChange,
   handleAssigneeChange,
@@ -144,6 +146,10 @@ export function Step1({
   loadingReferralDepts,
 }: Step1Props) {
   const campaignSelected = Boolean(form.campaign);
+  const resolvedNextActionOptions =
+    nextActionTypeOptions && nextActionTypeOptions.length > 0
+      ? nextActionTypeOptions
+      : [...TASK_TYPES];
 
   return (
     <Box>
@@ -256,7 +262,6 @@ export function Step1({
 
       {/* Language Preference */}
       <Box sx={{ mb: 4 }}>
-        <Typography sx={labelStyle}>Language Preference</Typography>
         <TextField
           select
           fullWidth
@@ -718,7 +723,7 @@ export function Step1({
             sx={inputStyle}
           >
             <MenuItem value="">-- Select --</MenuItem>
-            {TASK_TYPES.map((t) => (
+            {resolvedNextActionOptions.map((t) => (
               <MenuItem key={t} value={t}>
                 {t}
               </MenuItem>

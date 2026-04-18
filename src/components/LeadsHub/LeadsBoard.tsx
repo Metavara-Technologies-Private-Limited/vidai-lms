@@ -24,7 +24,7 @@ import {
   selectLeadsError,
 } from "../../store/leadSlice";
 import { selectClinic } from "../../store/clinicSlice";
-import { pipelineApi, type PipelineStage } from "../../services/pipeline.api";
+import { pipelineApi, type Pipeline, type PipelineStage } from "../../services/pipeline.api";
 import {
   DepartmentAPI,
   EmployeeAPI,
@@ -79,6 +79,8 @@ interface Props {
   search: string;
   filters?: FilterValues;
   canEditLeads?: boolean;
+  selectedIndustry?: string;
+  selectedPipelineId?: string;
 }
 
 // ====================== Phone normalizer ======================
@@ -213,6 +215,14 @@ const getStageUiActions = (stage: PipelineStage): {
 
 const normalizeStatusKey = (value: string): string =>
   value.toLowerCase().trim().replace(/[_\s-]+/g, "-");
+
+const extractStageFromDescription = (
+  description: string | null | undefined,
+): string => {
+  if (!description) return "";
+  const match = description.match(/(?:^|\|)\s*Stage:\s*([^|]+)/i);
+  return match?.[1]?.trim() ?? "";
+};
 
 const matchesStatusFilter = (leadValue: string, filterValue: string): boolean => {
   const normalizedLead = normalizeStatusKey(leadValue);
@@ -683,6 +693,8 @@ const LeadsBoard: React.FC<Props> = ({
   search,
   filters,
   canEditLeads = true,
+  selectedIndustry = "",
+  selectedPipelineId = "",
 }) => {
   const dispatch   = useDispatch<AppDispatch>();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
@@ -716,8 +728,32 @@ const LeadsBoard: React.FC<Props> = ({
       }
 
       try {
-        const pipelines = await pipelineApi.list(clinicId);
-        const activePipeline = pipelines.find((pipeline) => pipeline.is_active) ?? pipelines[0];
+        let activePipeline: Pipeline | null = null;
+
+        // Always prefer the explicitly selected pipeline because stage columns should
+        // reflect user selection exactly.
+        if (selectedPipelineId) {
+          try {
+            activePipeline = await pipelineApi.getById(selectedPipelineId);
+          } catch {
+            activePipeline = null;
+          }
+        }
+
+        if (!activePipeline) {
+          const pipelines = await pipelineApi.list(clinicId);
+          const pipelinesByIndustry = selectedIndustry
+            ? pipelines.filter((pipeline) => pipeline.industry_type === selectedIndustry)
+            : pipelines;
+
+          activePipeline =
+            pipelines.find((pipeline) => pipeline.id === selectedPipelineId) ??
+            pipelinesByIndustry.find((pipeline) => pipeline.is_active) ??
+            pipelinesByIndustry[0] ??
+            pipelines.find((pipeline) => pipeline.is_active) ??
+            pipelines[0] ??
+            null;
+        }
 
         if (!activePipeline || !Array.isArray(activePipeline.stages) || activePipeline.stages.length === 0) {
           setPipelineColumns([]);
@@ -726,6 +762,7 @@ const LeadsBoard: React.FC<Props> = ({
 
         const dynamicColumns = activePipeline.stages
           .slice()
+          .filter((stage) => (stage.stage_status ?? "").toLowerCase().trim() !== "inactive")
           .sort((left, right) => left.stage_order - right.stage_order)
           .map((stage, index) => {
             const uiActions = getStageUiActions(stage);
@@ -752,7 +789,7 @@ const LeadsBoard: React.FC<Props> = ({
     };
 
     void fetchPipelineStages();
-  }, [clinic?.id, reduxLeads]);
+  }, [clinic?.id, reduxLeads, selectedIndustry, selectedPipelineId]);
 
   const [openBookModal, setOpenBookModal] = React.useState(false);
   const [selectedLead,  setSelectedLead ] = React.useState<LeadItem | null>(null);
@@ -829,8 +866,12 @@ const LeadsBoard: React.FC<Props> = ({
   }, [leads, search, filters]);
 
   const activeBoardColumns = React.useMemo(
-    () => (pipelineColumns.length > 0 ? pipelineColumns : BOARD_COLUMNS),
-    [pipelineColumns],
+    () => {
+      const hasSelectionContext = Boolean(selectedIndustry || selectedPipelineId);
+      if (pipelineColumns.length > 0) return pipelineColumns;
+      return hasSelectionContext ? [] : BOARD_COLUMNS;
+    },
+    [pipelineColumns, selectedIndustry, selectedPipelineId],
   );
 
   const handleBookAppointmentSubmit = async () => {
@@ -917,12 +958,29 @@ const LeadsBoard: React.FC<Props> = ({
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ display: "flex", overflowX: "auto", gap: 3, p: 4, bgcolor: "#F8FAFC", height: "calc(100vh - 64px)", alignItems: "flex-start", "&::-webkit-scrollbar": { height: "10px" }, "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "10px" } }}>
 
-        {activeBoardColumns.map((col) => {
+        {activeBoardColumns.length === 0 ? (
+          <Alert severity="info" sx={{ width: "100%" }}>
+            No active stages found for the selected industry/pipeline.
+          </Alert>
+        ) : activeBoardColumns.map((col) => {
           const leadsInCol = filteredLeads.filter((l) => {
-            const leadStatus = (l.status || l.lead_status || "no status").toLowerCase().trim();
+            const candidateStatuses = [
+              l.status,
+              l.lead_status,
+              typeof l.task_type === "string" ? l.task_type : "",
+              typeof l.task === "string" ? l.task : "",
+              extractStageFromDescription(
+                typeof l.next_action_description === "string"
+                  ? l.next_action_description
+                  : "",
+              ),
+            ]
+              .map((value) => (value || "").toLowerCase().trim())
+              .filter(Boolean);
+
             return col.statusKey.some((key) => {
               const normalizedKey = (key || "no status").toLowerCase().trim();
-              return leadStatus === normalizedKey;
+              return candidateStatuses.includes(normalizedKey);
             });
           });
           return (

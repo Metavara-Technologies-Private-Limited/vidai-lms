@@ -28,8 +28,10 @@ import type { FormState } from "../../types/leads.types";
 import { LeadAPI, DepartmentAPI, LeadEmailAPI } from "../../services/leads.api";
 import type { Department } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
+import { pipelineApi, type Pipeline } from "../../services/pipeline.api";
 
 import {
+  TASK_TYPES,
   getAutoNextActionStatus,
   ALLOWED_DOC_TYPES,
   MAX_DOC_SIZE_MB,
@@ -54,6 +56,9 @@ import { sanitizeNameInput } from "../../utils/nameValidation";
 // ── Import referral API ───────────────────────────────────────────────────────
 import { fetchReferralDepartments } from "../../services/referral.api";
 import type { ReferralDepartment } from "../../services/referral.api";
+
+const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
+const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const capitalizeFirst = (value: string) =>
@@ -166,6 +171,11 @@ const showInputToast = (toastId: string, message: string) => {
 const sanitizeEmailInput = (value: string): string =>
   value.toLowerCase().replace(/[^a-z0-9@._%+-]/g, "");
 
+const isBackendNextActionType = (value: string): boolean => {
+  const normalized = value.toLowerCase().trim();
+  return TASK_TYPES.some((taskType) => taskType.toLowerCase().trim() === normalized);
+};
+
 // ====================== Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
@@ -205,6 +215,9 @@ export default function AddNewLead() {
   const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
 
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
+  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<string[]>(
+    [...TASK_TYPES],
+  );
   const [docDragOver, setDocDragOver] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -312,6 +325,67 @@ export default function AddNewLead() {
     };
     fetchDepartments();
   }, [clinicId]);
+
+  React.useEffect(() => {
+    const loadNextActionOptionsFromPipeline = async () => {
+      const selectedIndustry = localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
+      const selectedPipelineId = localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "";
+
+      try {
+        let selectedPipeline: Pipeline | null = null;
+
+        if (selectedPipelineId) {
+          try {
+            selectedPipeline = await pipelineApi.getById(selectedPipelineId);
+          } catch {
+            selectedPipeline = null;
+          }
+        }
+
+        if (!selectedPipeline) {
+          const pipelines = await pipelineApi.list(clinicId);
+          const pipelinesByIndustry = selectedIndustry
+            ? pipelines.filter((pipeline) => pipeline.industry_type === selectedIndustry)
+            : pipelines;
+
+          selectedPipeline =
+            pipelines.find((pipeline) => pipeline.id === selectedPipelineId) ??
+            pipelinesByIndustry.find((pipeline) => pipeline.is_active) ??
+            pipelinesByIndustry[0] ??
+            pipelines.find((pipeline) => pipeline.is_active) ??
+            pipelines[0] ??
+            null;
+        }
+
+        const activeStageNames = (selectedPipeline?.stages ?? [])
+          .filter((stage) => (stage.stage_status ?? "").toLowerCase().trim() !== "inactive")
+          .sort((left, right) => left.stage_order - right.stage_order)
+          .map((stage) => stage.stage_name.trim())
+          .filter(Boolean);
+
+        if (activeStageNames.length > 0) {
+          setNextActionTypeOptions(activeStageNames);
+        } else {
+          setNextActionTypeOptions([...TASK_TYPES]);
+        }
+      } catch {
+        setNextActionTypeOptions([...TASK_TYPES]);
+      }
+    };
+
+    void loadNextActionOptionsFromPipeline();
+  }, [clinicId]);
+
+  React.useEffect(() => {
+    if (!form.nextType) return;
+    if (nextActionTypeOptions.includes(form.nextType)) return;
+
+    setForm((prev) => ({
+      ...prev,
+      nextType: "",
+      nextStatus: "",
+    }));
+  }, [form.nextType, nextActionTypeOptions]);
 
   // ── Fetch Referral Departments from backend (falls back to static list) ─────
   React.useEffect(() => {
@@ -604,6 +678,18 @@ export default function AddNewLead() {
     // ── Resolve referral department name for email body ──────────────────────
     // form.referralDepartment now stores the ID (string); look up the name for display
     const referralDeptId = intOrNull(form.referralDepartment);
+    const selectedNextType = (form.nextType ?? "").trim();
+    const selectedNextDescription = (form.nextDesc ?? "").trim();
+    const backendSafeNextType =
+      selectedNextType && isBackendNextActionType(selectedNextType)
+        ? selectedNextType
+        : undefined;
+    const stageAwareNextActionDescription =
+      backendSafeNextType != null
+        ? selectedNextDescription
+        : [selectedNextType ? `Stage: ${selectedNextType}` : "", selectedNextDescription]
+            .filter(Boolean)
+            .join(" | ");
 
     return {
       clinic_id: clinicId,
@@ -625,8 +711,8 @@ export default function AddNewLead() {
       address: form.address ?? "",
       remark: form.remark ?? "",
       partner_full_name: form.partnerName ?? "",
-      next_action_description: form.nextDesc ?? "",
-      next_action_type: form.nextType || undefined,
+      next_action_description: stageAwareNextActionDescription,
+      next_action_type: backendSafeNextType,
       gender: IS_MEDICAL_APP ? genderValue : null,
       marital_status: IS_MEDICAL_APP ? maritalValue : null,
       partner_gender: IS_MEDICAL_APP ? partnerGenderValue : null,
@@ -981,6 +1067,7 @@ export default function AddNewLead() {
             }}
             handleCampaignChange={handleCampaignChange}
             handleNextTypeChange={handleNextTypeChange}
+            nextActionTypeOptions={nextActionTypeOptions}
             onReferralDepartmentChange={handleSelectChange(
               "referralDepartment",
             )}

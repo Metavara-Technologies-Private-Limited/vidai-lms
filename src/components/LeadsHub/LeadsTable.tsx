@@ -46,6 +46,7 @@ import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
 import { LeadAPI, TwilioAPI } from "../../services/leads.api";
+import { pipelineApi } from "../../services/pipeline.api";
 import CallDialog from "./CallDialog";
 
 import type { RawLead, ProcessedLead, Props } from "./LeadsTable.types";
@@ -75,6 +76,9 @@ const toastOptions = {
   autoClose: 3000,
   theme: "colored" as const,
 };
+
+const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
+const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 // Add this helper at the top of LeadsTable.tsx:
 const BACKEND_TO_DISPLAY: Record<string, string> = {
@@ -172,6 +176,7 @@ const matchesStatusFilter = (
 interface EditStatusDialogProps {
   open: boolean;
   currentStatus: string;
+  statusOptions: string[];
   onClose: () => void;
   onSave: (newStatus: string) => void;
 }
@@ -179,6 +184,7 @@ interface EditStatusDialogProps {
 const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
   open,
   currentStatus,
+  statusOptions,
   onClose,
   onSave,
 }) => {
@@ -289,7 +295,7 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
               backgroundColor: "#fff",
             }}
           >
-            {(ACTIVE_STATUS_OPTIONS as readonly string[]).map((opt) => (
+            {statusOptions.map((opt) => (
               <Box
                 key={opt}
                 onClick={() => {
@@ -373,6 +379,9 @@ const LeadsTable: React.FC<Props> = ({
   const [editStatusLead, setEditStatusLead] = React.useState<LeadItem | null>(
     null,
   );
+  const [editStatusOptions, setEditStatusOptions] = React.useState<string[]>(
+    [...ACTIVE_STATUS_OPTIONS],
+  );
 
   const [sortCol, setSortCol] = React.useState<string | null>(null);
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
@@ -380,6 +389,79 @@ const LeadsTable: React.FC<Props> = ({
   React.useEffect(() => {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
   }, [dispatch]);
+
+  React.useEffect(() => {
+    const loadEditStatusOptions = async () => {
+      const clinicId = Number(localStorage.getItem("clinic_id") ?? 0);
+      if (!clinicId) {
+        setEditStatusOptions([...ACTIVE_STATUS_OPTIONS]);
+        return;
+      }
+
+      const selectedIndustry =
+        localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
+      const selectedPipelineId =
+        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "";
+
+      try {
+        let selectedPipeline = null;
+
+        if (selectedPipelineId) {
+          try {
+            selectedPipeline = await pipelineApi.getById(selectedPipelineId);
+          } catch {
+            selectedPipeline = null;
+          }
+        }
+
+        if (!selectedPipeline) {
+          const pipelines = await pipelineApi.list(clinicId);
+          const pipelinesByIndustry = selectedIndustry
+            ? pipelines.filter(
+                (pipeline) => pipeline.industry_type === selectedIndustry,
+              )
+            : pipelines;
+
+          selectedPipeline =
+            pipelines.find((pipeline) => pipeline.id === selectedPipelineId) ??
+            pipelinesByIndustry.find((pipeline) => pipeline.is_active) ??
+            pipelinesByIndustry[0] ??
+            pipelines.find((pipeline) => pipeline.is_active) ??
+            pipelines[0] ??
+            null;
+        }
+
+        if (!selectedPipeline || !Array.isArray(selectedPipeline.stages)) {
+          setEditStatusOptions([...ACTIVE_STATUS_OPTIONS]);
+          return;
+        }
+
+        const activeStageKeys = new Set(
+          selectedPipeline.stages
+            .filter(
+              (stage) =>
+                (stage.stage_status ?? "").toLowerCase().trim() !== "inactive",
+            )
+            .map((stage) => normalizeStatusKey(stage.stage_name)),
+        );
+
+        const filteredOptions = ACTIVE_STATUS_OPTIONS.filter((status) =>
+          activeStageKeys.has(normalizeStatusKey(status)),
+        );
+
+        setEditStatusOptions(
+          filteredOptions.length > 0
+            ? filteredOptions
+            : [...ACTIVE_STATUS_OPTIONS],
+        );
+      } catch {
+        setEditStatusOptions([...ACTIVE_STATUS_OPTIONS]);
+      }
+    };
+
+    if (!editStatusLead) return;
+    void loadEditStatusOptions();
+  }, [editStatusLead]);
 
   React.useEffect(() => {
     if (!leads) return;
@@ -1477,6 +1559,7 @@ const LeadsTable: React.FC<Props> = ({
           editStatusLead?.lead_status ??
           "New"
         }
+        statusOptions={editStatusOptions}
         onClose={() => setEditStatusLead(null)}
         onSave={handleEditStatusSave}
       />
