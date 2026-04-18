@@ -306,8 +306,19 @@ export const deriveQuality = (lead: RawLead): "Hot" | "Warm" | "Cold" => {
   return "Cold";
 };
 
+const extractStageFromDescription = (
+  description: string | null | undefined,
+): string => {
+  if (!description) return "";
+  const match = description.match(/(?:^|\|)\s*Stage:\s*([^|]+)/i);
+  return match?.[1]?.trim() ?? "";
+};
+
 // ====================== Raw → LeadItem Mapper ======================
-export const mapRawToLeadItem = (lead: RawLead): LeadItem => ({
+export const mapRawToLeadItem = (lead: RawLead): LeadItem => {
+  const stageTaskType = extractStageFromDescription(lead.next_action_description);
+
+  return ({
   id: lead.id ?? "",
   full_name: lead.full_name ?? lead.name ?? "",
   name: lead.full_name ?? lead.name ?? "",
@@ -339,8 +350,13 @@ export const mapRawToLeadItem = (lead: RawLead): LeadItem => ({
   created_at: lead.created_at ?? lead.created_date ?? null,
   updated_at: lead.updated_at ?? lead.modified_date ?? null,
   last_contacted: lead.last_contacted ?? lead.last_contact_date ?? null,
-  task: lead.next_action_type ?? lead.task_type ?? lead.task ?? "N/A",
-  task_type: lead.next_action_type ?? lead.task_type ?? "",
+  task:
+    lead.next_action_type ??
+    lead.task_type ??
+    lead.task ??
+    stageTaskType ??
+    "N/A",
+  task_type: lead.next_action_type ?? lead.task_type ?? stageTaskType ?? "",
   taskStatus: lead.next_action_status ?? lead.task_status ?? "Pending",
   task_status: lead.next_action_status ?? lead.task_status ?? "",
   next_action_description: lead.next_action_description ?? "",
@@ -372,4 +388,5 @@ export const mapRawToLeadItem = (lead: RawLead): LeadItem => ({
   partner_inquiry: lead.partner_inquiry ?? false,
   clinic_id: lead.clinic_id ?? null,
   campaign_id: lead.campaign_id ?? null,
-});
+  });
+};

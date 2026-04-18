@@ -40,17 +40,19 @@ export const isAlphabeticName = (value?: string): boolean => {
 
 export const normalizeStageType = (value?: string): PipelineStageType => {
 	const normalized = value?.toLowerCase().trim();
+	if (normalized === "entry") return "lead";
+	if (normalized === "mid") return "engagement";
+	if (normalized === "final") return "closure";
 	if (normalized === "engagement") return "engagement";
 	if (normalized === "conversion") return "conversion";
 	if (normalized === "closure") return "closure";
 	return "lead";
 };
 
-export const normalizeStageStatus = (value?: string): "open" | "won" | "lost" => {
+export const normalizeStageStatus = (value?: string): "active" | "inactive" => {
 	const normalized = value?.toLowerCase().trim();
-	if (normalized === "won") return "won";
-	if (normalized === "lost") return "lost";
-	return "open";
+	if (normalized === "inactive") return "inactive";
+	return "active";
 };
 
 export const normalizeEntryRule = (value?: string): "manual" | "auto" => {

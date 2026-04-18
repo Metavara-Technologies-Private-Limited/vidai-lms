@@ -21,6 +21,7 @@ import Leads_Tableview_icon from "../assets/icons/Leads_Tableview_icon.svg";
 import type { FilterValues } from "../types/leads.types";
 import { api, DepartmentAPI, LeadAPI } from "../services/leads.api";
 import type { Department, Lead, LeadPayload } from "../services/leads.api";
+import { pipelineApi, type Pipeline } from "../services/pipeline.api";
 
 import { fetchLeads, selectLeads } from "../store/leadSlice";
 import {
@@ -39,6 +40,8 @@ import "../styles/Leads/leads.css";
 const STORAGE_KEY_FILTERS = "leads_filters";
 const STORAGE_KEY_TAB = "leads_active_tab";
 const STORAGE_KEY_VIEW = "leads_view_mode";
+const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
+const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 interface HeaderMatch {
   tableHeader: string;
@@ -418,7 +421,34 @@ const Leads: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
   const [importedLeads, setImportedLeads] = React.useState<Lead[]>([]);
   const [isSavingImport, setIsSavingImport] = React.useState(false);
+  const [availablePipelines, setAvailablePipelines] = React.useState<Pipeline[]>([]);
+  const [selectedIndustry, setSelectedIndustry] = React.useState<string>(
+    localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "",
+  );
+  const [selectedPipelineId, setSelectedPipelineId] = React.useState<string>(
+    localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "",
+  );
   const attemptedClinicHydrationRef = React.useRef<Set<number>>(new Set());
+
+  const industryOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          availablePipelines
+            .map((pipeline) => pipeline.industry_type)
+            .filter((industry): industry is string => Boolean(industry)),
+        ),
+      ),
+    [availablePipelines],
+  );
+
+  const filteredPipelinesByIndustry = React.useMemo(
+    () =>
+      availablePipelines.filter((pipeline) =>
+        selectedIndustry ? pipeline.industry_type === selectedIndustry : true,
+      ),
+    [availablePipelines, selectedIndustry],
+  );
 
   const applyFilters = React.useCallback(
     (leadsToFilter: Array<Lead & { status?: string }>) => {
@@ -574,6 +604,41 @@ const Leads: React.FC = () => {
     if (!canViewLeads) return;
     dispatch(fetchLeads());
   }, [canViewLeads, dispatch, clinic?.id, user?.id]);
+
+  React.useEffect(() => {
+    const fetchPipelinesForLeads = async () => {
+      const clinicId = Number(clinic?.id ?? localStorage.getItem("clinic_id") ?? 0);
+      if (!clinicId || !canViewLeads) {
+        setAvailablePipelines([]);
+        return;
+      }
+      try {
+        const pipelines = await pipelineApi.list(clinicId);
+        setAvailablePipelines(pipelines);
+      } catch {
+        setAvailablePipelines([]);
+      }
+    };
+    void fetchPipelinesForLeads();
+  }, [canViewLeads, clinic?.id]);
+
+  React.useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SELECTED_INDUSTRY, selectedIndustry);
+  }, [selectedIndustry]);
+
+  React.useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SELECTED_PIPELINE, selectedPipelineId);
+  }, [selectedPipelineId]);
+
+  React.useEffect(() => {
+    if (!selectedPipelineId) return;
+    const existsInIndustry = filteredPipelinesByIndustry.some(
+      (pipeline) => pipeline.id === selectedPipelineId,
+    );
+    if (!existsInIndustry) {
+      setSelectedPipelineId(filteredPipelinesByIndustry[0]?.id ?? "");
+    }
+  }, [filteredPipelinesByIndustry, selectedPipelineId]);
 
   React.useEffect(() => {
     // Warm up Calendar chunk so tab switch is instant on first open.
@@ -1112,7 +1177,11 @@ const Leads: React.FC = () => {
           {/* Add New Lead */}
           <Button
             className="add-lead-btn"
-            onClick={() => navigate("/leads/add")}
+            onClick={() => {
+              localStorage.setItem(STORAGE_KEY_SELECTED_INDUSTRY, selectedIndustry);
+              localStorage.setItem(STORAGE_KEY_SELECTED_PIPELINE, selectedPipelineId);
+              navigate("/leads/add");
+            }}
             disabled={!canAddLeads}
             sx={{ flexShrink: 0 }}
           >
@@ -1121,18 +1190,84 @@ const Leads: React.FC = () => {
         </Stack>
       </Stack>
 
-      {/* PILL TABS */}
-      <Stack direction="row" spacing={1} className="pill-tabs" sx={{ mb: 3 }}>
-        {tabs.map((t, i) => (
-          <Box
-            key={i}
-            className={`pill-tab ${tab === i ? "active" : ""}`}
-            onClick={() => setTab(i)}
-          >
-            {t.label}
-            {t.count !== null && <span className="tab-count">({t.count})</span>}
-          </Box>
-        ))}
+      {/* PILL TABS + PIPELINE SELECTORS */}
+      <Stack
+        direction={{ xs: "column", lg: "row" }}
+        spacing={1}
+        sx={{ mb: 3, justifyContent: "space-between", alignItems: { xs: "stretch", lg: "center" } }}
+      >
+        <Stack direction="row" spacing={1} className="pill-tabs" sx={{ flexWrap: "wrap" }}>
+          {tabs.map((t, i) => (
+            <Box
+              key={i}
+              className={`pill-tab ${tab === i ? "active" : ""}`}
+              onClick={() => setTab(i)}
+            >
+              {t.label}
+              {t.count !== null && <span className="tab-count">({t.count})</span>}
+            </Box>
+          ))}
+        </Stack>
+
+        {viewMode === "board" && (
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ minWidth: { lg: 420 } }}>
+            <Box sx={{ minWidth: 180 }}>
+              <Typography sx={{ fontSize: 11, color: "#64748B", mb: 0.4, fontWeight: 600 }}>Select Industry</Typography>
+              <Box
+                component="select"
+                value={selectedIndustry}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
+                  const nextIndustry = event.target.value;
+                  setSelectedIndustry(nextIndustry);
+                  setSelectedPipelineId("");
+                }}
+                style={{
+                  width: "100%",
+                  height: 36,
+                  borderRadius: 8,
+                  border: "1px solid #D0D5DD",
+                  padding: "0 10px",
+                  fontSize: 13,
+                  backgroundColor: "#fff",
+                }}
+              >
+                <option value="">All Industries</option>
+                {industryOptions.map((industry) => (
+                  <option key={industry} value={industry}>
+                    {industry.toUpperCase()}
+                  </option>
+                ))}
+              </Box>
+            </Box>
+
+            <Box sx={{ minWidth: 220 }}>
+              <Typography sx={{ fontSize: 11, color: "#64748B", mb: 0.4, fontWeight: 600 }}>Select Pipeline</Typography>
+              <Box
+                component="select"
+                value={selectedPipelineId}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                  setSelectedPipelineId(event.target.value)
+                }
+                style={{
+                  width: "100%",
+                  height: 36,
+                  borderRadius: 8,
+                  border: "1px solid #D0D5DD",
+                  padding: "0 10px",
+                  fontSize: 13,
+                  backgroundColor: "#fff",
+                }}
+              >
+                <option value="">Auto Select Pipeline</option>
+                {filteredPipelinesByIndustry.map((pipeline) => (
+                  <option key={pipeline.id} value={pipeline.id}>
+                    {pipeline.pipeline_name}
+                  </option>
+                ))}
+              </Box>
+            </Box>
+          </Stack>
+        )}
       </Stack>
 
       {/* CONTENT */}
@@ -1195,6 +1330,8 @@ const Leads: React.FC = () => {
                 search={search}
                 filters={activeFilters}
                 canEditLeads={canEditLeads}
+                selectedIndustry={selectedIndustry}
+                selectedPipelineId={selectedPipelineId}
               />
             ))}
         </React.Suspense>

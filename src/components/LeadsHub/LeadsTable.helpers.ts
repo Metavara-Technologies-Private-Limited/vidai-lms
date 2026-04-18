@@ -87,14 +87,24 @@ export const formatTaskType = (raw: string | null | undefined): string => {
   return found ?? trimmed;
 };
 
+const extractStageFromDescription = (
+  description: string | null | undefined,
+): string => {
+  if (!description) return "";
+  const match = description.match(/(?:^|\|)\s*Stage:\s*([^|]+)/i);
+  return match?.[1]?.trim() ?? "";
+};
+
 // ====================== Lead processor ======================
 export const processLead = (lead: RawLead): ProcessedLead => {
+  const stageTaskType = extractStageFromDescription(lead.next_action_description);
   const rawTaskType =
     lead.next_action_type ||
     lead.task_type ||
     lead.nextActionType ||
     lead.taskType ||
     lead.action_type ||
+    stageTaskType ||
     "";
   const taskType = formatTaskType(rawTaskType);
   const taskStatus = formatTaskStatus(lead.next_action_status, taskType);

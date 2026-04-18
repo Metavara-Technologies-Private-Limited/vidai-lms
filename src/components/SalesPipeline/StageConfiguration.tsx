@@ -93,7 +93,7 @@ const StageConfiguration = ({
 	const theme = useTheme();
 	const [activeTab, setActiveTab] = useState<"stage-rules" | "data-capture">("stage-rules");
 	const [stageType, setStageType] = useState("");
-	const [stageStatus, setStageStatus] = useState("");
+	const [stageStatus, setStageStatus] = useState("Active");
 	const [colorCode, setColorCode] = useState("#EEE788");
 	const [entryRule, setEntryRule] = useState("Manual");
 	const [isSaving, setIsSaving] = useState(false);
@@ -190,7 +190,7 @@ const StageConfiguration = ({
 	useEffect(() => {
 		if (!open) return;
 		setStageType(initialValues?.stageType ?? "");
-		setStageStatus(initialValues?.stageStatus ?? "");
+		setStageStatus(initialValues?.stageStatus ?? "Active");
 		setColorCode(normalizeHexColorInput(initialValues?.colorCode ?? "#EEE788"));
 		setEntryRule(initialValues?.entryRule ?? "Manual");
 		setStageActions(
@@ -430,10 +430,9 @@ const StageConfiguration = ({
 								<MenuItem value="">
 									<em>Select stage type</em>
 								</MenuItem>
-									<MenuItem value="Lead">Lead</MenuItem>
-									<MenuItem value="Engagement">Engagement</MenuItem>
-									<MenuItem value="Conversion">Conversion</MenuItem>
-									<MenuItem value="Closure">Closure</MenuItem>
+									<MenuItem value="Entry">Entry</MenuItem>
+									<MenuItem value="Mid">Mid</MenuItem>
+									<MenuItem value="Final">Final</MenuItem>
 								</TextField>
 								<TextField
 									size="small"
@@ -462,9 +461,8 @@ const StageConfiguration = ({
 								<MenuItem value="">
 									<em>Select stage status</em>
 								</MenuItem>
-									<MenuItem value="Open">Open</MenuItem>
-									<MenuItem value="Won">Won</MenuItem>
-									<MenuItem value="Lost">Lost</MenuItem>
+									<MenuItem value="Active">Active</MenuItem>
+									<MenuItem value="Inactive">Inactive</MenuItem>
 								</TextField>
 
 								<TextField
