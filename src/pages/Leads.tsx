@@ -1190,7 +1190,7 @@ const Leads: React.FC = () => {
         </Stack>
       </Stack>
 
-      {/* PILL TABS + PIPELINE SELECTORS */}
+      {/* PILL TABS */}
       <Stack
         direction={{ xs: "column", lg: "row" }}
         spacing={1}
@@ -1208,9 +1208,15 @@ const Leads: React.FC = () => {
             </Box>
           ))}
         </Stack>
+      </Stack>
 
-        {viewMode === "board" && (
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ minWidth: { lg: 420 } }}>
+      {/* PIPELINE SELECTORS */}
+      {tab !== 1 && tab !== 3 && tab !== 4 && tab !== 5 && (
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          sx={{ mb: 3, justifyContent: { sm: "flex-end" }, minWidth: { lg: 420 } }}
+        >
             <Box sx={{ minWidth: 180 }}>
               <Typography sx={{ fontSize: 11, color: "#64748B", mb: 0.4, fontWeight: 600 }}>Select Industry</Typography>
               <Box
@@ -1267,8 +1273,7 @@ const Leads: React.FC = () => {
               </Box>
             </Box>
           </Stack>
-        )}
-      </Stack>
+      )}
 
       {/* CONTENT */}
       {!canViewLeads ? null : waitingForContext ? (
@@ -1324,6 +1329,8 @@ const Leads: React.FC = () => {
                 filters={activeFilters}
                 importedLeads={tab === 0 ? importedLeads : []}
                 canEditLeads={canEditLeads}
+                selectedIndustry={selectedIndustry}
+                selectedPipelineId={selectedPipelineId}
               />
             ) : (
               <LeadsBoard

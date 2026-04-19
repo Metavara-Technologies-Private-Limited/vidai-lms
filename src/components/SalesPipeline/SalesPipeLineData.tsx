@@ -34,6 +34,7 @@ type StageCard = {
 
 type SalesPipeLineDataProps = {
   stages: StageCard[];
+  canEditPipeline?: boolean;
   onAddStage: (stageName?: string, stageConfig?: StageConfigPayload) => Promise<boolean> | boolean;
   onEditStage: (
     stageIndex: number,
@@ -110,6 +111,7 @@ const toStageStatusLabel = (value?: string): string => {
 
 const SalesPipeLineData = ({
   stages,
+  canEditPipeline = true,
   onAddStage,
   onEditStage,
   onDuplicateStage,
@@ -224,6 +226,7 @@ const SalesPipeLineData = ({
   };
 
   const handleAddStageClick = () => {
+    if (!canEditPipeline) return;
     setConfigurationMode("create");
     setSelectedStageIndex(null);
     setSelectedStageName("");
@@ -236,6 +239,7 @@ const SalesPipeLineData = ({
   };
 
   const handleStageCardClick = (stage: StageCard, stageIndex: number) => {
+    if (!canEditPipeline) return;
     if (isDragging) return;
     setConfigurationMode("edit");
     setSelectedStageIndex(stageIndex);
@@ -260,6 +264,7 @@ const SalesPipeLineData = ({
     stageName: string,
     stageConfig?: StageConfigPayload,
   ) => {
+    if (!canEditPipeline) return;
     const isEditMode = configurationMode === "edit" && selectedStageIndex !== null;
     const saved = isEditMode
       ? await Promise.resolve(onEditStage(selectedStageIndex, stageName, stageConfig))
@@ -307,10 +312,12 @@ const SalesPipeLineData = ({
   }, [selectedStageName]);
 
   const handleStageDragStart = (index: number) => {
+    if (!canEditPipeline) return;
     setDraggedStageIndex(index);
   };
 
   const handleStageDrop = (dropIndex: number) => {
+    if (!canEditPipeline) return;
     if (draggedStageIndex === null) return;
     onReorderStages(draggedStageIndex, dropIndex);
     setDraggedStageIndex(null);
@@ -382,9 +389,13 @@ const SalesPipeLineData = ({
             return (
               <Box
                 key={`${stage.id}-${index}`}
-                draggable
+                draggable={canEditPipeline}
                 onDragStart={() => handleStageDragStart(index)}
-                onDragOver={(event) => event.preventDefault()}
+                onDragOver={(event) => {
+                  if (canEditPipeline) {
+                    event.preventDefault();
+                  }
+                }}
                 onDrop={() => handleStageDrop(index)}
                 onDragEnd={() => setDraggedStageIndex(null)}
                 sx={{
@@ -403,7 +414,11 @@ const SalesPipeLineData = ({
                       border: `1px solid ${theme.palette.grey[200]}`,
                       backgroundColor: theme.palette.background.paper,
                       overflow: "hidden",
-                      cursor: isDragging ? "grabbing" : "pointer",
+                      cursor: !canEditPipeline
+                        ? "default"
+                        : isDragging
+                          ? "grabbing"
+                          : "pointer",
                     }}
                   >
                     <Box
@@ -550,6 +565,7 @@ const SalesPipeLineData = ({
                     event.stopPropagation();
                     void onDuplicateStage(index);
                   }}
+                  disabled={!canEditPipeline}
                   onMouseDown={(event) => event.stopPropagation()}
                   sx={stageActionButtonSx}
                 >
@@ -561,6 +577,7 @@ const SalesPipeLineData = ({
                     event.stopPropagation();
                     onArchiveStage(index);
                   }}
+                  disabled={!canEditPipeline}
                   onMouseDown={(event) => event.stopPropagation()}
                   sx={stageActionButtonSx}
                 >
@@ -572,6 +589,7 @@ const SalesPipeLineData = ({
                     event.stopPropagation();
                     onDeleteStage(index);
                   }}
+                  disabled={!canEditPipeline}
                   onMouseDown={(event) => event.stopPropagation()}
                   sx={stageActionButtonSx}
                 >
@@ -601,7 +619,8 @@ const SalesPipeLineData = ({
             justifyContent: "center",
             gap: 1,
             backgroundColor: alpha(theme.palette.background.paper, 0.58),
-            cursor: "pointer",
+            cursor: canEditPipeline ? "pointer" : "not-allowed",
+            opacity: canEditPipeline ? 1 : 0.65,
           }}
         >
           <Box
@@ -682,6 +701,7 @@ const SalesPipeLineData = ({
         <IconButton
           size="small"
           onClick={handleAddStageClick}
+          disabled={!canEditPipeline}
           sx={{
             width: 30,
             height: 30,
@@ -694,7 +714,7 @@ const SalesPipeLineData = ({
       </Box>
 
       <StageConfiguration
-        open={selectedStageName !== null}
+        open={canEditPipeline && selectedStageName !== null}
         stageName={selectedStageName ?? ""}
         onStageNameChange={(stageName) => setSelectedStageName(stageName)}
         initialValues={selectedStageConfig}

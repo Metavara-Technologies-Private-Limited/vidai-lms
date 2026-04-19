@@ -141,6 +141,18 @@ const normalizeStatusKey = (value: string): string =>
     .trim()
     .replace(/[_\s-]+/g, "-");
 
+const upsertStageMarker = (
+  description: string | undefined,
+  stageName: string,
+): string => {
+  const cleaned = (description ?? "")
+    .replace(/(?:^|\|)\s*Stage:\s*[^|]+/i, "")
+    .replace(/^\s*\|\s*|\s*\|\s*$/g, "")
+    .trim();
+
+  return cleaned ? `Stage: ${stageName} | ${cleaned}` : `Stage: ${stageName}`;
+};
+
 const matchesStatusFilter = (
   leadValue: string,
   filterValue: string,
@@ -190,6 +202,7 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
 }) => {
   const [selected, setSelected] = React.useState(currentStatus);
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
+  const hasStatusOptions = statusOptions.length > 0;
 
   React.useEffect(() => {
     if (open) {
@@ -244,7 +257,10 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
 
         {/* Custom trigger — shows selected chip + chevron */}
         <Box
-          onClick={() => setDropdownOpen((v) => !v)}
+          onClick={() => {
+            if (!hasStatusOptions) return;
+            setDropdownOpen((v) => !v);
+          }}
           sx={{
             display: "flex",
             alignItems: "center",
@@ -253,7 +269,8 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
             borderRadius: 2,
             px: 1.5,
             py: 0.75,
-            cursor: "pointer",
+            cursor: hasStatusOptions ? "pointer" : "not-allowed",
+            opacity: hasStatusOptions ? 1 : 0.7,
             transition: "border-color 0.15s",
             "&:hover": { borderColor: selectedStyle.borderColor },
           }}
@@ -295,7 +312,11 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
               backgroundColor: "#fff",
             }}
           >
-            {statusOptions.map((opt) => (
+            {statusOptions.length === 0 ? (
+              <Typography sx={{ fontSize: 12, color: "#667085", px: 1, py: 0.5 }}>
+                No active stages available for selected pipeline.
+              </Typography>
+            ) : statusOptions.map((opt) => (
               <Box
                 key={opt}
                 onClick={() => {
@@ -336,6 +357,7 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
         <Button
           variant="contained"
           onClick={() => onSave(selected)}
+          disabled={!hasStatusOptions}
           sx={{
             flex: 1,
             borderRadius: 1,
@@ -358,6 +380,8 @@ const LeadsTable: React.FC<Props> = ({
   filters,
   importedLeads = [],
   canEditLeads = true,
+  selectedIndustry = "",
+  selectedPipelineId = "",
 }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -393,22 +417,28 @@ const LeadsTable: React.FC<Props> = ({
   React.useEffect(() => {
     const loadEditStatusOptions = async () => {
       const clinicId = Number(localStorage.getItem("clinic_id") ?? 0);
+      const resolvedSelectedIndustry =
+        selectedIndustry ||
+        localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ||
+        "";
+      const resolvedSelectedPipelineId =
+        selectedPipelineId ||
+        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ||
+        "";
+      const hasSelectionContext =
+        Boolean(resolvedSelectedIndustry) || Boolean(resolvedSelectedPipelineId);
+
       if (!clinicId) {
-        setEditStatusOptions([...ACTIVE_STATUS_OPTIONS]);
+        setEditStatusOptions(hasSelectionContext ? [] : [...ACTIVE_STATUS_OPTIONS]);
         return;
       }
-
-      const selectedIndustry =
-        localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
-      const selectedPipelineId =
-        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "";
 
       try {
         let selectedPipeline = null;
 
-        if (selectedPipelineId) {
+        if (resolvedSelectedPipelineId) {
           try {
-            selectedPipeline = await pipelineApi.getById(selectedPipelineId);
+            selectedPipeline = await pipelineApi.getById(resolvedSelectedPipelineId);
           } catch {
             selectedPipeline = null;
           }
@@ -416,14 +446,14 @@ const LeadsTable: React.FC<Props> = ({
 
         if (!selectedPipeline) {
           const pipelines = await pipelineApi.list(clinicId);
-          const pipelinesByIndustry = selectedIndustry
+          const pipelinesByIndustry = resolvedSelectedIndustry
             ? pipelines.filter(
-                (pipeline) => pipeline.industry_type === selectedIndustry,
+                (pipeline) => pipeline.industry_type === resolvedSelectedIndustry,
               )
             : pipelines;
 
           selectedPipeline =
-            pipelines.find((pipeline) => pipeline.id === selectedPipelineId) ??
+            pipelines.find((pipeline) => pipeline.id === resolvedSelectedPipelineId) ??
             pipelinesByIndustry.find((pipeline) => pipeline.is_active) ??
             pipelinesByIndustry[0] ??
             pipelines.find((pipeline) => pipeline.is_active) ??
@@ -432,36 +462,34 @@ const LeadsTable: React.FC<Props> = ({
         }
 
         if (!selectedPipeline || !Array.isArray(selectedPipeline.stages)) {
-          setEditStatusOptions([...ACTIVE_STATUS_OPTIONS]);
+          setEditStatusOptions(hasSelectionContext ? [] : [...ACTIVE_STATUS_OPTIONS]);
           return;
         }
 
-        const activeStageKeys = new Set(
-          selectedPipeline.stages
-            .filter(
-              (stage) =>
-                (stage.stage_status ?? "").toLowerCase().trim() !== "inactive",
-            )
-            .map((stage) => normalizeStatusKey(stage.stage_name)),
-        );
-
-        const filteredOptions = ACTIVE_STATUS_OPTIONS.filter((status) =>
-          activeStageKeys.has(normalizeStatusKey(status)),
-        );
+        const activeStageNames = selectedPipeline.stages
+          .filter(
+            (stage) =>
+              (stage.stage_status ?? "").toLowerCase().trim() !== "inactive",
+          )
+          .sort((left, right) => left.stage_order - right.stage_order)
+          .map((stage) => stage.stage_name.trim())
+          .filter(Boolean);
 
         setEditStatusOptions(
-          filteredOptions.length > 0
-            ? filteredOptions
-            : [...ACTIVE_STATUS_OPTIONS],
+          activeStageNames.length > 0
+            ? activeStageNames
+            : hasSelectionContext
+              ? []
+              : [...ACTIVE_STATUS_OPTIONS],
         );
       } catch {
-        setEditStatusOptions([...ACTIVE_STATUS_OPTIONS]);
+        setEditStatusOptions(hasSelectionContext ? [] : [...ACTIVE_STATUS_OPTIONS]);
       }
     };
 
     if (!editStatusLead) return;
     void loadEditStatusOptions();
-  }, [editStatusLead]);
+  }, [editStatusLead, selectedIndustry, selectedPipelineId]);
 
   React.useEffect(() => {
     if (!leads) return;
@@ -545,26 +573,41 @@ const LeadsTable: React.FC<Props> = ({
   // handleEditStatusSave — all fields now available:
   const handleEditStatusSave = async (newStatus: string) => {
     if (!editStatusLead) return;
-    const apiStatus = STATUS_API_MAP[newStatus] ?? newStatus.toLowerCase();
+    const apiStatus = STATUS_API_MAP[newStatus];
+    const stageAwareDescription = upsertStageMarker(
+      editStatusLead.next_action_description as string | undefined,
+      newStatus,
+    );
+
+    const updatePayload = {
+      clinic_id: editStatusLead.clinic_id ?? 0,
+      department_id: editStatusLead.department_id ?? 0,
+      full_name: editStatusLead.full_name || "",
+      contact_no: editStatusLead.contact_no || "",
+      source: editStatusLead.source || "Unknown",
+      treatment_interest: editStatusLead.treatment_interest || "N/A",
+      book_appointment: editStatusLead.book_appointment || false,
+      appointment_date: editStatusLead.appointment_date || null,
+      slot: editStatusLead.slot || "",
+      is_active: editStatusLead.is_active !== false,
+      partner_inquiry: editStatusLead.partner_inquiry || false,
+      next_action_description: stageAwareDescription,
+      ...(apiStatus
+        ? { lead_status: apiStatus as "new" | "contacted" }
+        : {}),
+    };
+
     try {
-      await LeadAPI.update(editStatusLead.id, {
-        clinic_id: editStatusLead.clinic_id ?? 0,
-        department_id: editStatusLead.department_id ?? 0,
-        full_name: editStatusLead.full_name || "",
-        contact_no: editStatusLead.contact_no || "",
-        source: editStatusLead.source || "Unknown",
-        treatment_interest: editStatusLead.treatment_interest || "N/A",
-        book_appointment: editStatusLead.book_appointment || false,
-        appointment_date: editStatusLead.appointment_date || null,
-        slot: editStatusLead.slot || "",
-        is_active: editStatusLead.is_active !== false,
-        partner_inquiry: editStatusLead.partner_inquiry || false,
-        lead_status: apiStatus as "new" | "contacted",
-      });
+      await LeadAPI.update(editStatusLead.id, updatePayload);
       setLocalLeads((prev) =>
         prev.map((l) =>
           l.id === editStatusLead.id
-            ? { ...l, status: newStatus, lead_status: newStatus }
+            ? {
+                ...l,
+                status: newStatus,
+                lead_status: newStatus,
+                next_action_description: stageAwareDescription,
+              }
             : l,
         ),
       );
@@ -1553,6 +1596,7 @@ const LeadsTable: React.FC<Props> = ({
       <EditStatusDialog
         open={Boolean(editStatusLead)}
         currentStatus={
+          editStatusLead?.status ??
           BACKEND_TO_DISPLAY[
             editStatusLead?.lead_status?.toLowerCase() ?? ""
           ] ??

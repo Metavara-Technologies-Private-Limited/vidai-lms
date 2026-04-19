@@ -98,6 +98,7 @@ const extractStageFromDescription = (
 // ====================== Lead processor ======================
 export const processLead = (lead: RawLead): ProcessedLead => {
   const stageTaskType = extractStageFromDescription(lead.next_action_description);
+  const stageStatus = stageTaskType;
   const rawTaskType =
     lead.next_action_type ||
     lead.task_type ||
@@ -111,7 +112,8 @@ export const processLead = (lead: RawLead): ProcessedLead => {
   return {
     ...lead,
     assigned: lead.assigned_to_name || "Unassigned",
-    status: formatStatus(lead.status || lead.lead_status || "New"),
+    status: formatStatus(stageStatus || lead.status || lead.lead_status || "New"),
+    lead_status: stageStatus || lead.lead_status || lead.status || "New",
     name: lead.full_name || lead.name || "",
     quality: deriveQuality(lead),
     displayId: formatLeadId(lead.id),

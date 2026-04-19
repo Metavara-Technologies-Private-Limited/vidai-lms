@@ -772,6 +772,7 @@ const SalesPipelineDashboard = () => {
 									rules: stage.rules,
 									fields: stage.fields,
 								}))}
+								canEditPipeline={canEditPipeline}
 								onAddStage={handleOpenAddStage}
 								onEditStage={handleEditStage}
 								onDuplicateStage={handleDuplicateStage}
@@ -795,6 +796,7 @@ const SalesPipelineDashboard = () => {
 									startIcon={<AddIcon fontSize="small" />}
 									variant="outlined"
 									onClick={handleOpenCreatePipeline}
+									disabled={!canEditPipeline}
 									sx={{
 										mt: 1.5,
 										borderRadius: 2,

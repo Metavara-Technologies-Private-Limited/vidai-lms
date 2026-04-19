@@ -68,6 +68,7 @@ export const CardContent: React.FC<CardContentProps> = ({
   const showEmail = stageActions ? stageActions.showEmail : true;
   const showSms = stageActions ? stageActions.showSms : true;
   const customActions = stageActions?.customActions ?? [];
+  const hasContactOptions = showCall || showSms || showEmail;
   // If no stage-level rule exists yet, keep legacy behavior for New / Follow Up.
   const showBookButton = stageActions
     ? stageActions.showBookAppointment && isHovered
@@ -131,43 +132,47 @@ export const CardContent: React.FC<CardContentProps> = ({
         </Box>
       </Stack>
 
-      {/* Contact options */}
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}
-      >
-        CONTACT OPTION
-      </Typography>
-      <Stack direction="row" spacing={1.5} sx={{ mb: showBookButton ? 2 : 0 }}>
-        {showCall && (
-          <IconButton
-            size="small"
-            sx={iconBtnSx}
-            onClick={(e) => { e.stopPropagation(); onOpenCall(lead); }}
+      {hasContactOptions && (
+        <>
+          {/* Contact options */}
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}
           >
-            <PhoneIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        )}
-        {showSms && (
-          <IconButton
-            size="small"
-            sx={iconBtnSx}
-            onClick={(e) => { e.stopPropagation(); onOpenSms(lead); }}
-          >
-            <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        )}
-        {showEmail && (
-          <IconButton
-            size="small"
-            sx={iconBtnSx}
-            onClick={(e) => { e.stopPropagation(); onOpenMail(lead); }}
-          >
-            <MailOutlineIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        )}
-      </Stack>
+            CONTACT OPTION
+          </Typography>
+          <Stack direction="row" spacing={1.5} sx={{ mb: showBookButton ? 2 : 0 }}>
+            {showCall && (
+              <IconButton
+                size="small"
+                sx={iconBtnSx}
+                onClick={(e) => { e.stopPropagation(); onOpenCall(lead); }}
+              >
+                <PhoneIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            )}
+            {showSms && (
+              <IconButton
+                size="small"
+                sx={iconBtnSx}
+                onClick={(e) => { e.stopPropagation(); onOpenSms(lead); }}
+              >
+                <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            )}
+            {showEmail && (
+              <IconButton
+                size="small"
+                sx={iconBtnSx}
+                onClick={(e) => { e.stopPropagation(); onOpenMail(lead); }}
+              >
+                <MailOutlineIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            )}
+          </Stack>
+        </>
+      )}
 
       {customActions.length > 0 && (
         <Stack direction="row" spacing={0.75} sx={{ mb: showBookButton ? 1.5 : 0, flexWrap: "wrap", rowGap: 0.75 }}>
