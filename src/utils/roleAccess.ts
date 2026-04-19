@@ -182,10 +182,9 @@ const hasMenuPermission = (user: UserLike, key: string): boolean | null => {
   if (!hasPermissionContainer) return null;
 
   // When a permissions container exists, always use it deterministically.
-  // But if it is only an empty shell (for example after partial profile
-  // hydration), fall back to role-based access instead of hiding the app.
+  // If no permission payload is granted, deny by default.
   if (!hasPermissionPayload) {
-    return null;
+    return false;
   }
 
   // If a real payload exists but no labels could be parsed, deny instead of
@@ -227,7 +226,7 @@ const hasSubMenuPermission = (
   if (!hasPermissionContainer) return null;
 
   if (!hasPermissionPayload) {
-    return null;
+    return false;
   }
 
   if (labels.size === 0) {

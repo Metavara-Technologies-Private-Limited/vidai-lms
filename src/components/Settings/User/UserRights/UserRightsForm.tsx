@@ -155,7 +155,6 @@ const toApiPermissions = (
     });
 
   return [
-    ...build("module", rights.modules, (item) => ({ module_key: item, category_key: "_", subcategory_key: null })),
     ...build("category", rights.categories, (item) => ({ module_key: "_", category_key: item, subcategory_key: null })),
     ...build("subcategory", rights.subCategories, (item) => ({ module_key: "_", category_key: "_", subcategory_key: item })),
   ];
@@ -171,6 +170,7 @@ type ViewMode = "empty" | "summary" | "edit";
 const STEP_LABELS = ["Module", "Category", "Sub Category"];
 const MODULE_OPTIONS = ["Vidai Leads"];
 const FALLBACK_SUBCATEGORY_OPTIONS = ["Integration", "Tickets", "Templates", "User"];
+const EXCLUDED_ROW_LABELS = new Set(["vidai leads"]);
 
 const emptyPerm = (): PermissionFlags => ({
   add: false,
@@ -201,6 +201,9 @@ const initialRoles: RoleEntry[] = [
 
 const normalizeRoleKey = (value: string): string =>
   value.trim().toLowerCase().replace(/[-_\s]+/g, "");
+
+const shouldShowPermissionRow = (label: string): boolean =>
+  !EXCLUDED_ROW_LABELS.has(normalizePermissionLabel(label));
 
 const roleMatches = (roleName: string, userRole: string): boolean => {
   const roleKey = normalizeRoleKey(roleName);
@@ -442,7 +445,6 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   const allSelected = optionList.length > 0 && draftRights[rightsKey].length === optionList.length;
   const hasStepSelection = draftRights[rightsKey].length > 0;
   const hasAnySelection =
-    draftRights.modules.length > 0 ||
     draftRights.categories.length > 0 ||
     draftRights.subCategories.length > 0;
 
@@ -454,12 +456,14 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
         ...activeRole.rights.categories,
         ...activeRole.rights.subCategories,
       ]),
-    );
+    ).filter(shouldShowPermissionRow);
     return labels.map((label) => ({ label, perm: activeRole.permissions[label] ?? emptyPerm() }));
   }, [activeRole]);
 
   const editRows = useMemo(() => {
-    const labels = Array.from(new Set([...draftRights.modules, ...draftRights.categories, ...draftRights.subCategories]));
+    const labels = Array.from(
+      new Set([...draftRights.modules, ...draftRights.categories, ...draftRights.subCategories]),
+    ).filter(shouldShowPermissionRow);
     return labels.map((label) => ({ label, perm: draftPerms[label] ?? emptyPerm() }));
   }, [draftRights, draftPerms]);
 

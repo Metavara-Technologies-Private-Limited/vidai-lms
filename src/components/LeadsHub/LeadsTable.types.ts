@@ -44,6 +44,8 @@ export interface Props {
   filters?: FilterValues;
   importedLeads?: RawLead[];
   canEditLeads?: boolean;
+  selectedIndustry?: string;
+  selectedPipelineId?: string;
 }
 
 export interface ApiErrorShape {
