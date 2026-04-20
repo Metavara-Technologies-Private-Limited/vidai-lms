@@ -25,10 +25,9 @@ export type Employee = {
   official_email?: string;
 };
 
-// ── Document object shape returned by the API ──
 export type LeadDocument = {
   id: string;
-  file: string; // relative path e.g. /media/lead_documents/file.pdf
+  file: string;
   uploaded_at: string;
 };
 
@@ -80,7 +79,6 @@ export type Lead = {
   referral_department_name?: string | null;
 };
 
-// Type for creating/updating leads
 export type LeadPayload = {
   clinic_id: number;
   department_id: number;
@@ -118,7 +116,6 @@ export type LeadPayload = {
 };
 
 // ====================== Lead Email Types ======================
-
 export type LeadEmailPayload = {
   lead: string;
   subject: string;
@@ -126,9 +123,9 @@ export type LeadEmailPayload = {
   sender_email?: string | null;
   scheduled_at?: string | null;
   send_now?: boolean;
-  cc?: string[]; // ← FIXED: added for CC recipients
-  bcc?: string[]; // ← FIXED: added for BCC recipients
-  additional_to?: string[]; // ← FIXED: added for extra To recipients
+  cc?: string[];
+  bcc?: string[];
+  additional_to?: string[];
 };
 
 export type LeadEmailStatus =
@@ -165,6 +162,48 @@ export type LeadMailListItem = {
   created_at: string;
 };
 
+// ====================== Token Helpers ======================
+/**
+ * Checks multiple common key names in priority order so the fix works
+ * regardless of which key the login flow originally wrote.
+ * Priority: auth_token → access_token → access → token
+ */
+const TOKEN_KEYS = ["auth_token", "access_token", "access", "token"] as const;
+const REFRESH_KEYS = ["refresh_token", "refresh"] as const;
+
+export const getAccessToken = (): string | null => {
+  for (const key of TOKEN_KEYS) {
+    const val = localStorage.getItem(key);
+    if (val) return val;
+  }
+  return null;
+};
+
+export const getRefreshToken = (): string | null => {
+  for (const key of REFRESH_KEYS) {
+    const val = localStorage.getItem(key);
+    if (val) return val;
+  }
+  return null;
+};
+
+/**
+ * Persist tokens — writes to both the canonical key and aliases so
+ * any part of the app that reads any key gets the fresh value.
+ */
+export const setTokens = (access: string, refresh?: string): void => {
+  localStorage.setItem("auth_token", access);
+  localStorage.setItem("access_token", access);
+  if (refresh) {
+    localStorage.setItem("refresh_token", refresh);
+    localStorage.setItem("refresh", refresh);
+  }
+};
+
+export const clearTokens = (): void => {
+  [...TOKEN_KEYS, ...REFRESH_KEYS].forEach((k) => localStorage.removeItem(k));
+};
+
 // ====================== Axios Instance ======================
 const API_BASE_URL: string =
   (import.meta as unknown as { env: Record<string, string> }).env
@@ -175,56 +214,139 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("auth_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+// ── Request interceptor — attach token to EVERY outgoing request ──────────────
+api.interceptors.request.use(
+  (config) => {
+    const token = getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else if (import.meta.env.DEV) {
+      console.warn(
+        `[api] ⚠️ No auth token found for ${config.method?.toUpperCase()} ${config.url}. ` +
+          `Checked: ${TOKEN_KEYS.join(", ")}`,
+      );
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+// ── Response interceptor — normalise errors + refresh token on 401 ────────────
+let isRefreshing = false;
+let refreshQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: unknown) => void;
+}> = [];
+
+const drainQueue = (err: unknown, token: string | null = null): void => {
+  refreshQueue.forEach(({ resolve, reject }) =>
+    err ? reject(err) : resolve(token!),
+  );
+  refreshQueue = [];
+};
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const status = error?.response?.status;
-    const url = error?.config?.url;
+  async (error) => {
+    const status: number | undefined = error?.response?.status;
+    const url: string = error?.config?.url ?? "";
     const raw = error?.response?.data;
-    const skipErrorLog = Boolean(
+    const skipLog = Boolean(
       (error?.config as { __skipErrorLog?: boolean } | undefined)
         ?.__skipErrorLog,
     );
+
     const normalizeError = (value: unknown): string => {
       if (value == null) return "Unknown error";
       if (typeof value === "string") return value;
       if (typeof value === "number" || typeof value === "boolean")
         return String(value);
-
       if (Array.isArray(value)) {
         const first = value[0];
         return first == null ? "Unknown error" : normalizeError(first);
       }
-
       if (typeof value === "object") {
         const obj = value as Record<string, unknown>;
-
         if (typeof obj.detail === "string") return obj.detail;
         if (typeof obj.message === "string") return obj.message;
         if (typeof obj.error === "string") return obj.error;
-
         const entries = Object.entries(obj);
-        if (entries.length === 0) return "Unknown error";
-
+        if (!entries.length) return "Unknown error";
         return entries
           .slice(0, 4)
           .map(([k, v]) => `${k}: ${normalizeError(v)}`)
           .join(" | ");
       }
-
       return "Unknown error";
     };
 
-    const detail = normalizeError(raw ?? error?.message);
-    if (!skipErrorLog) {
-      console.error(`❌ API Error [${status}] ${url}: ${detail}`);
+    if (!skipLog) {
+      console.error(
+        `❌ API Error [${status}] ${url}: ${normalizeError(raw ?? error?.message)}`,
+      );
     }
+
+    // ── 401: attempt silent token refresh ────────────────────────────────────
+    const originalRequest = error.config as AxiosRequestConfig & {
+      _retry?: boolean;
+    };
+
+    const isAuthEndpoint =
+      url.includes("/token/refresh/") || url.includes("/auth/login/");
+
+    if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+      const refreshToken = getRefreshToken();
+
+      if (!refreshToken) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            "[api] 401 with no refresh token — redirecting to /login.",
+          );
+        }
+        clearTokens();
+        window.location.href = "/login";
+        return Promise.reject(error);
+      }
+
+      // Queue subsequent requests while refresh is in-flight
+      if (isRefreshing) {
+        return new Promise<string>((resolve, reject) => {
+          refreshQueue.push({ resolve, reject });
+        }).then((newToken) => {
+          originalRequest.headers = originalRequest.headers ?? {};
+          originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+          return api(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Plain axios — bypasses our interceptors to avoid an infinite loop
+        const { data } = await axios.post(
+          `${API_BASE_URL}/token/refresh/`,
+          { refresh: refreshToken },
+          { headers: { "Content-Type": "application/json" } },
+        );
+
+        const newAccess: string = data.access;
+        setTokens(newAccess, data.refresh ?? undefined);
+        drainQueue(null, newAccess);
+
+        originalRequest.headers = originalRequest.headers ?? {};
+        originalRequest.headers["Authorization"] = `Bearer ${newAccess}`;
+        return api(originalRequest);
+      } catch (refreshErr) {
+        drainQueue(refreshErr, null);
+        clearTokens();
+        window.location.href = "/login";
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
     return Promise.reject(error);
   },
 );
@@ -257,15 +379,11 @@ export const LeadAPI = {
         formData.append(key, String(value));
       }
     });
-    files.forEach((file) => {
-      formData.append("documents", file);
-    });
+    files.forEach((file) => formData.append("documents", file));
     const response = await api.post<Lead>(
       `/leads/?clinic_id=${data.clinic_id}`,
       formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      },
+      { headers: { "Content-Type": "multipart/form-data" } },
     );
     console.log("✅ Lead + documents created:", response.data);
     return response.data;
@@ -287,10 +405,6 @@ export const LeadAPI = {
     return response.data;
   },
 
-  // ── Send lead fields + new documents together in ONE multipart PUT ──
-  // This is the correct way to update a lead with new files.
-  // Do NOT call update() then uploadDocuments() separately — the second
-  // PUT would overwrite the lead with an incomplete payload.
   updateWithDocuments: async (
     leadId: string,
     data: Partial<LeadPayload>,
@@ -300,22 +414,14 @@ export const LeadAPI = {
     (Object.keys(data) as (keyof Partial<LeadPayload>)[]).forEach((key) => {
       const value = data[key];
       if (value === null || value === undefined) return;
-      // Booleans must be sent as "true"/"false" strings for Django multipart
-      if (typeof value === "boolean") {
-        formData.append(key, value ? "true" : "false");
-      } else {
-        formData.append(key, String(value));
-      }
+      formData.append(key, typeof value === "boolean" ? String(value) : String(value));
     });
     files.forEach((file) => formData.append("documents", file));
-    const clinicId =
-      (data as Partial<LeadPayload>).clinic_id ?? storedClinicId();
+    const clinicId = data.clinic_id ?? storedClinicId();
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      },
+      { headers: { "Content-Type": "multipart/form-data" } },
     );
     console.log("✅ Lead + documents updated:", response.data);
     return response.data;
@@ -326,16 +432,13 @@ export const LeadAPI = {
   },
 
   inactivate: async (leadId: string): Promise<void> => {
-    await api.patch(
-      `/leads/${leadId}/inactivate/?clinic_id=${storedClinicId()}`,
-    );
+    await api.patch(`/leads/${leadId}/inactivate/?clinic_id=${storedClinicId()}`);
   },
 
   delete: async (leadId: string): Promise<void> => {
     await api.patch(`/leads/${leadId}/delete/?clinic_id=${storedClinicId()}`);
   },
 
-  // Returns embedded documents from the lead object (no extra API call)
   getDocuments: async (leadId: string): Promise<LeadDocument[]> => {
     const lead = await LeadAPI.getById(leadId);
     return lead.documents ?? [];
@@ -347,21 +450,14 @@ export const LeadAPI = {
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${storedClinicId()}`,
       formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      },
+      { headers: { "Content-Type": "multipart/form-data" } },
     );
     return response.data;
   },
 
   uploadDocuments: async (leadId: string, files: File[]): Promise<Lead> => {
-    // First fetch the current lead so we can re-send all required fields.
-    // A bare multipart PUT with only `documents` causes Django to reset other
-    // fields (including is_active → false), archiving the lead.
     const current = await LeadAPI.getById(leadId);
     const formData = new FormData();
-
-    // Re-send all required lead fields so nothing gets wiped
     const safeFields: Record<string, string> = {
       clinic_id: String(current.clinic_id ?? 1),
       department_id: String(current.department_id ?? 1),
@@ -376,33 +472,25 @@ export const LeadAPI = {
       is_active: current.is_active ? "true" : "false",
     };
     Object.entries(safeFields).forEach(([k, v]) => formData.append(k, v));
-
-    // Append new files
     files.forEach((file) => formData.append("documents", file));
-
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${current.clinic_id ?? storedClinicId()}`,
       formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      },
+      { headers: { "Content-Type": "multipart/form-data" } },
     );
     return response.data;
   },
 };
 
 // ====================== Lead Email API ======================
-
 export const LeadEmailAPI = {
   create: async (
     data: LeadEmailPayload,
     options?: { suppressErrorLog?: boolean },
   ): Promise<LeadEmailResponse> => {
     const requestConfig: AxiosRequestConfig = {};
-    (
-      requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }
-    ).__skipErrorLog = options?.suppressErrorLog === true;
-
+    (requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }).__skipErrorLog =
+      options?.suppressErrorLog === true;
     const response = await api.post<LeadEmailResponse>(
       "/lead-email/",
       data,
@@ -414,27 +502,20 @@ export const LeadEmailAPI = {
 
   sendNow: async (
     data: Omit<LeadEmailPayload, "send_now">,
-  ): Promise<LeadEmailResponse> => {
-    return LeadEmailAPI.create({ ...data, send_now: true });
-  },
+  ): Promise<LeadEmailResponse> => LeadEmailAPI.create({ ...data, send_now: true }),
 
   saveAsDraft: async (
     data: Omit<LeadEmailPayload, "send_now">,
-  ): Promise<LeadEmailResponse> => {
-    return LeadEmailAPI.create({ ...data, send_now: false });
-  },
+  ): Promise<LeadEmailResponse> => LeadEmailAPI.create({ ...data, send_now: false }),
 
   list: async (leadUuid?: string): Promise<LeadMailListItem[]> => {
     const params = leadUuid ? { lead_uuid: leadUuid } : {};
-    const response = await api.get<LeadMailListItem[]>("/lead-mail/", {
-      params,
-    });
+    const response = await api.get<LeadMailListItem[]>("/lead-mail/", { params });
     return response.data;
   },
 
-  listByLead: async (leadId: string): Promise<LeadMailListItem[]> => {
-    return LeadEmailAPI.list(leadId);
-  },
+  listByLead: async (leadId: string): Promise<LeadMailListItem[]> =>
+    LeadEmailAPI.list(leadId),
 };
 
 // ====================== Email Template Types ======================
@@ -473,18 +554,13 @@ export const EmailTemplateAPI = {
   },
 
   create: async (payload: EmailTemplatePayload): Promise<EmailTemplate> => {
-    const response = await api.post<EmailTemplate>(
-      "/templates/mail/create/",
-      payload,
-    );
+    const response = await api.post<EmailTemplate>("/templates/mail/create/", payload);
     console.log("✅ Email template created:", response.data);
     return response.data;
   },
 
   getById: async (templateId: string | number): Promise<EmailTemplate> => {
-    const response = await api.get<EmailTemplate>(
-      `/templates/mail/${templateId}/`,
-    );
+    const response = await api.get<EmailTemplate>(`/templates/mail/${templateId}/`);
     return response.data;
   },
 
@@ -495,10 +571,7 @@ export const EmailTemplateAPI = {
 
 // ====================== Twilio API ======================
 export const TwilioAPI = {
-  makeCall: async (payload: {
-    lead_uuid: string;
-    to: string;
-  }): Promise<unknown> => {
+  makeCall: async (payload: { lead_uuid: string; to: string }): Promise<unknown> => {
     const response = await api.post("/twilio/make-call/", payload);
     console.log("📞 Call initiated:", response.data);
     return response.data;
@@ -527,10 +600,7 @@ export const ClinicAPI = {
     }
   },
 
-  create: async (data: {
-    name: string;
-    department: string[];
-  }): Promise<Clinic> => {
+  create: async (data: { name: string; department: string[] }): Promise<Clinic> => {
     const response = await api.post<Clinic>("/clinics", data);
     return response.data;
   },
@@ -549,12 +619,7 @@ export const ClinicAPI = {
     );
     const data = response.data;
     if (!Array.isArray(data)) {
-      if (
-        data &&
-        typeof data === "object" &&
-        "results" in data &&
-        Array.isArray(data.results)
-      ) {
+      if (data && typeof data === "object" && "results" in data && Array.isArray(data.results)) {
         return data.results;
       }
       return [];
@@ -566,16 +631,11 @@ export const ClinicAPI = {
 // ====================== Department API ======================
 export const DepartmentAPI = {
   listByClinic: async (clinicId: number): Promise<Department[]> => {
-    // Use the dedicated departments endpoint for accurate per-clinic data
     try {
-      const response = await api.get<Department[]>(
-        `/departments/?clinic_id=${clinicId}`,
-      );
+      const response = await api.get<Department[]>(`/departments/?clinic_id=${clinicId}`);
       const data = response.data;
-      if (Array.isArray(data)) return data;
-      return [];
+      return Array.isArray(data) ? data : [];
     } catch {
-      // Fallback: extract from clinic detail
       const clinic = await ClinicAPI.getById(clinicId);
       return clinic.department || [];
     }
@@ -589,9 +649,8 @@ export const DepartmentAPI = {
 
 // ====================== Employee API ======================
 export const EmployeeAPI = {
-  listByClinic: async (clinicId: number): Promise<Employee[]> => {
-    return ClinicAPI.getEmployees(clinicId);
-  },
+  listByClinic: async (clinicId: number): Promise<Employee[]> =>
+    ClinicAPI.getEmployees(clinicId),
 
   create: async (data: {
     user_id: number;

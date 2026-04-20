@@ -122,6 +122,7 @@ export interface FilterValues {
   status: string;
   quality: string;
   source: string;
+  subSource: string;
   dateFrom: string | null;
   dateTo: string | null;
 }

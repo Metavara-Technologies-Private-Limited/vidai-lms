@@ -28,15 +28,24 @@ import type { ReferralDepartment } from "../../services/referral.api";
 import type { FormState } from "../../types/leads.types";
 import {
   TASK_TYPES,
-  TASK_STATUS_FOR_TYPE,
+  SOURCE_OPTIONS,
+  SUB_SOURCE_OPTIONS,
   TIME_SLOTS,
   inputStyle,
   readOnlyStyle,
   labelStyle,
   getDocColor,
+  type LeadGeneratedByObject,
 } from "../LeadsHub/addNewLead.constants";
 
-// ── Import appType config ─────────────────────────────────────────────────────
+// Lifecycle statuses used as Next Action Status options (spec: New, Follow-up, Converted, Lost)
+const NEXT_ACTION_STATUS_OPTIONS = [
+  { label: "New", value: "new" },
+  { label: "Follow-up", value: "follow_up" },
+  { label: "Converted", value: "converted" },
+  { label: "Lost", value: "lost" },
+] as const;
+
 import {
   IS_MEDICAL_APP,
   IS_CONTRACTS_APP,
@@ -79,17 +88,13 @@ const SLOT_MENU_PROPS = {
         maxHeight: "144px",
         overflowY: "auto",
         scrollbarWidth: "thin",
-        "&::-webkit-scrollbar": {
-          width: "4px",
-        },
+        "&::-webkit-scrollbar": { width: "4px" },
         "&::-webkit-scrollbar-thumb": {
           backgroundColor: "#CBD5E1",
           borderRadius: "4px",
         },
       },
-      "& .MuiMenuItem-root": {
-        justifyContent: "flex-start",
-      },
+      "& .MuiMenuItem-root": { justifyContent: "flex-start" },
     },
   },
 };
@@ -105,9 +110,13 @@ interface Step1Props {
   leadGeneratedByInput: string;
   leadGeneratedByOptions: AssigneeOption[];
   leadGeneratedByLoading: boolean;
+  selectedLeadGeneratedBy: LeadGeneratedByObject | null;
   campaigns: Campaign[];
   nextActionTypeOptions?: string[];
   handleChange: (
+    field: keyof FormState,
+  ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSelectChange: (
     field: keyof FormState,
   ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleAssigneeInputChange: (value: string) => void;
@@ -115,9 +124,10 @@ interface Step1Props {
   handleLeadGeneratedByInputChange: (value: string) => void;
   handleLeadGeneratedByChange: (value: AssigneeOption | null) => void;
   handleCampaignChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSourceChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSubSourceChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleNextTypeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onReferralDepartmentChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  // ── Fetched from backend ───────────────────────────────────────────────────
   referralDepartments: ReferralDepartment[];
   loadingReferralDepts: boolean;
 }
@@ -132,20 +142,40 @@ export function Step1({
   leadGeneratedByInput,
   leadGeneratedByOptions,
   leadGeneratedByLoading,
+  selectedLeadGeneratedBy,
   campaigns,
   nextActionTypeOptions,
   handleChange,
+  handleSelectChange,
   handleAssigneeInputChange,
   handleAssigneeChange,
   handleLeadGeneratedByInputChange,
   handleLeadGeneratedByChange,
   handleCampaignChange,
+  handleSourceChange,
+  handleSubSourceChange,
   handleNextTypeChange,
   onReferralDepartmentChange,
   referralDepartments,
   loadingReferralDepts,
 }: Step1Props) {
   const campaignSelected = Boolean(form.campaign);
+
+  const availableSubSources: string[] =
+    form.source === "Referral"
+      ? referralDepartments.map((d) => d.name)
+      : form.source && SUB_SOURCE_OPTIONS[form.source]
+        ? SUB_SOURCE_OPTIONS[form.source]
+        : [];
+
+  const filteredCampaigns = form.subSource
+    ? campaigns.filter(
+        (c) =>
+          c.subSource.toLowerCase() === form.subSource.toLowerCase() ||
+          !form.subSource,
+      )
+    : campaigns;
+
   const resolvedNextActionOptions =
     nextActionTypeOptions && nextActionTypeOptions.length > 0
       ? nextActionTypeOptions
@@ -163,7 +193,7 @@ export function Step1({
         LEAD INFORMATION
       </Typography>
 
-      {/* Row 1: Full Name, Contact, Email, Location — always shown */}
+      {/* Row 1: Full Name, Contact, Email, Location */}
       <Box
         sx={{
           display: "grid",
@@ -190,6 +220,9 @@ export function Step1({
               size="small"
               value={form[field] as string}
               onChange={handleChange(field)}
+              inputProps={
+                field === "contact" ? { maxLength: 15 } : undefined
+              }
               sx={inputStyle}
             />
           </Box>
@@ -213,7 +246,7 @@ export function Step1({
               fullWidth
               size="small"
               value={form.gender}
-              onChange={handleChange("gender")}
+              onChange={handleSelectChange("gender")}
               sx={inputStyle}
             >
               <MenuItem value="Male">Male</MenuItem>
@@ -239,7 +272,7 @@ export function Step1({
               fullWidth
               size="small"
               value={form.marital}
-              onChange={handleChange("marital")}
+              onChange={handleSelectChange("marital")}
               sx={inputStyle}
             >
               <MenuItem value="">-- Select --</MenuItem>
@@ -262,12 +295,13 @@ export function Step1({
 
       {/* Language Preference */}
       <Box sx={{ mb: 4 }}>
+        <Typography sx={labelStyle}>Language Preference</Typography>
         <TextField
           select
           fullWidth
           size="small"
           value={form.language}
-          onChange={handleChange("language")}
+          onChange={handleSelectChange("language")}
           sx={{ ...inputStyle, maxWidth: "25%" }}
         >
           <MenuItem value="">-- Select --</MenuItem>
@@ -347,7 +381,7 @@ export function Step1({
                   fullWidth
                   size="small"
                   value={form.partnerGender}
-                  onChange={handleChange("partnerGender")}
+                  onChange={handleSelectChange("partnerGender")}
                   sx={inputStyle}
                 >
                   <MenuItem value="">-- Select --</MenuItem>
@@ -440,42 +474,14 @@ export function Step1({
           mb: 4,
         }}
       >
-        <Box>
-          <Typography sx={labelStyle}>Campaign Name</Typography>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            value={form.campaign}
-            onChange={handleCampaignChange}
-            sx={inputStyle}
-          >
-            <MenuItem value="">-- None --</MenuItem>
-            {campaigns.length === 0 ? (
-              <MenuItem value="" disabled>
-                No campaigns available
-              </MenuItem>
-            ) : (
-              campaigns.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              ))
-            )}
-          </TextField>
-        </Box>
+        {/* Source */}
         <Box>
           <Typography sx={labelStyle}>
             Source
             {campaignSelected && (
               <Typography
                 component="span"
-                sx={{
-                  fontSize: "0.65rem",
-                  color: "#6366F1",
-                  ml: 1,
-                  fontWeight: 500,
-                }}
+                sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}
               >
                 auto-filled from campaign
               </Typography>
@@ -495,59 +501,124 @@ export function Step1({
               fullWidth
               size="small"
               value={form.source}
-              onChange={handleChange("source")}
+              onChange={handleSourceChange}
               sx={inputStyle}
             >
               <MenuItem value="">-- Select --</MenuItem>
-              <MenuItem value="Social Media">Social Media</MenuItem>
-              <MenuItem value="Website">Website</MenuItem>
-              <MenuItem value="Referral">Referral</MenuItem>
-              <MenuItem value="Direct">Direct</MenuItem>
+              {SOURCE_OPTIONS.map((s) => (
+                <MenuItem key={s} value={s}>
+                  {s}
+                </MenuItem>
+              ))}
             </TextField>
           )}
         </Box>
-        <Box>
-          <Typography sx={labelStyle}>
-            Sub-Source
-            {campaignSelected && (
-              <Typography
-                component="span"
-                sx={{
-                  fontSize: "0.65rem",
-                  color: "#6366F1",
-                  ml: 1,
-                  fontWeight: 500,
+
+        {/* Sub-Source — hidden when source is "Other" */}
+        {form.source !== "Other" && (
+          <Box>
+            <Typography sx={labelStyle}>
+              Sub-Source
+              {campaignSelected && (
+                <Typography
+                  component="span"
+                  sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}
+                >
+                  auto-filled from campaign
+                </Typography>
+              )}
+            </Typography>
+            {campaignSelected ? (
+              <TextField
+                fullWidth
+                size="small"
+                value={form.subSource}
+                InputProps={{ readOnly: true }}
+                sx={readOnlyStyle}
+              />
+            ) : (
+              <TextField
+                select
+                fullWidth
+                size="small"
+                value={form.subSource}
+                onChange={handleSubSourceChange}
+                disabled={
+                  !form.source ||
+                  (form.source === "Referral" && loadingReferralDepts)
+                }
+                sx={inputStyle}
+                InputProps={{
+                  endAdornment:
+                    form.source === "Referral" && loadingReferralDepts ? (
+                      <CircularProgress size={16} sx={{ mr: 3 }} />
+                    ) : null,
                 }}
               >
-                auto-filled from campaign
-              </Typography>
+                <MenuItem value="">-- Select --</MenuItem>
+                {form.source === "Referral" && loadingReferralDepts ? (
+                  <MenuItem value="" disabled>
+                    Loading departments...
+                  </MenuItem>
+                ) : form.source === "Referral" && availableSubSources.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No departments available
+                  </MenuItem>
+                ) : (
+                  availableSubSources.map((s) => (
+                    <MenuItem key={s} value={s}>
+                      {s}
+                    </MenuItem>
+                  ))
+                )}
+                {!form.source && (
+                  <MenuItem value="" disabled>
+                    Select source first
+                  </MenuItem>
+                )}
+              </TextField>
             )}
-          </Typography>
-          {campaignSelected ? (
-            <TextField
-              fullWidth
-              size="small"
-              value={form.subSource}
-              InputProps={{ readOnly: true }}
-              sx={readOnlyStyle}
-            />
-          ) : (
+          </Box>
+        )}
+
+        {/* Campaign — hidden when source is "Other" */}
+        {form.source !== "Other" && (
+          <Box>
+            <Typography sx={labelStyle}>
+              Campaign Name
+              {form.subSource && !campaignSelected && (
+                <Typography
+                  component="span"
+                  sx={{ fontSize: "0.65rem", color: "#94A3B8", ml: 1, fontWeight: 500 }}
+                >
+                  linked with {form.subSource}
+                </Typography>
+              )}
+            </Typography>
             <TextField
               select
               fullWidth
               size="small"
-              value={form.subSource}
-              onChange={handleChange("subSource")}
+              value={form.campaign}
+              onChange={handleCampaignChange}
+              disabled={!form.subSource && !form.source}
               sx={inputStyle}
             >
-              <MenuItem value="">-- Select --</MenuItem>
-              <MenuItem value="Facebook">Facebook</MenuItem>
-              <MenuItem value="Instagram">Instagram</MenuItem>
-              <MenuItem value="Google">Google</MenuItem>
-              <MenuItem value="LinkedIn">LinkedIn</MenuItem>
+              <MenuItem value="">-- None --</MenuItem>
+              {filteredCampaigns.length === 0 ? (
+                <MenuItem value="" disabled>
+                  No campaigns available
+                </MenuItem>
+              ) : (
+                filteredCampaigns.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.name}
+                  </MenuItem>
+                ))
+              )}
             </TextField>
-          )}
-        </Box>
+          </Box>
+        )}
       </Box>
 
       {/* ── ASSIGNEE & NEXT ACTION DETAILS ───────────────────────────────── */}
@@ -560,7 +631,7 @@ export function Step1({
         ASSIGNEE & NEXT ACTION DETAILS
       </Typography>
 
-      {/* Row 1: Assigned To | Lead Generated By | Referral Department | Next Action Type */}
+      {/* Row 1 */}
       <Box
         sx={{
           display: "grid",
@@ -571,9 +642,14 @@ export function Step1({
           mb: 2,
         }}
       >
-        {/* Assigned To */}
+        {/* Assigned To — search-based Autocomplete (unchanged) */}
         <Box>
-          <Typography sx={labelStyle}>Assigned To</Typography>
+          <Typography sx={labelStyle}>
+            Assigned To{" "}
+            <Typography component="span" sx={{ color: "#EF4444", fontSize: "0.75rem" }}>
+              *
+            </Typography>
+          </Typography>
           <Autocomplete
             options={assigneeOptions}
             loading={assigneeLoading}
@@ -621,7 +697,7 @@ export function Step1({
           />
         </Box>
 
-        {/* Lead Generated By — contracts app only */}
+        {/* Lead Generated By — contracts app only, search-based Autocomplete (unchanged) */}
         {IS_CONTRACTS_APP && (
           <Box>
             <Typography sx={labelStyle}>Lead Generated By</Typography>
@@ -646,7 +722,18 @@ export function Step1({
               noOptionsText="Type to search user"
               renderOption={(props, option) => (
                 <li {...props} key={option.id}>
-                  {assigneeLabel(option)}
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>
+                      {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() ||
+                        option.username ||
+                        `User ${option.id}`}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {[option.role || option.designation, option.email]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </Typography>
+                  </Box>
                 </li>
               )}
               renderInput={(params) => (
@@ -670,10 +757,67 @@ export function Step1({
                 />
               )}
             />
+            {/* Detail card showing the selected user's object fields */}
+            {selectedLeadGeneratedBy && (
+              <Box
+                sx={{
+                  mt: 1,
+                  p: 1.5,
+                  borderRadius: "8px",
+                  border: "1px solid #E2E8F0",
+                  bgcolor: "#F8FAFC",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 1,
+                }}
+              >
+                <Box>
+                  <Typography sx={{ fontSize: "0.65rem", color: "#94A3B8", fontWeight: 600 }}>
+                    FIRST NAME
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.8rem", color: "#1E293B", fontWeight: 500 }}>
+                    {selectedLeadGeneratedBy.first_name || "—"}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: "0.65rem", color: "#94A3B8", fontWeight: 600 }}>
+                    LAST NAME
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.8rem", color: "#1E293B", fontWeight: 500 }}>
+                    {selectedLeadGeneratedBy.last_name || "—"}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: "0.65rem", color: "#94A3B8", fontWeight: 600 }}>
+                    ROLE
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.8rem", color: "#1E293B", fontWeight: 500 }}>
+                    {selectedLeadGeneratedBy.role || "—"}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: "0.65rem", color: "#94A3B8", fontWeight: 600 }}>
+                    EMAIL
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: "0.8rem",
+                      color: "#6366F1",
+                      fontWeight: 500,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {selectedLeadGeneratedBy.email || "—"}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
           </Box>
         )}
 
-        {/* Referral Department — fetched from backend */}
+        {/* Referral Department — contracts app only */}
         {IS_CONTRACTS_APP && (
           <Box>
             <Typography sx={labelStyle}>Referral Department</Typography>
@@ -745,36 +889,21 @@ export function Step1({
       >
         <Box>
           <Typography sx={labelStyle}>
-            Next Action Status
-            {form.nextType && (
-              <Typography
-                component="span"
-                sx={{
-                  fontSize: "0.65rem",
-                  color: "#6366F1",
-                  ml: 1,
-                  fontWeight: 500,
-                }}
-              >
-                auto-set for {form.nextType}
-              </Typography>
-            )}
+            Next Action Status{" "}
+            <Typography component="span" sx={{ color: "#EF4444", fontSize: "0.75rem" }}>
+              *
+            </Typography>
           </Typography>
           <TextField
             select
             fullWidth
             size="small"
             value={form.nextStatus}
-            onChange={handleChange("nextStatus")}
-            sx={form.nextType ? readOnlyStyle : inputStyle}
-            InputProps={{ readOnly: Boolean(form.nextType) }}
+            onChange={handleSelectChange("nextStatus")}
+            sx={inputStyle}
           >
-            {(
-              TASK_STATUS_FOR_TYPE[form.nextType] ?? [
-                { label: "To Do", value: "pending" },
-                { label: "Done", value: "completed" },
-              ]
-            ).map((opt) => (
+            <MenuItem value="">-- Select --</MenuItem>
+            {NEXT_ACTION_STATUS_OPTIONS.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>
                 {opt.label}
               </MenuItem>
