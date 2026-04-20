@@ -65,6 +65,8 @@ export type Lead = {
   next_action_description?: string;
   assigned_to_id?: number;
   assigned_to_name?: string;
+  created_by_id?: number;
+  created_by_name?: string;
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;

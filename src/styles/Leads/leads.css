@@ -178,16 +178,18 @@
 
 .pill-tabs {
   display: flex;
-  gap: 12px;
-  margin-bottom: 20px !important;
+  gap: 8px;
+  margin-bottom: 0 !important;
+  min-width: 0;
 }
 
 .pill-tab {
-  padding: 10px 16px;
+  height: 36px;              
+  padding: 0 12px;
   border-radius: 10px;
   border: 1px solid #E5E7EB;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   color: #6B7280;
   background: #FFFFFF;
   font-weight: 600;
@@ -196,6 +198,7 @@
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+  line-height: 1;
 }
 
 .pill-tab:hover {
@@ -211,8 +214,14 @@
 
 .tab-count {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   color: inherit;
+}
+
+@media (min-width: 1200px) {
+  .pill-tab {
+    padding: 8px 10px;
+  }
 }
 
 /* ===============================
