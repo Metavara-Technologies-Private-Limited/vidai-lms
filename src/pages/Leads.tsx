@@ -327,10 +327,7 @@ const Leads: React.FC = () => {
       : null;
   const role = resolveUserRole(authUser);
   const permissions = authUser?.permissions ?? nestedAuthUser?.permissions;
-  const leadAliases = React.useMemo(
-    () => ["leads hub"],
-    [],
-  );
+  const leadAliases = React.useMemo(() => ["leads hub"], []);
   const canViewLeads =
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, leadAliases, "view") ||
@@ -421,7 +418,9 @@ const Leads: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
   const [importedLeads, setImportedLeads] = React.useState<Lead[]>([]);
   const [isSavingImport, setIsSavingImport] = React.useState(false);
-  const [availablePipelines, setAvailablePipelines] = React.useState<Pipeline[]>([]);
+  const [availablePipelines, setAvailablePipelines] = React.useState<
+    Pipeline[]
+  >([]);
   const [selectedIndustry, setSelectedIndustry] = React.useState<string>(
     localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "",
   );
@@ -607,7 +606,9 @@ const Leads: React.FC = () => {
 
   React.useEffect(() => {
     const fetchPipelinesForLeads = async () => {
-      const clinicId = Number(clinic?.id ?? localStorage.getItem("clinic_id") ?? 0);
+      const clinicId = Number(
+        clinic?.id ?? localStorage.getItem("clinic_id") ?? 0,
+      );
       if (!clinicId || !canViewLeads) {
         setAvailablePipelines([]);
         return;
@@ -1178,8 +1179,14 @@ const Leads: React.FC = () => {
           <Button
             className="add-lead-btn"
             onClick={() => {
-              localStorage.setItem(STORAGE_KEY_SELECTED_INDUSTRY, selectedIndustry);
-              localStorage.setItem(STORAGE_KEY_SELECTED_PIPELINE, selectedPipelineId);
+              localStorage.setItem(
+                STORAGE_KEY_SELECTED_INDUSTRY,
+                selectedIndustry,
+              );
+              localStorage.setItem(
+                STORAGE_KEY_SELECTED_PIPELINE,
+                selectedPipelineId,
+              );
               navigate("/leads/add");
             }}
             disabled={!canAddLeads}
@@ -1194,86 +1201,114 @@ const Leads: React.FC = () => {
       <Stack
         direction={{ xs: "column", lg: "row" }}
         spacing={1}
-        sx={{ mb: 3, justifyContent: "space-between", alignItems: { xs: "stretch", lg: "center" } }}
+        sx={{
+          mb: 1,
+          justifyContent: "space-between",
+          alignItems: { xs: "stretch", lg: "center" },
+          minHeight: 40,
+        }}
       >
-        <Stack direction="row" spacing={1} className="pill-tabs" sx={{ flexWrap: "wrap" }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          className="pill-tabs"
+          sx={{
+            flexWrap: { xs: "wrap", lg: "nowrap" },
+            overflowX: { xs: "auto", lg: "visible" },
+            pb: { xs: 0.5, lg: 0 },
+            alignItems: "center",
+            height: 40,
+          }}
+        >
           {tabs.map((t, i) => (
             <Box
               key={i}
               className={`pill-tab ${tab === i ? "active" : ""}`}
               onClick={() => setTab(i)}
+              sx={{
+                flexShrink: 0,
+                height: 34,
+                display: "flex",
+                alignItems: "center",
+              }}
             >
               {t.label}
-              {t.count !== null && <span className="tab-count">({t.count})</span>}
+              {t.count !== null && (
+                <span className="tab-count">({t.count})</span>
+              )}
             </Box>
           ))}
         </Stack>
-      </Stack>
 
-      {/* PIPELINE SELECTORS */}
-      {tab !== 1 && tab !== 3 && tab !== 4 && tab !== 5 && (
+        {/* PIPELINE SELECTORS */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1}
-          sx={{ mb: 3, justifyContent: { sm: "flex-end" }, minWidth: { lg: 420 } }}
+          sx={{
+            justifyContent: { sm: "flex-end" },
+            minWidth: { lg: 292 },
+            flexShrink: 0,
+            mr: { lg: 2 },
+            alignItems: { xs: "stretch", sm: "center" },
+          }}
         >
-            <Box sx={{ minWidth: 180 }}>
-              <Typography sx={{ fontSize: 11, color: "#64748B", mb: 0.4, fontWeight: 600 }}>Select Industry</Typography>
-              <Box
-                component="select"
-                value={selectedIndustry}
-                onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
-                  const nextIndustry = event.target.value;
-                  setSelectedIndustry(nextIndustry);
-                  setSelectedPipelineId("");
-                }}
-                style={{
-                  width: "100%",
-                  height: 36,
-                  borderRadius: 8,
-                  border: "1px solid #D0D5DD",
-                  padding: "0 10px",
-                  fontSize: 13,
-                  backgroundColor: "#fff",
-                }}
-              >
-                <option value="">All Industries</option>
-                {industryOptions.map((industry) => (
-                  <option key={industry} value={industry}>
-                    {industry.toUpperCase()}
-                  </option>
-                ))}
-              </Box>
+          <Box sx={{ width: { xs: "100%", sm: 136 } }}>
+            <Box
+              component="select"
+              aria-label="Select Industry"
+              value={selectedIndustry}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
+                const nextIndustry = event.target.value;
+                setSelectedIndustry(nextIndustry);
+                setSelectedPipelineId("");
+              }}
+              style={{
+                width: "100%",
+                height: 34,
+                borderRadius: 8,
+                border: "1px solid #D0D5DD",
+                padding: "0 10px",
+                fontSize: 13,
+                backgroundColor: "#fff",
+              }}
+            >
+              <option value="">All Industries</option>
+              {industryOptions.map((industry) => (
+                <option key={industry} value={industry}>
+                  {industry.toUpperCase()}
+                </option>
+              ))}
             </Box>
+          </Box>
 
-            <Box sx={{ minWidth: 220 }}>
-              <Typography sx={{ fontSize: 11, color: "#64748B", mb: 0.4, fontWeight: 600 }}>Select Pipeline</Typography>
-              <Box
-                component="select"
-                value={selectedPipelineId}
-                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                  setSelectedPipelineId(event.target.value)
-                }
-                style={{
-                  width: "100%",
-                  height: 36,
-                  borderRadius: 8,
-                  border: "1px solid #D0D5DD",
-                  padding: "0 10px",
-                  fontSize: 13,
-                  backgroundColor: "#fff",
-                }}
-              >
-                <option value="">Auto Select Pipeline</option>
-                {filteredPipelinesByIndustry.map((pipeline) => (
-                  <option key={pipeline.id} value={pipeline.id}>
-                    {pipeline.pipeline_name}
-                  </option>
-                ))}
-              </Box>
+          <Box sx={{ width: { xs: "100%", sm: 148 } }}>
+            <Box
+              component="select"
+              aria-label="Select Pipeline"
+              value={selectedPipelineId}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                setSelectedPipelineId(event.target.value)
+              }
+              style={{
+                width: "100%",
+                height: 34,
+                borderRadius: 8,
+                border: "1px solid #D0D5DD",
+                padding: "0 10px",
+                fontSize: 13,
+                backgroundColor: "#fff",
+              }}
+            >
+              <option value="">All Pipelines</option>
+              {filteredPipelinesByIndustry.map((pipeline) => (
+                <option key={pipeline.id} value={pipeline.id}>
+                  {pipeline.pipeline_name}
+                </option>
+              ))}
             </Box>
-          </Stack>
-      )}
+          </Box>
+        </Stack>
+      </Stack>
 
       {/* CONTENT */}
       {!canViewLeads ? null : waitingForContext ? (
