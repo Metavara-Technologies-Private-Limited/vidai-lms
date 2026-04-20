@@ -18,6 +18,7 @@ import dayjs, { Dayjs } from "dayjs";
 
 import { DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import type { Department, Employee } from "../../services/leads.api";
+import { SOURCE_OPTIONS, SUB_SOURCE_OPTIONS, REFERRAL_DEPARTMENT_OPTIONS } from "./addNewLead.constants";
 import type { FilterValues } from "../../types/leads.types";
 
 interface FilterDialogProps {
@@ -42,6 +43,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     status: "",
     quality: "",
     source: "",
+    subSource: "",
     dateFrom: null,
     dateTo: null,
   });
@@ -49,7 +51,6 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   const [dateFrom, setDateFrom] = React.useState<Dayjs | null>(null);
   const [dateTo, setDateTo] = React.useState<Dayjs | null>(null);
   const [location, setLocation] = React.useState("");
-  const [subSource, setSubSource] = React.useState("");
 
   React.useEffect(() => {
     if (!open) return;
@@ -106,6 +107,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       ...prev,
       [field]: value,
       ...(field === "department" ? { assignee: "" } : {}),
+      ...(field === "source" ? { subSource: "" } : {}),
     }));
   };
 
@@ -142,6 +144,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       status: "",
       quality: "",
       source: "",
+      subSource: "",
       dateFrom: null,
       dateTo: null,
     };
@@ -150,7 +153,6 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     setDateFrom(null);
     setDateTo(null);
     setLocation("");
-    setSubSource("");
 
     if (onApplyFilters) {
       onApplyFilters(emptyFilters);
@@ -307,13 +309,12 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                   }}
                 >
                   <MenuItem value="">Select Status</MenuItem>
-                  <MenuItem value="new">New</MenuItem>
-                  <MenuItem value="contacted">Contacted</MenuItem>
-                  <MenuItem value="follow-ups">Follow-Ups</MenuItem>
-                  <MenuItem value="converted">Converted</MenuItem>
-                  <MenuItem value="lost">Lost</MenuItem>
-                  <MenuItem value="cycle conversion">Cycle Conversion</MenuItem>
-                  <MenuItem value="appointment">Appointment</MenuItem>
+                  <MenuItem value="New Leads">New Leads</MenuItem>
+                  <MenuItem value="Follow up">Follow up</MenuItem>
+                  <MenuItem value="Appointment">Appointment</MenuItem>
+                  <MenuItem value="Converted Leads">Converted Leads</MenuItem>
+                  <MenuItem value="Cycle Conversion">Cycle Conversion</MenuItem>
+                  <MenuItem value="Lost Leads">Lost Leads</MenuItem>
                 </TextField>
               </Box>
             </Box>
@@ -380,12 +381,11 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                   }}
                 >
                   <MenuItem value="">Select Source</MenuItem>
-                  <MenuItem value="Social Media">Social Media</MenuItem>
-                  <MenuItem value="Website">Website</MenuItem>
-                  <MenuItem value="Referral">Referral</MenuItem>
-                  <MenuItem value="Direct">Direct</MenuItem>
-                  <MenuItem value="Email">Email</MenuItem>
-                  <MenuItem value="Phone">Phone</MenuItem>
+                  {SOURCE_OPTIONS.map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {value}
+                    </MenuItem>
+                  ))}
                 </TextField>
               </Box>
               <Box sx={{ flex: 1 }}>
@@ -394,19 +394,37 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                   select
                   fullWidth
                   size="small"
-                  value={subSource}
-                  onChange={(e) => setSubSource(e.target.value)}
+                  value={filters.subSource}
+                  onChange={(e) => handleFilterChange("subSource", e.target.value)}
+                  disabled={!filters.source || filters.source === "Other"}
                   sx={inputStyle}
                   SelectProps={{
                     displayEmpty: true,
                   }}
                 >
                   <MenuItem value="">Select Sub-Source</MenuItem>
-                  <MenuItem value="Facebook">Facebook</MenuItem>
-                  <MenuItem value="Instagram">Instagram</MenuItem>
-                  <MenuItem value="LinkedIn">LinkedIn</MenuItem>
-                  <MenuItem value="Twitter">Twitter</MenuItem>
-                  <MenuItem value="Google Ads">Google Ads</MenuItem>
+                  {(() => {
+                    if (!filters.source || filters.source === "Other") {
+                      return null;
+                    }
+
+                    const availableSubSources =
+                      filters.source === "Referral"
+                        ? REFERRAL_DEPARTMENT_OPTIONS
+                        : SUB_SOURCE_OPTIONS[filters.source] ?? [];
+
+                    return availableSubSources.length > 0 ? (
+                      availableSubSources.map((value) => (
+                        <MenuItem key={value} value={value}>
+                          {value}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem value="" disabled>
+                        No sub-sources available
+                      </MenuItem>
+                    );
+                  })()}
                 </TextField>
               </Box>
             </Box>
