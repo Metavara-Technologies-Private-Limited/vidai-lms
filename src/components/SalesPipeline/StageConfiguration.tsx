@@ -17,6 +17,7 @@ import {
 	Typography,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { toast } from "react-toastify";
 
 type StageConfigurationProps = {
 	open: boolean;
@@ -75,10 +76,25 @@ const normalizeHexColorInput = (value: string): string => {
 
 const isValidHexColor = (value: string): boolean => /^#[0-9A-F]{6}$/.test(value.toUpperCase());
 const NAME_PATTERN = /^[A-Za-z ]+$/;
+const MAX_NAME_LENGTH = 50;
 const isAlphabeticName = (value?: string): boolean => {
 	if (!value) return false;
 	const normalized = value.trim().replace(/\s+/g, " ");
 	return normalized.length > 0 && NAME_PATTERN.test(normalized);
+};
+
+const sanitizeAlphabeticName = (value: string): string =>
+	value.replace(/[^A-Za-z ]/g, "").slice(0, MAX_NAME_LENGTH);
+
+const INPUT_TOAST_OPTIONS = {
+	position: "top-right" as const,
+	autoClose: 1400,
+};
+
+const showInputToast = (toastId: string, message: string) => {
+	if (!toast.isActive(toastId)) {
+		toast.error(message, { ...INPUT_TOAST_OPTIONS, toastId });
+	}
 };
 
 const StageConfiguration = ({
@@ -142,16 +158,40 @@ const StageConfiguration = ({
 		key: "fieldName" | "fieldType",
 		value: string,
 	) => {
+		if (key === "fieldName") {
+			if (/[^A-Za-z ]/.test(value)) {
+				showInputToast("pipeline-data-capture-name-alpha", "Only letters and spaces are allowed");
+			}
+			if (value.length > MAX_NAME_LENGTH) {
+				showInputToast("pipeline-data-capture-name-length", "Maximum 50 characters allowed");
+			}
+		}
+
+		const sanitizedValue =
+			key === "fieldName" ? sanitizeAlphabeticName(value) : value;
 		setDataCaptureFields((previous) =>
 			previous.map((field) =>
 				field.id === fieldId
 					? {
 							...field,
-							[key]: key === "fieldType" ? (value as DataCaptureField["fieldType"]) : value,
+							[key]:
+								key === "fieldType"
+									? (sanitizedValue as DataCaptureField["fieldType"])
+									: sanitizedValue,
 						}
 					: field,
 			),
 		);
+	};
+
+	const handleStageNameInputChange = (value: string) => {
+		if (/[^A-Za-z ]/.test(value)) {
+			showInputToast("pipeline-stage-name-alpha", "Only letters and spaces are allowed");
+		}
+		if (value.length > MAX_NAME_LENGTH) {
+			showInputToast("pipeline-stage-name-length", "Maximum 50 characters allowed");
+		}
+		onStageNameChange?.(sanitizeAlphabeticName(value));
 	};
 
 	const handleToggleMandatory = (fieldId: string) => {
@@ -222,10 +262,20 @@ const StageConfiguration = ({
 		const trimmedStageStatus = stageStatus.trim();
 		const trimmedColorCode = colorCode.trim();
 		const trimmedEntryRule = entryRule.trim();
+		const hasInvalidDataCaptureName = dataCaptureFields.some((field) => {
+			const trimmedFieldName = field.fieldName.trim();
+			return (
+				!trimmedFieldName ||
+				trimmedFieldName.length > MAX_NAME_LENGTH ||
+				!isAlphabeticName(trimmedFieldName)
+			);
+		});
 
 		const hasValidationError =
 			isSingleLetterStageName ||
+			trimmedStageName.length > MAX_NAME_LENGTH ||
 			(trimmedStageName.length > 0 && !isAlphabeticName(trimmedStageName)) ||
+			hasInvalidDataCaptureName ||
 			!trimmedStageType ||
 			!trimmedStageStatus ||
 			!isValidHexColor(trimmedColorCode) ||
@@ -381,20 +431,26 @@ const StageConfiguration = ({
 									size="small"
 									label="Stage Name"
 									value={stageName}
-									onChange={(event) => onStageNameChange?.(event.target.value)}
+									onChange={(event) =>
+										handleStageNameInputChange(event.target.value)
+									}
 									error={
 										showValidation &&
 										(isSingleLetterTypedStageName ||
+											stageName.trim().length > MAX_NAME_LENGTH ||
 											(stageName.trim().length > 0 && !isAlphabeticName(stageName)))
 									}
 									helperText={
 										showValidation && isSingleLetterTypedStageName
 												? "Stage name cannot be a single letter"
+											: showValidation && stageName.trim().length > MAX_NAME_LENGTH
+												? "Maximum 50 characters allowed"
 											: showValidation && !isAlphabeticName(stageName)
 												&& stageName.trim().length > 0
 												? "Only letters and spaces are allowed"
 												: " "
 									}
+									inputProps={{ maxLength: MAX_NAME_LENGTH }}
 									sx={{
 										"& .MuiOutlinedInput-root": {
 											borderRadius: 1.4,
@@ -753,8 +809,29 @@ const StageConfiguration = ({
 										onChange={(event) =>
 											handleUpdateField(field.id, "fieldName", event.target.value)
 										}
+										error={
+											showValidation &&
+											(
+												!field.fieldName.trim() ||
+												field.fieldName.trim().length > MAX_NAME_LENGTH ||
+												!isAlphabeticName(field.fieldName)
+											)
+										}
+										helperText={
+											showValidation && !field.fieldName.trim()
+												? "Field name is required"
+												: showValidation && field.fieldName.trim().length > MAX_NAME_LENGTH
+													? "Maximum 50 characters allowed"
+													: showValidation && !isAlphabeticName(field.fieldName)
+														? "Only letters and spaces are allowed"
+														: " "
+										}
+										inputProps={{ maxLength: MAX_NAME_LENGTH }}
 										fullWidth
-										sx={{ mb: 1.2 }}
+										sx={{
+											mb: 1.2,
+											"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
+										}}
 									/>
 									<TextField
 										size="small"

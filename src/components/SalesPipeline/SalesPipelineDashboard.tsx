@@ -52,6 +52,7 @@ import {
 } from "./salesPipeline.utils";
 
 const SalesPipelineDashboard = () => {
+	const MAX_STAGE_NAME_LENGTH = 50;
 	const theme = useTheme();
 	const dispatch = useDispatch<AppDispatch>();
 	const clinic = useSelector(selectClinic);
@@ -362,6 +363,10 @@ const SalesPipelineDashboard = () => {
 			toast.error("Stage name cannot be a single letter.");
 			return false;
 		}
+		if (normalizedStageName.length > MAX_STAGE_NAME_LENGTH) {
+			toast.error("Stage name cannot exceed 50 characters.");
+			return false;
+		}
 		if (normalizedStageName && !isAlphabeticName(normalizedStageName)) {
 			toast.error("Stage name can contain only letters and spaces.");
 			return false;
@@ -539,6 +544,10 @@ const SalesPipelineDashboard = () => {
 			normalizedStageName.length === 1 && /^[A-Za-z]$/.test(normalizedStageName);
 		if (isSingleLetterStageName) {
 			toast.error("Stage name cannot be a single letter.");
+			return false;
+		}
+		if (normalizedStageName.length > MAX_STAGE_NAME_LENGTH) {
+			toast.error("Stage name cannot exceed 50 characters.");
 			return false;
 		}
 		if (normalizedStageName && !isAlphabeticName(normalizedStageName)) {
