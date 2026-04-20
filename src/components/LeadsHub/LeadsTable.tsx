@@ -203,6 +203,8 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
   const [selected, setSelected] = React.useState(currentStatus);
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const hasStatusOptions = statusOptions.length > 0;
+  const noStagesMessage =
+    "This pipeline has no stages. Please select a different pipeline or create one stage.";
 
   React.useEffect(() => {
     if (open) {
@@ -256,44 +258,51 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
         </Typography>
 
         {/* Custom trigger — shows selected chip + chevron */}
-        <Box
-          onClick={() => {
-            if (!hasStatusOptions) return;
-            setDropdownOpen((v) => !v);
-          }}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            border: `2px solid ${dropdownOpen ? selectedStyle.borderColor : "#E2E8F0"}`,
-            borderRadius: 2,
-            px: 1.5,
-            py: 0.75,
-            cursor: hasStatusOptions ? "pointer" : "not-allowed",
-            opacity: hasStatusOptions ? 1 : 0.7,
-            transition: "border-color 0.15s",
-            "&:hover": { borderColor: selectedStyle.borderColor },
-          }}
+        <Tooltip
+          title={hasStatusOptions ? "" : noStagesMessage}
+          placement="top"
+          arrow
+          disableHoverListener={hasStatusOptions}
         >
-          <Chip
-            label={selected}
-            size="small"
-            sx={getStatusOptionChipSx(selected)}
-          />
           <Box
-            component="span"
+            onClick={() => {
+              if (!hasStatusOptions) return;
+              setDropdownOpen((v) => !v);
+            }}
             sx={{
-              ml: 1,
-              fontSize: 18,
-              color: "#94A3B8",
-              transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.2s",
-              lineHeight: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              border: `2px solid ${dropdownOpen ? selectedStyle.borderColor : "#E2E8F0"}`,
+              borderRadius: 2,
+              px: 1.5,
+              py: 0.75,
+              cursor: hasStatusOptions ? "pointer" : "not-allowed",
+              opacity: hasStatusOptions ? 1 : 0.7,
+              transition: "border-color 0.15s",
+              "&:hover": { borderColor: selectedStyle.borderColor },
             }}
           >
-            ▾
+            <Chip
+              label={selected}
+              size="small"
+              sx={getStatusOptionChipSx(selected)}
+            />
+            <Box
+              component="span"
+              sx={{
+                ml: 1,
+                fontSize: 18,
+                color: "#94A3B8",
+                transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s",
+                lineHeight: 1,
+              }}
+            >
+              ▾
+            </Box>
           </Box>
-        </Box>
+        </Tooltip>
 
         {/* Dropdown list */}
         {dropdownOpen && (
@@ -354,20 +363,29 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
         >
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          onClick={() => onSave(selected)}
-          disabled={!hasStatusOptions}
-          sx={{
-            flex: 1,
-            borderRadius: 1,
-            backgroundColor: "#505050",
-            color: "#FFFFFF",
-            "&:hover": { backgroundColor: "#232323" },
-          }}
+        <Tooltip
+          title={hasStatusOptions ? "" : noStagesMessage}
+          placement="top"
+          arrow
+          disableHoverListener={hasStatusOptions}
         >
-          Save
-        </Button>
+          <span style={{ flex: 1 }}>
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={() => onSave(selected)}
+              disabled={!hasStatusOptions}
+              sx={{
+                borderRadius: 1,
+                backgroundColor: "#505050",
+                color: "#FFFFFF",
+                "&:hover": { backgroundColor: "#232323" },
+              }}
+            >
+              Save
+            </Button>
+          </span>
+        </Tooltip>
       </DialogActions>
     </Dialog>
   );

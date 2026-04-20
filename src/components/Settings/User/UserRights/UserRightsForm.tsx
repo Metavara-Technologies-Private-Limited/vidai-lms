@@ -450,15 +450,18 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
   const summaryRows = useMemo(() => {
     if (!activeRole) return [] as { label: string; perm: PermissionFlags }[];
-    const labels = Array.from(
-      new Set([
-        ...activeRole.rights.modules,
-        ...activeRole.rights.categories,
-        ...activeRole.rights.subCategories,
-      ]),
-    ).filter(shouldShowPermissionRow);
-    return labels.map((label) => ({ label, perm: activeRole.permissions[label] ?? emptyPerm() }));
-  }, [activeRole]);
+
+    // Always show the complete module list in summary view.
+    // Includes top-level modules (Dashboard, Campaign, Leads Hub, etc.) plus sub-modules.
+    // Selected permissions render green ticks; unselected stay as empty boxes.
+    const allModuleLabels = Array.from(new Set([...categories, ...subCategories]))
+      .filter(shouldShowPermissionRow);
+
+    return allModuleLabels.map((label) => ({
+      label,
+      perm: activeRole.permissions[label] ?? emptyPerm(),
+    }));
+  }, [activeRole, categories, subCategories]);
 
   const editRows = useMemo(() => {
     const labels = Array.from(
