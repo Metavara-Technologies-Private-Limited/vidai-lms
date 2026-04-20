@@ -377,6 +377,7 @@ const Leads: React.FC = () => {
       status: "",
       quality: "",
       source: "",
+      subSource: "",
       dateFrom: null,
       dateTo: null,
     };
@@ -1109,7 +1110,6 @@ const Leads: React.FC = () => {
                 style={{
                   width: 18,
                   height: 18,
-                  // invert icon to white when active on dark background
                   filter: "none",
                   transition: "filter 0.15s ease",
                 }}
