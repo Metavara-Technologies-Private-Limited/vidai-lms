@@ -78,6 +78,16 @@ const normalizeEmail = (value: string) => value.trim().toLowerCase();
 const isValidEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+const MAX_REPLY_SUBJECT_LENGTH = 150;
+const MAX_REPLY_MESSAGE_LENGTH = 500;
+
+const getPlainTextLength = (html: string): number => {
+  if (!html) return 0;
+  const temp = document.createElement("div");
+  temp.innerHTML = html;
+  return (temp.textContent || "").trim().length;
+};
+
 const TicketReplyEditor = ({
   openReply,
   fromEmail,
@@ -121,6 +131,7 @@ const TicketReplyEditor = ({
   const [bccInput, setBccInput] = useState("");
   const [ccAnchorEl, setCcAnchorEl] = useState<HTMLElement | null>(null);
   const [bccAnchorEl, setBccAnchorEl] = useState<HTMLElement | null>(null);
+  const replyMessageLength = getPlainTextLength(replyMessage);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -745,13 +756,39 @@ const TicketReplyEditor = ({
 
         <InputBase
           value={replySubject}
-          onChange={(e) => setReplySubject(e.target.value)}
+          onChange={(e) =>
+            setReplySubject(e.target.value.slice(0, MAX_REPLY_SUBJECT_LENGTH))
+          }
           placeholder="Enter subject"
           sx={{ flex: 1, fontSize: 14, fontWeight: 500 }}
+          inputProps={{ maxLength: MAX_REPLY_SUBJECT_LENGTH }}
         />
+
+        <Typography
+          fontSize={11}
+          color={
+            replySubject.length >= MAX_REPLY_SUBJECT_LENGTH
+              ? "error.main"
+              : "text.secondary"
+          }
+        >
+          {replySubject.length}/{MAX_REPLY_SUBJECT_LENGTH}
+        </Typography>
       </Box>
 
       {/* MESSAGE */}
+      <Box display="flex" justifyContent="flex-end" mt={0.75}>
+        <Typography
+          fontSize={11}
+          color={
+            replyMessageLength >= MAX_REPLY_MESSAGE_LENGTH
+              ? "error.main"
+              : "text.secondary"
+          }
+        >
+          {replyMessageLength}/{MAX_REPLY_MESSAGE_LENGTH}
+        </Typography>
+      </Box>
       <Box
         ref={editorRef}
         contentEditable

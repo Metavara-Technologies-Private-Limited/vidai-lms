@@ -112,6 +112,11 @@ const assigneeLabel = (option: AssigneeOption): string => {
   return secondary ? `${primary} (${secondary})` : primary;
 };
 
+const MAX_TICKET_SUBJECT_LENGTH = 150;
+const MAX_TICKET_DESCRIPTION_LENGTH = 500;
+const MAX_TICKET_REQUESTED_BY_LENGTH = 50;
+const MAX_TICKET_ASSIGNED_TO_LENGTH = 50;
+
 const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const dispatch = useDispatch<AppDispatch>();
   const user = useSelector(selectUser);
@@ -147,9 +152,14 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
   useEffect(() => {
     if (user?.first_name && user?.last_name) {
-      setRequestedBy(`${user.first_name} ${user.last_name}`);
+      setRequestedBy(
+        `${user.first_name} ${user.last_name}`.slice(
+          0,
+          MAX_TICKET_REQUESTED_BY_LENGTH,
+        ),
+      );
     } else if (user?.username) {
-      setRequestedBy(user.username);
+      setRequestedBy(user.username.slice(0, MAX_TICKET_REQUESTED_BY_LENGTH));
     }
   }, [user]);
 
@@ -228,6 +238,16 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
       return;
     }
 
+    if (subject.trim().length > MAX_TICKET_SUBJECT_LENGTH) {
+      toast.warn("Subject cannot exceed 150 characters.");
+      return;
+    }
+
+    if (description.trim().length > MAX_TICKET_DESCRIPTION_LENGTH) {
+      toast.warn("Description cannot exceed 500 characters.");
+      return;
+    }
+
     if (!labId) {
       toast.warn("Please select Lab!");
       return;
@@ -240,6 +260,11 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
     if (!requestedBy.trim()) {
       toast.warn("Please select Requested By!");
+      return;
+    }
+
+    if (requestedBy.trim().length > MAX_TICKET_REQUESTED_BY_LENGTH) {
+      toast.warn("Requested By cannot exceed 50 characters.");
       return;
     }
 
@@ -389,11 +414,22 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                   return;
                 }
 
-                setSubject(value);
+                setSubject(value.slice(0, MAX_TICKET_SUBJECT_LENGTH));
               }}
               fullWidth
               sx={createTicketFocusedFieldSx}
+              helperText={`${subject.length}/${MAX_TICKET_SUBJECT_LENGTH}`}
+              FormHelperTextProps={{
+                sx: {
+                  textAlign: "right",
+                  color:
+                    subject.length >= MAX_TICKET_SUBJECT_LENGTH
+                      ? "error.main"
+                      : "text.secondary",
+                },
+              }}
               InputLabelProps={{ shrink: true }}
+              inputProps={{ maxLength: MAX_TICKET_SUBJECT_LENGTH }}
               disabled={loading}
             />
 
@@ -409,16 +445,27 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                   return;
                 }
 
-                setDescription(value);
+                setDescription(value.slice(0, MAX_TICKET_DESCRIPTION_LENGTH));
               }}
               multiline
               minRows={1}
               maxRows={3}
               fullWidth
               sx={createTicketFocusedFieldSx}
+              helperText={`${description.length}/${MAX_TICKET_DESCRIPTION_LENGTH}`}
+              FormHelperTextProps={{
+                sx: {
+                  textAlign: "right",
+                  color:
+                    description.length >= MAX_TICKET_DESCRIPTION_LENGTH
+                      ? "error.main"
+                      : "text.secondary",
+                },
+              }}
               InputLabelProps={{
                 shrink: true,
               }}
+              inputProps={{ maxLength: MAX_TICKET_DESCRIPTION_LENGTH }}
               disabled={loading}
             />
 
@@ -503,6 +550,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                 fullWidth
                 sx={createTicketFocusedFieldSx}
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ maxLength: MAX_TICKET_REQUESTED_BY_LENGTH }}
                 disabled
               />
 
@@ -550,7 +598,9 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                   assigneeOptions.find((option) => option.id === assigneeId) ||
                   null
                 }
-                onInputChange={(_, value) => setAssigneeSearch(value)}
+                onInputChange={(_, value) =>
+                  setAssigneeSearch(value.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH))
+                }
                 onChange={(_, value) => setAssigneeId(value?.id ?? "")}
                 getOptionLabel={assigneeLabel}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
@@ -564,6 +614,10 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                     placeholder="Search assignee"
                     sx={createTicketFocusedFieldSx}
                     InputLabelProps={{ shrink: true }}
+                    inputProps={{
+                      ...params.inputProps,
+                      maxLength: MAX_TICKET_ASSIGNED_TO_LENGTH,
+                    }}
                   />
                 )}
               />
