@@ -52,6 +52,17 @@ const ticketTypes = [
   "Login creation",
 ];
 
+const MAX_TICKET_SUBJECT_LENGTH = 150;
+const MAX_TICKET_DESCRIPTION_LENGTH = 500;
+const MAX_TICKET_ASSIGNED_TO_LENGTH = 50;
+
+const getPlainTextFromHtml = (value: string): string => {
+  if (!value) return "";
+  const temp = document.createElement("div");
+  temp.innerHTML = value;
+  return (temp.textContent || "").trim();
+};
+
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 const uniqueEmails = (items: string[]) =>
@@ -286,7 +297,12 @@ const TicketView = () => {
         normalizedEmployees.find((emp) => emp.id === ticketData.assigned_to_id)
           ?.email || "",
       );
-      setDraftAssigneeName(ticketData.assigned_to_name || "");
+      setDraftAssigneeName(
+        (ticketData.assigned_to_name || "").slice(
+          0,
+          MAX_TICKET_ASSIGNED_TO_LENGTH,
+        ),
+      );
       setDescription(ticketData.description);
     } catch {
       setError("Failed to load ticket details from server.");
@@ -391,7 +407,9 @@ const TicketView = () => {
           status,
           priority,
           assigned_to: assignTo === "" ? null : assignTo,
-          assigned_to_name: draftAssigneeName || undefined,
+          assigned_to_name:
+            draftAssigneeName.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH) ||
+            undefined,
           type,
         });
 
@@ -436,6 +454,18 @@ const TicketView = () => {
 
     if (!replyFrom.trim()) {
       toast.warn("Clinic sender email is required in From.");
+      return;
+    }
+
+    const replyMessageText = getPlainTextFromHtml(replyMessage);
+
+    if (replySubject.trim().length > MAX_TICKET_SUBJECT_LENGTH) {
+      toast.warn("Subject cannot exceed 150 characters.");
+      return;
+    }
+
+    if (replyMessageText.length > MAX_TICKET_DESCRIPTION_LENGTH) {
+      toast.warn("Description cannot exceed 500 characters.");
       return;
     }
 
@@ -803,7 +833,9 @@ const TicketView = () => {
           setPriority={setPriority}
           assignTo={assignTo}
           setAssignTo={setAssignTo}
-          setAssigneeName={setDraftAssigneeName}
+          setAssigneeName={(name) =>
+            setDraftAssigneeName(name.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH))
+          }
           selectedAssigneeEmail={currentAssigneeEmail}
           canEdit={canEditTickets}
           handleUpdate={handleUpdate}
