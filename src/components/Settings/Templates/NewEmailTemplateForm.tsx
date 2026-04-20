@@ -473,6 +473,17 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       return;
     }
 
+    if (formData.subject.length > 150) {
+      toast.error('Subject cannot exceed 150 characters', { toastId: 'template-subject-limit' });
+      return;
+    }
+
+    const bodyTextLength = editor?.getText().length ?? 0;
+    if (bodyTextLength > 1000) {
+      toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+      return;
+    }
+
     // const clinicId = getClinicId();
 
     const apiPayload = {
@@ -552,14 +563,20 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       <Box sx={{ p: 3, maxHeight: '70vh', overflowY: 'auto' }}>
         {/* Name Field */}
         <Box sx={{ mb: 2.5 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
-            Name
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+              Name
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: formData.name.length >= 50 ? '#EF4444' : '#9CA3AF' }}>
+              {formData.name.length}/50
+            </Typography>
+          </Box>
           <TextField 
             fullWidth 
             size="small" 
             value={formData.name}
             disabled={isViewOnly}
+            inputProps={{ maxLength: 50 }}
             onChange={(e) => {
               const value = e.target.value;
               if (!TEMPLATE_NAME_REGEX.test(value)) {
@@ -572,7 +589,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
               '& .MuiOutlinedInput-root': {
                 fontSize: '14px',
                 bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
-                '& fieldset': { borderColor: '#E5E7EB' }
+                '& fieldset': { borderColor: formData.name.length >= 50 ? '#EF4444' : '#E5E7EB' }
               }
             }}
           />
@@ -645,20 +662,26 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
         {/* Subject Field */}
         <Box sx={{ mb: 2.5 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
-            Subject
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+              Subject
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: formData.subject.length > 150 ? '#EF4444' : '#9CA3AF' }}>
+              {formData.subject.length}/150
+            </Typography>
+          </Box>
           <TextField 
             fullWidth 
             size="small" 
             value={formData.subject}
             disabled={isViewOnly}
+            inputProps={{ maxLength: 150 }}
             onChange={(e) => { setFormData({ ...formData, subject: e.target.value }); }}
             sx={{ 
               '& .MuiOutlinedInput-root': {
                 fontSize: '14px',
                 bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
-                '& fieldset': { borderColor: '#E5E7EB' }
+                '& fieldset': { borderColor: formData.subject.length >= 150 ? '#EF4444' : '#E5E7EB' }
               }
             }}
           />
@@ -666,9 +689,14 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
         {/* Body Editor */}
         <Box sx={{ mb: 2.5 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
-            Body
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+              Body
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: (editor?.getText().length ?? 0) > 1000 ? '#EF4444' : '#9CA3AF' }}>
+              {editor?.getText().length ?? 0}/1000
+            </Typography>
+          </Box>
           <Box
             sx={{ 
               border: '1px solid #E5E7EB', 

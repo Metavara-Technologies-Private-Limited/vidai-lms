@@ -104,10 +104,14 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
   }, [initialData]); // Re-sync when initialData changes
 
   const handleInputChange = (field: string, value: string) => {
-    if (field === 'name' && !TEMPLATE_NAME_REGEX.test(value)) {
-      toast.error('Template name contain only alphbets', { toastId: 'template-name-alpha' });
-      return;
+    if (field === 'name') {
+      if (!TEMPLATE_NAME_REGEX.test(value)) {
+        toast.error('Template name contain only alphbets', { toastId: 'template-name-alpha' });
+        return;
+      }
+      if (value.length > 50) return;
     }
+    if (field === 'body' && value.length > 1000) return;
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -142,6 +146,16 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
 
     if (!formData.body.trim()) {
       toast.error('Body is required', { toastId: 'template-body-required' });
+      return;
+    }
+
+    if (formData.name.length > 50) {
+      toast.error('Name cannot exceed 50 characters', { toastId: 'template-name-limit' });
+      return;
+    }
+
+    if (formData.body.length > 1000) {
+      toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
       return;
     }
 
@@ -186,17 +200,23 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
 
       <Box className={styles.formBody} sx={{ p: 3 }}>
         <Box className={styles.formGroup} sx={{ mb: 2.5 }}>
-          <Typography className={styles.fieldLabel}>Name</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+            <Typography className={styles.fieldLabel} sx={{ mb: '0 !important' }}>Name</Typography>
+            <Typography sx={{ fontSize: '11px', color: formData.name.length >= 50 ? '#EF4444' : '#9CA3AF' }}>
+              {formData.name.length}/50
+            </Typography>
+          </Box>
           <OutlinedInput 
             fullWidth size="small" 
             placeholder="Enter template name"
             value={formData.name}
-            disabled={isViewOnly} 
+            disabled={isViewOnly}
+            inputProps={{ maxLength: 50 }}
             onChange={(e) => handleInputChange('name', e.target.value)}
             sx={{ 
               borderRadius: '8px',
               backgroundColor: isViewOnly ? '#F9FAFB' : '#fff',
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#E5E7EB' }
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: formData.name.length >= 50 ? '#EF4444' : '#E5E7EB' }
             }}
           />
         </Box>
@@ -227,16 +247,23 @@ export const NewSMSTemplateForm: React.FC<NewSMSTemplateFormProps> = ({ onClose,
         </Box>
 
         <Box className={styles.formGroup} sx={{ mb: 2.5 }}>
-          <Typography className={styles.fieldLabel}>Body</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+            <Typography className={styles.fieldLabel} sx={{ mb: '0 !important' }}>Body</Typography>
+            <Typography sx={{ fontSize: '11px', color: formData.body.length >= 1000 ? '#EF4444' : '#9CA3AF' }}>
+              {formData.body.length}/1000
+            </Typography>
+          </Box>
           <textarea 
             className={styles.textArea}
             rows={6}
             placeholder="Write your SMS message here..."
             value={formData.body}
-            disabled={isViewOnly} 
+            disabled={isViewOnly}
+            maxLength={1000}
             onChange={(e) => handleInputChange('body', e.target.value)}
             style={{ 
-              width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E5E7EB', 
+              width: '100%', padding: '12px', borderRadius: '8px',
+              border: `1px solid ${formData.body.length >= 1000 ? '#EF4444' : '#E5E7EB'}`,
               fontFamily: 'inherit', resize: 'vertical', backgroundColor: isViewOnly ? '#F9FAFB' : '#fff'
             }}
           />
