@@ -587,7 +587,8 @@ const SalesPipelineDashboard = () => {
 			const mappedFields = mapDataCaptureToFields(stageConfig?.dataCaptureFields);
 			await Promise.all([
 				mappedRules ? pipelineApi.saveStageRules(currentStageId, mappedRules) : Promise.resolve(),
-				mappedFields.length > 0 ? pipelineApi.saveStageFields(currentStageId, mappedFields) : Promise.resolve(),
+				// Always call saveStageFields — even with an empty array — so deleted fields are cleared on the backend
+				pipelineApi.saveStageFields(currentStageId, mappedFields),
 			]);
 			if (stageConfig?.colorCode) {
 				setStageColorOverrides((previous) => ({
