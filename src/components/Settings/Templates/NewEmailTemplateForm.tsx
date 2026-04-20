@@ -45,6 +45,7 @@ import { toast } from 'react-toastify';
 import { selectClinic } from '../../../store/clinicSlice';
 
 const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
+const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1000;
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
   const candidate = doc.file_url || doc.file || doc.url || '';
@@ -181,9 +182,18 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
+  const lastValidBodyHtmlRef = useRef('');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const initialEditorContent = normalizeEditorHtml(((initialData as any)?.body || (initialData as any)?.email_body || ''));
+
+  const canUpdateBody = (nextLength: number): boolean => {
+    if (nextLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
+      toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+      return false;
+    }
+    return true;
+  };
 
   // Sync formData when initialData changes (for edit/view mode)
   React.useEffect(() => {
@@ -251,6 +261,14 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     if (!editor) return;
 
     const update = () => {
+      const currentBodyLength = editor.getText().length;
+      if (currentBodyLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
+        editor.commands.setContent(lastValidBodyHtmlRef.current, { emitUpdate: false });
+        toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+        return;
+      }
+
+      lastValidBodyHtmlRef.current = editor.getHTML();
       setToolbarTick(t => t + 1);
 
       const heading: 'Tt' | 'H1' | 'H2' = editor.isActive('heading', { level: 1 })
@@ -283,6 +301,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   useEffect(() => {
     if (!editor) return;
     editor.commands.setContent(initialEditorContent, { emitUpdate: false });
+    lastValidBodyHtmlRef.current = initialEditorContent;
   }, [editor, initialEditorContent]);
 
   const handleColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -310,10 +329,105 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
   const onEmojiSelect = (emojiData: EmojiClickData) => {
     if (editor) {
+      const currentLength = editor.getText().length;
+      if (!canUpdateBody(currentLength + emojiData.emoji.length)) {
+        return;
+      }
       editor.chain().focus().insertContent(emojiData.emoji).run();
+      lastValidBodyHtmlRef.current = editor.getHTML();
     }
     handleEmojiClose();
   };
+
+  useEffect(() => {
+    if (!editor || isViewOnly) return;
+
+    const editableDom = editor.view.dom as HTMLElement;
+
+    const handleBeforeInput = (event: InputEvent) => {
+      const inputType = event.inputType || '';
+      const isDeleteAction =
+        inputType.startsWith('delete') ||
+        inputType === 'historyUndo' ||
+        inputType === 'historyRedo';
+
+      if (isDeleteAction) return;
+
+      const currentLength = editor.getText().length;
+      const incomingLength = event.data?.length ?? 0;
+
+      if (!canUpdateBody(currentLength + incomingLength)) {
+        event.preventDefault();
+      }
+    };
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const pastedText = event.clipboardData?.getData('text') ?? '';
+      const currentLength = editor.getText().length;
+
+      if (canUpdateBody(currentLength + pastedText.length)) return;
+
+      event.preventDefault();
+
+      const allowedLength = Math.max(0, MAX_EMAIL_TEMPLATE_BODY_LENGTH - currentLength);
+      if (allowedLength > 0) {
+        editor.chain().focus().insertContent(pastedText.slice(0, allowedLength)).run();
+        lastValidBodyHtmlRef.current = editor.getHTML();
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const currentLength = editor.getText().length;
+      const isModifier = event.ctrlKey || event.metaKey || event.altKey;
+      const isNavigationKey = [
+        'Backspace',
+        'Delete',
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+        'Home',
+        'End',
+        'PageUp',
+        'PageDown',
+        'Tab',
+        'Escape',
+      ].includes(event.key);
+
+      if (isModifier || isNavigationKey) return;
+
+      if (event.key.length === 1 && !canUpdateBody(currentLength + 1)) {
+        event.preventDefault();
+      }
+    };
+
+    const handleDrop = (event: DragEvent) => {
+      const droppedText = event.dataTransfer?.getData('text') ?? '';
+      if (!droppedText) return;
+
+      const currentLength = editor.getText().length;
+      if (canUpdateBody(currentLength + droppedText.length)) return;
+
+      event.preventDefault();
+      const allowedLength = Math.max(0, MAX_EMAIL_TEMPLATE_BODY_LENGTH - currentLength);
+      if (allowedLength > 0) {
+        editor.chain().focus().insertContent(droppedText.slice(0, allowedLength)).run();
+        lastValidBodyHtmlRef.current = editor.getHTML();
+      }
+    };
+
+    editableDom.addEventListener('beforeinput', handleBeforeInput as EventListener);
+    editableDom.addEventListener('paste', handlePaste as EventListener);
+    editableDom.addEventListener('keydown', handleKeyDown as EventListener);
+    editableDom.addEventListener('drop', handleDrop as EventListener);
+
+    return () => {
+      editableDom.removeEventListener('beforeinput', handleBeforeInput as EventListener);
+      editableDom.removeEventListener('paste', handlePaste as EventListener);
+      editableDom.removeEventListener('keydown', handleKeyDown as EventListener);
+      editableDom.removeEventListener('drop', handleDrop as EventListener);
+    };
+  }, [editor, isViewOnly]);
 
   const keepSelection = (event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
@@ -479,7 +593,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     }
 
     const bodyTextLength = editor?.getText().length ?? 0;
-    if (bodyTextLength > 1000) {
+    if (bodyTextLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
       toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
       return;
     }
@@ -693,8 +807,8 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
             <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
               Body
             </Typography>
-            <Typography sx={{ fontSize: '11px', color: (editor?.getText().length ?? 0) > 1000 ? '#EF4444' : '#9CA3AF' }}>
-              {editor?.getText().length ?? 0}/1000
+            <Typography sx={{ fontSize: '11px', color: (editor?.getText().length ?? 0) > MAX_EMAIL_TEMPLATE_BODY_LENGTH ? '#EF4444' : '#9CA3AF' }}>
+              {editor?.getText().length ?? 0}/{MAX_EMAIL_TEMPLATE_BODY_LENGTH}
             </Typography>
           </Box>
           <Box
