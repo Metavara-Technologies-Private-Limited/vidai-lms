@@ -9,6 +9,8 @@ import {
   CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -429,6 +431,35 @@ const Leads: React.FC = () => {
     localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "",
   );
   const attemptedClinicHydrationRef = React.useRef<Set<number>>(new Set());
+  const tabScrollRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = React.useState(false);
+  const [canScrollRight, setCanScrollRight] = React.useState(false);
+
+  const updateTabScrollState = React.useCallback(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, []);
+
+  React.useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    updateTabScrollState();
+    el.addEventListener("scroll", updateTabScrollState);
+    const ro = new ResizeObserver(updateTabScrollState);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateTabScrollState);
+      ro.disconnect();
+    };
+  }, [updateTabScrollState]);
+
+  const scrollTabs = React.useCallback((dir: "left" | "right") => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === "left" ? -120 : 120, behavior: "smooth" });
+  }, []);
 
   const industryOptions = React.useMemo(
     () =>
@@ -1208,37 +1239,102 @@ const Leads: React.FC = () => {
           minHeight: 40,
         }}
       >
-        <Stack
-          direction="row"
-          spacing={1}
-          className="pill-tabs"
+        {/* Scroll wrapper: arrows only on small screens */}
+        <Box
           sx={{
-            flexWrap: { xs: "wrap", lg: "nowrap" },
-            overflowX: { xs: "auto", lg: "visible" },
-            pb: { xs: 0.5, lg: 0 },
+            display: "flex",
             alignItems: "center",
-            height: 40,
+            flex: 1,
+            minWidth: 0,
+            position: "relative",
           }}
         >
-          {tabs.map((t, i) => (
-            <Box
-              key={i}
-              className={`pill-tab ${tab === i ? "active" : ""}`}
-              onClick={() => setTab(i)}
-              sx={{
-                flexShrink: 0,
-                height: 34,
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              {t.label}
-              {t.count !== null && (
-                <span className="tab-count">({t.count})</span>
-              )}
-            </Box>
-          ))}
-        </Stack>
+          {/* Left arrow — small screens only */}
+          <Box
+            className="tab-scroll-arrow tab-scroll-arrow-left"
+            onClick={() => scrollTabs("left")}
+            sx={{
+              display: { xs: canScrollLeft ? "flex" : "none", lg: "none" },
+              alignItems: "center",
+              justifyContent: "center",
+              width: 20,
+              height: 28,
+              flexShrink: 0,
+              cursor: "pointer",
+              color: "#6B7280",
+              "&:hover": { color: "#EA580C" },
+            }}
+          >
+            <ChevronLeftIcon sx={{ fontSize: 16 }} />
+          </Box>
+
+          {/* Scrollable tab strip */}
+          <Box
+            ref={tabScrollRef}
+            className="pill-tabs-scroll"
+            sx={{
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "nowrap",
+              overflowX: "auto",
+              flex: 1,
+              minWidth: 0,
+              alignItems: "center",
+              pb: { xs: "3px", lg: 0 },
+              /* thin scrollbar only on small screens */
+              scrollbarWidth: { xs: "thin", lg: "none" } as never,
+              scrollbarColor: "#D1D5DB transparent",
+              "&::-webkit-scrollbar": {
+                height: { xs: "3px", lg: "0px" },
+              },
+              "&::-webkit-scrollbar-track": {
+                background: "transparent",
+              },
+              "&::-webkit-scrollbar-thumb": {
+                background: "#D1D5DB",
+                borderRadius: "4px",
+              },
+            }}
+          >
+            {tabs.map((t, i) => (
+              <Box
+                key={i}
+                className={`pill-tab ${tab === i ? "active" : ""}`}
+                onClick={() => setTab(i)}
+                sx={{
+                  flexShrink: 0,
+                  height: 34,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {t.label}
+                {t.count !== null && (
+                  <span className="tab-count">({t.count})</span>
+                )}
+              </Box>
+            ))}
+          </Box>
+
+          {/* Right arrow — small screens only */}
+          <Box
+            className="tab-scroll-arrow tab-scroll-arrow-right"
+            onClick={() => scrollTabs("right")}
+            sx={{
+              display: { xs: canScrollRight ? "flex" : "none", lg: "none" },
+              alignItems: "center",
+              justifyContent: "center",
+              width: 20,
+              height: 28,
+              flexShrink: 0,
+              cursor: "pointer",
+              color: "#6B7280",
+              "&:hover": { color: "#EA580C" },
+            }}
+          >
+            <ChevronRightIcon sx={{ fontSize: 16 }} />
+          </Box>
+        </Box>
 
         {/* PIPELINE SELECTORS */}
         <Stack

@@ -176,16 +176,17 @@
    PILL TABS
 ================================ */
 
-.pill-tabs {
+.pill-tabs,
+.pill-tabs-scroll {
   display: flex;
-  gap: 8px;
+  gap: 0;
   margin-bottom: 0 !important;
   min-width: 0;
 }
 
 .pill-tab {
-  height: 36px;              
-  padding: 0 12px;
+  height: 34px;              
+  padding: 0 10px;
   border-radius: 10px;
   border: 1px solid #E5E7EB;
   cursor: pointer;
@@ -198,7 +199,9 @@
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+  flex-shrink: 0;
   line-height: 1;
+  margin-right: 6px;
 }
 
 .pill-tab:hover {
@@ -218,9 +221,24 @@
   color: inherit;
 }
 
+@media (max-width: 900px) {
+  .pill-tab {
+    font-size: 11px;
+    padding: 0 8px;
+    height: 30px;
+    border-radius: 8px;
+    margin-right: 4px;
+  }
+
+  .tab-count {
+    font-size: 11px;
+  }
+}
+
 @media (min-width: 1200px) {
   .pill-tab {
-    padding: 8px 10px;
+    padding: 0 14px;
+    height: 36px;
   }
 }
 
