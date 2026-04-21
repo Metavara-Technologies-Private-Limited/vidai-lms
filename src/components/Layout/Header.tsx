@@ -15,10 +15,13 @@ import {
   Stack,
   Toolbar,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import MenuIcon from "@mui/icons-material/Menu";
 
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import NotificationIcon from "@/assets/icons/notification.svg";
@@ -51,9 +54,20 @@ import { toSafePhotoUrl } from "../../utils/mediaUrl";
 
 const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
 
-const Header = () => {
+type HeaderProps = {
+  showSidebarToggle?: boolean;
+  onSidebarToggle?: () => void;
+};
+
+const Header = ({
+  showSidebarToggle = false,
+  onSidebarToggle,
+}: HeaderProps) => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMdDown = useMediaQuery(theme.breakpoints.down("md"));
+  const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
   const user = useSelector(selectUser);
   const dbClinic = useSelector(selectClinic);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
@@ -402,14 +416,56 @@ const Header = () => {
         color: "text.primary",
       }}
     >
-      <Toolbar sx={{ justifyContent: "space-between", py: 2 }}>
+      <Toolbar
+        sx={{
+          justifyContent: "space-between",
+          py: 2,
+          px: { xs: 1.5, sm: 2 },
+          gap: 1.5,
+          flexWrap: { xs: "wrap", lg: "nowrap" },
+          alignItems: { xs: "flex-start", lg: "center" },
+        }}
+      >
         {/* LEFT: Breadcrumbs */}
-        <Box sx={{ display: "flex", alignItems: "center" }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            minWidth: 0,
+            flex: { xs: "1 1 100%", lg: "1 1 auto" },
+          }}
+        >
+          {showSidebarToggle && (
+            <IconButton
+              onClick={onSidebarToggle}
+              aria-label="Open sidebar"
+              sx={{
+                width: 42,
+                height: 42,
+                bgcolor: "#FFFFFF",
+                border: "1px solid #E5E7EB",
+                borderRadius: 2,
+                flexShrink: 0,
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
           <DynamicBreadcrumbs />
         </Box>
 
         {/* RIGHT */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: { xs: "space-between", md: "flex-end" },
+            gap: { xs: 1, sm: 1.5, md: 2 },
+            flexWrap: "wrap",
+            width: { xs: "100%", lg: "auto" },
+          }}
+        >
           <Box>
             <Box
               onClick={handleClinicOpen}
@@ -419,12 +475,20 @@ const Header = () => {
                 gap: 1,
                 cursor: "pointer",
                 background: "#f3f4f6",
-                px: 2,
+                px: { xs: 1.25, sm: 2 },
                 py: 1,
                 borderRadius: 2,
+                maxWidth: { xs: "100%", sm: 260 },
               }}
             >
-              <Typography variant="body2">
+              <Typography
+                variant="body2"
+                sx={{
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
                 Clinic: <b>{displayClinicName}</b>
               </Typography>
               <ArrowDropDownIcon />
@@ -454,13 +518,13 @@ const Header = () => {
               key={type}
               onClick={(e) => handleIconClick(e, type)}
               sx={{
-                width: 48,
-                height: 48,
+                width: isSmDown ? 42 : 48,
+                height: isSmDown ? 42 : 48,
                 backgroundColor: "#fff",
                 borderRadius: 1,
               }}
             >
-              <Box component="img" src={icon} width={24} />
+              <Box component="img" src={icon} width={isSmDown ? 20 : 24} />
             </IconButton>
           ))}
 
@@ -491,14 +555,14 @@ const Header = () => {
               }}
               onClick={handleUserMenuOpen}
             >
-              <Box sx={{ display: { xs: "none", sm: "block" } }}>
+              <Box sx={{ display: { xs: "none", md: "block" } }}>
                 <Typography fontWeight={600}>{displayUserName}</Typography>
 
                 <Typography fontSize={12} color="#6b7280">
                   {user?.designation_label || user?.designation || "—"}
                 </Typography>
               </Box>
-              <IconButton size="small">
+              <IconButton size="small" sx={{ p: isMdDown ? 0.5 : 1 }}>
                 <ArrowDropDownIcon />
               </IconButton>
             </Box>

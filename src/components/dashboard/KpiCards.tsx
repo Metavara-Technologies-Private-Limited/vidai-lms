@@ -2,10 +2,12 @@ import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
+import { useTheme } from "@mui/material/styles";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
 import NewLeadsIcon from "../../assets/icons/NewLeads.svg";
@@ -136,6 +138,8 @@ const formatCount = (value: number) => new Intl.NumberFormat("en-IN").format(val
 const KpiCards = () => {
   const leads = useSelector(selectLeads);
   const sourceLeads = useMemo<Lead[]>(() => (Array.isArray(leads) ? (leads as Lead[]) : []), [leads]);
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -290,7 +294,7 @@ const KpiCards = () => {
 
   return (
     <Box sx={{ position: "relative", width: "100%", px: 1 }}>
-      {showLeftArrow && (
+      {!isSmallScreen && showLeftArrow && (
         <IconButton
           onClick={handleScrollLeft}
           sx={{
@@ -333,7 +337,13 @@ const KpiCards = () => {
         ]}
       >
         {dynamicKpis.map((item) => {
-          const cardWidth = item.id === "totalConverted" ? 280 : 170;
+          const cardWidth = isSmallScreen
+            ? item.id === "totalConverted"
+              ? 240
+              : 148
+            : item.id === "totalConverted"
+              ? 280
+              : 170;
 
           return (
             <Card
@@ -345,6 +355,8 @@ const KpiCards = () => {
                   flexShrink: 0,
                   width: cardWidth,
                   minWidth: cardWidth,
+                  height: isSmallScreen ? 112 : 120,
+                  p: isSmallScreen ? 1.25 : 1.5,
                 },
               ]}
             >
@@ -387,7 +399,7 @@ const KpiCards = () => {
         })}
       </Box>
 
-      {showRightArrow && (
+      {!isSmallScreen && showRightArrow && (
         <IconButton
           onClick={handleScrollRight}
           sx={{

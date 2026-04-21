@@ -90,7 +90,14 @@ const ReviewRequestStepDetails = ({
 
   return (
     <Box>
-      <Box sx={{ display: "flex", gap: 1.5, mb: 1.5 }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+          gap: 1.5,
+          mb: 1.5,
+        }}
+      >
         <TextField
           size="small"
           fullWidth
@@ -118,7 +125,7 @@ const ReviewRequestStepDetails = ({
         onChange={(e) =>
           onLeadSelectionTypeChange(e.target.value as "all" | "manual")
         }
-        sx={{ mb: 1.5 }}
+        sx={{ mb: 1.5, flexDirection: { xs: "column", sm: "row" } }}
       >
         <FormControlLabel
           value="all"
@@ -132,7 +139,15 @@ const ReviewRequestStepDetails = ({
         />
       </RadioGroup>
 
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: { xs: "stretch", sm: "center" },
+          flexDirection: { xs: "column", sm: "row" },
+          gap: 1,
+          mb: 1.5,
+        }}
+      >
         <Autocomplete<Lead, true, false, false>
           multiple
           disableCloseOnSelect
@@ -246,11 +261,11 @@ const ReviewRequestStepDetails = ({
               }
             />
           )}
-          sx={{ flex: 1 }}
+          sx={{ flex: 1, width: "100%" }}
         />
 
         <IconButton
-          sx={{ p: 0 }}
+          sx={{ p: 0, alignSelf: { xs: "flex-end", sm: "center" } }}
           onClick={(event) => setFilterAnchorEl(event.currentTarget)}
         >
           <img

@@ -8,6 +8,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .title {
@@ -20,13 +22,15 @@
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
 }
 
 /* Search Field Styling */
 .searchField :global(.MuiOutlinedInput-root) {
   background-color: white;
   border-radius: 8px;
-  width: 320px;
+  width: min(320px, 100%);
   font-size: 14px;
 }
 
@@ -58,6 +62,7 @@
 /* Tabs Styling */
 .tabsWrapper {
   margin-top: 10px;
+  overflow-x: auto;
 }
 
 .tabItem {
@@ -88,4 +93,16 @@
 
 .tabsList :global(.MuiTabs-flexContainer) {
   gap: 0;
+}
+
+@media (max-width: 768px) {
+  .actions {
+    align-items: stretch;
+  }
+
+  .searchField,
+  .searchField :global(.MuiOutlinedInput-root),
+  .newTemplateBtn {
+    width: 100%;
+  }
 }

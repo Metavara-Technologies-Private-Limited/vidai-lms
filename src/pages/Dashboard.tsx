@@ -6,7 +6,8 @@ const Dashboard = () => {
     <Box
       sx={{
         width: "auto",
-        height: "100%",
+        height: "auto",
+        minHeight: 0,
         overflowY: "auto",
         paddingBottom: 4,
       }}

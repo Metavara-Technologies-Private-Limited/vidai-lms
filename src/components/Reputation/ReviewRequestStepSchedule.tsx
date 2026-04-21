@@ -65,7 +65,7 @@ const ReviewRequestStepSchedule = ({
           row
           value={formData.is_scheduled}
           onChange={(e) => onScheduleToggle(e.target.value as "yes" | "no")}
-          sx={{ mb: 1.75 }}
+          sx={{ mb: 1.75, flexDirection: { xs: "column", sm: "row" } }}
         >
           <FormControlLabel
             value="yes"
@@ -79,7 +79,13 @@ const ReviewRequestStepSchedule = ({
           />
         </RadioGroup>
 
-        <Box sx={{ display: "flex", gap: 1.5 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+            gap: 1.5,
+          }}
+        >
           <DatePicker
             label="Select Date"
             disabled={isDisabled}

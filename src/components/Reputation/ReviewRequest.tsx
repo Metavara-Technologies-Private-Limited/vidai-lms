@@ -649,6 +649,7 @@ Please share your valuable feedback here:
           maxHeight: "92vh",
           display: "flex",
           flexDirection: "column",
+          m: { xs: 1.5, sm: 2 },
         },
       }}
     >
@@ -668,7 +669,7 @@ Please share your valuable feedback here:
         </IconButton>
       </Box>
 
-      <DialogContent sx={{ p: "0 20px", overflowY: "auto" }}>
+      <DialogContent sx={{ px: { xs: 2, sm: 2.5 }, py: 0, overflowY: "auto" }}>
         <ReviewRequestStepper step={step} />
 
         {step === 1 && (
@@ -792,9 +793,11 @@ Please share your valuable feedback here:
 
       <Box
         sx={{
-          p: "16px 20px",
+          p: { xs: 2, sm: "16px 20px" },
           display: "flex",
           gap: 2,
+          flexDirection: { xs: "column-reverse", sm: "row" },
+          alignItems: "stretch",
           borderTop: "1px solid #F3F4F6",
         }}
       >
@@ -804,6 +807,7 @@ Please share your valuable feedback here:
           disabled={isSubmitting}
           sx={{
             flex: 1,
+            width: { xs: "100%", sm: "auto" },
             borderRadius: "8px",
             textTransform: "none",
             height: 44,
@@ -821,6 +825,7 @@ Please share your valuable feedback here:
           disabled={isSubmitting}
           sx={{
             flex: 1,
+            width: { xs: "100%", sm: "auto" },
             background: "#F3F4F6",
             color: "#4B5563",
             borderRadius: "8px",
@@ -841,6 +846,7 @@ Please share your valuable feedback here:
           disabled={isSubmitting}
           sx={{
             flex: 1.2,
+            width: { xs: "100%", sm: "auto" },
             background: "#4D4D4D",
             borderRadius: "8px",
             textTransform: "none",
