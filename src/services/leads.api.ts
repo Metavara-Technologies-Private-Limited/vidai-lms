@@ -85,7 +85,7 @@ export type LeadPayload = {
   campaign_id?: string | null;
   assigned_to_id?: number | null;
   assigned_to_name?: string | null;
-  lead_generated_by?: string;
+  // lead_generated_by removed — backend Lead model has no such field
   personal_id?: number | null;
   personal_name?: string | null;
   full_name: string;
@@ -102,7 +102,18 @@ export type LeadPayload = {
   partner_gender?: "male" | "female" | null;
   source: string;
   sub_source?: string;
-  lead_status?: "new" | "contacted" | "appointment";
+  lead_status?:
+    | "new"
+    | "contacted"
+    | "appointment"
+    | "follow up"
+    | "negotiation"
+    | "proposal sent"
+    | "contract signed"
+    | "converted"
+    | "cycle_conversion"
+    | "lost"
+    | "lost lead";
   next_action_status?: "pending" | "completed" | null;
   next_action_description?: string;
   next_action_type?: string;
@@ -113,6 +124,15 @@ export type LeadPayload = {
   remark?: string;
   is_active: boolean;
   referral_department_id?: number | null;
+};
+
+// Referral source object — sent alongside payload for contracts app
+// Backend reads this from request.data.get("referral_source")
+export type ReferralSourceObject = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
 };
 
 // ====================== Lead Email Types ======================
@@ -163,11 +183,6 @@ export type LeadMailListItem = {
 };
 
 // ====================== Token Helpers ======================
-/**
- * Checks multiple common key names in priority order so the fix works
- * regardless of which key the login flow originally wrote.
- * Priority: auth_token → access_token → access → token
- */
 const TOKEN_KEYS = ["auth_token", "access_token", "access", "token"] as const;
 const REFRESH_KEYS = ["refresh_token", "refresh"] as const;
 
@@ -187,10 +202,6 @@ export const getRefreshToken = (): string | null => {
   return null;
 };
 
-/**
- * Persist tokens — writes to both the canonical key and aliases so
- * any part of the app that reads any key gets the fresh value.
- */
 export const setTokens = (access: string, refresh?: string): void => {
   localStorage.setItem("auth_token", access);
   localStorage.setItem("access_token", access);
@@ -214,7 +225,7 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// ── Request interceptor — attach token to EVERY outgoing request ──────────────
+// ── Request interceptor ───────────────────────────────────────────────────────
 api.interceptors.request.use(
   (config) => {
     const token = getAccessToken();
@@ -231,7 +242,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// ── Response interceptor — normalise errors + refresh token on 401 ────────────
+// ── Response interceptor ──────────────────────────────────────────────────────
 let isRefreshing = false;
 let refreshQueue: Array<{
   resolve: (token: string) => void;
@@ -286,7 +297,6 @@ api.interceptors.response.use(
       );
     }
 
-    // ── 401: attempt silent token refresh ────────────────────────────────────
     const originalRequest = error.config as AxiosRequestConfig & {
       _retry?: boolean;
     };
@@ -308,7 +318,6 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Queue subsequent requests while refresh is in-flight
       if (isRefreshing) {
         return new Promise<string>((resolve, reject) => {
           refreshQueue.push({ resolve, reject });
@@ -323,7 +332,6 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Plain axios — bypasses our interceptors to avoid an infinite loop
         const { data } = await axios.post(
           `${API_BASE_URL}/token/refresh/`,
           { refresh: refreshToken },
@@ -359,18 +367,32 @@ export const LeadAPI = {
   list: (clinicId: number) =>
     api.get(`/leads/list/?clinic_id=${clinicId}`).then((res) => res.data),
 
-  create: async (data: LeadPayload): Promise<Lead> => {
+  // ── FIX: send X-Clinic-Id header + support referral_source object ──────────
+  create: async (
+    data: LeadPayload,
+    referralSource?: ReferralSourceObject,
+  ): Promise<Lead> => {
+    const body = referralSource
+      ? { ...data, referral_source: referralSource }
+      : data;
     const response = await api.post<Lead>(
       `/leads/?clinic_id=${data.clinic_id}`,
-      data,
+      body,
+      {
+        headers: {
+          "X-Clinic-Id": String(data.clinic_id),
+        },
+      },
     );
     console.log("✅ Lead created:", response.data);
     return response.data;
   },
 
+  // ── FIX: send X-Clinic-Id header + referral_source as JSON string in FormData
   createWithDocuments: async (
     data: LeadPayload,
     files: File[],
+    referralSource?: ReferralSourceObject,
   ): Promise<Lead> => {
     const formData = new FormData();
     (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
@@ -379,11 +401,20 @@ export const LeadAPI = {
         formData.append(key, String(value));
       }
     });
+    // referral_source must be JSON stringified in multipart FormData
+    if (referralSource) {
+      formData.append("referral_source", JSON.stringify(referralSource));
+    }
     files.forEach((file) => formData.append("documents", file));
     const response = await api.post<Lead>(
       `/leads/?clinic_id=${data.clinic_id}`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Clinic-Id": String(data.clinic_id),
+        },
+      },
     );
     console.log("✅ Lead + documents created:", response.data);
     return response.data;
@@ -401,6 +432,11 @@ export const LeadAPI = {
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       data,
+      {
+        headers: {
+          "X-Clinic-Id": String(clinicId),
+        },
+      },
     );
     return response.data;
   },
@@ -421,7 +457,12 @@ export const LeadAPI = {
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Clinic-Id": String(clinicId),
+        },
+      },
     );
     console.log("✅ Lead + documents updated:", response.data);
     return response.data;
@@ -450,7 +491,12 @@ export const LeadAPI = {
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${storedClinicId()}`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Clinic-Id": String(storedClinicId()),
+        },
+      },
     );
     return response.data;
   },
@@ -473,10 +519,16 @@ export const LeadAPI = {
     };
     Object.entries(safeFields).forEach(([k, v]) => formData.append(k, v));
     files.forEach((file) => formData.append("documents", file));
+    const clinicId = current.clinic_id ?? storedClinicId();
     const response = await api.put<Lead>(
-      `/leads/${leadId}/update/?clinic_id=${current.clinic_id ?? storedClinicId()}`,
+      `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Clinic-Id": String(clinicId),
+        },
+      },
     );
     return response.data;
   },
