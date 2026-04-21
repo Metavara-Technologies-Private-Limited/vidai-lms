@@ -209,9 +209,10 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       PaperProps={{
         sx: {
           borderRadius: "12px",
-          width: "580px",
-          maxWidth: "90vw",
+          width: { xs: "calc(100vw - 24px)", sm: "580px" },
+          maxWidth: "calc(100vw - 24px)",
           maxHeight: "90vh",
+          m: { xs: 1.5, sm: 2 },
         },
       }}
     >
@@ -234,11 +235,11 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       </Box>
 
       {/* Content */}
-      <DialogContent sx={{ px: 3, py: 0, pb: 2 }}>
+      <DialogContent sx={{ px: { xs: 2, sm: 3 }, py: 0, pb: 2 }}>
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {/* Row 1: From Date & To Date */}
-            <Box sx={{ display: "flex", gap: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>From Date</Typography>
                 <DatePicker
@@ -275,7 +276,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
             </Box>
 
             {/* Row 2: Lead Quality & Status */}
-            <Box sx={{ display: "flex", gap: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Lead Quality</Typography>
                 <TextField
@@ -320,7 +321,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
             </Box>
 
             {/* Row 3: Location & Assignee */}
-            <Box sx={{ display: "flex", gap: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Location</Typography>
                 <TextField
@@ -366,7 +367,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
             </Box>
 
             {/* Row 4: Source & Sub-Source */}
-            <Box sx={{ display: "flex", gap: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={labelStyle}>Source</Typography>
                 <TextField
@@ -433,7 +434,16 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       </DialogContent>
 
       {/* Actions */}
-      <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 2 }}>
+      <DialogActions
+        sx={{
+          px: { xs: 2, sm: 3 },
+          pb: 3,
+          pt: 1,
+          gap: 2,
+          flexDirection: { xs: "column-reverse", sm: "row" },
+          alignItems: "stretch",
+        }}
+      >
         <Button
           onClick={handleClearAll}
           fullWidth

@@ -65,6 +65,8 @@ import {
 import { getStatusChipSx, getTaskStatusChipSx } from "./LeadsTable.styles";
 import { SMSDialog } from "./SmsDialogs";
 import { EmailDialog } from "./EmailDialogs";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 
 // ── App-type config ───────────────────────────────────────────────────────────
 import { IS_CONTRACTS_APP, ACTIVE_STATUS_OPTIONS } from "../../config/appType";
@@ -401,6 +403,21 @@ const LeadsTable: React.FC<Props> = ({
   selectedIndustry = "",
   selectedPipelineId = "",
 }) => {
+  const theme = useTheme();
+  const disableStickyActions = useMediaQuery(theme.breakpoints.down("md"));
+  const contactCellStyle = disableStickyActions
+    ? { bgcolor: "#FFFFFF" }
+    : stickyContactStyle;
+  const menuCellStyle = disableStickyActions
+    ? { bgcolor: "#FFFFFF" }
+    : stickyMenuStyle;
+  const contactHeaderStyle = disableStickyActions
+    ? { bgcolor: "#F8FAFC" }
+    : stickyHeaderContactStyle;
+  const menuHeaderStyle = disableStickyActions
+    ? { bgcolor: "#F8FAFC" }
+    : stickyHeaderMenuStyle;
+
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -1334,10 +1351,10 @@ const LeadsTable: React.FC<Props> = ({
                   </Box>
                 </Box>
               </TableCell>
-              <TableCell align="center" sx={stickyHeaderContactStyle}>
+              <TableCell align="center" sx={contactHeaderStyle}>
                 Contact Option
               </TableCell>
-              <TableCell align="center" sx={stickyHeaderMenuStyle} />
+              <TableCell align="center" sx={menuHeaderStyle} />
             </TableRow>
           </TableHead>
 
@@ -1492,7 +1509,7 @@ const LeadsTable: React.FC<Props> = ({
 
                 <TableCell
                   align="center"
-                  sx={stickyContactStyle}
+                  sx={contactCellStyle}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Stack direction="row" spacing={1} justifyContent="center">
@@ -1538,7 +1555,7 @@ const LeadsTable: React.FC<Props> = ({
 
                 <TableCell
                   align="center"
-                  sx={stickyMenuStyle}
+                  sx={menuCellStyle}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MenuButton

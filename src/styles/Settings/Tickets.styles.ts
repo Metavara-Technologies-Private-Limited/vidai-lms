@@ -10,7 +10,8 @@ export const ticketsSearchBoxSx = {
   height: 34,
   border: "1px solid #E0E0E0",
   borderRadius: "6px",
-  width: 220,
+  width: { xs: "100%", sm: 220 },
+  minWidth: 0,
 
   "& input": {
     fontSize: "13px",
@@ -32,6 +33,7 @@ export const createTicketButtonSx = {
   textTransform: "none",
   color: "#FFFFFF",
   backgroundColor: "#505050",
+  width: { xs: "100%", sm: "auto" },
 
   "& .MuiButton-startIcon": {
     marginRight: "4px",
@@ -48,8 +50,9 @@ export const ticketsTabsSx = {
   minHeight: 36,
   height: 36,
 
-  width: "fit-content", // ✅ KEY: stop Tabs from stretching
+  width: { xs: "100%", md: "fit-content" }, // ✅ KEY: stop Tabs from stretching
   flexShrink: 0, // ✅ prevent flex expanding
+  overflowX: "auto",
 
   "& .MuiTabs-flexContainer": {
     height: 36,
@@ -157,6 +160,7 @@ export const ticketsActionsRowSx = {
   flexWrap: "wrap",
   rowGap: 1,
   columnGap: 1,
+  alignItems: { xs: "stretch", md: "center" },
 };
 
 /*  Column header text */

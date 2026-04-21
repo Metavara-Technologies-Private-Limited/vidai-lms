@@ -6,7 +6,8 @@ const Reputation = () => {
     <Box
       sx={{
         width: "auto",
-        height: "100%",
+        height: "auto",
+        minHeight: 0,
         overflowY: "auto",
         pb: 2,
       }}

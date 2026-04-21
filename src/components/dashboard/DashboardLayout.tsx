@@ -49,10 +49,10 @@ const DashboardLayout = () => {
         display: "grid",
         gridTemplateColumns: {
           xs: "1fr",
-          md: "minmax(0, 3fr) minmax(300px, 1fr)",
+          xl: "minmax(0, 3fr) minmax(320px, 1fr)",
         },
         gap: 2,
-        height: "100%",
+        height: "auto",
         minWidth: 0,
         alignItems: "stretch",
       }}
@@ -74,7 +74,7 @@ const DashboardLayout = () => {
         <KpiCards />
         <Card
           sx={{
-            p: 2,
+            p: { xs: 1.25, sm: 2 },
             mt: 2,
             border: "1px solid",
             borderColor: "rgba(0, 0, 0, 0.05)",
@@ -88,7 +88,9 @@ const DashboardLayout = () => {
           <Box
             display="flex"
             justifyContent="space-between"
-            alignItems="center"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            flexWrap="wrap"
+            gap={1.25}
             mb={2}
           >
             <Typography fontWeight={600}>Overview</Typography>
@@ -134,7 +136,14 @@ const DashboardLayout = () => {
       </Box>
 
       {/* RIGHT SLA CARD */}
-      <Card sx={{ p: 2, overflow: "auto" }}>
+      <Card
+        sx={{
+          p: { xs: 1.25, sm: 2 },
+          overflow: "auto",
+          minWidth: 0,
+          minHeight: { xs: 320, md: 360 },
+        }}
+      >
         <SlaAlerts />
       </Card>
     </Box>

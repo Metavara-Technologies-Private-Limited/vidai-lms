@@ -429,7 +429,7 @@ const ReputationDashboard = () => {
   }, [dispatch, _reputationClinic?.id]);
 
   return (
-    <Box sx={{ p: 0.5 }}>
+    <Box sx={{ p: { xs: 0.25, sm: 0.5 } }}>
       {/* Page Title */}
       {!openReviewDetails && (
         <Typography variant="h5" sx={{ mb: 3 }}>
@@ -452,7 +452,7 @@ const ReputationDashboard = () => {
           <Box
             sx={{
               display: "flex",
-              alignItems: "center",
+              alignItems: { xs: "stretch", sm: "center" },
               justifyContent: "space-between",
               mb: 2,
               gap: 2,
@@ -473,9 +473,11 @@ const ReputationDashboard = () => {
             <Box
               sx={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: { xs: "stretch", sm: "center" },
+                flexDirection: { xs: "column", sm: "row" },
                 gap: 1,
-                ml: "auto",
+                ml: { xs: 0, sm: "auto" },
+                width: { xs: "100%", sm: "auto" },
               }}
             >
               <TextField
@@ -485,7 +487,7 @@ const ReputationDashboard = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 sx={{
                   width: { xs: "100%", sm: 260 },
-                  minWidth: { xs: 220, sm: 260 },
+                  minWidth: { xs: 0, sm: 260 },
                   "& .MuiOutlinedInput-root": {
                     borderRadius: "10px",
                     backgroundColor: "#fff",
@@ -525,6 +527,7 @@ const ReputationDashboard = () => {
                   backgroundColor: "#505050",
                   color: "#fff",
                   whiteSpace: "nowrap",
+                  width: { xs: "100%", sm: "auto" },
                   "&:hover": {
                     backgroundColor: "#232323",
                   },
@@ -561,7 +564,11 @@ const ReputationDashboard = () => {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: "repeat(3,1fr)",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                xl: "repeat(3, minmax(0, 1fr))",
+              },
               gap: 2,
             }}
           >

@@ -1056,12 +1056,18 @@ const Leads: React.FC = () => {
       {/* HEADER */}
       <Stack
         className="leads-header"
-        direction="row"
+        direction={{ xs: "column", lg: "row" }}
         justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 3, flexWrap: "nowrap", minWidth: 0, width: "100%", gap: 2 }}
+        alignItems={{ xs: "stretch", lg: "center" }}
+        sx={{
+          mb: 3,
+          flexWrap: "wrap",
+          minWidth: 0,
+          width: "100%",
+          gap: 2,
+        }}
       >
-        <Typography className="leads-title" sx={{ flexShrink: 0 }}>
+        <Typography className="leads-title" sx={{ flexShrink: 0, minWidth: 0 }}>
           Leads Hub
         </Typography>
 
@@ -1069,15 +1075,21 @@ const Leads: React.FC = () => {
           direction="row"
           alignItems="center"
           spacing={1.5}
-          sx={{ flexShrink: 0, flexWrap: "nowrap" }}
+          sx={{
+            flexShrink: 1,
+            flexWrap: "wrap",
+            width: { xs: "100%", lg: "auto" },
+            rowGap: 1.25,
+            columnGap: 1.25,
+          }}
         >
           {/* Search */}
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
-              width: 300,
-              minWidth: 140,
+              width: { xs: "100%", sm: 320, lg: 300 },
+              minWidth: { xs: 0, sm: 200 },
               height: 40,
               borderRadius: "10px",
               border: "1px solid #E5E7EB",
@@ -1085,7 +1097,7 @@ const Leads: React.FC = () => {
               paddingLeft: "10px",
               paddingRight: "10px",
               gap: "6px",
-              flexShrink: 1,
+              flex: { xs: "1 1 100%", sm: "1 1 240px", lg: "0 1 auto" },
               "&:hover": { border: "1px solid #D1D5DB" },
               "&:focus-within": { border: "1px solid #9CA3AF" },
             }}
@@ -1221,7 +1233,11 @@ const Leads: React.FC = () => {
               navigate("/leads/add");
             }}
             disabled={!canAddLeads}
-            sx={{ flexShrink: 0 }}
+            sx={{
+              flexShrink: 0,
+              width: { xs: "100%", sm: "auto" },
+              ml: { xs: 0, sm: "auto", lg: 0 },
+            }}
           >
             + Add New Lead
           </Button>
@@ -1343,12 +1359,12 @@ const Leads: React.FC = () => {
           sx={{
             justifyContent: { sm: "flex-end" },
             minWidth: { lg: 292 },
-            flexShrink: 0,
-            mr: { lg: 2 },
+            flexShrink: 1,
+            width: { xs: "100%", lg: "auto" },
             alignItems: { xs: "stretch", sm: "center" },
           }}
         >
-          <Box sx={{ width: { xs: "100%", sm: 136 } }}>
+          <Box sx={{ width: { xs: "100%", sm: 150, lg: 136 } }}>
             <Box
               component="select"
               aria-label="Select Industry"
@@ -1377,7 +1393,7 @@ const Leads: React.FC = () => {
             </Box>
           </Box>
 
-          <Box sx={{ width: { xs: "100%", sm: 148 } }}>
+          <Box sx={{ width: { xs: "100%", sm: 170, lg: 148 } }}>
             <Box
               component="select"
               aria-label="Select Pipeline"

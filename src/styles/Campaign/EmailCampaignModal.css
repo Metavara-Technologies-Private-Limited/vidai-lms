@@ -3,7 +3,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 1000px;
+  width: min(1000px, calc(100vw - 24px));
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0px 20px 40px rgba(0, 0, 0, 0.12);
@@ -48,6 +48,7 @@
   display: flex;
   border: 1px solid lightgrey;
   align-items: center;
+  overflow-x: auto;
 }
 
 
@@ -119,6 +120,7 @@
 .form-row {
   display: flex;
   gap: 20px;
+  flex-wrap: wrap;
 }
 
 .form-group.half {
@@ -241,6 +243,7 @@ select:invalid {
 .account-row {
   display: flex;
   gap: 20px;
+  flex-wrap: wrap;
 }
 
 .account-card {
@@ -292,6 +295,7 @@ select:invalid {
   display: flex;
   gap: 20px;
   justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .mode-card {
@@ -414,6 +418,7 @@ select:invalid {
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .content-row img {
@@ -633,7 +638,51 @@ select:invalid {
 
 @media (max-width: 900px) {
   .schedule-row {
+    grid-template-columns: 1fr;
+  }
+
+  .email-campaign-modal {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .stepper {
+    width: 100%;
+    padding: 14px 16px;
+    margin: 18px 0 14px;
+  }
+
+  .form-row,
+  .account-row,
+  .mode-row,
+  .content-row,
+  .modal-actions {
     flex-direction: column;
+  }
+
+  .form-group.half,
+  .mode-card {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .modal-actions {
+    align-items: stretch;
+    padding: 12px 0 4px;
+  }
+
+  .modal-actions button,
+  .cancel-btn,
+  .next-btn {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .schedule-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 }
 

@@ -383,7 +383,7 @@ const memberStats: MemberStats | null =
 const stats = memberStats!;
 
   return (
-    <Box sx={{ p: 2, height: "calc(100vh - 200px)", overflowY: "auto" }}>
+    <Box sx={{ p: { xs: 1, sm: 2 }, height: "auto", minHeight: 0, overflowY: "auto" }}>
       
       {/* 1. Member Avatar Bar */}
       <Stack direction="row" spacing={3} sx={{ mb: 4, overflowX: "auto", pb: 1 }}>
@@ -466,16 +466,16 @@ const stats = memberStats!;
               {selectedMember.growth}
             </Typography>
             <Stack
-              direction="row"
+              direction={{ xs: "column", sm: "row" }}
               justifyContent="space-between"
               divider={<Box sx={{ width: "1px", bgcolor: "#FFC7B7", height: 32 }} />}
               sx={{
-                flexWrap: "nowrap",
-                overflowX: "hidden",
+                flexWrap: { xs: "wrap", sm: "nowrap" },
+                overflowX: { xs: "auto", sm: "hidden" },
                 mt: 1.5,
                 pt: 1,
                 pb: 0.5,
-                gap: 0,
+                gap: { xs: 1, sm: 0 },
               }}
             >
               <Box sx={{ textAlign: "left", flex: 1, minWidth: 0, px: 0.75 }}>
@@ -573,10 +573,14 @@ const stats = memberStats!;
           {/* 2. Horizontal Stats Overview Card */}
           <Card sx={{ ...overviewStripSx, mb: 4 }}>
             <Stack
-              direction="row"
+              direction={{ xs: "column", sm: "row" }}
               justifyContent="space-between"
               divider={<Box sx={{ width: "1px", bgcolor: "#FFC7B7", height: 30 }} />}
-              sx={{ flexWrap: "nowrap", overflowX: "hidden", gap: 0 }}
+              sx={{
+                flexWrap: { xs: "wrap", sm: "nowrap" },
+                overflowX: { xs: "auto", sm: "hidden" },
+                gap: { xs: 1, sm: 0 },
+              }}
             >
               {Object.entries(overview).map(([key, val]) => (
                 <Box key={key} sx={{ textAlign: "left", flex: 1, minWidth: 0, px: 0.75 }}>

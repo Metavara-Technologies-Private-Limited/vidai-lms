@@ -23,6 +23,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import CloseIcon from "@mui/icons-material/Close";
@@ -1453,6 +1455,8 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
 // LeadDetailView
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LeadDetailView() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -2353,7 +2357,7 @@ export default function LeadDetailView() {
         elevation={0}
         sx={{
           position: "relative",
-          p: 5,
+          p: { xs: 2, sm: 3, md: 5 },
           mb: 3,
           borderRadius: "16px",
           backgroundColor: "#FAFAFA",
@@ -2379,14 +2383,14 @@ export default function LeadDetailView() {
         <Stack
           direction="row"
           justifyContent="space-between"
-          alignItems="center"
+          alignItems="stretch"
           sx={{ position: "relative", width: "100%", zIndex: 1 }}
         >
           <Stack
-            direction="row"
-            alignItems="flex-end"
+            direction={{ xs: "column", md: "row" }}
+            alignItems={{ xs: "flex-start", md: "flex-end" }}
             justifyContent="space-between"
-            sx={{ width: "100%", pl: 2, pr: 1 }}
+            sx={{ width: "100%", pl: { xs: 0, sm: 1 }, pr: 0, gap: { xs: 1.25, md: 0 } }}
           >
             <Avatar
               sx={{
@@ -2396,8 +2400,8 @@ export default function LeadDetailView() {
                 height: 45,
                 fontSize: "30px",
                 fontWeight: 700,
-                transform: "translateY(-35px)",
-                ml: -2,
+                transform: { xs: "none", md: "translateY(-35px)" },
+                ml: { xs: 0, md: -2 },
                 flexShrink: 0,
               }}
             >
@@ -2405,7 +2409,11 @@ export default function LeadDetailView() {
             </Avatar>
             <Stack
               spacing={0.5}
-              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+              sx={{
+                flex: 1.3,
+                transform: { xs: "none", md: "translateY(14px)" },
+                minWidth: { xs: "100%", md: 0 },
+              }}
             >
               <Typography
                 variant="caption"
@@ -2420,7 +2428,11 @@ export default function LeadDetailView() {
             </Stack>
             <Stack
               spacing={0.5}
-              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+              sx={{
+                flex: 1.3,
+                transform: { xs: "none", md: "translateY(14px)" },
+                minWidth: { xs: "100%", md: 0 },
+              }}
             >
               <Typography
                 variant="caption"
@@ -2435,7 +2447,11 @@ export default function LeadDetailView() {
             </Stack>
             <Stack
               spacing={0.5}
-              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+              sx={{
+                flex: 1.3,
+                transform: { xs: "none", md: "translateY(14px)" },
+                minWidth: { xs: "100%", md: 0 },
+              }}
             >
               <Typography
                 variant="caption"
@@ -2460,7 +2476,11 @@ export default function LeadDetailView() {
             </Stack>
             <Stack
               spacing={0.5}
-              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+              sx={{
+                flex: 1.3,
+                transform: { xs: "none", md: "translateY(14px)" },
+                minWidth: { xs: "100%", md: 0 },
+              }}
             >
               <Typography
                 variant="caption"
@@ -2493,7 +2513,11 @@ export default function LeadDetailView() {
             </Stack>
             <Stack
               spacing={0.5}
-              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+              sx={{
+                flex: 1.3,
+                transform: { xs: "none", md: "translateY(14px)" },
+                minWidth: { xs: "100%", md: 0 },
+              }}
             >
               <Typography
                 variant="caption"
@@ -2516,7 +2540,11 @@ export default function LeadDetailView() {
             </Stack>
             <Stack
               spacing={0.5}
-              sx={{ flex: 1.3, transform: "translateY(14px)" }}
+              sx={{
+                flex: 1.3,
+                transform: { xs: "none", md: "translateY(14px)" },
+                minWidth: { xs: "100%", md: 0 },
+              }}
             >
               <Typography
                 variant="caption"
@@ -2653,9 +2681,10 @@ export default function LeadDetailView() {
       </Dialog>
 
       <Stack
-        direction="row"
+        direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
-        alignItems="center"
+        alignItems={{ xs: "stretch", md: "center" }}
+        gap={1.5}
         mb={3}
       >
         <Box
@@ -2663,12 +2692,13 @@ export default function LeadDetailView() {
             bgcolor: "#FAFAFA",
             borderRadius: "10px",
             p: 0.8,
-            width: "fit-content",
+            width: { xs: "100%", md: "fit-content" },
             display: "inline-flex",
             alignItems: "center",
+            overflowX: "auto",
           }}
         >
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} sx={{ minWidth: "max-content" }}>
             {TAB_LABELS.map((tab) => {
               const sel = activeTab === tab;
               return (
@@ -2688,7 +2718,7 @@ export default function LeadDetailView() {
                     alignItems: "center",
                   }}
                 >
-                  <Typography fontWeight={600} fontSize="14px" color="inherit">
+                  <Typography fontWeight={600} fontSize={isMobile ? "13px" : "14px"} color="inherit">
                     {tab}
                   </Typography>
                 </Box>
@@ -2696,7 +2726,11 @@ export default function LeadDetailView() {
             })}
           </Stack>
         </Box>
-        <Stack direction="row" spacing={2}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          sx={{ width: { xs: "100%", md: "auto" } }}
+        >
           <Button
             variant="outlined"
             startIcon={<EditOutlinedIcon />}
@@ -2707,6 +2741,7 @@ export default function LeadDetailView() {
               textTransform: "none",
               bgcolor: "#f3f3f3",
               color: "#505050",
+              width: { xs: "100%", sm: "auto" },
               border: "none",
               boxShadow: "none",
               "&:hover": {
@@ -2735,6 +2770,7 @@ export default function LeadDetailView() {
               textTransform: "none",
               bgcolor: isConverted ? "#E2E8F0" : "#505050",
               color: isConverted ? "#94A3B8" : "#FFFFFF",
+              width: { xs: "100%", sm: "auto" },
               px: 2,
               boxShadow: "none",
               "&:hover": {

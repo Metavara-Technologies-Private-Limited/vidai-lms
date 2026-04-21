@@ -245,4 +245,8 @@
   .tableContainer {
     overflow-x: auto;
   }
+
+  .tableWrapper {
+    overflow-x: auto;
+  }
 }
