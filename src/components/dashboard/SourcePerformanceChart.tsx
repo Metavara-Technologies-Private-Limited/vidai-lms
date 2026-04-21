@@ -18,7 +18,7 @@ import {
 } from "recharts";
 import { useState } from "react";
 import { mockData } from "./mockData";
-import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style.ts";
+import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 import type { TimeRange } from "./TimeRangeSelector";
 
 type Props = {
