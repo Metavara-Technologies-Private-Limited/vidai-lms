@@ -19,6 +19,12 @@ import {
 import { useState } from "react";
 import { mockData } from "./mockData";
 import { chartStyles } from "../../styles/Dashboard/SourcePerformanceChart.style";
+import type { TimeRange } from "./TimeRangeSelector";
+
+type Props = {
+  timeRange: TimeRange;
+};
+
 
 type Metric = "volume" | "rate" | "revenue" | "cost";
 import type{CustomTooltipProps} from "../../types/dashboard.types";
@@ -67,10 +73,11 @@ const CustomTooltip = ({
   );
 };
 
-const SourcePerformanceChart = () => {
+const SourcePerformanceChart = ({ timeRange }: Props) => {
   const [metric, setMetric] = useState<Metric>("volume");
   const data = mockData.overview.sourcePerformance;
 
+  console.log("timeRange",timeRange)
   const config = {
     volume: { key: "volume", label: "No. of Leads" },
     rate: { key: "convRate", label: "Conversion Rate (in %)" },
