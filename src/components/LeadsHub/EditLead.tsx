@@ -257,7 +257,7 @@ export default function EditLead() {
     const rawDigits = value.replace(/\D/g, "");
     const digitsOnly = rawDigits.slice(0, 10);
     if (/\D/.test(value)) {
-      showInputToast("edit-lead-contact-invalid", "only digits are allowd");
+      showInputToast("edit-lead-contact-invalid", "only digits are allowed");
     }
     if (rawDigits.length > 10) {
       showInputToast("edit-lead-contact-length", "only 10 digits allowed");

@@ -1496,6 +1496,7 @@ const Leads: React.FC = () => {
             open={filterOpen}
             onClose={() => setFilterOpen(false)}
             onApplyFilters={handleApplyFilters}
+            leads={leads || []}
           />
         </React.Suspense>
       )}

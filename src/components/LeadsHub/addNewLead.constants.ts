@@ -91,7 +91,7 @@ export type LeadPayload = {
   partner_gender: "male" | "female" | null;
   source: string;
   sub_source?: string;
-  next_action_status?: "pending" | "completed" | null;
+  next_action_status?: string | null;
   next_action_description?: string;
   next_action_type?: string;
   lead_status?:

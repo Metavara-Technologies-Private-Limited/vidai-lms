@@ -116,7 +116,7 @@ export type LeadPayload = {
     | "cycle_conversion"
     | "lost"
     | "lost lead";
-  next_action_status?: "pending" | "completed" | null;
+  next_action_status?: string | null;
   next_action_description?: string;
   next_action_type?: string;
   treatment_interest: string;
