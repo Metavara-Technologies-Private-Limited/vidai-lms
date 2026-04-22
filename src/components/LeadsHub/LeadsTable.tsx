@@ -658,7 +658,6 @@ const LeadsTable: React.FC<Props> = ({
                 status: nextStatusLabel,
                 lead_status: nextStatusLabel,
                 next_action_description: stageAwareDescription,
-                stage_id: selectedStatus.id ?? l.stage_id,
               }
             : l,
         ),
