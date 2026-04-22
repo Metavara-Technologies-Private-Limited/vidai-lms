@@ -9,6 +9,7 @@ import type { Department, Employee } from "../../services/leads.api";
 // component that uses an index-signature lead shape.
 export interface LeadItem {
   id: string;
+  stage_id?: string | number | null;
   full_name: string;
   name: string;
   initials: string;
@@ -76,6 +77,7 @@ export interface LeadItem {
 // ====================== Raw Redux Shape ======================
 export interface RawLead {
   id?: string;
+  stage_id?: string | number | null;
   full_name?: string;
   name?: string;
   initials?: string;

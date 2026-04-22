@@ -46,6 +46,7 @@ import { selectClinic } from '../../../store/clinicSlice';
 
 const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
 const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1000;
+const SUBJECT_MUST_CONTAIN_LETTER_REGEX = /[A-Za-z]/;
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
   const candidate = doc.file_url || doc.file || doc.url || '';
@@ -569,8 +570,17 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       return;
     }
 
-    if (!formData.subject.trim()) {
+    const trimmedSubject = formData.subject.trim();
+
+    if (!trimmedSubject) {
       toast.error('Subject is mandatory', { toastId: 'template-subject-required' });
+      return;
+    }
+
+    if (!SUBJECT_MUST_CONTAIN_LETTER_REGEX.test(trimmedSubject)) {
+      toast.error('Subject must include at least one letter', {
+        toastId: 'template-subject-letter-required',
+      });
       return;
     }
 
@@ -604,7 +614,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       name: formData.name,
       use_case: formData.useCase,
       body: editor?.getHTML() || '',
-      subject: formData.subject,
+      subject: trimmedSubject,
       clinic: clinicId,
     };
 

@@ -34,6 +34,7 @@ export type LeadDocument = {
 export type Lead = {
   status: string | undefined;
   id: string;
+  stage_id?: string | number;
   clinic_id: number;
   clinic_name: string;
   department_id: number;
@@ -82,6 +83,7 @@ export type Lead = {
 export type LeadPayload = {
   clinic_id: number;
   department_id: number;
+  stage_id?: string | number | null;
   campaign_id?: string | null;
   assigned_to_id?: number | null;
   assigned_to_name?: string | null;

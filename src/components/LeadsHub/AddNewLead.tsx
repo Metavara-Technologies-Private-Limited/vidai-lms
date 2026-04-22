@@ -203,6 +203,14 @@ export default function AddNewLead() {
   const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
 
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
+<<<<<<< Updated upstream
+=======
+  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<
+    Array<{ id?: string; label: string }>
+  >(TASK_TYPES.map((taskType) => ({ label: taskType })));
+  const [selectedNextActionStageId, setSelectedNextActionStageId] =
+    React.useState<string>("");
+>>>>>>> Stashed changes
   const [docDragOver, setDocDragOver] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -340,6 +348,7 @@ export default function AddNewLead() {
             null;
         }
 
+<<<<<<< Updated upstream
         // Active stages sorted by order
         const activeStages = (selectedPipeline?.stages ?? [])
           .filter((s) => (s.stage_status ?? "").toLowerCase().trim() !== "inactive")
@@ -402,6 +411,27 @@ export default function AddNewLead() {
           { label: "Active", value: "active" },
           { label: "Inactive", value: "inactive" },
         ]);
+=======
+        const activeStageOptions = (selectedPipeline?.stages ?? [])
+          .filter(
+            (stage) =>
+              (stage.stage_status ?? "").toLowerCase().trim() !== "inactive",
+          )
+          .sort((left, right) => left.stage_order - right.stage_order)
+          .map((stage) => ({
+            id: stage.id,
+            label: stage.stage_name.trim(),
+          }))
+          .filter((stage) => Boolean(stage.label));
+
+        if (activeStageOptions.length > 0) {
+          setNextActionTypeOptions(activeStageOptions);
+        } else {
+          setNextActionTypeOptions(TASK_TYPES.map((taskType) => ({ label: taskType })));
+        }
+      } catch {
+        setNextActionTypeOptions(TASK_TYPES.map((taskType) => ({ label: taskType })));
+>>>>>>> Stashed changes
       }
     };
 
@@ -411,7 +441,14 @@ export default function AddNewLead() {
   // Clear nextType/nextStatus if the selected value is no longer in the options list
   React.useEffect(() => {
     if (!form.nextType) return;
-    if (nextActionTypeOptions.includes(form.nextType)) return;
+    const matchedNextType = nextActionTypeOptions.find(
+      (option) => option.label === form.nextType,
+    );
+    if (matchedNextType) {
+      setSelectedNextActionStageId(matchedNextType.id ?? "");
+      return;
+    }
+    setSelectedNextActionStageId("");
     setForm((prev) => ({ ...prev, nextType: "", nextStatus: "" }));
   }, [form.nextType, nextActionTypeOptions]);
 
@@ -563,6 +600,7 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, department: value, personnel: "" }));
   };
 
+<<<<<<< Updated upstream
   const handleLeadStatusChange = (value: string) =>
     setForm((prev) => ({ ...prev, leadStatus: value }));
 
@@ -574,6 +612,16 @@ export default function AddNewLead() {
 
   const handleReferralDepartmentChange = (value: string) =>
     setForm((prev) => ({ ...prev, referralDepartment: value }));
+=======
+  const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedLabel = e.target.value;
+    const matchedOption = nextActionTypeOptions.find(
+      (option) => option.label === selectedLabel,
+    );
+    setSelectedNextActionStageId(matchedOption?.id ?? "");
+    setForm((prev) => ({ ...prev, nextType: selectedLabel }));
+  };
+>>>>>>> Stashed changes
 
   // ── File Handlers ──────────────────────────────────────────────────────────
   const addFiles = (files: File[]) => {
@@ -661,6 +709,7 @@ export default function AddNewLead() {
     return {
       clinic_id: clinicId,
       department_id: departmentId,
+      stage_id: selectedNextActionStageId || null,
       full_name: form.full_name.trim() || "Unknown Lead",
       contact_no: form.contact.trim() || "0000000000",
       source: form.source || "Direct",

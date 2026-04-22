@@ -67,6 +67,7 @@ export type ReferralSourceObject = {
 export type LeadPayload = {
   clinic_id: number;
   department_id: number;
+  stage_id?: string | number | null;
   campaign_id: string | null;
   assigned_to_id: number | null;
   assigned_to_name?: string | null;
