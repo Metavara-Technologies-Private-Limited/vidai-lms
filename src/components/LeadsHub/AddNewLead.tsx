@@ -33,6 +33,7 @@ import { pipelineApi, type Pipeline } from "../../services/pipeline.api";
 import {
   ALLOWED_DOC_TYPES,
   MAX_DOC_SIZE_MB,
+  TASK_TYPES,
   strOrNull,
   intOrNull,
   type LeadPayload,
@@ -194,27 +195,22 @@ export default function AddNewLead() {
   const [referralDepartments, setReferralDepartments] = React.useState<ReferralDepartment[]>([]);
   const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
 
-<<<<<<< Updated upstream
+  // ── File state (declared once) ─────────────────────────────────────────────
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
   const [docDragOver, setDocDragOver] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Next Action Type always uses TASK_TYPES; Status is Active/Inactive
+  // ── Pipeline / stage state ─────────────────────────────────────────────────
   const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<string[]>([...TASK_TYPES]);
-  const [nextActionTypeStageIdMap, setNextActionTypeStageIdMap] = React.useState<Record<string, string>>({});
-  const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string>("");
-  const [nextActionStatusOptions, setNextActionStatusOptions] = React.useState<NextActionStatusOption[]>([
-    { label: "Active", value: "active" },
-    { label: "Inactive", value: "inactive" },
-  ]);
-=======
-  // ── Pipeline stage names drive lead_status and next_action_status ─────────
-  // next_action_type is hardcoded from TASK_TYPES in constants
   const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
-  const [leadStatusOptions, setLeadStatusOptions] = React.useState<NextActionStatusOption[]>([]);
-  const [nextActionStatusOptions, setNextActionStatusOptions] = React.useState<NextActionStatusOption[]>([]);
->>>>>>> Stashed changes
+  const [pipelineStages, setPipelineStages] = React.useState<Array<{ id: string; stage_name: string }>>([]);
+  const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string | null>(null);
 
+  // Derived options consumed by Step1 — must be NextActionStatusOption[]
+  const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
+    () => pipelineStageNames.map((name) => ({ label: name, value: name })),
+    [pipelineStageNames],
+  );
   const rawCampaigns = useSelector(selectCampaign);
   const authedUser = useSelector(selectUser);
   const selectedClinic = useSelector(selectClinic);
@@ -228,6 +224,8 @@ export default function AddNewLead() {
       : null;
   const _role = resolveUserRole(_authUserRaw);
   const _perms = _authUserRaw?.permissions ?? _nestedUser?.permissions;
+  // Treat null authedUser as still loading — don't redirect prematurely
+  const authIsLoaded = authedUser != null;
   const canAddLeads =
     _role === "super_admin" ||
     hasAnySubcategoryActionPermission(_perms, ["leads hub"], "add");
@@ -285,6 +283,15 @@ export default function AddNewLead() {
     referralDepartment: "",
   });
 
+  // Next action status = all pipeline stages except the currently selected lead status
+  const filteredNextActionStatusOptions = React.useMemo<NextActionStatusOption[]>(
+    () =>
+      pipelineStageNames
+        .filter((name) => name !== form.leadStatus)
+        .map((name) => ({ label: name, value: name })),
+    [pipelineStageNames, form.leadStatus],
+  );
+
   // ── Fetch Departments ──────────────────────────────────────────────────────
   React.useEffect(() => {
     setDepartments([]);
@@ -310,7 +317,7 @@ export default function AddNewLead() {
     fetchDeps();
   }, [clinicId]);
 
-  // ── Load pipeline stages → lead_status = all stages, next_action_status = all stages
+  // ── Load pipeline stages ───────────────────────────────────────────────────
   React.useEffect(() => {
     const loadFromPipeline = async () => {
       const selectedIndustry = localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
@@ -348,133 +355,27 @@ export default function AddNewLead() {
           .filter((s) => s.stage_name.trim());
 
         const stageNames = activeStages.map((s) => s.stage_name.trim());
-        const stageIdByName = activeStages.reduce<Record<string, string>>((acc, stage) => {
-          const key = stage.stage_name.trim();
-          if (key) acc[key] = stage.id;
-          return acc;
-        }, {});
 
-        if (stageNames.length > 0) {
-<<<<<<< Updated upstream
-          setNextActionTypeStageIdMap(stageIdByName);
-          // Next Action Status = fixed active/inactive values
-          setNextActionStatusOptions([
-            { label: "Active", value: "active" },
-            { label: "Inactive", value: "inactive" },
-          ]);
+        // Populate pipeline stage names + full stage objects for ID resolution
+        setPipelineStageNames(stageNames);
+        setPipelineStages(activeStages.map((s) => ({ id: s.id, stage_name: s.stage_name.trim() })));
 
-          // Next Action Type = enabled rule action_types across all active stages
-          // Map action_type IDs (from StageConfiguration) → TASK_TYPES labels
-          const ACTION_TYPE_MAP: Record<string, string> = {
-            call: "Call Patient",
-            "proposal-email": "Send Email",
-            email: "Send Email",
-            whatsapp: "Send Message",
-            sms: "Send Message",
-            appointment: "Book Appointment",
-            follow_up: "Follow Up",
-            followup: "Follow Up",
-            review: "Review Details",
-            "no-action": "No Action",
-            no_action: "No Action",
-          };
-
-          const enabledActionTypes = activeStages
-            .flatMap((s) => (s.rules ?? []))
-            .filter((r) => r.is_enabled === true)
-            .map((r) => {
-              const key = (r.action_type ?? "").toLowerCase().trim();
-              return ACTION_TYPE_MAP[key] ?? null;
-            })
-            .filter((v): v is string => v !== null);
-
-          // Deduplicate while preserving order
-          const uniqueActionTypes = [...new Set(enabledActionTypes)];
-
-          // If no enabled rules found, fall back to full TASK_TYPES
-          setNextActionTypeOptions(
-            uniqueActionTypes.length > 0 ? uniqueActionTypes : [...TASK_TYPES],
-          );
-        } else {
-          // No active stages → type fallback, status still Active/Inactive
-          setNextActionTypeOptions([...TASK_TYPES]);
-          setNextActionTypeStageIdMap({});
-          setNextActionStatusOptions([
-            { label: "Active", value: "active" },
-            { label: "Inactive", value: "inactive" },
-          ]);
-        }
-      } catch {
-        // API error → fall back to TASK_TYPES, status still Active/Inactive
+        // Always show all task types — pipeline rules only gate stages, not what the user can select
         setNextActionTypeOptions([...TASK_TYPES]);
-        setNextActionTypeStageIdMap({});
-        setNextActionStatusOptions([
-          { label: "Active", value: "active" },
-          { label: "Inactive", value: "inactive" },
-        ]);
-=======
-          setPipelineStageNames(stageNames);
-          const stageOptions = stageNames.map((name) => ({ label: name, value: name }));
-          setLeadStatusOptions(stageOptions);
-          setNextActionStatusOptions(stageOptions);
-        } else {
-          setPipelineStageNames([]);
-          setLeadStatusOptions([]);
-          setNextActionStatusOptions([]);
-        }
       } catch {
-        setPipelineStageNames([]);
-        setLeadStatusOptions([]);
-        setNextActionStatusOptions([]);
->>>>>>> Stashed changes
+        setNextActionTypeOptions([...TASK_TYPES]);
       }
     };
 
     void loadFromPipeline();
   }, [clinicId]);
 
-  // ── Auto-clear nextStatus if options change and selected value is gone ─────
+  // ── Auto-clear nextType if options change and selected value is gone ────────
   React.useEffect(() => {
-<<<<<<< Updated upstream
     if (!form.nextType) return;
-    if (nextActionTypeOptions.includes(form.nextType)) {
-      setSelectedNextActionStageId(nextActionTypeStageIdMap[form.nextType] ?? "");
-      return;
-    }
-    setSelectedNextActionStageId("");
-    setForm((prev) => ({ ...prev, nextType: "", nextStatus: "" }));
-  }, [form.nextType, nextActionTypeOptions, nextActionTypeStageIdMap]);
-=======
-    if (!form.nextStatus) return;
-    const validValues = nextActionStatusOptions.map((o) => o.value);
-    if (validValues.includes(form.nextStatus)) return;
-    setForm((prev) => ({ ...prev, nextStatus: "", nextType: "" }));
-  }, [form.nextStatus, nextActionStatusOptions]);
-
-  // ── Auto-clear leadStatus if pipeline options change and value is gone ─────
-  React.useEffect(() => {
-    if (!form.leadStatus) return;
-    const validValues = leadStatusOptions.map((o) => o.value);
-    if (validValues.includes(form.leadStatus)) return;
-    setForm((prev) => ({ ...prev, leadStatus: "" }));
-  }, [form.leadStatus, leadStatusOptions]);
-
-  // ── Next Action Status = all stages minus the selected Lead Status (n-1) ──
-  const filteredNextActionStatusOptions = React.useMemo(() => {
-    if (!form.leadStatus) return nextActionStatusOptions;
-    return nextActionStatusOptions.filter(
-      (opt) => opt.value.toLowerCase() !== form.leadStatus.toLowerCase(),
-    );
-  }, [form.leadStatus, nextActionStatusOptions]);
-
-  // ── Auto-clear nextStatus when it no longer appears in filtered list ───────
-  React.useEffect(() => {
-    if (!form.nextStatus) return;
-    const validValues = filteredNextActionStatusOptions.map((o) => o.value);
-    if (validValues.includes(form.nextStatus)) return;
-    setForm((prev) => ({ ...prev, nextStatus: "", nextType: "" }));
-  }, [form.nextStatus, filteredNextActionStatusOptions]);
->>>>>>> Stashed changes
+    if (nextActionTypeOptions.includes(form.nextType)) return;
+    setForm((prev) => ({ ...prev, nextType: "" })); // only clear type, status is independent
+  }, [form.nextType, nextActionTypeOptions]);
 
   // ── Fetch Referral Departments ─────────────────────────────────────────────
   React.useEffect(() => {
@@ -623,30 +524,23 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, department: value, personnel: "" }));
   };
 
-  const handleLeadStatusChange = (value: string) =>
-    setForm((prev) => ({ ...prev, leadStatus: value }));
-
-<<<<<<< Updated upstream
-  const handleNextTypeChange = (value: string) => {
-    setSelectedNextActionStageId(nextActionTypeStageIdMap[value] ?? "");
-=======
-  // Changing next status resets next type since task context changes
-  const handleNextStatusChange = (value: string) =>
-    setForm((prev) => ({ ...prev, nextStatus: value, nextType: "" }));
+  const handleLeadStatusChange = (value: string) => {
+    // Resolve the stage ID for the selected lead status and clear stale nextStatus
+    const matched = pipelineStages.find((s) => s.stage_name === value);
+    setSelectedNextActionStageId(matched?.id ?? null);
+    setForm((prev) => ({ ...prev, leadStatus: value, nextStatus: "" }));
+  };
 
   const handleNextTypeChange = (value: string) =>
->>>>>>> Stashed changes
     setForm((prev) => ({ ...prev, nextType: value }));
-  };
+
+  const handleNextStatusChange = (value: string) =>
+    setForm((prev) => ({ ...prev, nextStatus: value }));
 
   const handleReferralDepartmentChange = (value: string) =>
     setForm((prev) => ({ ...prev, referralDepartment: value }));
 
   // ── File Handlers ──────────────────────────────────────────────────────────
-  const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
-  const [docDragOver, setDocDragOver] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-
   const addFiles = (files: File[]) => {
     files.forEach((file) => {
       if (!ALLOWED_DOC_TYPES.includes(file.type)) {
@@ -922,6 +816,7 @@ export default function AddNewLead() {
     { label: ACTIVE_FLOW_COPY.step3, step: 3 },
   ];
 
+  if (!authIsLoaded) return null; // wait for Redux auth to hydrate
   if (!canAddLeads) return <Navigate to="/leads" replace />;
 
   // ── Render ─────────────────────────────────────────────────────────────────
