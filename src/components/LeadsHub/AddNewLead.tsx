@@ -203,19 +203,13 @@ export default function AddNewLead() {
   const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
 
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
-<<<<<<< Updated upstream
-=======
-  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<
-    Array<{ id?: string; label: string }>
-  >(TASK_TYPES.map((taskType) => ({ label: taskType })));
-  const [selectedNextActionStageId, setSelectedNextActionStageId] =
-    React.useState<string>("");
->>>>>>> Stashed changes
   const [docDragOver, setDocDragOver] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Next Action Type always uses TASK_TYPES; Status is Active/Inactive
   const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<string[]>([...TASK_TYPES]);
+  const [nextActionTypeStageIdMap, setNextActionTypeStageIdMap] = React.useState<Record<string, string>>({});
+  const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string>("");
   const [nextActionStatusOptions, setNextActionStatusOptions] = React.useState<NextActionStatusOption[]>([
     { label: "Active", value: "active" },
     { label: "Inactive", value: "inactive" },
@@ -348,7 +342,6 @@ export default function AddNewLead() {
             null;
         }
 
-<<<<<<< Updated upstream
         // Active stages sorted by order
         const activeStages = (selectedPipeline?.stages ?? [])
           .filter((s) => (s.stage_status ?? "").toLowerCase().trim() !== "inactive")
@@ -356,8 +349,14 @@ export default function AddNewLead() {
           .filter((s) => s.stage_name.trim());
 
         const stageNames = activeStages.map((s) => s.stage_name.trim());
+        const stageIdByName = activeStages.reduce<Record<string, string>>((acc, stage) => {
+          const key = stage.stage_name.trim();
+          if (key) acc[key] = stage.id;
+          return acc;
+        }, {});
 
         if (stageNames.length > 0) {
+          setNextActionTypeStageIdMap(stageIdByName);
           // Next Action Status = fixed active/inactive values
           setNextActionStatusOptions([
             { label: "Active", value: "active" },
@@ -399,6 +398,7 @@ export default function AddNewLead() {
         } else {
           // No active stages → type fallback, status still Active/Inactive
           setNextActionTypeOptions([...TASK_TYPES]);
+          setNextActionTypeStageIdMap({});
           setNextActionStatusOptions([
             { label: "Active", value: "active" },
             { label: "Inactive", value: "inactive" },
@@ -407,31 +407,11 @@ export default function AddNewLead() {
       } catch {
         // API error → fall back to TASK_TYPES, status still Active/Inactive
         setNextActionTypeOptions([...TASK_TYPES]);
+        setNextActionTypeStageIdMap({});
         setNextActionStatusOptions([
           { label: "Active", value: "active" },
           { label: "Inactive", value: "inactive" },
         ]);
-=======
-        const activeStageOptions = (selectedPipeline?.stages ?? [])
-          .filter(
-            (stage) =>
-              (stage.stage_status ?? "").toLowerCase().trim() !== "inactive",
-          )
-          .sort((left, right) => left.stage_order - right.stage_order)
-          .map((stage) => ({
-            id: stage.id,
-            label: stage.stage_name.trim(),
-          }))
-          .filter((stage) => Boolean(stage.label));
-
-        if (activeStageOptions.length > 0) {
-          setNextActionTypeOptions(activeStageOptions);
-        } else {
-          setNextActionTypeOptions(TASK_TYPES.map((taskType) => ({ label: taskType })));
-        }
-      } catch {
-        setNextActionTypeOptions(TASK_TYPES.map((taskType) => ({ label: taskType })));
->>>>>>> Stashed changes
       }
     };
 
@@ -441,16 +421,13 @@ export default function AddNewLead() {
   // Clear nextType/nextStatus if the selected value is no longer in the options list
   React.useEffect(() => {
     if (!form.nextType) return;
-    const matchedNextType = nextActionTypeOptions.find(
-      (option) => option.label === form.nextType,
-    );
-    if (matchedNextType) {
-      setSelectedNextActionStageId(matchedNextType.id ?? "");
+    if (nextActionTypeOptions.includes(form.nextType)) {
+      setSelectedNextActionStageId(nextActionTypeStageIdMap[form.nextType] ?? "");
       return;
     }
     setSelectedNextActionStageId("");
     setForm((prev) => ({ ...prev, nextType: "", nextStatus: "" }));
-  }, [form.nextType, nextActionTypeOptions]);
+  }, [form.nextType, nextActionTypeOptions, nextActionTypeStageIdMap]);
 
   // ── Fetch Referral Departments ─────────────────────────────────────────────
   React.useEffect(() => {
@@ -600,28 +577,19 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, department: value, personnel: "" }));
   };
 
-<<<<<<< Updated upstream
   const handleLeadStatusChange = (value: string) =>
     setForm((prev) => ({ ...prev, leadStatus: value }));
 
-  const handleNextTypeChange = (value: string) =>
+  const handleNextTypeChange = (value: string) => {
+    setSelectedNextActionStageId(nextActionTypeStageIdMap[value] ?? "");
     setForm((prev) => ({ ...prev, nextType: value }));
+  };
 
   const handleNextStatusChange = (value: string) =>
     setForm((prev) => ({ ...prev, nextStatus: value }));
 
   const handleReferralDepartmentChange = (value: string) =>
     setForm((prev) => ({ ...prev, referralDepartment: value }));
-=======
-  const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedLabel = e.target.value;
-    const matchedOption = nextActionTypeOptions.find(
-      (option) => option.label === selectedLabel,
-    );
-    setSelectedNextActionStageId(matchedOption?.id ?? "");
-    setForm((prev) => ({ ...prev, nextType: selectedLabel }));
-  };
->>>>>>> Stashed changes
 
   // ── File Handlers ──────────────────────────────────────────────────────────
   const addFiles = (files: File[]) => {

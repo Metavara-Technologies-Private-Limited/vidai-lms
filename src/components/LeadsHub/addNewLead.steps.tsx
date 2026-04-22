@@ -100,20 +100,10 @@ interface Step1Props {
   leadGeneratedByLoading: boolean;
   selectedLeadGeneratedBy: LeadGeneratedByObject | null;
   campaigns: Campaign[];
-<<<<<<< Updated upstream
   nextActionTypeOptions?: string[];
   nextActionStatusOptions?: NextActionStatusOption[];
   handleChange: (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSelectChange: (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => void;
-=======
-  nextActionTypeOptions?: Array<{ id?: string; label: string }>;
-  handleChange: (
-    field: keyof FormState,
-  ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSelectChange: (
-    field: keyof FormState,
-  ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
->>>>>>> Stashed changes
   handleAssigneeInputChange: (value: string) => void;
   handleAssigneeChange: (value: AssigneeOption | null) => void;
   handleLeadGeneratedByInputChange: (value: string) => void;
@@ -174,15 +164,8 @@ export function Step1({
       )
     : campaigns;
 
-<<<<<<< Updated upstream
   const resolvedNextActionTypeOptions: string[] = nextActionTypeOptions ?? [];
   const resolvedNextActionStatusOptions: NextActionStatusOption[] = nextActionStatusOptions ?? [];
-=======
-  const resolvedNextActionOptions =
-    nextActionTypeOptions && nextActionTypeOptions.length > 0
-      ? nextActionTypeOptions
-      : TASK_TYPES.map((taskType) => ({ label: taskType }));
->>>>>>> Stashed changes
 
   return (
     <Box>
@@ -611,18 +594,8 @@ export function Step1({
             onChange={(e) => handleNextTypeChange(e.target.value)} sx={inputStyle}
           >
             <MenuItem value="">-- Select --</MenuItem>
-<<<<<<< Updated upstream
             {resolvedNextActionTypeOptions.map((t) => (
               <MenuItem key={t} value={t}>{t}</MenuItem>
-=======
-            {resolvedNextActionOptions.map((option) => (
-              <MenuItem
-                key={option.id ?? option.label}
-                value={option.label}
-              >
-                {option.label}
-              </MenuItem>
->>>>>>> Stashed changes
             ))}
           </TextField>
         </Box>
