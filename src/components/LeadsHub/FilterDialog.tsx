@@ -20,14 +20,32 @@ import { DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import type { Department, Employee } from "../../services/leads.api";
 import { SOURCE_OPTIONS, SUB_SOURCE_OPTIONS, REFERRAL_DEPARTMENT_OPTIONS } from "./addNewLead.constants";
 import type { FilterValues } from "../../types/leads.types";
+import { ACTIVE_STATUS_OPTIONS } from "../../config/appType";
+import type { Lead } from "../../services/leads.api";
+
+// Mapping from backend status to display status
+const BACKEND_TO_DISPLAY: Record<string, string> = {
+  new: "New",
+  appointment: "Appointment",
+  "follow up": "Follow Up",
+  follow_up: "Follow Up",
+  negotiation: "Negotiation",
+  "proposal sent": "Proposal Sent",
+  "contract signed": "Contract Signed",
+  converted: "Converted Lead",
+  "converted lead": "Converted Lead",
+  lost: "Lost Lead",
+  "lost lead": "Lost Lead",
+};
 
 interface FilterDialogProps {
   open: boolean;
   onClose: () => void;
   onApplyFilters?: (filters: FilterValues) => void;
+  leads?: Lead[];
 }
 
-const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilters }) => {
+const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilters, leads = [] }) => {
   const [clinicId] = React.useState(1);
 
   const [departments, setDepartments] = React.useState<Department[]>([]);
@@ -51,6 +69,44 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   const [dateFrom, setDateFrom] = React.useState<Dayjs | null>(null);
   const [dateTo, setDateTo] = React.useState<Dayjs | null>(null);
   const [location, setLocation] = React.useState("");
+
+  // Extract unique statuses and locations from current leads data
+  const availableStatuses = React.useMemo(() => {
+    if (!leads || leads.length === 0) return ACTIVE_STATUS_OPTIONS;
+    
+    const statusSet = new Set<string>();
+    leads.forEach((lead) => {
+      const status = lead.lead_status || lead.status;
+      if (status) {
+        // Convert backend status to display status
+        const displayStatus = Object.keys(BACKEND_TO_DISPLAY).find(
+          key => key.toLowerCase() === status.toLowerCase() || 
+                 BACKEND_TO_DISPLAY[key]?.toLowerCase() === status.toLowerCase()
+        );
+        if (displayStatus) {
+          statusSet.add(BACKEND_TO_DISPLAY[displayStatus]);
+        } else {
+          // If not found in mapping, add the status as-is
+          statusSet.add(status);
+        }
+      }
+    });
+    
+    return Array.from(statusSet).sort();
+  }, [leads]);
+
+  const availableLocations = React.useMemo(() => {
+    if (!leads || leads.length === 0) return [];
+    
+    const locationSet = new Set<string>();
+    leads.forEach((lead) => {
+      if (lead.location && lead.location.trim()) {
+        locationSet.add(lead.location.trim());
+      }
+    });
+    
+    return Array.from(locationSet).sort();
+  }, [leads]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -310,12 +366,11 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                   }}
                 >
                   <MenuItem value="">Select Status</MenuItem>
-                  <MenuItem value="New Leads">New Leads</MenuItem>
-                  <MenuItem value="Follow up">Follow up</MenuItem>
-                  <MenuItem value="Appointment">Appointment</MenuItem>
-                  <MenuItem value="Converted Leads">Converted Leads</MenuItem>
-                  <MenuItem value="Cycle Conversion">Cycle Conversion</MenuItem>
-                  <MenuItem value="Lost Leads">Lost Leads</MenuItem>
+                  {availableStatuses.map((status) => (
+                    <MenuItem key={status} value={status}>
+                      {status}
+                    </MenuItem>
+                  ))}
                 </TextField>
               </Box>
             </Box>
@@ -336,10 +391,11 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                   }}
                 >
                   <MenuItem value="">Select Location</MenuItem>
-                  <MenuItem value="LA Jolla, California">LA Jolla, California</MenuItem>
-                  <MenuItem value="Oceanview, California">Oceanview, California</MenuItem>
-                  <MenuItem value="Palm Sibo, California">Palm Sibo, California</MenuItem>
-                  <MenuItem value="Sunny C, California">Sunny C, California</MenuItem>
+                  {availableLocations.map((loc) => (
+                    <MenuItem key={loc} value={loc}>
+                      {loc}
+                    </MenuItem>
+                  ))}
                 </TextField>
               </Box>
               <Box sx={{ flex: 1 }}>
