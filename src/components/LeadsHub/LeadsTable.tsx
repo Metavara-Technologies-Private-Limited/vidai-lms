@@ -190,9 +190,9 @@ const matchesStatusFilter = (
 interface EditStatusDialogProps {
   open: boolean;
   currentStatus: string;
-  statusOptions: string[];
+  statusOptions: Array<{ id?: string; label: string }>;
   onClose: () => void;
-  onSave: (newStatus: string) => void;
+  onSave: (selectedStatus: { id?: string; label: string }) => void;
 }
 
 const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
@@ -207,6 +207,9 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
   const hasStatusOptions = statusOptions.length > 0;
   const noStagesMessage =
     "This pipeline has no stages. Please select a different pipeline or create one stage.";
+  const selectedOption =
+    statusOptions.find((option) => option.label === selected) ??
+    (selected ? { label: selected } : undefined);
 
   React.useEffect(() => {
     if (open) {
@@ -329,20 +332,20 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
               </Typography>
             ) : statusOptions.map((opt) => (
               <Box
-                key={opt}
+                key={opt.id ?? opt.label}
                 onClick={() => {
-                  setSelected(opt);
+                  setSelected(opt.label);
                   setDropdownOpen(false);
                 }}
                 sx={{ display: "inline-flex", pl: 0.5 }}
               >
                 <Chip
-                  label={opt}
+                  label={opt.label}
                   size="small"
                   sx={{
-                    ...getStatusOptionChipSx(opt),
-                    ...(opt === selected && {
-                      boxShadow: `0 0 0 2px ${STATUS_CHIP_STYLES[opt]?.borderColor ?? "#64748B"}44`,
+                    ...getStatusOptionChipSx(opt.label),
+                    ...(opt.label === selected && {
+                      boxShadow: `0 0 0 2px ${STATUS_CHIP_STYLES[opt.label]?.borderColor ?? "#64748B"}44`,
                     }),
                   }}
                 />
@@ -375,7 +378,7 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
             <Button
               fullWidth
               variant="contained"
-              onClick={() => onSave(selected)}
+              onClick={() => onSave(selectedOption ?? { label: selected })}
               disabled={!hasStatusOptions}
               sx={{
                 borderRadius: 1,
@@ -438,8 +441,10 @@ const LeadsTable: React.FC<Props> = ({
   const [editStatusLead, setEditStatusLead] = React.useState<LeadItem | null>(
     null,
   );
-  const [editStatusOptions, setEditStatusOptions] = React.useState<string[]>(
-    [...ACTIVE_STATUS_OPTIONS],
+  const [editStatusOptions, setEditStatusOptions] = React.useState<
+    Array<{ id?: string; label: string }>
+  >(
+    ACTIVE_STATUS_OPTIONS.map((status) => ({ label: status })),
   );
 
   const [sortCol, setSortCol] = React.useState<string | null>(null);
@@ -462,9 +467,12 @@ const LeadsTable: React.FC<Props> = ({
         "";
       const hasSelectionContext =
         Boolean(resolvedSelectedIndustry) || Boolean(resolvedSelectedPipelineId);
+      const fallbackStatusOptions = ACTIVE_STATUS_OPTIONS.map((status) => ({
+        label: status,
+      }));
 
       if (!clinicId) {
-        setEditStatusOptions(hasSelectionContext ? [] : [...ACTIVE_STATUS_OPTIONS]);
+        setEditStatusOptions(hasSelectionContext ? [] : fallbackStatusOptions);
         return;
       }
 
@@ -497,28 +505,31 @@ const LeadsTable: React.FC<Props> = ({
         }
 
         if (!selectedPipeline || !Array.isArray(selectedPipeline.stages)) {
-          setEditStatusOptions(hasSelectionContext ? [] : [...ACTIVE_STATUS_OPTIONS]);
+          setEditStatusOptions(hasSelectionContext ? [] : fallbackStatusOptions);
           return;
         }
 
-        const activeStageNames = selectedPipeline.stages
+        const activeStageOptions = selectedPipeline.stages
           .filter(
             (stage) =>
               (stage.stage_status ?? "").toLowerCase().trim() !== "inactive",
           )
           .sort((left, right) => left.stage_order - right.stage_order)
-          .map((stage) => stage.stage_name.trim())
-          .filter(Boolean);
+          .map((stage) => ({
+            id: stage.id,
+            label: stage.stage_name.trim(),
+          }))
+          .filter((stage) => Boolean(stage.label));
 
         setEditStatusOptions(
-          activeStageNames.length > 0
-            ? activeStageNames
+          activeStageOptions.length > 0
+            ? activeStageOptions
             : hasSelectionContext
               ? []
-              : [...ACTIVE_STATUS_OPTIONS],
+              : fallbackStatusOptions,
         );
       } catch {
-        setEditStatusOptions(hasSelectionContext ? [] : [...ACTIVE_STATUS_OPTIONS]);
+        setEditStatusOptions(hasSelectionContext ? [] : fallbackStatusOptions);
       }
     };
 
@@ -606,12 +617,16 @@ const LeadsTable: React.FC<Props> = ({
   };
 
   // handleEditStatusSave — all fields now available:
-  const handleEditStatusSave = async (newStatus: string) => {
+  const handleEditStatusSave = async (selectedStatus: {
+    id?: string;
+    label: string;
+  }) => {
     if (!editStatusLead) return;
-    const apiStatus = STATUS_API_MAP[newStatus];
+    const nextStatusLabel = selectedStatus.label;
+    const apiStatus = STATUS_API_MAP[nextStatusLabel];
     const stageAwareDescription = upsertStageMarker(
       editStatusLead.next_action_description as string | undefined,
-      newStatus,
+      nextStatusLabel,
     );
 
     const updatePayload = {
@@ -627,6 +642,7 @@ const LeadsTable: React.FC<Props> = ({
       is_active: editStatusLead.is_active !== false,
       partner_inquiry: editStatusLead.partner_inquiry || false,
       next_action_description: stageAwareDescription,
+      ...(selectedStatus.id ? { stage_id: selectedStatus.id } : {}),
       ...(apiStatus
         ? { lead_status: apiStatus as "new" | "contacted" }
         : {}),
@@ -639,15 +655,16 @@ const LeadsTable: React.FC<Props> = ({
           l.id === editStatusLead.id
             ? {
                 ...l,
-                status: newStatus,
-                lead_status: newStatus,
+                status: nextStatusLabel,
+                lead_status: nextStatusLabel,
                 next_action_description: stageAwareDescription,
+                stage_id: selectedStatus.id ?? l.stage_id,
               }
             : l,
         ),
       );
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-      toast.success(`Status updated to "${newStatus}".`, toastOptions);
+      toast.success(`Status updated to "${nextStatusLabel}".`, toastOptions);
     } catch (err: unknown) {
       toast.error(
         extractErrorMessage(err, "Failed to update status."),
