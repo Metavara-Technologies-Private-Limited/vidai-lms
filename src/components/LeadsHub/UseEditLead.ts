@@ -10,24 +10,32 @@ import { toast } from "react-toastify";
 
 import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
+import { pipelineApi, type Pipeline } from "../../services/pipeline.api";
 import { fetchLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
 import { selectUser } from "../../store/authSlice";
+import { selectClinic } from "../../store/clinicSlice";
 import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import type { NextActionStatus } from "../../types/leads.types";
-import { TASK_STATUS_FOR_TYPE, getAutoNextActionStatus } from "./LeadTaskConfig";
+import { TASK_TYPES, TASK_STATUS_FOR_TYPE } from "./LeadTaskConfig";
+// getAutoNextActionStatus removed — unused
 import {
   hasAnySubcategoryActionPermission,
   resolveUserRole,
 } from "../../utils/roleAccess";
+import { fetchReferralDepartments } from "../../services/referral.api";
+import type { ReferralDepartment } from "../../services/referral.api";
 
 // ====================== App-type config import ======================
 import {
   IS_MEDICAL_APP,
   IS_CONTRACTS_APP,
   ACTIVE_FLOW_COPY,
-} from "../../config/appType"; // adjust path correctly/ adjust path to wherever you placed appConfig.ts
+} from "../../config/appType";
+
+const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
+const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 // ====================== Extended Lead type ======================
 export interface LeadResponse extends Lead {
@@ -59,6 +67,8 @@ export interface CampaignOption {
   subSource: string;
   isActive: boolean;
 }
+
+export type NextActionStatusOption = { label: string; value: string };
 
 type AssigneeOption = {
   id: number;
@@ -108,22 +118,18 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
       if (!Number.isFinite(id)) return null;
       return {
         id,
-        first_name:
-          typeof record.first_name === "string" ? record.first_name : undefined,
-        last_name:
-          typeof record.last_name === "string" ? record.last_name : undefined,
-        username:
-          typeof record.username === "string" ? record.username : undefined,
+        first_name: typeof record.first_name === "string" ? record.first_name : undefined,
+        last_name: typeof record.last_name === "string" ? record.last_name : undefined,
+        username: typeof record.username === "string" ? record.username : undefined,
         role: typeof record.role === "string" ? record.role : undefined,
-        designation:
-          typeof record.designation === "string" ? record.designation : undefined,
+        designation: typeof record.designation === "string" ? record.designation : undefined,
         email: typeof record.email === "string" ? record.email : undefined,
       };
     })
     .filter((item): item is AssigneeOption => item !== null);
 };
 
-const personnelOptionLabel = (option: AssigneeOption): string => assigneeOptionLabel(option);
+export const personnelOptionLabel = (option: AssigneeOption): string => assigneeOptionLabel(option);
 
 // ====================== Helpers ======================
 export const strOrNull = (val: string | undefined | null): string | null =>
@@ -145,15 +151,12 @@ export const isNextActionStatus = (v: string): v is NextActionStatus =>
 export const formatLeadId = (id: string | number | null | undefined): string => {
   const safeId = id == null ? "" : String(id);
   if (!safeId) return "#LN-000";
-
   if (safeId.match(/^#?LN-\d+$/i)) return safeId.startsWith("#") ? safeId : `#${safeId}`;
   const lnMatch = safeId.match(/#?LN-(\d+)/i);
   if (lnMatch) return `#LN-${lnMatch[1]}`;
   const numMatch = safeId.match(/\d+/);
   if (numMatch) return `#LN-${numMatch[0]}`;
-  const hash = safeId
-    .split("")
-    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hash = safeId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return `#LN-${(hash % 900) + 100}`;
 };
 
@@ -180,12 +183,7 @@ export const normalizeDocument = (doc: {
   id?: number | string;
 }): ExistingDocument => {
   const url = doc.url || doc.file || doc.document || "";
-  const rawName =
-    doc.name ||
-    doc.file_name ||
-    doc.original_name ||
-    url.split("/").pop() ||
-    "Document";
+  const rawName = doc.name || doc.file_name || doc.original_name || url.split("/").pop() || "Document";
   return { url, name: rawName, id: doc.id };
 };
 
@@ -199,12 +197,11 @@ export const TIME_SLOTS = [
   "05:30 PM - 06:00 PM",
 ];
 
-// ====================== Stepper labels (app-type aware) ======================
-// Derive STEPS from ACTIVE_FLOW_COPY so labels update automatically
+// ====================== Stepper labels ======================
 export const STEPS = [
-  ACTIVE_FLOW_COPY.step1,   // "Patient Details" | "Lead Details"
-  ACTIVE_FLOW_COPY.step2,   // "Medical Details" | "Product Details"
-  ACTIVE_FLOW_COPY.step3,   // always "Book Appointment"
+  ACTIVE_FLOW_COPY.step1,
+  ACTIVE_FLOW_COPY.step2,
+  ACTIVE_FLOW_COPY.step3,
 ] as const;
 export const TOTAL_STEPS = STEPS.length;
 
@@ -246,9 +243,12 @@ export const sectionLabelStyle = {
   mb: 1.5,
 } as const;
 
-// ====================== Helper: normalize truthy API value ======================
+// ====================== Helper ======================
 const isTruthy = (val: unknown): boolean =>
   val === true || val === 1 || val === "1" || val === "true";
+
+const capitalizeFirst = (value: string) =>
+  value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
 
 // ====================== Hook ======================
 export function useEditLead() {
@@ -256,16 +256,16 @@ export function useEditLead() {
   const { id } = useParams();
   const dispatch = useDispatch<AppDispatch>();
   const authUser = useSelector(selectUser) as Record<string, unknown> | null;
+  const selectedClinic = useSelector(selectClinic);
   const role = resolveUserRole(authUser);
   const nestedAuthUser =
     authUser?.user && typeof authUser.user === "object"
       ? (authUser.user as Record<string, unknown>)
       : null;
   const permissions = authUser?.permissions ?? nestedAuthUser?.permissions;
-  const leadAliases = ["leads hub"];
   const canEditLeads =
     role === "super_admin" ||
-    hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
+    hasAnySubcategoryActionPermission(permissions, ["leads hub"], "edit");
 
   // ── Campaigns from Redux store ──
   const rawCampaigns = useSelector(selectCampaign);
@@ -273,12 +273,9 @@ export function useEditLead() {
     () =>
       (rawCampaigns || []).map((api: RawCampaign) => ({
         id: api.id,
-        name: api.campaign_name ?? "",
+        name: capitalizeFirst(api.campaign_name ?? ""),
         source: api.campaign_mode === 1 ? "Social Media" : "Email",
-        subSource:
-          api.campaign_mode === 1
-            ? (api.social_media?.[0]?.platform_name ?? "")
-            : "gmail",
+        subSource: api.campaign_mode === 1 ? (api.social_media?.[0]?.platform_name ?? "") : "Gmail",
         isActive: Boolean(api.is_active),
       })),
     [rawCampaigns],
@@ -299,11 +296,20 @@ export function useEditLead() {
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
   const [employeeError, setEmployeeError] = React.useState<string | null>(null);
 
+  // ── Referral departments ──
+  const [referralDepartments, setReferralDepartments] = React.useState<ReferralDepartment[]>([]);
+  const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
+
+  // ── Pipeline / stage state (mirrors AddNewLead) ──
+  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
+  const [pipelineStages, setPipelineStages] = React.useState<Array<{ id: string; stage_name: string }>>([]);
+  const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string | null>(null);
+
   // Lead meta
   const [leadData, setLeadData] = React.useState<Lead | null>(null);
-  const [clinicId, setClinicId] = React.useState<number>(1);
-
-  // Track the lead's original department_id so we never overwrite it
+  const [clinicId, setClinicId] = React.useState<number>(
+    selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1),
+  );
   const [leadDepartmentId, setLeadDepartmentId] = React.useState<number | null>(null);
 
   // ── Step 1: shared fields ──
@@ -327,6 +333,12 @@ export function useEditLead() {
   const [nextStatus, setNextStatus] = React.useState("");
   const [nextDesc, setNextDesc] = React.useState("");
 
+  // ── Lead Status (pipeline stage) ──
+  const [leadStatus, setLeadStatus] = React.useState("");
+
+  // ── Referral Department ──
+  const [referralDepartment, setReferralDepartment] = React.useState("");
+
   // ── Step 1: MEDICAL-only fields ──
   const [gender, setGender] = React.useState("");
   const [age, setAge] = React.useState("");
@@ -337,7 +349,7 @@ export function useEditLead() {
   const [partnerAge, setPartnerAge] = React.useState("");
   const [partnerGender, setPartnerGender] = React.useState("");
 
-  // ── Step 1: CONTRACTS-only fields (Contact Information section) ──
+  // ── Step 1: CONTRACTS-only fields ──
   const [contactPersonName, setContactPersonName] = React.useState("");
   const [designation, setDesignation] = React.useState("");
   const [contactPersonPhone, setContactPersonPhone] = React.useState("");
@@ -353,7 +365,7 @@ export function useEditLead() {
   const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
 
-  // Step 3 — appointment fields
+  // Step 3
   const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("no");
   const [department, setDepartment] = React.useState("");
   const [appointmentPersonnel, setAppointmentPersonnel] = React.useState("");
@@ -365,7 +377,25 @@ export function useEditLead() {
   const [slot, setSlot] = React.useState("");
   const [remark, setRemark] = React.useState("");
 
-  // ── Auto-fill source & subSource when campaign selection changes ──
+  // ── Pipeline derived options (mirrors AddNewLead) ──
+  const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
+    () => pipelineStageNames.map((name) => ({ label: name, value: name })),
+    [pipelineStageNames],
+  );
+
+  // Next action status = all stages except the currently selected lead status
+  const filteredNextActionStatusOptions = React.useMemo<NextActionStatusOption[]>(
+    () =>
+      pipelineStageNames
+        .filter((name) => name !== leadStatus)
+        .map((name) => ({ label: name, value: name })),
+    [pipelineStageNames, leadStatus],
+  );
+
+  // Next action type always shows all TASK_TYPES
+  const nextActionTypeOptions: string[] = [...TASK_TYPES];
+
+  // ── Auto-fill source & subSource when campaign changes ──
   React.useEffect(() => {
     if (!campaign) return;
     const matched = campaigns.find((c) => String(c.id) === String(campaign));
@@ -374,29 +404,105 @@ export function useEditLead() {
     setSubSource(matched.subSource);
   }, [campaign, campaigns]);
 
-  // ====================== Derived ======================
+  // ── Legacy availableTaskStatuses (kept for backward compat with EditLead.tsx) ──
   const availableTaskStatuses = React.useMemo<{ label: string; value: string }[]>(() => {
-    if (!nextType) {
-      return [
-        { label: "To Do", value: "pending" },
-        { label: "Done", value: "completed" },
-      ];
-    }
-    return TASK_STATUS_FOR_TYPE[nextType] ?? [
-      { label: "To Do", value: "pending" },
-      { label: "Done", value: "completed" },
-    ];
+    if (!nextType) return [{ label: "To Do", value: "pending" }, { label: "Done", value: "completed" }];
+    return TASK_STATUS_FOR_TYPE[nextType] ?? [{ label: "To Do", value: "pending" }, { label: "Done", value: "completed" }];
   }, [nextType]);
 
+  // ====================== Pipeline effect (mirrors AddNewLead) ======================
+  React.useEffect(() => {
+    const loadFromPipeline = async () => {
+      const selectedIndustry = localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
+      const selectedPipelineId = localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "";
+
+      try {
+        let selectedPipeline: Pipeline | null = null;
+
+        if (selectedPipelineId) {
+          try { selectedPipeline = await pipelineApi.getById(selectedPipelineId); }
+          catch { selectedPipeline = null; }
+        }
+
+        if (!selectedPipeline) {
+          const pipelines = await pipelineApi.list(clinicId);
+          const byIndustry = selectedIndustry
+            ? pipelines.filter((p) => p.industry_type === selectedIndustry)
+            : pipelines;
+
+          selectedPipeline =
+            pipelines.find((p) => p.id === selectedPipelineId) ??
+            byIndustry.find((p) => p.is_active) ??
+            byIndustry[0] ??
+            pipelines.find((p) => p.is_active) ??
+            pipelines[0] ??
+            null;
+        }
+
+        const activeStages = (selectedPipeline?.stages ?? [])
+          .filter((s) => (s.stage_status ?? "").toLowerCase().trim() === "active")
+          .sort((a, b) => a.stage_order - b.stage_order)
+          .filter((s) => s.stage_name.trim());
+
+        const stageNames = activeStages.map((s) => s.stage_name.trim());
+        setPipelineStageNames(stageNames);
+        setPipelineStages(activeStages.map((s) => ({ id: s.id, stage_name: s.stage_name.trim() })));
+      } catch {
+        setPipelineStageNames([]);
+        setPipelineStages([]);
+      }
+    };
+
+    void loadFromPipeline();
+  }, [clinicId]);
+
+  // ── Fetch Referral Departments ──
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        setLoadingReferralDepts(true);
+        const data = await fetchReferralDepartments(clinicId);
+        setReferralDepartments(data);
+      } catch {
+        setReferralDepartments([]);
+      } finally {
+        setLoadingReferralDepts(false);
+      }
+    };
+    load();
+  }, [clinicId]);
+
   // ====================== Handlers ======================
+  const handleLeadStatusChange = (value: string) => {
+    const matched = pipelineStages.find((s) => s.stage_name === value);
+    setSelectedNextActionStageId(matched?.id ?? null);
+    setLeadStatus(value);
+    setNextStatus(""); // clear stale next status when lead status changes
+  };
+
   const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newType = e.target.value;
     setNextType(newType);
-    setNextStatus(getAutoNextActionStatus(newType));
+    // Don't auto-set nextStatus — user picks from pipeline stages
   };
+
+  const handleNextStatusChange = (value: string) => setNextStatus(value);
+
+  const handleReferralDepartmentChange = (value: string) => setReferralDepartment(value);
 
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCampaignId(e.target.value);
+  };
+
+  const handleSourceChange = (value: string) => {
+    setSource(value);
+    setSubSource("");
+    setCampaignId("");
+  };
+
+  const handleSubSourceChange = (value: string) => {
+    setSubSource(value);
+    setCampaignId("");
   };
 
   const handleDateChange = (d: Date | Dayjs | null) => {
@@ -430,13 +536,8 @@ export function useEditLead() {
     e.target.value = "";
   };
 
-  const handleRemoveDocument = (index: number) => {
-    setDocuments((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleRemoveExistingDocument = (index: number) => {
-    setExistingDocuments((prev) => prev.filter((_, i) => i !== index));
-  };
+  const handleRemoveDocument = (index: number) => setDocuments((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveExistingDocument = (index: number) => setExistingDocuments((prev) => prev.filter((_, i) => i !== index));
 
   // ====================== Fetch Lead ======================
   React.useEffect(() => {
@@ -446,7 +547,10 @@ export function useEditLead() {
         setLoading(true);
         const lead = await LeadAPI.getById(id) as LeadResponse;
         setLeadData(lead as unknown as Lead);
-        setClinicId(lead.clinic_id ?? 1);
+
+        // Fix: include selectedClinic?.id so the effect re-runs if clinic changes
+        const resolvedClinicId = lead.clinic_id ?? selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
+        setClinicId(resolvedClinicId);
 
         const origDeptId = lead.department_id ?? null;
         setLeadDepartmentId(typeof origDeptId === "number" ? origDeptId : null);
@@ -469,6 +573,15 @@ export function useEditLead() {
         setNextStatus(lead.next_action_status ?? "");
         setNextDesc(lead.next_action_description ?? "");
 
+        // ── Lead Status (pipeline stage) ──
+        const anyLead = lead as unknown as Record<string, unknown>;
+        const rawLeadStatus = (anyLead.lead_status as string) ?? (anyLead.stage_name as string) ?? "";
+        setLeadStatus(rawLeadStatus);
+
+        // ── Referral Department ──
+        const rawReferralDept = anyLead.referral_department_id;
+        if (rawReferralDept != null) setReferralDepartment(String(rawReferralDept));
+
         // ── MEDICAL-only fields ──
         if (IS_MEDICAL_APP) {
           setGender(lead.gender === "male" ? "Male" : lead.gender === "female" ? "Female" : "");
@@ -483,19 +596,12 @@ export function useEditLead() {
 
         // ── CONTRACTS-only fields ──
         if (IS_CONTRACTS_APP) {
-          const anyLead = lead as unknown as Record<string, unknown>;
           setContactPersonName((anyLead.contact_person_name as string) ?? "");
           setDesignation((anyLead.designation as string) ?? "");
           setContactPersonPhone((anyLead.contact_person_phone as string) ?? "");
           setContactPersonEmail((anyLead.contact_person_email as string) ?? "");
-          setLeadGeneratedBy(
-            ((anyLead.lead_generated_by as string) ??
-              (anyLead.personal_name as string) ??
-              "") as string,
-          );
-          setLeadGeneratedById(
-            ((anyLead.personal_id as number | string | undefined)?.toString() ?? "") as string,
-          );
+          setLeadGeneratedBy(((anyLead.lead_generated_by as string) ?? (anyLead.personal_name as string) ?? "") as string);
+          setLeadGeneratedById(((anyLead.personal_id as number | string | undefined)?.toString() ?? "") as string);
         }
 
         setTreatmentInterest(lead.treatment_interest ?? "");
@@ -507,21 +613,17 @@ export function useEditLead() {
         setWantAppointment(hasBooking ? "yes" : "no");
 
         if (hasBooking) {
-          // Only set department for appointment if medical app (contracts has no department field)
-          if (IS_MEDICAL_APP) {
-            setDepartment(lead.department_id?.toString() ?? "");
-          }
-          const anyLead = lead as unknown as { personal_id?: number; personal_name?: string };
-          const personnelId = anyLead.personal_id;
+          if (IS_MEDICAL_APP) setDepartment(lead.department_id?.toString() ?? "");
+          const personnelId = (anyLead.personal_id as number | undefined);
           setAppointmentPersonnel(personnelId?.toString() ?? "");
-          setAppointmentPersonnelSearch(anyLead.personal_name ?? "");
+          setAppointmentPersonnelSearch((anyLead.personal_name as string) ?? "");
           setAppointmentDate(lead.appointment_date ?? "");
           if (lead.appointment_date) setSelectedDate(dayjs(lead.appointment_date));
           setSlot(lead.slot ?? "");
           setRemark(lead.remark ?? "");
         }
 
-        // ── Fetch existing documents ──
+        // ── Existing documents ──
         const embeddedDocs = (lead as unknown as { documents?: unknown[] }).documents;
         if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
           const normalized = embeddedDocs.map((d) => normalizeDocument(d as Parameters<typeof normalizeDocument>[0]));
@@ -534,11 +636,8 @@ export function useEditLead() {
             if (Array.isArray(rawDocs) && rawDocs.length > 0) {
               setExistingDocuments(rawDocs.map((d) => normalizeDocument(d as Parameters<typeof normalizeDocument>[0])));
             }
-          } catch {
-            // silently ignore — not critical
-          } finally {
-            setDocsLoading(false);
-          }
+          } catch { /* silently ignore */ }
+          finally { setDocsLoading(false); }
         }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load lead");
@@ -547,7 +646,8 @@ export function useEditLead() {
       }
     };
     load();
-  }, [id]);
+    // selectedClinic?.id added to satisfy react-hooks/exhaustive-deps
+  }, [id, selectedClinic?.id]);
 
   // ====================== Fetch Departments ======================
   React.useEffect(() => {
@@ -584,116 +684,73 @@ export function useEditLead() {
     load();
   }, [clinicId]);
 
+  // ── Assignee search ──
   React.useEffect(() => {
     const timer = setTimeout(async () => {
-      if (!assigneeSearch.trim()) {
-        setAssigneeOptions([]);
-        return;
-      }
+      if (!assigneeSearch.trim()) { setAssigneeOptions([]); return; }
       try {
         setAssigneeLoading(true);
-        const response = await authApi.searchUsers({
-          search: assigneeSearch,
-          limit: 20,
-          offset: 0,
-        });
+        const response = await authApi.searchUsers({ search: assigneeSearch, limit: 20, offset: 0 });
         setAssigneeOptions(normalizeAssignees(response));
-      } catch {
-        setAssigneeOptions([]);
-      } finally {
-        setAssigneeLoading(false);
-      }
+      } catch { setAssigneeOptions([]); }
+      finally { setAssigneeLoading(false); }
     }, 350);
-
     return () => clearTimeout(timer);
   }, [assigneeSearch]);
 
+  // ── Lead Generated By search ──
   React.useEffect(() => {
     const timer = setTimeout(async () => {
-      if (!leadGeneratedBySearch.trim()) {
-        setLeadGeneratedByOptions([]);
-        return;
-      }
+      if (!leadGeneratedBySearch.trim()) { setLeadGeneratedByOptions([]); return; }
       try {
         setLeadGeneratedByLoading(true);
-        const response = await authApi.searchUsers({
-          search: leadGeneratedBySearch,
-          limit: 20,
-          offset: 0,
-        });
+        const response = await authApi.searchUsers({ search: leadGeneratedBySearch, limit: 20, offset: 0 });
         setLeadGeneratedByOptions(normalizeAssignees(response));
-      } catch {
-        setLeadGeneratedByOptions([]);
-      } finally {
-        setLeadGeneratedByLoading(false);
-      }
+      } catch { setLeadGeneratedByOptions([]); }
+      finally { setLeadGeneratedByLoading(false); }
     }, 350);
-
     return () => clearTimeout(timer);
   }, [leadGeneratedBySearch]);
 
+  // ── Appointment personnel search ──
   React.useEffect(() => {
     const timer = setTimeout(async () => {
-      if (wantAppointment !== "yes") {
+      if (wantAppointment !== "yes" || !appointmentPersonnelSearch.trim()) {
         setAppointmentPersonnelOptions([]);
         return;
       }
-
-      if (!appointmentPersonnelSearch.trim()) {
-        setAppointmentPersonnelOptions([]);
-        return;
-      }
-
       try {
         setAppointmentPersonnelLoading(true);
-        const response = await authApi.searchUsers({
-          search: appointmentPersonnelSearch,
-          limit: 20,
-          offset: 0,
-        });
+        const response = await authApi.searchUsers({ search: appointmentPersonnelSearch, limit: 20, offset: 0 });
         setAppointmentPersonnelOptions(normalizeAssignees(response));
-      } catch {
-        setAppointmentPersonnelOptions([]);
-      } finally {
-        setAppointmentPersonnelLoading(false);
-      }
+      } catch { setAppointmentPersonnelOptions([]); }
+      finally { setAppointmentPersonnelLoading(false); }
     }, 350);
-
     return () => clearTimeout(timer);
-  }, [
-    appointmentPersonnelSearch,
-    wantAppointment,
-  ]);
+  }, [appointmentPersonnelSearch, wantAppointment]);
 
   const selectedAppointmentPersonnel = React.useMemo(() => {
     const selectedId = Number(appointmentPersonnel);
     if (Number.isFinite(selectedId)) {
-      const matched = appointmentPersonnelOptions.find((option) => option.id === selectedId);
+      const matched = appointmentPersonnelOptions.find((o) => o.id === selectedId);
       if (matched) return matched;
     }
-
     if (!appointmentPersonnelSearch.trim()) return null;
-
     return {
-      id: Number.isFinite(selectedId) ? selectedId : 0,
-      first_name: undefined,
-      last_name: undefined,
+      id: Number.isFinite(Number(appointmentPersonnel)) ? Number(appointmentPersonnel) : 0,
+      first_name: undefined, last_name: undefined,
       username: appointmentPersonnelSearch,
-      role: undefined,
-      designation: undefined,
-      email: undefined,
+      role: undefined, designation: undefined, email: undefined,
     } satisfies AssigneeOption;
   }, [appointmentPersonnel, appointmentPersonnelOptions, appointmentPersonnelSearch]);
 
-  // ====================== Filter Personnel by Appointment Department ======================
+  // ── Filter Personnel by Department ──
   React.useEffect(() => {
     if (!department || employees.length === 0) { setFilteredPersonnel([]); return; }
     const selectedDept = departments.find((d) => d.id === Number(department));
     if (!selectedDept) { setFilteredPersonnel([]); return; }
     const normalize = (s: string) => (s ?? "").trim().toLowerCase().normalize("NFC");
-    setFilteredPersonnel(
-      employees.filter((emp) => normalize(emp.department_name) === normalize(selectedDept.name))
-    );
+    setFilteredPersonnel(employees.filter((emp) => normalize(emp.department_name) === normalize(selectedDept.name)));
   }, [department, employees, departments]);
 
   // ====================== Save ======================
@@ -703,43 +760,31 @@ export function useEditLead() {
     if (!canEditLeads) {
       const msg = "You do not have permission to edit leads.";
       setError(msg);
-      toast.error(msg, {
-        position: "top-right",
-        autoClose: 3000,
-        theme: "colored",
-      });
+      toast.error(msg, { position: "top-right", autoClose: 3000, theme: "colored" });
       return;
     }
 
     const bookingActive = wantAppointment === "yes";
 
     if (bookingActive) {
-      // Department is only required for medical app
-      if (IS_MEDICAL_APP && !department) {
-        setError("Please select a department for the appointment.");
-        return;
-      }
-      if (!appointmentDate) {
-        setError("Please select a date for the appointment.");
-        return;
-      }
-      if (!slot) {
-        setError("Please select a time slot for the appointment.");
-        return;
-      }
+      if (IS_MEDICAL_APP && !department) { setError("Please select a department for the appointment."); return; }
+      if (!appointmentDate) { setError("Please select a date for the appointment."); return; }
+      if (!slot) { setError("Please select a time slot for the appointment."); return; }
     }
 
-    const resolvedStatus = isNextActionStatus(nextStatus) ? nextStatus : null;
+    const resolvedStatus = nextStatus || null;
     const resolvedDeptId: number = leadDepartmentId ?? leadData.department_id ?? clinicId;
     const coupleActive = IS_MEDICAL_APP && isCouple === "yes";
     const matchedGeneratedByOption = leadGeneratedByOptions.find(
       (option) => assigneeOptionLabel(option) === leadGeneratedBy,
     );
     const resolvedGeneratedById = intOrNull(leadGeneratedById) ?? matchedGeneratedByOption?.id ?? null;
+    const referralDeptId = intOrNull(referralDepartment);
 
     const updateData = {
       clinic_id: clinicId,
       department_id: resolvedDeptId,
+      stage_id: selectedNextActionStageId || null,
       full_name: fullName.trim(),
       contact_no: contactNo.trim(),
       email: strOrNull(email),
@@ -753,64 +798,45 @@ export function useEditLead() {
       next_action_type: nextType || undefined,
       next_action_status: resolvedStatus,
       next_action_description: nextDesc || "",
+      ...(leadStatus ? { lead_status: leadStatus as LeadPayload["lead_status"] } : {}),
       treatment_interest: treatments.length > 0 ? treatments.join(",") : (treatmentInterest || ""),
       is_active: leadData?.is_active !== false,
       book_appointment: bookingActive,
+      referral_department_id: referralDeptId ?? null,
 
-      // ── MEDICAL-only payload fields ──
-      ...(IS_MEDICAL_APP
-        ? {
-            age: intOrNull(age),
-            marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
-            gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
-            language_preference: language || "",
-            partner_inquiry: coupleActive,
-            partner_full_name: coupleActive ? (partnerName || "") : "",
-            partner_age: coupleActive ? intOrNull(partnerAge) : null,
-            partner_gender: coupleActive && partnerGender
-              ? (partnerGender.toLowerCase() as "male" | "female")
-              : null,
-          }
-        : {}),
+      ...(IS_MEDICAL_APP ? {
+        age: intOrNull(age),
+        marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
+        gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
+        language_preference: language || "",
+        partner_inquiry: coupleActive,
+        partner_full_name: coupleActive ? (partnerName || "") : "",
+        partner_age: coupleActive ? intOrNull(partnerAge) : null,
+        partner_gender: coupleActive && partnerGender ? (partnerGender.toLowerCase() as "male" | "female") : null,
+      } : {}),
 
-      // ── CONTRACTS-only payload fields ──
-      ...(IS_CONTRACTS_APP
-        ? {
-            contact_person_name: contactPersonName || "",
-            designation: designation || "",
-            contact_person_phone: contactPersonPhone || "",
-            contact_person_email: contactPersonEmail || "",
-            lead_generated_by: leadGeneratedBy || "",
-            personal_id: resolvedGeneratedById,
-            personal_name: leadGeneratedBy || null,
-          }
-        : {}),
+      ...(IS_CONTRACTS_APP ? {
+        contact_person_name: contactPersonName || "",
+        designation: designation || "",
+        contact_person_phone: contactPersonPhone || "",
+        contact_person_email: contactPersonEmail || "",
+        lead_generated_by: leadGeneratedBy || "",
+        personal_id: resolvedGeneratedById,
+        personal_name: leadGeneratedBy || null,
+      } : {}),
 
-      // ── Appointment fields: omit entirely when not booking ──
-      ...(bookingActive
-        ? {
-            appointment_date: appointmentDate,
-            slot: slot,
-            remark: remark || "",
-            ...(IS_MEDICAL_APP
-              ? {
-                  personal_id: appointmentPersonnel
-                    ? intOrNull(appointmentPersonnel)
-                    : null,
-                }
-              : {}),
-            // Department in appointment payload only for medical
-            ...(IS_MEDICAL_APP ? {} : {}),
-          }
-        : {
-            appointment_date: undefined,
-            slot: undefined,
-            remark: "",
-            ...(IS_MEDICAL_APP ? { personal_id: null } : {}),
-          }),
+      ...(bookingActive ? {
+        appointment_date: appointmentDate,
+        slot,
+        remark: remark || "",
+        ...(IS_MEDICAL_APP ? { personal_id: appointmentPersonnel ? intOrNull(appointmentPersonnel) : null } : {}),
+      } : {
+        appointment_date: undefined,
+        slot: undefined,
+        remark: "",
+        ...(IS_MEDICAL_APP ? { personal_id: null } : {}),
+      }),
     };
-
-    console.log("Saving lead payload:", JSON.stringify(updateData, null, 2));
 
     setShowSuccess(true);
     setSaving(true);
@@ -825,11 +851,7 @@ export function useEditLead() {
 
     doSave()
       .then(() => {
-        toast.success("Lead saved successfully!", {
-          position: "top-right",
-          autoClose: 1500,
-          theme: "colored",
-        });
+        toast.success("Lead saved successfully!", { position: "top-right", autoClose: 1500, theme: "colored" });
         setTimeout(() => {
           navigate("/leads", { replace: true });
           dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
@@ -841,14 +863,11 @@ export function useEditLead() {
         const anyErr = err as { response?: { data?: { detail?: string; message?: string } }; detail?: string };
         if (anyErr?.response?.data?.detail) msg = anyErr.response.data.detail;
         else if (anyErr?.response?.data?.message) msg = anyErr.response.data.message;
-        console.error("Save failed:", err);
         setError(msg);
         setShowSuccess(false);
         toast.error(msg, { position: "top-right", autoClose: 5000, theme: "colored" });
       })
-      .finally(() => {
-        setSaving(false);
-      });
+      .finally(() => { setSaving(false); });
   };
 
   return {
@@ -867,6 +886,19 @@ export function useEditLead() {
     loadingEmployees,
     employeeError, setEmployeeError,
     leadData,
+    // ── Pipeline / stage ──
+    leadStatusOptions,
+    filteredNextActionStatusOptions,
+    nextActionTypeOptions,
+    leadStatus,
+    handleLeadStatusChange,
+    handleNextStatusChange,
+    handleSourceChange,
+    handleSubSourceChange,
+    handleReferralDepartmentChange,
+    referralDepartments,
+    loadingReferralDepts,
+    referralDepartment,
     // ── Shared fields ──
     fullName, setFullName,
     contactNo, setContactNo,
@@ -929,7 +961,7 @@ export function useEditLead() {
     remark, setRemark,
     handleSave,
     handleWantAppointmentChange,
-    // ── App-type flags (pass through so EditLead.tsx can use directly) ──
+    // ── App-type flags ──
     IS_MEDICAL_APP,
     IS_CONTRACTS_APP,
     ACTIVE_FLOW_COPY,
