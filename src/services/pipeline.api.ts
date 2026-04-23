@@ -21,12 +21,17 @@ export type PipelineStageType =
   | "engagement"
   | "conversion"
   | "closure";
+
+// Backend uses: "open" | "won" | "lost"
+// Frontend previously used: "active" | "inactive"
+// Both are now accepted everywhere.
 export type PipelineStageStatus =
   | "active"
   | "inactive"
   | "open"
   | "won"
   | "lost";
+
 export type PipelineRuleActionType =
   | "call"
   | "email"
@@ -142,6 +147,18 @@ type PipelineApiResponse = Partial<Pipeline> & {
   stages?: PipelineStageApiResponse[];
 };
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns true when a stage_status value should be treated as "active/visible".
+ * Backend uses "open" for active stages; frontend historically used "active".
+ * Both are accepted here so the filter works regardless of which value arrives.
+ */
+export const isActiveStageStatus = (status: string | undefined | null): boolean => {
+  const s = (status ?? "").toLowerCase().trim();
+  return s === "open" || s === "active";
+};
+
 const normalizeStage = (
   stage: PipelineStageApiResponse,
   index: number,
@@ -156,7 +173,9 @@ const normalizeStage = (
   ),
   stage_name: stage.stage_name ?? "Untitled Stage",
   stage_type: stage.stage_type ?? "lead",
-  stage_status: stage.stage_status ?? "active",
+  // Preserve the exact value from the backend ("open", "won", "lost", "active", etc.)
+  // so isActiveStageStatus() can match it correctly downstream.
+  stage_status: stage.stage_status ?? "open",
   stage_order: stage.stage_order ?? index,
   stage_color: stage.stage_color ?? stage.color_code,
   entry_rule: stage.entry_rule,
@@ -232,7 +251,7 @@ const removeRelationsForBackend = <TPayload extends StageMutationPayload>(
 };
 
 const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
-  const isRenderableStage = (stage: PipelineStageApiResponse): boolean => {
+  const isValidStage = (stage: PipelineStageApiResponse): boolean => {
     if (!stage || typeof stage !== "object") return false;
     if (Object.keys(stage).length === 0) return false;
     return (
@@ -249,7 +268,7 @@ const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
 
   const stages = Array.isArray(pipeline.stages)
     ? pipeline.stages
-        .filter(isRenderableStage)
+        .filter(isValidStage)
         .map((stage, index) => normalizeStage(stage, index))
     : [];
 
@@ -260,7 +279,9 @@ const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
     pipeline_name: pipeline.pipeline_name ?? "Untitled Pipeline",
     industry_type: pipeline.industry_type ?? "other",
     is_active: pipeline.is_active ?? true,
-    stages: stages.sort((left, right) => left.stage_order - right.stage_order),
+    // Sort by stage_order ascending — backend Meta.ordering = ["stage_order"]
+    // but we sort here too in case the response arrives unsorted.
+    stages: stages.sort((a, b) => a.stage_order - b.stage_order),
   };
 };
 
@@ -397,7 +418,6 @@ export const pipelineApi = {
     };
 
     try {
-      // Prefer RESTful delete first when available.
       await http.delete(`/pipelines/${pipelineId}/`, { params });
       return;
     } catch (restDeleteError) {
@@ -415,8 +435,6 @@ export const pipelineApi = {
 
       if (shouldFallbackToActionDelete) {
         try {
-          // Use POST action fallback instead of DELETE /delete/ to avoid
-          // malformed upstream responses seen on some backend deployments.
           await http.post(`/pipelines/${pipelineId}/delete/`, undefined, {
             params,
           });
@@ -425,7 +443,6 @@ export const pipelineApi = {
           if (await wasDeleted()) {
             return;
           }
-
           throw actionDeleteError;
         }
       }
@@ -470,7 +487,7 @@ export const pipelineApi = {
       } = {
         ...payload,
         pipeline: payload.pipeline_id,
-        stage_status: payload.stage_status ?? "active",
+        stage_status: payload.stage_status ?? "open",
       };
 
       if (candidate?.response?.status === 400) {
@@ -643,8 +660,6 @@ export const pipelineApi = {
 
   async removeStage(stageId: string): Promise<void> {
     try {
-      // Prefer RESTful delete first. Some /delete/ DELETE handlers return
-      // malformed responses through proxy.
       await http.delete(`/pipelines/stages/${stageId}/`, {
         params: { clinic_id: storedClinicId() },
       });
