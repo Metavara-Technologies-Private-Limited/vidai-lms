@@ -28,7 +28,12 @@ import type { FormState } from "../../types/leads.types";
 import { LeadAPI, DepartmentAPI, LeadEmailAPI } from "../../services/leads.api";
 import type { Department } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
-import { pipelineApi, type Pipeline } from "../../services/pipeline.api";
+import {
+  pipelineApi,
+  isActiveStageStatus,
+  type Pipeline,
+  type PipelineStage,
+} from "../../services/pipeline.api";
 
 import {
   ALLOWED_DOC_TYPES,
@@ -164,6 +169,28 @@ const showInputToast = (toastId: string, message: string) => {
 const sanitizeEmailInput = (value: string): string =>
   value.toLowerCase().replace(/[^a-z0-9@._%+-]/g, "");
 
+// ── Derive action type labels from a single stage's enabled rules ─────────────
+const deriveActionTypeOptions = (stage: PipelineStage): string[] => {
+  const labels = stage.rules
+    .filter((r) => r.is_enabled)
+    .map((r) => (r.custom_label?.trim() ? r.custom_label.trim() : r.action_type));
+  return labels.length > 0 ? labels : [...TASK_TYPES];
+};
+
+// ── Derive union of action type labels across all stages ──────────────────────
+const deriveAllActionTypeOptions = (stages: PipelineStage[]): string[] => {
+  const labels = Array.from(
+    new Set(
+      stages.flatMap((s) =>
+        s.rules
+          .filter((r) => r.is_enabled)
+          .map((r) => (r.custom_label?.trim() ? r.custom_label.trim() : r.action_type)),
+      ),
+    ),
+  );
+  return labels.length > 0 ? labels : [...TASK_TYPES];
+};
+
 // ====================== Component ======================
 export default function AddNewLead() {
   const navigate = useNavigate();
@@ -195,28 +222,34 @@ export default function AddNewLead() {
   const [referralDepartments, setReferralDepartments] = React.useState<ReferralDepartment[]>([]);
   const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
 
-  // ── File state (declared once) ─────────────────────────────────────────────
+  // ── File state ─────────────────────────────────────────────────────────────
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
   const [docDragOver, setDocDragOver] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // ── Pipeline / stage state ─────────────────────────────────────────────────
-  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<string[]>([...TASK_TYPES]);
+  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<string[]>([]);
   const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
-  const [pipelineStages, setPipelineStages] = React.useState<Array<{ id: string; stage_name: string }>>([]);
+  // Store full PipelineStage objects so rules are accessible
+  const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>([]);
   const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string | null>(null);
 
-  // Derived options consumed by Step1 — must be NextActionStatusOption[]
+  // Derived options consumed by Step1 — order comes from stage_order on the objects
   const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
-    () => pipelineStageNames.map((name) => ({ label: name, value: name })),
-    [pipelineStageNames],
+    () =>
+      pipelineStages.map((s) => ({
+        label: s.stage_name.trim(),
+        value: s.stage_name.trim(),
+      })),
+    [pipelineStages],
   );
+
   const rawCampaigns = useSelector(selectCampaign);
   const authedUser = useSelector(selectUser);
   const selectedClinic = useSelector(selectClinic);
   const clinicId = selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
 
-  // ── Permission guard ──────────────────────────────────────────────────────
+  // ── Permission guard ───────────────────────────────────────────────────────
   const _authUserRaw = authedUser as unknown as Record<string, unknown> | null;
   const _nestedUser =
     _authUserRaw?.user && typeof _authUserRaw.user === "object"
@@ -224,7 +257,6 @@ export default function AddNewLead() {
       : null;
   const _role = resolveUserRole(_authUserRaw);
   const _perms = _authUserRaw?.permissions ?? _nestedUser?.permissions;
-  // Treat null authedUser as still loading — don't redirect prematurely
   const authIsLoaded = authedUser != null;
   const canAddLeads =
     _role === "super_admin" ||
@@ -283,14 +315,27 @@ export default function AddNewLead() {
     referralDepartment: "",
   });
 
-  // Next action status = all pipeline stages except the currently selected lead status
-  const filteredNextActionStatusOptions = React.useMemo<NextActionStatusOption[]>(
-    () =>
-      pipelineStageNames
-        .filter((name) => name !== form.leadStatus)
-        .map((name) => ({ label: name, value: name })),
-    [pipelineStageNames, form.leadStatus],
-  );
+  // Next action status = only stages that come AFTER the selected lead status
+  // e.g. if "Follow Up" is order 2, exclude "New" (order 1) and "Follow Up" (order 2)
+  const filteredNextActionStatusOptions = React.useMemo<NextActionStatusOption[]>(() => {
+    if (!form.leadStatus) {
+      return pipelineStageNames.map((name) => ({ label: name, value: name }));
+    }
+
+    const currentStage = pipelineStages.find(
+      (s) => s.stage_name.trim().toLowerCase() === form.leadStatus.trim().toLowerCase(),
+    );
+
+    if (!currentStage) {
+      return pipelineStageNames.map((name) => ({ label: name, value: name }));
+    }
+
+    // Only show stages with a higher stage_order than the selected lead status
+    return pipelineStages
+      .filter((s) => s.stage_order > currentStage.stage_order)
+      .map((s) => ({ label: s.stage_name, value: s.stage_name }));
+
+  }, [pipelineStages, pipelineStageNames, form.leadStatus]);
 
   // ── Fetch Departments ──────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -349,20 +394,27 @@ export default function AddNewLead() {
             null;
         }
 
-        const activeStages = (selectedPipeline?.stages ?? [])
-          .filter((s) => (s.stage_status ?? "").toLowerCase().trim() === "active")
-          .sort((a, b) => a.stage_order - b.stage_order)
-          .filter((s) => s.stage_name.trim());
+        const rawStages = (selectedPipeline?.stages ?? []);
+        const activeStages = rawStages
+          .filter((s) => isActiveStageStatus(s.stage_status))
+          .filter((s) => s.stage_name.trim())
+          .sort((a, b) => {
+            const aOrder = typeof a.stage_order === "number" ? a.stage_order : 0;
+            const bOrder = typeof b.stage_order === "number" ? b.stage_order : 0;
+            if (aOrder === bOrder) return 0;
+            return aOrder - bOrder;
+          });
 
         const stageNames = activeStages.map((s) => s.stage_name.trim());
 
-        // Populate pipeline stage names + full stage objects for ID resolution
         setPipelineStageNames(stageNames);
-        setPipelineStages(activeStages.map((s) => ({ id: s.id, stage_name: s.stage_name.trim() })));
+        // Store full stage objects — rules are needed for action type derivation
+        setPipelineStages(activeStages);
 
-        // Always show all task types — pipeline rules only gate stages, not what the user can select
-        setNextActionTypeOptions([...TASK_TYPES]);
+        // Initial options = union of enabled rule labels across all active stages
+        setNextActionTypeOptions(deriveAllActionTypeOptions(activeStages));
       } catch {
+        // No pipeline configured — fall back to the static task type list
         setNextActionTypeOptions([...TASK_TYPES]);
       }
     };
@@ -370,11 +422,11 @@ export default function AddNewLead() {
     void loadFromPipeline();
   }, [clinicId]);
 
-  // ── Auto-clear nextType if options change and selected value is gone ────────
+  // ── Auto-clear nextType if it's no longer valid for the selected stage ─────
   React.useEffect(() => {
     if (!form.nextType) return;
     if (nextActionTypeOptions.includes(form.nextType)) return;
-    setForm((prev) => ({ ...prev, nextType: "" })); // only clear type, status is independent
+    setForm((prev) => ({ ...prev, nextType: "" }));
   }, [form.nextType, nextActionTypeOptions]);
 
   // ── Fetch Referral Departments ─────────────────────────────────────────────
@@ -525,10 +577,23 @@ export default function AddNewLead() {
   };
 
   const handleLeadStatusChange = (value: string) => {
-    // Resolve the stage ID for the selected lead status and clear stale nextStatus
-    const matched = pipelineStages.find((s) => s.stage_name === value);
+    const trimmed = value.trim();
+
+    // Find the matching stage to read its rules
+    const matched = pipelineStages.find(
+      (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
     setSelectedNextActionStageId(matched?.id ?? null);
-    setForm((prev) => ({ ...prev, leadStatus: value, nextStatus: "" }));
+
+    // Action type options come from the selected stage's enabled rules;
+    // fall back to the union across all stages when no stage is matched.
+    const stageActionOptions = matched
+      ? deriveActionTypeOptions(matched)
+      : deriveAllActionTypeOptions(pipelineStages);
+    setNextActionTypeOptions(stageActionOptions);
+
+    // Clear dependent fields since the stage context has changed
+    setForm((prev) => ({ ...prev, leadStatus: trimmed, nextStatus: "", nextType: "" }));
   };
 
   const handleNextTypeChange = (value: string) =>
@@ -816,7 +881,7 @@ export default function AddNewLead() {
     { label: ACTIVE_FLOW_COPY.step3, step: 3 },
   ];
 
-  if (!authIsLoaded) return null; // wait for Redux auth to hydrate
+  if (!authIsLoaded) return null;
   if (!canAddLeads) return <Navigate to="/leads" replace />;
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -894,6 +959,7 @@ export default function AddNewLead() {
             campaigns={campaigns}
             leadStatusOptions={leadStatusOptions}
             nextActionStatusOptions={filteredNextActionStatusOptions}
+            nextActionTypeOptions={nextActionTypeOptions}
             handleChange={handleChange}
             handleSelectChange={handleSelectChange}
             handleAssigneeInputChange={(value) => {
