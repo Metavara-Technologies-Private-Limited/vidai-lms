@@ -41,7 +41,8 @@ const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 // ====================== Extended Lead type ======================
-export interface LeadResponse extends Lead {
+// FIX TS2430: Omit 'gender' from Lead so we can widen it to include null
+export interface LeadResponse extends Omit<Lead, "gender"> {
   gender?: "male" | "female" | "other" | null;
   language_preference?: string | null;
   next_action_type?: string;
@@ -589,7 +590,7 @@ export function useEditLead() {
   // Runs once when pipelineStages first populates (lead fetch has already set
   // leadStatus / nextStatus). Re-derives nextActionTypeOptions from the
   // pre-populated nextStatus stage so the dropdown shows the correct options
-  // for the existing lead values — identical to how AddNewLead initialises
+  // for the existing lead values — identical to how AddNewLead initializes
   // options when the user first picks a lead status.
   const pipelineStagesLoaded = pipelineStages.length > 0;
   React.useEffect(() => {

@@ -113,6 +113,12 @@ export type LeadPayload = {
   remark: string;
   is_active: boolean;
   referral_department_id?: number | null;
+
+  // ── Contact Information (contracts app) ───────────────────────────────────
+  contact_full_name?: string | null;
+  contact_designation?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
 };
 
 // ====================== Campaign Type ======================
