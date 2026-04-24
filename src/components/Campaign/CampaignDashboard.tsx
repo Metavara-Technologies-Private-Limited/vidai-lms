@@ -83,7 +83,7 @@ const CampaignDashboard = ({
   const fetchGoogleAdsInsights = React.useCallback(async (campaignId: string) => {
     try {
       console.log("Fetching Google Ads insights for campaign ID:", campaignId);
-      const res = await CampaignAPI.getGoogleAdsInsights(campaignId);
+      const res = await CampaignAPI.getGoogleAdsInsightsFromApi(campaignId);
       const data = res.data?.insights || res.data || {};
 
       console.log("GOOGLE ADS INSIGHTS RAW:", data);

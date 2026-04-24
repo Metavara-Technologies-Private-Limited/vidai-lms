@@ -110,7 +110,13 @@ export const CampaignAPI = {
   // ✅ Fetches latest Google Ads insights from DB
   // after Zapier webhook triggers the data fetch
   getGoogleAdsInsights: (campaignId: string) =>
-    http.get(`/campaigns/${campaignId}/google-ads-insights/`, {
-      params: { clinic_id: storedClinicId() },
+    http.get(`/google-ads/insights/`, {
+      params: { campaign_id: campaignId, clinic_id: storedClinicId() },
+    }),
+
+  // Explicit alias for debugging and clear endpoint routing
+  getGoogleAdsInsightsFromApi: (campaignId: string) =>
+    http.get(`/google-ads/insights/`, {
+      params: { campaign_id: campaignId, clinic_id: storedClinicId() },
     }),
 };
