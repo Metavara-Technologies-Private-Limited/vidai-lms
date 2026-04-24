@@ -253,7 +253,10 @@ export default function EditLead() {
   const handleFullNameChange = (value: string) => {
     const sanitized = sanitizeNameInput(value);
     if (sanitized !== value)
-      showInputToast("edit-lead-name-invalid", "Only letters, numbers and spaces allowed");
+      showInputToast(
+        "edit-lead-name-invalid",
+        "Only letters, numbers and spaces allowed",
+      );
     setFullName(sanitized);
   };
 
@@ -834,9 +837,8 @@ export default function EditLead() {
                     clearOnBlur={false}
                     filterOptions={(options) => options}
                     value={
-                      assigneeOptions.find(
-                        (o) => String(o.id) === assignee,
-                      ) || null
+                      assigneeOptions.find((o) => String(o.id) === assignee) ||
+                      null
                     }
                     inputValue={assigneeName}
                     onInputChange={(_, value, reason) => {
@@ -847,9 +849,7 @@ export default function EditLead() {
                     }}
                     onChange={(_, value) => {
                       setAssignee(value ? String(value.id) : "");
-                      setAssigneeName(
-                        value ? assigneeOptionLabel(value) : "",
-                      );
+                      setAssigneeName(value ? assigneeOptionLabel(value) : "");
                     }}
                     getOptionLabel={assigneeOptionLabel}
                     isOptionEqualToValue={(o, v) => o.id === v.id}
@@ -907,9 +907,7 @@ export default function EditLead() {
                         setLeadGeneratedBy(
                           value ? assigneeOptionLabel(value) : "",
                         );
-                        setLeadGeneratedById(
-                          value ? String(value.id) : "",
-                        );
+                        setLeadGeneratedById(value ? String(value.id) : "");
                       }}
                       getOptionLabel={assigneeOptionLabel}
                       isOptionEqualToValue={(o, v) => o.id === v.id}
@@ -931,10 +929,7 @@ export default function EditLead() {
                             endAdornment: (
                               <>
                                 {leadGeneratedByLoading ? (
-                                  <CircularProgress
-                                    size={14}
-                                    sx={{ mr: 1 }}
-                                  />
+                                  <CircularProgress size={14} sx={{ mr: 1 }} />
                                 ) : null}
                                 {params.InputProps.endAdornment}
                               </>
@@ -1007,9 +1002,7 @@ export default function EditLead() {
                     fullWidth
                     size="small"
                     value={nextStatus}
-                    onChange={(e) =>
-                      handleNextStatusChange(e.target.value)
-                    }
+                    onChange={(e) => handleNextStatusChange(e.target.value)}
                     sx={inputStyle}
                   >
                     <MenuItem value="">-- Select --</MenuItem>
@@ -1420,10 +1413,7 @@ export default function EditLead() {
                             <em>-- Select Department --</em>
                           </MenuItem>
                           {departments.map((dept) => (
-                            <MenuItem
-                              key={dept.id}
-                              value={dept.id.toString()}
-                            >
+                            <MenuItem key={dept.id} value={dept.id.toString()}>
                               {dept.name}
                             </MenuItem>
                           ))}
@@ -1457,8 +1447,7 @@ export default function EditLead() {
                         getOptionLabel={personnelOptionLabel}
                         isOptionEqualToValue={(o, v) => o.id === v.id}
                         disabled={
-                          loadingEmployees ||
-                          (IS_MEDICAL_APP && !department)
+                          loadingEmployees || (IS_MEDICAL_APP && !department)
                         }
                         noOptionsText={
                           IS_MEDICAL_APP && !department
