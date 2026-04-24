@@ -254,7 +254,10 @@ export default function EditLead() {
   const handleFullNameChange = (value: string) => {
     const sanitized = sanitizeNameInput(value);
     if (sanitized !== value)
-      showInputToast("edit-lead-name-invalid", "Only letters, numbers and spaces allowed");
+      showInputToast(
+        "edit-lead-name-invalid",
+        "Only letters, numbers and spaces allowed",
+      );
     setFullName(sanitized);
   };
 
@@ -580,7 +583,7 @@ export default function EditLead() {
                 </Box>
               )}
 
-              {/* MEDICAL — Language Preference */
+              {/* MEDICAL — Language Preference */}
               {IS_MEDICAL_APP && (
                 <Box sx={{ mb: 3 }}>
                   <Typography sx={labelStyle}>Language Preference</Typography>
