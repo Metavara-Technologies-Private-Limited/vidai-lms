@@ -352,10 +352,7 @@ export default function AddNewLead() {
   });
 
   // Next action status = only stages that come AFTER the selected lead status
-  // e.g. if "Follow Up" is order 2, exclude "New" (order 1) and "Follow Up" (order 2)
-  const filteredNextActionStatusOptions = React.useMemo<
-    NextActionStatusOption[]
-  >(() => {
+  const filteredNextActionStatusOptions = React.useMemo<NextActionStatusOption[]>(() => {
     if (!form.leadStatus) {
       return pipelineStageNames.map((name) => ({ label: name, value: name }));
     }
@@ -688,6 +685,7 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, department: value, personnel: "" }));
   };
 
+  // ── Lead Status Change — auto-populates Next Action Status ────────────────
   const handleLeadStatusChange = (value: string) => {
     const trimmed = value.trim();
 
@@ -704,11 +702,20 @@ export default function AddNewLead() {
       : deriveAllActionTypeOptions(pipelineStages);
     setNextActionTypeOptions(stageActionOptions);
 
-    // Clear dependent fields since the stage context has changed
+    // Auto-populate Next Action Status with the first stage that comes
+    // after the selected lead status (by stage_order).
+    const nextStages = pipelineStages
+      .filter((s) => (matched ? s.stage_order > matched.stage_order : true))
+      .sort((a, b) => a.stage_order - b.stage_order);
+
+    // Only auto-fill when a valid lead status is selected; clear otherwise.
+    const autoNextStatus =
+      trimmed && nextStages[0] ? nextStages[0].stage_name.trim() : "";
+
     setForm((prev) => ({
       ...prev,
       leadStatus: trimmed,
-      nextStatus: "",
+      nextStatus: autoNextStatus,
       nextType: "",
     }));
   };
