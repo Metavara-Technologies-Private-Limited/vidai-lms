@@ -100,10 +100,15 @@ const CampaignDashboard = ({
         conversion_rate: String(data.ctr ?? data.conversion_rate ?? prev.conversion_rate ?? "0%"),
         ctr: String(data.ctr ?? prev.ctr ?? "0"),
       }));
+
+      return data;
     } catch (err) {
       console.error("Google Ads insights fetch failed", err);
+      return null;
     }
   }, []);
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   React.useEffect(() => {
     const fetchAll = async () => {
@@ -157,7 +162,18 @@ const CampaignDashboard = ({
         }
 
         if (hasGoogleAds) {
-          await fetchGoogleAdsInsights(campaign.id);
+          const googleData = await fetchGoogleAdsInsights(campaign.id);
+
+          // If the initial fetch returns empty zero metrics, wait and retry once.
+          if (
+            googleData &&
+            Number(googleData.impressions ?? 0) === 0 &&
+            Number(googleData.clicks ?? 0) === 0 &&
+            Number(googleData.cost ?? 0) === 0
+          ) {
+            await sleep(1800);
+            await fetchGoogleAdsInsights(campaign.id);
+          }
         }
 
       } catch (err) {
