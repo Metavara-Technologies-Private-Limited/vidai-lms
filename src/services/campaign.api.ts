@@ -50,6 +50,13 @@ export const CampaignAPI = {
       params: { clinic_id: data.clinic_id },
     }),
 
+  // ← new: pause or enable a Google Ads campaign
+  updateGoogleAdsStatus: (campaignId: string, action: "pause" | "enable") =>
+    http.post("/google-ads/status/", {
+      campaign_id: campaignId,
+      action,
+    }),
+
   getFacebookStatus: () => http.get("/facebook/status"),
 
   get: (id: string) =>

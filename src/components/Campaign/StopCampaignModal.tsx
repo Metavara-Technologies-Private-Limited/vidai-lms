@@ -5,10 +5,12 @@ import {
   platformIcons,
   type Platform,
 } from "../../constants/campaigns.constants";
+import { CampaignAPI } from "../../services/campaign.api";
 
 interface Props {
   campaignName: string;
   platforms: Platform[];
+  campaignId?: string;        // ← new: needed to call Google Ads status API
   onClose: () => void;
   onStop: () => void;
 }
@@ -16,6 +18,7 @@ interface Props {
 export default function StopCampaignModal({
   campaignName,
   platforms,
+  campaignId,
   onClose,
   onStop,
 }: Props) {
@@ -28,6 +31,23 @@ export default function StopCampaignModal({
         ? prev.filter((p) => p !== platform)
         : [...prev, platform],
     );
+  };
+
+  const handleStop = async () => {
+    // ── Pause Google Ads if selected ──────────────────────────
+    if (selectedPlatforms.includes("google_ads") && campaignId) {
+      try {
+        await CampaignAPI.updateGoogleAdsStatus(campaignId, "pause");
+      } catch (err) {
+        console.error("[GoogleAds] Failed to pause campaign:", err);
+        toast.warn("Campaign stopped locally, but Google Ads pause failed.");
+      }
+    }
+    // ─────────────────────────────────────────────────────────
+
+    onStop();
+    toast.warn("Campaign stopped successfully");
+    onClose();
   };
 
   return (
@@ -104,11 +124,7 @@ export default function StopCampaignModal({
 
               <button
                 className="stop-btn"
-                onClick={() => {
-                  onStop();
-                  toast.warn("Campaign stopped successfully");
-                  onClose();
-                }}
+                onClick={handleStop}
               >
                 Yes
               </button>
