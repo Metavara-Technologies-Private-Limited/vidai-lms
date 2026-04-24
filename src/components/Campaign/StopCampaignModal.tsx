@@ -103,6 +103,8 @@ export default function StopCampaignModal({
           </>
         )}
 
+        /* ===== STEP 2 : CONFIRMATION ===== */
+
         {/* ===== STEP 2 : CONFIRMATION ===== */}
         {showConfirm && (
           <>

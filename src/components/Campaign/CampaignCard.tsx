@@ -260,6 +260,7 @@ export default function CampaignCard({
         </div>
       </div>
 
+      /* Stop Campaign Modal */
       {showStopModal && (
         <StopCampaignModal
           campaignName={c.name}

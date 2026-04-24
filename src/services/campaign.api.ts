@@ -88,6 +88,8 @@ export const CampaignAPI = {
       params: { clinic_id: storedClinicId() },
     }),
 
+  // Add this method to fetch latest Google Ads insights for a campaign
+
   // ✅ Fetches latest Mailchimp insights from Mailchimp API
   // and saves them to CampaignEmailConfig.insights JSONField in DB.
   // Called automatically when CampaignDashboard opens for email campaigns.
