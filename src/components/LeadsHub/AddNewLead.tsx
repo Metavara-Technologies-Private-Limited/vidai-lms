@@ -685,22 +685,17 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, department: value, personnel: "" }));
   };
 
-  // ── Lead Status Change — auto-populates Next Action Status ────────────────
+  // ── Lead Status Change ────────────────────────────────────────────────────
+  // Auto-populates Next Action Status with the first stage after the selected
+  // lead status, then derives Next Action Type from that auto-populated stage.
   const handleLeadStatusChange = (value: string) => {
     const trimmed = value.trim();
 
-    // Find the matching stage to read its rules
+    // Find the matching stage to track its id (used in payload)
     const matched = pipelineStages.find(
       (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
     );
     setSelectedNextActionStageId(matched?.id ?? null);
-
-    // Action type options come from the selected stage's enabled rules;
-    // fall back to the union across all stages when no stage is matched.
-    const stageActionOptions = matched
-      ? deriveActionTypeOptions(matched)
-      : deriveAllActionTypeOptions(pipelineStages);
-    setNextActionTypeOptions(stageActionOptions);
 
     // Auto-populate Next Action Status with the first stage that comes
     // after the selected lead status (by stage_order).
@@ -708,9 +703,17 @@ export default function AddNewLead() {
       .filter((s) => (matched ? s.stage_order > matched.stage_order : true))
       .sort((a, b) => a.stage_order - b.stage_order);
 
-    // Only auto-fill when a valid lead status is selected; clear otherwise.
     const autoNextStatus =
       trimmed && nextStages[0] ? nextStages[0].stage_name.trim() : "";
+
+    // Derive action type options from the auto-populated next action status stage.
+    // Fall back to the union across all stages when no next stage exists.
+    const autoNextStage = nextStages[0] ?? null;
+    const stageActionOptions = autoNextStage
+      ? deriveActionTypeOptions(autoNextStage)
+      : deriveAllActionTypeOptions(pipelineStages);
+
+    setNextActionTypeOptions(stageActionOptions);
 
     setForm((prev) => ({
       ...prev,
@@ -723,8 +726,26 @@ export default function AddNewLead() {
   const handleNextTypeChange = (value: string) =>
     setForm((prev) => ({ ...prev, nextType: value }));
 
-  const handleNextStatusChange = (value: string) =>
-    setForm((prev) => ({ ...prev, nextStatus: value }));
+  // ── Next Action Status Change ─────────────────────────────────────────────
+  // Re-derives Next Action Type options from the newly selected status stage.
+  const handleNextStatusChange = (value: string) => {
+    const trimmed = value.trim();
+
+    // Find the stage matching the selected next action status
+    const matched = pipelineStages.find(
+      (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+
+    // Action type options come from the selected next action status stage's
+    // enabled rules; fall back to the union across all stages when unmatched.
+    const stageActionOptions = matched
+      ? deriveActionTypeOptions(matched)
+      : deriveAllActionTypeOptions(pipelineStages);
+
+    setNextActionTypeOptions(stageActionOptions);
+
+    setForm((prev) => ({ ...prev, nextStatus: trimmed, nextType: "" }));
+  };
 
   const handleReferralDepartmentChange = (value: string) =>
     setForm((prev) => ({ ...prev, referralDepartment: value }));

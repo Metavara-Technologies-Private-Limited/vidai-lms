@@ -31,7 +31,6 @@ import {
 import { fetchReferralDepartments } from "../../services/referral.api";
 import type { ReferralDepartment } from "../../services/referral.api";
 
-// ====================== App-type config import ======================
 import {
   IS_MEDICAL_APP,
   IS_CONTRACTS_APP,
@@ -85,7 +84,8 @@ type AssigneeOption = {
 };
 
 const assigneeOptionLabel = (option: AssigneeOption): string => {
-  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const fullName =
+    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
   const secondary = option.role || option.designation;
   return secondary ? `${primary} (${secondary})` : primary;
@@ -122,12 +122,21 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
       if (!Number.isFinite(id)) return null;
       return {
         id,
-        first_name: typeof record.first_name === "string" ? record.first_name : undefined,
-        last_name: typeof record.last_name === "string" ? record.last_name : undefined,
-        username: typeof record.username === "string" ? record.username : undefined,
+        first_name:
+          typeof record.first_name === "string"
+            ? record.first_name
+            : undefined,
+        last_name:
+          typeof record.last_name === "string" ? record.last_name : undefined,
+        username:
+          typeof record.username === "string" ? record.username : undefined,
         role: typeof record.role === "string" ? record.role : undefined,
-        designation: typeof record.designation === "string" ? record.designation : undefined,
-        email: typeof record.email === "string" ? record.email : undefined,
+        designation:
+          typeof record.designation === "string"
+            ? record.designation
+            : undefined,
+        email:
+          typeof record.email === "string" ? record.email : undefined,
       };
     })
     .filter((item): item is AssigneeOption => item !== null);
@@ -181,7 +190,8 @@ export const formatBytes = (bytes: number): string => {
 
 export const getFileTypeLabel = (file: File): string => {
   if (file.type === "application/pdf") return "PDF";
-  if (file.type.startsWith("image/")) return file.type.split("/")[1].toUpperCase();
+  if (file.type.startsWith("image/"))
+    return file.type.split("/")[1].toUpperCase();
   if (file.type.includes("word")) return "DOC";
   return file.name.split(".").pop()?.toUpperCase() ?? "FILE";
 };
@@ -359,7 +369,7 @@ export function useEditLead() {
   const [referralDepartments, setReferralDepartments] = React.useState<ReferralDepartment[]>([]);
   const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
 
-  // ── Pipeline / stage state — now stores full PipelineStage objects ──
+  // ── Pipeline / stage state ──
   const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>([]);
   const [selectedNextActionStageId, setSelectedNextActionStageId] =
     React.useState<string | null>(null);
@@ -452,7 +462,8 @@ export function useEditLead() {
     [pipelineStages],
   );
 
-  // Next action status: only stages with a higher stage_order than the selected lead status
+  // Next action status: only stages with a higher stage_order than the
+  // selected lead status — identical to AddNewLead's filteredNextActionStatusOptions
   const filteredNextActionStatusOptions = React.useMemo<NextActionStatusOption[]>(() => {
     if (!leadStatus) {
       return pipelineStages.map((s) => ({
@@ -475,7 +486,10 @@ export function useEditLead() {
 
     return pipelineStages
       .filter((s) => s.stage_order > currentStage.stage_order)
-      .map((s) => ({ label: s.stage_name.trim(), value: s.stage_name.trim() }));
+      .map((s) => ({
+        label: s.stage_name.trim(),
+        value: s.stage_name.trim(),
+      }));
   }, [pipelineStages, leadStatus]);
 
   // ── Auto-clear nextType if it's no longer valid for the selected stage ─────
@@ -551,19 +565,18 @@ export function useEditLead() {
           .filter((s) => isActiveStageStatus(s.stage_status))
           .filter((s) => s.stage_name.trim())
           .sort((a, b) => {
-            const aOrder = typeof a.stage_order === "number" ? a.stage_order : 0;
-            const bOrder = typeof b.stage_order === "number" ? b.stage_order : 0;
+            const aOrder =
+              typeof a.stage_order === "number" ? a.stage_order : 0;
+            const bOrder =
+              typeof b.stage_order === "number" ? b.stage_order : 0;
             if (aOrder === bOrder) return 0;
             return aOrder - bOrder;
           });
 
-        // Store full PipelineStage objects (rules are needed for action type derivation)
         setPipelineStages(activeStages);
-
-        // Initial action type options = union across all active stages
+        // Initial options = union across all active stages
         setNextActionTypeOptions(deriveAllActionTypeOptions(activeStages));
       } catch {
-        // No pipeline configured — fall back to the static task type list
         setPipelineStages([]);
         setNextActionTypeOptions([...TASK_TYPES]);
       }
@@ -571,6 +584,49 @@ export function useEditLead() {
 
     void loadFromPipeline();
   }, [clinicId]);
+
+  // ── Reconciliation effect ─────────────────────────────────────────────────
+  // Runs once when pipelineStages first populates (lead fetch has already set
+  // leadStatus / nextStatus). Re-derives nextActionTypeOptions from the
+  // pre-populated nextStatus stage so the dropdown shows the correct options
+  // for the existing lead values — identical to how AddNewLead initialises
+  // options when the user first picks a lead status.
+  const pipelineStagesLoaded = pipelineStages.length > 0;
+  React.useEffect(() => {
+    if (!pipelineStagesLoaded) return;
+
+    // Prefer: derive from the stage that matches the saved nextStatus
+    const nextStage = pipelineStages.find(
+      (s) =>
+        s.stage_name.trim().toLowerCase() === nextStatus.trim().toLowerCase(),
+    );
+
+    if (nextStage) {
+      setNextActionTypeOptions(deriveActionTypeOptions(nextStage));
+      return;
+    }
+
+    // Fallback: derive from stages after the saved leadStatus
+    const leadStage = pipelineStages.find(
+      (s) =>
+        s.stage_name.trim().toLowerCase() === leadStatus.trim().toLowerCase(),
+    );
+
+    if (leadStage) {
+      const afterStages = pipelineStages
+        .filter((s) => s.stage_order > leadStage.stage_order)
+        .sort((a, b) => a.stage_order - b.stage_order);
+      const firstAfter = afterStages[0];
+      setNextActionTypeOptions(
+        firstAfter
+          ? deriveActionTypeOptions(firstAfter)
+          : deriveAllActionTypeOptions(pipelineStages),
+      );
+    } else {
+      setNextActionTypeOptions(deriveAllActionTypeOptions(pipelineStages));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineStagesLoaded]); // Only re-run when stages first load
 
   // ── Fetch Referral Departments ──
   React.useEffect(() => {
@@ -592,9 +648,10 @@ export function useEditLead() {
 
   /**
    * Lead Status Change — mirrors AddNewLead exactly:
-   * 1. Derives action type options from the selected stage's enabled rules.
-   * 2. Auto-populates Next Action Status with the first stage after the
+   * 1. Auto-populates Next Action Status with the first stage AFTER the
    *    selected lead status (by stage_order).
+   * 2. Derives nextActionTypeOptions from that auto-populated next stage
+   *    (NOT from the lead status stage itself).
    * 3. Clears nextType so the user picks one valid for the new stage.
    */
   const handleLeadStatusChange = (value: string) => {
@@ -605,15 +662,7 @@ export function useEditLead() {
     );
     setSelectedNextActionStageId(matched?.id ?? null);
 
-    // Action type options from the selected stage's enabled rules;
-    // fall back to union across all stages when no stage is matched.
-    const stageActionOptions = matched
-      ? deriveActionTypeOptions(matched)
-      : deriveAllActionTypeOptions(pipelineStages);
-    setNextActionTypeOptions(stageActionOptions);
-
-    // Auto-populate Next Action Status with the first stage after the selected
-    // lead status (by stage_order). Clear when no valid lead status selected.
+    // Stages that come AFTER the selected lead status, sorted by stage_order
     const nextStages = pipelineStages
       .filter((s) => (matched ? s.stage_order > matched.stage_order : true))
       .sort((a, b) => a.stage_order - b.stage_order);
@@ -621,21 +670,48 @@ export function useEditLead() {
     const autoNextStatus =
       trimmed && nextStages[0] ? nextStages[0].stage_name.trim() : "";
 
+    // Derive action type options from the auto-populated next action stage
+    // (same logic as AddNewLead — NOT from the lead status stage itself)
+    const autoNextStage = nextStages[0] ?? null;
+    const stageActionOptions = autoNextStage
+      ? deriveActionTypeOptions(autoNextStage)
+      : deriveAllActionTypeOptions(pipelineStages);
+
+    setNextActionTypeOptions(stageActionOptions);
     setLeadStatus(trimmed);
     setNextStatus(autoNextStatus);
-    setNextType(""); // clear stale next type when lead status changes
+    setNextType(""); // clear stale next type
   };
 
   /**
-   * Next Action Type Change — accepts a plain string value (not an event),
-   * matching the signature expected by EditLead.tsx's TextField onChange handler.
-   * The caller in EditLead.tsx passes `e.target.value` directly.
+   * Next Action Status Change — mirrors AddNewLead exactly:
+   * Re-derives nextActionTypeOptions from the newly selected status stage.
+   * Clears nextType so the user picks one valid for the new stage.
+   */
+  const handleNextStatusChange = (value: string) => {
+    const trimmed = value.trim();
+
+    const matched = pipelineStages.find(
+      (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+
+    // Action type options from the selected next action status stage's
+    // enabled rules; fall back to union across all stages when unmatched.
+    const stageActionOptions = matched
+      ? deriveActionTypeOptions(matched)
+      : deriveAllActionTypeOptions(pipelineStages);
+
+    setNextActionTypeOptions(stageActionOptions);
+    setNextStatus(trimmed);
+    setNextType(""); // clear stale next type
+  };
+
+  /**
+   * Next Action Type Change — accepts a plain ChangeEvent from TextField.
    */
   const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNextType(e.target.value);
   };
-
-  const handleNextStatusChange = (value: string) => setNextStatus(value);
 
   const handleReferralDepartmentChange = (value: string) =>
     setReferralDepartment(value);
@@ -691,6 +767,7 @@ export function useEditLead() {
 
   const handleRemoveDocument = (index: number) =>
     setDocuments((prev) => prev.filter((_, i) => i !== index));
+
   const handleRemoveExistingDocument = (index: number) =>
     setExistingDocuments((prev) => prev.filter((_, i) => i !== index));
 
@@ -782,27 +859,30 @@ export function useEditLead() {
         }
 
         // ── CONTRACTS-only fields ──
+        // Field names match the backend API response & LeadPayload type
         if (IS_CONTRACTS_APP) {
           setContactPersonName(
-            (anyLead.contact_person_name as string) ?? "",
+            (anyLead.contact_full_name as string) ?? "",
           );
-          setDesignation((anyLead.designation as string) ?? "");
+          setDesignation(
+            (anyLead.contact_designation as string) ?? "",
+          );
           setContactPersonPhone(
-            (anyLead.contact_person_phone as string) ?? "",
+            (anyLead.contact_phone as string) ?? "",
           );
           setContactPersonEmail(
-            (anyLead.contact_person_email as string) ?? "",
+            (anyLead.contact_email as string) ?? "",
           );
           setLeadGeneratedBy(
-            ((anyLead.lead_generated_by as string) ??
+            ((anyLead.lead_generated_by_name as string) ??
               (anyLead.personal_name as string) ??
-              "") as string,
+              ""),
           );
           setLeadGeneratedById(
             (
               (anyLead.personal_id as number | string | undefined)?.toString() ??
               ""
-            ) as string,
+            ),
           );
         }
 
@@ -837,9 +917,7 @@ export function useEditLead() {
         ).documents;
         if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
           const normalized = embeddedDocs.map((d) =>
-            normalizeDocument(
-              d as Parameters<typeof normalizeDocument>[0],
-            ),
+            normalizeDocument(d as Parameters<typeof normalizeDocument>[0]),
           );
           setExistingDocuments(normalized);
           initialExistingDocuments.current = normalized;
@@ -964,10 +1042,7 @@ export function useEditLead() {
   // ── Appointment personnel search ──
   React.useEffect(() => {
     const timer = setTimeout(async () => {
-      if (
-        wantAppointment !== "yes" ||
-        !appointmentPersonnelSearch.trim()
-      ) {
+      if (wantAppointment !== "yes" || !appointmentPersonnelSearch.trim()) {
         setAppointmentPersonnelOptions([]);
         return;
       }
@@ -1031,7 +1106,8 @@ export function useEditLead() {
       (s ?? "").trim().toLowerCase().normalize("NFC");
     setFilteredPersonnel(
       employees.filter(
-        (emp) => normalize(emp.department_name) === normalize(selectedDept.name),
+        (emp) =>
+          normalize(emp.department_name) === normalize(selectedDept.name),
       ),
     );
   }, [department, employees, departments]);
@@ -1129,15 +1205,15 @@ export function useEditLead() {
           }
         : {}),
 
+      // ── Contracts-only: correct field names matching LeadPayload & backend ──
       ...(IS_CONTRACTS_APP
         ? {
-            contact_person_name: contactPersonName || "",
-            designation: designation || "",
-            contact_person_phone: contactPersonPhone || "",
-            contact_person_email: contactPersonEmail || "",
-            lead_generated_by: leadGeneratedBy || "",
+            contact_full_name: contactPersonName.trim() || null,
+            contact_designation: designation.trim() || null,
+            contact_phone: contactPersonPhone.trim() || null,
+            contact_email: strOrNull(contactPersonEmail) ?? null,
             personal_id: resolvedGeneratedById,
-            personal_name: leadGeneratedBy || null,
+            personal_name: leadGeneratedBy.trim() || null,
           }
         : {}),
 
