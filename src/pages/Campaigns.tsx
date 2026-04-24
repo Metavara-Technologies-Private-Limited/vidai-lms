@@ -1,185 +1,258 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { selectClinic } from "../store/clinicSlice";
+import { Alert } from "@mui/material";
 import "../styles/Campaign/campaigns.css";
+import searchIcon from "../components/Campaign/Icons/search.png";
+import CampaignHeader from "../components/Campaign/CampaignHeader";
+import CampaignCard from "../components/Campaign/CampaignCard";
+import {
+  fetchCampaign,
+  selectCampaign,
+  selectCampaignLoading,
+  updateCampaignStatus,
+} from "../store/campaignSlice";
+import { selectUser } from "../store/authSlice";
+import type { AppDispatch } from "../store";
+import {
+  hasAnySubcategoryActionPermission,
+  resolveUserRole,
+} from "../utils/roleAccess";
+import {
+  CAMPAIGN_MODE,
+  CAMPAIGN_STATUS,
+  CAMPAIGN_TABS,
+  CAMPAIGN_TYPE,
+  PLATFORMS,
+  STATUS_MAP,
+  type CampaignStatus,
+  type CampaignType,
+  type Platform,
+  type Tab,
+} from "../constants/campaigns.constants";
+import type { Campaign, CampaignAPIType } from "../types/campaigns.types";
 
-/* ===== ICONS ===== */
-import searchIcon from "../components/Layout/Campaign/Icons/search.png";
-
-/* ===== COMPONENTS ===== */
-import CampaignHeader from "../components/Layout/Campaign/CampaignHeader";
-import CampaignCard from "../components/Layout/Campaign/CampaignCard";
-import AddNewCampaign from "../components/Layout/Campaign/AddNewCampaign";
-import SocialCampaignModal from "../components/Layout/Campaign/SocialCampaignModal";
-import CampaignDashboard from "../components/Layout/Campaign/CampaignDashboard";
-// import EmailCampaignModal from "../components/Layout/Campaign/EmailCampaignModal";
-
-/* ===== TYPES ===== */
-type CampaignStatus =
-  | "Live"
-  | "Draft"
-  | "Schedule"
-  | "Paused"
-  | "Stopped"
-  | "Completed"
-  | "Failed";
-
-type CampaignType = "social" | "email";
-type Tab = "all" | "social" | "email";
-
-export interface Campaign {
-  id: string;
-  name: string;
-  type: CampaignType;
-  status: CampaignStatus;
-  start: string;
-  end: string;
-  platforms: ("facebook" | "instagram" | "linkedin" | "gmail")[];
-  leads: number;
-  scheduledAt?: string;
-
-  /* ===== DASHBOARD FIELDS (OPTIONAL) ===== */
-  totalBudget?: number;
-  totalImpressions?: number;
-  totalClicks?: number;
-  conversions?: number;
-  totalSpend?: number;
-  ctr?: number;
-  conversionRate?: number;
-  cpc?: number;
-  cpa?: number;
-  createdBy?: string;
-  createdDate?: string;
-  campaignMode?: string;
-  objective?: string;
-}
-
-/* ===== INITIAL DATA ===== */
-const INITIAL_CAMPAIGNS: Campaign[] = [
-  {
-    id: "1",
-    name: "IVF Awareness – December",
-    type: "social",
-    status: "Live",
-    start: "01/12/2025",
-    end: "07/12/2025",
-    platforms: ["facebook", "instagram", "linkedin"],
-    leads: 14,
-    objective: "Leads Generation",
-    totalImpressions: 2000,
-    totalClicks: 500,
-    totalSpend: 400,
-    ctr: 4,
-    conversionRate: 6.7,
-  },
-  {
-    id: "2",
-    name: "Your Fertility Consultation – Next Steps",
-    type: "email",
-    status: "Failed",
-    start: "01/12/2025",
-    end: "07/12/2025",
-    platforms: ["gmail"],
-    leads: 0,
-    objective: "Email Engagement",
-  },
-  {
-    id: "3",
-    name: "IVF Awareness – December",
-    type: "social",
-    status: "Schedule",
-    start: "01/12/2025",
-    end: "07/12/2025",
-    platforms: ["facebook", "instagram"],
-    leads: 0,
-    scheduledAt: "01 Dec at 10:00 AM",
-  },
-  {
-    id: "4",
-    name: "IVF Consultation Follow-up",
-    type: "email",
-    status: "Draft",
-    start: "02/12/2025",
-    end: "08/12/2025",
-    platforms: ["gmail"],
-    leads: 3,
-  },
-  {
-    id: "5",
-    name: "IVF Awareness – December",
-    type: "email",
-    status: "Live",
-    start: "01/12/2025",
-    end: "07/12/2025",
-    platforms: ["gmail"],
-    leads: 14,
-    objective: "Leads Generation",
-    totalImpressions: 2000,
-    totalClicks: 500,
-    totalSpend: 400,
-    ctr: 4,
-    conversionRate: 6.7,
-  }
-];
+const AddNewCampaign = lazy(
+  () => import("../components/Campaign/AddNewCampaign"),
+);
+const SocialCampaignModal = lazy(
+  () => import("../components/Campaign/SocialCampaignModal"),
+);
+const CampaignDashboard = lazy(
+  () => import("../components/Campaign/CampaignDashboard"),
+);
+const EmailCampaignModal = lazy(
+  () => import("../components/Campaign/EmailCampaignModal"),
+);
+const EditCampaignModal = lazy(
+  () => import("../components/Campaign/EditCampaignModal"),
+);
+const DuplicateCampaignModal = lazy(
+  () => import("../components/Campaign/DuplicateCampaignModal"),
+);
 
 export default function CampaignsScreen() {
-  const [tab, setTab] = useState<Tab>("all");
+  const dispatch = useDispatch<AppDispatch>();
+  const rawCampaigns = useSelector(selectCampaign);
+  const campaignLoading = useSelector(selectCampaignLoading);
+  const user = useSelector(selectUser);
+  const authUser = user as unknown as Record<string, unknown> | null;
+  const nestedAuthUser =
+    authUser?.user && typeof authUser.user === "object"
+      ? (authUser.user as Record<string, unknown>)
+      : null;
+  const role = resolveUserRole(authUser);
+  const permissions = authUser?.permissions ?? nestedAuthUser?.permissions;
+  const campaignAliases = ["campaigns", "campaign"];
+  const canViewCampaigns =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, campaignAliases, "view") ||
+    hasAnySubcategoryActionPermission(permissions, campaignAliases, "print");
+  const canAddCampaigns =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, campaignAliases, "add");
+  const canEditCampaigns =
+    role === "super_admin" ||
+    hasAnySubcategoryActionPermission(permissions, campaignAliases, "edit");
+
+  const _campaignClinic = useSelector(selectClinic);
+
+  useEffect(() => {
+    if (!canViewCampaigns) return;
+    dispatch(fetchCampaign());
+  }, [dispatch, canViewCampaigns, _campaignClinic?.id]);
+
+  const campaigns = useMemo<Campaign[]>(() => {
+    return (rawCampaigns || []).map((api: CampaignAPIType) => {
+      const backendStatus = (api.status ?? "").toLowerCase();
+
+      const status =
+        STATUS_MAP[backendStatus] ??
+        (api.is_active ? CAMPAIGN_STATUS.LIVE : CAMPAIGN_STATUS.DRAFT);
+
+      let platforms: Platform[] = [];
+      let type: CampaignType;
+
+      const isEmailCampaign = api.campaign_mode === CAMPAIGN_MODE.EMAIL;
+
+      if (isEmailCampaign) {
+        type = CAMPAIGN_TYPE.EMAIL;
+        platforms = [PLATFORMS.GMAIL];
+      } else {
+        type = CAMPAIGN_TYPE.SOCIAL;
+        if (Array.isArray(api.social_media) && api.social_media.length > 0) {
+          platforms = api.social_media
+            .filter((s) => s.is_active !== false)
+            .map((s) => s.platform_name ?? "")
+            .filter(Boolean) as Platform[];
+        }
+      }
+
+      return {
+        id: api.id,
+        name: api.campaign_name ?? "",
+        description: api.campaign_description ?? "",
+        type,
+        status,
+        start: api.start_date,
+        end: api.end_date,
+        platforms,
+        leads: api.lead_generated ?? 0,
+        lead_generated: api.lead_generated ?? 0,
+        scheduledAt: api.email?.[0]?.scheduled_at ?? api.selected_start,
+        selected_start: api.selected_start,
+        enter_time: api.enter_time,
+        objective: api.campaign_objective,
+        budget_data: api.budget_data,
+        image_url: api.image_url ?? null,
+        platform_data: api.platform_data ?? {},
+        campaign_content:
+          api.campaign_content || api.email?.[0]?.email_body || "",
+
+        total_spend: api.total_spend ?? 0,
+        cpc: api.cpc ?? 0,
+        // Mailchimp metrics
+        impressions: api.impressions ?? 0,
+        clicks: api.clicks ?? 0,
+        emails_sent: api.emails_sent ?? 0,
+        bounces: api.bounces ?? 0,
+        unsubscribes: api.unsubscribes ?? 0,
+        conversion_rate: api.conversion_rate ?? 0,
+        // FB Insights
+        fb_likes: api.fb_likes ?? 0,
+        fb_comments: api.fb_comments ?? 0,
+        fb_shares: api.fb_shares ?? 0,
+        fb_impressions: api.fb_impressions ?? 0,
+        fb_reach: api.fb_reach ?? 0,
+        fb_clicks: api.fb_clicks ?? 0,
+      };
+    });
+  }, [rawCampaigns]);
+
+  // UI States
+  const [tab, setTab] = useState<Tab>(CAMPAIGN_TABS.ALL);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CampaignStatus | "all">("all");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
-  const [campaigns, setCampaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
-
+  const [openStatus, setOpenStatus] = useState(false);
   const [showAddCampaign, setShowAddCampaign] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
-
-  const [selectedCampaign, setSelectedCampaign] =
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(
+    null,
+  );
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [duplicatingCampaign, setDuplicatingCampaign] =
     useState<Campaign | null>(null);
 
-  const handleCreateCampaign = (newCampaign: Campaign) => {
-    setCampaigns((prev) => [newCampaign, ...prev]);
+  const handleStatusChange = (id: string, status: CampaignStatus) => {
+    dispatch(updateCampaignStatus({ id, status }));
+  };
+
+  const handleEdit = (campaign: Campaign) => {
+    if (!canEditCampaigns) return;
+    setEditingCampaign(campaign);
+    setShowEditModal(true);
+  };
+
+  const handleDuplicate = (campaign: Campaign) => {
+    if (!canEditCampaigns) return;
+    setDuplicatingCampaign(campaign);
   };
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
-      const tabOk = tab === "all" || c.type === tab;
-      const searchOk = c.name.toLowerCase().includes(search.toLowerCase());
+      const tabOk = tab === CAMPAIGN_TABS.ALL || c.type === tab;
+      const searchOk = (c.name ?? "")
+        .toLowerCase()
+        .includes(search.toLowerCase());
       const statusOk = status === "all" || c.status === status;
       return tabOk && searchOk && statusOk;
     });
   }, [campaigns, tab, search, status]);
 
-  /* ===== DASHBOARD VIEW ===== */
+  const allCount = campaigns.length;
+  const socialCount = campaigns.filter(
+    (c) => c.type === CAMPAIGN_TYPE.SOCIAL,
+  ).length;
+
+  const emailCount = campaigns.filter(
+    (c) => c.type === CAMPAIGN_TYPE.EMAIL,
+  ).length;
+
   if (selectedCampaign) {
     return (
-      <CampaignDashboard
-        campaign={selectedCampaign}
-        onBack={() => setSelectedCampaign(null)}
-      />
+      <Suspense
+        fallback={<div className="empty-state">Loading campaign...</div>}
+      >
+        <CampaignDashboard
+          campaign={selectedCampaign}
+          onBack={() => setSelectedCampaign(null)}
+        />
+      </Suspense>
     );
   }
 
-  /* ===== LIST VIEW ===== */
   return (
     <div className="campaigns-page">
-      <CampaignHeader onAddNew={() => setShowAddCampaign(true)} />
-
+      {!canViewCampaigns && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          You do not have permission to view campaigns.
+        </Alert>
+      )}
+      <CampaignHeader
+        onAddNew={() => setShowAddCampaign(true)}
+        canAddCampaign={canAddCampaigns}
+      />
       <div className="filters-row">
+        {/* Header Filter */}
         <div className="tabs">
-          {(["all", "social", "email"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              className={`tab-btn ${tab === t ? "active" : ""}`}
-              onClick={() => setTab(t)}
-            >
-              {t === "all"
-                ? "All Campaigns"
-                : t === "social"
-                ? "Social Media Campaigns"
-                : "Email Campaigns"}
-            </button>
-          ))}
+          <button
+            className={`tab-btn ${tab === CAMPAIGN_TABS.ALL ? "active" : ""}`}
+            onClick={() => setTab(CAMPAIGN_TABS.ALL)}
+          >
+            All Campaigns ({allCount})
+          </button>
+
+          <button
+            className={`tab-btn ${
+              tab === CAMPAIGN_TABS.SOCIAL ? "active" : ""
+            }`}
+            onClick={() => setTab(CAMPAIGN_TABS.SOCIAL)}
+          >
+            Social Media Campaigns ({socialCount})
+          </button>
+
+          <button
+            className={`tab-btn ${tab === CAMPAIGN_TABS.EMAIL ? "active" : ""}`}
+            onClick={() => setTab(CAMPAIGN_TABS.EMAIL)}
+          >
+            Email Campaigns ({emailCount})
+          </button>
         </div>
 
+        {/* Header Search */}
         <div className="right-filters">
           <div className="search-input">
             <img src={searchIcon} alt="Search" className="search-icon" />
@@ -190,26 +263,46 @@ export default function CampaignsScreen() {
             />
           </div>
 
-          <select
-            value={status}
-            onChange={(e) =>
-              setStatus(e.target.value as CampaignStatus | "all")
-            }
-          >
-            <option value="all">All Status</option>
-            <option value="Live">Live</option>
-            <option value="Draft">Draft</option>
-            <option value="Schedule">Schedule</option>
-            <option value="Paused">Paused</option>
-            <option value="Stopped">Stopped</option>
-            <option value="Completed">Completed</option>
-            <option value="Failed">Failed</option>
-          </select>
+          {/* Header Status Filter */}
+          <div className="status-dropdown">
+            <div
+              className={`status-btn ${openStatus ? "active" : ""}`}
+              onClick={() => setOpenStatus((prev) => !prev)}
+            >
+              {status === "all" ? "All Status" : status}
+            </div>
+
+            {openStatus && (
+              <div className="status-menu">
+                {(
+                  ["all", ...Object.values(CAMPAIGN_STATUS)] as (
+                    | CampaignStatus
+                    | "all"
+                  )[]
+                ).map((item) => (
+                  <div
+                    key={item}
+                    className={`status-item ${
+                      status === item ? "selected" : ""
+                    }`}
+                    onClick={() => {
+                      setStatus(item);
+                      setOpenStatus(false);
+                    }}
+                  >
+                    {item === "all" ? "All Status" : item}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="campaign-grid">
-        {filteredCampaigns.length === 0 ? (
+        {!canViewCampaigns ? null : campaignLoading ? (
+          <div className="empty-state">Loading campaigns...</div>
+        ) : filteredCampaigns.length === 0 ? (
           <div className="empty-state">No campaigns found</div>
         ) : (
           filteredCampaigns.map((campaign) => (
@@ -218,44 +311,77 @@ export default function CampaignsScreen() {
               campaign={campaign}
               openMenuId={openMenuId}
               setOpenMenuId={setOpenMenuId}
-              onViewDetail={setSelectedCampaign} // ✅ ONLY ADDITION
+              onViewDetail={setSelectedCampaign}
+              onStatusChange={handleStatusChange}
+              onEdit={handleEdit}
+              onDuplicate={handleDuplicate}
+              canEditCampaign={canEditCampaigns}
             />
           ))
         )}
       </div>
 
+      {/* ================= MODALS ================= */}
       {showAddCampaign && (
-        <AddNewCampaign
-          onClose={() => setShowAddCampaign(false)}
-          onSocialSelect={() => {
-            setShowAddCampaign(false);
-            setShowSocialModal(true);
-          }}
-          onEmailSelect={() => {
-            setShowAddCampaign(false);
-            setShowEmailModal(true);
-          }}
-        />
+        <Suspense fallback={null}>
+          <AddNewCampaign
+            onClose={() => setShowAddCampaign(false)}
+            onSocialSelect={() => {
+              setShowAddCampaign(false);
+              setShowSocialModal(true);
+            }}
+            onEmailSelect={() => {
+              setShowAddCampaign(false);
+              setShowEmailModal(true);
+            }}
+          />
+        </Suspense>
       )}
-
       {showSocialModal && (
-        <SocialCampaignModal
-          onClose={() => setShowSocialModal(false)}
-          onSave={(newCampaign: Campaign) => {
-            handleCreateCampaign(newCampaign);
-            setShowSocialModal(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <SocialCampaignModal
+            onClose={() => setShowSocialModal(false)}
+            onSave={() => {
+              setShowSocialModal(false);
+              dispatch(fetchCampaign());
+            }}
+          />
+        </Suspense>
       )}
-
       {showEmailModal && (
-        <EmailCampaignModal
-          onClose={() => setShowEmailModal(false)}
-          onSave={(newCampaign: Campaign) => {
-            handleCreateCampaign(newCampaign);
-            setShowEmailModal(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <EmailCampaignModal
+            onClose={() => setShowEmailModal(false)}
+            onSave={() => {
+              setShowEmailModal(false);
+              dispatch(fetchCampaign());
+            }}
+          />
+        </Suspense>
+      )}
+      {showEditModal && editingCampaign && (
+        <Suspense fallback={null}>
+          <EditCampaignModal
+            campaign={editingCampaign}
+            onClose={() => setShowEditModal(false)}
+            onSave={() => {
+              setShowEditModal(false);
+              dispatch(fetchCampaign());
+            }}
+          />
+        </Suspense>
+      )}
+      {duplicatingCampaign && (
+        <Suspense fallback={null}>
+          <DuplicateCampaignModal
+            campaign={duplicatingCampaign}
+            onClose={() => setDuplicatingCampaign(null)}
+            onSave={() => {
+              setDuplicatingCampaign(null);
+              dispatch(fetchCampaign());
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

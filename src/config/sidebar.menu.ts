@@ -1,14 +1,20 @@
-// src/config/sidebar.menu.ts
-import { lazy, type JSX } from "react";
+import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
 export type MenuItem = {
   key: string;
   label: string;
   path: string;
-  page: React.LazyExoticComponent<() => JSX.Element>;
+  page?: LazyExoticComponent<ComponentType<object>>;
+  subMenu?: MenuItem[];
 };
 
-export const LEADS_MENU: MenuItem[] = [
+// ✅ Change this to "demo" to restrict to 3 pages, or "full" to show all
+export const APP_CONDITION: "demo" | "full" = "full"; //we can add full(to see all tabs )
+
+// Demo allowed keys
+export const DEMO_ALLOWED_KEYS = ["dashboard", "leads", "settings"];
+
+const ALL_LEADS_MENU: MenuItem[] = [
   {
     key: "dashboard",
     label: "Dashboard",
@@ -34,6 +40,18 @@ export const LEADS_MENU: MenuItem[] = [
     page: lazy(() => import("../pages/Campaigns")),
   },
   {
+    key: "reputation",
+    label: "Reputation Management",
+    path: "/reputation",
+    page: lazy(() => import("../pages/Reputation")),
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    path: "/reports",
+    page: lazy(() => import("../pages/Reports.tsx")),
+  },
+  {
     key: "pipeline",
     label: "Sales Pipeline Configuration",
     path: "/pipeline",
@@ -44,8 +62,44 @@ export const LEADS_MENU: MenuItem[] = [
     label: "Settings",
     path: "/settings",
     page: lazy(() => import("../pages/Settings")),
+    subMenu: [
+      {
+        key: "integration",
+        label: "Integration",
+        path: "/settings/integration",
+        page: lazy(
+          () => import("../components/Settings/Integration/Integration.tsx"),
+        ),
+      },
+      {
+        key: "tickets",
+        label: "Tickets",
+        path: "/settings/tickets",
+        page: lazy(() => import("../components/Settings/Menus/Tickets")),
+      },
+      {
+        key: "templates",
+        label: "Templates",
+        path: "/settings/templates",
+        page: lazy(
+          () => import("../components/Settings/Templates/TemplatesPage"),
+        ),
+      },
+      {
+        key: "users",
+        label: "User",
+        path: "/settings/users",
+        page: lazy(() => import("../components/Settings/User/UsersPage")),
+      },
+    ],
   },
 ];
+
+// ✅ Export filtered or full menu based on condition
+export const LEADS_MENU: MenuItem[] =
+  APP_CONDITION === "full"
+    ? ALL_LEADS_MENU
+    : ALL_LEADS_MENU.filter((item) => DEMO_ALLOWED_KEYS.includes(item.key));
 
 export const DOCUMENTS_MENU: MenuItem[] = [
   {

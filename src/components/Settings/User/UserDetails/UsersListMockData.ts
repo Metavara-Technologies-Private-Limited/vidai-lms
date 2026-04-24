@@ -1,0 +1,161 @@
+// mockData.ts
+
+export type User = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  gender: "Male" | "Female" | "Other";
+  dateOfJoining: string;
+  dateOfBirth: string;
+  role: string;
+  username: string;
+  mobileNumber: string;
+  email: string;
+  locked: boolean;
+  status: boolean;
+};
+
+const usersMockData: User[] = [
+  {
+    id: 1,
+    firstName: "Marvin",
+    lastName: "McKinney",
+    gender: "Male",
+    dateOfJoining: "2022-05-10",
+    dateOfBirth: "1990-08-15",
+    role: "Admin",
+    username: "marvin.mckinney",
+    mobileNumber: "9876543210",
+    email: "marvin@example.com",
+    locked: true,
+    status: true,
+  },
+  {
+    id: 2,
+    firstName: "John",
+    lastName: "Doe",
+    gender: "Male",
+    dateOfJoining: "2023-01-12",
+    dateOfBirth: "1992-03-20",
+    role: "Manager",
+    username: "john.doe",
+    mobileNumber: "9123456780",
+    email: "john@example.com",
+    locked: false,
+    status: true,
+  },
+  {
+    id: 3,
+    firstName: "Sarah",
+    lastName: "Connor",
+    gender: "Female",
+    dateOfJoining: "2021-09-01",
+    dateOfBirth: "1988-11-05",
+    role: "User",
+    username: "sarah.connor",
+    mobileNumber: "9988776655",
+    email: "sarah@example.com",
+    locked: false,
+    status: false,
+  },
+  {
+    id: 4,
+    firstName: "Alex",
+    lastName: "Smith",
+    gender: "Male",
+    dateOfJoining: "2020-07-18",
+    dateOfBirth: "1985-02-10",
+    role: "Admin",
+    username: "alex.smith",
+    mobileNumber: "9090909090",
+    email: "alex@example.com",
+    locked: true,
+    status: true,
+  },
+  {
+    id: 5,
+    firstName: "Emma",
+    lastName: "Watson",
+    gender: "Female",
+    dateOfJoining: "2024-02-25",
+    dateOfBirth: "1995-06-12",
+    role: "User",
+    username: "emma.watson",
+    mobileNumber: "9012345678",
+    email: "emma@example.com",
+    locked: false,
+    status: true,
+  },
+  {
+    id: 6,
+    firstName: "David",
+    lastName: "Johnson",
+    gender: "Male",
+    dateOfJoining: "2022-11-30",
+    dateOfBirth: "1989-09-09",
+    role: "Manager",
+    username: "david.johnson",
+    mobileNumber: "9871234560",
+    email: "david@example.com",
+    locked: true,
+    status: true,
+  },
+  {
+    id: 7,
+    firstName: "Olivia",
+    lastName: "Brown",
+    gender: "Female",
+    dateOfJoining: "2023-06-14",
+    dateOfBirth: "1993-04-22",
+    role: "User",
+    username: "olivia.brown",
+    mobileNumber: "9998887776",
+    email: "olivia@example.com",
+    locked: false,
+    status: false,
+  },
+  {
+    id: 8,
+    firstName: "William",
+    lastName: "Jones",
+    gender: "Male",
+    dateOfJoining: "2021-03-08",
+    dateOfBirth: "1987-12-01",
+    role: "Admin",
+    username: "william.jones",
+    mobileNumber: "9887766554",
+    email: "william@example.com",
+    locked: true,
+    status: true,
+  },
+    {
+    id: 9,
+    firstName: "Tony",
+    lastName: "Stark",
+    gender: "Male",
+    dateOfJoining: "2023-06-14",
+    dateOfBirth: "1993-04-22",
+    role: "User",
+    username: "tony.stark",
+    mobileNumber: "9998887776",
+    email: "tony.stark@example.com",
+    locked: false,
+    status: false,
+  },
+  {
+    id: 10,
+    firstName: "Thanos",
+    lastName: "Villain",
+    gender: "Male",
+    dateOfJoining: "2021-03-08",
+    dateOfBirth: "1987-12-01",
+    role: "Admin",
+    username: "thanos.villain",
+    mobileNumber: "9887766554",
+    email: "thanos.villain@example.com",
+    locked: true,
+    status: true,
+  },
+];
+
+export default usersMockData;

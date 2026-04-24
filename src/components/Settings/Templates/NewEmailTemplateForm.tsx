@@ -1,0 +1,1325 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Box, Typography, Button, IconButton, TextField, MenuItem, Select, Popover, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import FormatBoldIcon from '@mui/icons-material/FormatBold';
+import FormatItalicIcon from '@mui/icons-material/FormatItalic';
+import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined';
+import StrikethroughSIcon from '@mui/icons-material/StrikethroughS';
+import FormatColorTextIcon from '@mui/icons-material/FormatColorText';
+import FormatAlignLeftIcon from '@mui/icons-material/FormatAlignLeft';
+import FormatAlignCenterIcon from '@mui/icons-material/FormatAlignCenter';
+import FormatAlignRightIcon from '@mui/icons-material/FormatAlignRight';
+import FormatAlignJustifyIcon from '@mui/icons-material/FormatAlignJustify';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import FormatIndentDecreaseIcon from '@mui/icons-material/FormatIndentDecrease';
+import FormatIndentIncreaseIcon from '@mui/icons-material/FormatIndentIncrease';
+import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
+import CodeIcon from '@mui/icons-material/Code';
+import LinkIcon from '@mui/icons-material/Link';
+import ImageIcon from '@mui/icons-material/Image';
+import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
+import UndoIcon from '@mui/icons-material/Undo';
+import RedoIcon from '@mui/icons-material/Redo';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import { TextAlign } from '@tiptap/extension-text-align';
+import { Underline } from '@tiptap/extension-underline';
+import { Link as TiptapLink } from '@tiptap/extension-link';
+import { Image as TiptapImage } from '@tiptap/extension-image';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
+import FontFamily from '@tiptap/extension-font-family';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
+import ListItem from '@tiptap/extension-list-item';
+import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
+import { PreviewTemplateModal } from './PreviewEmailTemplateModal';
+import type { NewEmailTemplateFormProps, TemplateDocument } from '../../../types/templates.types';
+import type { EmailTemplate } from '../../../types/tickets.types';
+import { useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
+import { selectClinic } from '../../../store/clinicSlice';
+
+const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
+const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1000;
+const SUBJECT_MUST_CONTAIN_LETTER_REGEX = /[A-Za-z]/;
+
+const getDocumentUrl = (doc: TemplateDocument): string => {
+  const candidate = doc.file_url || doc.file || doc.url || '';
+  if (!candidate) return '';
+  if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
+    return candidate;
+  }
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/api\/?$/, '');
+  return `${baseUrl}${candidate}`;
+};
+
+const getDocumentName = (doc: TemplateDocument): string => {
+  return doc.name || doc.filename || doc.file?.split('/').pop() || doc.file_url?.split('/').pop() || 'Document';
+};
+
+const extractDocuments = (payload: unknown): TemplateDocument[] => {
+  if (!payload || typeof payload !== 'object') return [];
+  const record = payload as Record<string, unknown>;
+  const candidates = [record.documents, record.template_documents, record.files, record.attachments];
+  const match = candidates.find((value) => Array.isArray(value));
+  return Array.isArray(match) ? (match as TemplateDocument[]) : [];
+};
+
+const normalizeEditorHtml = (html: string): string => {
+  if (!html) return html;
+
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/api\/?$/, '');
+
+  return html.replace(/<img([^>]*?)src=["']([^"']+)["']([^>]*)>/gi, (_match, pre, src, post) => {
+    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
+      return `<img${pre}src="${src}"${post}>`;
+    }
+    const absoluteSrc = `${baseUrl}${src.startsWith('/') ? src : `/${src}`}`;
+    return `<img${pre}src="${absoluteSrc}"${post}>`;
+  });
+};
+
+const BlockStyleExtension = Extension.create({
+  name: 'blockStyle',
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['paragraph', 'heading', 'blockquote', 'listItem'],
+        attributes: {
+          style: {
+            default: null,
+            parseHTML: (element) => element.getAttribute('style'),
+            renderHTML: (attributes) => {
+              if (!attributes.style) {
+                return {};
+              }
+
+              return {
+                style: attributes.style,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
+
+export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
+  const clinic = useSelector(selectClinic);
+  const clinicId = clinic?.id || 1;
+  const isViewOnly = mode === 'view';
+
+  // Get clinic ID from various possible sources
+  // const getClinicId = (): number => {
+  //   // Try localStorage first
+  //   const storedClinicId = localStorage.getItem("clinic_id");
+  //   if (storedClinicId) return parseInt(storedClinicId, 10);
+    
+  //   // Try from user data
+  //   const userData = localStorage.getItem("user");
+  //   if (userData) {
+  //     try {
+  //       const user = JSON.parse(userData);
+  //       if (user.clinic_id) return user.clinic_id;
+  //     } catch (err) {
+  //       console.error("Failed to parse user data", err);
+  //     }
+  //   }
+    
+  //   // Try from initial data
+  //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  //   const formData = initialData as any;
+  //   if (formData?.clinic) return formData.clinic;
+    
+  //   // Default fallback - you should replace this with actual clinic ID
+  //   console.warn("No clinic ID found, using default. Please set clinic_id in localStorage or context.");
+  //   return 1;
+  // };
+
+  // Normalize useCase to match MenuItem values (capitalize first letter)
+  // Also handles API responses that might come in different formats
+  const normalizeUseCase = (value: string | undefined) => {
+    if (!value) return "";
+    const trimmed = value.trim().toLowerCase();
+    
+    // Map common API variations to canonical form
+    const mapping: Record<string, string> = {
+      'appointment': 'Appointment',
+      'confirm': 'Appointment',
+      'confirmation': 'Appointment',
+      'reminder': 'Reminder',
+      'follow-up': 'Follow-up',
+      'followup': 'Follow-up',
+      'onboarding': 'Appointment'
+    };
+    
+    return mapping[trimmed] || value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+  };
+
+  const [formData, setFormData] = useState({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    name: ((initialData as any)?.name || ''),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useCase: normalizeUseCase((initialData as any)?.use_case || (initialData as any)?.useCase || ''),
+    subject: ((initialData as EmailTemplate)?.subject || ''),
+  });
+
+  const [showPreview, setShowPreview] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [existingDocuments, setExistingDocuments] = useState<TemplateDocument[]>([]);
+  const [removedExistingDocumentIds, setRemovedExistingDocumentIds] = useState<string[]>([]);
+  const [colorAnchor, setColorAnchor] = useState<HTMLButtonElement | null>(null);
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLButtonElement | null>(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [currentFont, setCurrentFont] = useState('Nunito');
+  const [currentHeading, setCurrentHeading] = useState<'Tt' | 'H1' | 'H2'>('Tt');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
+  const lastValidBodyHtmlRef = useRef('');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const initialEditorContent = normalizeEditorHtml(((initialData as any)?.body || (initialData as any)?.email_body || ''));
+
+  const canUpdateBody = (nextLength: number): boolean => {
+    if (nextLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
+      toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+      return false;
+    }
+    return true;
+  };
+
+  // Sync formData when initialData changes (for edit/view mode)
+  React.useEffect(() => {
+    if (initialData) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = initialData as any;
+      setFormData(prev => ({
+        ...prev,
+        name: data?.name || prev.name,
+        useCase: normalizeUseCase(data?.use_case || data?.useCase || prev.useCase),
+        subject: data?.subject || prev.subject
+      }));
+      setExistingDocuments(extractDocuments(initialData));
+      setRemovedExistingDocumentIds([]);
+      setUploadedFiles([]);
+    }
+  }, [initialData]);
+
+  // Rainbow color palette
+  const colors = [
+    '#FF0000', // Red
+    '#FF7F00', // Orange
+    '#FFFF00', // Yellow
+    '#00FF00', // Green
+    '#0000FF', // Blue
+    '#4B0082', // Indigo
+    '#9400D3', // Violet
+    '#FF1493', // Pink
+    '#000000', // Black
+    '#808080', // Gray
+    '#FFFFFF', // White
+    '#8B4513', // Brown
+  ];
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+      }),
+      Underline,
+      FontFamily,
+      BulletList,
+      OrderedList,
+      ListItem,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
+      TiptapLink.configure({
+        openOnClick: false,
+      }),
+      TiptapImage,
+      TextStyle,
+      Color,
+      BlockStyleExtension,
+    ],
+    content: initialEditorContent,
+    editable: !isViewOnly,
+  });
+
+  // force re-render when editor state/selection changes so toolbar reflects active states, undo/redo, font etc.
+  const [, setToolbarTick] = useState(0);
+  useEffect(() => {
+    if (!editor) return;
+
+    const update = () => {
+      const currentBodyLength = editor.getText().length;
+      if (currentBodyLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
+        editor.commands.setContent(lastValidBodyHtmlRef.current, { emitUpdate: false });
+        toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+        return;
+      }
+
+      lastValidBodyHtmlRef.current = editor.getHTML();
+      setToolbarTick(t => t + 1);
+
+      const heading: 'Tt' | 'H1' | 'H2' = editor.isActive('heading', { level: 1 })
+        ? 'H1'
+        : editor.isActive('heading', { level: 2 })
+          ? 'H2'
+          : 'Tt';
+      setCurrentHeading(heading);
+
+      const fontFamily = (editor.getAttributes('textStyle').fontFamily as string | undefined) || 'Nunito';
+      setCurrentFont(fontFamily);
+
+      lastSelectionRef.current = {
+        from: editor.state.selection.from,
+        to: editor.state.selection.to,
+      };
+    };
+
+    update();
+    editor.on('transaction', update);
+    editor.on('selectionUpdate', update);
+    editor.on('update', update);
+    return () => {
+      editor.off('transaction', update);
+      editor.off('selectionUpdate', update);
+      editor.off('update', update);
+    };
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.commands.setContent(initialEditorContent, { emitUpdate: false });
+    lastValidBodyHtmlRef.current = initialEditorContent;
+  }, [editor, initialEditorContent]);
+
+  const handleColorClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setColorAnchor(event.currentTarget);
+  };
+
+  const handleColorClose = () => {
+    setColorAnchor(null);
+  };
+
+  const handleColorSelect = (color: string) => {
+    if (editor) {
+      editor.chain().focus().setColor(color).run();
+    }
+    handleColorClose();
+  };
+
+  const handleEmojiClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setEmojiAnchor(event.currentTarget);
+  };
+
+  const handleEmojiClose = () => {
+    setEmojiAnchor(null);
+  };
+
+  const onEmojiSelect = (emojiData: EmojiClickData) => {
+    if (editor) {
+      const currentLength = editor.getText().length;
+      if (!canUpdateBody(currentLength + emojiData.emoji.length)) {
+        return;
+      }
+      editor.chain().focus().insertContent(emojiData.emoji).run();
+      lastValidBodyHtmlRef.current = editor.getHTML();
+    }
+    handleEmojiClose();
+  };
+
+  useEffect(() => {
+    if (!editor || isViewOnly) return;
+
+    const editableDom = editor.view.dom as HTMLElement;
+
+    const handleBeforeInput = (event: InputEvent) => {
+      const inputType = event.inputType || '';
+      const isDeleteAction =
+        inputType.startsWith('delete') ||
+        inputType === 'historyUndo' ||
+        inputType === 'historyRedo';
+
+      if (isDeleteAction) return;
+
+      const currentLength = editor.getText().length;
+      const incomingLength = event.data?.length ?? 0;
+
+      if (!canUpdateBody(currentLength + incomingLength)) {
+        event.preventDefault();
+      }
+    };
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const pastedText = event.clipboardData?.getData('text') ?? '';
+      const currentLength = editor.getText().length;
+
+      if (canUpdateBody(currentLength + pastedText.length)) return;
+
+      event.preventDefault();
+
+      const allowedLength = Math.max(0, MAX_EMAIL_TEMPLATE_BODY_LENGTH - currentLength);
+      if (allowedLength > 0) {
+        editor.chain().focus().insertContent(pastedText.slice(0, allowedLength)).run();
+        lastValidBodyHtmlRef.current = editor.getHTML();
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const currentLength = editor.getText().length;
+      const isModifier = event.ctrlKey || event.metaKey || event.altKey;
+      const isNavigationKey = [
+        'Backspace',
+        'Delete',
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+        'Home',
+        'End',
+        'PageUp',
+        'PageDown',
+        'Tab',
+        'Escape',
+      ].includes(event.key);
+
+      if (isModifier || isNavigationKey) return;
+
+      if (event.key.length === 1 && !canUpdateBody(currentLength + 1)) {
+        event.preventDefault();
+      }
+    };
+
+    const handleDrop = (event: DragEvent) => {
+      const droppedText = event.dataTransfer?.getData('text') ?? '';
+      if (!droppedText) return;
+
+      const currentLength = editor.getText().length;
+      if (canUpdateBody(currentLength + droppedText.length)) return;
+
+      event.preventDefault();
+      const allowedLength = Math.max(0, MAX_EMAIL_TEMPLATE_BODY_LENGTH - currentLength);
+      if (allowedLength > 0) {
+        editor.chain().focus().insertContent(droppedText.slice(0, allowedLength)).run();
+        lastValidBodyHtmlRef.current = editor.getHTML();
+      }
+    };
+
+    editableDom.addEventListener('beforeinput', handleBeforeInput as EventListener);
+    editableDom.addEventListener('paste', handlePaste as EventListener);
+    editableDom.addEventListener('keydown', handleKeyDown as EventListener);
+    editableDom.addEventListener('drop', handleDrop as EventListener);
+
+    return () => {
+      editableDom.removeEventListener('beforeinput', handleBeforeInput as EventListener);
+      editableDom.removeEventListener('paste', handlePaste as EventListener);
+      editableDom.removeEventListener('keydown', handleKeyDown as EventListener);
+      editableDom.removeEventListener('drop', handleDrop as EventListener);
+    };
+  }, [editor, isViewOnly]);
+
+  const keepSelection = (event: React.MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+  };
+
+  const handleFontChange = (value: string) => {
+    if (!editor) return;
+    setCurrentFont(value);
+
+    const chain = editor.chain().focus();
+    if (lastSelectionRef.current) {
+      chain.setTextSelection(lastSelectionRef.current);
+    }
+    chain.setFontFamily(value).run();
+  };
+
+  const handleHeadingChange = (value: 'Tt' | 'H1' | 'H2') => {
+    if (!editor) return;
+    setCurrentHeading(value);
+
+    const chain = editor.chain().focus();
+    if (lastSelectionRef.current) {
+      chain.setTextSelection(lastSelectionRef.current);
+    }
+
+    if (value === 'Tt') {
+      chain.setParagraph().run();
+      return;
+    }
+
+    if (value === 'H1') chain.setHeading({ level: 1 }).run();
+    if (value === 'H2') chain.setHeading({ level: 2 }).run();
+  };
+
+  const adjustIndent = (delta: number) => {
+    if (!editor) return;
+    const { selection } = editor.state;
+    const { $from } = selection;
+    const node = $from.parent;
+    const style = (node.attrs && node.attrs.style) || '';
+    const match = /margin-left:\s*(\d+)px/.exec(style);
+    const curr = match ? parseInt(match[1], 10) : 0;
+    const next = Math.max(0, curr + delta);
+    const cleaned = style.replace(/margin-left:\s*\d+px;?/g, '').trim();
+    const newStyle = (cleaned ? cleaned + '; ' : '') + `margin-left: ${next}px`;
+
+    if (editor.isActive('listItem')) {
+      editor.chain().focus().updateAttributes('listItem', { style: newStyle }).run();
+      return;
+    }
+
+    if (editor.isActive('blockquote')) {
+      editor.chain().focus().updateAttributes('blockquote', { style: newStyle }).run();
+      return;
+    }
+
+    if (editor.isActive('heading')) {
+      editor.chain().focus().updateAttributes('heading', { style: newStyle }).run();
+      return;
+    }
+
+    editor.chain().focus().updateAttributes('paragraph', { style: newStyle }).run();
+  };
+
+  const addLink = () => {
+    if (!editor) return;
+    const currentHref = (editor.getAttributes('link').href as string | undefined) || '';
+    setLinkUrl(currentHref);
+    setLinkDialogOpen(true);
+  };
+
+  const handleApplyLink = () => {
+    if (!editor) return;
+
+    const chain = editor.chain().focus();
+    if (lastSelectionRef.current) {
+      chain.setTextSelection(lastSelectionRef.current);
+    }
+
+    if (!linkUrl.trim()) {
+      chain.unsetLink().run();
+    } else {
+      chain.extendMarkRange('link').setLink({ href: linkUrl.trim() }).run();
+    }
+
+    setLinkDialogOpen(false);
+    setLinkUrl('');
+  };
+
+  const addImage = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && editor) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const url = e.target?.result as string;
+        editor.chain().focus().setImage({ src: url }).run();
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      setUploadedFiles([...uploadedFiles, ...Array.from(files)]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
+  };
+
+  const removeExistingDocument = (documentId?: string | number) => {
+    if (documentId === undefined || documentId === null) return;
+    const normalized = String(documentId);
+    setExistingDocuments((prev) => prev.filter((doc) => String(doc.id) !== normalized));
+    setRemovedExistingDocumentIds((prev) => prev.includes(normalized) ? prev : [...prev, normalized]);
+  };
+
+  const handlePreview = () => {
+    setShowPreview(true);
+  };
+
+  const handleBackToEdit = () => {
+    setShowPreview(false);
+  };
+
+  // ─── ONLY CHANGE: pass uploadedFiles as second argument ──────────────────────
+  // NewTemplateModal.handleFormSaveWithFiles(payload, files) receives both,
+  // saves the template first (gets id back), then POSTs each file to
+  // POST /api/templates/mail/{id}/documents/ → inserts into restapi_template_mail_document
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Name filed is mandtory', { toastId: 'template-name-required' });
+      return;
+    }
+
+    const trimmedSubject = formData.subject.trim();
+
+    if (!trimmedSubject) {
+      toast.error('Subject is mandatory', { toastId: 'template-subject-required' });
+      return;
+    }
+
+    if (!SUBJECT_MUST_CONTAIN_LETTER_REGEX.test(trimmedSubject)) {
+      toast.error('Subject must include at least one letter', {
+        toastId: 'template-subject-letter-required',
+      });
+      return;
+    }
+
+    if (!formData.useCase) {
+      toast.error('Use case is mandatory', { toastId: 'template-usecase-required' });
+      return;
+    }
+
+    const bodyHtml = editor?.getHTML() || '';
+    const bodyIsEmpty = !bodyHtml || bodyHtml === '<p></p>' || bodyHtml.replace(/<[^>]*>/g, '').trim() === '';
+
+    if (bodyIsEmpty) {
+      toast.error('Body is required', { toastId: 'template-body-required' });
+      return;
+    }
+
+    if (formData.subject.length > 150) {
+      toast.error('Subject cannot exceed 150 characters', { toastId: 'template-subject-limit' });
+      return;
+    }
+
+    const bodyTextLength = editor?.getText().length ?? 0;
+    if (bodyTextLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
+      toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+      return;
+    }
+
+    // const clinicId = getClinicId();
+
+    const apiPayload = {
+      name: formData.name,
+      use_case: formData.useCase,
+      body: editor?.getHTML() || '',
+      subject: trimmedSubject,
+      clinic: clinicId,
+    };
+
+    console.log("📧 Email Template Payload:", JSON.stringify(apiPayload, null, 2));
+
+    // Pass plain payload + files + removed document ids so modal can
+    // delete previous files and then upload new files.
+    await onSave(apiPayload, uploadedFiles, removedExistingDocumentIds);
+  };
+
+  // Helper to generate random ID outside of render function
+   
+  const generateId = () => {
+     
+    // eslint-disable-next-line react-hooks/purity
+    return Math.random().toString(36).substr(2, 9);
+  };
+
+  if (showPreview) {
+    const previewTemplate = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      id: ((initialData as any)?.id || generateId()),
+      name: formData.name,
+      subject: formData.subject,
+      body: editor?.getHTML() || '',
+      useCase: formData.useCase as "Appointment" | "Reminder" | "Feedback" | "Follow-Up" | "Re-engagement" | "No-Show" | "Marketing" | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lastUpdatedAt: ((initialData as any)?.lastUpdatedAt || new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      createdBy: ((initialData as any)?.createdBy || 'System'),
+      type: 'email' as const
+    };
+
+    return (
+      <PreviewTemplateModal 
+        open={showPreview}
+        onClose={onClose}
+        onBackToEdit={handleBackToEdit}
+        onSave={handleSave}
+        templateData={previewTemplate}
+      />
+    );
+  }
+
+  if (!editor) {
+    return null;
+  }
+
+  const openColorPicker = Boolean(colorAnchor);
+
+  return (
+    <Box sx={{ width: '100%', bgcolor: 'white', borderRadius: '12px' }}>
+      {/* Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        p: 2.5, 
+        borderBottom: '1px solid #E5E7EB' 
+      }}>
+        <Typography sx={{ fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+          {isViewOnly ? 'View Email Template' : mode === 'edit' ? 'Edit Email Template' : 'New Email Template'}
+        </Typography>
+        <IconButton onClick={onClose} size="small" sx={{ color: '#6B7280' }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      {/* Body */}
+      <Box sx={{ p: 3, maxHeight: '70vh', overflowY: 'auto' }}>
+        {/* Name Field */}
+        <Box sx={{ mb: 2.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+              Name
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: formData.name.length >= 50 ? '#EF4444' : '#9CA3AF' }}>
+              {formData.name.length}/50
+            </Typography>
+          </Box>
+          <TextField 
+            fullWidth 
+            size="small" 
+            value={formData.name}
+            disabled={isViewOnly}
+            inputProps={{ maxLength: 50 }}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (!TEMPLATE_NAME_REGEX.test(value)) {
+                toast.error('Template name contain only alphbets', { toastId: 'template-name-alpha' });
+                return;
+              }
+              setFormData({ ...formData, name: value });
+            }}
+            sx={{ 
+              '& .MuiOutlinedInput-root': {
+                fontSize: '14px',
+                bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+                '& fieldset': { borderColor: formData.name.length >= 50 ? '#EF4444' : '#E5E7EB' }
+              }
+            }}
+          />
+        </Box>
+
+        {/* Use Case */}
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+            Use Case
+          </Typography>
+          <Select 
+            fullWidth 
+            size="small" 
+            value={formData.useCase}
+            displayEmpty
+            disabled={isViewOnly}
+            onChange={(e) => { setFormData({ ...formData, useCase: e.target.value }); }}
+            IconComponent={KeyboardArrowDownIcon}
+            sx={{ 
+              fontSize: '14px',
+              borderRadius: '6px', 
+              bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+              '& fieldset': { borderColor: '#E5E7EB' }
+            }}
+          >
+            <MenuItem value="" disabled>
+              <Box component="span" sx={{ color: '#9CA3AF', fontSize: '14px' }}>Select Use Case</Box>
+            </MenuItem>
+            <MenuItem value="Appointment">
+               <Box component="span" sx={{ 
+                 color: '#16A34A', 
+                 bgcolor: '#F0FDF4', 
+                 px: 1.5, 
+                 py: 0.5, 
+                 borderRadius: '4px', 
+                 fontSize: '12px', 
+                 fontWeight: 600 
+               }}>
+                 Appointment
+               </Box>
+            </MenuItem>
+            <MenuItem value="Follow-up">
+               <Box component="span" sx={{ 
+                 color: '#3B82F6', 
+                 bgcolor: '#EFF6FF', 
+                 px: 1.5, 
+                 py: 0.5, 
+                 borderRadius: '4px', 
+                 fontSize: '12px', 
+                 fontWeight: 600 
+               }}>
+                 Follow-up
+               </Box>
+            </MenuItem>
+            <MenuItem value="Reminder">
+               <Box component="span" sx={{ 
+                 color: '#D97706', 
+                 bgcolor: '#FFFBEB', 
+                 px: 1.5, 
+                 py: 0.5, 
+                 borderRadius: '4px', 
+                 fontSize: '12px', 
+                 fontWeight: 600 
+               }}>
+                 Reminder
+               </Box>
+            </MenuItem>
+          </Select>
+        </Box>
+
+        {/* Subject Field */}
+        <Box sx={{ mb: 2.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+              Subject
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: formData.subject.length > 150 ? '#EF4444' : '#9CA3AF' }}>
+              {formData.subject.length}/150
+            </Typography>
+          </Box>
+          <TextField 
+            fullWidth 
+            size="small" 
+            value={formData.subject}
+            disabled={isViewOnly}
+            inputProps={{ maxLength: 150 }}
+            onChange={(e) => { setFormData({ ...formData, subject: e.target.value }); }}
+            sx={{ 
+              '& .MuiOutlinedInput-root': {
+                fontSize: '14px',
+                bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+                '& fieldset': { borderColor: formData.subject.length >= 150 ? '#EF4444' : '#E5E7EB' }
+              }
+            }}
+          />
+        </Box>
+
+        {/* Body Editor */}
+        <Box sx={{ mb: 2.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+              Body
+            </Typography>
+            <Typography sx={{ fontSize: '11px', color: (editor?.getText().length ?? 0) > MAX_EMAIL_TEMPLATE_BODY_LENGTH ? '#EF4444' : '#9CA3AF' }}>
+              {editor?.getText().length ?? 0}/{MAX_EMAIL_TEMPLATE_BODY_LENGTH}
+            </Typography>
+          </Box>
+          <Box
+            sx={{ 
+              border: '1px solid #E5E7EB', 
+              borderRadius: '8px',
+              bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
+            }}>
+            {/* Editor Content */}
+            <Box sx={{
+              '& .ProseMirror': {
+                minHeight: '200px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+                padding: '12px 16px',
+                outline: 'none',
+                fontSize: '13px',
+                lineHeight: 1.6,
+                color: '#374151',
+                '& p': { margin: '0 0 4px 0' },
+                '& h1': { fontSize: '2rem', fontWeight: 700, margin: '8px 0' },
+                '& h2': { fontSize: '1.5rem', fontWeight: 600, margin: '8px 0' },
+                '& ul': { listStyleType: 'disc', paddingLeft: '20px', margin: '4px 0' },
+                '& ol': { listStyleType: 'decimal', paddingLeft: '20px', margin: '4px 0' },
+                '& li': { display: 'list-item' },
+                '& li p': { margin: 0 },
+                '& blockquote': {
+                  borderLeft: '3px solid #D1D5DB',
+                  margin: '8px 0',
+                  paddingLeft: '12px',
+                  color: '#4B5563',
+                },
+                '& a': { color: '#6366F1', textDecoration: 'underline' },
+                '& img': { maxWidth: '100%', height: 'auto', borderRadius: '4px' },
+              }
+            }}>
+              <EditorContent editor={editor} />
+            </Box>
+
+            {/* Toolbar - First Row */}
+            {!isViewOnly && (
+              <>
+                <Box sx={{
+                  display: 'flex',
+                  gap: 0.5,
+                  p: 1,
+                  borderTop: '1px solid #E5E7EB',
+                  bgcolor: '#FAFBFC',
+                  flexWrap: 'wrap'
+                }}>
+                  <IconButton title="Undo" aria-label="Undo" size="small" onMouseDown={keepSelection} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} sx={{ p: 0.5 }}>
+                    <UndoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                  </IconButton>
+                  <IconButton title="Redo" aria-label="Redo" size="small" onMouseDown={keepSelection} onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} sx={{ p: 0.5 }}>
+                    <RedoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                  </IconButton>
+
+                  {/* Font family selector */}
+                  <Select
+                    size="small"
+                    value={currentFont}
+                    onChange={(e) => handleFontChange(e.target.value as string)}
+                    sx={{ width: 120, height: 28, fontSize: '12px', ml: 1, '& fieldset': { border: 'none' } }}
+                  >
+                    <MenuItem value="Nunito" sx={{ fontFamily: 'Nunito' }}>Nunito</MenuItem>
+                    <MenuItem value="Arial" sx={{ fontFamily: 'Arial' }}>Arial</MenuItem>
+                    <MenuItem value="Times New Roman" sx={{ fontFamily: 'Times New Roman' }}>Times New Roman</MenuItem>
+                    <MenuItem value="Courier New" sx={{ fontFamily: 'Courier New' }}>Courier New</MenuItem>
+                  </Select>
+
+                  {/* Size / Heading selector */}
+                  <Select
+                    size="small"
+                    value={currentHeading}
+                    onChange={(e) => handleHeadingChange(e.target.value as 'Tt' | 'H1' | 'H2')}
+                    sx={{ width: 60, height: 28, fontSize: '12px', '& fieldset': { border: 'none' } }}
+                  >
+                    <MenuItem value="Tt">Tt</MenuItem>
+                    <MenuItem value="H1">H1</MenuItem>
+                    <MenuItem value="H2">H2</MenuItem>
+                  </Select>
+
+                  <IconButton
+                    title="Bold"
+                    aria-label="Bold"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().toggleBold().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('bold') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('bold')}
+                  >
+                    <FormatBoldIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton
+                    title="Italic"
+                    aria-label="Italic"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().toggleItalic().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('italic') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('italic')}
+                  >
+                    <FormatItalicIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton
+                    title="Underline"
+                    aria-label="Underline"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().toggleUnderline().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('underline') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('underline')}
+                  >
+                    <FormatUnderlinedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton
+                    title="Strikethrough"
+                    aria-label="Strikethrough"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().toggleStrike().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('strike') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('strike')}
+                  >
+                    <StrikethroughSIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton
+                    title="Text Color"
+                    aria-label="Text Color"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={handleColorClick}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('textStyle') ? '#E5E7EB' : 'transparent' }}
+                  >
+                    <FormatColorTextIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton
+                    title="Align Left"
+                    aria-label="Align Left"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'left' }) ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive({ textAlign: 'left' })}
+                  >
+                    <FormatAlignLeftIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton
+                    title="Align Center"
+                    aria-label="Align Center"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'center' }) ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive({ textAlign: 'center' })}
+                  >
+                    <FormatAlignCenterIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton
+                    title="Align Right"
+                    aria-label="Align Right"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'right' }) ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive({ textAlign: 'right' })}
+                  >
+                    <FormatAlignRightIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton
+                    title="Justify"
+                    aria-label="Justify"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'justify' }) ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive({ textAlign: 'justify' })}
+                  >
+                    <FormatAlignJustifyIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton
+                    title="Bulleted List"
+                    aria-label="Bulleted List"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().toggleBulletList().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('bulletList') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('bulletList')}
+                  >
+                    <FormatListBulletedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton
+                    title="Numbered List"
+                    aria-label="Numbered List"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('orderedList') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('orderedList')}
+                  >
+                    <FormatListNumberedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  {/* Indent controls */}
+                  <IconButton
+                    title="Decrease Indent"
+                    aria-label="Decrease Indent"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => adjustIndent(-20)}
+                    sx={{ p: 0.5 }}
+                  >
+                    <FormatIndentDecreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton
+                    title="Increase Indent"
+                    aria-label="Increase Indent"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => adjustIndent(20)}
+                    sx={{ p: 0.5 }}
+                  >
+                    <FormatIndentIncreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+
+                  <IconButton
+                    title="Quote"
+                    aria-label="Quote"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('blockquote') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('blockquote')}
+                  >
+                    <FormatQuoteIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton
+                    title="Code Block"
+                    aria-label="Code Block"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('codeBlock') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('codeBlock')}
+                  >
+                    <CodeIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                </Box>
+
+                {/* Toolbar - Second Row */}
+                <Box sx={{
+                  display: 'flex',
+                  gap: 0.5,
+                  px: 1,
+                  pb: 1,
+                  bgcolor: '#FAFBFC',
+                  borderBottomLeftRadius: '8px',
+                  borderBottomRightRadius: '8px'
+                }}>
+                  <IconButton title="Attach File" aria-label="Attach File" size="small" onMouseDown={keepSelection} onClick={() => fileInputRef.current?.click()} sx={{ p: 0.5 }}>
+                    <AttachFileIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton
+                    title="Insert Link"
+                    aria-label="Insert Link"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={addLink}
+                    sx={{ p: 0.5, bgcolor: editor.isActive('link') ? '#E5E7EB' : 'transparent' }}
+                    aria-pressed={editor.isActive('link')}
+                  >
+                    <LinkIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton title="Insert Emoji" aria-label="Insert Emoji" size="small" onMouseDown={keepSelection} onClick={handleEmojiClick} sx={{ p: 0.5 }}>
+                    <EmojiEmotionsIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                  <IconButton title="Insert Image" aria-label="Insert Image" size="small" onMouseDown={keepSelection} onClick={addImage} sx={{ p: 0.5 }}>
+                    <ImageIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  </IconButton>
+                </Box>
+              </>
+            )}
+          </Box>
+        </Box>
+
+        {/* Upload Documents */}
+        <Box>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+            Upload Documents
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+            <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+            <Button 
+              variant="contained" 
+              onClick={() => !isViewOnly && fileInputRef.current?.click()} 
+              disabled={isViewOnly}
+              sx={{ 
+                bgcolor: '#6B7280',
+                textTransform: 'none',
+                fontSize: '13px',
+                px: 2,
+                py: 0.75,
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#4B5563' }
+              }}
+            >
+              Choose File
+            </Button>
+            <Typography sx={{ color: '#9CA3AF', fontSize: '12px' }}>
+              {uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s) selected` : 'No File Chosen'}
+            </Typography>
+          </Box>
+
+          {existingDocuments.length > 0 && (
+            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {existingDocuments.map((doc) => {
+                const url = getDocumentUrl(doc);
+                const name = getDocumentName(doc);
+                return (
+                  <Box key={String(doc.id ?? name)} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: '#F9FAFB', borderRadius: '6px' }}>
+                    <AttachFileIcon sx={{ fontSize: 16, color: '#6B7280' }} />
+                    <Typography
+                      component={url ? 'a' : 'span'}
+                      href={url || undefined}
+                      target={url ? '_blank' : undefined}
+                      rel={url ? 'noopener noreferrer' : undefined}
+                      sx={{
+                        flex: 1,
+                        fontSize: '12px',
+                        color: url ? '#2563EB' : '#374151',
+                        textDecoration: url ? 'underline' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {name}
+                    </Typography>
+                    {!isViewOnly && (
+                      <IconButton size="small" onClick={() => removeExistingDocument(doc.id)} sx={{ p: 0.5 }}>
+                        <CloseIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+
+          {uploadedFiles.length > 0 && (
+            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {uploadedFiles.map((file, index) => (
+                <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: '#F9FAFB', borderRadius: '6px' }}>
+                  <AttachFileIcon sx={{ fontSize: 16, color: '#6B7280' }} />
+                  <Typography sx={{ flex: 1, fontSize: '12px', color: '#374151' }}>{file.name}</Typography>
+                  {!isViewOnly && (
+                    <IconButton size="small" onClick={() => removeFile(index)} sx={{ p: 0.5 }}>
+                      <CloseIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      {/* Footer */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'flex-end', 
+        gap: 1.5, 
+        p: 2.5, 
+        borderTop: '1px solid #E5E7EB' 
+      }}>
+        <Button 
+          onClick={onClose} 
+          variant="outlined"
+          sx={{
+            textTransform: 'none',
+            fontSize: '14px',
+            borderColor: '#D1D5DB',
+            color: '#374151',
+            px: 3,
+            '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+          }}
+        >
+          Cancel
+        </Button>
+        {!isViewOnly && (
+          <>
+            <Button 
+              variant="outlined" 
+              onClick={handlePreview}
+              sx={{
+                textTransform: 'none',
+                fontSize: '14px',
+                borderColor: '#D1D5DB',
+                color: '#374151',
+                px: 3,
+                '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+              }}
+            >
+              Preview
+            </Button>
+            <Button 
+              variant="contained" 
+              onClick={handleSave} 
+              sx={{ 
+                textTransform: 'none',
+                fontSize: '14px',
+                bgcolor: '#111827',
+                px: 3,
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#000' }
+              }}
+            >
+              Save
+            </Button>
+          </>
+        )}
+      </Box>
+
+      {/* Color Picker Popover */}
+      <Popover
+        open={openColorPicker}
+        anchorEl={colorAnchor}
+        onClose={handleColorClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <Box sx={{ p: 2, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1, maxWidth: '220px' }}>
+          {colors.map((color) => (
+            <Box
+              key={color}
+              onClick={() => handleColorSelect(color)}
+              sx={{
+                width: 30,
+                height: 30,
+                bgcolor: color,
+                borderRadius: '4px',
+                cursor: 'pointer',
+                border: color === '#FFFFFF' ? '1px solid #E5E7EB' : 'none',
+                transition: 'transform 0.2s',
+                '&:hover': {
+                  transform: 'scale(1.1)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                }
+              }}
+            />
+          ))}
+        </Box>
+      </Popover>
+
+      <Popover
+        open={Boolean(emojiAnchor)}
+        anchorEl={emojiAnchor}
+        onClose={handleEmojiClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <EmojiPicker onEmojiClick={onEmojiSelect} />
+      </Popover>
+
+      <Dialog open={linkDialogOpen} onClose={() => setLinkDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Add Link</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            margin="dense"
+            label="URL"
+            placeholder="https://example.com"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleApplyLink}>Apply</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};

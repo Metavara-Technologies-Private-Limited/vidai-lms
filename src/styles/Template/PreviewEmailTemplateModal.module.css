@@ -1,0 +1,128 @@
+/* Header */
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: transparent;
+}
+
+.modalTitle {
+  font-weight: 700;
+  font-size: 16px;
+  color: #111827;
+}
+
+.closeBtn {
+  color: #6B7280;
+}
+
+/* Outer preview card (single border for entire content) */
+.emailPreview {
+  margin: 16px;
+  border: 1px solid #E5E7EB; /* single border around entire content */
+  border-radius: 12px;
+  background-color: #ffffff;
+  overflow: hidden;
+}
+
+/* Sender block: no separate border (inside card) */
+.senderSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fff;
+}
+
+/* Avatar */
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Sender text */
+.senderInfo { display: flex; flex-direction: column; }
+.clinicName {
+  font-weight: 600;
+  font-size: 14px;
+  color: #111827;
+}
+.emailAddress {
+  font-size: 12px;
+  color: #6B7280;
+  opacity: 0.95;
+}
+
+/* Subject line: no border, just spacing */
+.subjectLine {
+  padding: 12px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #111827;
+  background: #fff;
+  border-bottom: 1px solid transparent; /* keep spacing consistent */
+}
+
+/* Body area with scrollbar and constrained height */
+.emailBody {
+  padding: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #374151;
+  min-height: 120px;
+  max-height: calc(60vh - 160px); /* keeps overall modal within viewport */
+  overflow-y: auto;
+  background: #fff;
+}
+
+/* Logo: inside same card, no extra border */
+.logoSection {
+  padding: 12px 16px;
+  text-align: left;
+  background: #fff;
+  border-top: 1px solid transparent;
+}
+
+/* Placeholder styling */
+.placeholder {
+  color: #6D28D9;
+  background-color: #F5F3FF;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Scrollbar */
+.emailBody::-webkit-scrollbar {
+  width: 8px;
+}
+.emailBody::-webkit-scrollbar-thumb {
+  background-color: #E5E7EB;
+  border-radius: 8px;
+}
+.emailBody::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Footer */
+.modalFooter {
+  padding: 12px 16px;
+  border-top: 1px solid #E5E7EB;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: transparent;
+}
+
+/* small helper: ensure content spacing matches screenshot */
+.subjectLine a,
+.emailBody a {
+  color: #6D28D9;
+  text-decoration: none;
+  font-weight: 600;
+}

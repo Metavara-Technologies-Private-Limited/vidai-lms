@@ -1,4 +1,3 @@
-// src/config/sidebar.tabs.ts
 import QualityIcon from "../assets/icons/Quality_control.svg";
 import DocumentIcon from "../assets/icons/Documentation_control.svg";
 import RiskIcon from "../assets/icons/Riskmanagement.svg";

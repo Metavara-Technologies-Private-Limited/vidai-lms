@@ -1,0 +1,721 @@
+// services/leads.api.ts
+import axios, { type AxiosRequestConfig } from "axios";
+
+// ====================== Types ======================
+export type Department = {
+  id: number;
+  name: string;
+  is_active: boolean;
+};
+
+export type Clinic = {
+  id: number;
+  name: string;
+  department: Department[];
+};
+
+export type Employee = {
+  id: number;
+  emp_name: string;
+  emp_type: string;
+  department_name: string;
+  email?: string;
+  emp_email?: string;
+  user_email?: string;
+  official_email?: string;
+};
+
+export type LeadDocument = {
+  id: string;
+  file: string;
+  uploaded_at: string;
+};
+
+export type Lead = {
+  status: string | undefined;
+  id: string;
+  stage_id?: string | number;
+  clinic_id: number;
+  clinic_name: string;
+  department_id: number;
+  department_name: string;
+  full_name: string;
+  contact_no: string;
+  email?: string;
+  age?: number;
+  marital_status?: "single" | "married";
+  location?: string;
+  address?: string;
+  partner_inquiry: boolean;
+  partner_full_name?: string;
+  partner_age?: number;
+  partner_gender?: "male" | "female";
+  source: string;
+  sub_source?: string;
+  lead_status?:
+    | "New"
+    | "Contacted"
+    | "Follow-Ups"
+    | "Converted"
+    | "Lost"
+    | "Cycle Conversion"
+    | "Appointment";
+  next_action_type?: string;
+  next_action_status?: string;
+  next_action_description?: string;
+  assigned_to_id?: number;
+  assigned_to_name?: string;
+  created_by_id?: number;
+  created_by_name?: string;
+  treatment_interest: string;
+  book_appointment: boolean;
+  appointment_date: string;
+  slot: string;
+  remark?: string;
+  documents?: LeadDocument[];
+  is_active: boolean;
+  created_at: string;
+  modified_at: string;
+  referral_department_id?: number | null;
+  referral_department_name?: string | null;
+};
+
+export type LeadPayload = {
+  clinic_id: number;
+  department_id: number;
+  stage_id?: string | number | null;
+  campaign_id?: string | null;
+  assigned_to_id?: number | null;
+  assigned_to_name?: string | null;
+  // lead_generated_by removed — backend Lead model has no such field
+  personal_id?: number | null;
+  personal_name?: string | null;
+  full_name: string;
+  contact_no: string;
+  age?: number | null;
+  marital_status?: "single" | "married" | null;
+  email?: string | null;
+  language_preference?: string;
+  location?: string;
+  address?: string;
+  partner_inquiry: boolean;
+  partner_full_name?: string;
+  partner_age?: number | null;
+  partner_gender?: "male" | "female" | null;
+  source: string;
+  sub_source?: string;
+  lead_status?:
+    | "new"
+    | "contacted"
+    | "appointment"
+    | "follow up"
+    | "negotiation"
+    | "proposal sent"
+    | "contract signed"
+    | "converted"
+    | "cycle_conversion"
+    | "lost"
+    | "lost lead";
+  next_action_status?: string | null;
+  next_action_description?: string;
+  next_action_type?: string;
+  treatment_interest: string;
+  book_appointment: boolean;
+  appointment_date: string | null;
+  slot: string;
+  remark?: string;
+  is_active: boolean;
+  referral_department_id?: number | null;
+};
+
+// Referral source object — sent alongside payload for contracts app
+// Backend reads this from request.data.get("referral_source")
+export type ReferralSourceObject = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+};
+
+// ====================== Lead Email Types ======================
+export type LeadEmailPayload = {
+  lead: string;
+  subject: string;
+  email_body: string;
+  sender_email?: string | null;
+  scheduled_at?: string | null;
+  send_now?: boolean;
+  cc?: string[];
+  bcc?: string[];
+  additional_to?: string[];
+};
+
+export type LeadEmailStatus =
+  | "DRAFT"
+  | "SCHEDULED"
+  | "SENT"
+  | "FAILED"
+  | "CANCELLED";
+
+export type LeadEmailResponse = {
+  id: number;
+  lead: string;
+  subject: string;
+  email_body: string;
+  sender_email?: string | null;
+  scheduled_at?: string | null;
+  status: LeadEmailStatus;
+  sent_at?: string | null;
+  failed_reason?: string | null;
+  created_at: string;
+  send_now?: boolean;
+};
+
+export type LeadMailListItem = {
+  id: number;
+  lead_uuid: string;
+  subject: string;
+  sender_email?: string | null;
+  email_body: string;
+  status: LeadEmailStatus;
+  failed_reason?: string | null;
+  scheduled_at?: string | null;
+  sent_at?: string | null;
+  created_at: string;
+};
+
+// ====================== Token Helpers ======================
+const TOKEN_KEYS = ["auth_token", "access_token", "access", "token"] as const;
+const REFRESH_KEYS = ["refresh_token", "refresh"] as const;
+
+export const getAccessToken = (): string | null => {
+  for (const key of TOKEN_KEYS) {
+    const val = localStorage.getItem(key);
+    if (val) return val;
+  }
+  return null;
+};
+
+export const getRefreshToken = (): string | null => {
+  for (const key of REFRESH_KEYS) {
+    const val = localStorage.getItem(key);
+    if (val) return val;
+  }
+  return null;
+};
+
+export const setTokens = (access: string, refresh?: string): void => {
+  localStorage.setItem("auth_token", access);
+  localStorage.setItem("access_token", access);
+  if (refresh) {
+    localStorage.setItem("refresh_token", refresh);
+    localStorage.setItem("refresh", refresh);
+  }
+};
+
+export const clearTokens = (): void => {
+  [...TOKEN_KEYS, ...REFRESH_KEYS].forEach((k) => localStorage.removeItem(k));
+};
+
+// ====================== Axios Instance ======================
+const API_BASE_URL: string =
+  (import.meta as unknown as { env: Record<string, string> }).env
+    ?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api";
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { "Content-Type": "application/json" },
+});
+
+// ── Request interceptor ───────────────────────────────────────────────────────
+api.interceptors.request.use(
+  (config) => {
+    const token = getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else if (import.meta.env.DEV) {
+      console.warn(
+        `[api] ⚠️ No auth token found for ${config.method?.toUpperCase()} ${config.url}. ` +
+          `Checked: ${TOKEN_KEYS.join(", ")}`,
+      );
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+// ── Response interceptor ──────────────────────────────────────────────────────
+let isRefreshing = false;
+let refreshQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: unknown) => void;
+}> = [];
+
+const drainQueue = (err: unknown, token: string | null = null): void => {
+  refreshQueue.forEach(({ resolve, reject }) =>
+    err ? reject(err) : resolve(token!),
+  );
+  refreshQueue = [];
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status: number | undefined = error?.response?.status;
+    const url: string = error?.config?.url ?? "";
+    const raw = error?.response?.data;
+    const skipLog = Boolean(
+      (error?.config as { __skipErrorLog?: boolean } | undefined)
+        ?.__skipErrorLog,
+    );
+
+    const normalizeError = (value: unknown): string => {
+      if (value == null) return "Unknown error";
+      if (typeof value === "string") return value;
+      if (typeof value === "number" || typeof value === "boolean")
+        return String(value);
+      if (Array.isArray(value)) {
+        const first = value[0];
+        return first == null ? "Unknown error" : normalizeError(first);
+      }
+      if (typeof value === "object") {
+        const obj = value as Record<string, unknown>;
+        if (typeof obj.detail === "string") return obj.detail;
+        if (typeof obj.message === "string") return obj.message;
+        if (typeof obj.error === "string") return obj.error;
+        const entries = Object.entries(obj);
+        if (!entries.length) return "Unknown error";
+        return entries
+          .slice(0, 4)
+          .map(([k, v]) => `${k}: ${normalizeError(v)}`)
+          .join(" | ");
+      }
+      return "Unknown error";
+    };
+
+    if (!skipLog) {
+      console.error(
+        `❌ API Error [${status}] ${url}: ${normalizeError(raw ?? error?.message)}`,
+      );
+    }
+
+    const originalRequest = error.config as AxiosRequestConfig & {
+      _retry?: boolean;
+    };
+
+    const isAuthEndpoint =
+      url.includes("/token/refresh/") || url.includes("/auth/login/");
+
+    if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+      const refreshToken = getRefreshToken();
+
+      if (!refreshToken) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            "[api] 401 with no refresh token — redirecting to /login.",
+          );
+        }
+        clearTokens();
+        window.location.href = "/login";
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        return new Promise<string>((resolve, reject) => {
+          refreshQueue.push({ resolve, reject });
+        }).then((newToken) => {
+          originalRequest.headers = originalRequest.headers ?? {};
+          originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+          return api(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await axios.post(
+          `${API_BASE_URL}/token/refresh/`,
+          { refresh: refreshToken },
+          { headers: { "Content-Type": "application/json" } },
+        );
+
+        const newAccess: string = data.access;
+        setTokens(newAccess, data.refresh ?? undefined);
+        drainQueue(null, newAccess);
+
+        originalRequest.headers = originalRequest.headers ?? {};
+        originalRequest.headers["Authorization"] = `Bearer ${newAccess}`;
+        return api(originalRequest);
+      } catch (refreshErr) {
+        drainQueue(refreshErr, null);
+        clearTokens();
+        window.location.href = "/login";
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
+
+// ====================== Lead API ======================
+const storedClinicId = (): number =>
+  Number(localStorage.getItem("clinic_id") ?? 0);
+
+export const LeadAPI = {
+  list: (clinicId: number) =>
+    api.get(`/leads/list/?clinic_id=${clinicId}`).then((res) => res.data),
+
+  // ── FIX: send X-Clinic-Id header + support referral_source object ──────────
+  create: async (
+    data: LeadPayload,
+    referralSource?: ReferralSourceObject,
+  ): Promise<Lead> => {
+    const body = referralSource
+      ? { ...data, referral_source: referralSource }
+      : data;
+    const response = await api.post<Lead>(
+      `/leads/?clinic_id=${data.clinic_id}`,
+      body,
+      {
+        headers: {
+          "X-Clinic-Id": String(data.clinic_id),
+        },
+      },
+    );
+    console.log("✅ Lead created:", response.data);
+    return response.data;
+  },
+
+  // ── FIX: send X-Clinic-Id header + referral_source as JSON string in FormData
+  createWithDocuments: async (
+    data: LeadPayload,
+    files: File[],
+    referralSource?: ReferralSourceObject,
+  ): Promise<Lead> => {
+    const formData = new FormData();
+    (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
+      const value = data[key];
+      if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    });
+    // referral_source must be JSON stringified in multipart FormData
+    if (referralSource) {
+      formData.append("referral_source", JSON.stringify(referralSource));
+    }
+    files.forEach((file) => formData.append("documents", file));
+    const response = await api.post<Lead>(
+      `/leads/?clinic_id=${data.clinic_id}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Clinic-Id": String(data.clinic_id),
+        },
+      },
+    );
+    console.log("✅ Lead + documents created:", response.data);
+    return response.data;
+  },
+
+  getById: async (leadId: string): Promise<Lead> => {
+    const response = await api.get<Lead>(
+      `/leads/${leadId}/?clinic_id=${storedClinicId()}`,
+    );
+    return response.data;
+  },
+
+  update: async (leadId: string, data: Partial<LeadPayload>): Promise<Lead> => {
+    const clinicId = data.clinic_id ?? storedClinicId();
+    const response = await api.put<Lead>(
+      `/leads/${leadId}/update/?clinic_id=${clinicId}`,
+      data,
+      {
+        headers: {
+          "X-Clinic-Id": String(clinicId),
+        },
+      },
+    );
+    return response.data;
+  },
+
+  updateWithDocuments: async (
+    leadId: string,
+    data: Partial<LeadPayload>,
+    files: File[],
+  ): Promise<Lead> => {
+    const formData = new FormData();
+    (Object.keys(data) as (keyof Partial<LeadPayload>)[]).forEach((key) => {
+      const value = data[key];
+      if (value === null || value === undefined) return;
+      formData.append(key, typeof value === "boolean" ? String(value) : String(value));
+    });
+    files.forEach((file) => formData.append("documents", file));
+    const clinicId = data.clinic_id ?? storedClinicId();
+    const response = await api.put<Lead>(
+      `/leads/${leadId}/update/?clinic_id=${clinicId}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Clinic-Id": String(clinicId),
+        },
+      },
+    );
+    console.log("✅ Lead + documents updated:", response.data);
+    return response.data;
+  },
+
+  activate: async (leadId: string): Promise<void> => {
+    await api.post(`/leads/${leadId}/activate/?clinic_id=${storedClinicId()}`);
+  },
+
+  inactivate: async (leadId: string): Promise<void> => {
+    await api.patch(`/leads/${leadId}/inactivate/?clinic_id=${storedClinicId()}`);
+  },
+
+  delete: async (leadId: string): Promise<void> => {
+    await api.patch(`/leads/${leadId}/delete/?clinic_id=${storedClinicId()}`);
+  },
+
+  getDocuments: async (leadId: string): Promise<LeadDocument[]> => {
+    const lead = await LeadAPI.getById(leadId);
+    return lead.documents ?? [];
+  },
+
+  uploadDocument: async (leadId: string, file: File): Promise<Lead> => {
+    const formData = new FormData();
+    formData.append("documents", file);
+    const response = await api.put<Lead>(
+      `/leads/${leadId}/update/?clinic_id=${storedClinicId()}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Clinic-Id": String(storedClinicId()),
+        },
+      },
+    );
+    return response.data;
+  },
+
+  uploadDocuments: async (leadId: string, files: File[]): Promise<Lead> => {
+    const current = await LeadAPI.getById(leadId);
+    const formData = new FormData();
+    const safeFields: Record<string, string> = {
+      clinic_id: String(current.clinic_id ?? 1),
+      department_id: String(current.department_id ?? 1),
+      full_name: current.full_name ?? "",
+      contact_no: current.contact_no ?? "",
+      source: current.source ?? "",
+      treatment_interest: current.treatment_interest ?? "",
+      book_appointment: current.book_appointment ? "true" : "false",
+      appointment_date: current.appointment_date ?? "",
+      slot: current.slot ?? "",
+      partner_inquiry: current.partner_inquiry ? "true" : "false",
+      is_active: current.is_active ? "true" : "false",
+    };
+    Object.entries(safeFields).forEach(([k, v]) => formData.append(k, v));
+    files.forEach((file) => formData.append("documents", file));
+    const clinicId = current.clinic_id ?? storedClinicId();
+    const response = await api.put<Lead>(
+      `/leads/${leadId}/update/?clinic_id=${clinicId}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Clinic-Id": String(clinicId),
+        },
+      },
+    );
+    return response.data;
+  },
+};
+
+// ====================== Lead Email API ======================
+export const LeadEmailAPI = {
+  create: async (
+    data: LeadEmailPayload,
+    options?: { suppressErrorLog?: boolean },
+  ): Promise<LeadEmailResponse> => {
+    const requestConfig: AxiosRequestConfig = {};
+    (requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }).__skipErrorLog =
+      options?.suppressErrorLog === true;
+    const response = await api.post<LeadEmailResponse>(
+      "/lead-email/",
+      data,
+      requestConfig,
+    );
+    console.log("✅ Lead email created:", response.data);
+    return response.data as LeadEmailResponse;
+  },
+
+  sendNow: async (
+    data: Omit<LeadEmailPayload, "send_now">,
+  ): Promise<LeadEmailResponse> => LeadEmailAPI.create({ ...data, send_now: true }),
+
+  saveAsDraft: async (
+    data: Omit<LeadEmailPayload, "send_now">,
+  ): Promise<LeadEmailResponse> => LeadEmailAPI.create({ ...data, send_now: false }),
+
+  list: async (leadUuid?: string): Promise<LeadMailListItem[]> => {
+    const params = leadUuid ? { lead_uuid: leadUuid } : {};
+    const response = await api.get<LeadMailListItem[]>("/lead-mail/", { params });
+    return response.data;
+  },
+
+  listByLead: async (leadId: string): Promise<LeadMailListItem[]> =>
+    LeadEmailAPI.list(leadId),
+};
+
+// ====================== Email Template Types ======================
+export type EmailTemplate = {
+  id: string | number;
+  name: string;
+  subject: string;
+  body: string;
+  description?: string;
+  use_case?: string;
+  is_active?: boolean;
+  created_at?: string;
+};
+
+export type EmailTemplatePayload = {
+  clinic: number;
+  name: string;
+  subject: string;
+  body: string;
+  description?: string;
+  use_case?: string;
+  created_by: number;
+  is_active?: boolean;
+};
+
+// ====================== Email Template API ======================
+export const EmailTemplateAPI = {
+  list: async (): Promise<EmailTemplate[]> => {
+    const response = await api.get<EmailTemplate[]>("/templates/mail/");
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === "object" && "results" in (data as object)) {
+      return (data as { results: EmailTemplate[] }).results ?? [];
+    }
+    return [];
+  },
+
+  create: async (payload: EmailTemplatePayload): Promise<EmailTemplate> => {
+    const response = await api.post<EmailTemplate>("/templates/mail/create/", payload);
+    console.log("✅ Email template created:", response.data);
+    return response.data;
+  },
+
+  getById: async (templateId: string | number): Promise<EmailTemplate> => {
+    const response = await api.get<EmailTemplate>(`/templates/mail/${templateId}/`);
+    return response.data;
+  },
+
+  delete: async (templateId: string | number): Promise<void> => {
+    await api.delete(`/templates/mail/${templateId}/delete/`);
+  },
+};
+
+// ====================== Twilio API ======================
+export const TwilioAPI = {
+  makeCall: async (payload: { lead_uuid: string; to: string }): Promise<unknown> => {
+    const response = await api.post("/twilio/make-call/", payload);
+    console.log("📞 Call initiated:", response.data);
+    return response.data;
+  },
+
+  sendSMS: async (payload: {
+    lead_uuid: string;
+    to: string;
+    message: string;
+  }): Promise<unknown> => {
+    const response = await api.post("/twilio/send-sms/", payload);
+    console.log("💬 SMS sent:", response.data);
+    return response.data;
+  },
+};
+
+// ====================== Clinic API ======================
+export const ClinicAPI = {
+  getById: async (clinicId: number): Promise<Clinic> => {
+    try {
+      const response = await api.get<Clinic>(`/clinics/${clinicId}/detail/`);
+      return response.data;
+    } catch {
+      const fallback = await api.get<Clinic>(`/get_clinic/${clinicId}/`);
+      return fallback.data;
+    }
+  },
+
+  create: async (data: { name: string; department: string[] }): Promise<Clinic> => {
+    const response = await api.post<Clinic>("/clinics", data);
+    return response.data;
+  },
+
+  update: async (
+    clinicId: number,
+    data: { name: string; department: string[] },
+  ): Promise<Clinic> => {
+    const response = await api.put<Clinic>(`/clinics/${clinicId}/`, data);
+    return response.data;
+  },
+
+  getEmployees: async (clinicId: number): Promise<Employee[]> => {
+    const response = await api.get<Employee[] | { results: Employee[] }>(
+      `/clinics/${clinicId}/employees/`,
+    );
+    const data = response.data;
+    if (!Array.isArray(data)) {
+      if (data && typeof data === "object" && "results" in data && Array.isArray(data.results)) {
+        return data.results;
+      }
+      return [];
+    }
+    return data;
+  },
+};
+
+// ====================== Department API ======================
+export const DepartmentAPI = {
+  listByClinic: async (clinicId: number): Promise<Department[]> => {
+    try {
+      const response = await api.get<Department[]>(`/departments/?clinic_id=${clinicId}`);
+      const data = response.data;
+      return Array.isArray(data) ? data : [];
+    } catch {
+      const clinic = await ClinicAPI.getById(clinicId);
+      return clinic.department || [];
+    }
+  },
+
+  listActiveByClinic: async (clinicId: number): Promise<Department[]> => {
+    const departments = await DepartmentAPI.listByClinic(clinicId);
+    return departments.filter((dept) => dept.is_active);
+  },
+};
+
+// ====================== Employee API ======================
+export const EmployeeAPI = {
+  listByClinic: async (clinicId: number): Promise<Employee[]> =>
+    ClinicAPI.getEmployees(clinicId),
+
+  create: async (data: {
+    user_id: number;
+    clinic_id: number;
+    department_id: number;
+    emp_type: string;
+    emp_name: string;
+  }): Promise<Employee> => {
+    const response = await api.post<Employee>("/employees/", data);
+    return response.data;
+  },
+};
+
+export { api };

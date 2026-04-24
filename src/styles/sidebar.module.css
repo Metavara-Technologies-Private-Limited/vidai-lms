@@ -10,7 +10,10 @@
 .cardWrapper {
     flex: 1;
     padding: 0 16px;
-    margin-top: 16px;
+    margin-top: 0px;
+    margin-bottom: 0;
+    overflow: hidden;
+    min-width: 0;
 }
 
 .card {
@@ -23,7 +26,8 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: auto;
 }
 
 /* DECOR BG */
@@ -41,4 +45,35 @@
     text-align: center;
     margin-top: auto;
     padding-bottom: 8px;
+}
+
+@media (max-width: 1535px) {
+    .cardWrapper {
+        padding: 0 12px;
+    }
+
+    .card {
+        padding: 20px;
+        border-radius: 18px;
+    }
+}
+
+@media (max-width: 600px) {
+    .iconrowbox {
+        width: 100%;
+        gap: 10px;
+    }
+
+    .cardWrapper {
+        padding: 0 10px;
+    }
+
+    .card {
+        padding: 16px;
+        border-radius: 16px;
+    }
+
+    .cardBg {
+        width: 160px;
+    }
 }

@@ -1,0 +1,705 @@
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  TextField,
+  Box,
+  Button,
+  MenuItem,
+  Stack,
+  Typography,
+  Divider,
+  CircularProgress,
+  Autocomplete,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import { useState, useEffect } from "react";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import type { Dayjs } from "dayjs";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import type { AppDispatch } from "../../../store";
+import { fetchTickets, fetchTicketDashboard } from "../../../store/ticketSlice";
+import { ticketsApi, labsApi, clinicsApi } from "../../../services/tickets.api";
+import { authApi } from "../../../services/auth.api";
+import type { CreateTicketProps } from "../../../types/Settings.types";
+import type {
+  CreateTicketRequest,
+  TicketPriority,
+  Lab,
+  Department,
+  PaginatedResponse,
+} from "../../../types/tickets.types";
+
+import {
+  createTicketFocusedFieldSx,
+  createTicketDialogPaperSx,
+  createTicketCloseButtonSx,
+  createTicketCancelButtonSx,
+  createTicketSaveButtonSx,
+  createTicketUploadButtonSx,
+} from "../../../styles/Settings/Tickets.styles";
+import { selectUser } from "../../../store/authSlice";
+import { selectClinic } from "../../../store/clinicSlice";
+
+type AssigneeOption = {
+  id: number;
+  first_name: string | undefined;
+  last_name: string | undefined;
+  username: string | undefined;
+  role: string | undefined;
+  designation: string | undefined;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
+const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
+  const root = asRecord(raw);
+  const list: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(root?.objects)
+      ? (root?.objects as unknown[])
+      : Array.isArray(root?.results)
+        ? (root?.results as unknown[])
+        : Array.isArray(root?.data)
+          ? (root?.data as unknown[])
+          : [];
+
+  return list
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record) return null;
+
+      const idValue = record.id ?? record.user_id;
+      const id =
+        typeof idValue === "number"
+          ? idValue
+          : typeof idValue === "string"
+            ? Number(idValue)
+            : NaN;
+
+      if (!Number.isFinite(id)) return null;
+
+      return {
+        id,
+        first_name:
+          typeof record.first_name === "string" ? record.first_name : undefined,
+        last_name:
+          typeof record.last_name === "string" ? record.last_name : undefined,
+        username:
+          typeof record.username === "string" ? record.username : undefined,
+        role: typeof record.role === "string" ? record.role : undefined,
+        designation:
+          typeof record.designation === "string"
+            ? record.designation
+            : undefined,
+      };
+    })
+    .filter((item): item is AssigneeOption => item !== null);
+};
+
+const assigneeLabel = (option: AssigneeOption): string => {
+  const fullName =
+    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const primary = fullName || option.username || `User ${option.id}`;
+  const secondary = option.role || option.designation;
+  return secondary ? `${primary} (${secondary})` : primary;
+};
+
+const MAX_TICKET_SUBJECT_LENGTH = 150;
+const MAX_TICKET_DESCRIPTION_LENGTH = 500;
+const MAX_TICKET_REQUESTED_BY_LENGTH = 50;
+const MAX_TICKET_ASSIGNED_TO_LENGTH = 50;
+
+const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
+  const dispatch = useDispatch<AppDispatch>();
+  const user = useSelector(selectUser);
+  const selectedClinic = useSelector(selectClinic);
+  const clinicId =
+    selectedClinic?.id ??
+    (Number(localStorage.getItem("clinic_id") || 0) || null) ??
+    user?.clinics?.find((clinic) => clinic.is_default)?.clinic_id ??
+    user?.clinics?.[0]?.clinic_id ??
+    1;
+
+  // --- Form States ---
+  const [subject, setSubject] = useState("");
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState<Dayjs | null>(null);
+  const [labId, setLabId] = useState("");
+  const [departmentId, setDepartmentId] = useState<number | "">("");
+  const [priority, setPriority] = useState<TicketPriority | "">("");
+  const [assigneeId, setAssigneeId] = useState<number | "">("");
+  const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
+  const [assigneeLoading, setAssigneeLoading] = useState(false);
+  const [requestedBy, setRequestedBy] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // --- Data States (Dropdowns) ---
+  const [labs, setLabs] = useState<Lab[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+
+  // --- UI States ---
+  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+
+  useEffect(() => {
+    if (user?.first_name && user?.last_name) {
+      setRequestedBy(
+        `${user.first_name} ${user.last_name}`.slice(
+          0,
+          MAX_TICKET_REQUESTED_BY_LENGTH,
+        ),
+      );
+    } else if (user?.username) {
+      setRequestedBy(user.username.slice(0, MAX_TICKET_REQUESTED_BY_LENGTH));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!assigneeSearch.trim()) {
+        setAssigneeOptions([]);
+        return;
+      }
+
+      try {
+        setAssigneeLoading(true);
+        const response = await authApi.searchUsers({
+          search: assigneeSearch,
+          limit: 20,
+          offset: 0,
+        });
+        setAssigneeOptions(normalizeAssignees(response));
+      } catch {
+        setAssigneeOptions([]);
+      } finally {
+        setAssigneeLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [assigneeSearch]);
+
+  // 1. Fetch live data for dropdowns matching Swagger definitions
+  useEffect(() => {
+    if (open) {
+      const loadData = async () => {
+        setLoadingData(true);
+        try {
+          const results = await Promise.allSettled([
+            labsApi.getLabs(),
+            clinicsApi.getClinicDetail(clinicId),
+          ]);
+
+          if (results[0].status === "fulfilled") {
+            const labsData = results[0].value as Lab[] | PaginatedResponse<Lab>;
+            const labList = Array.isArray(labsData)
+              ? labsData
+              : labsData.results;
+            setLabs(labList.filter((l) => l.is_active));
+          } else {
+            console.error("Labs API failed. Using empty list.");
+            setLabs([]);
+          }
+
+          if (results[1].status === "fulfilled") {
+            setDepartments(results[1].value?.department || []);
+          }
+        } catch {
+          const connError = "Connection error. Check backend server.";
+          toast.error(connError);
+        } finally {
+          setLoadingData(false);
+        }
+      };
+      loadData();
+    }
+  }, [open, clinicId]);
+
+  // 2. Submit Logic matching TicketWrite definition
+  const handleSubmit = async () => {
+    // Check required fields
+    // --- Field Wise Validation ---
+    if (!subject.trim()) {
+      toast.warn("Subject is required!");
+      return;
+    }
+
+    if (!description.trim()) {
+      toast.warn("Description is required!");
+      return;
+    }
+
+    if (subject.trim().length > MAX_TICKET_SUBJECT_LENGTH) {
+      toast.warn("Subject cannot exceed 150 characters.");
+      return;
+    }
+
+    if (description.trim().length > MAX_TICKET_DESCRIPTION_LENGTH) {
+      toast.warn("Description cannot exceed 500 characters.");
+      return;
+    }
+
+    if (!labId) {
+      toast.warn("Please select Lab!");
+      return;
+    }
+
+    if (!departmentId) {
+      toast.warn("Please select Department!");
+      return;
+    }
+
+    if (!requestedBy.trim()) {
+      toast.warn("Please select Requested By!");
+      return;
+    }
+
+    if (requestedBy.trim().length > MAX_TICKET_REQUESTED_BY_LENGTH) {
+      toast.warn("Requested By cannot exceed 50 characters.");
+      return;
+    }
+
+    if (!priority) {
+      toast.warn("Please select Priority!");
+      return;
+    }
+
+    if (!dueDate) {
+      toast.warn("Please select Due Date!");
+      return;
+    }
+
+    if (!assigneeId) {
+      toast.warn("Please select Assignee!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload: CreateTicketRequest = {
+        subject: subject.trim(),
+        description: description.trim() || "No description provided",
+        lab: labId,
+        department: Number(departmentId),
+        requested_by: requestedBy.trim(),
+        priority: priority as TicketPriority,
+        status: "new",
+        assigned_to: assigneeId ? Number(assigneeId) : null,
+        due_date: dueDate ? dueDate.format("YYYY-MM-DD") : null,
+      };
+
+      const res = await ticketsApi.createTicket(payload);
+
+      if (selectedFile && res.id) {
+        await ticketsApi.uploadDocument(res.id, selectedFile);
+      }
+      toast.success("Ticket created successfully!");
+      handleClose();
+      dispatch(fetchTickets());
+      dispatch(fetchTicketDashboard());
+    } catch (err: unknown) {
+      let finalError =
+        "Submission failed. Ensure Lab and Department IDs are valid.";
+
+      if (typeof err === "object" && err !== null && "response" in err) {
+        const serverData = (err as { response?: { data?: unknown } }).response
+          ?.data;
+
+        const stringifyError = (value: unknown): string => {
+          if (value == null) return "Unknown error";
+          if (typeof value === "string") return value;
+          if (typeof value === "number" || typeof value === "boolean")
+            return String(value);
+          if (Array.isArray(value)) return value.map(stringifyError).join(", ");
+          if (typeof value === "object") {
+            return Object.entries(value as Record<string, unknown>)
+              .map(
+                ([key, nestedValue]) =>
+                  `${key}: ${stringifyError(nestedValue)}`,
+              )
+              .join(" | ");
+          }
+          return String(value);
+        };
+
+        if (serverData && typeof serverData === "object") {
+          finalError = stringifyError(serverData);
+        }
+      }
+
+      toast.error(finalError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reset = () => {
+    setSubject("");
+    setDescription("");
+    setDueDate(null);
+    setLabId("");
+    setDepartmentId("");
+    setPriority("");
+    setAssigneeId("");
+    setRequestedBy("");
+    setAssigneeSearch("");
+    setAssigneeOptions([]);
+    setSelectedFile(null);
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth={false}
+      scroll="paper"
+      PaperProps={{ sx: createTicketDialogPaperSx }}
+    >
+      <DialogTitle sx={{ position: "relative" }}>
+        <Typography fontWeight={700} fontSize="1.1rem">
+          New Ticket
+        </Typography>
+        <IconButton onClick={handleClose} sx={createTicketCloseButtonSx}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+        <Divider sx={{ mt: 2, mx: -3 }} />
+      </DialogTitle>
+
+      <DialogContent
+        sx={{
+          maxHeight: "calc(100vh - 180px)",
+          overflowY: "auto",
+        }}
+      >
+        {loadingData ? (
+          <Box display="flex" flexDirection="column" alignItems="center" py={6}>
+            <CircularProgress size={32} sx={{ mb: 2 }} />
+            <Typography variant="caption" color="text.secondary">
+              Fetching latest Lab & Assignee records...
+            </Typography>
+          </Box>
+        ) : (
+          <Stack spacing={2.5} mt={2}>
+            <TextField
+              label="Subject"
+              placeholder="Enter subject"
+              value={subject}
+              onChange={(e) => {
+                const value = e.target.value;
+
+                // Allow only alphanumeric + space
+                const alphanumericRegex = /^[a-zA-Z0-9 ]*$/;
+
+                if (!alphanumericRegex.test(value)) {
+                  toast.error("Only letters and numbers are allowed");
+                  return;
+                }
+
+                if (value.length === 1 && !/^[a-zA-Z]/.test(value)) {
+                  toast.error("Subject must start with a letter");
+                  return;
+                }
+
+                setSubject(value.slice(0, MAX_TICKET_SUBJECT_LENGTH));
+              }}
+              fullWidth
+              sx={createTicketFocusedFieldSx}
+              helperText={`${subject.length}/${MAX_TICKET_SUBJECT_LENGTH}`}
+              FormHelperTextProps={{
+                sx: {
+                  textAlign: "right",
+                  color:
+                    subject.length >= MAX_TICKET_SUBJECT_LENGTH
+                      ? "error.main"
+                      : "text.secondary",
+                },
+              }}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ maxLength: MAX_TICKET_SUBJECT_LENGTH }}
+              disabled={loading}
+            />
+
+            <TextField
+              label="Detailed Description"
+              placeholder="Enter description"
+              value={description}
+              onChange={(e) => {
+                const value = e.target.value;
+
+                if (value.length === 1 && !/^[a-zA-Z]/.test(value)) {
+                  toast.error("Description must start with a letter");
+                  return;
+                }
+
+                setDescription(value.slice(0, MAX_TICKET_DESCRIPTION_LENGTH));
+              }}
+              multiline
+              minRows={1}
+              maxRows={3}
+              fullWidth
+              sx={createTicketFocusedFieldSx}
+              helperText={`${description.length}/${MAX_TICKET_DESCRIPTION_LENGTH}`}
+              FormHelperTextProps={{
+                sx: {
+                  textAlign: "right",
+                  color:
+                    description.length >= MAX_TICKET_DESCRIPTION_LENGTH
+                      ? "error.main"
+                      : "text.secondary",
+                },
+              }}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              inputProps={{ maxLength: MAX_TICKET_DESCRIPTION_LENGTH }}
+              disabled={loading}
+            />
+
+            <Stack direction="row" spacing={2}>
+              <TextField
+                select
+                label="Lab Name"
+                value={labId}
+                onChange={(e) => setLabId(e.target.value)}
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => {
+                    if (!selected) {
+                      return (
+                        <span className="ticket-select-placeholder">
+                          Select lab name
+                        </span>
+                      );
+                    }
+                    const lab = labs.find(
+                      (l) => String(l.id) === String(selected),
+                    );
+                    return lab ? lab.name : "";
+                  },
+                }}
+              >
+                {labs.map((l) => (
+                  <MenuItem key={l.id} value={l.id}>
+                    {l.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                select
+                label="Department"
+                value={departmentId}
+                onChange={(e) => {
+                  const value =
+                    e.target.value === "" ? "" : Number(e.target.value);
+                  setDepartmentId(value);
+                  setAssigneeId("");
+                }}
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => {
+                    if (!selected) {
+                      return (
+                        <span className="ticket-select-placeholder">
+                          Select department
+                        </span>
+                      );
+                    }
+
+                    const dept = departments.find(
+                      (d) => String(d.id) === String(selected),
+                    );
+                    return dept ? dept.name : "";
+                  },
+                }}
+              >
+                {departments.map((d) => (
+                  <MenuItem key={d.id} value={d.id}>
+                    {d.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Stack>
+
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Requested By"
+                value={requestedBy}
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ maxLength: MAX_TICKET_REQUESTED_BY_LENGTH }}
+                disabled
+              />
+
+              <TextField
+                select
+                label="Priority"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as TicketPriority)}
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (selected) => {
+                    if (!selected) {
+                      return (
+                        <span className="ticket-select-placeholder">
+                          Select priority
+                        </span>
+                      );
+                    }
+
+                    const map: Record<string, string> = {
+                      low: "Low",
+                      medium: "Medium",
+                      high: "High",
+                    };
+
+                    return map[selected as string];
+                  },
+                }}
+              >
+                <MenuItem value="low">Low</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="high">High</MenuItem>
+              </TextField>
+            </Stack>
+
+            <Stack direction="row" spacing={2}>
+              <Autocomplete
+                options={assigneeOptions}
+                loading={assigneeLoading}
+                value={
+                  assigneeOptions.find((option) => option.id === assigneeId) ||
+                  null
+                }
+                onInputChange={(_, value) =>
+                  setAssigneeSearch(value.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH))
+                }
+                onChange={(_, value) => setAssigneeId(value?.id ?? "")}
+                getOptionLabel={assigneeLabel}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                fullWidth
+                disabled={loading}
+                noOptionsText="Type to search assignee"
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Assign To"
+                    placeholder="Search assignee"
+                    sx={createTicketFocusedFieldSx}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{
+                      ...params.inputProps,
+                      maxLength: MAX_TICKET_ASSIGNED_TO_LENGTH,
+                    }}
+                  />
+                )}
+              />
+
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                  label="Due Date"
+                  value={dueDate}
+                  onChange={(v) => setDueDate(v as Dayjs | null)}
+                  disabled={loading}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      sx: createTicketFocusedFieldSx,
+                      InputLabelProps: { shrink: true },
+                    },
+                  }}
+                />
+              </LocalizationProvider>
+            </Stack>
+
+            <Box
+              sx={{
+                width: { xs: "100%", sm: "70%", md: "50%" },
+              }}
+            >
+              <TextField
+                label="Upload Documents"
+                value={selectedFile?.name || ""}
+                placeholder="No file Choosen"
+                fullWidth
+                sx={createTicketFocusedFieldSx}
+                InputLabelProps={{ shrink: true }}
+                disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <Button
+                      component="label"
+                      disabled={loading}
+                      sx={createTicketUploadButtonSx}
+                    >
+                      Choose File
+                      <input
+                        hidden
+                        type="file"
+                        onChange={(e) =>
+                          setSelectedFile(e.target.files?.[0] || null)
+                        }
+                      />
+                    </Button>
+                  ),
+                  readOnly: true,
+                }}
+              />
+            </Box>
+
+            <Stack direction="row" justifyContent="flex-end" spacing={2} pt={1}>
+              <Button
+                onClick={handleClose}
+                sx={createTicketCancelButtonSx}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                sx={createTicketSaveButtonSx}
+                disabled={loading}
+              >
+                {loading ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </Stack>
+          </Stack>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default CreateTicket;

@@ -1,0 +1,359 @@
+.loginPage {
+  min-height: 100dvh;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.7fr 0.95fr;
+  background: #e8e8ea;
+}
+
+.heroPanel {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid #d8d8da;
+  background: #fff;
+}
+
+.heroImage {
+  width: 90%;
+  height: 100%;
+  margin: auto;
+  object-fit: cover;
+  padding: 50px;
+  margin-top: -20px;
+}
+
+.heroTagline {
+  position: absolute;
+  left: 20%;
+  bottom: 30%;
+  text-align: center;
+  color: #2b3445;
+  font-size: clamp(22px, 1.5vw, 26px);
+  font-weight: 500;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.heroTaglineAccent {
+  color: #e17e61;
+}
+
+.formPanel {
+  position: relative;
+  background: #e8e8ea;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+}
+
+.topSection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.languageWrap {
+  align-self: flex-end;
+  width: min(175px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.languageLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+}
+
+.languageSelect {
+  width: 100%;
+  height: 32px;
+  /* border: 1px solid #dd876f; */
+  border-radius: 8px;
+  background: #ececee;
+  color: #5d5d5d;
+  font-size: 13px;
+  padding: 0 8px;
+  outline: none;
+}
+
+.formContent {
+  /* flex: 1; */
+  transform: scale(1.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: clamp(22px, 7vh, 80px) 0 18px;
+  margin-top: 50px;
+}
+
+.logo {
+  margin-top: 100px;
+  width: min(170px, 62%);
+  align-self: center;
+}
+
+.loginForm {
+  width: min(320px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.inputGroup {
+  display: flex;
+  align-items: center;
+  border-bottom: 1.5px solid #b6b7ba;
+  gap: 8px;
+  padding-bottom: 3px;
+}
+
+.inputGroup + .inputGroup {
+  margin-top: 8px;
+}
+
+.inputIcon {
+  color: #1f2734;
+  flex-shrink: 0;
+}
+
+.inputField {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  color: #8a8c91;
+  outline: none;
+  line-height: 1.1;
+}
+
+.inputField::placeholder {
+  color: #8a8c91;
+}
+
+.eyeButton {
+  border: 0;
+  background: transparent;
+  color: #6d7075;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.errorText {
+  color: #b00020;
+  font-size: 13px;
+  margin-top: -6px;
+}
+
+.loginButton {
+  margin-top: 6px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: #595a5f;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16);
+}
+
+.loginButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.loginButton {
+  transition: all 0.2s ease;
+}
+
+.loginButton:hover {
+  opacity: 0.85;
+}
+
+.forgotButton {
+  margin-top: 2px;
+  border: 0;
+  background: transparent;
+  color: #1f2d45;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+@media (max-width: 1200px) {
+  .loginPage {
+    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.95fr);
+  }
+
+  .heroPanel {
+    min-height: 100dvh;
+  }
+
+  .heroImage {
+    padding: 26px;
+  }
+
+  .heroTagline {
+    bottom: 28%;
+    font-size: clamp(22px, 1.5vw, 26px);
+  }
+
+  .formPanel {
+    min-height: 100dvh;
+    padding: 18px 20px;
+  }
+
+  .topSection {
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .languageWrap {
+    width: min(155px, 100%);
+  }
+
+  .languageLabel {
+    font-size: 13px;
+  }
+
+  .languageSelect {
+    font-size: 13px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .formContent {
+    gap: 18px;
+    padding-top: clamp(28px, 10vh, 88px);
+    margin-top: 50px;
+  }
+
+  .logo {
+    width: 150px;
+  }
+
+  .loginForm {
+    max-width: 340px;
+    gap: 16px;
+  }
+
+  .inputField {
+    font-size: 18px;
+  }
+
+  .errorText {
+    font-size: 14px;
+  }
+
+  .loginButton {
+    margin-top: 10px;
+    height: 42px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+
+  .forgotButton {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .loginPage {
+    display: flex;
+    min-height: 100dvh;
+  }
+
+  .heroPanel {
+    display: none;
+  }
+
+  .formPanel {
+    width: 100%;
+    min-height: 100dvh;
+    padding: 20px;
+  }
+
+  .topSection {
+    align-items: flex-end;
+    gap: 20px;
+  }
+
+  .languageWrap {
+    align-self: flex-end;
+    width: min(175px, 100%);
+  }
+
+  .languageLabel {
+    font-size: 16px;
+  }
+
+  .languageSelect {
+    height: 44px;
+    font-size: 16px;
+    padding: 0 12px;
+  }
+
+  .logo {
+    width: min(180px, 62vw);
+  }
+
+  .formContent {
+    justify-content: flex-start;
+    padding: 32px 0 12px;
+  }
+
+  .loginForm {
+    width: 100%;
+    max-width: 420px;
+    gap: 22px;
+  }
+
+  .inputField {
+    font-size: 18px;
+  }
+
+  .loginButton {
+    margin-top: 8px;
+    height: 46px;
+    font-size: 18px;
+  }
+
+  .forgotButton {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .formPanel {
+    padding: 16px;
+  }
+
+  .topSection {
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .languageWrap {
+    align-self: stretch;
+    width: 100%;
+    max-width: none;
+  }
+
+  .formContent {
+    padding-top: 24px;
+  }
+
+  .loginForm {
+    gap: 18px;
+  }
+
+  .inputField {
+    font-size: 17px;
+  }
+}
