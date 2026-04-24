@@ -88,6 +88,8 @@ export const CampaignAPI = {
       params: { clinic_id: storedClinicId() },
     }),
 
+    
+
   // Add this method to fetch latest Google Ads insights for a campaign
 
   // ✅ Fetches latest Mailchimp insights from Mailchimp API
@@ -95,6 +97,20 @@ export const CampaignAPI = {
   // Called automatically when CampaignDashboard opens for email campaigns.
   getMailchimpInsights: (campaignId: string) =>
     http.get(`/campaigns/${campaignId}/mailchimp-insights/`, {
+      params: { clinic_id: storedClinicId() },
+    }),
+
+  // ✅ Triggers Google Ads insights fetch via Zapier webhook
+  // Called automatically when CampaignDashboard opens for Google Ads campaigns.
+  triggerGoogleAdsInsights: (campaignId: string) =>
+    http.post(`/campaign/insights/trigger/`, {
+      campaign_id: campaignId,
+    }),
+
+  // ✅ Fetches latest Google Ads insights from DB
+  // after Zapier webhook triggers the data fetch
+  getGoogleAdsInsights: (campaignId: string) =>
+    http.get(`/campaigns/${campaignId}/google-ads-insights/`, {
       params: { clinic_id: storedClinicId() },
     }),
 };

@@ -93,6 +93,17 @@ const CampaignDashboard = ({
           }
         }
 
+        // ✅ Trigger Google Ads insights fetch via Zapier if campaign has google_ads platform
+        const hasGoogleAds = campaign.platforms?.includes(PLATFORMS.GOOGLE_ADS);
+        if (hasGoogleAds) {
+          try {
+            await CampaignAPI.triggerGoogleAdsInsights(campaign.id);
+            console.log("Google Ads insights trigger sent");
+          } catch (err) {
+            console.error("Google Ads insights trigger failed:", err);
+          }
+        }
+
         const res = await CampaignAPI.get(campaign.id);
         const d = res.data;
 
