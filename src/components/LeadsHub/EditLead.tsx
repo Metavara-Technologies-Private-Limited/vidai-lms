@@ -999,26 +999,6 @@ export default function EditLead() {
                   </TextField>
                 </Box>
 
-                {/* Next Action Type */}
-                <Box>
-                  <Typography sx={labelStyle}>Next Action Type</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={nextType}
-                    onChange={handleNextTypeChange}
-                    sx={inputStyle}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    {nextActionTypeOptions.map((t) => (
-                      <MenuItem key={t} value={t}>
-                        {t}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-
                 {/* Next Action Status */}
                 <Box>
                   <Typography sx={labelStyle}>Next Action Status</Typography>
@@ -1036,6 +1016,26 @@ export default function EditLead() {
                     {filteredNextActionStatusOptions.map((opt) => (
                       <MenuItem key={opt.value} value={opt.value}>
                         {opt.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+
+                  {/* Next Action Type */}
+                <Box>
+                  <Typography sx={labelStyle}>Next Action Type</Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={nextType}
+                    onChange={handleNextTypeChange}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {nextActionTypeOptions.map((t) => (
+                      <MenuItem key={t} value={t}>
+                        {t}
                       </MenuItem>
                     ))}
                   </TextField>
