@@ -29,8 +29,11 @@ import {
   formatDate,
   formatTime,
   getScheduledDateTime,
+  getMessageCharacterCount,
   isFieldFilled,
   isRequestNameValid,
+  REVIEW_REQUEST_BODY_MAX_LENGTH,
+  REVIEW_REQUEST_SUBJECT_MAX_LENGTH,
   sanitizeRequestNameInput,
   type ReviewRequestFormData,
 } from "./reviewRequest.utils";
@@ -267,6 +270,8 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     const isEmailMode = formData.mode === "email";
     const subjectEmpty = isEmailMode && !isFieldFilled(formData.subject);
     const messageEmpty = !isFieldFilled(formData.message);
+    const subjectLength = formData.subject.length;
+    const messageLength = getMessageCharacterCount(formData.message);
 
     if (subjectEmpty && messageEmpty) {
       showErrorToast("Please fill all fields");
@@ -277,7 +282,21 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       return false;
     }
 
+    if (isEmailMode && subjectLength > REVIEW_REQUEST_SUBJECT_MAX_LENGTH) {
+      showErrorToast(
+        `Subject cannot exceed ${REVIEW_REQUEST_SUBJECT_MAX_LENGTH} characters`,
+      );
+      return false;
+    }
+
     if (!validateMandatoryField(formData.message, "Message")) {
+      return false;
+    }
+
+    if (messageLength > REVIEW_REQUEST_BODY_MAX_LENGTH) {
+      showErrorToast(
+        `Message cannot exceed ${REVIEW_REQUEST_BODY_MAX_LENGTH} characters`,
+      );
       return false;
     }
 
@@ -725,11 +744,22 @@ Please share your valuable feedback here:
               setFormData((prev) => ({ ...prev, bcc_emails: value }));
             }}
             onSubjectChange={(value) => {
-              setFormData((prev) => ({ ...prev, subject: value }));
+              const nextValue = value.slice(
+                0,
+                REVIEW_REQUEST_SUBJECT_MAX_LENGTH,
+              );
+              setFormData((prev) => ({ ...prev, subject: nextValue }));
             }}
             onSubjectBlur={() => {
               if (formData.mode === "email") {
                 validateMandatoryField(formData.subject, "Subject");
+                if (
+                  formData.subject.length > REVIEW_REQUEST_SUBJECT_MAX_LENGTH
+                ) {
+                  showErrorToast(
+                    `Subject cannot exceed ${REVIEW_REQUEST_SUBJECT_MAX_LENGTH} characters`,
+                  );
+                }
               }
             }}
             onMessageChange={(value) => {
@@ -737,6 +767,14 @@ Please share your valuable feedback here:
             }}
             onMessageBlur={() => {
               validateMandatoryField(formData.message, "Message");
+              if (
+                getMessageCharacterCount(formData.message) >
+                REVIEW_REQUEST_BODY_MAX_LENGTH
+              ) {
+                showErrorToast(
+                  `Message cannot exceed ${REVIEW_REQUEST_BODY_MAX_LENGTH} characters`,
+                );
+              }
             }}
             onFileSelect={handleFileSelect}
           />

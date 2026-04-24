@@ -45,6 +45,12 @@ import {
   sectionLabelStyle,
 } from "./UseEditLead";
 import { sanitizeNameInput } from "../../utils/nameValidation";
+import {
+  sanitizePhoneInput,
+  sanitizeEmailFieldInput,
+  sanitizeLocationInput,
+  sanitizeAddressInput,
+} from "../../utils/leadFieldValidation";
 
 const INPUT_TOAST_OPTIONS = { position: "top-right" as const, autoClose: 1400 };
 
@@ -75,9 +81,6 @@ const SLOT_MENU_PROPS = {
     },
   },
 };
-
-const sanitizeEmailInput = (value: string): string =>
-  value.toLowerCase().replace(/[^a-z0-9@._%+-]/g, "");
 
 export default function EditLead() {
   const {
@@ -250,28 +253,44 @@ export default function EditLead() {
   const handleFullNameChange = (value: string) => {
     const sanitized = sanitizeNameInput(value);
     if (sanitized !== value)
-      showInputToast("edit-lead-name-invalid", "enter only alphanumeric");
+      showInputToast("edit-lead-name-invalid", "Only letters, numbers and spaces allowed");
     setFullName(sanitized);
   };
 
   const handleContactChange = (value: string) => {
-    const rawDigits = value.replace(/\D/g, "");
-    const digitsOnly = rawDigits.slice(0, 15);
-    if (/\D/.test(value))
-      showInputToast("edit-lead-contact-invalid", "only digits are allowed");
-    if (rawDigits.length > 15)
-      showInputToast("edit-lead-contact-length", "only 15 digits allowed");
-    setContactNo(digitsOnly);
+    const { value: sanitized, error } = sanitizePhoneInput(value);
+    if (error) showInputToast("edit-lead-contact-invalid", error);
+    setContactNo(sanitized);
   };
 
   const handleEmailChange = (value: string) => {
-    const sanitized = sanitizeEmailInput(value);
-    if (sanitized !== value.toLowerCase())
-      showInputToast(
-        "edit-lead-email-invalid",
-        "enter valid email characters only",
-      );
+    const { value: sanitized, error } = sanitizeEmailFieldInput(value);
+    if (error) showInputToast("edit-lead-email-invalid", error);
     setEmail(sanitized);
+  };
+
+  const handleLocationChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeLocationInput(value);
+    if (error) showInputToast("edit-lead-location-invalid", error);
+    setLocation(sanitized);
+  };
+
+  const handleAddressChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeAddressInput(value);
+    if (error) showInputToast("edit-lead-address-invalid", error);
+    setAddress(sanitized);
+  };
+
+  const handleContactPersonPhoneChange = (value: string) => {
+    const { value: sanitized, error } = sanitizePhoneInput(value);
+    if (error) showInputToast("edit-lead-contact-person-phone-invalid", error);
+    setContactPersonPhone(sanitized);
+  };
+
+  const handleContactPersonEmailChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeEmailFieldInput(value);
+    if (error) showInputToast("edit-lead-contact-person-email-invalid", error);
+    setContactPersonEmail(sanitized);
   };
 
   const assigneeOptionLabel = (option: {
@@ -471,7 +490,7 @@ export default function EditLead() {
                     fullWidth
                     size="small"
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    onChange={(e) => handleLocationChange(e.target.value)}
                     sx={inputStyle}
                   />
                 </Box>
@@ -535,7 +554,7 @@ export default function EditLead() {
                       fullWidth
                       size="small"
                       value={address}
-                      onChange={(e) => setAddress(e.target.value)}
+                      onChange={(e) => handleAddressChange(e.target.value)}
                       sx={inputStyle}
                     />
                   </Box>
@@ -569,7 +588,7 @@ export default function EditLead() {
                     fullWidth
                     size="small"
                     value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    onChange={(e) => handleAddressChange(e.target.value)}
                     sx={inputStyle}
                   />
                 </Box>
@@ -695,7 +714,7 @@ export default function EditLead() {
                         size="small"
                         value={contactPersonPhone}
                         onChange={(e) =>
-                          setContactPersonPhone(e.target.value)
+                          handleContactPersonPhoneChange(e.target.value)
                         }
                         sx={inputStyle}
                       />
@@ -707,7 +726,7 @@ export default function EditLead() {
                         size="small"
                         value={contactPersonEmail}
                         onChange={(e) =>
-                          setContactPersonEmail(e.target.value)
+                          handleContactPersonEmailChange(e.target.value)
                         }
                         sx={inputStyle}
                       />

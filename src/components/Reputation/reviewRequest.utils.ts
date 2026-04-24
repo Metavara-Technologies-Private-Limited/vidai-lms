@@ -48,10 +48,40 @@ export const createInitialReviewRequestFormData = (): ReviewRequestFormData => {
 export const initialReviewRequestFormData =
   createInitialReviewRequestFormData();
 
+export const REVIEW_REQUEST_SUBJECT_MAX_LENGTH = 150;
+export const REVIEW_REQUEST_BODY_MAX_LENGTH = 1000;
+
 const requestNamePattern = /^[A-Za-z][A-Za-z0-9 ]*$/;
 const requestNameTypingPattern = /^[A-Za-z0-9 ]*$/;
 
 export const isFieldFilled = (value: string) => value.trim().length > 0;
+
+export const getMessagePlainText = (value: string) => {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof document === "undefined") {
+    return value
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>|<\/div>|<\/li>|<\/h[1-6]>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\r\n/g, "\n");
+  }
+
+  const container = document.createElement("div");
+  container.innerHTML = value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>|<\/div>|<\/li>|<\/h[1-6]>/gi, "\n");
+
+  const text = container.textContent || container.innerText || "";
+
+  return text.replace(/\u00a0/g, " ").replace(/\r\n/g, "\n");
+};
+
+export const getMessageCharacterCount = (value: string) =>
+  getMessagePlainText(value).length;
 
 export const isRequestNameValid = (name: string) =>
   requestNamePattern.test(name.trim());

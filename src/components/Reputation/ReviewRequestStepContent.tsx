@@ -42,7 +42,12 @@ import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
 import AddIcon from "@mui/icons-material/Add";
 import AI_Suggest, { type AiSuggestionItem } from "./AI_Suggest";
 import { toast } from "react-toastify";
-import type { ReviewRequestFormData } from "./reviewRequest.utils";
+import {
+  getMessageCharacterCount,
+  REVIEW_REQUEST_BODY_MAX_LENGTH,
+  REVIEW_REQUEST_SUBJECT_MAX_LENGTH,
+  type ReviewRequestFormData,
+} from "./reviewRequest.utils";
 import ReviewRequestTemplateDialog, {
   type TemplateListItem,
 } from "./ReviewRequestTemplateDialog";
@@ -131,6 +136,7 @@ const ReviewRequestStepContent = ({
       : formData.mode === "sms"
         ? "SMS"
         : "WhatsApp";
+  const messageCharacterCount = getMessageCharacterCount(formData.message);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -678,6 +684,8 @@ const ReviewRequestStepContent = ({
             value={formData.subject}
             onChange={(e) => onSubjectChange(e.target.value)}
             onBlur={onSubjectBlur}
+            inputProps={{ maxLength: REVIEW_REQUEST_SUBJECT_MAX_LENGTH }}
+            helperText={`${formData.subject.length}/${REVIEW_REQUEST_SUBJECT_MAX_LENGTH}`}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
@@ -816,6 +824,21 @@ const ReviewRequestStepContent = ({
 
           {renderEditorToolbar()}
         </Box>
+
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            textAlign: "right",
+            color:
+              messageCharacterCount > REVIEW_REQUEST_BODY_MAX_LENGTH
+                ? "#DC2626"
+                : "#6B7280",
+            mb: 1.5,
+          }}
+        >
+          {messageCharacterCount}/{REVIEW_REQUEST_BODY_MAX_LENGTH}
+        </Typography>
 
         {(formData.mode === "sms" || formData.mode === "whatsapp") && (
           <Box sx={{ mt: 2 }}>

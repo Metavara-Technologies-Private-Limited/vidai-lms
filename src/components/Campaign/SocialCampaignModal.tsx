@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import "../../styles/Campaign/EmailCampaignModal.css";
 import "../../styles/Campaign/SocialCampaignModal.css";
 import { CampaignAPI } from "../../services/campaign.api";
@@ -32,6 +32,10 @@ import {
   platformIcons,
   type Platform,
 } from "../../constants/campaigns.constants";
+import {
+  canTypeCampaignName,
+  getCampaignNameValidationError,
+} from "./campaignNameValidation";
 
 type Props = {
   onClose: () => void;
@@ -52,37 +56,57 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
   const googleAdsCustomerId = clinic?.google_ads_customer_id;
-  const [googleAdsIntegrationConnected, setGoogleAdsIntegrationConnected] = useState(false);
-
-  // ── Fix: wrap the async fetch in useCallback so useEffect dependency is stable ──
-  const fetchGoogleAdsStatus = useCallback(async () => {
-    if (!clinic?.id) {
-      setGoogleAdsIntegrationConnected(false);
-      return;
-    }
-    try {
-      const res = await integrationApi.getSocialAccounts(clinic.id);
-      const accs = Array.isArray(res.data) ? res.data : [];
-      setGoogleAdsIntegrationConnected(
-        accs.some(
-          (acc) =>
-            typeof acc.platform === "string" &&
-            acc.platform.toLowerCase().includes("google"),
-        ),
-      );
-    } catch (err) {
-      console.error("Failed to fetch Google Ads integration status", err);
-      setGoogleAdsIntegrationConnected(false);
-    }
-  }, [clinic?.id]);
+  const [googleAdsIntegrationConnected, setGoogleAdsIntegrationConnected] =
+    useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
+    if (!clinic?.id) {
+      // Keep this asynchronous so React compiler does not flag sync state updates in effect.
+      queueMicrotask(() => {
+        if (isMounted) {
+          setGoogleAdsIntegrationConnected(false);
+        }
+      });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const fetchGoogleAdsStatus = async () => {
+      try {
+        const res = await integrationApi.getSocialAccounts(clinic.id);
+        const accs = Array.isArray(res.data) ? res.data : [];
+
+        if (!isMounted) return;
+
+        setGoogleAdsIntegrationConnected(
+          accs.some(
+            (acc) =>
+              typeof acc.platform === "string" &&
+              acc.platform.toLowerCase().includes("google"),
+          ),
+        );
+      } catch (err) {
+        console.error("Failed to fetch Google Ads integration status", err);
+        if (isMounted) {
+          setGoogleAdsIntegrationConnected(false);
+        }
+      }
+    };
+
     fetchGoogleAdsStatus();
-  }, [fetchGoogleAdsStatus]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [clinic]);
 
   const isGoogleAdsConnected = Boolean(
     (googleAdsCustomerId && String(googleAdsCustomerId).trim().length) ||
-      googleAdsIntegrationConnected,
+    googleAdsIntegrationConnected,
   );
 
   const [step, setStep] = useState(1);
@@ -309,6 +333,16 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
   const handleNext = () => {
     setSubmitted(true);
+    if (step === 1) {
+      const campaignNameError = getCampaignNameValidationError(campaignName);
+      if (campaignNameError) {
+        toast.error(campaignNameError, {
+          toastId: "social-campaign-name-error",
+        });
+        return;
+      }
+    }
+
     if (step === 1 && step1Valid) {
       setStep(2);
       setSubmitted(false);
@@ -449,29 +483,34 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             null;
 
           await CampaignAPI.createGoogleAds({
-            clinic_id:        clinicId,
-            customer_id:      String(clinic?.google_ads_customer_id ?? ""),
-            campaign_name:    campaignName,
-            budget:           budgets["google_ads"],
+            clinic_id: clinicId,
+            customer_id: String(clinic?.google_ads_customer_id ?? ""),
+            campaign_name: campaignName,
+            budget: budgets["google_ads"],
             bidding_strategy: "MANUAL_CPC",
-            locations:        [],
-            keywords:         [],
-            cpc_bid:          20,
-            ad_group_name:    `${campaignName} AdGroup`,
-            final_url:        clinic?.website ?? "https://example.com",
-            headline_1:       campaignName.slice(0, 30),
-            headline_2:       "Learn More",
-            headline_3:       "Contact Us Today",
-            description:      campaignDescription.slice(0, 90),
-            description_2:    "Call us now or visit our website.",
-            image_url:        googleAdsImage,
-            platform_data:    { google_ads: resolvedContent["google_ads"] },
+            locations: [],
+            keywords: [],
+            cpc_bid: 20,
+            ad_group_name: `${campaignName} AdGroup`,
+            final_url: clinic?.website ?? "https://example.com",
+            headline_1: campaignName.slice(0, 30),
+            headline_2: "Learn More",
+            headline_3: "Contact Us Today",
+            description: campaignDescription.slice(0, 90),
+            description_2: "Call us now or visit our website.",
+            image_url: googleAdsImage,
+            platform_data: { google_ads: resolvedContent["google_ads"] },
           });
 
           console.log("[GoogleAds] Campaign sent to Zapier successfully");
         } catch (googleAdsErr) {
-          console.error("[GoogleAds] Failed to trigger Google Ads:", googleAdsErr);
-          toast.warn("Campaign saved, but Google Ads trigger failed. Check logs.");
+          console.error(
+            "[GoogleAds] Failed to trigger Google Ads:",
+            googleAdsErr,
+          );
+          toast.warn(
+            "Campaign saved, but Google Ads trigger failed. Check logs.",
+          );
         }
       } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
         toast.warn(
@@ -488,12 +527,19 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         const listRes = await CampaignAPI.list();
         const list = Array.isArray(listRes.data) ? listRes.data : [];
         const found = list
-          .filter((item) =>
-            String(item?.campaign_name ?? "").trim().toLowerCase() === campaignName.trim().toLowerCase()
+          .filter(
+            (item) =>
+              String(item?.campaign_name ?? "")
+                .trim()
+                .toLowerCase() === campaignName.trim().toLowerCase(),
           )
           .sort((a, b) => {
-            const at = new Date(String(a?.modified_at ?? a?.created_at ?? 0)).getTime();
-            const bt = new Date(String(b?.modified_at ?? b?.created_at ?? 0)).getTime();
+            const at = new Date(
+              String(a?.modified_at ?? a?.created_at ?? 0),
+            ).getTime();
+            const bt = new Date(
+              String(b?.modified_at ?? b?.created_at ?? 0),
+            ).getTime();
             return bt - at;
           })[0];
 
@@ -557,7 +603,16 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
               <label>Campaign Name *</label>
               <input
                 value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  if (!canTypeCampaignName(nextValue)) {
+                    toast.error("Alphanumeric and underscore are allowed", {
+                      toastId: "social-campaign-name-typing",
+                    });
+                    return;
+                  }
+                  setCampaignName(nextValue);
+                }}
                 placeholder="e.g. New Product Launch"
               />
             </div>
@@ -671,20 +726,20 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
               </p>
               <div className="account-row">
                 {PLATFORM_LIST.map((acc) => (
-                    <div
-                      key={acc.id}
-                      className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
-                      onClick={() => toggleAccount(acc.id)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <div className="account-left">
-                        <img src={platformIcons[acc.id]} alt={acc.label} />
-                        <span>{acc.label}</span>
-                      </div>
-                      <div
-                        className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
-                      />
+                  <div
+                    key={acc.id}
+                    className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
+                    onClick={() => toggleAccount(acc.id)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="account-left">
+                      <img src={platformIcons[acc.id]} alt={acc.label} />
+                      <span>{acc.label}</span>
                     </div>
+                    <div
+                      className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
