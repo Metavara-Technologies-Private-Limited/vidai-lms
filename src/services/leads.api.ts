@@ -43,6 +43,7 @@ export type Lead = {
   contact_no: string;
   email?: string;
   age?: number;
+  gender?: "male" | "female";
   marital_status?: "single" | "married";
   location?: string;
   address?: string;
@@ -78,6 +79,12 @@ export type Lead = {
   modified_at: string;
   referral_department_id?: number | null;
   referral_department_name?: string | null;
+
+  // ── Contact Information (contracts app) ───────────────────────────────────
+  contact_full_name?: string | null;
+  contact_designation?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
 };
 
 export type LeadPayload = {
@@ -87,12 +94,12 @@ export type LeadPayload = {
   campaign_id?: string | null;
   assigned_to_id?: number | null;
   assigned_to_name?: string | null;
-  // lead_generated_by removed — backend Lead model has no such field
   personal_id?: number | null;
   personal_name?: string | null;
   full_name: string;
   contact_no: string;
   age?: number | null;
+  gender?: "male" | "female" | null;
   marital_status?: "single" | "married" | null;
   email?: string | null;
   language_preference?: string;
@@ -126,10 +133,15 @@ export type LeadPayload = {
   remark?: string;
   is_active: boolean;
   referral_department_id?: number | null;
+
+  // ── Contact Information (contracts app) ───────────────────────────────────
+  contact_full_name?: string | null;
+  contact_designation?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
 };
 
 // Referral source object — sent alongside payload for contracts app
-// Backend reads this from request.data.get("referral_source")
 export type ReferralSourceObject = {
   first_name: string;
   last_name: string;
@@ -369,7 +381,6 @@ export const LeadAPI = {
   list: (clinicId: number) =>
     api.get(`/leads/list/?clinic_id=${clinicId}`).then((res) => res.data),
 
-  // ── FIX: send X-Clinic-Id header + support referral_source object ──────────
   create: async (
     data: LeadPayload,
     referralSource?: ReferralSourceObject,
@@ -390,24 +401,27 @@ export const LeadAPI = {
     return response.data;
   },
 
-  // ── FIX: send X-Clinic-Id header + referral_source as JSON string in FormData
   createWithDocuments: async (
     data: LeadPayload,
     files: File[],
     referralSource?: ReferralSourceObject,
   ): Promise<Lead> => {
     const formData = new FormData();
+
+    // Append all payload fields — null becomes "" so backend receives the field
     (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
       const value = data[key];
-      if (value !== null && value !== undefined) {
-        formData.append(key, String(value));
-      }
+      if (value === undefined) return;
+      formData.append(key, value === null ? "" : String(value));
     });
-    // referral_source must be JSON stringified in multipart FormData
+
+    // Referral source must be JSON-stringified in multipart FormData
     if (referralSource) {
       formData.append("referral_source", JSON.stringify(referralSource));
     }
+
     files.forEach((file) => formData.append("documents", file));
+
     const response = await api.post<Lead>(
       `/leads/?clinic_id=${data.clinic_id}`,
       formData,
@@ -449,12 +463,16 @@ export const LeadAPI = {
     files: File[],
   ): Promise<Lead> => {
     const formData = new FormData();
+
+    // Append all payload fields — null becomes "" so backend receives the field
     (Object.keys(data) as (keyof Partial<LeadPayload>)[]).forEach((key) => {
       const value = data[key];
-      if (value === null || value === undefined) return;
-      formData.append(key, typeof value === "boolean" ? String(value) : String(value));
+      if (value === undefined) return;
+      formData.append(key, value === null ? "" : String(value));
     });
+
     files.forEach((file) => formData.append("documents", file));
+
     const clinicId = data.clinic_id ?? storedClinicId();
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
@@ -475,7 +493,9 @@ export const LeadAPI = {
   },
 
   inactivate: async (leadId: string): Promise<void> => {
-    await api.patch(`/leads/${leadId}/inactivate/?clinic_id=${storedClinicId()}`);
+    await api.patch(
+      `/leads/${leadId}/inactivate/?clinic_id=${storedClinicId()}`,
+    );
   },
 
   delete: async (leadId: string): Promise<void> => {
@@ -543,8 +563,9 @@ export const LeadEmailAPI = {
     options?: { suppressErrorLog?: boolean },
   ): Promise<LeadEmailResponse> => {
     const requestConfig: AxiosRequestConfig = {};
-    (requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }).__skipErrorLog =
-      options?.suppressErrorLog === true;
+    (
+      requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }
+    ).__skipErrorLog = options?.suppressErrorLog === true;
     const response = await api.post<LeadEmailResponse>(
       "/lead-email/",
       data,
@@ -556,15 +577,19 @@ export const LeadEmailAPI = {
 
   sendNow: async (
     data: Omit<LeadEmailPayload, "send_now">,
-  ): Promise<LeadEmailResponse> => LeadEmailAPI.create({ ...data, send_now: true }),
+  ): Promise<LeadEmailResponse> =>
+    LeadEmailAPI.create({ ...data, send_now: true }),
 
   saveAsDraft: async (
     data: Omit<LeadEmailPayload, "send_now">,
-  ): Promise<LeadEmailResponse> => LeadEmailAPI.create({ ...data, send_now: false }),
+  ): Promise<LeadEmailResponse> =>
+    LeadEmailAPI.create({ ...data, send_now: false }),
 
   list: async (leadUuid?: string): Promise<LeadMailListItem[]> => {
     const params = leadUuid ? { lead_uuid: leadUuid } : {};
-    const response = await api.get<LeadMailListItem[]>("/lead-mail/", { params });
+    const response = await api.get<LeadMailListItem[]>("/lead-mail/", {
+      params,
+    });
     return response.data;
   },
 
@@ -601,20 +626,29 @@ export const EmailTemplateAPI = {
     const response = await api.get<EmailTemplate[]>("/templates/mail/");
     const data = response.data;
     if (Array.isArray(data)) return data;
-    if (data && typeof data === "object" && "results" in (data as object)) {
+    if (
+      data &&
+      typeof data === "object" &&
+      "results" in (data as object)
+    ) {
       return (data as { results: EmailTemplate[] }).results ?? [];
     }
     return [];
   },
 
   create: async (payload: EmailTemplatePayload): Promise<EmailTemplate> => {
-    const response = await api.post<EmailTemplate>("/templates/mail/create/", payload);
+    const response = await api.post<EmailTemplate>(
+      "/templates/mail/create/",
+      payload,
+    );
     console.log("✅ Email template created:", response.data);
     return response.data;
   },
 
   getById: async (templateId: string | number): Promise<EmailTemplate> => {
-    const response = await api.get<EmailTemplate>(`/templates/mail/${templateId}/`);
+    const response = await api.get<EmailTemplate>(
+      `/templates/mail/${templateId}/`,
+    );
     return response.data;
   },
 
@@ -625,7 +659,10 @@ export const EmailTemplateAPI = {
 
 // ====================== Twilio API ======================
 export const TwilioAPI = {
-  makeCall: async (payload: { lead_uuid: string; to: string }): Promise<unknown> => {
+  makeCall: async (payload: {
+    lead_uuid: string;
+    to: string;
+  }): Promise<unknown> => {
     const response = await api.post("/twilio/make-call/", payload);
     console.log("📞 Call initiated:", response.data);
     return response.data;
@@ -654,7 +691,10 @@ export const ClinicAPI = {
     }
   },
 
-  create: async (data: { name: string; department: string[] }): Promise<Clinic> => {
+  create: async (data: {
+    name: string;
+    department: string[];
+  }): Promise<Clinic> => {
     const response = await api.post<Clinic>("/clinics", data);
     return response.data;
   },
@@ -673,7 +713,12 @@ export const ClinicAPI = {
     );
     const data = response.data;
     if (!Array.isArray(data)) {
-      if (data && typeof data === "object" && "results" in data && Array.isArray(data.results)) {
+      if (
+        data &&
+        typeof data === "object" &&
+        "results" in data &&
+        Array.isArray(data.results)
+      ) {
         return data.results;
       }
       return [];
@@ -686,7 +731,9 @@ export const ClinicAPI = {
 export const DepartmentAPI = {
   listByClinic: async (clinicId: number): Promise<Department[]> => {
     try {
-      const response = await api.get<Department[]>(`/departments/?clinic_id=${clinicId}`);
+      const response = await api.get<Department[]>(
+        `/departments/?clinic_id=${clinicId}`,
+      );
       const data = response.data;
       return Array.isArray(data) ? data : [];
     } catch {
