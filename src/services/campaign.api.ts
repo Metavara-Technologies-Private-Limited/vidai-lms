@@ -50,6 +50,13 @@ export const CampaignAPI = {
       params: { clinic_id: data.clinic_id },
     }),
 
+  // ← new: pause or enable a Google Ads campaign
+  updateGoogleAdsStatus: (campaignId: string, action: "pause" | "enable") =>
+    http.post("/google-ads/status/", {
+      campaign_id: campaignId,
+      action,
+    }),
+
   getFacebookStatus: () => http.get("/facebook/status"),
 
   get: (id: string) =>
@@ -80,6 +87,8 @@ export const CampaignAPI = {
     http.get(`/campaigns/${campaignId}/facebook-debug/`, {
       params: { clinic_id: storedClinicId() },
     }),
+
+  // Add this method to fetch latest Google Ads insights for a campaign
 
   // ✅ Fetches latest Mailchimp insights from Mailchimp API
   // and saves them to CampaignEmailConfig.insights JSONField in DB.

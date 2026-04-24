@@ -12,9 +12,10 @@ import mailCardIcon from "./Icons/mail-card.png";
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
-import type { Campaign } from"../../types/campaigns.types";
+import type { Campaign } from "../../types/campaigns.types";
 import { CAMPAIGN_STATUS, platformIcons, PLATFORMS, type CampaignStatus } from "../../constants/campaigns.constants";
 import { formatScheduleTime } from "../../utils/campaigns.utils";
+import { CampaignAPI } from "../../services/campaign.api"; // ← added
 
 const INACTIVE_STATUSES = new Set<CampaignStatus>([
   CAMPAIGN_STATUS.STOPPED,
@@ -148,14 +149,24 @@ export default function CampaignCard({
             <img src={viewIcon} alt="View" width={20} height={20} />
           </button>
 
+          {/* ── Pause / Play button ── */}
           <button
             className="action-btn pause-btn"
             disabled={!canEditCampaign}
             title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
-            onClick={(e) => {
+            onClick={async (e) => {                          // ← async added
               e.stopPropagation();
               if (!canEditCampaign) return;
               if (c.status === CAMPAIGN_STATUS.STOPPED) {
+                // ── Enable in Google Ads if applicable ──
+                if (platforms.includes("google_ads")) {      // ← added
+                  try {                                      // ← added
+                    await CampaignAPI.updateGoogleAdsStatus(c.id, "enable"); // ← added
+                  } catch (err) {                            // ← added
+                    console.error("[GoogleAds] Failed to enable campaign:", err); // ← added
+                    toast.warn("Campaign enabled locally, but Google Ads enable failed."); // ← added
+                  }                                          // ← added
+                }                                            // ← added
                 onStatusChange(c.id, CAMPAIGN_STATUS.LIVE);
                 toast.success("Campaign is Live now");
               } else {
@@ -198,11 +209,7 @@ export default function CampaignCard({
                   title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
                   style={
                     !canEditCampaign
-                      ? {
-                          opacity: 0.5,
-                          cursor: "not-allowed",
-                          pointerEvents: "none",
-                        }
+                      ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
                       : undefined
                   }
                 >
@@ -220,19 +227,11 @@ export default function CampaignCard({
                   title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
                   style={
                     !canEditCampaign
-                      ? {
-                          opacity: 0.5,
-                          cursor: "not-allowed",
-                          pointerEvents: "none",
-                        }
+                      ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
                       : undefined
                   }
                 >
-                  <img
-                    src={duplicateIcon}
-                    alt="Duplicate"
-                    className="menu-icon"
-                  />
+                  <img src={duplicateIcon} alt="Duplicate" className="menu-icon" />
                   Duplicate
                 </div>
                 {!INACTIVE_STATUSES.has(c.status) && (
@@ -247,11 +246,7 @@ export default function CampaignCard({
                     title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
                     style={
                       !canEditCampaign
-                        ? {
-                            opacity: 0.5,
-                            cursor: "not-allowed",
-                            pointerEvents: "none",
-                          }
+                        ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
                         : undefined
                     }
                   >
@@ -265,10 +260,12 @@ export default function CampaignCard({
         </div>
       </div>
 
+      /* Stop Campaign Modal */
       {showStopModal && (
         <StopCampaignModal
           campaignName={c.name}
           platforms={platforms}
+          campaignId={c.id}           
           onClose={() => setShowStopModal(false)}
           onStop={() => {
             onStatusChange(c.id, CAMPAIGN_STATUS.STOPPED);
