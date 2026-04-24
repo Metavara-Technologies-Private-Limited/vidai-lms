@@ -32,6 +32,10 @@ import {
 import type { EmailCampaignPayload } from "../../types/campaigns.types";
 import { useSelector } from "react-redux";
 import { selectClinic } from "../../store/clinicSlice";
+import {
+  canTypeCampaignName,
+  getCampaignNameValidationError,
+} from "./campaignNameValidation";
 import TemplateService, {
   type TemplateDocument,
 } from "../../services/templates.api";
@@ -96,6 +100,16 @@ export default function EmailCampaignModal({
   /* ================= NAVIGATION ================= */
   const handleNext = () => {
     setSubmitted(true);
+
+    if (step === 1) {
+      const campaignNameError = getCampaignNameValidationError(campaignName);
+      if (campaignNameError) {
+        toast.error(campaignNameError, {
+          toastId: "email-campaign-name-error",
+        });
+        return;
+      }
+    }
 
     if (step === 1 && step1Valid) {
       setStep(2);
@@ -185,12 +199,19 @@ export default function EmailCampaignModal({
         const listRes = await CampaignAPI.list();
         const list = Array.isArray(listRes.data) ? listRes.data : [];
         const found = list
-          .filter((item) =>
-            String(item?.campaign_name ?? "").trim().toLowerCase() === campaignName.trim().toLowerCase()
+          .filter(
+            (item) =>
+              String(item?.campaign_name ?? "")
+                .trim()
+                .toLowerCase() === campaignName.trim().toLowerCase(),
           )
           .sort((a, b) => {
-            const at = new Date(String(a?.modified_at ?? a?.created_at ?? 0)).getTime();
-            const bt = new Date(String(b?.modified_at ?? b?.created_at ?? 0)).getTime();
+            const at = new Date(
+              String(a?.modified_at ?? a?.created_at ?? 0),
+            ).getTime();
+            const bt = new Date(
+              String(b?.modified_at ?? b?.created_at ?? 0),
+            ).getTime();
             return bt - at;
           })[0];
 
@@ -272,7 +293,17 @@ export default function EmailCampaignModal({
                 <label>Campaign Name *</label>
                 <input
                   value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    if (!canTypeCampaignName(nextValue)) {
+                      toast.error(
+                        "Alphanumeric and underscore are allowed",
+                        { toastId: "email-campaign-name-typing" },
+                      );
+                      return;
+                    }
+                    setCampaignName(nextValue);
+                  }}
                   placeholder="e.g. New Product Launch"
                 />
               </div>
