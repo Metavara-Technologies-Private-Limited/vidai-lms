@@ -80,6 +80,31 @@ const CampaignDashboard = ({
     }
   }, []);
 
+  const fetchGoogleAdsInsights = React.useCallback(async (campaignId: string) => {
+    try {
+      console.log("Fetching Google Ads insights for campaign ID:", campaignId);
+      const res = await CampaignAPI.getGoogleAdsInsights(campaignId);
+      const data = res.data?.insights || res.data || {};
+
+      console.log("GOOGLE ADS INSIGHTS RAW:", data);
+
+      setAdInsights((prev) => ({
+        ...prev,
+        impressions: Number(data.impressions ?? prev.impressions),
+        clicks: Number(data.clicks ?? prev.clicks),
+        spend: String(data.cost ?? prev.spend ?? "0"),
+        reach: String(data.reach ?? prev.reach ?? "0"),
+        cpc: parseFloat(String(data.avg_cpc ?? prev.cpc ?? "0")).toFixed(2),
+        conversions: Number(data.conversions ?? prev.conversions),
+        total_budget: String(data.total_budget ?? prev.total_budget ?? "0"),
+        conversion_rate: String(data.ctr ?? data.conversion_rate ?? prev.conversion_rate ?? "0%"),
+        ctr: String(data.ctr ?? prev.ctr ?? "0"),
+      }));
+    } catch (err) {
+      console.error("Google Ads insights fetch failed", err);
+    }
+  }, []);
+
   React.useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -131,6 +156,10 @@ const CampaignDashboard = ({
           await fetchAdInsights(fbCampaignId);
         }
 
+        if (hasGoogleAds) {
+          await fetchGoogleAdsInsights(campaign.id);
+        }
+
       } catch (err) {
         console.error("Failed to fetch campaign data:", err);
       } finally {
@@ -139,7 +168,7 @@ const CampaignDashboard = ({
     };
 
     fetchAll();
-  }, [campaign.id, campaign.type, campaign.fb_campaign_id, campaign.platforms, fetchAdInsights]);
+  }, [campaign.id, campaign.type, campaign.fb_campaign_id, campaign.platforms, fetchAdInsights, fetchGoogleAdsInsights]);
 
   // ─── Budget ───────────────────────────────────────────────────────────────
   const budgetData: Record<string, number> = fullCampaign.budget_data ?? {};
