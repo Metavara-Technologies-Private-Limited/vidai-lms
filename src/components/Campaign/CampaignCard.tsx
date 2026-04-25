@@ -154,21 +154,33 @@ export default function CampaignCard({
             className="action-btn pause-btn"
             disabled={!canEditCampaign}
             title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
-            onClick={async (e) => {                          // ← async added
+            onClick={async (e) => {
               e.stopPropagation();
               if (!canEditCampaign) return;
               if (c.status === CAMPAIGN_STATUS.STOPPED) {
-                // ── Enable in Google Ads if applicable ──
-                if (platforms.includes("google_ads")) {      // ← added
-                  try {                                      // ← added
-                    await CampaignAPI.updateGoogleAdsStatus(c.id, "enable"); // ← added
-                  } catch (err) {                            // ← added
-                    console.error("[GoogleAds] Failed to enable campaign:", err); // ← added
-                    toast.warn("Campaign enabled locally, but Google Ads enable failed."); // ← added
-                  }                                          // ← added
-                }                                            // ← added
-                onStatusChange(c.id, CAMPAIGN_STATUS.LIVE);
-                toast.success("Campaign is Live now");
+                let shouldSetLive = true;
+
+                if (platforms.includes("google_ads")) {
+                  try {
+                    const res = await CampaignAPI.updateGoogleAdsStatus(c.id, "enable");
+                    if (!res.data?.success || res.data?.skipped) {
+                      shouldSetLive = false;
+                      throw new Error(
+                        res.data?.error || res.data?.message || "Google Ads enable request was skipped or failed"
+                      );
+                    }
+                    toast.success("Google Ads campaign enabled successfully.");
+                  } catch (err) {
+                    shouldSetLive = false;
+                    console.error("[GoogleAds] Failed to enable campaign:", err);
+                    toast.warn("Google Ads enable failed; campaign remains stopped locally.");
+                  }
+                }
+
+                if (shouldSetLive) {
+                  onStatusChange(c.id, CAMPAIGN_STATUS.LIVE);
+                  toast.success("Campaign is Live now");
+                }
               } else {
                 setShowStopModal(true);
               }
