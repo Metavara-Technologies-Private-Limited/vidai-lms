@@ -22,6 +22,12 @@ function mapApiCampaign(raw: any): Campaign {
       .filter(Boolean);
   }
 
+  if (platforms.length === 0 && Array.isArray(raw.select_ad_accounts) && raw.select_ad_accounts.length > 0) {
+    platforms = raw.select_ad_accounts
+      .filter(Boolean)
+      .map((p: string) => p.toLowerCase());
+  }
+
   if (platforms.length === 0 && Array.isArray(raw.platforms)) {
     platforms = raw.platforms.map((p: string) => p.toLowerCase());
   }
