@@ -34,19 +34,28 @@ export default function StopCampaignModal({
   };
 
   const handleStop = async () => {
-    // ── Pause Google Ads if selected ──────────────────────────
+    let googlePauseSucceeded = true;
+
     if (selectedPlatforms.includes("google_ads") && campaignId) {
       try {
-        await CampaignAPI.updateGoogleAdsStatus(campaignId, "pause");
+        const res = await CampaignAPI.updateGoogleAdsStatus(campaignId, "pause");
+        if (!res.data?.success || res.data?.skipped) {
+          throw new Error(
+            res.data?.error || res.data?.message || "Google Ads pause request was skipped or failed"
+          );
+        }
+        toast.success("Google Ads campaign paused successfully.");
       } catch (err) {
+        googlePauseSucceeded = false;
         console.error("[GoogleAds] Failed to pause campaign:", err);
-        toast.warn("Campaign stopped locally, but Google Ads pause failed.");
+        toast.warn("Google Ads pause failed; campaign was stopped locally.");
       }
     }
-    // ─────────────────────────────────────────────────────────
 
     onStop();
-    toast.warn("Campaign stopped successfully");
+    if (googlePauseSucceeded) {
+      toast.warn("Campaign stopped successfully");
+    }
     onClose();
   };
 
