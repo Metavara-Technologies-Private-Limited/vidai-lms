@@ -105,6 +105,11 @@ export default function CampaignsScreen() {
             .filter((s) => s.is_active !== false)
             .map((s) => s.platform_name ?? "")
             .filter(Boolean) as Platform[];
+        } else if (
+          Array.isArray(api.select_ad_accounts) &&
+          api.select_ad_accounts.length > 0
+        ) {
+          platforms = api.select_ad_accounts.filter(Boolean) as Platform[];
         }
       }
 
