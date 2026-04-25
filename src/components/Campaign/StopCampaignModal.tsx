@@ -10,7 +10,7 @@ import { CampaignAPI } from "../../services/campaign.api";
 interface Props {
   campaignName: string;
   platforms: Platform[];
-  campaignId?: string;        // ← new: needed to call Google Ads status API
+  campaignId?: string;
   onClose: () => void;
   onStop: () => void;
 }
@@ -34,28 +34,28 @@ export default function StopCampaignModal({
   };
 
   const handleStop = async () => {
-    let googlePauseSucceeded = true;
-
+    // ── Pause Google Ads if selected ──
     if (selectedPlatforms.includes("google_ads") && campaignId) {
       try {
-        const res = await CampaignAPI.updateGoogleAdsStatus(campaignId, "pause");
-        if (!res.data?.success || res.data?.skipped) {
-          throw new Error(
-            res.data?.error || res.data?.message || "Google Ads pause request was skipped or failed"
-          );
-        }
-        toast.success("Google Ads campaign paused successfully.");
+        await CampaignAPI.updateGoogleAdsStatus(campaignId, "pause");
       } catch (err) {
-        googlePauseSucceeded = false;
         console.error("[GoogleAds] Failed to pause campaign:", err);
-        toast.warn("Google Ads pause failed; campaign was stopped locally.");
+        toast.warn("Campaign stopped locally, but Google Ads pause failed.");
+      }
+    }
+
+    // ── Pause LinkedIn if selected ──
+    if (selectedPlatforms.includes("linkedin") && campaignId) {
+      try {
+        await CampaignAPI.updateLinkedInStatus(campaignId, "PAUSED");
+      } catch (err) {
+        console.error("[LinkedIn] Failed to pause campaign:", err);
+        toast.warn("Campaign stopped locally, but LinkedIn pause failed.");
       }
     }
 
     onStop();
-    if (googlePauseSucceeded) {
-      toast.warn("Campaign stopped successfully");
-    }
+    toast.warn("Campaign stopped successfully");
     onClose();
   };
 
@@ -111,8 +111,6 @@ export default function StopCampaignModal({
             </div>
           </>
         )}
-
-        /* ===== STEP 2 : CONFIRMATION ===== */
 
         {/* ===== STEP 2 : CONFIRMATION ===== */}
         {showConfirm && (
