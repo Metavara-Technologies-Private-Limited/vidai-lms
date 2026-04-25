@@ -6,7 +6,6 @@ const storedClinicId = (): number =>
   Number(localStorage.getItem("clinic_id") ?? 0);
 
 export const CampaignAPI = {
-  // clinicId can be passed explicitly (from Redux state) or falls back to localStorage
   list: (clinicId?: number) =>
     http.get<CampaignAPIType[]>("/campaigns/list/", {
       params: { clinic_id: clinicId ?? storedClinicId() },
@@ -50,12 +49,31 @@ export const CampaignAPI = {
       params: { clinic_id: data.clinic_id },
     }),
 
-  // ← new: pause or enable a Google Ads campaign
   updateGoogleAdsStatus: (campaignId: string, action: "pause" | "enable") =>
     http.post("/google-ads/status/", {
       campaign_id: campaignId,
       action,
     }),
+
+  // ── LinkedIn ──────────────────────────────────────────────────
+  triggerLinkedInInsights: (campaignId: string) =>
+    http.post("/social/campaign/insights/", {
+      campaign_id: campaignId,
+      platform: "linkedin",
+    }),
+
+  getLinkedInStatus: (campaignId: string) =>
+    http.post("/social/campaign/status/", {
+      campaign_id: campaignId,
+      platform: "linkedin",
+    }),
+
+  updateLinkedInStatus: (campaignId: string, desiredStatus: "ACTIVE" | "PAUSED") =>
+    http.post("/social/campaign/update/", {
+      campaign_id: campaignId,
+      desired_status: desiredStatus,
+    }),
+  // ─────────────────────────────────────────────────────────────
 
   getFacebookStatus: () => http.get("/facebook/status"),
 
@@ -79,7 +97,6 @@ export const CampaignAPI = {
       params: { clinic_id: storedClinicId() },
     }),
 
-  // Add this after getFacebookInsights:
   getFBAdInsights: (fbCampaignId: string) =>
     http.get(`/fb/campaigns/${fbCampaignId}/insights/?date_preset=maximum`),
 
@@ -88,33 +105,21 @@ export const CampaignAPI = {
       params: { clinic_id: storedClinicId() },
     }),
 
-    
-
-  // Add this method to fetch latest Google Ads insights for a campaign
-
-  // ✅ Fetches latest Mailchimp insights from Mailchimp API
-  // and saves them to CampaignEmailConfig.insights JSONField in DB.
-  // Called automatically when CampaignDashboard opens for email campaigns.
   getMailchimpInsights: (campaignId: string) =>
     http.get(`/campaigns/${campaignId}/mailchimp-insights/`, {
       params: { clinic_id: storedClinicId() },
     }),
 
-  // ✅ Triggers Google Ads insights fetch via Zapier webhook
-  // Called automatically when CampaignDashboard opens for Google Ads campaigns.
   triggerGoogleAdsInsights: (campaignId: string) =>
     http.post(`/campaign/insights/trigger/`, {
       campaign_id: campaignId,
     }),
 
-  // ✅ Fetches latest Google Ads insights from DB
-  // after Zapier webhook triggers the data fetch
   getGoogleAdsInsights: (campaignId: string) =>
     http.get(`/google-ads/insights/`, {
       params: { campaign_id: campaignId, clinic_id: storedClinicId() },
     }),
 
-  // Explicit alias for debugging and clear endpoint routing
   getGoogleAdsInsightsFromApi: (campaignId: string) =>
     http.get(`/google-ads/insights/`, {
       params: { campaign_id: campaignId, clinic_id: storedClinicId() },

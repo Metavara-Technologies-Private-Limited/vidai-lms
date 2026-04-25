@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 import type { Campaign } from "../../types/campaigns.types";
 import { CAMPAIGN_STATUS, platformIcons, PLATFORMS, type CampaignStatus } from "../../constants/campaigns.constants";
 import { formatScheduleTime } from "../../utils/campaigns.utils";
-import { CampaignAPI } from "../../services/campaign.api"; // ← added
+import { CampaignAPI } from "../../services/campaign.api";
 
 const INACTIVE_STATUSES = new Set<CampaignStatus>([
   CAMPAIGN_STATUS.STOPPED,
@@ -160,6 +160,7 @@ export default function CampaignCard({
               if (c.status === CAMPAIGN_STATUS.STOPPED) {
                 let shouldSetLive = true;
 
+                // ── Enable Google Ads ──
                 if (platforms.includes("google_ads")) {
                   try {
                     const res = await CampaignAPI.updateGoogleAdsStatus(c.id, "enable");
@@ -174,6 +175,18 @@ export default function CampaignCard({
                     shouldSetLive = false;
                     console.error("[GoogleAds] Failed to enable campaign:", err);
                     toast.warn("Google Ads enable failed; campaign remains stopped locally.");
+                  }
+                }
+
+                // ── Enable LinkedIn ──
+                if (platforms.includes("linkedin")) {
+                  try {
+                    await CampaignAPI.updateLinkedInStatus(c.id, "ACTIVE");
+                    toast.success("LinkedIn campaign enabled successfully.");
+                  } catch (err) {
+                    shouldSetLive = false;
+                    console.error("[LinkedIn] Failed to enable campaign:", err);
+                    toast.warn("LinkedIn enable failed; campaign remains stopped locally.");
                   }
                 }
 
@@ -272,12 +285,11 @@ export default function CampaignCard({
         </div>
       </div>
 
-
       {showStopModal && (
         <StopCampaignModal
           campaignName={c.name}
           platforms={platforms}
-          campaignId={c.id}           
+          campaignId={c.id}
           onClose={() => setShowStopModal(false)}
           onStop={() => {
             onStatusChange(c.id, CAMPAIGN_STATUS.STOPPED);
