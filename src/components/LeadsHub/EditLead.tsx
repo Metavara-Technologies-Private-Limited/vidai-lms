@@ -45,6 +45,7 @@ import {
   sectionLabelStyle,
 } from "./UseEditLead";
 import { sanitizeNameInput } from "../../utils/nameValidation";
+import { capitalizeFirst } from "../../utils/nameValidation";
 import {
   sanitizePhoneInput,
   sanitizeEmailFieldInput,
@@ -257,7 +258,27 @@ export default function EditLead() {
         "edit-lead-name-invalid",
         "Only letters, numbers and spaces allowed",
       );
-    setFullName(sanitized);
+    setFullName(capitalizeFirst(sanitized));
+  };
+
+  const handlePartnerNameChange = (value: string) => {
+    const sanitized = sanitizeNameInput(value);
+    if (sanitized !== value)
+      showInputToast(
+        "edit-lead-name-invalid",
+        "Only letters, numbers and spaces allowed",
+      );
+    setPartnerName(capitalizeFirst(sanitized));
+  };
+
+  const handleContactPersonNameChange = (value: string) => {
+    const sanitized = sanitizeNameInput(value);
+    if (sanitized !== value)
+      showInputToast(
+        "edit-lead-name-invalid",
+        "Only letters, numbers and spaces allowed",
+      );
+    setContactPersonName(capitalizeFirst(sanitized));
   };
 
   const handleContactChange = (value: string) => {
@@ -641,7 +662,9 @@ export default function EditLead() {
                           fullWidth
                           size="small"
                           value={partnerName}
-                          onChange={(e) => setPartnerName(e.target.value)}
+                          onChange={(e) =>
+                            handlePartnerNameChange(e.target.value)
+                          }
                           sx={inputStyle}
                         />
                       </Box>
@@ -696,7 +719,9 @@ export default function EditLead() {
                         fullWidth
                         size="small"
                         value={contactPersonName}
-                        onChange={(e) => setContactPersonName(e.target.value)}
+                        onChange={(e) =>
+                          handleContactPersonNameChange(e.target.value)
+                        }
                         sx={inputStyle}
                       />
                     </Box>
@@ -1014,7 +1039,7 @@ export default function EditLead() {
                   </TextField>
                 </Box>
 
-                  {/* Next Action Type */}
+                {/* Next Action Type */}
                 <Box>
                   <Typography sx={labelStyle}>Next Action Type</Typography>
                   <TextField
@@ -1500,6 +1525,7 @@ export default function EditLead() {
                       <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DatePicker
                           value={selectedDate}
+                          format="DD/MM/YYYY"
                           onChange={(val) => handleDateChange(val)}
                           slotProps={{
                             textField: {

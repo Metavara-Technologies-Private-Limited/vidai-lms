@@ -7,6 +7,7 @@ import {
   type LeadDocument,
 } from "../services/leads.api";
 import type { RootState } from ".";
+import { resolveUserRole } from "../utils/roleAccess";
 
 // ====================== API Error Type ======================
 type ApiError = {
@@ -18,6 +19,77 @@ type ApiError = {
     };
   };
   message?: string;
+};
+
+type AuthLikeUser = {
+  id?: number | string;
+  user_id?: number | string;
+  user?: {
+    id?: number | string;
+    user_id?: number | string;
+  };
+};
+
+const toNumericId = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const collectLeadIds = (lead: Lead, keys: string[]): number[] => {
+  const rawLead = lead as unknown as Record<string, unknown>;
+  return keys
+    .map((key) => toNumericId(rawLead[key]))
+    .filter((value): value is number => value !== null);
+};
+
+const resolveCurrentUserId = (
+  authUser: AuthLikeUser | null | undefined,
+): number | null => {
+  return (
+    toNumericId(authUser?.id) ??
+    toNumericId(authUser?.user_id) ??
+    toNumericId(authUser?.user?.id) ??
+    toNumericId(authUser?.user?.user_id) ??
+    null
+  );
+};
+
+const filterLeadsForRole = (
+  leads: Lead[],
+  role: "super_admin" | "admin" | "user" | "unknown",
+  currentUserId: number | null,
+): Lead[] => {
+  if (role !== "user") {
+    return leads;
+  }
+
+  // Keep existing behavior when user identity is unavailable.
+  if (!currentUserId) {
+    return leads;
+  }
+
+  return leads.filter((lead) => {
+    const creatorIds = collectLeadIds(lead, [
+      "created_by_id",
+      "created_by",
+      "user_id",
+    ]);
+    const generatedByIds = collectLeadIds(lead, [
+      "personal_id",
+      "lead_generated_by_id",
+      "generated_by_id",
+      "referred_by_id",
+    ]);
+
+    return (
+      creatorIds.includes(currentUserId) ||
+      generatedByIds.includes(currentUserId)
+    );
+  });
 };
 
 // ====================== Type Definitions ======================
@@ -102,16 +174,19 @@ export const fetchLeads = createAsyncThunk<
 >("leads/fetchAll", async (_, { rejectWithValue, getState }) => {
   try {
     const state = getState();
-    console.log("cc:state", state);
     const clinicId = state.clinic.data?.id;
+    const authUser = state.auth.user as AuthLikeUser | null;
+    const role = resolveUserRole(
+      authUser as unknown as Record<string, unknown> | null,
+    );
+    const currentUserId = resolveCurrentUserId(authUser);
 
     if (!clinicId) {
       return rejectWithValue("Clinic not selected");
     }
 
     const leads = await LeadAPI.list(clinicId);
-    console.log("📊 Fetched leads from API:", leads.length);
-    return leads;
+    return filterLeadsForRole(leads, role, currentUserId);
   } catch (err) {
     const error = err as ApiError;
     const message =

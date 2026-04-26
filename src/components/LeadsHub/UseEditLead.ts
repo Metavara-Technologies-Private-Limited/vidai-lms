@@ -20,7 +20,12 @@ import { fetchLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
 import { selectUser } from "../../store/authSlice";
 import { selectClinic } from "../../store/clinicSlice";
-import type { Lead, LeadPayload, Department, Employee } from "../../services/leads.api";
+import type {
+  Lead,
+  LeadPayload,
+  Department,
+  Employee,
+} from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import type { NextActionStatus } from "../../types/leads.types";
 import { TASK_TYPES, TASK_STATUS_FOR_TYPE } from "./LeadTaskConfig";
@@ -124,9 +129,7 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
       return {
         id,
         first_name:
-          typeof record.first_name === "string"
-            ? record.first_name
-            : undefined,
+          typeof record.first_name === "string" ? record.first_name : undefined,
         last_name:
           typeof record.last_name === "string" ? record.last_name : undefined,
         username:
@@ -136,8 +139,7 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
           typeof record.designation === "string"
             ? record.designation
             : undefined,
-        email:
-          typeof record.email === "string" ? record.email : undefined,
+        email: typeof record.email === "string" ? record.email : undefined,
       };
     })
     .filter((item): item is AssigneeOption => item !== null);
@@ -361,31 +363,39 @@ export function useEditLead() {
   // Lookup data
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>([]);
+  const [filteredPersonnel, setFilteredPersonnel] = React.useState<Employee[]>(
+    [],
+  );
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
   const [employeeError, setEmployeeError] = React.useState<string | null>(null);
 
   // ── Referral departments ──
-  const [referralDepartments, setReferralDepartments] = React.useState<ReferralDepartment[]>([]);
+  const [referralDepartments, setReferralDepartments] = React.useState<
+    ReferralDepartment[]
+  >([]);
   const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
 
   // ── Pipeline / stage state ──
-  const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>([]);
+  const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>(
+    [],
+  );
   const [selectedNextActionStageId, setSelectedNextActionStageId] =
     React.useState<string | null>(null);
 
   // ── Next action type options — derived from pipeline rules ──
-  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<string[]>([
-    ...TASK_TYPES,
-  ]);
+  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<
+    string[]
+  >([...TASK_TYPES]);
 
   // Lead meta
   const [leadData, setLeadData] = React.useState<Lead | null>(null);
   const [clinicId, setClinicId] = React.useState<number>(
     selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1),
   );
-  const [leadDepartmentId, setLeadDepartmentId] = React.useState<number | null>(null);
+  const [leadDepartmentId, setLeadDepartmentId] = React.useState<number | null>(
+    null,
+  );
 
   // ── Step 1: shared fields ──
   const [fullName, setFullName] = React.useState("");
@@ -399,11 +409,16 @@ export function useEditLead() {
   const [assignee, setAssignee] = React.useState("");
   const [assigneeName, setAssigneeName] = React.useState("");
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
-  const [assigneeOptions, setAssigneeOptions] = React.useState<AssigneeOption[]>([]);
+  const [assigneeOptions, setAssigneeOptions] = React.useState<
+    AssigneeOption[]
+  >([]);
   const [assigneeLoading, setAssigneeLoading] = React.useState(false);
   const [leadGeneratedBySearch, setLeadGeneratedBySearch] = React.useState("");
-  const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<AssigneeOption[]>([]);
-  const [leadGeneratedByLoading, setLeadGeneratedByLoading] = React.useState(false);
+  const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<
+    AssigneeOption[]
+  >([]);
+  const [leadGeneratedByLoading, setLeadGeneratedByLoading] =
+    React.useState(false);
   const [nextType, setNextType] = React.useState("");
   const [nextStatus, setNextStatus] = React.useState("");
   const [nextDesc, setNextDesc] = React.useState("");
@@ -436,17 +451,24 @@ export function useEditLead() {
   const [treatmentInterest, setTreatmentInterest] = React.useState("");
   const [treatments, setTreatments] = React.useState<string[]>([]);
   const [documents, setDocuments] = React.useState<File[]>([]);
-  const [existingDocuments, setExistingDocuments] = React.useState<ExistingDocument[]>([]);
+  const [existingDocuments, setExistingDocuments] = React.useState<
+    ExistingDocument[]
+  >([]);
   const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
 
   // Step 3
-  const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("no");
+  const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">(
+    "no",
+  );
   const [department, setDepartment] = React.useState("");
   const [appointmentPersonnel, setAppointmentPersonnel] = React.useState("");
-  const [appointmentPersonnelSearch, setAppointmentPersonnelSearch] = React.useState("");
-  const [appointmentPersonnelOptions, setAppointmentPersonnelOptions] = React.useState<AssigneeOption[]>([]);
-  const [appointmentPersonnelLoading, setAppointmentPersonnelLoading] = React.useState(false);
+  const [appointmentPersonnelSearch, setAppointmentPersonnelSearch] =
+    React.useState("");
+  const [appointmentPersonnelOptions, setAppointmentPersonnelOptions] =
+    React.useState<AssigneeOption[]>([]);
+  const [appointmentPersonnelLoading, setAppointmentPersonnelLoading] =
+    React.useState(false);
   const [appointmentDate, setAppointmentDate] = React.useState("");
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
   const [slot, setSlot] = React.useState("");
@@ -465,7 +487,9 @@ export function useEditLead() {
 
   // Next action status: only stages with a higher stage_order than the
   // selected lead status — identical to AddNewLead's filteredNextActionStatusOptions
-  const filteredNextActionStatusOptions = React.useMemo<NextActionStatusOption[]>(() => {
+  const filteredNextActionStatusOptions = React.useMemo<
+    NextActionStatusOption[]
+  >(() => {
     if (!leadStatus) {
       return pipelineStages.map((s) => ({
         label: s.stage_name.trim(),
@@ -510,22 +534,21 @@ export function useEditLead() {
   }, [campaign, campaigns]);
 
   // ── Legacy availableTaskStatuses (kept for backward compat) ──
-  const availableTaskStatuses = React.useMemo<{ label: string; value: string }[]>(
-    () => {
-      if (!nextType)
-        return [
-          { label: "To Do", value: "pending" },
-          { label: "Done", value: "completed" },
-        ];
-      return (
-        TASK_STATUS_FOR_TYPE[nextType] ?? [
-          { label: "To Do", value: "pending" },
-          { label: "Done", value: "completed" },
-        ]
-      );
-    },
-    [nextType],
-  );
+  const availableTaskStatuses = React.useMemo<
+    { label: string; value: string }[]
+  >(() => {
+    if (!nextType)
+      return [
+        { label: "To Do", value: "pending" },
+        { label: "Done", value: "completed" },
+      ];
+    return (
+      TASK_STATUS_FOR_TYPE[nextType] ?? [
+        { label: "To Do", value: "pending" },
+        { label: "Done", value: "completed" },
+      ]
+    );
+  }, [nextType]);
 
   // ====================== Pipeline effect (mirrors AddNewLead exactly) ======================
   React.useEffect(() => {
@@ -792,9 +815,7 @@ export function useEditLead() {
         setClinicId(resolvedClinicId);
 
         const origDeptId = lead.department_id ?? null;
-        setLeadDepartmentId(
-          typeof origDeptId === "number" ? origDeptId : null,
-        );
+        setLeadDepartmentId(typeof origDeptId === "number" ? origDeptId : null);
 
         // ── Shared fields ──
         setFullName(lead.full_name ?? "");
@@ -862,28 +883,18 @@ export function useEditLead() {
         // ── CONTRACTS-only fields ──
         // Field names match the backend API response & LeadPayload type
         if (IS_CONTRACTS_APP) {
-          setContactPersonName(
-            (anyLead.contact_full_name as string) ?? "",
-          );
-          setDesignation(
-            (anyLead.contact_designation as string) ?? "",
-          );
-          setContactPersonPhone(
-            (anyLead.contact_phone as string) ?? "",
-          );
-          setContactPersonEmail(
-            (anyLead.contact_email as string) ?? "",
-          );
+          setContactPersonName((anyLead.contact_full_name as string) ?? "");
+          setDesignation((anyLead.contact_designation as string) ?? "");
+          setContactPersonPhone((anyLead.contact_phone as string) ?? "");
+          setContactPersonEmail((anyLead.contact_email as string) ?? "");
           setLeadGeneratedBy(
-            ((anyLead.lead_generated_by_name as string) ??
+            (anyLead.lead_generated_by_name as string) ??
               (anyLead.personal_name as string) ??
-              ""),
+              "",
           );
           setLeadGeneratedById(
-            (
-              (anyLead.personal_id as number | string | undefined)?.toString() ??
-              ""
-            ),
+            (anyLead.personal_id as number | string | undefined)?.toString() ??
+              "",
           );
         }
 
@@ -913,9 +924,8 @@ export function useEditLead() {
         }
 
         // ── Existing documents ──
-        const embeddedDocs = (
-          lead as unknown as { documents?: unknown[] }
-        ).documents;
+        const embeddedDocs = (lead as unknown as { documents?: unknown[] })
+          .documents;
         if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
           const normalized = embeddedDocs.map((d) =>
             normalizeDocument(d as Parameters<typeof normalizeDocument>[0]),
@@ -942,9 +952,7 @@ export function useEditLead() {
           }
         }
       } catch (err: unknown) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load lead",
-        );
+        setError(err instanceof Error ? err.message : "Failed to load lead");
       } finally {
         setLoading(false);
       }
@@ -1096,9 +1104,7 @@ export function useEditLead() {
       setFilteredPersonnel([]);
       return;
     }
-    const selectedDept = departments.find(
-      (d) => d.id === Number(department),
-    );
+    const selectedDept = departments.find((d) => d.id === Number(department));
     if (!selectedDept) {
       setFilteredPersonnel([]);
       return;
@@ -1132,15 +1138,33 @@ export function useEditLead() {
 
     if (bookingActive) {
       if (IS_MEDICAL_APP && !department) {
-        setError("Please select a department for the appointment.");
+        const msg = "Please select a department for the appointment.";
+        setError(null);
+        toast.error(msg, {
+          position: "top-right",
+          autoClose: 3000,
+          theme: "colored",
+        });
         return;
       }
       if (!appointmentDate) {
-        setError("Please select a date for the appointment.");
+        const msg = "Please select a date for the appointment.";
+        setError(null);
+        toast.error(msg, {
+          position: "top-right",
+          autoClose: 3000,
+          theme: "colored",
+        });
         return;
       }
       if (!slot) {
-        setError("Please select a time slot for the appointment.");
+        const msg = "Please select a time slot for the appointment.";
+        setError(null);
+        toast.error(msg, {
+          position: "top-right",
+          autoClose: 3000,
+          theme: "colored",
+        });
         return;
       }
     }
@@ -1153,9 +1177,7 @@ export function useEditLead() {
       (option) => assigneeOptionLabel(option) === leadGeneratedBy,
     );
     const resolvedGeneratedById =
-      intOrNull(leadGeneratedById) ??
-      matchedGeneratedByOption?.id ??
-      null;
+      intOrNull(leadGeneratedById) ?? matchedGeneratedByOption?.id ?? null;
     const referralDeptId = intOrNull(referralDepartment);
 
     const updateData = {
@@ -1179,9 +1201,7 @@ export function useEditLead() {
         ? { lead_status: leadStatus as LeadPayload["lead_status"] }
         : {}),
       treatment_interest:
-        treatments.length > 0
-          ? treatments.join(",")
-          : treatmentInterest || "",
+        treatments.length > 0 ? treatments.join(",") : treatmentInterest || "",
       is_active: leadData?.is_active !== false,
       book_appointment: bookingActive,
       referral_department_id: referralDeptId ?? null,
@@ -1263,9 +1283,7 @@ export function useEditLead() {
         });
         setTimeout(() => {
           navigate("/leads", { replace: true });
-          dispatch(
-            fetchLeads() as unknown as Parameters<typeof dispatch>[0],
-          );
+          dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
         }, 800);
       })
       .catch((err: unknown) => {
@@ -1277,8 +1295,7 @@ export function useEditLead() {
           };
           detail?: string;
         };
-        if (anyErr?.response?.data?.detail)
-          msg = anyErr.response.data.detail;
+        if (anyErr?.response?.data?.detail) msg = anyErr.response.data.detail;
         else if (anyErr?.response?.data?.message)
           msg = anyErr.response.data.message;
         setError(msg);

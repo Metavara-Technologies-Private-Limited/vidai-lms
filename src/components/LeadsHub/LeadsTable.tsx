@@ -59,6 +59,7 @@ import {
 } from "./LeadsTable.types";
 import {
   extractErrorMessage,
+  hasUsablePhone,
   normalizePhone,
   processLead,
 } from "./LeadsTable.helpers";
@@ -327,30 +328,34 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
             }}
           >
             {statusOptions.length === 0 ? (
-              <Typography sx={{ fontSize: 12, color: "#667085", px: 1, py: 0.5 }}>
+              <Typography
+                sx={{ fontSize: 12, color: "#667085", px: 1, py: 0.5 }}
+              >
                 No active stages available for selected pipeline.
               </Typography>
-            ) : statusOptions.map((opt) => (
-              <Box
-                key={opt.id ?? opt.label}
-                onClick={() => {
-                  setSelected(opt.label);
-                  setDropdownOpen(false);
-                }}
-                sx={{ display: "inline-flex", pl: 0.5 }}
-              >
-                <Chip
-                  label={opt.label}
-                  size="small"
-                  sx={{
-                    ...getStatusOptionChipSx(opt.label),
-                    ...(opt.label === selected && {
-                      boxShadow: `0 0 0 2px ${STATUS_CHIP_STYLES[opt.label]?.borderColor ?? "#64748B"}44`,
-                    }),
+            ) : (
+              statusOptions.map((opt) => (
+                <Box
+                  key={opt.id ?? opt.label}
+                  onClick={() => {
+                    setSelected(opt.label);
+                    setDropdownOpen(false);
                   }}
-                />
-              </Box>
-            ))}
+                  sx={{ display: "inline-flex", pl: 0.5 }}
+                >
+                  <Chip
+                    label={opt.label}
+                    size="small"
+                    sx={{
+                      ...getStatusOptionChipSx(opt.label),
+                      ...(opt.label === selected && {
+                        boxShadow: `0 0 0 2px ${STATUS_CHIP_STYLES[opt.label]?.borderColor ?? "#64748B"}44`,
+                      }),
+                    }}
+                  />
+                </Box>
+              ))
+            )}
           </Box>
         )}
       </DialogContent>
@@ -443,9 +448,7 @@ const LeadsTable: React.FC<Props> = ({
   );
   const [editStatusOptions, setEditStatusOptions] = React.useState<
     Array<{ id?: string; label: string }>
-  >(
-    ACTIVE_STATUS_OPTIONS.map((status) => ({ label: status })),
-  );
+  >(ACTIVE_STATUS_OPTIONS.map((status) => ({ label: status })));
 
   const [sortCol, setSortCol] = React.useState<string | null>(null);
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
@@ -466,7 +469,8 @@ const LeadsTable: React.FC<Props> = ({
         localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ||
         "";
       const hasSelectionContext =
-        Boolean(resolvedSelectedIndustry) || Boolean(resolvedSelectedPipelineId);
+        Boolean(resolvedSelectedIndustry) ||
+        Boolean(resolvedSelectedPipelineId);
       const fallbackStatusOptions = ACTIVE_STATUS_OPTIONS.map((status) => ({
         label: status,
       }));
@@ -481,7 +485,9 @@ const LeadsTable: React.FC<Props> = ({
 
         if (resolvedSelectedPipelineId) {
           try {
-            selectedPipeline = await pipelineApi.getById(resolvedSelectedPipelineId);
+            selectedPipeline = await pipelineApi.getById(
+              resolvedSelectedPipelineId,
+            );
           } catch {
             selectedPipeline = null;
           }
@@ -491,12 +497,15 @@ const LeadsTable: React.FC<Props> = ({
           const pipelines = await pipelineApi.list(clinicId);
           const pipelinesByIndustry = resolvedSelectedIndustry
             ? pipelines.filter(
-                (pipeline) => pipeline.industry_type === resolvedSelectedIndustry,
+                (pipeline) =>
+                  pipeline.industry_type === resolvedSelectedIndustry,
               )
             : pipelines;
 
           selectedPipeline =
-            pipelines.find((pipeline) => pipeline.id === resolvedSelectedPipelineId) ??
+            pipelines.find(
+              (pipeline) => pipeline.id === resolvedSelectedPipelineId,
+            ) ??
             pipelinesByIndustry.find((pipeline) => pipeline.is_active) ??
             pipelinesByIndustry[0] ??
             pipelines.find((pipeline) => pipeline.is_active) ??
@@ -505,7 +514,9 @@ const LeadsTable: React.FC<Props> = ({
         }
 
         if (!selectedPipeline || !Array.isArray(selectedPipeline.stages)) {
-          setEditStatusOptions(hasSelectionContext ? [] : fallbackStatusOptions);
+          setEditStatusOptions(
+            hasSelectionContext ? [] : fallbackStatusOptions,
+          );
           return;
         }
 
@@ -643,9 +654,7 @@ const LeadsTable: React.FC<Props> = ({
       partner_inquiry: editStatusLead.partner_inquiry || false,
       next_action_description: stageAwareDescription,
       ...(selectedStatus.id ? { stage_id: selectedStatus.id } : {}),
-      ...(apiStatus
-        ? { lead_status: apiStatus as "new" | "contacted" }
-        : {}),
+      ...(apiStatus ? { lead_status: apiStatus as "new" | "contacted" } : {}),
     };
 
     try {
@@ -887,7 +896,9 @@ const LeadsTable: React.FC<Props> = ({
       >
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
-          <Typography color="text.secondary">Loading leads...</Typography>
+          <Typography color="text.secondary">
+            Hold Tight!! Leads are Loading....
+          </Typography>
         </Stack>
       </Box>
     );
@@ -1528,45 +1539,72 @@ const LeadsTable: React.FC<Props> = ({
                   sx={contactCellStyle}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Stack direction="row" spacing={1} justifyContent="center">
-                    <Tooltip title={`Call ${lead.contact_no || "N/A"}`}>
-                      <span>
-                        <IconButton
-                          className="action-btn"
-                          size="small"
-                          onClick={(e) => handleCallOpen(e, lead)}
-                        >
-                          <PhoneIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={`SMS ${lead.contact_no || "N/A"}`}>
-                      <IconButton
-                        className="action-btn"
-                        size="small"
-                        onClick={(e) => handleSMSOpen(e, lead)}
+                  {(() => {
+                    const hasPhone = hasUsablePhone(lead.contact_no);
+                    return (
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        justifyContent="center"
                       >
-                        <ChatBubbleOutlineIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip
-                      title={lead.email ? `Email ${lead.email}` : "No email"}
-                    >
-                      <span>
-                        <IconButton
-                          className="action-btn"
-                          size="small"
-                          disabled={!lead.email}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEmailLead(lead);
-                          }}
+                        <Tooltip
+                          title={
+                            hasPhone
+                              ? `Call ${lead.contact_no || "N/A"}`
+                              : "No contact number"
+                          }
                         >
-                          <EmailOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Stack>
+                          <span>
+                            <IconButton
+                              className="action-btn"
+                              size="small"
+                              disabled={!hasPhone}
+                              onClick={(e) => handleCallOpen(e, lead)}
+                            >
+                              <PhoneIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip
+                          title={
+                            hasPhone
+                              ? `SMS ${lead.contact_no || "N/A"}`
+                              : "No contact number"
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              className="action-btn"
+                              size="small"
+                              disabled={!hasPhone}
+                              onClick={(e) => handleSMSOpen(e, lead)}
+                            >
+                              <ChatBubbleOutlineIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip
+                          title={
+                            lead.email ? `Email ${lead.email}` : "No email"
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              className="action-btn"
+                              size="small"
+                              disabled={!lead.email}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEmailLead(lead);
+                              }}
+                            >
+                              <EmailOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    );
+                  })()}
                 </TableCell>
 
                 <TableCell

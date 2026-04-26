@@ -107,8 +107,12 @@ interface Step1Props {
    * Populated by the parent; empty array = no rules configured yet.
    */
   nextActionTypeOptions?: string[];
-  handleChange: (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSelectChange: (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleChange: (
+    field: keyof FormState,
+  ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSelectChange: (
+    field: keyof FormState,
+  ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleAssigneeInputChange: (value: string) => void;
   handleAssigneeChange: (value: AssigneeOption | null) => void;
   handleLeadGeneratedByInputChange: (value: string) => void;
@@ -170,8 +174,10 @@ export function Step1({
       )
     : campaigns;
 
-  const resolvedLeadStatusOptions: NextActionStatusOption[] = leadStatusOptions ?? [];
-  const resolvedNextActionStatusOptions: NextActionStatusOption[] = nextActionStatusOptions ?? [];
+  const resolvedLeadStatusOptions: NextActionStatusOption[] =
+    leadStatusOptions ?? [];
+  const resolvedNextActionStatusOptions: NextActionStatusOption[] =
+    nextActionStatusOptions ?? [];
 
   // Use options provided by the parent (derived from pipeline stage rules).
   // The parent already falls back to TASK_TYPES when no rules are configured,
@@ -181,14 +187,21 @@ export function Step1({
   return (
     <Box>
       {/* ── LEAD INFORMATION ─────────────────────────────────────────────── */}
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         LEAD INFORMATION
       </Typography>
 
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: IS_CONTRACTS_APP ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
+          gridTemplateColumns: IS_CONTRACTS_APP
+            ? "repeat(5, 1fr)"
+            : "repeat(4, 1fr)",
           gap: 2,
           mb: 3,
         }}
@@ -218,11 +231,20 @@ export function Step1({
 
       {/* Medical — Gender, Age, Marital, Address */}
       {IS_MEDICAL_APP && (
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 4 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 2,
+            mb: 4,
+          }}
+        >
           <Box>
             <Typography sx={labelStyle}>Gender</Typography>
             <TextField
-              select fullWidth size="small"
+              select
+              fullWidth
+              size="small"
               value={form.gender}
               onChange={handleSelectChange("gender")}
               sx={inputStyle}
@@ -234,7 +256,9 @@ export function Step1({
           <Box>
             <Typography sx={labelStyle}>Age</Typography>
             <TextField
-              fullWidth size="small" type="number"
+              fullWidth
+              size="small"
+              type="number"
               value={form.age}
               onChange={handleChange("age")}
               sx={inputStyle}
@@ -243,7 +267,9 @@ export function Step1({
           <Box>
             <Typography sx={labelStyle}>Marital Status</Typography>
             <TextField
-              select fullWidth size="small"
+              select
+              fullWidth
+              size="small"
               value={form.marital}
               onChange={handleSelectChange("marital")}
               sx={inputStyle}
@@ -256,7 +282,8 @@ export function Step1({
           <Box>
             <Typography sx={labelStyle}>Address</Typography>
             <TextField
-              fullWidth size="small"
+              fullWidth
+              size="small"
               value={form.address}
               onChange={handleChange("address")}
               sx={inputStyle}
@@ -269,7 +296,9 @@ export function Step1({
       <Box sx={{ mb: 4 }}>
         <Typography sx={labelStyle}>Language Preference</Typography>
         <TextField
-          select fullWidth size="small"
+          select
+          fullWidth
+          size="small"
           value={form.language}
           onChange={handleSelectChange("language")}
           sx={{ ...inputStyle, maxWidth: "25%" }}
@@ -284,26 +313,49 @@ export function Step1({
       {/* ── PARTNER INFORMATION — medical only ───────────────────────────── */}
       {IS_MEDICAL_APP && (
         <>
-          <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+          <Typography
+            variant="subtitle2"
+            fontWeight={700}
+            color="#1E293B"
+            sx={{ mb: 2 }}
+          >
             PARTNER INFORMATION
           </Typography>
           <Box sx={{ mb: 2 }}>
-            <Typography sx={{ ...labelStyle, mb: 1 }}>Is This Inquiry For A Couple?</Typography>
+            <Typography sx={{ ...labelStyle, mb: 1 }}>
+              Is This Inquiry For A Couple?
+            </Typography>
             <RadioGroup
               row
               value={isCouple}
               onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}
             >
-              <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
-              <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+              <FormControlLabel
+                value="yes"
+                control={<Radio size="small" />}
+                label="Yes"
+              />
+              <FormControlLabel
+                value="no"
+                control={<Radio size="small" />}
+                label="No"
+              />
             </RadioGroup>
           </Box>
           {isCouple === "yes" && (
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 2,
+                mb: 4,
+              }}
+            >
               <Box>
                 <Typography sx={labelStyle}>Full Name</Typography>
                 <TextField
-                  fullWidth size="small"
+                  fullWidth
+                  size="small"
                   value={form.partnerName}
                   onChange={handleChange("partnerName")}
                   sx={inputStyle}
@@ -312,7 +364,9 @@ export function Step1({
               <Box>
                 <Typography sx={labelStyle}>Age</Typography>
                 <TextField
-                  fullWidth size="small" type="number"
+                  fullWidth
+                  size="small"
+                  type="number"
                   value={form.partnerAge}
                   onChange={handleChange("partnerAge")}
                   sx={inputStyle}
@@ -321,7 +375,9 @@ export function Step1({
               <Box>
                 <Typography sx={labelStyle}>Gender</Typography>
                 <TextField
-                  select fullWidth size="small"
+                  select
+                  fullWidth
+                  size="small"
                   value={form.partnerGender}
                   onChange={handleSelectChange("partnerGender")}
                   sx={inputStyle}
@@ -339,10 +395,22 @@ export function Step1({
       {/* ── CONTACT INFORMATION — contracts only ─────────────────────────── */}
       {IS_CONTRACTS_APP && (
         <>
-          <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+          <Typography
+            variant="subtitle2"
+            fontWeight={700}
+            color="#1E293B"
+            sx={{ mb: 2 }}
+          >
             {ACTIVE_FLOW_COPY.contactSectionLabel}
           </Typography>
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 4 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 2,
+              mb: 4,
+            }}
+          >
             {(
               [
                 ["Full Name", "contactFullName"],
@@ -354,9 +422,13 @@ export function Step1({
               <Box key={field}>
                 <Typography sx={labelStyle}>{lbl}</Typography>
                 <TextField
-                  fullWidth size="small"
+                  fullWidth
+                  size="small"
                   value={(form[field] as string) ?? ""}
                   onChange={handleChange(field)}
+                  inputProps={
+                    field === "contactPhone" ? { maxLength: 15 } : undefined
+                  }
                   sx={inputStyle}
                 />
               </Box>
@@ -366,37 +438,63 @@ export function Step1({
       )}
 
       {/* ── SOURCE & CAMPAIGN DETAILS ────────────────────────────────────── */}
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         SOURCE & CAMPAIGN DETAILS
       </Typography>
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
-
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 2,
+          mb: 4,
+        }}
+      >
         {/* Source */}
         <Box>
           <Typography sx={labelStyle}>
             Source
             {campaignSelected && (
-              <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+              <Typography
+                component="span"
+                sx={{
+                  fontSize: "0.65rem",
+                  color: "#6366F1",
+                  ml: 1,
+                  fontWeight: 500,
+                }}
+              >
                 auto-filled from campaign
               </Typography>
             )}
           </Typography>
           {campaignSelected ? (
             <TextField
-              fullWidth size="small"
+              fullWidth
+              size="small"
               value={form.source}
               InputProps={{ readOnly: true }}
               sx={readOnlyStyle}
             />
           ) : (
             <TextField
-              select fullWidth size="small"
+              select
+              fullWidth
+              size="small"
               value={form.source}
               onChange={(e) => handleSourceChange(e.target.value)}
               sx={inputStyle}
             >
               <MenuItem value="">-- Select --</MenuItem>
-              {SOURCE_OPTIONS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              {SOURCE_OPTIONS.map((s) => (
+                <MenuItem key={s} value={s}>
+                  {s}
+                </MenuItem>
+              ))}
             </TextField>
           )}
         </Box>
@@ -407,41 +505,68 @@ export function Step1({
             <Typography sx={labelStyle}>
               Sub-Source
               {campaignSelected && (
-                <Typography component="span" sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}>
+                <Typography
+                  component="span"
+                  sx={{
+                    fontSize: "0.65rem",
+                    color: "#6366F1",
+                    ml: 1,
+                    fontWeight: 500,
+                  }}
+                >
                   auto-filled from campaign
                 </Typography>
               )}
             </Typography>
             {campaignSelected ? (
               <TextField
-                fullWidth size="small"
+                fullWidth
+                size="small"
                 value={form.subSource}
                 InputProps={{ readOnly: true }}
                 sx={readOnlyStyle}
               />
             ) : (
               <TextField
-                select fullWidth size="small"
+                select
+                fullWidth
+                size="small"
                 value={form.subSource}
                 onChange={(e) => handleSubSourceChange(e.target.value)}
-                disabled={!form.source || (form.source === "Referral" && loadingReferralDepts)}
+                disabled={
+                  !form.source ||
+                  (form.source === "Referral" && loadingReferralDepts)
+                }
                 sx={inputStyle}
                 InputProps={{
                   endAdornment:
-                    form.source === "Referral" && loadingReferralDepts
-                      ? <CircularProgress size={16} sx={{ mr: 3 }} />
-                      : null,
+                    form.source === "Referral" && loadingReferralDepts ? (
+                      <CircularProgress size={16} sx={{ mr: 3 }} />
+                    ) : null,
                 }}
               >
                 <MenuItem value="">-- Select --</MenuItem>
                 {form.source === "Referral" && loadingReferralDepts ? (
-                  <MenuItem value="" disabled>Loading departments...</MenuItem>
-                ) : form.source === "Referral" && availableSubSources.length === 0 ? (
-                  <MenuItem value="" disabled>No departments available</MenuItem>
+                  <MenuItem value="" disabled>
+                    Loading departments...
+                  </MenuItem>
+                ) : form.source === "Referral" &&
+                  availableSubSources.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No departments available
+                  </MenuItem>
                 ) : (
-                  availableSubSources.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)
+                  availableSubSources.map((s) => (
+                    <MenuItem key={s} value={s}>
+                      {s}
+                    </MenuItem>
+                  ))
                 )}
-                {!form.source && <MenuItem value="" disabled>Select source first</MenuItem>}
+                {!form.source && (
+                  <MenuItem value="" disabled>
+                    Select source first
+                  </MenuItem>
+                )}
               </TextField>
             )}
           </Box>
@@ -453,13 +578,23 @@ export function Step1({
             <Typography sx={labelStyle}>
               Campaign Name
               {form.subSource && !campaignSelected && (
-                <Typography component="span" sx={{ fontSize: "0.65rem", color: "#94A3B8", ml: 1, fontWeight: 500 }}>
+                <Typography
+                  component="span"
+                  sx={{
+                    fontSize: "0.65rem",
+                    color: "#94A3B8",
+                    ml: 1,
+                    fontWeight: 500,
+                  }}
+                >
                   linked with {form.subSource}
                 </Typography>
               )}
             </Typography>
             <TextField
-              select fullWidth size="small"
+              select
+              fullWidth
+              size="small"
               value={form.campaign}
               onChange={(e) => handleCampaignChange(e.target.value)}
               disabled={!form.subSource && !form.source}
@@ -467,9 +602,15 @@ export function Step1({
             >
               <MenuItem value="">-- None --</MenuItem>
               {filteredCampaigns.length === 0 ? (
-                <MenuItem value="" disabled>No campaigns available</MenuItem>
+                <MenuItem value="" disabled>
+                  No campaigns available
+                </MenuItem>
               ) : (
-                filteredCampaigns.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)
+                filteredCampaigns.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.name}
+                  </MenuItem>
+                ))
               )}
             </TextField>
           </Box>
@@ -477,7 +618,12 @@ export function Step1({
       </Box>
 
       {/* ── ASSIGNEE & NEXT ACTION DETAILS ───────────────────────────────── */}
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         ASSIGNEE & NEXT ACTION DETAILS
       </Typography>
 
@@ -485,7 +631,9 @@ export function Step1({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: IS_CONTRACTS_APP ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
+          gridTemplateColumns: IS_CONTRACTS_APP
+            ? "repeat(3, 1fr)"
+            : "repeat(2, 1fr)",
           gap: 2,
           mb: 2,
         }}
@@ -494,20 +642,30 @@ export function Step1({
         <Box>
           <Typography sx={labelStyle}>
             Assigned To{" "}
-            <Typography component="span" sx={{ color: "#EF4444", fontSize: "0.75rem" }}>*</Typography>
+            <Typography
+              component="span"
+              sx={{ color: "#EF4444", fontSize: "0.75rem" }}
+            >
+              *
+            </Typography>
           </Typography>
           <Autocomplete
             options={assigneeOptions}
             loading={assigneeLoading}
             clearOnBlur={false}
             filterOptions={(options) => options}
-            value={assigneeOptions.find((o) => String(o.id) === form.assignee) || null}
+            value={
+              assigneeOptions.find((o) => String(o.id) === form.assignee) ||
+              null
+            }
             inputValue={assigneeName}
             onInputChange={(_, value: string, reason) => {
               if (reason === "reset") return;
               handleAssigneeInputChange(value);
             }}
-            onChange={(_, value: AssigneeOption | null) => handleAssigneeChange(value)}
+            onChange={(_, value: AssigneeOption | null) =>
+              handleAssigneeChange(value)
+            }
             getOptionLabel={assigneeLabel}
             isOptionEqualToValue={(a, b) => a.id === b.id}
             noOptionsText="Type to search assignee"
@@ -515,7 +673,8 @@ export function Step1({
               <li {...props} key={option.id}>
                 <Box>
                   <Typography variant="body2" fontWeight={600}>
-                    {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() || option.username}
+                    {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() ||
+                      option.username}
                   </Typography>
                   {(option.role || option.designation) && (
                     <Typography variant="caption" color="text.secondary">
@@ -527,12 +686,18 @@ export function Step1({
             )}
             renderInput={(params) => (
               <TextField
-                {...params} fullWidth size="small" placeholder="Search assignee" sx={inputStyle}
+                {...params}
+                fullWidth
+                size="small"
+                placeholder="Search assignee"
+                sx={inputStyle}
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (
                     <>
-                      {assigneeLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+                      {assigneeLoading ? (
+                        <CircularProgress size={20} sx={{ mr: 1 }} />
+                      ) : null}
                       {params.InputProps.endAdornment}
                     </>
                   ),
@@ -551,13 +716,19 @@ export function Step1({
               loading={leadGeneratedByLoading}
               clearOnBlur={false}
               filterOptions={(options) => options}
-              value={leadGeneratedByOptions.find((o) => assigneeLabel(o) === leadGeneratedByInput) || null}
+              value={
+                leadGeneratedByOptions.find(
+                  (o) => assigneeLabel(o) === leadGeneratedByInput,
+                ) || null
+              }
               inputValue={leadGeneratedByInput}
               onInputChange={(_, value: string, reason) => {
                 if (reason === "reset") return;
                 handleLeadGeneratedByInputChange(value);
               }}
-              onChange={(_, value: AssigneeOption | null) => handleLeadGeneratedByChange(value)}
+              onChange={(_, value: AssigneeOption | null) =>
+                handleLeadGeneratedByChange(value)
+              }
               getOptionLabel={assigneeLabel}
               isOptionEqualToValue={(a, b) => a.id === b.id}
               noOptionsText="Type to search user"
@@ -565,22 +736,32 @@ export function Step1({
                 <li {...props} key={option.id}>
                   <Box>
                     <Typography variant="body2" fontWeight={600}>
-                      {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() || option.username || `User ${option.id}`}
+                      {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() ||
+                        option.username ||
+                        `User ${option.id}`}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {[option.role || option.designation, option.email].filter(Boolean).join(" · ")}
+                      {[option.role || option.designation, option.email]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </Typography>
                   </Box>
                 </li>
               )}
               renderInput={(params) => (
                 <TextField
-                  {...params} fullWidth size="small" placeholder="Search user" sx={inputStyle}
+                  {...params}
+                  fullWidth
+                  size="small"
+                  placeholder="Search user"
+                  sx={inputStyle}
                   InputProps={{
                     ...params.InputProps,
                     endAdornment: (
                       <>
-                        {leadGeneratedByLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+                        {leadGeneratedByLoading ? (
+                          <CircularProgress size={20} sx={{ mr: 1 }} />
+                        ) : null}
                         {params.InputProps.endAdornment}
                       </>
                     ),
@@ -591,9 +772,14 @@ export function Step1({
             {selectedLeadGeneratedBy && (
               <Box
                 sx={{
-                  mt: 1, p: 1.5, borderRadius: "8px",
-                  border: "1px solid #E2E8F0", bgcolor: "#F8FAFC",
-                  display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1,
+                  mt: 1,
+                  p: 1.5,
+                  borderRadius: "8px",
+                  border: "1px solid #E2E8F0",
+                  bgcolor: "#F8FAFC",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 1,
                 }}
               >
                 {(
@@ -605,7 +791,13 @@ export function Step1({
                   ] as [string, string | undefined][]
                 ).map(([fieldLabel, fieldValue]) => (
                   <Box key={fieldLabel}>
-                    <Typography sx={{ fontSize: "0.65rem", color: "#94A3B8", fontWeight: 600 }}>
+                    <Typography
+                      sx={{
+                        fontSize: "0.65rem",
+                        color: "#94A3B8",
+                        fontWeight: 600,
+                      }}
+                    >
                       {fieldLabel}
                     </Typography>
                     <Typography
@@ -632,25 +824,33 @@ export function Step1({
           <Box>
             <Typography sx={labelStyle}>Referral Department</Typography>
             <TextField
-              select fullWidth size="small"
+              select
+              fullWidth
+              size="small"
               value={form.referralDepartment}
               onChange={(e) => handleReferralDepartmentChange(e.target.value)}
               sx={inputStyle}
               disabled={loadingReferralDepts}
               InputProps={{
-                endAdornment: loadingReferralDepts
-                  ? <CircularProgress size={20} sx={{ mr: 1 }} />
-                  : null,
+                endAdornment: loadingReferralDepts ? (
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                ) : null,
               }}
             >
               <MenuItem value="">-- None --</MenuItem>
               {loadingReferralDepts ? (
-                <MenuItem value="" disabled>Loading...</MenuItem>
+                <MenuItem value="" disabled>
+                  Loading...
+                </MenuItem>
               ) : referralDepartments.length === 0 ? (
-                <MenuItem value="" disabled>No departments available</MenuItem>
+                <MenuItem value="" disabled>
+                  No departments available
+                </MenuItem>
               ) : (
                 referralDepartments.map((dept) => (
-                  <MenuItem key={dept.id} value={String(dept.id)}>{dept.name}</MenuItem>
+                  <MenuItem key={dept.id} value={String(dept.id)}>
+                    {dept.name}
+                  </MenuItem>
                 ))
               )}
             </TextField>
@@ -662,7 +862,9 @@ export function Step1({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: IS_CONTRACTS_APP ? "repeat(4, 1fr)" : "repeat(3, 1fr)",
+          gridTemplateColumns: IS_CONTRACTS_APP
+            ? "repeat(4, 1fr)"
+            : "repeat(3, 1fr)",
           gap: 2,
           mb: 2,
         }}
@@ -671,17 +873,26 @@ export function Step1({
         <Box>
           <Typography sx={labelStyle}>
             Lead Status{" "}
-            <Typography component="span" sx={{ color: "#EF4444", fontSize: "0.75rem" }}>*</Typography>
+            <Typography
+              component="span"
+              sx={{ color: "#EF4444", fontSize: "0.75rem" }}
+            >
+              *
+            </Typography>
           </Typography>
           <TextField
-            select fullWidth size="small"
+            select
+            fullWidth
+            size="small"
             value={form.leadStatus}
             onChange={(e) => handleLeadStatusChange(e.target.value)}
             sx={inputStyle}
           >
             <MenuItem value="">-- Select --</MenuItem>
             {resolvedLeadStatusOptions.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
             ))}
           </TextField>
         </Box>
@@ -690,17 +901,26 @@ export function Step1({
         <Box>
           <Typography sx={labelStyle}>
             Next Action Status{" "}
-            <Typography component="span" sx={{ color: "#EF4444", fontSize: "0.75rem" }}>*</Typography>
+            <Typography
+              component="span"
+              sx={{ color: "#EF4444", fontSize: "0.75rem" }}
+            >
+              *
+            </Typography>
           </Typography>
           <TextField
-            select fullWidth size="small"
+            select
+            fullWidth
+            size="small"
             value={form.nextStatus}
             onChange={(e) => handleNextStatusChange(e.target.value)}
             sx={inputStyle}
           >
             <MenuItem value="">-- Select --</MenuItem>
             {resolvedNextActionStatusOptions.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
             ))}
           </TextField>
         </Box>
@@ -709,7 +929,9 @@ export function Step1({
         <Box>
           <Typography sx={labelStyle}>Next Action Type</Typography>
           <TextField
-            select fullWidth size="small"
+            select
+            fullWidth
+            size="small"
             value={form.nextType}
             onChange={(e) => handleNextTypeChange(e.target.value)}
             sx={inputStyle}
@@ -718,11 +940,15 @@ export function Step1({
             <MenuItem value="">-- Select --</MenuItem>
             {resolvedNextActionTypeOptions.length === 0 ? (
               <MenuItem value="" disabled>
-                {form.leadStatus ? "No actions configured for this stage" : "Select a lead status first"}
+                {form.leadStatus
+                  ? "No actions configured for this stage"
+                  : "Select a lead status first"}
               </MenuItem>
             ) : (
               resolvedNextActionTypeOptions.map((label) => (
-                <MenuItem key={label} value={label}>{label}</MenuItem>
+                <MenuItem key={label} value={label}>
+                  {label}
+                </MenuItem>
               ))
             )}
           </TextField>
@@ -733,7 +959,8 @@ export function Step1({
           <Box>
             <Typography sx={labelStyle}>Next Action Description</Typography>
             <TextField
-              fullWidth size="small"
+              fullWidth
+              size="small"
               value={form.nextDesc}
               onChange={handleChange("nextDesc")}
               sx={inputStyle}
@@ -747,7 +974,8 @@ export function Step1({
         <Box sx={{ mb: 2 }}>
           <Typography sx={labelStyle}>Next Action Description</Typography>
           <TextField
-            fullWidth size="small"
+            fullWidth
+            size="small"
             value={form.nextDesc}
             onChange={handleChange("nextDesc")}
             sx={inputStyle}
@@ -782,20 +1010,29 @@ export function Step2({
   removeFile,
   handleFileInputChange,
 }: Step2Props) {
-  const sectionHeading = IS_MEDICAL_APP ? "TREATMENT INFORMATION" : "PRODUCT INFORMATION";
+  const sectionHeading = IS_MEDICAL_APP
+    ? "TREATMENT INFORMATION"
+    : "PRODUCT INFORMATION";
   const interestLabel = ACTIVE_FLOW_COPY.treatmentLabel;
   const interestOptions = ACTIVE_FLOW_COPY.treatmentOptions;
 
   return (
     <Box>
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         {sectionHeading}
       </Typography>
 
       <Box sx={{ mb: 3 }}>
         <Typography sx={labelStyle}>{interestLabel}</Typography>
         <TextField
-          select fullWidth size="small"
+          select
+          fullWidth
+          size="small"
           value={form.treatmentInterest}
           onChange={(e) => {
             const value = e.target.value;
@@ -810,8 +1047,14 @@ export function Step2({
           sx={{ ...inputStyle, maxWidth: "50%" }}
           SelectProps={{ displayEmpty: true }}
         >
-          <MenuItem value="" disabled>Select</MenuItem>
-          {interestOptions.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+          <MenuItem value="" disabled>
+            Select
+          </MenuItem>
+          {interestOptions.map((opt) => (
+            <MenuItem key={opt} value={opt}>
+              {opt}
+            </MenuItem>
+          ))}
         </TextField>
       </Box>
 
@@ -828,16 +1071,26 @@ export function Step2({
                 }))
               }
               sx={{
-                bgcolor: "#FEE2E2", color: "#B91C1C", fontWeight: 600,
+                bgcolor: "#FEE2E2",
+                color: "#B91C1C",
+                fontWeight: 600,
                 border: "1px solid #FCA5A5",
-                "& .MuiChip-deleteIcon": { color: "#B91C1C", "&:hover": { color: "#991B1B" } },
+                "& .MuiChip-deleteIcon": {
+                  color: "#B91C1C",
+                  "&:hover": { color: "#991B1B" },
+                },
               }}
             />
           ))}
         </Stack>
       )}
 
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         DOCUMENTS & REPORTS (Optional)
       </Typography>
 
@@ -847,16 +1100,24 @@ export function Step2({
           setDocDragOver(false);
           addFiles(Array.from(e.dataTransfer.files));
         }}
-        onDragOver={(e) => { e.preventDefault(); setDocDragOver(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDocDragOver(true);
+        }}
         onDragLeave={() => setDocDragOver(false)}
         onClick={() => fileInputRef.current?.click()}
         sx={{
           border: docDragOver ? "2px dashed #6366F1" : "2px dashed #E2E8F0",
-          borderRadius: "12px", p: 3,
-          display: "inline-flex", flexDirection: "column",
-          alignItems: "center", textAlign: "center",
+          borderRadius: "12px",
+          p: 3,
+          display: "inline-flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
           bgcolor: docDragOver ? "rgba(99,102,241,0.04)" : "#F8FAFC",
-          minWidth: "400px", transition: "all 0.2s", cursor: "pointer",
+          minWidth: "400px",
+          transition: "all 0.2s",
+          cursor: "pointer",
         }}
       >
         <input
@@ -871,16 +1132,27 @@ export function Step2({
         <Button
           variant="contained"
           component="span"
-          onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            fileInputRef.current?.click();
+          }}
           sx={{
-            bgcolor: "#64748B", textTransform: "none",
-            borderRadius: "8px", fontWeight: 600, px: 3, py: 1,
+            bgcolor: "#64748B",
+            textTransform: "none",
+            borderRadius: "8px",
+            fontWeight: 600,
+            px: 3,
+            py: 1,
             "&:hover": { bgcolor: "#475569" },
           }}
         >
           Choose File
         </Button>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 1 }}
+        >
           {pendingFiles.length > 0
             ? `${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""} selected`
             : "No File Chosen · PDF, Word, JPG, PNG up to 10MB"}
@@ -895,26 +1167,41 @@ export function Step2({
             return (
               <Stack
                 key={`${file.name}-${index}`}
-                direction="row" alignItems="center" spacing={2}
+                direction="row"
+                alignItems="center"
+                spacing={2}
                 sx={{
-                  px: 2, py: 1, borderRadius: "8px",
-                  border: "1px solid #E2E8F0", bgcolor: "#F8FAFC",
+                  px: 2,
+                  py: 1,
+                  borderRadius: "8px",
+                  border: "1px solid #E2E8F0",
+                  bgcolor: "#F8FAFC",
                 }}
               >
                 <Box
                   sx={{
-                    width: 32, height: 32, borderRadius: "6px",
+                    width: 32,
+                    height: 32,
+                    borderRadius: "6px",
                     bgcolor: `${color}18`,
-                    display: "flex", alignItems: "center",
-                    justifyContent: "center", flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
                   }}
                 >
                   <InsertDriveFileOutlinedIcon sx={{ fontSize: 16, color }} />
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography
-                    variant="body2" fontWeight={600} color="#1E293B"
-                    sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    variant="body2"
+                    fontWeight={600}
+                    color="#1E293B"
+                    sx={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
                   >
                     {file.name}
                   </Typography>
@@ -925,7 +1212,10 @@ export function Step2({
                 <Tooltip title="Remove">
                   <IconButton
                     size="small"
-                    onClick={(e) => { e.stopPropagation(); removeFile(index); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(index);
+                    }}
                     sx={{ color: "#94A3B8", "&:hover": { color: "#EF4444" } }}
                   >
                     <CloseIcon fontSize="small" />
@@ -955,7 +1245,9 @@ interface Step3Props {
   selectedPersonnel: AssigneeOption | null;
   handlePersonnelInputChange: (value: string) => void;
   handlePersonnelChange: (value: AssigneeOption | null) => void;
-  handleChange: (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleChange: (
+    field: keyof FormState,
+  ) => (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleDepartmentChange: (value: string) => void;
 }
 
@@ -983,8 +1275,11 @@ export function Step3({
       ...prev,
       wantAppointment: value,
       ...(value === "no" && {
-        department: "", personnel: "",
-        appointmentDate: "", slot: "", remark: "",
+        department: "",
+        personnel: "",
+        appointmentDate: "",
+        slot: "",
+        remark: "",
       }),
     }));
     if (value === "no") setSelectedDate(null);
@@ -992,18 +1287,35 @@ export function Step3({
 
   return (
     <Box>
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         APPOINTMENT DETAILS
       </Typography>
       <Box sx={{ mb: 3 }}>
-        <Typography sx={{ ...labelStyle, mb: 1 }}>Want to Book an Appointment?</Typography>
+        <Typography sx={{ ...labelStyle, mb: 1 }}>
+          Want to Book an Appointment?
+        </Typography>
         <RadioGroup
           row
           value={form.wantAppointment}
-          onChange={(e) => handleWantAppointmentChange(e.target.value as "yes" | "no")}
+          onChange={(e) =>
+            handleWantAppointmentChange(e.target.value as "yes" | "no")
+          }
         >
-          <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
-          <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+          <FormControlLabel
+            value="yes"
+            control={<Radio size="small" />}
+            label="Yes"
+          />
+          <FormControlLabel
+            value="no"
+            control={<Radio size="small" />}
+            label="No"
+          />
         </RadioGroup>
       </Box>
 
@@ -1013,7 +1325,8 @@ export function Step3({
             sx={{
               display: "grid",
               gridTemplateColumns: IS_MEDICAL_APP ? "repeat(2, 1fr)" : "1fr",
-              gap: 2, mb: 2,
+              gap: 2,
+              mb: 2,
             }}
           >
             {IS_MEDICAL_APP && (
@@ -1023,33 +1336,44 @@ export function Step3({
                   options={departments}
                   loading={loadingDepartments}
                   disabled={loadingDepartments}
-                  value={departments.find((d) => d.id.toString() === form.department) ?? null}
+                  value={
+                    departments.find(
+                      (d) => d.id.toString() === form.department,
+                    ) ?? null
+                  }
                   getOptionLabel={(d) => d.name}
                   isOptionEqualToValue={(a, b) => a.id === b.id}
                   onChange={(_, dept) =>
                     handleDepartmentChange(dept ? dept.id.toString() : "")
                   }
                   renderOption={(props, dept) => (
-                    <li {...props} key={dept.id}>{dept.name}</li>
+                    <li {...props} key={dept.id}>
+                      {dept.name}
+                    </li>
                   )}
                   renderInput={(params) => (
                     <TextField
-                      {...params} size="small" fullWidth
-                      placeholder="Search department" sx={inputStyle}
+                      {...params}
+                      size="small"
+                      fullWidth
+                      placeholder="Search department"
+                      sx={inputStyle}
                       InputProps={{
                         ...params.InputProps,
                         endAdornment: (
                           <>
-                            {loadingDepartments
-                              ? <CircularProgress size={20} sx={{ mr: 1 }} />
-                              : null}
+                            {loadingDepartments ? (
+                              <CircularProgress size={20} sx={{ mr: 1 }} />
+                            ) : null}
                             {params.InputProps.endAdornment}
                           </>
                         ),
                       }}
                     />
                   )}
-                  noOptionsText={loadingDepartments ? "Loading..." : "No departments"}
+                  noOptionsText={
+                    loadingDepartments ? "Loading..." : "No departments"
+                  }
                 />
               </Box>
             )}
@@ -1067,10 +1391,15 @@ export function Step3({
                   if (reason === "reset") return;
                   handlePersonnelInputChange(value);
                 }}
-                onChange={(_, value: AssigneeOption | null) => handlePersonnelChange(value)}
+                onChange={(_, value: AssigneeOption | null) =>
+                  handlePersonnelChange(value)
+                }
                 getOptionLabel={assigneeLabel}
                 isOptionEqualToValue={(a, b) => a.id === b.id}
-                disabled={loadingEmployees || (IS_MEDICAL_APP ? !form.department : false)}
+                disabled={
+                  loadingEmployees ||
+                  (IS_MEDICAL_APP ? !form.department : false)
+                }
                 noOptionsText={
                   IS_MEDICAL_APP && !form.department
                     ? "Select department first"
@@ -1080,7 +1409,8 @@ export function Step3({
                   <li {...props} key={option.id}>
                     <Box>
                       <Typography variant="body2" fontWeight={600}>
-                        {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() || option.username}
+                        {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() ||
+                          option.username}
                       </Typography>
                       {(option.role || option.designation) && (
                         <Typography variant="caption" color="text.secondary">
@@ -1092,15 +1422,18 @@ export function Step3({
                 )}
                 renderInput={(params) => (
                   <TextField
-                    {...params} fullWidth size="small"
-                    placeholder="Search appointment personnel" sx={inputStyle}
+                    {...params}
+                    fullWidth
+                    size="small"
+                    placeholder="Search appointment personnel"
+                    sx={inputStyle}
                     InputProps={{
                       ...params.InputProps,
                       endAdornment: (
                         <>
-                          {personnelLoading || loadingEmployees
-                            ? <CircularProgress size={20} sx={{ mr: 1 }} />
-                            : null}
+                          {personnelLoading || loadingEmployees ? (
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                          ) : null}
                           {params.InputProps.endAdornment}
                         </>
                       ),
@@ -1111,36 +1444,59 @@ export function Step3({
             </Box>
           </Box>
 
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 3 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: 2,
+              mb: 3,
+            }}
+          >
             <Box>
               <Typography sx={labelStyle}>Date</Typography>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DatePicker
                   value={selectedDate}
+                  format="DD/MM/YYYY"
                   onChange={(newDate) => {
-                    const asDayjs = newDate ? dayjs(newDate as Dayjs | Date) : null;
-                    const validDate = asDayjs && asDayjs.isValid() ? asDayjs : null;
+                    const asDayjs = newDate
+                      ? dayjs(newDate as Dayjs | Date)
+                      : null;
+                    const validDate =
+                      asDayjs && asDayjs.isValid() ? asDayjs : null;
                     setSelectedDate(validDate);
                     setForm((prev) => ({
                       ...prev,
-                      appointmentDate: validDate ? validDate.format("YYYY-MM-DD") : "",
+                      appointmentDate: validDate
+                        ? validDate.format("YYYY-MM-DD")
+                        : "",
                     }));
                   }}
-                  slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      fullWidth: true,
+                      sx: inputStyle,
+                    },
+                  }}
                 />
               </LocalizationProvider>
             </Box>
             <Box>
               <Typography sx={labelStyle}>Select Slot</Typography>
               <TextField
-                select fullWidth size="small"
+                select
+                fullWidth
+                size="small"
                 value={form.slot}
                 onChange={handleChange("slot")}
                 sx={inputStyle}
                 SelectProps={{ autoWidth: true, MenuProps: SLOT_MENU_PROPS }}
               >
                 {TIME_SLOTS.map((slot, i) => (
-                  <MenuItem key={i} value={slot}>{slot}</MenuItem>
+                  <MenuItem key={i} value={slot}>
+                    {slot}
+                  </MenuItem>
                 ))}
               </TextField>
             </Box>
@@ -1149,7 +1505,10 @@ export function Step3({
           <Box>
             <Typography sx={labelStyle}>Remark</Typography>
             <TextField
-              fullWidth size="small" multiline rows={2}
+              fullWidth
+              size="small"
+              multiline
+              rows={2}
               placeholder="Type Here..."
               value={form.remark}
               onChange={handleChange("remark")}

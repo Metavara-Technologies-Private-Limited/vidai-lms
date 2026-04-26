@@ -3,8 +3,15 @@
 
 import * as React from "react";
 import {
-  Box, Stack, Typography, Paper, Avatar, Chip,
-  IconButton, Button, Divider,
+  Box,
+  Stack,
+  Typography,
+  Paper,
+  Avatar,
+  Chip,
+  IconButton,
+  Button,
+  Divider,
 } from "@mui/material";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
@@ -14,6 +21,7 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import { useNavigate } from "react-router-dom";
 
 import { MenuButton } from "./LeadsMenuDialogs";
+import { hasUsablePhone } from "./LeadsTable.helpers";
 import { STATUS_OPTIONS_BY_APP, APP_TYPE } from "../../config/appType";
 
 import type { LeadItem, ColumnConfig } from "./Leadsboardtypes";
@@ -25,8 +33,8 @@ export type { LeadItem, ColumnConfig };
 // Driven from appType config — stays in sync if status names ever change
 const BOOK_APPOINTMENT_STATUSES = new Set(
   STATUS_OPTIONS_BY_APP[APP_TYPE].filter(
-    (s) => s === "New" || s === "Follow Up"
-  )
+    (s) => s === "New" || s === "Follow Up",
+  ),
 );
 
 // ====================== Shared icon button style ======================
@@ -38,27 +46,58 @@ const iconBtnSx = {
   "&:hover": { bgcolor: "#F8FAFC", color: "#6366F1" },
 };
 
+const hasUsableEmail = (email: string | null | undefined): boolean => {
+  if (!email) return false;
+  const trimmed = email.trim();
+  if (!trimmed) return false;
+  const normalized = trimmed.toLowerCase();
+  if (
+    normalized === "n/a" ||
+    normalized === "na" ||
+    normalized === "no email" ||
+    normalized === "none" ||
+    normalized === "-"
+  ) {
+    return false;
+  }
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+};
+
 // ====================== Card Content (collapsed / expanded) ======================
 interface CardContentProps {
   lead: LeadItem;
   columnLabel: string;
   stageActions?: ColumnConfig["uiActions"];
   isHovered: boolean;
-  onOpenSms:  (lead: LeadItem) => void;
+  onOpenSms: (lead: LeadItem) => void;
   onOpenMail: (lead: LeadItem) => void;
   onOpenBook: (lead: LeadItem) => void;
   onOpenCall: (lead: LeadItem) => void;
 }
 
 export const CardContent: React.FC<CardContentProps> = ({
-  lead, columnLabel, stageActions, isHovered, onOpenSms, onOpenMail, onOpenBook, onOpenCall,
+  lead,
+  columnLabel,
+  stageActions,
+  isHovered,
+  onOpenSms,
+  onOpenMail,
+  onOpenBook,
+  onOpenCall,
 }) => {
   // Collapsed view
   if (!isHovered) {
     return (
       <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
-        <Typography variant="caption" fontWeight={600} sx={{ color: "#64748B", fontSize: "0.7rem" }}>
-          Score: <Box component="span" sx={{ color: "#1E293B" }}>{lead.score || 0}%</Box>
+        <Typography
+          variant="caption"
+          fontWeight={600}
+          sx={{ color: "#64748B", fontSize: "0.7rem" }}
+        >
+          Score:{" "}
+          <Box component="span" sx={{ color: "#1E293B" }}>
+            {lead.score || 0}%
+          </Box>
         </Typography>
       </Box>
     );
@@ -69,10 +108,24 @@ export const CardContent: React.FC<CardContentProps> = ({
   const showSms = stageActions ? stageActions.showSms : true;
   const customActions = stageActions?.customActions ?? [];
   const hasContactOptions = showCall || showSms || showEmail;
+  const phoneCandidate = String(
+    lead.contact_no ??
+      lead.phone ??
+      lead.phone_number ??
+      lead.mobile ??
+      lead.contact ??
+      lead.contact_number ??
+      lead.contactNo ??
+      "",
+  ).trim();
+  const canUsePhone = hasUsablePhone(phoneCandidate);
+  const emailCandidate = String(lead.email ?? lead.email_address ?? "").trim();
+  const canUseEmail = hasUsableEmail(emailCandidate);
   // If no stage-level rule exists yet, keep legacy behavior for New / Follow Up.
   const showBookButton = stageActions
     ? stageActions.showBookAppointment && isHovered
-    : BOOK_APPOINTMENT_STATUSES.has(columnLabel as "New" | "Follow Up") && isHovered;
+    : BOOK_APPOINTMENT_STATUSES.has(columnLabel as "New" | "Follow Up") &&
+      isHovered;
 
   const formattedDate = lead.created_at
     ? new Date(lead.created_at as string).toLocaleDateString("en-GB")
@@ -90,14 +143,23 @@ export const CardContent: React.FC<CardContentProps> = ({
       <Stack spacing={1} sx={{ mb: 1 }}>
         <Stack direction="row" spacing={1} alignItems="center">
           <LocationOnIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.75rem" }}
+          >
             {lead.location as string}
           </Typography>
         </Stack>
         <Stack direction="row" spacing={1} alignItems="center">
           <CalendarMonthIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
-            {formattedDate}{formattedTime ? `, ${formattedTime}` : ""}
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.75rem" }}
+          >
+            {formattedDate}
+            {formattedTime ? `, ${formattedTime}` : ""}
           </Typography>
         </Stack>
       </Stack>
@@ -114,7 +176,12 @@ export const CardContent: React.FC<CardContentProps> = ({
           >
             ASSIGNED TO
           </Typography>
-          <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            fontWeight={600}
+            color="#1E293B"
+            sx={{ fontSize: "0.75rem" }}
+          >
             {lead.assigned as string}
           </Typography>
         </Box>
@@ -126,7 +193,12 @@ export const CardContent: React.FC<CardContentProps> = ({
           >
             LEAD SOURCE
           </Typography>
-          <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            fontWeight={600}
+            color="#1E293B"
+            sx={{ fontSize: "0.75rem" }}
+          >
             {lead.source as string}
           </Typography>
         </Box>
@@ -138,16 +210,38 @@ export const CardContent: React.FC<CardContentProps> = ({
           <Typography
             variant="caption"
             color="text.secondary"
-            sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}
+            sx={{
+              fontSize: "0.6rem",
+              display: "block",
+              fontWeight: 700,
+              mb: 1,
+            }}
           >
             CONTACT OPTION
           </Typography>
-          <Stack direction="row" spacing={1.5} sx={{ mb: showBookButton ? 2 : 0 }}>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            sx={{ mb: showBookButton ? 2 : 0 }}
+          >
             {showCall && (
               <IconButton
                 size="small"
-                sx={iconBtnSx}
-                onClick={(e) => { e.stopPropagation(); onOpenCall(lead); }}
+                disabled={!canUsePhone}
+                sx={{
+                  ...iconBtnSx,
+                  ...(!canUsePhone
+                    ? {
+                        opacity: 0.45,
+                        color: "#94A3B8",
+                        "&:hover": { bgcolor: "transparent", color: "#94A3B8" },
+                      }
+                    : {}),
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenCall(lead);
+                }}
               >
                 <PhoneIcon sx={{ fontSize: 16 }} />
               </IconButton>
@@ -155,8 +249,21 @@ export const CardContent: React.FC<CardContentProps> = ({
             {showSms && (
               <IconButton
                 size="small"
-                sx={iconBtnSx}
-                onClick={(e) => { e.stopPropagation(); onOpenSms(lead); }}
+                disabled={!canUsePhone}
+                sx={{
+                  ...iconBtnSx,
+                  ...(!canUsePhone
+                    ? {
+                        opacity: 0.45,
+                        color: "#94A3B8",
+                        "&:hover": { bgcolor: "transparent", color: "#94A3B8" },
+                      }
+                    : {}),
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenSms(lead);
+                }}
               >
                 <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
               </IconButton>
@@ -164,8 +271,21 @@ export const CardContent: React.FC<CardContentProps> = ({
             {showEmail && (
               <IconButton
                 size="small"
-                sx={iconBtnSx}
-                onClick={(e) => { e.stopPropagation(); onOpenMail(lead); }}
+                disabled={!canUseEmail}
+                sx={{
+                  ...iconBtnSx,
+                  ...(!canUseEmail
+                    ? {
+                        opacity: 0.45,
+                        color: "#94A3B8",
+                        "&:hover": { bgcolor: "transparent", color: "#94A3B8" },
+                      }
+                    : {}),
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenMail(lead);
+                }}
               >
                 <MailOutlineIcon sx={{ fontSize: 16 }} />
               </IconButton>
@@ -175,7 +295,11 @@ export const CardContent: React.FC<CardContentProps> = ({
       )}
 
       {customActions.length > 0 && (
-        <Stack direction="row" spacing={0.75} sx={{ mb: showBookButton ? 1.5 : 0, flexWrap: "wrap", rowGap: 0.75 }}>
+        <Stack
+          direction="row"
+          spacing={0.75}
+          sx={{ mb: showBookButton ? 1.5 : 0, flexWrap: "wrap", rowGap: 0.75 }}
+        >
           {customActions.map((customActionLabel) => (
             <Chip
               key={customActionLabel}
@@ -199,7 +323,10 @@ export const CardContent: React.FC<CardContentProps> = ({
           fullWidth
           variant="contained"
           size="small"
-          onClick={(e) => { e.stopPropagation(); onOpenBook(lead); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenBook(lead);
+          }}
           sx={{
             bgcolor: "#334155",
             textTransform: "none",
@@ -224,8 +351,8 @@ interface LeadCardProps {
   columnColor: string;
   stageActions?: ColumnConfig["uiActions"];
   isHovered: boolean;
-  onHover:    (id: string | null) => void;
-  onOpenSms:  (lead: LeadItem) => void;
+  onHover: (id: string | null) => void;
+  onOpenSms: (lead: LeadItem) => void;
   onOpenMail: (lead: LeadItem) => void;
   onOpenBook: (lead: LeadItem) => void;
   onOpenCall: (lead: LeadItem) => void;
@@ -235,8 +362,18 @@ interface LeadCardProps {
 }
 
 export const LeadCard: React.FC<LeadCardProps> = ({
-  lead, columnLabel, columnColor, stageActions, isHovered,
-  onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, canEditLeads = true, setLeads,
+  lead,
+  columnLabel,
+  columnColor,
+  stageActions,
+  isHovered,
+  onHover,
+  onOpenSms,
+  onOpenMail,
+  onOpenBook,
+  onOpenCall,
+  canEditLeads = true,
+  setLeads,
 }) => {
   const navigate = useNavigate();
 
@@ -263,7 +400,11 @@ export const LeadCard: React.FC<LeadCardProps> = ({
       }}
     >
       {/* Header row */}
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="flex-start"
+      >
         <Stack direction="row" spacing={2} alignItems="center">
           <Avatar
             sx={{
@@ -285,7 +426,11 @@ export const LeadCard: React.FC<LeadCardProps> = ({
             >
               {lead.full_name ?? lead.name}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontSize: "0.75rem" }}
+            >
               {lead.id}
             </Typography>
           </Box>
@@ -300,13 +445,17 @@ export const LeadCard: React.FC<LeadCardProps> = ({
               fontSize: "0.65rem",
               fontWeight: 700,
               bgcolor:
-                lead.quality === "Hot" ? "#FEE2E2"
-                : lead.quality === "Warm" ? "#FEF3C7"
-                : "#F1F5F9",
+                lead.quality === "Hot"
+                  ? "#FEE2E2"
+                  : lead.quality === "Warm"
+                    ? "#FEF3C7"
+                    : "#F1F5F9",
               color:
-                lead.quality === "Hot" ? "#B91C1C"
-                : lead.quality === "Warm" ? "#B45309"
-                : "#475569",
+                lead.quality === "Hot"
+                  ? "#B91C1C"
+                  : lead.quality === "Warm"
+                    ? "#B45309"
+                    : "#475569",
             }}
           />
           <Box onClick={(e) => e.stopPropagation()}>
@@ -339,8 +488,8 @@ export interface LeadColumnProps {
   col: ColumnConfig;
   leads: LeadItem[];
   hoveredId: string | null;
-  onHover:    (id: string | null) => void;
-  onOpenSms:  (lead: LeadItem) => void;
+  onHover: (id: string | null) => void;
+  onOpenSms: (lead: LeadItem) => void;
   onOpenMail: (lead: LeadItem) => void;
   onOpenBook: (lead: LeadItem) => void;
   onOpenCall: (lead: LeadItem) => void;
@@ -350,7 +499,16 @@ export interface LeadColumnProps {
 }
 
 export const LeadColumn: React.FC<LeadColumnProps> = ({
-  col, leads, hoveredId, onHover, onOpenSms, onOpenMail, onOpenBook, onOpenCall, canEditLeads = true, setLeads,
+  col,
+  leads,
+  hoveredId,
+  onHover,
+  onOpenSms,
+  onOpenMail,
+  onOpenBook,
+  onOpenCall,
+  canEditLeads = true,
+  setLeads,
 }) => (
   <Box
     sx={{
