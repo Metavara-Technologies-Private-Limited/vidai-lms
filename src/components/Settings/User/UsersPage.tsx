@@ -18,9 +18,7 @@ import {
 import { selectLoginType, selectUser, setUser } from "../../../store/authSlice";
 import { fetchUsers } from "../../../store/userSlice";
 import { toSafePhotoUrl } from "../../../utils/mediaUrl";
-import {
-  hasAnySubcategoryActionPermission,
-} from "../../../utils/roleAccess";
+import { hasAnySubcategoryActionPermission } from "../../../utils/roleAccess";
 import type { AppDispatch, RootState } from "../../../store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -72,7 +70,8 @@ const UsersPage: React.FC = () => {
     roles.length > 0
       ? [...roles]
           .sort((a, b) => {
-            const byPriority = roleOrderPriority(a.name) - roleOrderPriority(b.name);
+            const byPriority =
+              roleOrderPriority(a.name) - roleOrderPriority(b.name);
             if (byPriority !== 0) return byPriority;
             return a.name.localeCompare(b.name);
           })
@@ -94,15 +93,22 @@ const UsersPage: React.FC = () => {
   const canAssignRoles =
     loginType === "INT" &&
     (currentRoleName === "super admin" || currentRoleName === "superadmin");
-  const usersPermissions = (authUser as Record<string, unknown> | null)?.permissions;
+  const usersPermissions = (authUser as Record<string, unknown> | null)
+    ?.permissions;
   const userAliases = ["user", "users"];
   const canViewUsers =
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "view") ||
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "print");
-  const canAddUsers =
-    hasAnySubcategoryActionPermission(usersPermissions, userAliases, "add");
-  const canEditUsers =
-    hasAnySubcategoryActionPermission(usersPermissions, userAliases, "edit");
+  const canAddUsers = hasAnySubcategoryActionPermission(
+    usersPermissions,
+    userAliases,
+    "add",
+  );
+  const canEditUsers = hasAnySubcategoryActionPermission(
+    usersPermissions,
+    userAliases,
+    "edit",
+  );
 
   const extractApiErrorMessage = (error: unknown): string => {
     const payload =
@@ -341,19 +347,31 @@ const UsersPage: React.FC = () => {
     const roleFromRecord =
       typeof record.role === "object" && record.role
         ? record.role.id
-        : record.roleId ?? record.role;
+        : (record.roleId ?? record.role);
 
     return {
       firstName:
         profile.first_name || record.first_name || record.firstName || "",
       lastName: profile.last_name || record.last_name || record.lastName || "",
       gender: profile.gender || record.gender || "",
-      dateOfJoining: profile.date_of_joining || record.date_of_joining || record.dateOfJoining
-        ? dayjs(profile.date_of_joining || record.date_of_joining || record.dateOfJoining)
-        : null,
-      dateOfBirth: profile.date_of_birth || record.date_of_birth || record.dateOfBirth
-        ? dayjs(profile.date_of_birth || record.date_of_birth || record.dateOfBirth)
-        : null,
+      dateOfJoining:
+        profile.date_of_joining ||
+        record.date_of_joining ||
+        record.dateOfJoining
+          ? dayjs(
+              profile.date_of_joining ||
+                record.date_of_joining ||
+                record.dateOfJoining,
+            )
+          : null,
+      dateOfBirth:
+        profile.date_of_birth || record.date_of_birth || record.dateOfBirth
+          ? dayjs(
+              profile.date_of_birth ||
+                record.date_of_birth ||
+                record.dateOfBirth,
+            )
+          : null,
       userRole:
         roleFromProfile != null
           ? String(roleFromProfile)
@@ -361,7 +379,8 @@ const UsersPage: React.FC = () => {
             ? String(roleFromRecord)
             : "",
       userName: record.username || "",
-      mobileNo: profile.mobile_no || record.mobile_no || record.mobileNumber || "",
+      mobileNo:
+        profile.mobile_no || record.mobile_no || record.mobileNumber || "",
       emailId: record.email || "",
       password: EDIT_PASSWORD_PLACEHOLDER,
       confirmPassword: EDIT_PASSWORD_PLACEHOLDER,
@@ -414,7 +433,9 @@ const UsersPage: React.FC = () => {
 
     if (editingUser?.source === "client") {
       toast.error("This user belongs to client DB and cannot be updated here");
-      return;
+      throw new Error(
+        "This user belongs to client DB and cannot be updated here",
+      );
     }
 
     const normalizedUserName = normalizeText(data.userName);
@@ -430,7 +451,7 @@ const UsersPage: React.FC = () => {
 
     if (duplicateUserName) {
       toast.error("Username already exists");
-      return;
+      throw new Error("Username already exists");
     }
 
     const duplicateEmail = users.some(
@@ -442,7 +463,7 @@ const UsersPage: React.FC = () => {
 
     if (duplicateEmail) {
       toast.error("Email already exists");
-      return;
+      throw new Error("Email already exists");
     }
 
     const duplicateMobile = users.some(
@@ -455,7 +476,7 @@ const UsersPage: React.FC = () => {
 
     if (duplicateMobile) {
       toast.error("Mobile number already exists");
-      return;
+      throw new Error("Mobile number already exists");
     }
 
     setIsSubmitting(true);

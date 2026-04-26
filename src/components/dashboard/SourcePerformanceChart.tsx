@@ -24,6 +24,7 @@ import type { TimeRange } from "./TimeRangeSelector";
 import { isWithinTimeRange } from "./timeRange.utils";
 import { selectLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
+import { selectClinic } from "../../store/clinicSlice";
 import type { CampaignAPIType } from "../../types/campaigns.types";
 
 type Metric = "volume" | "rate" | "revenue" | "cost";
@@ -78,6 +79,16 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
   const [metric, setMetric] = useState<Metric>("volume");
   const leads = useSelector(selectLeads);
   const campaigns = useSelector(selectCampaign) as CampaignAPIType[];
+  const selectedClinicId = useSelector(selectClinic)?.id;
+  const rawStoredClinicId = localStorage.getItem("clinic_id");
+  const parsedStoredClinicId = rawStoredClinicId
+    ? Number(rawStoredClinicId)
+    : NaN;
+  const storedClinicId =
+    Number.isFinite(parsedStoredClinicId) && parsedStoredClinicId > 0
+      ? parsedStoredClinicId
+      : null;
+  const clinicId = selectedClinicId != null ? selectedClinicId : storedClinicId;
   const sourceBaseRows = mockData.overview.sourcePerformance.map(
     (row) => row.name,
   );
@@ -89,6 +100,8 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
   const sourceData = useMemo(() => {
     const filtered = (Array.isArray(leads) ? leads : []).filter(
       (l) =>
+        Boolean(clinicId) &&
+        Number(l.clinic_id) === clinicId &&
         l.is_active !== false &&
         isWithinTimeRange(l.modified_at || l.created_at, timeRange),
     );
@@ -176,12 +189,14 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
         cost: 0,
       };
     });
-  }, [leads, sourceBaseRows, timeRange]);
+  }, [clinicId, leads, sourceBaseRows, timeRange]);
 
   // Campaign-based data: Revenue (total budget) and Cost per Lead (budget / leads)
   const campaignData = useMemo(() => {
     const active = (Array.isArray(campaigns) ? campaigns : []).filter(
       (c) =>
+        Boolean(clinicId) &&
+        Number(c.clinic) === clinicId &&
         !c.is_deleted &&
         isWithinTimeRange(
           c.modified_at || c.created_at || c.start_date,
@@ -227,7 +242,7 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
         cost: liveCampaign?.cost ?? 0,
       };
     });
-  }, [campaignBaseRows, campaigns, timeRange]);
+  }, [campaignBaseRows, campaigns, clinicId, timeRange]);
 
   const data =
     metric === "cost" || metric === "revenue" ? campaignData : sourceData;

@@ -329,11 +329,13 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     setError(null);
 
     try {
+      const resolvedContactNo =
+        lead.contact_no || lead.phone || lead.phone_number || undefined;
       await api.put(`/leads/${lead.id}/update/?clinic_id=${clinicId}`, {
         clinic_id: clinicId,
         department_id: deptId,
         full_name: lead.full_name || lead.name,
-        contact_no: lead.contact_no || lead.phone || lead.phone_number || "",
+        ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
         source: lead.source || "Unknown",
         treatment_interest: lead.treatment_interest || "N/A",
         lead_status: "appointment",

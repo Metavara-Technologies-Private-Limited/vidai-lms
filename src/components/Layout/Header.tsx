@@ -46,6 +46,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import { clinicApi } from "../../services/clinic.api";
 import { fetchLeads } from "../../store/leadSlice";
 import { fetchCampaign } from "../../store/campaignSlice";
+import { fetchPipelines } from "../../store/pipelineSlice";
 import { fetchUsers } from "../../store/userSlice";
 import { authApi } from "../../services/auth.api";
 import { toast } from "react-toastify";
@@ -198,7 +199,11 @@ const Header = ({
       localStorage.setItem("clinic_id", String(selectedClinicId));
       await dispatch(fetchClinic(selectedClinicId));
       // Re-fetch all clinic-scoped data in parallel
-      await Promise.all([dispatch(fetchLeads()), dispatch(fetchCampaign())]);
+      await Promise.all([
+        dispatch(fetchLeads()),
+        dispatch(fetchCampaign()),
+        dispatch(fetchPipelines(selectedClinicId)),
+      ]);
     };
 
     hydrateClinic();
@@ -331,9 +336,7 @@ const Header = ({
       setPhotoVersion(Date.now());
     }
 
-    dispatch(
-      setUser(nextUser),
-    );
+    dispatch(setUser(nextUser));
   };
 
   const handleProfilePhotoFileChange = async (

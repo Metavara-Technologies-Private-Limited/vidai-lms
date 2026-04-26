@@ -377,6 +377,23 @@ api.interceptors.response.use(
 const storedClinicId = (): number =>
   Number(localStorage.getItem("clinic_id") ?? 0);
 
+const removeBlankUpdateFields = <T extends Record<string, unknown>>(
+  payload: T,
+): Partial<T> => {
+  const next = { ...payload } as Record<string, unknown>;
+
+  // Backend rejects blank or null contact_no on update; omit it when empty/null so existing value is preserved.
+  if (
+    next.contact_no === null ||
+    next.contact_no === undefined ||
+    (typeof next.contact_no === "string" && next.contact_no.trim() === "")
+  ) {
+    delete next.contact_no;
+  }
+
+  return next as Partial<T>;
+};
+
 export const LeadAPI = {
   list: (clinicId: number) =>
     api.get(`/leads/list/?clinic_id=${clinicId}`).then((res) => res.data),
@@ -445,9 +462,10 @@ export const LeadAPI = {
 
   update: async (leadId: string, data: Partial<LeadPayload>): Promise<Lead> => {
     const clinicId = data.clinic_id ?? storedClinicId();
+    const sanitizedData = removeBlankUpdateFields(data);
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
-      data,
+      sanitizedData,
       {
         headers: {
           "X-Clinic-Id": String(clinicId),
@@ -463,13 +481,16 @@ export const LeadAPI = {
     files: File[],
   ): Promise<Lead> => {
     const formData = new FormData();
+    const sanitizedData = removeBlankUpdateFields(data);
 
     // Append all payload fields — null becomes "" so backend receives the field
-    (Object.keys(data) as (keyof Partial<LeadPayload>)[]).forEach((key) => {
-      const value = data[key];
-      if (value === undefined) return;
-      formData.append(key, value === null ? "" : String(value));
-    });
+    (Object.keys(sanitizedData) as (keyof Partial<LeadPayload>)[]).forEach(
+      (key) => {
+        const value = sanitizedData[key];
+        if (value === undefined) return;
+        formData.append(key, value === null ? "" : String(value));
+      },
+    );
 
     files.forEach((file) => formData.append("documents", file));
 
@@ -626,11 +647,7 @@ export const EmailTemplateAPI = {
     const response = await api.get<EmailTemplate[]>("/templates/mail/");
     const data = response.data;
     if (Array.isArray(data)) return data;
-    if (
-      data &&
-      typeof data === "object" &&
-      "results" in (data as object)
-    ) {
+    if (data && typeof data === "object" && "results" in (data as object)) {
       return (data as { results: EmailTemplate[] }).results ?? [];
     }
     return [];

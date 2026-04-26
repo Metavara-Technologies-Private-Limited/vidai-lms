@@ -1905,6 +1905,11 @@ export default function LeadDetailView() {
 
   const handleAddNextAction = async () => {
     if (!actionType.trim() || !actionDescription.trim() || !activeLead) return;
+    const resolvedContactNo =
+      activeLead.contact_no ||
+      activeLead.phone ||
+      activeLead.phone_number ||
+      undefined;
     try {
       setActionSubmitting(true);
       await api.put(
@@ -1913,11 +1918,7 @@ export default function LeadDetailView() {
           clinic_id: activeLead.clinic_id,
           department_id: activeLead.department_id,
           full_name: activeLead.full_name || activeLead.name,
-          contact_no:
-            activeLead.contact_no ||
-            activeLead.phone ||
-            activeLead.phone_number ||
-            "",
+          ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
           source: activeLead.source || "Unknown",
           treatment_interest: activeLead.treatment_interest || "N/A",
           book_appointment: activeLead.book_appointment || false,
