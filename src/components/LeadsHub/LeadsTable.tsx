@@ -640,24 +640,50 @@ const LeadsTable: React.FC<Props> = ({
       nextStatusLabel,
     );
 
-    const updatePayload = {
-      clinic_id: editStatusLead.clinic_id ?? 0,
-      department_id: editStatusLead.department_id ?? 0,
-      full_name: editStatusLead.full_name || "",
-      contact_no: editStatusLead.contact_no || "",
-      source: editStatusLead.source || "Unknown",
-      treatment_interest: editStatusLead.treatment_interest || "N/A",
-      book_appointment: editStatusLead.book_appointment || false,
-      appointment_date: editStatusLead.appointment_date || null,
-      slot: editStatusLead.slot || "",
-      is_active: editStatusLead.is_active !== false,
-      partner_inquiry: editStatusLead.partner_inquiry || false,
-      next_action_description: stageAwareDescription,
-      ...(selectedStatus.id ? { stage_id: selectedStatus.id } : {}),
-      ...(apiStatus ? { lead_status: apiStatus as "new" | "contacted" } : {}),
-    };
-
     try {
+      const latestLead = await LeadAPI.getById(editStatusLead.id);
+      const storedClinicId = Number(localStorage.getItem("clinic_id") ?? 0);
+      const resolvedClinicId =
+        latestLead.clinic_id ?? editStatusLead.clinic_id ?? storedClinicId;
+      const resolvedDepartmentId =
+        latestLead.department_id ?? editStatusLead.department_id;
+
+      const resolvedContactNo =
+        latestLead.contact_no || editStatusLead.contact_no;
+
+      const updatePayload = {
+        ...(resolvedClinicId ? { clinic_id: resolvedClinicId } : {}),
+        ...(resolvedDepartmentId
+          ? { department_id: resolvedDepartmentId }
+          : {}),
+        full_name:
+          latestLead.full_name ||
+          editStatusLead.full_name ||
+          editStatusLead.name ||
+          "",
+        ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
+        source: latestLead.source || editStatusLead.source || "",
+        treatment_interest:
+          latestLead.treatment_interest ||
+          editStatusLead.treatment_interest ||
+          "",
+        book_appointment:
+          latestLead.book_appointment ??
+          editStatusLead.book_appointment ??
+          false,
+        appointment_date:
+          latestLead.appointment_date ??
+          editStatusLead.appointment_date ??
+          null,
+        slot: latestLead.slot || editStatusLead.slot || "",
+        is_active: latestLead.is_active !== false,
+        partner_inquiry:
+          latestLead.partner_inquiry ?? editStatusLead.partner_inquiry ?? false,
+        next_action_description: stageAwareDescription,
+        ...(selectedStatus.id ? { stage_id: selectedStatus.id } : {}),
+        ...(apiStatus ? { lead_status: apiStatus as "new" | "contacted" } : {}),
+      };
+
       await LeadAPI.update(editStatusLead.id, updatePayload);
       setLocalLeads((prev) =>
         prev.map((l) =>

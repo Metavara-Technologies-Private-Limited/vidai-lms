@@ -71,7 +71,7 @@ const DashboardLayout = () => {
         <Typography variant="h6" pb={2}>
           Refera MD Dashboard
         </Typography>
-        <KpiCards />
+        <KpiCards timeRange={timeRange} />
         <Card
           sx={{
             p: { xs: 1.25, sm: 2 },
