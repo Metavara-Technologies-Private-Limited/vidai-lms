@@ -296,19 +296,18 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 
     // Validation
     if (IS_MEDICAL_APP && !department) {
-      setError("Please select a department.");
-      return;
-    }
-    if (!personnel) {
-      setError("Please select a personnel.");
+      setError(null);
+      toast.error("Please select a department.", toastOptions);
       return;
     }
     if (!selectedDate) {
-      setError("Please select a date.");
+      setError(null);
+      toast.error("Please select a date.", toastOptions);
       return;
     }
     if (!slot) {
-      setError("Please select a time slot.");
+      setError(null);
+      toast.error("Please select a time slot.", toastOptions);
       return;
     }
 
@@ -316,13 +315,15 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     const deptId = IS_MEDICAL_APP
       ? Number(department)
       : (lead.department_id ?? 0);
-    const personnelId = Number(personnel);
+    const personnelId = personnel ? Number(personnel) : null;
 
     // Lookup display names for the optimistic update
     const selectedDept = departments.find((d) => d.id === deptId);
     const selectedEmp =
       selectedPersonnelOption ??
-      personnelOptions.find((u) => u.id === personnelId);
+      (personnelId != null
+        ? personnelOptions.find((u) => u.id === personnelId)
+        : undefined);
 
     setSaving(true);
     setError(null);
@@ -526,7 +527,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
                 {...params}
                 fullWidth
                 size="small"
-                label="Personnel *"
+                label="Personnel"
                 placeholder="Search personnel"
                 sx={modalFieldSx}
                 InputLabelProps={{
@@ -563,6 +564,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
               value={selectedDate}
+              format="DD/MM/YYYY"
               onChange={(val) => setSelectedDate(val ? dayjs(val) : null)}
               minDate={today}
               disabled={saving}

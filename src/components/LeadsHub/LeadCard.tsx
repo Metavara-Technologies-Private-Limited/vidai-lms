@@ -16,6 +16,7 @@ import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
 
 import { MenuButton, CallButton } from "./LeadsMenuDialogs";
+import { hasUsablePhone } from "./LeadsTable.helpers";
 
 // FIX: import MappedLead directly inline instead of from a separate types file
 // to avoid Windows file-casing issues entirely. MappedLead only needs the fields
@@ -56,7 +57,12 @@ interface CardContentProps {
 }
 
 const LeadCardContent: React.FC<CardContentProps> = ({
-  lead, columnLabel, isHovered, onOpenSms, onOpenMail, onOpenBook,
+  lead,
+  columnLabel,
+  isHovered,
+  onOpenSms,
+  onOpenMail,
+  onOpenBook,
 }) => {
   const iconBtnStyle = {
     border: "1px solid #E2E8F0",
@@ -68,13 +74,35 @@ const LeadCardContent: React.FC<CardContentProps> = ({
 
   const showButton =
     (columnLabel === "NEW LEADS" || columnLabel === "FOLLOW-UPS") && isHovered;
+  const phoneCandidate = String(
+    lead.contact_no ??
+      lead.contact_phone ??
+      lead.contact_number ??
+      lead.phone ??
+      "",
+  ).trim();
+  const hasPhone = hasUsablePhone(phoneCandidate);
+  const hasEmail = Boolean(String(lead.email ?? "").trim());
+  const disabledIconBtnStyle = {
+    ...iconBtnStyle,
+    opacity: 0.45,
+    color: "#94A3B8",
+    pointerEvents: "none",
+    "&:hover": { bgcolor: "transparent", color: "#94A3B8" },
+  };
 
   if (!isHovered) {
     return (
       <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
-        <Typography variant="caption" fontWeight={600} sx={{ color: "#64748B", fontSize: "0.7rem" }}>
+        <Typography
+          variant="caption"
+          fontWeight={600}
+          sx={{ color: "#64748B", fontSize: "0.7rem" }}
+        >
           Score:{" "}
-          <Box component="span" sx={{ color: "#1E293B" }}>{lead.score || 0}%</Box>
+          <Box component="span" sx={{ color: "#1E293B" }}>
+            {lead.score || 0}%
+          </Box>
         </Typography>
       </Box>
     );
@@ -84,7 +112,10 @@ const LeadCardContent: React.FC<CardContentProps> = ({
     ? new Date(lead.created_at).toLocaleDateString("en-GB")
     : "Not specified";
   const formattedTime = lead.created_at
-    ? new Date(lead.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+    ? new Date(lead.created_at).toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : "";
 
   return (
@@ -92,13 +123,21 @@ const LeadCardContent: React.FC<CardContentProps> = ({
       <Stack spacing={1} sx={{ mb: 1 }}>
         <Stack direction="row" spacing={1} alignItems="center">
           <LocationOnIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.75rem" }}
+          >
             {lead.location}
           </Typography>
         </Stack>
         <Stack direction="row" spacing={1} alignItems="center">
           <CalendarMonthIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.75rem" }}
+          >
             {`${formattedDate}${formattedTime ? `, ${formattedTime}` : ""}`}
           </Typography>
         </Stack>
@@ -108,50 +147,99 @@ const LeadCardContent: React.FC<CardContentProps> = ({
 
       <Stack direction="row" justifyContent="space-between" sx={{ mb: 2 }}>
         <Box>
-          <Typography variant="caption" color="text.secondary"
-            sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700 }}
+          >
             ASSIGNED TO
           </Typography>
-          <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            fontWeight={600}
+            color="#1E293B"
+            sx={{ fontSize: "0.75rem" }}
+          >
             {lead.assigned}
           </Typography>
         </Box>
         <Box sx={{ textAlign: "right" }}>
-          <Typography variant="caption" color="text.secondary"
-            sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700 }}
+          >
             LEAD SOURCE
           </Typography>
-          <Typography variant="caption" fontWeight={600} color="#1E293B" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            fontWeight={600}
+            color="#1E293B"
+            sx={{ fontSize: "0.75rem" }}
+          >
             {lead.source}
           </Typography>
         </Box>
       </Stack>
 
-      <Typography variant="caption" color="text.secondary"
-        sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ fontSize: "0.6rem", display: "block", fontWeight: 700, mb: 1 }}
+      >
         CONTACT OPTION
       </Typography>
       <Stack direction="row" spacing={1.5} sx={{ mb: showButton ? 2 : 0 }}>
-        <Box sx={iconBtnStyle} onClick={(e) => e.stopPropagation()}>
-          <CallButton lead={lead} />
+        <Box
+          sx={hasPhone ? iconBtnStyle : disabledIconBtnStyle}
+          onClick={(e) => e.stopPropagation()}
+          title={hasPhone ? "Call" : "No contact number"}
+        >
+          <CallButton lead={lead} disabled={!hasPhone} />
         </Box>
-        <IconButton size="small" sx={iconBtnStyle}
-          onClick={(e) => { e.stopPropagation(); onOpenSms(lead); }}>
+        <IconButton
+          size="small"
+          sx={hasPhone ? iconBtnStyle : disabledIconBtnStyle}
+          disabled={!hasPhone}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenSms(lead);
+          }}
+        >
           <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
         </IconButton>
-        <IconButton size="small" sx={iconBtnStyle}
-          onClick={(e) => { e.stopPropagation(); onOpenMail(lead); }}>
+        <IconButton
+          size="small"
+          sx={hasEmail ? iconBtnStyle : disabledIconBtnStyle}
+          disabled={!hasEmail}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenMail(lead);
+          }}
+        >
           <MailOutlineIcon sx={{ fontSize: 16 }} />
         </IconButton>
       </Stack>
 
       {showButton && (
-        <Button fullWidth variant="contained" size="small"
-          onClick={(e) => { e.stopPropagation(); onOpenBook(lead); }}
+        <Button
+          fullWidth
+          variant="contained"
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenBook(lead);
+          }}
           sx={{
-            bgcolor: "#334155", textTransform: "none", borderRadius: "8px",
-            fontWeight: 600, py: 1.2, mt: 1, "&:hover": { bgcolor: "#1e293b" },
-          }}>
+            bgcolor: "#334155",
+            textTransform: "none",
+            borderRadius: "8px",
+            fontWeight: 600,
+            py: 1.2,
+            mt: 1,
+            "&:hover": { bgcolor: "#1e293b" },
+          }}
+        >
           Book an Appointment
         </Button>
       )}
@@ -180,9 +268,18 @@ interface LeadCardProps {
 }
 
 export const LeadCard: React.FC<LeadCardProps> = ({
-  lead, columnLabel, columnColor, isHovered,
-  onMouseEnter, onMouseLeave, onClick,
-  onOpenSms, onOpenMail, onOpenBook, canEditLeads = true, setLeads,
+  lead,
+  columnLabel,
+  columnColor,
+  isHovered,
+  onMouseEnter,
+  onMouseLeave,
+  onClick,
+  onOpenSms,
+  onOpenMail,
+  onOpenBook,
+  canEditLeads = true,
+  setLeads,
 }) => (
   <Paper
     onMouseEnter={onMouseEnter}
@@ -205,16 +302,37 @@ export const LeadCard: React.FC<LeadCardProps> = ({
       }),
     }}
   >
-    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+    <Stack
+      direction="row"
+      justifyContent="space-between"
+      alignItems="flex-start"
+    >
       <Stack direction="row" spacing={2} alignItems="center">
-        <Avatar sx={{ width: 36, height: 36, fontSize: "0.8rem", bgcolor: "#EEF2FF", color: "#6366F1", fontWeight: 700 }}>
+        <Avatar
+          sx={{
+            width: 36,
+            height: 36,
+            fontSize: "0.8rem",
+            bgcolor: "#EEF2FF",
+            color: "#6366F1",
+            fontWeight: 700,
+          }}
+        >
           {lead.initials}
         </Avatar>
         <Box>
-          <Typography variant="subtitle2" fontWeight={700} sx={{ fontSize: "0.9rem", color: "#1E293B" }}>
+          <Typography
+            variant="subtitle2"
+            fontWeight={700}
+            sx={{ fontSize: "0.9rem", color: "#1E293B" }}
+          >
             {lead.full_name || lead.name}
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.75rem" }}
+          >
             {lead.id}
           </Typography>
         </Box>
@@ -227,8 +345,18 @@ export const LeadCard: React.FC<LeadCardProps> = ({
             height: 20,
             fontSize: "0.65rem",
             fontWeight: 700,
-            bgcolor: lead.quality === "Hot" ? "#FEE2E2" : lead.quality === "Warm" ? "#FEF3C7" : "#F1F5F9",
-            color: lead.quality === "Hot" ? "#B91C1C" : lead.quality === "Warm" ? "#B45309" : "#475569",
+            bgcolor:
+              lead.quality === "Hot"
+                ? "#FEE2E2"
+                : lead.quality === "Warm"
+                  ? "#FEF3C7"
+                  : "#F1F5F9",
+            color:
+              lead.quality === "Hot"
+                ? "#B91C1C"
+                : lead.quality === "Warm"
+                  ? "#B45309"
+                  : "#475569",
           }}
         />
         <Box onClick={(e) => e.stopPropagation()}>

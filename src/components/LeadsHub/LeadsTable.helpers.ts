@@ -16,10 +16,18 @@ export const extractErrorMessage = (err: unknown, fallback: string): string => {
 export const normalizePhone = (phone: string | undefined): string => {
   if (!phone) return "";
   const cleaned = phone.replace(/\s+/g, "").replace(/-/g, "");
+  const digitsOnly = cleaned.replace(/\D/g, "");
+  if (digitsOnly && /^0+$/.test(digitsOnly)) return "";
   if (cleaned.startsWith("+")) return cleaned;
   if (/^\d{10}$/.test(cleaned)) return `+91${cleaned}`;
   if (/^91\d{10}$/.test(cleaned)) return `+${cleaned}`;
   return `+${cleaned}`;
+};
+
+export const hasUsablePhone = (phone: string | null | undefined): boolean => {
+  if (!phone) return false;
+  const digitsOnly = phone.replace(/\D/g, "");
+  return digitsOnly.length > 0 && !/^0+$/.test(digitsOnly);
 };
 
 // ====================== Lead field formatters ======================
@@ -32,11 +40,14 @@ export const deriveQuality = (lead: RawLead): "Hot" | "Warm" | "Cold" => {
   return "Cold";
 };
 
-export const formatLeadId = (id: string | number | null | undefined): string => {
+export const formatLeadId = (
+  id: string | number | null | undefined,
+): string => {
   const safeId = id == null ? "" : String(id);
   if (!safeId) return "#LN-000";
 
-  if (safeId.match(/^#?LN-\d+$/i)) return safeId.startsWith("#") ? safeId : `#${safeId}`;
+  if (safeId.match(/^#?LN-\d+$/i))
+    return safeId.startsWith("#") ? safeId : `#${safeId}`;
   const lnMatch = safeId.match(/#?LN-(\d+)/i);
   if (lnMatch) return `#LN-${lnMatch[1]}`;
   const numMatch = safeId.match(/\d+/);
@@ -97,7 +108,9 @@ const extractStageFromDescription = (
 
 // ====================== Lead processor ======================
 export const processLead = (lead: RawLead): ProcessedLead => {
-  const stageTaskType = extractStageFromDescription(lead.next_action_description);
+  const stageTaskType = extractStageFromDescription(
+    lead.next_action_description,
+  );
   const stageStatus = stageTaskType;
   const rawTaskType =
     lead.next_action_type ||
@@ -112,7 +125,9 @@ export const processLead = (lead: RawLead): ProcessedLead => {
   return {
     ...lead,
     assigned: lead.assigned_to_name || "Unassigned",
-    status: formatStatus(stageStatus || lead.status || lead.lead_status || "New"),
+    status: formatStatus(
+      stageStatus || lead.status || lead.lead_status || "New",
+    ),
     lead_status: stageStatus || lead.lead_status || lead.status || "New",
     name: lead.full_name || lead.name || "",
     quality: deriveQuality(lead),

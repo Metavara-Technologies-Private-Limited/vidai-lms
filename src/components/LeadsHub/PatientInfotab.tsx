@@ -101,16 +101,22 @@ function DocTypeIcon({ url, size = 22 }: { url: string; size?: number }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: safely read a string field from a lead record trying multiple keys
 // ─────────────────────────────────────────────────────────────────────────────
-function getLeadField(
-  lead: LeadRecord,
-  ...keys: string[]
-): string {
+function getLeadField(lead: LeadRecord, ...keys: string[]): string {
   const r = lead as unknown as Record<string, unknown>;
   for (const key of keys) {
     const val = r[key];
     if (typeof val === "string" && val.trim() !== "") return val.trim();
   }
   return "N/A";
+}
+
+function normalizePhoneDisplay(value: string | null | undefined): string {
+  if (!value) return "N/A";
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "N/A") return "N/A";
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  if (!digitsOnly || /^0+$/.test(digitsOnly)) return "N/A";
+  return trimmed;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -918,23 +924,29 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
               />
               <InfoCell
                 label="CONTACT NO"
-                value={getLeadField(
-                  lead,
-                  "contact_phone",
-                  "contact_no",
-                  "contactPhone",
-                  "contact_person_phone",
-                  "contact_number",
-                ) || leadPhone}
+                value={
+                  normalizePhoneDisplay(
+                    getLeadField(
+                      lead,
+                      "contact_phone",
+                      "contact_no",
+                      "contactPhone",
+                      "contact_person_phone",
+                      "contact_number",
+                    ),
+                  ) || leadPhone
+                }
               />
               <InfoCell
                 label="EMAIL"
-                value={getLeadField(
-                  lead,
-                  "contact_email",
-                  "contactEmail",
-                  "contact_person_email",
-                ) || leadEmail}
+                value={
+                  getLeadField(
+                    lead,
+                    "contact_email",
+                    "contactEmail",
+                    "contact_person_email",
+                  ) || leadEmail
+                }
                 truncate={false}
               />
             </InfoGrid>

@@ -138,6 +138,15 @@ function capitalize(val: string | undefined | null): string {
   return val.charAt(0).toUpperCase() + val.slice(1);
 }
 
+function toDisplayPhone(val: string | undefined | null): string {
+  if (!val) return "N/A";
+  const trimmed = val.trim();
+  if (!trimmed) return "N/A";
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  if (!digitsOnly || /^0+$/.test(digitsOnly)) return "N/A";
+  return trimmed;
+}
+
 const LEAD_STATUS_OPTIONS = STATUS_OPTIONS_BY_APP[APP_TYPE];
 type LeadStatusOption = (typeof LEAD_STATUS_OPTIONS)[number];
 
@@ -2168,11 +2177,9 @@ export default function LeadDetailView() {
     activeLead.full_name || activeLead.name || "Unknown",
   );
   const leadInitials = activeLead.initials || leadName.charAt(0).toUpperCase();
-  const leadPhone =
-    activeLead.phone ||
-    activeLead.contact_number ||
-    activeLead.contact_no ||
-    "N/A";
+  const leadPhone = toDisplayPhone(
+    activeLead.phone || activeLead.contact_number || activeLead.contact_no,
+  );
   const leadEmail = activeLead.email || "N/A";
   const leadLocation = capitalizeWords(activeLead.location || "N/A");
   const leadGender = capitalize(activeLead.gender);
@@ -2390,7 +2397,12 @@ export default function LeadDetailView() {
             direction={{ xs: "column", md: "row" }}
             alignItems={{ xs: "flex-start", md: "flex-end" }}
             justifyContent="space-between"
-            sx={{ width: "100%", pl: { xs: 0, sm: 1 }, pr: 0, gap: { xs: 1.25, md: 0 } }}
+            sx={{
+              width: "100%",
+              pl: { xs: 0, sm: 1 },
+              pr: 0,
+              gap: { xs: 1.25, md: 0 },
+            }}
           >
             <Avatar
               sx={{
@@ -2718,7 +2730,11 @@ export default function LeadDetailView() {
                     alignItems: "center",
                   }}
                 >
-                  <Typography fontWeight={600} fontSize={isMobile ? "13px" : "14px"} color="inherit">
+                  <Typography
+                    fontWeight={600}
+                    fontSize={isMobile ? "13px" : "14px"}
+                    color="inherit"
+                  >
                     {tab}
                   </Typography>
                 </Box>
