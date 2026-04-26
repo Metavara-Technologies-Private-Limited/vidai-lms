@@ -92,6 +92,12 @@ const SLOT_OPTIONS = [
   "05:00 PM - 05:30 PM",
 ];
 
+const toastOptions = {
+  position: "top-right" as const,
+  autoClose: 3000,
+  theme: "colored" as const,
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
