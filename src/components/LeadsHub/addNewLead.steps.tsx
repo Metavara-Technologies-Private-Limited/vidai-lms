@@ -65,15 +65,21 @@ const assigneeLabel = (option: AssigneeOption): string => {
   return secondary ? `${primary} (${secondary})` : primary;
 };
 
+// ── Capitalize first letter of each word ─────────────────────────────────────
+const capitalizeWords = (str: string): string =>
+  str
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
 const SLOT_MENU_PROPS = {
   anchorOrigin: { vertical: "bottom" as const, horizontal: "left" as const },
   transformOrigin: { vertical: "top" as const, horizontal: "left" as const },
+  disablePortal: false,
   PaperProps: {
     sx: {
-      width: "max-content",
-      maxWidth: "none",
       "& .MuiMenu-list": {
-        maxHeight: "144px",
+        maxHeight: "200px",
         overflowY: "auto",
         scrollbarWidth: "thin",
         "&::-webkit-scrollbar": { width: "4px" },
@@ -82,7 +88,11 @@ const SLOT_MENU_PROPS = {
           borderRadius: "4px",
         },
       },
-      "& .MuiMenuItem-root": { justifyContent: "flex-start" },
+      "& .MuiMenuItem-root": {
+        justifyContent: "flex-start",
+        fontSize: "0.875rem",
+        whiteSpace: "nowrap",
+      },
     },
   },
 };
@@ -102,10 +112,6 @@ interface Step1Props {
   campaigns: Campaign[];
   leadStatusOptions?: NextActionStatusOption[];
   nextActionStatusOptions?: NextActionStatusOption[];
-  /**
-   * Labels derived from the selected pipeline stage's enabled rules.
-   * Populated by the parent; empty array = no rules configured yet.
-   */
   nextActionTypeOptions?: string[];
   handleChange: (
     field: keyof FormState,
@@ -178,11 +184,13 @@ export function Step1({
     leadStatusOptions ?? [];
   const resolvedNextActionStatusOptions: NextActionStatusOption[] =
     nextActionStatusOptions ?? [];
-
-  // Use options provided by the parent (derived from pipeline stage rules).
-  // The parent already falls back to TASK_TYPES when no rules are configured,
-  // so we just use what we receive — no local hardcoded fallback needed.
   const resolvedNextActionTypeOptions: string[] = nextActionTypeOptions ?? [];
+
+  // Campaign is hidden when source is "Referral" OR
+  // when source is "Direct" and sub-source is not "Gmail"
+  const isCampaignDisabled =
+    form.source === "Referral" ||
+    (form.source === "Direct" && form.subSource !== "Gmail");
 
   return (
     <Box>
@@ -216,7 +224,17 @@ export function Step1({
           ] as [string, keyof FormState][]
         ).map(([lbl, field]) => (
           <Box key={field}>
-            <Typography sx={labelStyle}>{lbl}</Typography>
+            <Typography sx={labelStyle}>
+              {lbl}
+              {field === "full_name" && (
+                <Typography
+                  component="span"
+                  sx={{ color: "#EF4444", fontSize: "0.75rem" }}
+                >
+                  {" "}*
+                </Typography>
+              )}
+            </Typography>
             <TextField
               fullWidth
               size="small"
@@ -446,10 +464,14 @@ export function Step1({
       >
         SOURCE & CAMPAIGN DETAILS
       </Typography>
+
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
+          // Collapse to 2 columns when Campaign field is hidden
+          gridTemplateColumns: isCampaignDisabled
+            ? "repeat(2, 1fr)"
+            : "repeat(3, 1fr)",
           gap: 2,
           mb: 4,
         }}
@@ -572,8 +594,8 @@ export function Step1({
           </Box>
         )}
 
-        {/* Campaign */}
-        {form.source !== "Other" && (
+        {/* Campaign Name — hidden when source is Referral or Direct + non-Gmail */}
+        {form.source !== "Other" && !isCampaignDisabled && (
           <Box>
             <Typography sx={labelStyle}>
               Campaign Name
@@ -591,28 +613,43 @@ export function Step1({
                 </Typography>
               )}
             </Typography>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              value={form.campaign}
-              onChange={(e) => handleCampaignChange(e.target.value)}
-              disabled={!form.subSource && !form.source}
-              sx={inputStyle}
-            >
-              <MenuItem value="">-- None --</MenuItem>
-              {filteredCampaigns.length === 0 ? (
-                <MenuItem value="" disabled>
-                  No campaigns available
-                </MenuItem>
-              ) : (
-                filteredCampaigns.map((c) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.name}
+            {campaignSelected ? (
+              <TextField
+                fullWidth
+                size="small"
+                value={
+                  form.campaign
+                    ? (filteredCampaigns.find((c) => c.id === form.campaign)
+                        ?.name ?? "")
+                    : ""
+                }
+                InputProps={{ readOnly: true }}
+                sx={readOnlyStyle}
+              />
+            ) : (
+              <TextField
+                select
+                fullWidth
+                size="small"
+                value={form.campaign}
+                onChange={(e) => handleCampaignChange(e.target.value)}
+                disabled={!form.subSource && !form.source}
+                sx={inputStyle}
+              >
+                <MenuItem value="">-- None --</MenuItem>
+                {filteredCampaigns.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No campaigns available
                   </MenuItem>
-                ))
-              )}
-            </TextField>
+                ) : (
+                  filteredCampaigns.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  ))
+                )}
+              </TextField>
+            )}
           </Box>
         )}
       </Box>
@@ -707,10 +744,10 @@ export function Step1({
           />
         </Box>
 
-        {/* Lead Generated By — contracts only */}
+        {/* Lead Generated By (Referral) — contracts only */}
         {IS_CONTRACTS_APP && (
           <Box>
-            <Typography sx={labelStyle}>Lead Generated By</Typography>
+            <Typography sx={labelStyle}>Lead Generated By (Referral)</Typography>
             <Autocomplete
               options={leadGeneratedByOptions}
               loading={leadGeneratedByLoading}
@@ -925,7 +962,7 @@ export function Step1({
           </TextField>
         </Box>
 
-        {/* Next Action Type — populated from pipeline stage rules */}
+        {/* Next Action Type */}
         <Box>
           <Typography sx={labelStyle}>Next Action Type</Typography>
           <TextField
@@ -947,7 +984,7 @@ export function Step1({
             ) : (
               resolvedNextActionTypeOptions.map((label) => (
                 <MenuItem key={label} value={label}>
-                  {label}
+                  {capitalizeWords(label)}
                 </MenuItem>
               ))
             )}
@@ -1458,6 +1495,7 @@ export function Step3({
                 <DatePicker
                   value={selectedDate}
                   format="DD/MM/YYYY"
+                  disablePast
                   onChange={(newDate) => {
                     const asDayjs = newDate
                       ? dayjs(newDate as Dayjs | Date)
@@ -1491,8 +1529,12 @@ export function Step3({
                 value={form.slot}
                 onChange={handleChange("slot")}
                 sx={inputStyle}
-                SelectProps={{ autoWidth: true, MenuProps: SLOT_MENU_PROPS }}
+                SelectProps={{
+                  native: false,
+                  MenuProps: SLOT_MENU_PROPS,
+                }}
               >
+                <MenuItem value="">-- Select --</MenuItem>
                 {TIME_SLOTS.map((slot, i) => (
                   <MenuItem key={i} value={slot}>
                     {slot}
