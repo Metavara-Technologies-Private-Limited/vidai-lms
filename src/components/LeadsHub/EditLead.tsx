@@ -41,6 +41,7 @@ import {
   STEPS,
   TOTAL_STEPS,
   inputStyle,
+  readOnlyStyle,
   labelStyle,
   sectionLabelStyle,
 } from "./UseEditLead";
@@ -61,15 +62,20 @@ const showInputToast = (toastId: string, message: string) => {
   }
 };
 
+// ── Capitalize first letter of each word (for action type labels) ─────────────
+const capitalizeWords = (str: string): string =>
+  str
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
 const SLOT_MENU_PROPS = {
   anchorOrigin: { vertical: "bottom" as const, horizontal: "left" as const },
   transformOrigin: { vertical: "top" as const, horizontal: "left" as const },
   PaperProps: {
     sx: {
-      width: "max-content",
-      maxWidth: "none",
       "& .MuiMenu-list": {
-        maxHeight: "144px",
+        maxHeight: "200px",
         overflowY: "auto",
         scrollbarWidth: "thin",
         "&::-webkit-scrollbar": { width: "4px" },
@@ -78,7 +84,11 @@ const SLOT_MENU_PROPS = {
           borderRadius: "4px",
         },
       },
-      "& .MuiMenuItem-root": { justifyContent: "flex-start" },
+      "& .MuiMenuItem-root": {
+        justifyContent: "flex-start",
+        fontSize: "0.875rem",
+        whiteSpace: "nowrap",
+      },
     },
   },
 };
@@ -109,7 +119,6 @@ export default function EditLead() {
     handleNextStatusChange,
     handleSourceChange,
     handleSubSourceChange,
-    handleReferralDepartmentChange,
     referralDepartments,
     loadingReferralDepts,
     referralDepartment,
@@ -166,12 +175,6 @@ export default function EditLead() {
     setContactPersonPhone,
     contactPersonEmail,
     setContactPersonEmail,
-    leadGeneratedBy,
-    setLeadGeneratedBy,
-    setLeadGeneratedById,
-    setLeadGeneratedBySearch,
-    leadGeneratedByOptions,
-    leadGeneratedByLoading,
     // ── Step 2 ──
     treatmentInterest,
     setTreatmentInterest,
@@ -250,7 +253,12 @@ export default function EditLead() {
 
   const leadLabel = leadData.id ? formatLeadId(leadData.id.toString()) : "";
 
-  // ── Input sanitisers (same as AddNewLead) ──────────────────────────────────
+  // ── Campaign disabled when source is Referral OR Direct + non-Gmail ────────
+  const isCampaignDisabled =
+    source === "Referral" ||
+    (source === "Direct" && subSource !== "Gmail");
+
+  // ── Input sanitizers ───────────────────────────────────────────────────────
   const handleFullNameChange = (value: string) => {
     const sanitized = sanitizeNameInput(value);
     if (sanitized !== value)
@@ -332,8 +340,11 @@ export default function EditLead() {
     return secondary ? `${primary} (${secondary})` : primary;
   };
 
-  // Sub-source options based on selected source
-  const subSourceOptions: string[] = SUB_SOURCE_OPTIONS[source] ?? [];
+  // Sub-source options — use referral department names when source is "Referral"
+  const subSourceOptions: string[] =
+    source === "Referral"
+      ? referralDepartments.map((d) => d.name)
+      : (SUB_SOURCE_OPTIONS[source] ?? []);
 
   return (
     <Box>
@@ -382,7 +393,7 @@ export default function EditLead() {
           </Typography>
         </Box>
 
-        {/* ── Stepper (matches AddNewLead style exactly) ── */}
+        {/* ── Stepper ── */}
         <Box sx={{ bgcolor: "white", px: 1, pt: 1, pb: 3 }}>
           <Box
             sx={{
@@ -466,16 +477,19 @@ export default function EditLead() {
           {/* ===== STEP 1 ===== */}
           {currentStep === 1 && (
             <Box>
+
               {/* ── SECTION: Lead Information ── */}
               <Typography sx={sectionLabelStyle}>LEAD INFORMATION</Typography>
 
-              {/* Row: Full Name · Contact · Email · Location (4-col, matches AddNewLead) */}
+              {/* Row 1: Full Name · Contact · Email · Location  (+ Address for CONTRACTS) */}
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gridTemplateColumns: IS_CONTRACTS_APP
+                    ? "repeat(5, 1fr)"
+                    : "repeat(4, 1fr)",
                   gap: 2,
-                  mb: 2,
+                  mb: 3,
                 }}
               >
                 <Box>
@@ -518,16 +532,29 @@ export default function EditLead() {
                     sx={inputStyle}
                   />
                 </Box>
+                {/* CONTRACTS — Address sits in the same row as lead info */}
+                {IS_CONTRACTS_APP && (
+                  <Box>
+                    <Typography sx={labelStyle}>Address</Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={address}
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      sx={inputStyle}
+                    />
+                  </Box>
+                )}
               </Box>
 
-              {/* MEDICAL — Gender · Age · Marital Status · Address (4-col) */}
+              {/* MEDICAL — Row 2: Gender · Age · Marital Status · Address */}
               {IS_MEDICAL_APP && (
                 <Box
                   sx={{
                     display: "grid",
                     gridTemplateColumns: "repeat(4, 1fr)",
                     gap: 2,
-                    mb: 2,
+                    mb: 3,
                   }}
                 >
                   <Box>
@@ -585,16 +612,24 @@ export default function EditLead() {
                 </Box>
               )}
 
-              {/* MEDICAL — Language Preference (single field, 25% width) */}
-              {IS_MEDICAL_APP && (
-                <Box sx={{ mb: 3 }}>
+              {/* Language Preference — 1 col out of 4 so it matches all other field widths */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
+                <Box>
                   <Typography sx={labelStyle}>Language Preference</Typography>
                   <TextField
                     select
+                    fullWidth
                     size="small"
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    sx={{ ...inputStyle, maxWidth: "25%" }}
+                    sx={inputStyle}
                   >
                     <MenuItem value="">-- Select --</MenuItem>
                     <MenuItem value="English">English</MenuItem>
@@ -602,21 +637,7 @@ export default function EditLead() {
                     <MenuItem value="Kannada">Kannada</MenuItem>
                   </TextField>
                 </Box>
-              )}
-
-              {/* CONTRACTS — Address (full width row) */}
-              {IS_CONTRACTS_APP && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography sx={labelStyle}>Address</Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={address}
-                    onChange={(e) => handleAddressChange(e.target.value)}
-                    sx={inputStyle}
-                  />
-                </Box>
-              )}
+              </Box>
 
               {/* MEDICAL — Partner Information */}
               {IS_MEDICAL_APP && (
@@ -624,7 +645,7 @@ export default function EditLead() {
                   <Typography sx={sectionLabelStyle}>
                     PARTNER INFORMATION
                   </Typography>
-                  <Box sx={{ mb: 1.5 }}>
+                  <Box sx={{ mb: 2 }}>
                     <Typography sx={{ ...labelStyle, mb: 0.5 }}>
                       Is This Inquiry For A Couple?
                     </Typography>
@@ -651,7 +672,7 @@ export default function EditLead() {
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(3, 1fr)",
+                        gridTemplateColumns: "repeat(4, 1fr)",
                         gap: 2,
                         mb: 3,
                       }}
@@ -699,7 +720,7 @@ export default function EditLead() {
                 </>
               )}
 
-              {/* CONTRACTS — Contact Person Information (4-col) */}
+              {/* CONTRACTS — Contact Person Information */}
               {IS_CONTRACTS_APP && (
                 <>
                   <Typography sx={sectionLabelStyle}>
@@ -763,94 +784,194 @@ export default function EditLead() {
                 </>
               )}
 
-              {/* ── SECTION: Source & Campaign (3-col, matches AddNewLead) ── */}
+              {/* ── SECTION: Source & Campaign ── */}
               <Typography sx={sectionLabelStyle}>
                 SOURCE & CAMPAIGN DETAILS
               </Typography>
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gridTemplateColumns: isCampaignDisabled
+                    ? "repeat(2, 1fr)"
+                    : "repeat(3, 1fr)",
                   gap: 2,
                   mb: 3,
                 }}
               >
+                {/* Source — read-only when campaign is selected */}
                 <Box>
-                  <Typography sx={labelStyle}>Source</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={source}
-                    onChange={(e) => handleSourceChange(e.target.value)}
-                    sx={inputStyle}
-                    disabled={Boolean(campaign)}
-                  >
-                    <MenuItem value="">-- Select Source --</MenuItem>
-                    {SOURCE_OPTIONS.map((s) => (
-                      <MenuItem key={s} value={s}>
-                        {s}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                  <Typography sx={labelStyle}>
+                    Source
+                    {campaign && (
+                      <Typography
+                        component="span"
+                        sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}
+                      >
+                        auto-filled from campaign
+                      </Typography>
+                    )}
+                  </Typography>
+                  {campaign ? (
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={source}
+                      InputProps={{ readOnly: true }}
+                      sx={readOnlyStyle}
+                    />
+                  ) : (
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      value={source}
+                      onChange={(e) => handleSourceChange(e.target.value)}
+                      sx={inputStyle}
+                    >
+                      <MenuItem value="">-- Select Source --</MenuItem>
+                      {SOURCE_OPTIONS.map((s) => (
+                        <MenuItem key={s} value={s}>
+                          {s}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
                 </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Sub-Source</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={subSource}
-                    onChange={(e) => handleSubSourceChange(e.target.value)}
-                    sx={inputStyle}
-                    disabled={!source || Boolean(campaign)}
-                  >
-                    <MenuItem value="">-- Select Sub-Source --</MenuItem>
-                    {subSourceOptions.map((s) => (
-                      <MenuItem key={s} value={s}>
-                        {s}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Campaign Name</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={campaign}
-                    onChange={handleCampaignChange}
-                    sx={inputStyle}
-                  >
-                    <MenuItem value="">-- Select Campaign --</MenuItem>
-                    {campaigns.map((c) => (
-                      <MenuItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
+
+                {/* Sub-Source — uses referral departments when source is Referral */}
+                {source !== "Other" && (
+                  <Box>
+                    <Typography sx={labelStyle}>
+                      Sub-Source
+                      {campaign && (
+                        <Typography
+                          component="span"
+                          sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}
+                        >
+                          auto-filled from campaign
+                        </Typography>
+                      )}
+                    </Typography>
+                    {campaign ? (
+                      <TextField
+                        fullWidth
+                        size="small"
+                        value={subSource}
+                        InputProps={{ readOnly: true }}
+                        sx={readOnlyStyle}
+                      />
+                    ) : (
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        value={subSource}
+                        onChange={(e) => handleSubSourceChange(e.target.value)}
+                        disabled={
+                          !source ||
+                          (source === "Referral" && loadingReferralDepts)
+                        }
+                        sx={inputStyle}
+                        InputProps={{
+                          endAdornment:
+                            source === "Referral" && loadingReferralDepts ? (
+                              <CircularProgress size={16} sx={{ mr: 3 }} />
+                            ) : null,
+                        }}
+                      >
+                        <MenuItem value="">-- Select Sub-Source --</MenuItem>
+                        {source === "Referral" && loadingReferralDepts ? (
+                          <MenuItem value="" disabled>
+                            Loading departments...
+                          </MenuItem>
+                        ) : source === "Referral" &&
+                          subSourceOptions.length === 0 ? (
+                          <MenuItem value="" disabled>
+                            No departments available
+                          </MenuItem>
+                        ) : (
+                          subSourceOptions.map((s) => (
+                            <MenuItem key={s} value={s}>
+                              {s}
+                            </MenuItem>
+                          ))
+                        )}
+                        {!source && (
+                          <MenuItem value="" disabled>
+                            Select source first
+                          </MenuItem>
+                        )}
+                      </TextField>
+                    )}
+                  </Box>
+                )}
+
+                {/* Campaign Name — hidden when Referral OR Direct + non-Gmail */}
+                {source !== "Other" && !isCampaignDisabled && (
+                  <Box>
+                    <Typography sx={labelStyle}>
+                      Campaign Name
+                      {subSource && !campaign && (
+                        <Typography
+                          component="span"
+                          sx={{ fontSize: "0.65rem", color: "#94A3B8", ml: 1, fontWeight: 500 }}
+                        >
+                          linked with {subSource}
+                        </Typography>
+                      )}
+                    </Typography>
+                    {campaign ? (
+                      <TextField
+                        fullWidth
+                        size="small"
+                        value={
+                          campaigns.find((c) => String(c.id) === campaign)?.name ?? ""
+                        }
+                        InputProps={{ readOnly: true }}
+                        sx={readOnlyStyle}
+                      />
+                    ) : (
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        value={campaign}
+                        onChange={handleCampaignChange}
+                        disabled={!subSource && !source}
+                        sx={inputStyle}
+                      >
+                        <MenuItem value="">-- None --</MenuItem>
+                        {campaigns.length === 0 ? (
+                          <MenuItem value="" disabled>
+                            No campaigns available
+                          </MenuItem>
+                        ) : (
+                          campaigns.map((c) => (
+                            <MenuItem key={c.id} value={String(c.id)}>
+                              {c.name}
+                            </MenuItem>
+                          ))
+                        )}
+                      </TextField>
+                    )}
+                  </Box>
+                )}
               </Box>
 
               {/* ── SECTION: Assignee & Next Action ── */}
-              {/* Mirrors AddNewLead layout:
-                  Row A — Assigned To · (Lead Generated By if CONTRACTS) · Referral Dept
-                  Row B — Lead Status · Next Action Type · Next Action Status · Next Action Desc
-                  Each row is its own grid so columns stay balanced regardless of app type. */}
               <Typography sx={sectionLabelStyle}>
                 ASSIGNEE & NEXT ACTION DETAILS
               </Typography>
 
-              {/* Row A: Assigned To + optional Lead Generated By + Referral Dept */}
+              {/* Row 1: Assigned To · Referral Dept (NON-CONTRACTS) · Lead Status · Next Action Status */}
               <Box
                 sx={{
                   display: "grid",
                   gridTemplateColumns: IS_CONTRACTS_APP
                     ? "repeat(3, 1fr)"
-                    : "repeat(2, 1fr)",
+                    : "repeat(4, 1fr)",
                   gap: 2,
-                  mb: 2,
+                  mb: 3,
                 }}
               >
                 {/* Assigned To */}
@@ -907,98 +1028,24 @@ export default function EditLead() {
                   />
                 </Box>
 
-                {/* CONTRACTS-only: Lead Generated By */}
-                {IS_CONTRACTS_APP && (
+                {/* NON-CONTRACTS: Referral Department read-only */}
+                {!IS_CONTRACTS_APP && (
                   <Box>
-                    <Typography sx={labelStyle}>Lead Generated By</Typography>
-                    <Autocomplete
-                      options={leadGeneratedByOptions}
-                      loading={leadGeneratedByLoading}
-                      clearOnBlur={false}
-                      filterOptions={(options) => options}
+                    <Typography sx={labelStyle}>Referral Department</Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
                       value={
-                        leadGeneratedByOptions.find(
-                          (o) => assigneeOptionLabel(o) === leadGeneratedBy,
-                        ) || null
+                        referralDepartments.find(
+                          (d) => String(d.id) === referralDepartment,
+                        )?.name ?? referralDepartment
                       }
-                      inputValue={leadGeneratedBy}
-                      onInputChange={(_, value, reason) => {
-                        if (reason === "reset") return;
-                        setLeadGeneratedBySearch(value);
-                        setLeadGeneratedBy(value);
-                        setLeadGeneratedById("");
-                      }}
-                      onChange={(_, value) => {
-                        setLeadGeneratedBy(
-                          value ? assigneeOptionLabel(value) : "",
-                        );
-                        setLeadGeneratedById(value ? String(value.id) : "");
-                      }}
-                      getOptionLabel={assigneeOptionLabel}
-                      isOptionEqualToValue={(o, v) => o.id === v.id}
-                      noOptionsText="Type to search user"
-                      renderOption={(props, option) => (
-                        <li {...props} key={option.id}>
-                          {assigneeOptionLabel(option)}
-                        </li>
-                      )}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          fullWidth
-                          size="small"
-                          placeholder="Search user"
-                          sx={inputStyle}
-                          InputProps={{
-                            ...params.InputProps,
-                            endAdornment: (
-                              <>
-                                {leadGeneratedByLoading ? (
-                                  <CircularProgress size={14} sx={{ mr: 1 }} />
-                                ) : null}
-                                {params.InputProps.endAdornment}
-                              </>
-                            ),
-                          }}
-                        />
-                      )}
+                      InputProps={{ readOnly: true }}
+                      sx={readOnlyStyle}
                     />
                   </Box>
                 )}
 
-                {/* Referral Department */}
-                <Box>
-                  <Typography sx={labelStyle}>Referral Department</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={referralDepartment}
-                    onChange={(e) =>
-                      handleReferralDepartmentChange(e.target.value)
-                    }
-                    sx={inputStyle}
-                    disabled={loadingReferralDepts}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    {referralDepartments.map((d) => (
-                      <MenuItem key={d.id} value={String(d.id)}>
-                        {d.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-              </Box>
-
-              {/* Row B: Lead Status · Next Action Type · Next Action Status · Next Action Desc (4-col) */}
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 2,
-                  mb: 2,
-                }}
-              >
                 {/* Lead Status */}
                 <Box>
                   <Typography sx={labelStyle}>Lead Status</Typography>
@@ -1038,8 +1085,17 @@ export default function EditLead() {
                     ))}
                   </TextField>
                 </Box>
+              </Box>
 
-                {/* Next Action Type */}
+              {/* Row 2: Next Action Type · Next Action Description */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
                 <Box>
                   <Typography sx={labelStyle}>Next Action Type</Typography>
                   <TextField
@@ -1049,21 +1105,27 @@ export default function EditLead() {
                     value={nextType}
                     onChange={handleNextTypeChange}
                     sx={inputStyle}
+                    disabled={nextActionTypeOptions.length === 0}
                   >
                     <MenuItem value="">-- Select --</MenuItem>
-                    {nextActionTypeOptions.map((t) => (
-                      <MenuItem key={t} value={t}>
-                        {t}
+                    {nextActionTypeOptions.length === 0 ? (
+                      <MenuItem value="" disabled>
+                        {leadStatus
+                          ? "No actions configured for this stage"
+                          : "Select a lead status first"}
                       </MenuItem>
-                    ))}
+                    ) : (
+                      nextActionTypeOptions.map((t) => (
+                        <MenuItem key={t} value={t}>
+                          {capitalizeWords(t)}
+                        </MenuItem>
+                      ))
+                    )}
                   </TextField>
                 </Box>
 
-                {/* Next Action Description */}
                 <Box>
-                  <Typography sx={labelStyle}>
-                    Next Action Description
-                  </Typography>
+                  <Typography sx={labelStyle}>Next Action Description</Typography>
                   <TextField
                     fullWidth
                     size="small"
@@ -1073,6 +1135,7 @@ export default function EditLead() {
                   />
                 </Box>
               </Box>
+
             </Box>
           )}
 
@@ -1082,31 +1145,41 @@ export default function EditLead() {
               <Typography sx={sectionLabelStyle}>
                 {ACTIVE_FLOW_COPY.medicalSection.toUpperCase()}
               </Typography>
-              <Box sx={{ mb: 2 }}>
-                <Typography sx={labelStyle}>
-                  {ACTIVE_FLOW_COPY.treatmentLabel} *
-                </Typography>
-                <TextField
-                  select
-                  size="small"
-                  value={treatmentInterest}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setTreatmentInterest(v);
-                    if (v && !treatments.includes(v))
-                      setTreatments((prev) => [...prev, v]);
-                  }}
-                  sx={{ ...inputStyle, maxWidth: "50%" }}
-                >
-                  <MenuItem value="" disabled>
-                    Select
-                  </MenuItem>
-                  {ACTIVE_FLOW_COPY.treatmentOptions.map((opt) => (
-                    <MenuItem key={opt} value={opt}>
-                      {opt}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: 2,
+                  mb: 2,
+                }}
+              >
+                <Box>
+                  <Typography sx={labelStyle}>
+                    {ACTIVE_FLOW_COPY.treatmentLabel} *
+                  </Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={treatmentInterest}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTreatmentInterest(v);
+                      if (v && !treatments.includes(v))
+                        setTreatments((prev) => [...prev, v]);
+                    }}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="" disabled>
+                      Select
                     </MenuItem>
-                  ))}
-                </TextField>
+                    {ACTIVE_FLOW_COPY.treatmentOptions.map((opt) => (
+                      <MenuItem key={opt} value={opt}>
+                        {opt}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
               </Box>
               {treatments.length > 0 && (
                 <Stack
@@ -1402,15 +1475,15 @@ export default function EditLead() {
 
               {wantAppointment === "yes" && (
                 <Box>
+                  {/* Row 1: Department (MEDICAL) · Personnel · Date · Slot */}
                   <Box
                     sx={{
                       display: "grid",
                       gridTemplateColumns: IS_MEDICAL_APP
-                        ? "repeat(2, 1fr)"
-                        : "repeat(1, 1fr)",
+                        ? "repeat(4, 1fr)"
+                        : "repeat(3, 1fr)",
                       gap: 2,
-                      mb: 2,
-                      maxWidth: IS_CONTRACTS_APP ? "50%" : "100%",
+                      mb: 3,
                     }}
                   >
                     {IS_MEDICAL_APP && (
@@ -1510,22 +1583,13 @@ export default function EditLead() {
                         )}
                       />
                     </Box>
-                  </Box>
-
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(2, 1fr)",
-                      gap: 2,
-                      mb: 2,
-                    }}
-                  >
                     <Box>
                       <Typography sx={labelStyle}>Date *</Typography>
                       <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DatePicker
                           value={selectedDate}
                           format="DD/MM/YYYY"
+                          disablePast
                           onChange={(val) => handleDateChange(val)}
                           slotProps={{
                             textField: {
@@ -1547,7 +1611,7 @@ export default function EditLead() {
                         onChange={(e) => setSlot(e.target.value)}
                         sx={inputStyle}
                         SelectProps={{
-                          autoWidth: true,
+                          native: false,
                           MenuProps: SLOT_MENU_PROPS,
                         }}
                       >
@@ -1563,7 +1627,8 @@ export default function EditLead() {
                     </Box>
                   </Box>
 
-                  <Box>
+                  {/* Row 2: Remark — full width */}
+                  <Box sx={{ mb: 3 }}>
                     <Typography sx={labelStyle}>Remark</Typography>
                     <TextField
                       fullWidth
@@ -1582,7 +1647,7 @@ export default function EditLead() {
           )}
         </Box>
 
-        {/* ── Footer (matches AddNewLead style) ── */}
+        {/* ── Footer ── */}
         <Box
           sx={{
             bgcolor: "white",
@@ -1650,7 +1715,6 @@ export default function EditLead() {
                 minWidth: "100px",
                 "&:hover": { bgcolor: "#1E293B" },
               }}
-              title={!canEditLeads ? "No permission to edit leads" : undefined}
             >
               {saving ? (
                 <CircularProgress size={18} sx={{ color: "#fff" }} />
