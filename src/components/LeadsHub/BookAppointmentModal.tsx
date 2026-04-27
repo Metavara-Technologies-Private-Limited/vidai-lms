@@ -151,17 +151,20 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
   const root = asRecord(raw);
+  const data = asRecord(root?.data);
+
   const list: unknown[] = Array.isArray(raw)
     ? raw
-    : Array.isArray(root?.objects)
-      ? (root?.objects as unknown[])
+    : Array.isArray(data?.objects) // ✅ FIXED
+      ? (data.objects as unknown[])
       : Array.isArray(root?.results)
-        ? (root?.results as unknown[])
+        ? (root.results as unknown[])
         : Array.isArray(root?.data)
-          ? (root?.data as unknown[])
+          ? (root.data as unknown[])
           : [];
 
   const assignees: AssigneeOption[] = [];
+
   for (const item of list) {
     const record = asRecord(item);
     if (!record) continue;
@@ -178,20 +181,17 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
 
     assignees.push({
       id,
-      first_name:
-        typeof record.first_name === "string" ? record.first_name : undefined,
-      last_name:
-        typeof record.last_name === "string" ? record.last_name : undefined,
-      username:
-        typeof record.username === "string" ? record.username : undefined,
-      role: typeof record.role === "string" ? record.role : undefined,
-      designation:
-        typeof record.designation === "string" ? record.designation : undefined,
-      email: typeof record.email === "string" ? record.email : undefined,
+      first_name: record.first_name as string,
+      last_name: record.last_name as string,
+      username: record.username as string,
+      role: record.role as string,
+      designation: record.designation as string,
+      email: record.email as string,
     });
   }
+
   return assignees;
-};
+};    
 
 const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =

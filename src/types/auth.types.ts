@@ -19,16 +19,16 @@ export type LoginResponse = {
   };
 };
 
-export type ExternalLoginResponse = {
-  token: string;
-  user: {
-    username: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    designation: string;
-  };
-};
+// export type ExternalLoginResponse = {
+//   token: string;
+//   user: {
+//     username: string;
+//     first_name: string;
+//     last_name: string;
+//     email: string;
+//     designation: string;
+//   };
+// };
 
 export type NormalizedLoginResponse = {
   token: string;

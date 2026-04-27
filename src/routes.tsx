@@ -248,6 +248,7 @@ export default function AppRoutes() {
             ...(user as AuthUser | null),
             ...(profile as unknown as AuthUser),
             clinics: normalizedClinics,
+            permissions: (user as AuthUser)?.permissions,
             profile_loaded: true,
           } as AuthUser),
         );
@@ -262,14 +263,15 @@ export default function AppRoutes() {
           }
 
           if (
+            loginType !== "EXT" &&
             defaultClinic?.clinic__name &&
             typeof profile.email === "string"
           ) {
-            await syncClinic(defaultClinic, profile.email);
+            await syncClinic(defaultClinic, profile.email, loginType);
+          } else {
+            // EXT users or INT users with no clinics
+            await dispatch(fetchClinic(1));
           }
-        } else {
-          // EXT users or INT users with no clinics
-          await dispatch(fetchClinic(1));
         }
 
         await dispatch(fetchLeads());

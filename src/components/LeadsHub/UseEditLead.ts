@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // ============================================================
 // useEditLead.ts  –  State, effects, handlers & helpers
 // Consumed by EditLead.tsx (pure JSX layer)
@@ -108,11 +109,13 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
     ? raw
     : Array.isArray(root?.objects)
       ? (root?.objects as unknown[])
-      : Array.isArray(root?.results)
-        ? (root?.results as unknown[])
-        : Array.isArray(root?.data)
-          ? (root?.data as unknown[])
-          : [];
+      : Array.isArray((root?.data as any)?.objects)
+        ? ((root?.data as any).objects as unknown[])
+        : Array.isArray(root?.results)
+          ? (root?.results as unknown[])
+          : Array.isArray(root?.data)
+            ? (root?.data as unknown[])
+            : [];
 
   return list
     .map((item) => {
@@ -833,6 +836,28 @@ export function useEditLead() {
 
         setAssignee(lead.assigned_to_id?.toString() ?? "");
         setAssigneeName(lead.assigned_to_name ?? "");
+        // hydrate assignee into options so Autocomplete can show it
+        if (lead.assigned_to_id != null) {
+          const id = Number(lead.assigned_to_id);
+
+          setAssigneeOptions((prev): AssigneeOption[] => {
+            const exists = prev.find((o) => o.id === id);
+            if (exists) return prev;
+
+            return [
+              {
+                id,
+                first_name: lead.assigned_to_name?.split(" ")[0],
+                last_name: lead.assigned_to_name?.split(" ").slice(1).join(" "),
+                username: lead.assigned_to_name,
+                role: undefined,
+                designation: undefined,
+                email: undefined,
+              },
+              ...prev,
+            ];
+          });
+        }
         setNextType(lead.next_action_type ?? "");
         setNextStatus(lead.next_action_status ?? "");
         setNextDesc(lead.next_action_description ?? "");

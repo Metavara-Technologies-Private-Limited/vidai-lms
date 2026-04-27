@@ -311,11 +311,24 @@ export const DoctorReferrals: React.FC = () => {
   const clinic = useSelector(selectClinic);
   const state = location.state as { doctorName?: string } | null;
   const doctorName = state?.doctorName ?? `Doctor #${doctorId}`;
+  const dispatch = useDispatch<AppDispatch>();
+const sources = useSelector(selectSources) as ReferralSource[];
 
   const [search, setSearch] = useState("");
   const [patients, setPatients] = useState<PatientCard[]>([]);
   const [selected, setSelected] = useState<PatientCard | null>(null);
   const [loading, setLoading] = useState(true);
+  const sourceMap = useMemo(() => {
+    const map: Record<number, ReferralSource> = {};
+    sources.forEach(s => {
+      map[s.id] = s;
+    });
+    return map;
+  }, [sources]);
+
+  useEffect(() => {
+    dispatch(loadReferralSources({}));
+  }, [dispatch]);
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -332,6 +345,8 @@ export const DoctorReferrals: React.FC = () => {
 
         const cards = filtered.map((lead): PatientCard => {
           const style = getPatientAvatarStyle(lead.id);
+          const source = sourceMap[lead.referral_source_id || 0];
+
           return {
             id: lead.id,
             name: lead.full_name ?? "Unknown",
@@ -340,6 +355,9 @@ export const DoctorReferrals: React.FC = () => {
             avatarColor: style.color,
             mrn: buildMRN(lead.id),
             referralDate: formatDate(lead.created_at),
+
+            referralSourceName: source?.name ?? "Direct",
+
             raw: lead,
           };
         });
@@ -354,7 +372,7 @@ export const DoctorReferrals: React.FC = () => {
       }
     };
     fetchLeads();
-  }, [doctorId, clinic?.id]);
+  }, [doctorId, clinic?.id, sourceMap]);
 
   const filtered = useMemo(
     () =>

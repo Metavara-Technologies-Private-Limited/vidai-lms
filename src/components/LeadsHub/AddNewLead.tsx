@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from "react";
 import {
   Box,
@@ -98,52 +99,23 @@ type AssigneeOption = {
   email: string | undefined;
 };
 
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
+// const asRecord = (value: unknown): Record<string, unknown> | null =>
+//   typeof value === "object" && value !== null
+//     ? (value as Record<string, unknown>)
+//     : null;
 
-const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
-  const root = asRecord(raw);
-  const list: unknown[] = Array.isArray(raw)
-    ? raw
-    : Array.isArray(root?.objects)
-      ? (root?.objects as unknown[])
-      : Array.isArray(root?.results)
-        ? (root?.results as unknown[])
-        : Array.isArray(root?.data)
-          ? (root?.data as unknown[])
-          : [];
+const normalizeAssignees = (res: any): AssigneeOption[] => {
+  const users = res?.data?.objects || [];
 
-  return list
-    .map((item) => {
-      const record = asRecord(item);
-      if (!record) return null;
-      const idValue = record.id ?? record.user_id;
-      const id =
-        typeof idValue === "number"
-          ? idValue
-          : typeof idValue === "string"
-            ? Number(idValue)
-            : NaN;
-      if (!Number.isFinite(id)) return null;
-      return {
-        id,
-        first_name:
-          typeof record.first_name === "string" ? record.first_name : undefined,
-        last_name:
-          typeof record.last_name === "string" ? record.last_name : undefined,
-        username:
-          typeof record.username === "string" ? record.username : undefined,
-        role: typeof record.role === "string" ? record.role : undefined,
-        designation:
-          typeof record.designation === "string"
-            ? record.designation
-            : undefined,
-        email: typeof record.email === "string" ? record.email : undefined,
-      };
-    })
-    .filter((item): item is AssigneeOption => item !== null);
+  return users.map((u: any) => ({
+    id: u.id,
+    first_name: u.first_name,
+    last_name: u.last_name,
+    username: u.username,
+    role: u.role,
+    designation: u.designation,
+    email: u.email,
+  }));
 };
 
 const assigneeLabel = (option: AssigneeOption): string => {
@@ -533,8 +505,11 @@ export default function AddNewLead() {
           limit: 20,
           offset: 0,
         });
+        console.log("SEARCH RESPONSE:", response); // 👈 add this
+
         setAssigneeOptions(normalizeAssignees(response));
-      } catch {
+      } catch (err) {
+        console.error("SEARCH ERROR:", err); // 👈 ADD THIS
         setAssigneeOptions([]);
       } finally {
         setAssigneeLoading(false);
@@ -915,9 +890,8 @@ export default function AddNewLead() {
         : {}),
       assigned_to_id: intOrNull(form.assignee) ?? null,
       assigned_to_name: assigneeName.trim() || null,
-      personal_id: IS_CONTRACTS_APP
-        ? (selectedLeadGeneratedBy?.id ?? null)
-        : (intOrNull(form.personnel) ?? null),
+      personal_id:
+        selectedLeadGeneratedBy?.id ?? intOrNull(form.personnel) ?? null,
       personal_name: IS_CONTRACTS_APP
         ? selectedLeadGeneratedBy
           ? `${selectedLeadGeneratedBy.first_name} ${selectedLeadGeneratedBy.last_name}`.trim()
@@ -1254,7 +1228,7 @@ export default function AddNewLead() {
             assigneeLoading={assigneeLoading}
             leadGeneratedByInput={
               selectedLeadGeneratedBy
-                ? `${selectedLeadGeneratedBy.first_name} ${selectedLeadGeneratedBy.last_name}`.trim()
+                ? `${selectedLeadGeneratedBy.first_name} ${selectedLeadGeneratedBy.last_name}`
                 : leadGeneratedBySearch
             }
             leadGeneratedByOptions={leadGeneratedByOptions}
@@ -1284,7 +1258,8 @@ export default function AddNewLead() {
             }}
             handleLeadGeneratedByChange={(value) => {
               if (value) {
-                setSelectedLeadGeneratedBy(toLeadGeneratedByObject(value));
+                const obj = toLeadGeneratedByObject(value);
+                setSelectedLeadGeneratedBy(obj);
                 setLeadGeneratedBySearch(assigneeLabel(value));
               } else {
                 setSelectedLeadGeneratedBy(null);

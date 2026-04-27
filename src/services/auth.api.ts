@@ -1,5 +1,5 @@
 import type {
-  ExternalLoginResponse,
+  // ExternalLoginResponse,
   LoginPayload,
   LoginResponse,
   LoginType,
@@ -10,22 +10,22 @@ import { http } from "./http";
 
 export const LOGIN_TYPE: LoginType = "INT";
 
-const normalizeExternalResponse = (
-  res: ExternalLoginResponse,
-): NormalizedLoginResponse => ({
-  token: res.token,
-  refresh: "",
-  user: {
-    id: 0,
-    username: res.user.username,
-    email: res.user.email,
-    first_name: res.user.first_name,
-    last_name: res.user.last_name,
-    designation: res.user.designation,
-  },
-  role: res.user.designation,
-  permissions: {},
-});
+// const normalizeExternalResponse = (
+//   res: ExternalLoginResponse,
+// ): NormalizedLoginResponse => ({
+//   token: res.token,
+//   refresh: "",
+//   user: {
+//     id: 0,
+//     username: res.user.username,
+//     email: res.user.email,
+//     first_name: res.user.first_name,
+//     last_name: res.user.last_name,
+//     designation: res.user.designation,
+//   },
+//   role: res.user.designation,
+//   permissions: {},
+// });
 
 const unwrapResponseData = <T>(payload: unknown): T => {
   if (
@@ -48,18 +48,15 @@ export const authApi = {
     data: LoginPayload,
     mode: LoginType,
   ): Promise<NormalizedLoginResponse> => {
-    if (mode === "EXT") {
-      const res = await http.post<ExternalLoginResponse>("/proxy/login/", data);
-      return normalizeExternalResponse(res.data);
-    }
-
-    const res = await http.post<LoginResponse>("/auth/login/", data);
+    const url = mode === "EXT" ? "/proxy/login/" : "/auth/login/";
+  
+    const res = await http.post<LoginResponse>(url, data);
     const response = res.data;
-
+  
     if (!response.success || !response.data?.access_token) {
       throw new Error(response.message || "Login failed");
     }
-
+  
     return {
       token: response.data.access_token,
       refresh: response.data.refresh_token,

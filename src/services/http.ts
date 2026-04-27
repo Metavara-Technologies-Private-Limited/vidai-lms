@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosError, type AxiosInstance } from "axios";
 import { store, type AppDispatch } from "../store";
 import { setExternalToken } from "../store/authSlice";
@@ -27,7 +28,7 @@ export const http = axios.create({
   headers: { "Content-Type": "application/json" },
 }) as HttpInstance;
 
-let extTokenPromise: Promise<string> | null = null;
+// let extTokenPromise: Promise<string> | null = null;
 
 // Add interceptor to handle FormData properly
 // When FormData is sent, remove the Content-Type header to allow browser/axios
@@ -44,30 +45,22 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const getExtToken = async (dispatch: AppDispatch, getState: any) => {
+export const getExtToken = async (dispatch: AppDispatch, getState:any, forceRefresh = false) => {
   const state = getState();
+  const stored = localStorage.getItem("ext_token");
 
-  if (state.auth.extToken) {
-    return state.auth.extToken;
-  }
+  if (!forceRefresh && state.auth.extToken) return state.auth.extToken;
+  if (!forceRefresh && stored) return stored;
 
-  if (!extTokenPromise) {
-    extTokenPromise = (async () => {
-      const res = await http.post("/proxy/login/", {
-        username: "Admin",
-        password: "vidai_admin@2023",
-      });
+  const res = await http.post("/proxy/login/", {
+    username: "Admin",
+    password: "vidai_admin@2023",
+  });
 
-      const token = res.data.token;
-      dispatch(setExternalToken(token));
+  const token = res.data?.data?.ext_token;
+  dispatch(setExternalToken(token));
 
-      extTokenPromise = null;
-      return token;
-    })();
-  }
-
-  return extTokenPromise;
+  return token;
 };
 
 export const getAccessToken = (): string | null =>
@@ -193,17 +186,36 @@ http.interceptors.response.use(
       url.includes("/auth/login/") ||
       url.includes("/proxy/login/") ||
       url.includes("/token/refresh/");
+    
+    // const isExternalApi = url.includes("/users-search/");
 
     if (
       !originalRequest ||
       status !== 401 ||
       originalRequest._retry ||
       isAuthRoute
+      // isExternalApi
     ) {
       return Promise.reject(error);
     }
 
     originalRequest._retry = true;
+
+    // HANDLE EXT TOKEN
+if (url.includes("/users-search/")) {
+  try {
+    const newExtToken = await getExtToken(store.dispatch, store.getState, true); // force refresh
+
+    (originalRequest.headers as any)?.set?.(
+      "Authorization",
+      `Bearer ${newExtToken}`,
+    );
+
+    return http.request(originalRequest);
+  } catch {
+    return Promise.reject(error);
+  }
+}
 
     if (!refreshPromise) {
       refreshPromise = refreshAccessToken().finally(() => {
@@ -219,9 +231,10 @@ http.interceptors.response.use(
     if (typeof originalRequest.headers?.set === "function") {
       originalRequest.headers.set("Authorization", `Bearer ${newToken}`);
     } else {
-      const headers = (originalRequest.headers ?? {}) as Record<string, string>;
-      headers.Authorization = `Bearer ${newToken}`;
-      originalRequest.headers = headers as typeof originalRequest.headers;
+      (originalRequest.headers as any)?.set?.(
+        "Authorization",
+        `Bearer ${newToken}`,
+      );
     }
 
     return http.request(originalRequest);

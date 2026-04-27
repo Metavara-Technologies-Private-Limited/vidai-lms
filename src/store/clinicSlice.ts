@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { clinicApi } from "../services/clinic.api";
 import type { Clinic } from "../types/clinic.types";
 import type { RootState } from ".";
+import type { LoginType } from "../types/auth.types";
 
 type ApiError = {
   response?: {
@@ -45,7 +46,10 @@ type ProfileClinic = {
 export const syncClinic = async (
   clinic: ProfileClinic,
   email: string,
+  loginType: LoginType,
 ) => {
+  if (loginType === "EXT") return;
+
   const res = await clinicApi.searchByName(clinic.clinic__name);
 
   if (res.data.length > 0) return;

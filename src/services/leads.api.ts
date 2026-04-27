@@ -79,6 +79,7 @@ export type Lead = {
   modified_at: string;
   referral_department_id?: number | null;
   referral_department_name?: string | null;
+  referral_source_id?: number | null;
 
   // ── Contact Information (contracts app) ───────────────────────────────────
   contact_full_name?: string | null;

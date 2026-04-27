@@ -34,6 +34,7 @@ export interface PatientCard {
   mrn: string;
   referralDate: string;
   raw: Lead;
+  referralSourceName?: string;
 }
 
 export interface SourceTableRow {

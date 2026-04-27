@@ -28,8 +28,6 @@ import {
 import { toast } from "react-toastify";
 import { toSafePhotoUrl } from "../utils/mediaUrl";
 
-
-
 function resolveInitialLanguage(): LanguageCode {
   const raw = (localStorage.getItem(STORAGE_LANGUAGE_KEY) || "").trim();
   const byCode = LANGUAGE_OPTIONS.find((opt) => opt.code === raw)?.code;
@@ -333,7 +331,15 @@ export default function VidaiLogin() {
               )}
             </button>
 
-            <button type="button" className={styles.forgotButton}>
+            <button
+              type="button"
+              className={styles.forgotButton}
+              onClick={() => {
+                toast.info(
+                  "Please contact your administrator to reset your password.",
+                );
+              }}
+            >
               {t.forgotPassword}
             </button>
           </form>

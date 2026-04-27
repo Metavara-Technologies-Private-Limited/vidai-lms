@@ -477,7 +477,6 @@ export default function EditLead() {
           {/* ===== STEP 1 ===== */}
           {currentStep === 1 && (
             <Box>
-
               {/* ── SECTION: Lead Information ── */}
               <Typography sx={sectionLabelStyle}>LEAD INFORMATION</Typography>
 
@@ -805,7 +804,12 @@ export default function EditLead() {
                     {campaign && (
                       <Typography
                         component="span"
-                        sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}
+                        sx={{
+                          fontSize: "0.65rem",
+                          color: "#6366F1",
+                          ml: 1,
+                          fontWeight: 500,
+                        }}
                       >
                         auto-filled from campaign
                       </Typography>
@@ -846,7 +850,12 @@ export default function EditLead() {
                       {campaign && (
                         <Typography
                           component="span"
-                          sx={{ fontSize: "0.65rem", color: "#6366F1", ml: 1, fontWeight: 500 }}
+                          sx={{
+                            fontSize: "0.65rem",
+                            color: "#6366F1",
+                            ml: 1,
+                            fontWeight: 500,
+                          }}
                         >
                           auto-filled from campaign
                         </Typography>
@@ -914,7 +923,12 @@ export default function EditLead() {
                       {subSource && !campaign && (
                         <Typography
                           component="span"
-                          sx={{ fontSize: "0.65rem", color: "#94A3B8", ml: 1, fontWeight: 500 }}
+                          sx={{
+                            fontSize: "0.65rem",
+                            color: "#94A3B8",
+                            ml: 1,
+                            fontWeight: 500,
+                          }}
                         >
                           linked with {subSource}
                         </Typography>
@@ -925,7 +939,8 @@ export default function EditLead() {
                         fullWidth
                         size="small"
                         value={
-                          campaigns.find((c) => String(c.id) === campaign)?.name ?? ""
+                          campaigns.find((c) => String(c.id) === campaign)
+                            ?.name ?? ""
                         }
                         InputProps={{ readOnly: true }}
                         sx={readOnlyStyle}
@@ -984,7 +999,12 @@ export default function EditLead() {
                     filterOptions={(options) => options}
                     value={
                       assigneeOptions.find((o) => String(o.id) === assignee) ||
-                      null
+                      (assignee
+                        ? {
+                            id: Number(assignee),
+                            username: assigneeName,
+                          }
+                        : null)
                     }
                     inputValue={assigneeName}
                     onInputChange={(_, value, reason) => {
@@ -1125,7 +1145,9 @@ export default function EditLead() {
                 </Box>
 
                 <Box>
-                  <Typography sx={labelStyle}>Next Action Description</Typography>
+                  <Typography sx={labelStyle}>
+                    Next Action Description
+                  </Typography>
                   <TextField
                     fullWidth
                     size="small"
@@ -1135,7 +1157,6 @@ export default function EditLead() {
                   />
                 </Box>
               </Box>
-
             </Box>
           )}
 
