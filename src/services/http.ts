@@ -53,8 +53,8 @@ export const getExtToken = async (dispatch: AppDispatch, getState:any, forceRefr
   if (!forceRefresh && stored) return stored;
 
   const res = await http.post("/proxy/login/", {
-    username: "Admin",
-    password: "vidai_admin@2023",
+    username: "Thomas",
+    password: "super@123",
   });
 
   const token = res.data?.data?.ext_token;
