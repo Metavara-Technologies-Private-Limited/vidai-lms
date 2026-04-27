@@ -14,7 +14,7 @@ import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined
 import { ClinicAPI, LeadAPI } from "../../services/leads.api";
 import type { Employee, Lead } from "../../services/leads.api";
 import { useDispatch, useSelector } from "react-redux";
-import { loadReferralSources, selectSources } from "../../store/referralSlice";
+import { clearSources, loadReferralSources, selectSources, selectSourcesLoading } from "../../store/referralSlice";
 import type { AppDispatch } from "../../store";
 import { selectClinic } from "../../store/clinicSlice";
 import {
@@ -30,6 +30,7 @@ import {
   getInitials,
   getPatientAvatarStyle,
 } from "./referrals.utils";
+import { fetchReferralDepartments } from "../../services/referral.api";
 
 interface DoctorRow {
   id: number;
@@ -51,7 +52,7 @@ interface ReferralSource {
 
 interface SourcePageConfig {
   title: string;
-  departmentId: number;
+  departmentId?: number;
   searchPlaceholder: string;
   headers: string[];
   toRow: (source: ReferralSource) => SourceTableRow;
@@ -60,7 +61,7 @@ interface SourcePageConfig {
 const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
   corporate: {
     title: "Corporate HR",
-    departmentId: 2,
+    // departmentId: 2,
     searchPlaceholder: "Search by Partner name",
     headers: ["HR Name", "Email | Contact", "Referrals", "Company Name"],
     toRow: (item) => ({
@@ -74,7 +75,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
   },
   insurance: {
     title: "Insurance Partners",
-    departmentId: 4,
+    // departmentId: 4,
     searchPlaceholder: "Search by Partner name",
     headers: [
       "Insurance Provider",
@@ -93,7 +94,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
   },
   diagnostic: {
     title: "Diagnostic Labs",
-    departmentId: 3,
+    // departmentId: 3,
     searchPlaceholder: "Search by Partner name",
     headers: ["Lab Name", "Email | Contact", "Referrals", "City"],
     toRow: (item) => ({
@@ -107,7 +108,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
   },
   zoya: {
     title: "Zoya Partners",
-    departmentId: 6,
+    // departmentId: 6,
     searchPlaceholder: "Search by Partner name",
     headers: ["Partner Name", "Email | Contact", "Referrals", "Region"],
     toRow: (item) => ({
@@ -121,7 +122,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
   },
   practo: {
     title: "Practo Referrals",
-    departmentId: 5,
+    // departmentId: 5,
     searchPlaceholder: "Search by Partner name",
     headers: [
       "Account Manager",
@@ -151,12 +152,33 @@ const SourceDepartmentPage = ({
   const dispatch = useDispatch<AppDispatch>();
   const sources = useSelector(selectSources) as ReferralSource[];
   const config = SOURCE_PAGE_CONFIG[pageKey];
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const loading = useSelector(selectSourcesLoading);
 
   useEffect(() => {
-    dispatch(
-      loadReferralSources({ referral_department_id: config.departmentId }),
-    );
-  }, [dispatch, config.departmentId]);
+    const loadDept = async () => {
+      const clinicId = Number(localStorage.getItem("clinic_id"));
+      const depts = await fetchReferralDepartments(clinicId);
+
+      const match = depts.find((d) =>
+        config.title.toLowerCase().includes(d.name.toLowerCase()),
+      );
+
+      if (match) {
+        setDepartmentId(match.id);
+      }
+    };
+
+    loadDept();
+  }, [config.title]);
+
+  useEffect(() => {
+    if (!departmentId) return;
+
+    dispatch(clearSources());
+
+    dispatch(loadReferralSources({ referral_department_id: departmentId }));
+  }, [dispatch, departmentId]);
 
   const rows = useMemo(
     () =>
@@ -176,7 +198,11 @@ const SourceDepartmentPage = ({
         setSearch={setSearch}
         placeholder={config.searchPlaceholder}
       />
-      <PartnerSourceTable rows={rows} headers={config.headers} />
+      {loading ? (
+        <CircularProgress />
+      ) : (
+        <PartnerSourceTable rows={rows} headers={config.headers} />
+      )}
     </Box>
   );
 };

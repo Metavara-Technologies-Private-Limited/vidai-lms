@@ -934,12 +934,15 @@ export function useEditLead() {
         setWantAppointment(hasBooking ? "yes" : "no");
 
         if (hasBooking) {
-          if (IS_MEDICAL_APP)
-            setDepartment(lead.department_id?.toString() ?? "");
-          const personnelId = anyLead.personal_id as number | undefined;
+          const personnelId = anyLead.appointment_personnel_id as
+            | number
+            | undefined;
+
           setAppointmentPersonnel(personnelId?.toString() ?? "");
           setAppointmentPersonnelSearch(
-            (anyLead.personal_name as string) ?? "",
+            typeof anyLead.appointment_personnel_name === "string"
+              ? anyLead.appointment_personnel_name
+              : "",
           );
           setAppointmentDate(lead.appointment_date ?? "");
           if (lead.appointment_date)
@@ -1270,9 +1273,10 @@ export function useEditLead() {
             remark: remark || "",
             ...(IS_MEDICAL_APP
               ? {
-                  personal_id: appointmentPersonnel
-                    ? intOrNull(appointmentPersonnel)
-                    : null,
+                  assigned_to_id: intOrNull(assignee),
+                  assigned_to_name: appointmentPersonnelSearch,
+                  personal_id: resolvedGeneratedById,
+                  appointment_personnel_id: intOrNull(appointmentPersonnel),
                 }
               : {}),
           }

@@ -95,6 +95,8 @@ export interface LeadRecord {
   partner_inquiry?: boolean;
   phone_number?: string;
   documents?: DocumentEntry[];
+  referral_source_name?: string;
+  referral_department_name?: string;
 }
 
 export interface CallMessageProps {

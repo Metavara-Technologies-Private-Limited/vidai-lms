@@ -162,7 +162,7 @@ export async function fetchReferralDepartments(
     )
       return response.data.results;
 
-    return STATIC_REFERRAL_DEPARTMENTS;
+    return [];
   } catch (error) {
     const status =
       (error as { response?: { status?: number } })?.response?.status ?? 0;
@@ -170,11 +170,9 @@ export async function fetchReferralDepartments(
       markReferralDepartmentsEndpointUnsupported();
       const fallbackSources = await fetchReferralSources({});
       const inferredDepartments = mapSourcesToDepartments(fallbackSources);
-      return inferredDepartments.length > 0
-        ? inferredDepartments
-        : STATIC_REFERRAL_DEPARTMENTS;
+      return inferredDepartments;
     }
 
-    return STATIC_REFERRAL_DEPARTMENTS;
+    return [];
   }
 }
