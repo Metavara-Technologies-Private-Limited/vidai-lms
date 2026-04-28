@@ -8,6 +8,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { useTheme } from "@mui/material/styles";
+import type { Theme, SystemStyleObject } from "@mui/system";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
 import NewLeadsIcon from "../../assets/icons/NewLeads.svg";
@@ -26,6 +27,25 @@ import {
   getActivePipelineStages,
   normalizeStageName,
 } from "./pipelineStage.utils";
+
+// Array of available icons for random assignment
+// Exclude TotalLeadsIcon (the 'three person' icon) from dynamic stage icons
+const RANDOM_STAGE_ICONS = [
+  NewLeadsIcon,
+  AppointmentsIcon,
+  FollowUpsIcon,
+  TotalConvertedIcon,
+  LostLeadsIcon,
+];
+
+// Exclude totalLeads style from dynamic stage styles
+const RANDOM_STAGE_STYLES = [
+  kpiCardsStyles.newLeads,
+  kpiCardsStyles.appointments,
+  kpiCardsStyles.followUps,
+  kpiCardsStyles.totalConverted,
+  kpiCardsStyles.lostLeads,
+];
 import type { TimeRange } from "./TimeRangeSelector";
 import { getTimeRangeBounds, isDateWithinBounds } from "./timeRange.utils";
 
@@ -39,18 +59,16 @@ type KpiCardId =
   | "lostLeads"
   | "negotiation"
   | "proposalSent"
-  | "contractSigned"
-  | string; // Support dynamic stage IDs
+  | "contractSigned";
 
 type LocalKpiCardData = {
   id: KpiCardId;
   label: string;
   value: number;
   breakdown?: Array<{ label: string; value: number }>;
-  stageColor?: string;
-  stageName?: string;
-  isDynamicStage?: boolean;
 };
+
+type DynamicKpiCardData = LocalKpiCardData & { icon: string; cardStyle: SystemStyleObject<Theme> };
 
 type ExtendedKpiCounts = LiveKpiCounts & {
   cycleConversion: number;
@@ -59,111 +77,52 @@ type ExtendedKpiCounts = LiveKpiCounts & {
   contractSigned: number;
   registered: number;
   treatment: number;
-  [key: string]: number; // Support dynamic stage counts
 };
 
 /* KPI → ICON MAP */
-const KPI_ICONS: Record<string, string> = {
-  totalLeads: TotalLeadsIcon,
-  newLeads: NewLeadsIcon,
-  appointments: AppointmentsIcon,
-  followUps: FollowUpsIcon,
-  cycleConversion: TotalConvertedIcon,
-  totalConverted: TotalConvertedIcon,
-  lostLeads: LostLeadsIcon,
-  negotiation: FollowUpsIcon,
-  proposalSent: AppointmentsIcon,
-  contractSigned: TotalConvertedIcon,
-};
 
-const getIconForStage = (stageName: string): string => {
-  const normalized = normalizeStageName(stageName);
-  if (KPI_ICONS[normalized]) return KPI_ICONS[normalized];
-
-  // Infer icon based on stage name keywords
-  if (normalized.includes("appointment") || normalized.includes("demo"))
-    return AppointmentsIcon;
-  if (normalized.includes("follow") || normalized.includes("qualified"))
-    return FollowUpsIcon;
-  if (
-    normalized.includes("contract") ||
-    normalized.includes("signed") ||
-    normalized.includes("won")
-  )
-    return TotalConvertedIcon;
-  if (normalized.includes("lost") || normalized.includes("closed"))
-    return LostLeadsIcon;
-
-  // Default icon
-  return NewLeadsIcon;
-};
-
-const getCardStyleForStage = (stageColor?: string) => {
-  if (!stageColor) return kpiCardsStyles.totalLeads;
-
-  const hslaLight = stageColor.replace("hsl", "hsla").replace(")", ", 0.25)");
-  const hslaLighter = stageColor.replace("hsl", "hsla").replace(")", ", 0.12)");
-
-  return {
-    background: `linear-gradient(
-      180deg,
-      ${hslaLight} 0%,
-      ${hslaLighter} 75%,
-      #EFE 100%
-    )`,
-  };
-};
-
-const getColorFromString = (str: string) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-
-  const h = hash % 360;
-
-  return `hsl(${h}, 50%, 78%)`;
-};
-
-const getCardStyle = (id: KpiCardId, stageColor?: string) => {
-  console.log(stageColor)
-  switch (id) {
-    case "totalLeads":
-      return kpiCardsStyles.totalLeads;
-    case "newLeads":
-      return kpiCardsStyles.newLeads;
-    case "appointments":
-      return kpiCardsStyles.appointments;
-    case "followUps":
-      return kpiCardsStyles.followUps;
-    case "cycleConversion":
-      return kpiCardsStyles.totalConverted;
-    case "totalConverted":
-      return kpiCardsStyles.totalConverted;
-    case "lostLeads":
-      return kpiCardsStyles.lostLeads;
-    case "negotiation":
-      return kpiCardsStyles.followUps;
-    case "proposalSent":
-      return kpiCardsStyles.appointments;
-    case "contractSigned":
-      return kpiCardsStyles.totalConverted;
-    default:
-      return kpiCardsStyles.totalLeads;
-  }
-};
 
 const formatCount = (value: number) =>
   new Intl.NumberFormat("en-IN").format(value || 0);
 
+const equivalentStatuses: Record<string, string[]> = {
+  new: ["new"],
+  contacted: ["contacted"],
+  "follow-ups": [
+    "follow-ups",
+    "follow-up",
+    "followup",
+    "follow-up-leads",
+    "follow-up-lead",
+    "follow-up-lead-stage",
+    "follow-up-stage",
+    "contacted",
+  ],
+  converted: ["converted", "converted-lead", "converted-leads"],
+  lost: ["lost", "lost-lead", "lost-leads", "closed", "closed-lost"],
+  "cycle-conversion": ["cycle-conversion", "cycleconversion"],
+  appointment: ["appointment", "appointments"],
+  negotiation: ["negotiation", "negotiating"],
+  "proposal-sent": ["proposal-sent", "proposal"],
+  "contract-signed": ["contract-signed", "contractsigned", "contract"],
+};
 
+const getEquivalentStatusKeys = (statusKey: string): Set<string> => {
+  const normalized = normalizeStageName(statusKey);
+  return new Set(equivalentStatuses[normalized] ?? [normalized]);
+};
 
+const stageMatchesStatusKey = (
+  stageName: string,
+  statusKey: string,
+): boolean => {
+  const normalizedStage = normalizeStageName(stageName);
+  return getEquivalentStatusKeys(statusKey).has(normalizedStage);
+};
 
 interface KpiCardsProps {
   timeRange: TimeRange;
 }
-
-// ... keep all imports and helper functions (getIconForStage, getCardStyle, etc.) exactly as they are
 
 const KpiCards = ({ timeRange }: KpiCardsProps) => {
   const leads = useSelector(selectLeads);
@@ -183,7 +142,6 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  // Keep the counts calculation as is to ensure data integrity
   const counts = useMemo<ExtendedKpiCounts>(() => {
     const bounds = getTimeRangeBounds(timeRange);
     const filteredLeads = sourceLeads.filter((lead) => {
@@ -196,65 +154,90 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
       return true;
     });
 
+    const activeLeadCount = filteredLeads.reduce(
+      (count, lead) => (lead?.is_active === false ? count : count + 1),
+      0,
+    );
 
     if (filteredLeads.length === 0 || pipelineStages.length === 0) {
-      // Fill all required keys for ExtendedKpiCounts
-      const emptyCounts: ExtendedKpiCounts = {
-        totalLeads: 0,
+      return {
+        totalLeads: activeLeadCount,
         newLeads: 0,
         appointments: 0,
         followUps: 0,
         cycleConversion: 0,
         totalConverted: 0,
         lostLeads: 0,
+        registered: 0,
+        treatment: 0,
         negotiation: 0,
         proposalSent: 0,
         contractSigned: 0,
-        registered: 0,
-        treatment: 0,
       };
-      pipelineStages.forEach((stage) => { emptyCounts[String(stage.id)] = 0; });
-      return emptyCounts;
     }
 
     const stageCounts = buildStageCountMap(filteredLeads, pipelineStages);
-    const dynamicCounts: Record<string, number> = {};
-    pipelineStages.forEach((stage) => {
-      dynamicCounts[stage.id] = stageCounts[stage.id] ?? 0;
-    });
+
+    const sumCountsByStatusKey = (statusKey: string): number =>
+      pipelineStages.reduce((total, stage) => {
+        if (!stageMatchesStatusKey(stage.stage_name, statusKey)) return total;
+        return total + (stageCounts[stage.id] ?? 0);
+      }, 0);
+
+    const newLeads = sumCountsByStatusKey("new");
+    const appointments = sumCountsByStatusKey("appointment");
+    const followUps = sumCountsByStatusKey("follow-ups");
+    const cycleConversion = sumCountsByStatusKey("cycle-conversion");
+    const converted = sumCountsByStatusKey("converted");
+    const lostLeads = sumCountsByStatusKey("lost");
+    const negotiation = sumCountsByStatusKey("negotiation");
+    const proposalSent = sumCountsByStatusKey("proposal-sent");
+    const contractSigned = sumCountsByStatusKey("contract-signed");
+
+    const totalConverted = converted + cycleConversion + contractSigned;
 
     return {
-      totalLeads: filteredLeads.length,
-      ...dynamicCounts,
-    } as ExtendedKpiCounts;
+      totalLeads: activeLeadCount,
+      newLeads,
+      appointments,
+      followUps,
+      cycleConversion,
+      totalConverted,
+      lostLeads,
+      registered: converted,
+      treatment: cycleConversion,
+      negotiation,
+      proposalSent,
+      contractSigned,
+    };
   }, [pipelineStages, sourceLeads, timeRange]);
 
-  // REDUCED LOGIC: Only Total Leads + Dynamic Pipeline Stages
-  const dynamicKpis = useMemo<LocalKpiCardData[]>(() => {
-    // 1. Start with Total Leads
-    const cards: LocalKpiCardData[] = [
-      { id: "totalLeads", label: "Total Leads", value: counts.totalLeads },
+  // Fully dynamic: show a KPI card for every pipeline stage with a random icon
+  const dynamicKpis = useMemo<DynamicKpiCardData[]>(() => {
+    // Always show total leads first
+    const cards: DynamicKpiCardData[] = [
+      { id: "totalLeads", label: "Total Leads", value: counts.totalLeads, icon: TotalLeadsIcon, cardStyle: kpiCardsStyles.totalLeads },
     ];
 
-    // 2. Map only the pipeline stages from your sales pipeline
-    pipelineStages.forEach((stage) => {
-      const stageId = String(stage.id);
+    pipelineStages.forEach((stage, idx) => {
+      const icon = RANDOM_STAGE_ICONS[idx % RANDOM_STAGE_ICONS.length];
+      const cardStyle = RANDOM_STAGE_STYLES[idx % RANDOM_STAGE_STYLES.length];
       cards.push({
-        id: stageId as KpiCardId,
+        id: normalizeStageName(stage.stage_name) as KpiCardId,
         label: stage.stage_name,
-        value: counts[stageId] ?? 0,
-        stageColor: stage.stage_color || getColorFromString(stage.stage_name),
-        stageName: stage.stage_name,
-        isDynamicStage: true,
+        value: buildStageCountMap(sourceLeads, pipelineStages)[stage.id] || 0,
+        icon,
+        cardStyle,
       });
     });
 
     return cards;
-  }, [counts, pipelineStages]);
+  }, [counts, pipelineStages, sourceLeads]);
 
   const checkScroll = useCallback(() => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setShowLeftArrow(scrollLeft > 10);
       const isAtEnd = scrollLeft >= scrollWidth - clientWidth - 10;
       setShowRightArrow(!isAtEnd && scrollWidth > clientWidth);
@@ -263,7 +246,9 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
 
   useEffect(() => {
     window.addEventListener("resize", checkScroll);
-    return () => window.removeEventListener("resize", checkScroll);
+    return () => {
+      window.removeEventListener("resize", checkScroll);
+    };
   }, [checkScroll]);
 
   useEffect(() => {
@@ -285,9 +270,16 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
         <IconButton
           onClick={handleScrollLeft}
           sx={{
-            position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
-            zIndex: 10, bgcolor: "white", boxShadow: "0px 2px 8px rgba(0,0,0,0.2)",
-            width: 36, height: 36, border: "1px solid #e0e0e0",
+            position: "absolute",
+            left: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 10,
+            bgcolor: "white",
+            boxShadow: "0px 2px 8px rgba(0,0,0,0.2)",
+            width: 36,
+            height: 36,
+            border: "1px solid #e0e0e0",
             "&:hover": { bgcolor: "#f5f5f5" },
           }}
         >
@@ -301,45 +293,61 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
         sx={[
           kpiCardsStyles.grid,
           {
-            display: "flex", gap: 1.5, overflowX: "auto", flexWrap: "nowrap",
-            width: "100%", pb: 1, scrollbarWidth: "thin",
+            display: "flex",
+            gap: 1.5,
+            overflowX: "auto",
+            flexWrap: "nowrap",
+            width: "100%",
+            pb: 1,
+            scrollbarWidth: "thin",
             "&::-webkit-scrollbar": { height: "5px" },
-            "&::-webkit-scrollbar-thumb": { backgroundColor: "#daddf0", borderRadius: "10px" },
+            "&::-webkit-scrollbar-thumb": {
+              backgroundColor: "#daddf0",
+              borderRadius: "10px",
+            },
           },
         ]}
       >
         {dynamicKpis.map((item) => {
-          // All cards now use the standard width since totalConverted is removed
-          const cardWidth = isSmallScreen ? 148 : 170;
+          const cardWidth = isSmallScreen
+            ? item.id === "totalConverted"
+              ? 240
+              : 148
+            : item.id === "totalConverted"
+              ? 280
+              : 170;
 
-          const iconSrc = item.id === "totalLeads" 
-            ? TotalLeadsIcon 
-            : getIconForStage(item.stageName || item.label);
-
+          // Ensure cardStyle is always a plain object, not undefined or array
           return (
             <Card
               key={item.id}
               sx={[
                 kpiCardsStyles.cardBase,
-                item.isDynamicStage
-  ? getCardStyleForStage(item.stageColor)
-  : getCardStyle(item.id as KpiCardId),
+                item.cardStyle,
                 {
-                  flexShrink: 0, width: cardWidth, minWidth: cardWidth,
-                  height: isSmallScreen ? 112 : 120, p: isSmallScreen ? 1.25 : 1.5,
+                  flexShrink: 0,
+                  width: cardWidth,
+                  minWidth: cardWidth,
+                  height: isSmallScreen ? 112 : 120,
+                  p: isSmallScreen ? 1.25 : 1.5,
                 },
               ]}
             >
               <Box sx={kpiCardsStyles.iconWrapper}>
                 <Box
                   component="img"
-                  src={iconSrc}
+                  src={item.icon}
                   alt={item.label}
                   sx={kpiCardsStyles.icon}
                 />
               </Box>
-              <Typography sx={kpiCardsStyles.label}>{item.label}</Typography>
-              <Typography sx={kpiCardsStyles.value}>{formatCount(item.value)}</Typography>
+
+              <Typography sx={kpiCardsStyles.label}>
+                {item.label}
+              </Typography>
+              <Typography sx={kpiCardsStyles.value}>
+                {formatCount(item.value)}
+              </Typography>
             </Card>
           );
         })}
@@ -349,9 +357,16 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
         <IconButton
           onClick={handleScrollRight}
           sx={{
-            position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)",
-            zIndex: 10, bgcolor: "white", boxShadow: "0px 2px 8px rgba(0,0,0,0.2)",
-            width: 36, height: 36, border: "1px solid #e0e0e0",
+            position: "absolute",
+            right: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 10,
+            bgcolor: "white",
+            boxShadow: "0px 2px 8px rgba(0,0,0,0.2)",
+            width: 36,
+            height: 36,
+            border: "1px solid #e0e0e0",
             "&:hover": { bgcolor: "#f5f5f5" },
           }}
         >
