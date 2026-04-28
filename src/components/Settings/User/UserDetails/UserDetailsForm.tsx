@@ -404,7 +404,13 @@ const UserDetailsForm: React.FC<Props> = ({
     }
   };
 
+
+  // Required label helper for plain string labels
+  const getRequiredLabel = (label: string) => `${label} *`;
+
   return (
+
+    
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box>
         <Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 2 }}>
@@ -528,7 +534,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="First Name"
+              label={getRequiredLabel("First Name")}
               placeholder="Type Here..."
               value={form.firstName}
               onChange={(e) =>
@@ -545,7 +551,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="Last Name"
+              label={getRequiredLabel("Last Name")}
               placeholder="Type Here..."
               value={form.lastName}
               onChange={(e) =>
@@ -592,7 +598,7 @@ const UserDetailsForm: React.FC<Props> = ({
 
           <FieldGrid>
             <SelectField
-              label="User Role"
+              label={requireRole ? getRequiredLabel("User Role") : "User Role"}
               value={form.userRole}
               onChange={(v) => setForm((prev) => ({ ...prev, userRole: v }))}
               options={roleOptions}
@@ -603,7 +609,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="User Name"
+              label={getRequiredLabel("User Name")}
               placeholder="Type Here..."
               value={form.userName}
               onChange={(e) =>
@@ -617,7 +623,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="Mobile Number"
+              label={getRequiredLabel("Mobile Number")}
               placeholder="Type Here..."
               value={form.mobileNo}
               onChange={(e) => {
@@ -639,7 +645,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="Email"
+              label={getRequiredLabel("Email")}
               placeholder="Type Here..."
               value={form.emailId}
               onChange={(e) =>
@@ -655,7 +661,7 @@ const UserDetailsForm: React.FC<Props> = ({
 
           <FieldGrid>
             <PasswordField
-              label="Password"
+              label={getRequiredLabel("Password")}
               value={form.password}
               onChange={(v) => setForm((prev) => ({ ...prev, password: v }))}
               onFocus={() => {
@@ -673,7 +679,7 @@ const UserDetailsForm: React.FC<Props> = ({
 
           <FieldGrid>
             <PasswordField
-              label="Confirm Password"
+              label={getRequiredLabel("Confirm Password")}
               value={form.confirmPassword}
               onChange={(v) =>
                 setForm((prev) => ({ ...prev, confirmPassword: v }))
