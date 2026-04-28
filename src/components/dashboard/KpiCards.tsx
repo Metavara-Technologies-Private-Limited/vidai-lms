@@ -98,17 +98,35 @@ const getIconForStage = (stageName: string): string => {
   return NewLeadsIcon;
 };
 
-const getCardStyleForStage = (stageColor?: string): Record<string, unknown> => {
-  if (stageColor) {
-    return {
-      background: `linear-gradient(135deg, ${stageColor}22 0%, ${stageColor}11 100%)`,
-      borderLeft: `4px solid ${stageColor}`,
-    };
+const getCardStyleForStage = (stageColor?: string) => {
+  if (!stageColor) return kpiCardsStyles.totalLeads;
+
+  const hslaLight = stageColor.replace("hsl", "hsla").replace(")", ", 0.25)");
+  const hslaLighter = stageColor.replace("hsl", "hsla").replace(")", ", 0.12)");
+
+  return {
+    background: `linear-gradient(
+      180deg,
+      ${hslaLight} 0%,
+      ${hslaLighter} 75%,
+      #EFE 100%
+    )`,
+  };
+};
+
+const getColorFromString = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return kpiCardsStyles.newLeads;
+
+  const h = hash % 360;
+
+  return `hsl(${h}, 50%, 78%)`;
 };
 
 const getCardStyle = (id: KpiCardId, stageColor?: string) => {
+  console.log(stageColor)
   switch (id) {
     case "totalLeads":
       return kpiCardsStyles.totalLeads;
@@ -131,7 +149,7 @@ const getCardStyle = (id: KpiCardId, stageColor?: string) => {
     case "contractSigned":
       return kpiCardsStyles.totalConverted;
     default:
-      return getCardStyleForStage(stageColor);
+      return kpiCardsStyles.totalLeads;
   }
 };
 
@@ -225,7 +243,7 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
         id: stageId as KpiCardId,
         label: stage.stage_name,
         value: counts[stageId] ?? 0,
-        stageColor: stage.stage_color,
+        stageColor: stage.stage_color || getColorFromString(stage.stage_name),
         stageName: stage.stage_name,
         isDynamicStage: true,
       });
@@ -303,7 +321,9 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
               key={item.id}
               sx={[
                 kpiCardsStyles.cardBase,
-                getCardStyle(item.id as KpiCardId, item.stageColor),
+                item.isDynamicStage
+  ? getCardStyleForStage(item.stageColor)
+  : getCardStyle(item.id as KpiCardId),
                 {
                   flexShrink: 0, width: cardWidth, minWidth: cardWidth,
                   height: isSmallScreen ? 112 : 120, p: isSmallScreen ? 1.25 : 1.5,
