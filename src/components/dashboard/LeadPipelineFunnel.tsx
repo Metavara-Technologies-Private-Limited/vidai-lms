@@ -88,10 +88,13 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
         (countsByStage[matchedStage.id] ?? 0) + 1;
     }
 
-    return stages.map((item) => ({
-      ...item,
-      value: countsByStage[item.key] ?? 0,
-    }));
+    // Sort by value descending (highest count first, leftmost)
+    return stages
+      .map((item) => ({
+        ...item,
+        value: countsByStage[item.key] ?? 0,
+      }))
+      .sort((a, b) => b.value - a.value);
   }, [pipelineStages, sourceLeads, stages, timeRange]);
 
   if (loading) {
