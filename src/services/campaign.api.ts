@@ -56,23 +56,65 @@ export const CampaignAPI = {
     }),
 
   // ── LinkedIn ──────────────────────────────────────────────────
+
+  /**
+   * Trigger LinkedIn campaign insights fetch via Zapier.
+   * POST /api/social/campaign/insights/
+   */
   triggerLinkedInInsights: (campaignId: string) =>
     http.post("/social/campaign/insights/", {
       campaign_id: campaignId,
       platform: "linkedin",
     }),
 
+  /**
+   * Trigger LinkedIn campaign status sync via Zapier.
+   * POST /api/social/campaign/status/
+   */
   getLinkedInStatus: (campaignId: string) =>
     http.post("/social/campaign/status/", {
       campaign_id: campaignId,
       platform: "linkedin",
     }),
 
-  updateLinkedInStatus: (campaignId: string, desiredStatus: "ACTIVE" | "PAUSED") =>
+  /**
+   * Update LinkedIn campaign status (ACTIVE | PAUSED).
+   * POST /api/social/campaign/update/
+   */
+  updateLinkedInStatus: (
+    campaignId: string,
+    desiredStatus: "ACTIVE" | "PAUSED",
+  ) =>
     http.post("/social/campaign/update/", {
       campaign_id: campaignId,
       desired_status: desiredStatus,
     }),
+
+  /**
+   * Check whether the clinic's LinkedIn SocialAccount has all required
+   * fields (account_id, org_urn, campaign_group) set.
+   * GET /api/webhooks/linkedin-account-status/<clinic_id>/
+   *
+   * Response shape:
+   * {
+   *   connected: boolean;
+   *   setup_complete: boolean;
+   *   missing: string[];       // e.g. ["account_id", "org_urn"]
+   *   account_id?: string;
+   *   org_urn?: string;
+   *   has_campaign_group?: boolean;
+   * }
+   */
+  getLinkedInAccountStatus: (clinicId: number) =>
+    http.get<{
+      connected: boolean;
+      setup_complete: boolean;
+      missing: string[];
+      account_id?: string;
+      org_urn?: string;
+      has_campaign_group?: boolean;
+    }>(`/webhooks/linkedin-account-status/${clinicId}/`),
+
   // ─────────────────────────────────────────────────────────────
 
   getFacebookStatus: () => http.get("/facebook/status"),
@@ -88,9 +130,11 @@ export const CampaignAPI = {
     }),
 
   updateStatus: (id: string, status: string, fullData: CampaignAPIType) =>
-    http.put(`/campaigns/${id}/update/`, { ...fullData, status }, {
-      params: { clinic_id: storedClinicId() },
-    }),
+    http.put(
+      `/campaigns/${id}/update/`,
+      { ...fullData, status },
+      { params: { clinic_id: storedClinicId() } },
+    ),
 
   getFacebookInsights: (campaignId: string) =>
     http.get(`/campaigns/${campaignId}/facebook-insights/`, {

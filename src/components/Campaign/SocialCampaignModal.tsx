@@ -10,6 +10,8 @@ import {
   Modal,
   Typography,
   IconButton,
+  Chip,
+  Tooltip,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -52,6 +54,16 @@ const PLATFORM_LIST: { id: Platform; label: string; cpc: number }[] = [
 const isPlainUrl = (str: string) =>
   str.trim().startsWith("http") && !str.trim().includes(" ");
 
+// ─── LinkedIn account status shape ───────────────────────────────
+interface LinkedInAccountStatus {
+  connected: boolean;
+  setup_complete: boolean;
+  missing: string[];
+  account_id?: string;
+  org_urn?: string;
+  has_campaign_group?: boolean;
+}
+
 export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
@@ -59,24 +71,36 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const [googleAdsIntegrationConnected, setGoogleAdsIntegrationConnected] =
     useState(false);
 
+  // ─── LinkedIn account status ───────────────────────────────────
+  const [linkedInAccountStatus, setLinkedInAccountStatus] =
+    useState<LinkedInAccountStatus | null>(null);
+  const [linkedInStatusLoading, setLinkedInStatusLoading] = useState(false);
+
+  // ─── Per-campaign LinkedIn live status (after creation) ────────
+  const [linkedInLiveStatus, setLinkedInLiveStatus] = useState<string | null>(null);
+  const [linkedInInsightsLoading, setLinkedInInsightsLoading] = useState(false);
+  const [linkedInStatusCheckLoading, setLinkedInStatusCheckLoading] = useState(false);
+  const [linkedInUpdateLoading, setLinkedInUpdateLoading] = useState(false);
+  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+
   useEffect(() => {
     let isMounted = true;
 
     if (!clinic?.id) {
-      // Keep this asynchronous so React compiler does not flag sync state updates in effect.
       queueMicrotask(() => {
         if (isMounted) {
           setGoogleAdsIntegrationConnected(false);
+          setLinkedInAccountStatus(null);
         }
       });
-
       return () => {
         isMounted = false;
       };
     }
 
-    const fetchGoogleAdsStatus = async () => {
+    const fetchStatuses = async () => {
       try {
+        // ── Google Ads connection check ──────────────────────────
         const res = await integrationApi.getSocialAccounts(clinic.id);
         const accs = Array.isArray(res.data) ? res.data : [];
 
@@ -95,9 +119,30 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           setGoogleAdsIntegrationConnected(false);
         }
       }
+
+      // ── LinkedIn account setup check ─────────────────────────
+      try {
+        setLinkedInStatusLoading(true);
+        const liRes = await CampaignAPI.getLinkedInAccountStatus(clinic.id);
+        if (isMounted) {
+          setLinkedInAccountStatus(liRes.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch LinkedIn account status", err);
+        if (isMounted) {
+          // Treat as not connected if the endpoint errors
+          setLinkedInAccountStatus({
+            connected: false,
+            setup_complete: false,
+            missing: ["linkedin_account"],
+          });
+        }
+      } finally {
+        if (isMounted) setLinkedInStatusLoading(false);
+      }
     };
 
-    fetchGoogleAdsStatus();
+    fetchStatuses();
 
     return () => {
       isMounted = false;
@@ -106,7 +151,15 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
   const isGoogleAdsConnected = Boolean(
     (googleAdsCustomerId && String(googleAdsCustomerId).trim().length) ||
-    googleAdsIntegrationConnected,
+      googleAdsIntegrationConnected,
+  );
+
+  /**
+   * True when LinkedIn is fully wired up (connected + account_id + org_urn +
+   * campaign_group all present). Only then do we actually send to Zapier.
+   */
+  const isLinkedInFullySetup = Boolean(
+    linkedInAccountStatus?.connected && linkedInAccountStatus?.setup_complete,
   );
 
   const [step, setStep] = useState(1);
@@ -326,6 +379,22 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   const toggleAccount = (id: Platform) => {
+    // Warn if LinkedIn is selected but not fully set up
+    if (
+      id === "linkedin" &&
+      !accounts.includes("linkedin") &&
+      linkedInAccountStatus !== null &&
+      !isLinkedInFullySetup
+    ) {
+      const missing = linkedInAccountStatus?.missing ?? [];
+      const missingStr = missing.length
+        ? ` Missing: ${missing.join(", ")}.`
+        : "";
+      toast.warn(
+        `LinkedIn is not fully set up.${missingStr} The campaign will be saved but LinkedIn ads will not be triggered until setup is complete.`,
+        { toastId: "linkedin-not-setup" },
+      );
+    }
     setAccounts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
@@ -352,7 +421,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     }
   };
 
-  const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
+  const handleCreateCampaign = async (
+    type: "live" | "draft" | "scheduled",
+  ) => {
     setSubmitted(true);
 
     const needsSchedule = type === "scheduled" || type === "draft";
@@ -429,7 +500,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             ? CAMPAIGN_STATUS.SCHEDULED
             : CAMPAIGN_STATUS.DRAFT;
 
-      // BE SocialMediaCampaignCreateAPIView expects the string array, not numeric constant
       const campaignMode: ("organic_posting" | "paid_advertising")[] = [
         mode === "paid" ? "paid_advertising" : "organic_posting",
       ];
@@ -468,9 +538,19 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
       const createdRes = await CampaignAPI.createSocial(payload);
 
-      // -------------------------------------------------------
+      // Store campaign id for post-creation LinkedIn controls
+      const newCampaignId: string | null =
+        (createdRes?.data as { id?: string })?.id ??
+        (createdRes?.data as { campaign_id?: string })?.campaign_id ??
+        null;
+
+      if (newCampaignId) {
+        setCreatedCampaignId(newCampaignId);
+      }
+
+      // ─────────────────────────────────────────────────────────
       // Google Ads: fire the dedicated endpoint if selected
-      // -------------------------------------------------------
+      // ─────────────────────────────────────────────────────────
       const shouldSendGoogleAds =
         accounts.includes("google_ads") && isGoogleAdsConnected;
 
@@ -517,7 +597,17 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           "Google Ads was not triggered because this clinic is not connected to Google Ads.",
         );
       }
-      // -------------------------------------------------------
+
+      // ─────────────────────────────────────────────────────────
+      // LinkedIn: warn if selected but not fully set up
+      // ─────────────────────────────────────────────────────────
+      if (accounts.includes("linkedin") && !isLinkedInFullySetup) {
+        const missing = linkedInAccountStatus?.missing ?? [];
+        toast.warn(
+          `Campaign saved. LinkedIn ads were NOT sent because the LinkedIn account setup is incomplete (missing: ${missing.join(", ") || "account details"}). Complete setup in Integrations and retry.`,
+          { autoClose: 8000 },
+        );
+      }
 
       onSave(createdRes?.data ?? payload);
       toast.success("Campaign created successfully");
@@ -555,6 +645,228 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
       toast.error("Failed to create campaign");
     }
+  };
+
+  // ─── LinkedIn post-creation actions ──────────────────────────
+  const handleLinkedInStatusCheck = async () => {
+    if (!createdCampaignId) return;
+    setLinkedInStatusCheckLoading(true);
+    try {
+      const res = await CampaignAPI.getLinkedInStatus(createdCampaignId);
+      const respStatus =
+        (res?.data as { linkedin_live_status?: string })?.linkedin_live_status ??
+        (res?.data as { status?: string })?.status ??
+        "unknown";
+      setLinkedInLiveStatus(String(respStatus));
+      toast.success(`LinkedIn status: ${respStatus}`);
+    } catch {
+      toast.error("Failed to fetch LinkedIn status");
+    } finally {
+      setLinkedInStatusCheckLoading(false);
+    }
+  };
+
+  const handleLinkedInInsights = async () => {
+    if (!createdCampaignId) return;
+    setLinkedInInsightsLoading(true);
+    try {
+      await CampaignAPI.triggerLinkedInInsights(createdCampaignId);
+      toast.success("LinkedIn insights requested. Data will sync shortly.");
+    } catch {
+      toast.error("Failed to trigger LinkedIn insights");
+    } finally {
+      setLinkedInInsightsLoading(false);
+    }
+  };
+
+  const handleLinkedInPause = async () => {
+    if (!createdCampaignId) return;
+    setLinkedInUpdateLoading(true);
+    try {
+      await CampaignAPI.updateLinkedInStatus(createdCampaignId, "PAUSED");
+      setLinkedInLiveStatus("PAUSED");
+      toast.success("LinkedIn campaign paused.");
+    } catch {
+      toast.error("Failed to pause LinkedIn campaign");
+    } finally {
+      setLinkedInUpdateLoading(false);
+    }
+  };
+
+  const handleLinkedInResume = async () => {
+    if (!createdCampaignId) return;
+    setLinkedInUpdateLoading(true);
+    try {
+      await CampaignAPI.updateLinkedInStatus(createdCampaignId, "ACTIVE");
+      setLinkedInLiveStatus("ACTIVE");
+      toast.success("LinkedIn campaign resumed.");
+    } catch {
+      toast.error("Failed to resume LinkedIn campaign");
+    } finally {
+      setLinkedInUpdateLoading(false);
+    }
+  };
+
+  // ─── LinkedIn connection badge shown on platform card ─────────
+  const renderLinkedInBadge = () => {
+    if (linkedInStatusLoading) {
+      return (
+        <Chip
+          label="Checking…"
+          size="small"
+          sx={{ ml: 1, fontSize: "10px", height: 18, bgcolor: "#f0f0f0" }}
+        />
+      );
+    }
+    if (!linkedInAccountStatus) return null;
+
+    if (!linkedInAccountStatus.connected) {
+      return (
+        <Tooltip title="LinkedIn not connected. Go to Integrations to connect.">
+          <Chip
+            label="Not connected"
+            size="small"
+            color="error"
+            sx={{ ml: 1, fontSize: "10px", height: 18 }}
+          />
+        </Tooltip>
+      );
+    }
+
+    if (!linkedInAccountStatus.setup_complete) {
+      const missing = linkedInAccountStatus.missing.join(", ");
+      return (
+        <Tooltip
+          title={`LinkedIn connected but setup incomplete. Missing: ${missing}. Go to Integrations.`}
+        >
+          <Chip
+            label="Setup incomplete"
+            size="small"
+            color="warning"
+            sx={{ ml: 1, fontSize: "10px", height: 18 }}
+          />
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Tooltip title="LinkedIn fully connected and ready.">
+        <Chip
+          label="Ready"
+          size="small"
+          color="success"
+          sx={{ ml: 1, fontSize: "10px", height: 18 }}
+        />
+      </Tooltip>
+    );
+  };
+
+  // ─── LinkedIn live controls panel (shown in Step 3 after campaign exists) ─
+  const renderLinkedInControls = () => {
+    if (!accounts.includes("linkedin")) return null;
+
+    return (
+      <div
+        className="section-card"
+        style={{
+          marginTop: 16,
+          border: "1px solid #0077b5",
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <img
+            src={platformIcons["linkedin"]}
+            alt="LinkedIn"
+            style={{ width: 20, height: 20 }}
+          />
+          <h3 style={{ margin: 0, color: "#0077b5" }}>LinkedIn Campaign Controls</h3>
+          {linkedInLiveStatus && (
+            <Chip
+              label={linkedInLiveStatus}
+              size="small"
+              color={
+                linkedInLiveStatus === "ACTIVE"
+                  ? "success"
+                  : linkedInLiveStatus === "PAUSED"
+                    ? "warning"
+                    : "default"
+              }
+              sx={{ ml: "auto" }}
+            />
+          )}
+        </div>
+
+        {!isLinkedInFullySetup && (
+          <p
+            style={{
+              color: "#d97706",
+              fontSize: 12,
+              marginBottom: 10,
+              backgroundColor: "#fffbeb",
+              padding: "6px 10px",
+              borderRadius: 4,
+              border: "1px solid #fcd34d",
+            }}
+          >
+            ⚠️ LinkedIn account setup is incomplete (missing:{" "}
+            {linkedInAccountStatus?.missing?.join(", ") || "account details"}).
+            Complete setup in Integrations for ads to be triggered.
+          </p>
+        )}
+
+        {isLinkedInFullySetup && !createdCampaignId && (
+          <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+            Controls will be available after the campaign is created.
+          </p>
+        )}
+
+        {isLinkedInFullySetup && createdCampaignId && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              className="cancel-btn"
+              style={{ fontSize: 12, padding: "4px 12px" }}
+              onClick={handleLinkedInStatusCheck}
+              disabled={linkedInStatusCheckLoading}
+            >
+              {linkedInStatusCheckLoading ? "Checking…" : "🔄 Sync Status"}
+            </button>
+
+            <button
+              className="cancel-btn"
+              style={{ fontSize: 12, padding: "4px 12px" }}
+              onClick={handleLinkedInInsights}
+              disabled={linkedInInsightsLoading}
+            >
+              {linkedInInsightsLoading ? "Requesting…" : "📊 Fetch Insights"}
+            </button>
+
+            {linkedInLiveStatus !== "PAUSED" && (
+              <button
+                className="cancel-btn"
+                style={{ fontSize: 12, padding: "4px 12px", color: "#d97706" }}
+                onClick={handleLinkedInPause}
+                disabled={linkedInUpdateLoading}
+              >
+                {linkedInUpdateLoading ? "Updating…" : "⏸ Pause"}
+              </button>
+            )}
+
+            {linkedInLiveStatus === "PAUSED" && (
+              <button
+                className="next-btn"
+                style={{ fontSize: 12, padding: "4px 12px" }}
+                onClick={handleLinkedInResume}
+                disabled={linkedInUpdateLoading}
+              >
+                {linkedInUpdateLoading ? "Updating…" : "▶ Resume"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -661,11 +973,13 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     displayEmpty
                   >
                     <MenuItem value="">Select Audience</MenuItem>
-                    {Object.entries(CAMPAIGN_AUDIENCE).map(([value, label]) => (
-                      <MenuItem key={value} value={value}>
-                        {label}
-                      </MenuItem>
-                    ))}
+                    {Object.entries(CAMPAIGN_AUDIENCE).map(
+                      ([value, label]) => (
+                        <MenuItem key={value} value={value}>
+                          {label}
+                        </MenuItem>
+                      ),
+                    )}
                   </Select>
                 </FormControl>
               </div>
@@ -735,6 +1049,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     <div className="account-left">
                       <img src={platformIcons[acc.id]} alt={acc.label} />
                       <span>{acc.label}</span>
+                      {/* LinkedIn-specific connection badge */}
+                      {acc.id === "linkedin" && renderLinkedInBadge()}
                     </div>
                     <div
                       className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
@@ -897,31 +1213,31 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   <div className="budget-section">
                     <h3>Budget Allocation</h3>
                     <div className="budget-row">
-                      {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).map(
-                        (p) => (
-                          <div key={p.id} className="budget-card">
-                            <div className="budget-title">
-                              <img src={platformIcons[p.id]} alt={p.label} />
-                              <span>
-                                {p.label} (Estimate CPC : ${p.cpc})
-                              </span>
-                            </div>
-                            <div className="budget-input-wrapper">
-                              <label>Enter Amount ($)</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="10"
-                                value={budgets[p.id]}
-                                onChange={(e) =>
-                                  setBudget(p.id, Number(e.target.value))
-                                }
-                                className="budget-input"
-                              />
-                            </div>
+                      {PLATFORM_LIST.filter((p) =>
+                        accounts.includes(p.id),
+                      ).map((p) => (
+                        <div key={p.id} className="budget-card">
+                          <div className="budget-title">
+                            <img src={platformIcons[p.id]} alt={p.label} />
+                            <span>
+                              {p.label} (Estimate CPC : ${p.cpc})
+                            </span>
                           </div>
-                        ),
-                      )}
+                          <div className="budget-input-wrapper">
+                            <label>Enter Amount ($)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="10"
+                              value={budgets[p.id]}
+                              onChange={(e) =>
+                                setBudget(p.id, Number(e.target.value))
+                              }
+                              className="budget-input"
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                     <div className="total-budget">
                       <div>
@@ -941,6 +1257,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 </>
               )}
             </div>
+
+            {/* LinkedIn controls panel — always shown in step 3 if linkedin selected */}
+            {renderLinkedInControls()}
           </div>
         )}
 
