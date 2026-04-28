@@ -53,10 +53,11 @@ export const getActivePipelineStages = (
   const pipeline = resolveActivePipeline(pipelines);
   if (!pipeline || !Array.isArray(pipeline.stages)) return [];
 
+  // Sort in descending order (highest stage_order first)
   return pipeline.stages
     .filter((stage) => isActiveStageStatus(stage.stage_status))
     .slice()
-    .sort((left, right) => left.stage_order - right.stage_order);
+    .sort((left, right) => right.stage_order - left.stage_order);
 };
 
 const resolveLeadStatusText = (lead: Lead): string => {
