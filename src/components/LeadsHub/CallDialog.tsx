@@ -47,7 +47,7 @@ const CallDialog: React.FC<Props> = ({
     if (open && callState === "ringing") {
       const audio = new Audio(
         ringingAudioUrl ||
-          "https://actions.google.com/sounds/v1/alarms/phone_ring.ogg",
+          "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
       );
       audio.loop = true;
       audio.play().catch(() => {});
