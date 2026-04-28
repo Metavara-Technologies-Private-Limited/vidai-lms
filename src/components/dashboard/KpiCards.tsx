@@ -219,7 +219,13 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
       { id: "totalLeads", label: "Total Leads", value: counts.totalLeads, icon: TotalLeadsIcon, cardStyle: kpiCardsStyles.totalLeads },
     ];
 
-    pipelineStages.forEach((stage, idx) => {
+    // Sort stages by stage_order before rendering
+    const sortedStages = [...pipelineStages].sort((a, b) => {
+      const aOrder = typeof a.stage_order === 'number' ? a.stage_order : 0;
+      const bOrder = typeof b.stage_order === 'number' ? b.stage_order : 0;
+      return aOrder - bOrder;
+    });
+    sortedStages.forEach((stage, idx) => {
       const icon = RANDOM_STAGE_ICONS[idx % RANDOM_STAGE_ICONS.length];
       const cardStyle = RANDOM_STAGE_STYLES[idx % RANDOM_STAGE_STYLES.length];
       cards.push({
