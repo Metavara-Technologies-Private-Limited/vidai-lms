@@ -20,27 +20,26 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// ✅ NEW: adInsights shape passed from CampaignDashboard
+interface AdInsights {
+  impressions: number;
+  clicks: number;
+  spend: string;
+  reach: string;
+  cpc: string;
+  cpm: string;
+  conversions: number;
+  total_budget: string;
+  conversion_rate: string;
+  ctr: string;
+}
+
 interface Props {
   campaign: Campaign;
   activeTab: string;
   activeSubTab: string;
+  adInsights?: AdInsights; // ✅ NEW: real insights from parent
 }
-
-// const performanceData = [
-//   { date: "1 Jan", facebook: 650, instagram: 520 },
-//   { date: "2 Jan", facebook: 630, instagram: 600 },
-//   { date: "3 Jan", facebook: 520, instagram: 480 },
-//   { date: "4 Jan", facebook: 280, instagram: 320 },
-//   { date: "5 Jan", facebook: 240, instagram: 260 },
-//   { date: "6 Jan", facebook: 620, instagram: 580 },
-//   { date: "7 Jan", facebook: 160, instagram: 220 },
-// ];
-
-// const platformData = [
-//   { name: "Instagram", value: 30, color: "#A8AEBF" },
-//   { name: "Facebook", value: 20, color: "#C5CAD8" },
-//   { name: "LinkedIn", value: 50, color: "#8D95A8" },
-// ];
 
 const PIE_COLORS: Record<string, string> = {
   instagram: "#A8AEBF",
@@ -50,41 +49,28 @@ const PIE_COLORS: Record<string, string> = {
   google_ads: "#4285F4",
 };
 
-// Kept as fallback for social (FB insights pending app review)
-const performanceData = [
-  { date: "1 Jan", facebook: 650, instagram: 520 },
-  { date: "2 Jan", facebook: 630, instagram: 600 },
-  { date: "3 Jan", facebook: 520, instagram: 480 },
-  { date: "4 Jan", facebook: 280, instagram: 320 },
-  { date: "5 Jan", facebook: 240, instagram: 260 },
-  { date: "6 Jan", facebook: 620, instagram: 580 },
-  { date: "7 Jan", facebook: 160, instagram: 220 },
-];
-
 const CampaignTabContent: React.FC<Props> = ({
   campaign,
   activeTab,
   activeSubTab,
+  adInsights, // ✅ NEW
 }) => {
   const [selectedPlatform, setSelectedPlatform] = React.useState<
-    "facebook" | "instagram"
+    "facebook" | "instagram" | "google_ads" | "linkedin"
   >("facebook");
 
   // ─── Resolve content & image for the active platform ────────────────────
   const platformData_raw: Record<string, string> =
     (campaign as any).platform_data ?? {};
 
-  // Get the text for the active sub-tab platform (or fall back to campaign_content)
   const activePlatformKey = (activeSubTab || "").toLowerCase();
   const platformText: string =
     platformData_raw[activePlatformKey] ||
     (campaign as any).campaign_content ||
     "";
 
-  // Image URL stored on the campaign
   const imageUrl: string = (campaign as any).image_url || "";
 
-  // Parse the text — strip raw URLs (they are shown as image), extract hashtags
   const URL_REGEX = /https?:\/\/\S+/gi;
   const cleanedText = platformText.replace(URL_REGEX, "").trim();
   const lines = cleanedText.split("\n").filter((l) => l.trim());
@@ -98,15 +84,12 @@ const CampaignTabContent: React.FC<Props> = ({
 
     return (
       <div className="cd-content-card">
-        {/* Text side */}
         <div
           className="cd-content-text"
           style={{ flex: hasImage ? "1 1 55%" : "1 1 100%" }}
         >
-          {/* Campaign name as title */}
           <h3 className="cd-content-title">{campaign.name}</h3>
 
-          {/* Body paragraphs */}
           {hasText ? (
             platformText.trim().startsWith("<") ? (
               <div
@@ -126,11 +109,9 @@ const CampaignTabContent: React.FC<Props> = ({
             </p>
           )}
 
-          {/* Hashtags */}
           {hashtagLine && <p className="cd-content-tags">{hashtagLine}</p>}
         </div>
 
-        {/* Image side — only render if image exists */}
         {hasImage && (
           <div className="cd-content-image">
             <img
@@ -143,7 +124,6 @@ const CampaignTabContent: React.FC<Props> = ({
                 borderRadius: "12px",
               }}
               onError={(e) => {
-                // Hide image container if load fails
                 (e.currentTarget.parentElement as HTMLElement).style.display =
                   "none";
               }}
@@ -156,87 +136,167 @@ const CampaignTabContent: React.FC<Props> = ({
 
   /* ================= PERFORMANCE ================= */
   if (activeTab === "Performance") {
+    const platforms: string[] = (campaign as any).platforms ?? [];
+    const isEmail = campaign.type === "email";
+
+    // ✅ Build real chart data from adInsights — one summary bar per metric
+    // Since we have totals (not time-series), we show a summary metrics bar
+    // and replace the mock line chart with a real metrics display
+    const impressions = adInsights?.impressions ?? 0;
+    const clicks      = adInsights?.clicks ?? 0;
+    const ctr         = adInsights?.ctr ?? "0";
+    const cpc         = adInsights?.cpc ?? "0";
+    const spend       = adInsights?.spend ?? "0";
+    const conversions = adInsights?.conversions ?? 0;
+
+    const hasRealData = impressions > 0 || clicks > 0 || parseFloat(spend) > 0;
+
+    // ✅ Build chart data — show metric breakdown as bar-style line chart
+    const chartData = hasRealData
+      ? [
+          { metric: "Impressions", value: impressions },
+          { metric: "Clicks",      value: clicks },
+          { metric: "Conversions", value: conversions },
+        ]
+      : [];
+
+    // ✅ Platform toggle — only show platforms this campaign has
+    const availablePlatforms = platforms.filter((p) =>
+      ["facebook", "instagram", "google_ads", "linkedin"].includes(p)
+    );
+
     return (
       <div className="cd-performance-card">
-        <h4 className="cd-perf-title">Impressions</h4>
+        <h4 className="cd-perf-title">Performance Overview</h4>
         <div className="cd-perf-divider"></div>
+
+        {/* ✅ Platform toggle — dynamic based on campaign platforms */}
         <div className="cd-perf-row">
           <div className="cd-perf-left">
             <div className="cd-perf-number">
-              {campaign.type === "email"
+              {isEmail
                 ? ((campaign as any).impressions ?? 0)
-                : "—"}
+                : hasRealData
+                  ? impressions.toLocaleString()
+                  : "—"}
             </div>
             <div className="cd-perf-sub">
-              {campaign.type === "email" ? "Total Opens" : "Pending App Review"}
+              {isEmail ? "Total Opens" : hasRealData ? "Total Impressions" : "No data yet"}
             </div>
           </div>
 
-          <div className="cd-platform-toggle">
-            <label>
-              <input
-                type="radio"
-                checked={selectedPlatform === "facebook"}
-                onChange={() => setSelectedPlatform("facebook")}
-              />
-              Facebook
-            </label>
-
-            <label>
-              <input
-                type="radio"
-                checked={selectedPlatform === "instagram"}
-                onChange={() => setSelectedPlatform("instagram")}
-              />
-              Instagram
-            </label>
-          </div>
+          {!isEmail && availablePlatforms.length > 0 && (
+            <div className="cd-platform-toggle">
+              {availablePlatforms.map((p) => (
+                <label key={p}>
+                  <input
+                    type="radio"
+                    checked={selectedPlatform === p}
+                    onChange={() => setSelectedPlatform(p as any)}
+                  />
+                  {p === "google_ads" ? "Google Ads" : p.charAt(0).toUpperCase() + p.slice(1)}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
-        <ResponsiveContainer width="100%" height={210} minWidth={0}>
-          <LineChart
-            data={performanceData}
-            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-          >
-            <defs>
-              <filter id="lineShadow" height="200%">
-                <feDropShadow
-                  dx="0"
-                  dy="4"
-                  stdDeviation="8"
-                  floodColor="#5B6EF5"
-                  floodOpacity="0.15"
-                />
-              </filter>
-            </defs>
-            <CartesianGrid
-              strokeDasharray="4 4"
-              vertical={false}
-              stroke="#F1F1F1"
-            />
-            <XAxis
-              dataKey="date"
-              axisLine={false}
-              tickLine={false}
-              stroke="#9E9E9E"
-            />
-            <YAxis axisLine={false} tickLine={false} stroke="#9E9E9E" />
-            <Tooltip content={<CustomTooltip />} />
-            <Line
-              type="natural"
-              dataKey={selectedPlatform}
-              stroke="#5B6EF5"
-              strokeWidth={2.5}
-              dot={false}
-              filter="url(#lineShadow)"
-              activeDot={{
-                r: 6,
-                stroke: "#ffffff",
-                strokeWidth: 3,
-                fill: "#5B6EF5",
-              }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+
+        {/* ✅ Real metrics summary cards */}
+        {!isEmail && hasRealData && (
+          <div style={{
+            display: "flex",
+            gap: "16px",
+            marginBottom: "20px",
+            flexWrap: "wrap",
+          }}>
+            {[
+              { label: "Impressions", value: impressions.toLocaleString(),     color: "#5B6EF5" },
+              { label: "Clicks",      value: clicks.toLocaleString(),           color: "#47B35F" },
+              { label: "CTR",         value: `${parseFloat(ctr).toFixed(2)}%`, color: "#ECB856" },
+              { label: "Avg CPC",     value: `₹${parseFloat(cpc).toFixed(2)}`, color: "#F25B5B" },
+              { label: "Cost",        value: `₹${parseFloat(spend).toFixed(2)}`, color: "#835DEF" },
+              { label: "Conversions", value: String(conversions),               color: "#2D6BF0" },
+            ].map((m) => (
+              <div key={m.label} style={{
+                flex: "1 1 130px",
+                background: "#f9f9fb",
+                borderRadius: "12px",
+                padding: "14px 16px",
+                borderLeft: `4px solid ${m.color}`,
+              }}>
+                <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px" }}>{m.label}</div>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: "#222" }}>{m.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ✅ Chart — real data if available, message if not */}
+        {isEmail ? (
+          <ResponsiveContainer width="100%" height={210} minWidth={0}>
+            <LineChart
+              data={[
+                { date: "Opens",       value: (campaign as any).impressions ?? 0 },
+                { date: "Clicks",      value: (campaign as any).clicks ?? 0 },
+                { date: "Bounces",     value: (campaign as any).bounces ?? 0 },
+                { date: "Unsubscribes",value: (campaign as any).unsubscribes ?? 0 },
+              ]}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#F1F1F1" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} stroke="#9E9E9E" />
+              <YAxis axisLine={false} tickLine={false} stroke="#9E9E9E" />
+              <Tooltip content={<CustomTooltip />} />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#5B6EF5"
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: "#5B6EF5" }}
+                activeDot={{ r: 6, stroke: "#ffffff", strokeWidth: 3, fill: "#5B6EF5" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : hasRealData && chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={210} minWidth={0}>
+            <LineChart
+              data={chartData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <defs>
+                <filter id="lineShadow" height="200%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#5B6EF5" floodOpacity="0.15" />
+                </filter>
+              </defs>
+              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#F1F1F1" />
+              <XAxis dataKey="metric" axisLine={false} tickLine={false} stroke="#9E9E9E" />
+              <YAxis axisLine={false} tickLine={false} stroke="#9E9E9E" />
+              <Tooltip content={<CustomTooltip />} />
+              <Line
+                type="natural"
+                dataKey="value"
+                stroke="#5B6EF5"
+                strokeWidth={2.5}
+                dot={{ r: 5, fill: "#5B6EF5" }}
+                filter="url(#lineShadow)"
+                activeDot={{ r: 6, stroke: "#ffffff", strokeWidth: 3, fill: "#5B6EF5" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{
+            height: 210,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#aaa",
+            fontSize: "14px",
+            background: "#fafafa",
+            borderRadius: "12px",
+          }}>
+            No performance data yet — insights will appear after Zapier fetches them.
+          </div>
+        )}
       </div>
     );
   }
@@ -263,7 +323,6 @@ const CampaignTabContent: React.FC<Props> = ({
         color: PIE_COLORS[p] ?? "#ccc",
       }));
 
-    // fallback: if no budget data (organic), show equal split
     const pieData =
       platformData.length > 0
         ? platformData
@@ -297,87 +356,55 @@ const CampaignTabContent: React.FC<Props> = ({
                   outerRadius={130}
                   activeShape={(props: any) => {
                     const {
-                      cx,
-                      cy,
-                      midAngle,
-                      innerRadius,
-                      outerRadius,
-                      startAngle,
-                      endAngle,
-                      fill,
-                      payload,
+                      cx, cy, midAngle, innerRadius, outerRadius,
+                      startAngle, endAngle, fill, payload,
                     } = props;
 
                     const RADIAN = Math.PI / 180;
-                    const midRadius =
-                      innerRadius + (outerRadius - innerRadius) / 2;
+                    const midRadius = innerRadius + (outerRadius - innerRadius) / 2;
                     const x = cx + midRadius * Math.cos(-midAngle * RADIAN);
                     const y = cy + midRadius * Math.sin(-midAngle * RADIAN);
 
                     return (
                       <>
                         <Sector
-                          cx={cx}
-                          cy={cy}
+                          cx={cx} cy={cy}
                           innerRadius={innerRadius}
                           outerRadius={outerRadius + 6}
                           startAngle={startAngle}
                           endAngle={endAngle}
                           fill={fill}
                         />
-                        <foreignObject
-                          x={x - 40}
-                          y={y - 35}
-                          width="90"
-                          height="70"
-                        >
-                          <div
-                            style={{
-                              position: "relative",
-                              background: "#ffffff",
-                              borderRadius: "14px",
-                              padding: "8px 12px",
-                              textAlign: "center",
-                              boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
-                              display: "flex",
-                              flexDirection: "column",
-                              justifyContent: "center",
-                              alignItems: "center",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "14px",
-                                fontWeight: 600,
-                                color: "#222",
-                              }}
-                            >
+                        <foreignObject x={x - 40} y={y - 35} width="90" height="70">
+                          <div style={{
+                            position: "relative",
+                            background: "#ffffff",
+                            borderRadius: "14px",
+                            padding: "8px 12px",
+                            textAlign: "center",
+                            boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center",
+                          }}>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: "#222" }}>
                               {payload.value} %
                             </div>
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                color: "#8A8A8A",
-                                marginTop: "2px",
-                              }}
-                            >
+                            <div style={{ fontSize: "12px", color: "#8A8A8A", marginTop: "2px" }}>
                               {payload.name}
                             </div>
-                            <div
-                              style={{
-                                position: "absolute",
-                                bottom: "-4px",
-                                left: "50%",
-                                transform: "translateX(-50%)",
-                                width: 0,
-                                height: 0,
-                                borderLeft: "6px solid transparent",
-                                borderRight: "6px solid transparent",
-                                borderTop: "6px solid #ffffff",
-                                filter:
-                                  "drop-shadow(0 3px 3px rgba(0,0,0,0.06))",
-                              }}
-                            />
+                            <div style={{
+                              position: "absolute",
+                              bottom: "-4px",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              width: 0, height: 0,
+                              borderLeft: "6px solid transparent",
+                              borderRight: "6px solid transparent",
+                              borderTop: "6px solid #ffffff",
+                              filter: "drop-shadow(0 3px 3px rgba(0,0,0,0.06))",
+                            }} />
                           </div>
                         </foreignObject>
                       </>
@@ -422,17 +449,15 @@ const CampaignTabContent: React.FC<Props> = ({
     );
   }
 
+  /* ================= AI INSIGHTS ================= */
   if (activeTab === "AI Insights") {
     const isEmail = campaign.type === "email";
     const platforms: string[] = (campaign as any).platforms ?? [];
-    const budgetRaw: Record<string, number> =
-      (campaign as any).budget_data ?? {};
+    const budgetRaw: Record<string, number> = (campaign as any).budget_data ?? {};
     const totalBudget = platforms.reduce((s, p) => s + (budgetRaw[p] ?? 0), 0);
     const leadCount = (campaign as any).lead_generated ?? 0;
     const topPlatform =
-      [...platforms].sort(
-        (a, b) => (budgetRaw[b] ?? 0) - (budgetRaw[a] ?? 0),
-      )[0] ?? "facebook";
+      [...platforms].sort((a, b) => (budgetRaw[b] ?? 0) - (budgetRaw[a] ?? 0))[0] ?? "facebook";
     const cpa = leadCount > 0 ? (totalBudget / leadCount).toFixed(2) : null;
 
     return (
@@ -488,17 +513,15 @@ const CampaignTabContent: React.FC<Props> = ({
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div
-        style={{
-          background: "#ffffff",
-          padding: "8px 14px",
-          borderRadius: "10px",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
-          fontSize: "13px",
-          fontWeight: 500,
-        }}
-      >
-        {payload[0].value} Impressions
+      <div style={{
+        background: "#ffffff",
+        padding: "8px 14px",
+        borderRadius: "10px",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
+        fontSize: "13px",
+        fontWeight: 500,
+      }}>
+        {payload[0].value?.toLocaleString()} {payload[0].payload?.metric ?? "Impressions"}
       </div>
     );
   }
@@ -506,10 +529,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 const PlatformCard = ({
-  icon,
-  title,
-  spend,
-  conversion,
+  icon, title, spend, conversion,
 }: {
   icon: string;
   title: string;
