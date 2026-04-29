@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Dialog,
   DialogContent,
@@ -54,63 +55,31 @@ type AssigneeOption = {
   designation: string | undefined;
 };
 
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
+// const asRecord = (value: unknown): Record<string, unknown> | null =>
+//   typeof value === "object" && value !== null
+//     ? (value as Record<string, unknown>)
+//     : null;
 
-const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
-  const root = asRecord(raw);
-  const list: unknown[] = Array.isArray(raw)
-    ? raw
-    : Array.isArray(root?.objects)
-      ? (root?.objects as unknown[])
-      : Array.isArray(root?.results)
-        ? (root?.results as unknown[])
-        : Array.isArray(root?.data)
-          ? (root?.data as unknown[])
-          : [];
+const normalizeAssignees = (res: any): AssigneeOption[] => {
+  const users = res?.data?.objects || [];
 
-  return list
-    .map((item) => {
-      const record = asRecord(item);
-      if (!record) return null;
-
-      const idValue = record.id ?? record.user_id;
-      const id =
-        typeof idValue === "number"
-          ? idValue
-          : typeof idValue === "string"
-            ? Number(idValue)
-            : NaN;
-
-      if (!Number.isFinite(id)) return null;
-
-      return {
-        id,
-        first_name:
-          typeof record.first_name === "string" ? record.first_name : undefined,
-        last_name:
-          typeof record.last_name === "string" ? record.last_name : undefined,
-        username:
-          typeof record.username === "string" ? record.username : undefined,
-        role: typeof record.role === "string" ? record.role : undefined,
-        designation:
-          typeof record.designation === "string"
-            ? record.designation
-            : undefined,
-      };
-    })
-    .filter((item): item is AssigneeOption => item !== null);
+  return users.map((u: any) => ({
+    id: u.id,
+    first_name: u.first_name,
+    last_name: u.last_name,
+    username: u.username,
+    role: u.role_label || u.role,
+    designation: u.designation,
+  }));
 };
 
-const assigneeLabel = (option: AssigneeOption): string => {
-  const fullName =
-    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
-  const primary = fullName || option.username || `User ${option.id}`;
-  const secondary = option.role || option.designation;
-  return secondary ? `${primary} (${secondary})` : primary;
-};
+    const assigneeLabel = (option: AssigneeOption): string => {
+      const fullName =
+        `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+      const primary = fullName || option.username || `User ${option.id}`;
+      const secondary = option.role;
+      return secondary ? `${primary} (${secondary})` : primary;
+    };
 
 const MAX_TICKET_SUBJECT_LENGTH = 150;
 const MAX_TICKET_DESCRIPTION_LENGTH = 500;
@@ -598,9 +567,13 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                   assigneeOptions.find((option) => option.id === assigneeId) ||
                   null
                 }
-                onInputChange={(_, value) =>
-                  setAssigneeSearch(value.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH))
-                }
+                onInputChange={(_, value, reason) => {
+                  if (reason === "input") {
+                    setAssigneeSearch(
+                      value.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH),
+                    );
+                  }
+                }}
                 onChange={(_, value) => setAssigneeId(value?.id ?? "")}
                 getOptionLabel={assigneeLabel}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
