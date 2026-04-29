@@ -207,8 +207,13 @@ const SalesPipeLineData = ({
         const nextCount = activeLeads.filter((lead) =>
           nextCandidates.includes(normalizeLeadStatus(lead)),
         ).length;
-        conversionValue =
-          leadCount > 0 ? Math.round((nextCount / leadCount) * 100) : 0;
+        if (leadCount === 0) {
+          conversionValue = 100;
+        } else if (nextCount === 0) {
+          conversionValue = 100;
+        } else {
+          conversionValue = Math.min(100, Math.round((nextCount / leadCount) * 100));
+        }
       }
 
       return {

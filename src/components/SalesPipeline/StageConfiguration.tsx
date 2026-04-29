@@ -129,6 +129,13 @@ const StageConfiguration = ({
 	});
 
 	const handleAddAnotherField = () => {
+		if (!stageName.trim()) {
+			toast.error("Please enter stage name before adding data capture", {
+				position: "top-right",
+				autoClose: 2000,
+			});
+			return;
+		}
 		setDataCaptureFields((previous) => [...previous, createEmptyField()]);
 	};
 
