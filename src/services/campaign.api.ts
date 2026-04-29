@@ -44,6 +44,10 @@ export const CampaignAPI = {
     description_2?: string;
     image_url?: string | null;
     platform_data?: Record<string, unknown>;
+    // ✅ FIX: controls which campaign type Zapier creates (prevents duplicate Search + Display)
+    campaign_type?: string;
+    // ✅ FIX: links Zapier callback response back to our internal campaign DB record
+    internal_campaign_id?: string;
   }) =>
     http.post("/google-ads/create/", data, {
       params: { clinic_id: data.clinic_id },

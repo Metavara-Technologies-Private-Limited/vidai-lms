@@ -205,3 +205,29 @@ export interface SocialCampaignPayload {
 
   schedule_date_range?: string;
 }
+
+// ✅ Google Ads campaign creation payload
+export interface GoogleAdsCampaignPayload {
+  clinic_id: number;
+  customer_id: string;
+  campaign_name: string;
+  budget?: number;
+  bidding_strategy?: string;
+  locations?: string[];
+  keywords?: string[];
+  cpc_bid?: number;
+  ad_group_name?: string;
+  final_url?: string;
+  headline_1?: string;
+  headline_2?: string;
+  headline_3?: string;
+  description?: string;
+  description_2?: string;
+  image_url?: string | null;
+  platform_data?: Record<string, string>;
+  login_customer_id?: string;
+  // ✅ FIX: controls which campaign type Zapier creates (prevents duplicate Search + Display)
+  campaign_type?: string;
+  // ✅ FIX: links Zapier callback response back to our internal campaign DB record
+  internal_campaign_id?: string;
+}
