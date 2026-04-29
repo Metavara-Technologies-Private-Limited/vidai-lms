@@ -82,9 +82,6 @@ const CampaignDashboard = ({
   }, []);
 
   // ─── Google Ads insights — reads from DB only ─────────────────────────────
-  // ✅ FIX: This just reads what's already in DB for THIS specific campaign.
-  // It does NOT call Google Ads API directly (that caused all 149 campaigns to return).
-  // Zapier writes the insights to DB via /api/campaign/insights/callback/
   const fetchGoogleAdsInsightsFromDB = React.useCallback(async (campaignId: string) => {
     try {
       console.log("[GoogleAds] Reading insights from DB for campaign:", campaignId);
@@ -93,7 +90,6 @@ const CampaignDashboard = ({
 
       console.log("[GoogleAds] DB insights raw:", data);
 
-      // Check if we actually have real data (not all zeros)
       const hasRealData =
         Number(data.impressions ?? 0) > 0 ||
         Number(data.clicks ?? 0) > 0 ||
@@ -112,10 +108,10 @@ const CampaignDashboard = ({
           conversion_rate: String(data.ctr ?? data.conversion_rate ?? prev.conversion_rate ?? "0%"),
           ctr:             String(data.ctr            ?? prev.ctr          ?? "0"),
         }));
-        return true; // signals that real data was found
+        return true;
       }
 
-      return false; // no real data yet
+      return false;
     } catch (err) {
       console.error("[GoogleAds] DB insights fetch failed", err);
       return false;
@@ -137,7 +133,6 @@ const CampaignDashboard = ({
 
         const hasGoogleAds = campaign.platforms?.includes(PLATFORMS.GOOGLE_ADS);
 
-        // ─── Step 1: fetch basic campaign data ───────────────────────────
         const res = await CampaignAPI.get(campaign.id);
         const d = res.data;
         const fbCampaignId = d.fb_campaign_id ?? campaign.fb_campaign_id ?? null;
@@ -160,20 +155,14 @@ const CampaignDashboard = ({
           budget_data:        d.budget_data         ?? prev.budget_data ?? {},
         }));
 
-        // ─── Step 2: Facebook insights ───────────────────────────────────
         if (fbCampaignId) {
           await fetchAdInsights(fbCampaignId);
         }
 
-        // ─── Step 3: Google Ads insights — trigger + poll DB ─────────────
         if (hasGoogleAds) {
-          // ✅ FIX: First check if we already have insights saved in DB from a previous fetch
           const alreadyHasData = await fetchGoogleAdsInsightsFromDB(campaign.id);
 
           if (!alreadyHasData) {
-            // ✅ FIX: No data yet — trigger Zapier to fetch insights for THIS specific campaign
-            // CampaignInsightsTriggerAPIView sends campaign_resource_name to Zapier
-            // so Zapier filters by exact campaign (not LIKE name which returns all 149)
             console.log("[GoogleAds] No DB data — triggering Zapier insights fetch...");
             try {
               await CampaignAPI.triggerGoogleAdsInsights(campaign.id);
@@ -182,8 +171,6 @@ const CampaignDashboard = ({
               console.error("[GoogleAds] Trigger failed:", err);
             }
 
-            // ✅ FIX: Poll DB up to 5 times (every 3s) waiting for Zapier callback to write insights
-            // This replaces the old immediate fetch that always got zeros because Zapier wasn't done
             let attempts = 0;
             const maxAttempts = 5;
             const pollIntervalMs = 3000;
@@ -387,7 +374,13 @@ const CampaignDashboard = ({
         </div>
       )}
 
-      <CampaignTabContent campaign={fullCampaign} activeTab={activeTab} activeSubTab={activeSubTab} />
+      {/* ✅ FIX: pass adInsights so Performance tab shows real data instead of mock */}
+      <CampaignTabContent
+        campaign={fullCampaign}
+        activeTab={activeTab}
+        activeSubTab={activeSubTab}
+        adInsights={adInsights}
+      />
     </div>
   );
 };
