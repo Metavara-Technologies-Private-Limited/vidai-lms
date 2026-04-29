@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
@@ -6,11 +12,19 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import EastRoundedIcon from "@mui/icons-material/EastRounded";
 import Groups2OutlinedIcon from "@mui/icons-material/Groups2Outlined";
 import PublishedWithChangesOutlinedIcon from "@mui/icons-material/PublishedWithChangesOutlined";
-import WestRoundedIcon from "@mui/icons-material/WestRounded";
-import { Box, CircularProgress, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  CircularProgress,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useDispatch, useSelector } from "react-redux";
-import type { PipelineStageField, PipelineStageRule } from "../../services/pipeline.api";
+import type {
+  PipelineStageField,
+  PipelineStageRule,
+} from "../../services/pipeline.api";
 import type { Lead as ApiLead } from "../../services/leads.api";
 import type { AppDispatch } from "../../store";
 import {
@@ -18,7 +32,9 @@ import {
   selectLeads,
   selectLeadsLoading,
 } from "../../store/leadSlice";
-import StageConfiguration, { type StageConfigPayload } from "./StageConfiguration";
+import StageConfiguration, {
+  type StageConfigPayload,
+} from "./StageConfiguration";
 import { mapRulesToActions } from "./salesPipeline.utils";
 
 type StageCard = {
@@ -35,7 +51,10 @@ type StageCard = {
 type SalesPipeLineDataProps = {
   stages: StageCard[];
   canEditPipeline?: boolean;
-  onAddStage: (stageName?: string, stageConfig?: StageConfigPayload) => Promise<boolean> | boolean;
+  onAddStage: (
+    stageName?: string,
+    stageConfig?: StageConfigPayload,
+  ) => Promise<boolean> | boolean;
   onEditStage: (
     stageIndex: number,
     stageName: string,
@@ -125,10 +144,18 @@ const SalesPipeLineData = ({
   const leads = useSelector(selectLeads) as ApiLead[];
   const leadsLoading = useSelector(selectLeadsLoading);
 
-  const [selectedStageName, setSelectedStageName] = useState<string | null>(null);
-  const [selectedStageIndex, setSelectedStageIndex] = useState<number | null>(null);
-  const [selectedStageConfig, setSelectedStageConfig] = useState<Partial<StageConfigPayload>>({});
-  const [configurationMode, setConfigurationMode] = useState<"create" | "edit">("create");
+  const [selectedStageName, setSelectedStageName] = useState<string | null>(
+    null,
+  );
+  const [selectedStageIndex, setSelectedStageIndex] = useState<number | null>(
+    null,
+  );
+  const [selectedStageConfig, setSelectedStageConfig] = useState<
+    Partial<StageConfigPayload>
+  >({});
+  const [configurationMode, setConfigurationMode] = useState<"create" | "edit">(
+    "create",
+  );
   const [draggedStageIndex, setDraggedStageIndex] = useState<number | null>(
     null,
   );
@@ -245,13 +272,17 @@ const SalesPipeLineData = ({
     setSelectedStageIndex(stageIndex);
     setSelectedStageName(stage.stageName);
     const resolvedStageColor =
-      stage.stageColor ?? stageHeaderColors[stageIndex % stageHeaderColors.length];
+      stage.stageColor ??
+      stageHeaderColors[stageIndex % stageHeaderColors.length];
     setSelectedStageConfig({
       stageType: toStageTypeLabel(stage.stageType),
       stageStatus: toStageStatusLabel(stage.stageStatus),
       colorCode: resolvedStageColor,
       entryRule: toStageLabel(stage.entryRule) ?? "Manual",
-      actions: stage.rules && stage.rules.length > 0 ? mapRulesToActions(stage.rules) : [],
+      actions:
+        stage.rules && stage.rules.length > 0
+          ? mapRulesToActions(stage.rules)
+          : [],
       dataCaptureFields: stage.fields?.map((f) => ({
         fieldName: f.field_name,
         fieldType: f.field_type,
@@ -265,9 +296,12 @@ const SalesPipeLineData = ({
     stageConfig?: StageConfigPayload,
   ) => {
     if (!canEditPipeline) return;
-    const isEditMode = configurationMode === "edit" && selectedStageIndex !== null;
+    const isEditMode =
+      configurationMode === "edit" && selectedStageIndex !== null;
     const saved = isEditMode
-      ? await Promise.resolve(onEditStage(selectedStageIndex, stageName, stageConfig))
+      ? await Promise.resolve(
+          onEditStage(selectedStageIndex, stageName, stageConfig),
+        )
       : await Promise.resolve(onAddStage(stageName, stageConfig));
 
     if (saved !== false) {
@@ -277,14 +311,24 @@ const SalesPipeLineData = ({
     }
   };
 
-  const handleMoveAllLeft = () => {
-    if (!cardsContainerRef.current) return;
-    cardsContainerRef.current.scrollBy({ left: -260, behavior: "smooth" });
-  };
+  const handleHorizontalWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    const container = cardsContainerRef.current;
+    if (!container) return;
 
-  const handleMoveAllRight = () => {
-    if (!cardsContainerRef.current) return;
-    cardsContainerRef.current.scrollBy({ left: 260, behavior: "smooth" });
+    const hasHorizontalOverflow =
+      container.scrollWidth > container.clientWidth + 2;
+
+    if (!hasHorizontalOverflow) return;
+
+    const delta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY;
+
+    if (delta === 0) return;
+
+    event.preventDefault();
+    container.scrollLeft += delta;
   };
 
   useEffect(() => {
@@ -347,168 +391,162 @@ const SalesPipeLineData = ({
       }}
       sx={{
         width: "100%",
+        minWidth: 0,
         height: "100%",
         minHeight: "100%",
         display: "flex",
         alignItems: "center",
-        justifyContent: "center",
-        px: 2.5,
+        justifyContent: { xs: "flex-start", md: "center" },
+        px: { xs: 0.5, sm: 2.5 },
         position: "relative",
-        overflow: "hidden",
+        overflowX: "hidden",
+        overflowY: "hidden",
       }}
     >
       <Box
         ref={cardsContainerRef}
+        onWheel={handleHorizontalWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={stopDragging}
         onMouseLeave={stopDragging}
         sx={{
+          width: "100%",
+          minWidth: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: stageMetrics.length === 0 ? "center" : "flex-start",
-          flexWrap: "nowrap",
-          gap: 0.9,
-          width: `${100 / zoomScale}%`,
           overflowX: "auto",
           overflowY: "hidden",
-          maxWidth: "100%",
-          pb: 1,
+          pb: 2,
           cursor: isDragging ? "grabbing" : "grab",
           userSelect: "none", // Prevents text selection while dragging
-          transform: `scale(${zoomScale})`,
-          transformOrigin: "left top",
-          msOverflowStyle: "none",
-          scrollbarWidth: "none",
+          touchAction: "pan-x",
+          WebkitOverflowScrolling: "touch",
+          msOverflowStyle: "auto",
+          scrollbarWidth: "thin",
+          scrollbarColor: `${alpha(theme.palette.grey[500], 0.7)} transparent`,
           scrollBehavior: isDragging ? "auto" : "smooth",
-          "&::-webkit-scrollbar": { display: "none" },
+          scrollSnapType: "x mandatory",
+          "&::-webkit-scrollbar": {
+            height: 10,
+          },
+          "&::-webkit-scrollbar-track": {
+            backgroundColor: "transparent",
+          },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: alpha(theme.palette.grey[500], 0.45),
+            borderRadius: 999,
+          },
+          "&::-webkit-scrollbar-thumb:hover": {
+            backgroundColor: alpha(theme.palette.grey[500], 0.7),
+          },
         }}
       >
-        {stageMetrics.map(
-          ({ stage, stageName, leadCount, conversionValue }, index) => {
-            return (
-              <Box
-                key={`${stage.id}-${index}`}
-                draggable={canEditPipeline}
-                onDragStart={() => handleStageDragStart(index)}
-                onDragOver={(event) => {
-                  if (canEditPipeline) {
-                    event.preventDefault();
-                  }
-                }}
-                onDrop={() => handleStageDrop(index)}
-                onDragEnd={() => setDraggedStageIndex(null)}
-                sx={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 0.9,
-                  flexShrink: 0,
-                }}
-              >
-                <Box sx={{ position: "relative" }}>
-                  <Box
-                    onClick={() => handleStageCardClick(stage, index)}
-                    sx={{
-                      width: 176,
-                      borderRadius: 2,
-                      border: `1px solid ${theme.palette.grey[200]}`,
-                      backgroundColor: theme.palette.background.paper,
-                      overflow: "hidden",
-                      cursor: !canEditPipeline
-                        ? "default"
-                        : isDragging
-                          ? "grabbing"
-                          : "pointer",
-                    }}
-                  >
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: stageMetrics.length === 0 ? "center" : "flex-start",
+            flexWrap: "nowrap",
+            gap: 0.9,
+            width: "max-content",
+            minWidth: "100%",
+            maxWidth: "none",
+            transform: `scale(${zoomScale})`,
+            transformOrigin: "left top",
+          }}
+        >
+          {stageMetrics.map(
+            ({ stage, stageName, leadCount, conversionValue }, index) => {
+              return (
+                <Box
+                  key={`${stage.id}-${index}`}
+                  draggable={canEditPipeline}
+                  onDragStart={() => handleStageDragStart(index)}
+                  onDragOver={(event) => {
+                    if (canEditPipeline) {
+                      event.preventDefault();
+                    }
+                  }}
+                  onDrop={() => handleStageDrop(index)}
+                  onDragEnd={() => setDraggedStageIndex(null)}
+                  sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 0.9,
+                    flexShrink: 0,
+                    scrollSnapAlign: "start",
+                  }}
+                >
+                  <Box sx={{ position: "relative" }}>
                     <Box
+                      onClick={() => handleStageCardClick(stage, index)}
                       sx={{
-                        px: 1.4,
-                        py: 1,
-                        backgroundColor:
-                          stage.stageColor ?? stageHeaderColors[index % stageHeaderColors.length],
+                        width: 176,
+                        borderRadius: 2,
+                        border: `1px solid ${theme.palette.grey[200]}`,
+                        backgroundColor: theme.palette.background.paper,
+                        overflow: "hidden",
+                        cursor: !canEditPipeline
+                          ? "default"
+                          : isDragging
+                            ? "grabbing"
+                            : "pointer",
                       }}
                     >
-                      <Typography
-                        sx={{
-                          fontSize: 16,
-                          fontWeight: 700,
-                          lineHeight: 1.2,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {stageName}
-                      </Typography>
-                      {(stage.stageStatus ?? "").toLowerCase().trim() === "inactive" && (
-                        <Box
-                          sx={{
-                            mt: 0.45,
-                            display: "inline-block",
-                            px: 0.7,
-                            py: 0.15,
-                            borderRadius: 1,
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "#B42318",
-                            backgroundColor: "#FEE4E2",
-                            border: "1px solid #FDA29B",
-                          }}
-                        >
-                          Inactive
-                        </Box>
-                      )}
-                      <Typography
-                        sx={{ fontSize: 12, color: "text.secondary", mt: 0.2 }}
-                      >
-                        {`Stage ${index + 1}`}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ p: 1.2 }}>
                       <Box
                         sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.8,
-                          border: `1px solid ${theme.palette.grey[200]}`,
-                          borderRadius: 1.5,
-                          px: 0.95,
-                          py: 0.6,
-                          mb: 0.8,
+                          px: 1.4,
+                          py: 1,
+                          backgroundColor:
+                            stage.stageColor ??
+                            stageHeaderColors[index % stageHeaderColors.length],
                         }}
                       >
-                        <Box
+                        <Typography
                           sx={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 1.2,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            backgroundColor: alpha(
-                              theme.palette.grey[300],
-                              0.35,
-                            ),
-                            color: theme.palette.text.secondary,
+                            fontSize: 16,
+                            fontWeight: 700,
+                            lineHeight: 1.2,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                           }}
                         >
-                          <Groups2OutlinedIcon sx={{ fontSize: 16 }} />
-                        </Box>
-                        <Typography
-                          sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}
-                        >
-                          {leadCount}
+                          {stageName}
                         </Typography>
+                        {(stage.stageStatus ?? "").toLowerCase().trim() ===
+                          "inactive" && (
+                          <Box
+                            sx={{
+                              mt: 0.45,
+                              display: "inline-block",
+                              px: 0.7,
+                              py: 0.15,
+                              borderRadius: 1,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#B42318",
+                              backgroundColor: "#FEE4E2",
+                              border: "1px solid #FDA29B",
+                            }}
+                          >
+                            Inactive
+                          </Box>
+                        )}
                         <Typography
-                          sx={{ fontSize: 12, color: "text.secondary" }}
+                          sx={{
+                            fontSize: 12,
+                            color: "text.secondary",
+                            mt: 0.2,
+                          }}
                         >
-                          Leads
+                          {`Stage ${index + 1}`}
                         </Typography>
                       </Box>
 
-                      {index < stageMetrics.length - 1 && (
+                      <Box sx={{ p: 1.2 }}>
                         <Box
                           sx={{
                             display: "flex",
@@ -518,6 +556,7 @@ const SalesPipeLineData = ({
                             borderRadius: 1.5,
                             px: 0.95,
                             py: 0.6,
+                            mb: 0.8,
                           }}
                         >
                           <Box
@@ -535,9 +574,7 @@ const SalesPipeLineData = ({
                               color: theme.palette.text.secondary,
                             }}
                           >
-                            <PublishedWithChangesOutlinedIcon
-                              sx={{ fontSize: 16 }}
-                            />
+                            <Groups2OutlinedIcon sx={{ fontSize: 16 }} />
                           </Box>
                           <Typography
                             sx={{
@@ -546,102 +583,165 @@ const SalesPipeLineData = ({
                               lineHeight: 1,
                             }}
                           >
-                            {conversionValue ?? 0}%
+                            {leadCount}
                           </Typography>
                           <Typography
                             sx={{ fontSize: 12, color: "text.secondary" }}
                           >
-                            Conv.
+                            Leads
                           </Typography>
                         </Box>
-                      )}
+
+                        {index < stageMetrics.length - 1 && (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.8,
+                              border: `1px solid ${theme.palette.grey[200]}`,
+                              borderRadius: 1.5,
+                              px: 0.95,
+                              py: 0.6,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: 1.2,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: alpha(
+                                  theme.palette.grey[300],
+                                  0.35,
+                                ),
+                                color: theme.palette.text.secondary,
+                              }}
+                            >
+                              <PublishedWithChangesOutlinedIcon
+                                sx={{ fontSize: 16 }}
+                              />
+                            </Box>
+                            <Typography
+                              sx={{
+                                fontSize: 20,
+                                fontWeight: 700,
+                                lineHeight: 1,
+                              }}
+                            >
+                              {conversionValue ?? 0}%
+                            </Typography>
+                            <Typography
+                              sx={{ fontSize: 12, color: "text.secondary" }}
+                            >
+                              Conv.
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
                     </Box>
+
+                    <Stack
+                      direction="row"
+                      spacing={0.8}
+                      sx={{ mt: 0.9, justifyContent: "center" }}
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void onDuplicateStage(index);
+                        }}
+                        disabled={!canEditPipeline}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        sx={stageActionButtonSx}
+                      >
+                        <ContentCopyOutlinedIcon
+                          sx={{ fontSize: 16, color: "#5A88E8" }}
+                        />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onArchiveStage(index);
+                        }}
+                        disabled={!canEditPipeline}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        sx={stageActionButtonSx}
+                      >
+                        <ArchiveOutlinedIcon
+                          sx={{ fontSize: 16, color: "#E29B55" }}
+                        />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteStage(index);
+                        }}
+                        disabled={!canEditPipeline}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        sx={stageActionButtonSx}
+                      >
+                        <DeleteOutlineOutlinedIcon
+                          sx={{ fontSize: 16, color: "#CF3D3D" }}
+                        />
+                      </IconButton>
+                    </Stack>
                   </Box>
-
-              <Stack direction="row" spacing={0.8} sx={{ mt: 0.9, justifyContent: "center" }}>
-                <IconButton
-                  size="small"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void onDuplicateStage(index);
-                  }}
-                  disabled={!canEditPipeline}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  sx={stageActionButtonSx}
-                >
-                  <ContentCopyOutlinedIcon sx={{ fontSize: 16, color: "#5A88E8" }} />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onArchiveStage(index);
-                  }}
-                  disabled={!canEditPipeline}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  sx={stageActionButtonSx}
-                >
-                  <ArchiveOutlinedIcon sx={{ fontSize: 16, color: "#E29B55" }} />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDeleteStage(index);
-                  }}
-                  disabled={!canEditPipeline}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  sx={stageActionButtonSx}
-                >
-                  <DeleteOutlineOutlinedIcon sx={{ fontSize: 16, color: "#CF3D3D" }} />
-                </IconButton>
-              </Stack>
+                  <EastRoundedIcon
+                    sx={{
+                      color: theme.palette.grey[400],
+                      fontSize: 18,
+                      mt: 10,
+                    }}
+                  />
                 </Box>
-                <EastRoundedIcon
-                  sx={{ color: theme.palette.grey[400], fontSize: 18, mt: 10 }}
-                />
-              </Box>
-            );
-          },
-        )}
+              );
+            },
+          )}
 
-        <Box
-          onClick={handleAddStageClick}
-          sx={{
-            flexShrink: 0,
-            width: 176,
-            height: 188,
-            borderRadius: 2,
-            border: `1px dashed ${theme.palette.grey[300]}`,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 1,
-            backgroundColor: alpha(theme.palette.background.paper, 0.58),
-            cursor: canEditPipeline ? "pointer" : "not-allowed",
-            opacity: canEditPipeline ? 1 : 0.65,
-          }}
-        >
           <Box
+            onClick={handleAddStageClick}
             sx={{
-              width: 30,
-              height: 30,
-              borderRadius: 1,
+              flexShrink: 0,
+              width: 176,
+              height: 188,
+              borderRadius: 2,
+              border: `1px dashed ${theme.palette.grey[300]}`,
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: "#2F2F2F",
-              color: "#FFFFFF",
+              gap: 1,
+              backgroundColor: alpha(theme.palette.background.paper, 0.58),
+              cursor: canEditPipeline ? "pointer" : "not-allowed",
+              opacity: canEditPipeline ? 1 : 0.65,
+              scrollSnapAlign: "start",
             }}
           >
-            <AddBoxOutlinedIcon sx={{ fontSize: 17 }} />
+            <Box
+              sx={{
+                width: 30,
+                height: 30,
+                borderRadius: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#2F2F2F",
+                color: "#FFFFFF",
+              }}
+            >
+              <AddBoxOutlinedIcon sx={{ fontSize: 17 }} />
+            </Box>
+            <Typography
+              sx={{ fontSize: 18, fontWeight: 700, textAlign: "center" }}
+            >
+              Add New Stage
+            </Typography>
           </Box>
-          <Typography
-            sx={{ fontSize: 18, fontWeight: 700, textAlign: "center" }}
-          >
-            Add New Stage
-          </Typography>
         </Box>
       </Box>
 
@@ -662,56 +762,6 @@ const SalesPipeLineData = ({
           </Typography>
         </Box>
       )}
-
-      <Box
-        sx={{
-          position: "absolute",
-          right: 18,
-          bottom: 18,
-          display: "flex",
-          alignItems: "center",
-          gap: 0.8,
-          zIndex: 3,
-        }}
-      >
-        <IconButton
-          size="small"
-          onClick={handleMoveAllLeft}
-          sx={{
-            width: 30,
-            height: 30,
-            border: `1px solid ${theme.palette.grey[300]}`,
-            backgroundColor: theme.palette.background.paper,
-          }}
-        >
-          <WestRoundedIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-        <IconButton
-          size="small"
-          onClick={handleMoveAllRight}
-          sx={{
-            width: 30,
-            height: 30,
-            border: `1px solid ${theme.palette.grey[300]}`,
-            backgroundColor: theme.palette.background.paper,
-          }}
-        >
-          <EastRoundedIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-        <IconButton
-          size="small"
-          onClick={handleAddStageClick}
-          disabled={!canEditPipeline}
-          sx={{
-            width: 30,
-            height: 30,
-            border: `1px solid ${theme.palette.grey[300]}`,
-            backgroundColor: theme.palette.background.paper,
-          }}
-        >
-          <AddBoxOutlinedIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-      </Box>
 
       <StageConfiguration
         open={canEditPipeline && selectedStageName !== null}

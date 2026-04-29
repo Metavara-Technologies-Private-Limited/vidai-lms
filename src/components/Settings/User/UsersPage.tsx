@@ -1,6 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { lazy, Suspense, useEffect, useState } from "react";
-import { Box, CircularProgress, Tab, Tabs } from "@mui/material";
+import {
+  Box,
+  CircularProgress,
+  Tab,
+  Tabs,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
@@ -59,6 +66,8 @@ const normalizeRoleName = (value: unknown): string =>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const UsersPage: React.FC = () => {
+  const theme = useTheme();
+  const isCompactDesktop = useMediaQuery(theme.breakpoints.down("xl"));
   const authUser = useSelector(selectUser);
   const loginType = useSelector(selectLoginType);
   const [activeTab, setActiveTab] = useState<TabKey>("details");
@@ -669,8 +678,8 @@ const UsersPage: React.FC = () => {
         sx={{
           borderBottom: "1px solid #E0E0E0",
           minHeight: 40,
-          mx: -3,
-          mt: -2,
+          mx: { xs: -2, md: isCompactDesktop ? -2.5 : -3 },
+          mt: { xs: -1.5, md: -2 },
           "& .MuiTabs-indicator": {
             backgroundColor: "#E17E61",
             height: 2.1,
@@ -678,11 +687,12 @@ const UsersPage: React.FC = () => {
 
           "& .MuiTab-root": {
             textTransform: "none",
-            fontSize: 15,
+            fontSize: { xs: 13, sm: 14, lg: isCompactDesktop ? 14 : 15 },
             fontWeight: 500,
             color: "#BBBBBB",
             minHeight: 40,
-            p: 0,
+            px: { xs: 1, sm: 1.5 },
+            py: 0,
           },
 
           "& .MuiTab-root.Mui-selected": {
@@ -696,7 +706,13 @@ const UsersPage: React.FC = () => {
       </Tabs>
 
       {/* ── Content area ── */}
-      <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          p: { xs: 2, md: isCompactDesktop ? 2.5 : 3 },
+        }}
+      >
         {/* Tab panels */}
         <Suspense fallback={<CircularProgress size={24} />}>
           {activeTab === "details" && detailsView === "list" && (

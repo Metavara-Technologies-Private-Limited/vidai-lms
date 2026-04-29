@@ -67,12 +67,12 @@ export const TemplateHeader: React.FC<TemplateHeaderProps> = ({
           <Button 
             variant="contained" 
             startIcon={<Add />} 
-            className={styles.newTemplateBtn}
+            className={`${styles.newTemplateBtn} mobile-add-button`}
             onClick={onNewTemplate}
             disabled={!canAddTemplate}
             title={!canAddTemplate ? "No permission to add templates" : undefined}
           >
-            New Template
+            <span className="mobile-add-button-label">New Template</span>
           </Button>
         </Box>
       </Box>

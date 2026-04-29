@@ -125,3 +125,29 @@ input[type="reset"]:disabled:hover {
 .MuiIconButton-root.Mui-disabled svg {
   color: #9ca3af !important;
 }
+
+.mobile-add-button {
+  white-space: nowrap;
+}
+
+.mobile-add-button-label {
+  display: inline;
+}
+
+@media (max-width: 600px) {
+  .mobile-add-button {
+    min-width: 36px !important;
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 10px !important;
+  }
+
+  .mobile-add-button .MuiButton-startIcon {
+    margin: 0 !important;
+  }
+
+  .mobile-add-button-label {
+    display: none !important;
+  }
+}

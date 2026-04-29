@@ -1362,9 +1362,17 @@ const Leads: React.FC = () => {
             flexShrink: 1,
             width: { xs: "100%", lg: "auto" },
             alignItems: { xs: "stretch", sm: "center" },
+            position: "relative",
+            zIndex: 5,
           }}
         >
-          <Box sx={{ width: { xs: "100%", sm: 150, lg: 136 } }}>
+          <Box
+            sx={{
+              width: { xs: "100%", sm: 150, lg: 136 },
+              position: "relative",
+              zIndex: 5,
+            }}
+          >
             <Box
               component="select"
               aria-label="Select Industry"
@@ -1393,7 +1401,13 @@ const Leads: React.FC = () => {
             </Box>
           </Box>
 
-          <Box sx={{ width: { xs: "100%", sm: 170, lg: 148 } }}>
+          <Box
+            sx={{
+              width: { xs: "100%", sm: 170, lg: 148 },
+              position: "relative",
+              zIndex: 5,
+            }}
+          >
             <Box
               component="select"
               aria-label="Select Pipeline"

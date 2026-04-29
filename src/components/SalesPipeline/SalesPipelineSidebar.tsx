@@ -97,6 +97,7 @@ const SalesPipelineSidebar = ({
 			<Button
 				fullWidth
 				startIcon={<AddIcon fontSize="small" />}
+				className="mobile-add-button"
 				variant="outlined"
 				onClick={onOpenCreatePipeline}
 				disabled={!canEditPipeline}
@@ -115,7 +116,9 @@ const SalesPipelineSidebar = ({
 					},
 				}}
 			>
-				Create New Pipeline
+				<span className="mobile-add-button-label">
+					Create New Pipeline
+				</span>
 			</Button>
 
 			<Stack spacing={1.2} sx={{ pr: 0.45 }}>

@@ -115,7 +115,7 @@ const defaultForm: UserFormData = {
 const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
 
 const FieldGrid = ({ children }: { children: React.ReactNode }) => (
-  <Grid size={{ xs: 12, sm: 3 }}>{children}</Grid>
+  <Grid size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>{children}</Grid>
 );
 
 const SelectField = ({
@@ -413,7 +413,15 @@ const UserDetailsForm: React.FC<Props> = ({
     
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 2 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            mb: 3,
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
           <Box sx={{ position: "relative", width: 64, height: 64 }}>
             {form.profilePhoto && !photoLoadFailed && (
               <Box
@@ -699,7 +707,13 @@ const UserDetailsForm: React.FC<Props> = ({
         </Grid>
 
         <Box
-          sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 4 }}
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 2,
+            mt: 4,
+            flexWrap: "wrap",
+          }}
         >
           <Button
             variant="outlined"
@@ -712,6 +726,7 @@ const UserDetailsForm: React.FC<Props> = ({
               fontSize: 13,
               borderRadius: "6px",
               px: 3,
+              minWidth: { xs: "100%", sm: 140 },
               "&:hover": { borderColor: "#505050", bgcolor: "transparent" },
             }}
           >
@@ -728,6 +743,7 @@ const UserDetailsForm: React.FC<Props> = ({
               fontSize: 13,
               borderRadius: "6px",
               px: 3,
+              minWidth: { xs: "100%", sm: 180 },
               "&:hover": { bgcolor: "#232323" },
             }}
           >

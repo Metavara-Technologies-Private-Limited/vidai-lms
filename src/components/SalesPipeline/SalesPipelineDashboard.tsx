@@ -760,11 +760,12 @@ const SalesPipelineDashboard = () => {
 						sx={{
 							height: "100%",
 							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
+							alignItems: "stretch",
+							justifyContent: "flex-start",
 							textAlign: "center",
-							px: 2,
-							overflow: "hidden",
+							px: { xs: 1, sm: 2 },
+							overflowX: "auto",
+							overflowY: "hidden",
 						}}
 					>
 						{selectedPipeline ? (
@@ -804,6 +805,7 @@ const SalesPipelineDashboard = () => {
 								</Typography>
 								<Button
 									startIcon={<AddIcon fontSize="small" />}
+									className="mobile-add-button"
 									variant="outlined"
 									onClick={handleOpenCreatePipeline}
 									disabled={!canEditPipeline}
@@ -813,7 +815,9 @@ const SalesPipelineDashboard = () => {
 										fontWeight: 700,
 									}}
 								>
-									Create New Pipeline
+									<span className="mobile-add-button-label">
+										Create New Pipeline
+									</span>
 								</Button>
 							</Box>
 						)}

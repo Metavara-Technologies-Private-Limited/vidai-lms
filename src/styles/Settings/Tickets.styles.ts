@@ -10,7 +10,8 @@ export const ticketsSearchBoxSx = {
   height: 34,
   border: "1px solid #E0E0E0",
   borderRadius: "6px",
-  width: { xs: "100%", sm: 220 },
+  width: { xs: "auto", sm: 210 },
+  flex: { xs: "1 1 180px", sm: "0 1 auto" },
   minWidth: 0,
 
   "& input": {
@@ -33,7 +34,8 @@ export const createTicketButtonSx = {
   textTransform: "none",
   color: "#FFFFFF",
   backgroundColor: "#505050",
-  width: { xs: "100%", sm: "auto" },
+  width: "auto",
+  flexShrink: 0,
 
   "& .MuiButton-startIcon": {
     marginRight: "4px",
@@ -53,6 +55,14 @@ export const ticketsTabsSx = {
   width: { xs: "100%", md: "fit-content" }, // ✅ KEY: stop Tabs from stretching
   flexShrink: 0, // ✅ prevent flex expanding
   overflowX: "auto",
+
+  "& .MuiTabs-scroller": {
+    overflowX: "auto !important",
+  },
+
+  "& .MuiTabs-scrollButtons": {
+    width: 24,
+  },
 
   "& .MuiTabs-flexContainer": {
     height: 36,
@@ -92,11 +102,15 @@ export const ticketsTableHeaderSx = {
   backgroundColor: "#F8F8F9",
   borderBottom: "1px solid #EEE",
   borderRadius: 1.5,
-  fontSize: "10px",
+  fontSize: "11px",
+  gap: 1.5,
+  minWidth: 980,
 };
 
 /* Table row */
 export const ticketsRowSx = {
+  minWidth: 980,
+  gap: 1.5,
   "&:hover": { background: "#FAFAFA" },
 };
 
@@ -168,6 +182,8 @@ export const ticketsColumnHeaderCellSx = {
   fontSize: "12px",
   fontWeight: 500,
   color: "#626262",
+  minWidth: 0,
+  paddingRight: 8,
 };
 
 /* Ellipsis cell (lab name / subject reusable) */

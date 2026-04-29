@@ -14,12 +14,12 @@ export default function CampaignHeader({
     <div className="page-header">
       <Typography variant="h6">Campaigns</Typography>
       <button
-        className="primary-btn"
+        className="primary-btn mobile-add-button"
         onClick={onAddNew}
         disabled={!canAddCampaign}
         title={!canAddCampaign ? "No permission to add campaigns" : undefined}
       >
-        Add New Campaign
+        <span className="mobile-add-button-label">Add New Campaign</span>
       </button>
     </div>
   );

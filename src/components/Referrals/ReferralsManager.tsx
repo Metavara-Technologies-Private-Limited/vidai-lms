@@ -7,6 +7,8 @@ import {
   Paper,
   Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -332,6 +334,8 @@ export const Doctors: React.FC = () => {
 };
 
 export const DoctorReferrals: React.FC = () => {
+  const theme = useTheme();
+  const isTabletDown = useMediaQuery(theme.breakpoints.down("md"));
   const { doctorId } = useParams<{ doctorId: string }>();
   const location = useLocation();
   const clinic = useSelector(selectClinic);
@@ -426,7 +430,12 @@ const sources = useSelector(selectSources) as ReferralSource[];
             borderRadius="8px"
             px={1.5}
             py={0.75}
-            sx={{ cursor: "pointer", bgcolor: "#fff" }}
+            sx={{
+              cursor: "pointer",
+              bgcolor: "#fff",
+              width: { xs: "100%", sm: "auto" },
+              justifyContent: { xs: "space-between", sm: "flex-start" },
+            }}
           >
             <Typography fontSize="13px" color="#374151">
               {new Date().toLocaleString("default", {
@@ -446,11 +455,16 @@ const sources = useSelector(selectSources) as ReferralSource[];
           <CircularProgress size={32} />
         </Box>
       ) : (
-        <Box display="flex" gap={2.5} alignItems="flex-start">
+        <Box
+          display="flex"
+          gap={2.5}
+          alignItems="flex-start"
+          flexDirection={{ xs: "column", md: "row" }}
+        >
           <Paper
             elevation={0}
             sx={{
-              width: 290,
+              width: { xs: "100%", md: 290 },
               flexShrink: 0,
               borderRadius: "12px",
               border: "1px solid #F0F0F0",
@@ -485,7 +499,7 @@ const sources = useSelector(selectSources) as ReferralSource[];
 
             <Box
               sx={{
-                maxHeight: "calc(100vh - 280px)",
+                maxHeight: isTabletDown ? 320 : "calc(100vh - 280px)",
                 overflowY: "auto",
                 "&::-webkit-scrollbar": { width: "4px" },
                 "&::-webkit-scrollbar-thumb": {
@@ -551,6 +565,9 @@ const sources = useSelector(selectSources) as ReferralSource[];
                         <Box
                           display="flex"
                           justifyContent="space-between"
+                          alignItems="center"
+                          gap={1}
+                          flexWrap="wrap"
                           mt={0.25}
                         >
                           <Typography

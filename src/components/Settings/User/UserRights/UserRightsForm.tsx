@@ -7,6 +7,8 @@ import {
   FormControlLabel,
   IconButton,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
@@ -316,6 +318,9 @@ const chipStyleByType: Record<"module" | "category" | "subcategory", { border: s
 };
 
 const UserRightsForm: React.FC<Props> = ({ onSave }) => {
+  const theme = useTheme();
+  const isCompactDesktop = useMediaQuery(theme.breakpoints.down("xl"));
+  const isTabletDown = useMediaQuery(theme.breakpoints.down("lg"));
   const user = useSelector(selectUser);
   const authUser = user as unknown as Record<string, unknown> | null;
   const permissions = authUser?.permissions;
@@ -662,7 +667,14 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   return (
-    <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+    <Box
+      sx={{
+        display: "flex",
+        gap: 2,
+        alignItems: "flex-start",
+        flexDirection: isTabletDown ? "column" : "row",
+      }}
+    >
       {!canViewUserRights ? (
         <Box
           sx={{
@@ -683,7 +695,9 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
       <>
       <Box
         sx={{
-          width: 360,
+          width: { xs: "100%", lg: 340, xl: 360 },
+          maxWidth: "100%",
+          flexShrink: 0,
           border: "1px solid #E0E0E0",
           borderRadius: "10px",
           bgcolor: "#fff",
@@ -812,7 +826,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
         )}
       </Box>
 
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
         {mode === "empty" && (
           <Box
             sx={{
@@ -840,6 +854,8 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                gap: 1,
+                flexWrap: "wrap",
                 bgcolor: "#F6F6F6",
                 borderRadius: "10px",
                 px: 2,
@@ -857,22 +873,26 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
               </IconButton>
             </Box>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "260px repeat(4, 1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "8px", px: 1.2, py: 1.2, mb: 0.8 }}>
-              <Box />
-              {["Add", "Edit", "View", "Print"].map((h) => (
-                <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
-              ))}
-            </Box>
+            <Box sx={{ overflowX: "auto" }}>
+              <Box sx={{ minWidth: isCompactDesktop ? 620 : 720 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(4, minmax(72px, 1fr))", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "8px", px: 1.2, py: 1.2, mb: 0.8 }}>
+                  <Box />
+                  {["Add", "Edit", "View", "Print"].map((h) => (
+                    <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
+                  ))}
+                </Box>
 
-            {summaryRows.map((row) => (
-              <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "260px repeat(4, 1fr)", alignItems: "center", px: 1.2, py: 1 }}>
-                <Box sx={{ borderLeft: "6px solid #3A7BD5", bgcolor: "#EDF2F8", borderRadius: "4px", px: 1.3, py: 0.8, fontSize: 13 }}>{row.label}</Box>
-                <Tick checked={row.perm.add} />
-                <Tick checked={row.perm.edit} />
-                <Tick checked={row.perm.view} />
-                <Tick checked={row.perm.print} />
+                {summaryRows.map((row) => (
+                  <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(4, minmax(72px, 1fr))", alignItems: "center", px: 1.2, py: 1 }}>
+                    <Box sx={{ borderLeft: "6px solid #3A7BD5", bgcolor: "#EDF2F8", borderRadius: "4px", px: 1.3, py: 0.8, fontSize: 13 }}>{row.label}</Box>
+                    <Tick checked={row.perm.add} />
+                    <Tick checked={row.perm.edit} />
+                    <Tick checked={row.perm.view} />
+                    <Tick checked={row.perm.print} />
+                  </Box>
+                ))}
               </Box>
-            ))}
+            </Box>
           </Box>
         )}
 
@@ -880,7 +900,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
           <Box sx={{ border: "1px solid #E0E0E0", borderRadius: "10px", bgcolor: "#fff", p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
             <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Page Access</Typography>
 
-            <Box sx={{ border: "1px solid #ECECEC", borderRadius: "12px", px: 2, py: 1, display: "flex", alignItems: "center", width: "100%" }}>
+            <Box sx={{ border: "1px solid #ECECEC", borderRadius: "12px", px: 2, py: 1, display: "flex", alignItems: "center", width: "100%", flexWrap: "wrap", rowGap: 1 }}>
               {STEP_LABELS.map((label, idx) => (
                 <React.Fragment key={label}>
                   <StepDot
@@ -895,7 +915,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
               ))}
             </Box>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(180px,1fr))", gap: 1.2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 1.2 }}>
               {optionList.map((label) => (
                 <FormControlLabel
                   key={label}
@@ -914,7 +934,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
               ))}
             </Box>
 
-            <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -928,61 +948,65 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                 label={<Typography sx={{ fontSize: 13 }}>{allSelected ? "Deselect All" : "Select All"}</Typography>}
                 sx={{ m: 0 }}
               />
-              <Box sx={{ flex: 1 }} />
-              <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={!canManageUserRights || (activeStep < 2 ? !hasStepSelection : !hasAnySelection)} sx={{ textTransform: "none", minWidth: 110, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
+              <Box sx={{ flex: 1, minWidth: 0 }} />
+              <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={!canManageUserRights || (activeStep < 2 ? !hasStepSelection : !hasAnySelection)} sx={{ textTransform: "none", minWidth: { xs: "100%", sm: 110 }, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
             </Box>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "220px repeat(5,1fr)", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "10px", px: 1.2, py: 1 }}>
-              <Box />
-              {["All", "Add", "Edit", "View", "Print"].map((h) => (
-                <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
-              ))}
-            </Box>
-
-            <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
-              {editRows.map((row) => {
-                const itemType = getItemType(row.label, draftRights);
-                const chipColors = chipStyleByType[itemType];
-
-                return (
-                <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "220px repeat(5,1fr)", alignItems: "center", px: 1, py: 0.8 }}>
-                  <Box sx={{ display: "flex", alignItems: "center" }}>
-                    <Box sx={{ border: `1px solid ${chipColors.border}`, bgcolor: chipColors.bg, borderRadius: "8px", px: 1.1, py: 0.5, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 0.8 }}>
-                      {row.label}
-                      <CancelIcon sx={{ fontSize: 15, color: "#E17E61", cursor: "pointer" }} onClick={() => removeRow(row.label)} />
-                    </Box>
-                  </Box>
-
-                  <Tick checked={row.perm.add && row.perm.edit && row.perm.view && row.perm.print} onClick={() => {
-                    if (!canManageUserRights) return;
-                    const allOn = row.perm.add && row.perm.edit && row.perm.view && row.perm.print;
-                    setDraftPerms((prev) => ({
-                      ...prev,
-                      [row.label]: {
-                        ...row.perm,
-                        add: !allOn,
-                        edit: !allOn,
-                        view: !allOn,
-                        print: !allOn,
-                      },
-                    }));
-                  }} />
-                  <Tick checked={row.perm.add} onClick={canManageUserRights ? () => togglePerm(row.label, "add") : undefined} />
-                  <Tick checked={row.perm.edit} onClick={canManageUserRights ? () => togglePerm(row.label, "edit") : undefined} />
-                  <Tick checked={row.perm.view} onClick={canManageUserRights ? () => togglePerm(row.label, "view") : undefined} />
-                  <Tick checked={row.perm.print} onClick={canManageUserRights ? () => togglePerm(row.label, "print") : undefined} />
+            <Box sx={{ overflowX: "auto" }}>
+              <Box sx={{ minWidth: isCompactDesktop ? 700 : 820 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(5, minmax(72px, 1fr))", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "10px", px: 1.2, py: 1 }}>
+                  <Box />
+                  {["All", "Add", "Edit", "View", "Print"].map((h) => (
+                    <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
+                  ))}
                 </Box>
-                );
-              })}
+
+                <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
+                  {editRows.map((row) => {
+                    const itemType = getItemType(row.label, draftRights);
+                    const chipColors = chipStyleByType[itemType];
+
+                    return (
+                    <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(5, minmax(72px, 1fr))", alignItems: "center", px: 1, py: 0.8 }}>
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <Box sx={{ border: `1px solid ${chipColors.border}`, bgcolor: chipColors.bg, borderRadius: "8px", px: 1.1, py: 0.5, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 0.8 }}>
+                          {row.label}
+                          <CancelIcon sx={{ fontSize: 15, color: "#E17E61", cursor: "pointer" }} onClick={() => removeRow(row.label)} />
+                        </Box>
+                      </Box>
+
+                      <Tick checked={row.perm.add && row.perm.edit && row.perm.view && row.perm.print} onClick={() => {
+                        if (!canManageUserRights) return;
+                        const allOn = row.perm.add && row.perm.edit && row.perm.view && row.perm.print;
+                        setDraftPerms((prev) => ({
+                          ...prev,
+                          [row.label]: {
+                            ...row.perm,
+                            add: !allOn,
+                            edit: !allOn,
+                            view: !allOn,
+                            print: !allOn,
+                          },
+                        }));
+                      }} />
+                      <Tick checked={row.perm.add} onClick={canManageUserRights ? () => togglePerm(row.label, "add") : undefined} />
+                      <Tick checked={row.perm.edit} onClick={canManageUserRights ? () => togglePerm(row.label, "edit") : undefined} />
+                      <Tick checked={row.perm.view} onClick={canManageUserRights ? () => togglePerm(row.label, "view") : undefined} />
+                      <Tick checked={row.perm.print} onClick={canManageUserRights ? () => togglePerm(row.label, "print") : undefined} />
+                    </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
             </Box>
 
-            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.2 }}>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.2, flexWrap: "wrap" }}>
               <Button variant="outlined" onClick={() => setMode("summary")} sx={{ textTransform: "none", minWidth: 130, borderRadius: "12px", fontSize: 14 }}>Cancel</Button>
               <Button
                 variant="contained"
                 onClick={handleSaveGrant}
                 disabled={saving || !canManageUserRights}
-                sx={{ textTransform: "none", minWidth: 240, borderRadius: "12px", bgcolor: "#545454", fontSize: 14, "&:hover": { bgcolor: "#232323" } }}
+                sx={{ textTransform: "none", minWidth: { xs: "100%", sm: 240 }, borderRadius: "12px", bgcolor: "#545454", fontSize: 14, "&:hover": { bgcolor: "#232323" } }}
               >
                 {saving ? <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} /> : null}
                 Save &amp; Grant Access

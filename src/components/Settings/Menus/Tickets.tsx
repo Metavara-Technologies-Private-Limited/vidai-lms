@@ -241,15 +241,15 @@ const Tickets = () => {
   }
 
   const columns = [
-    { key: "ticket_no", label: "Ticket No", flex: 1 },
-    { key: "lab_name", label: "Lab Name", flex: 1.4 },
-    { key: "subject", label: "Subject", flex: 1 },
-    { key: "created_at", label: "Created Date", flex: 1.1 },
-    { key: "due_date", label: "Due Date", flex: 1.1 },
-    { key: "requested_by", label: "Requested By", flex: 1.2 },
-    { key: "department", label: "Department", flex: 1.2 },
-    { key: "priority", label: "Priority", flex: 0.96 },
-    { key: "assigned_to", label: "Assigned To", flex: 1.5 },
+    { key: "ticket_no", label: "Ticket No", flex: 1, minWidth: 90 },
+    { key: "lab_name", label: "Lab Name", flex: 1.4, minWidth: 120 },
+    { key: "subject", label: "Subject", flex: 1.15, minWidth: 110 },
+    { key: "created_at", label: "Created Date", flex: 1.1, minWidth: 110 },
+    { key: "due_date", label: "Due Date", flex: 1.1, minWidth: 100 },
+    { key: "requested_by", label: "Requested By", flex: 1.2, minWidth: 120 },
+    { key: "department", label: "Department", flex: 1.2, minWidth: 120 },
+    { key: "priority", label: "Priority", flex: 0.96, minWidth: 90 },
+    { key: "assigned_to", label: "Assigned To", flex: 1.5, minWidth: 135 },
   ];
 
   return (
@@ -274,6 +274,9 @@ const Tickets = () => {
             setTab(v);
             setPage(1);
           }}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           TabIndicatorProps={{ style: { display: "none" } }}
           sx={ticketsTabsSx}
         >
@@ -288,7 +291,12 @@ const Tickets = () => {
           direction="row"
           spacing={1}
           alignItems="center"
-          sx={{ ml: "auto", flexWrap: "wrap", justifyContent: "flex-end" }}
+          sx={{
+            ml: "auto",
+            flexWrap: "wrap",
+            justifyContent: { xs: "flex-start", md: "flex-end" },
+            width: { xs: "100%", md: "auto" },
+          }}
         >
           <Box sx={ticketsSearchBoxSx}>
             <SearchIcon fontSize="small" />
@@ -313,11 +321,12 @@ const Tickets = () => {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
+            className="mobile-add-button"
             sx={createTicketButtonSx}
             disabled={!canAddTickets}
             onClick={() => setOpenCreate(true)}
           >
-            Create New
+            <span className="mobile-add-button-label">Create New</span>
           </Button>
         </Stack>
       </Stack>
@@ -326,7 +335,11 @@ const Tickets = () => {
       <Box sx={{ overflowX: "auto" }}>
         <Stack direction="row" px={2} py={2} sx={ticketsTableHeaderSx}>
           {columns.map((col) => (
-            <Box key={col.key} flex={col.flex} sx={ticketsColumnHeaderCellSx}>
+            <Box
+              key={col.key}
+              flex={col.flex}
+              sx={{ ...ticketsColumnHeaderCellSx, minWidth: col.minWidth }}
+            >
               {col.label}
             </Box>
           ))}
@@ -353,31 +366,56 @@ const Tickets = () => {
                 borderBottom: "1px solid #f1f1f1",
               }}
             >
-              <Box flex={columns[0].flex} sx={ticketsNumberCellSx}>
+              <Box
+                flex={columns[0].flex}
+                sx={{ ...ticketsNumberCellSx, minWidth: columns[0].minWidth }}
+              >
                 {t.ticket_no?.replace("TICKET-", "TN-")}
               </Box>
 
-              <Box flex={columns[1].flex} sx={ticketsEllipsisCellSx}>
+              <Box
+                flex={columns[1].flex}
+                sx={{ ...ticketsEllipsisCellSx, minWidth: columns[1].minWidth }}
+              >
                 {t.lab_name}
               </Box>
 
-              <Box flex={columns[2].flex} sx={ticketsEllipsisCellSx}>
+              <Box
+                flex={columns[2].flex}
+                sx={{ ...ticketsEllipsisCellSx, minWidth: columns[2].minWidth }}
+              >
                 {t.subject}
               </Box>
 
-              <Box flex={columns[3].flex} fontSize="13px">
+              <Box
+                flex={columns[3].flex}
+                fontSize="13px"
+                sx={{ minWidth: columns[3].minWidth }}
+              >
                 {dayjs(t.created_at).format("DD/MM/YYYY")}
               </Box>
 
-              <Box flex={columns[4].flex} fontSize="13px">
+              <Box
+                flex={columns[4].flex}
+                fontSize="13px"
+                sx={{ minWidth: columns[4].minWidth }}
+              >
                 {t.due_date ? dayjs(t.due_date).format("DD/MM/YYYY") : "—"}
               </Box>
 
-              <Box flex={columns[5].flex} fontSize="13px">
+              <Box
+                flex={columns[5].flex}
+                fontSize="13px"
+                sx={{ minWidth: columns[5].minWidth }}
+              >
                 {t.requested_by || "nil"}
               </Box>
 
-              <Box flex={columns[6].flex} fontSize="13px">
+              <Box
+                flex={columns[6].flex}
+                fontSize="13px"
+                sx={{ minWidth: columns[6].minWidth }}
+              >
                 {t.department_name}
               </Box>
 
@@ -385,6 +423,7 @@ const Tickets = () => {
                 flex={columns[7].flex}
                 display="flex"
                 justifyContent="flex-start"
+                sx={{ minWidth: columns[7].minWidth }}
               >
                 <Chip
                   label={
@@ -402,6 +441,7 @@ const Tickets = () => {
                 display="flex"
                 alignItems="center"
                 gap={1}
+                sx={{ minWidth: columns[8].minWidth }}
               >
                 <Avatar sx={ticketsAvatarSx}>
                   {t.assigned_to_id
