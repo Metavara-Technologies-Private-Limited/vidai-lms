@@ -185,6 +185,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const [accounts, setAccounts] = useState<Platform[]>([]);
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
+  // ✅ FIX: Keywords state — used for Google Ads
+  const [keywordsInput, setKeywordsInput] = useState("");
+
   const [platformContent, setPlatformContent] = useState<
     Record<Platform, string>
   >({
@@ -556,11 +559,25 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
       if (shouldSendGoogleAds) {
         try {
+          // ✅ FIX: Resolve google_ads image — check google_ads platform first,
+          //         then fall back to any platform image, then to global image_url
           const googleAdsImage =
             platformImageUrlsRef.current["google_ads"]?.trim() ||
             platformImageUrls["google_ads"]?.trim() ||
             image_url ||
             null;
+
+          // ✅ FIX: Parse keywords from the keywordsInput state (comma-separated)
+          const parsedKeywords = keywordsInput
+            .split(",")
+            .map((k) => k.trim())
+            .filter(Boolean);
+
+          console.log("[GoogleAds] Sending payload:", {
+            internal_campaign_id: String(newCampaignId ?? ""),
+            image_url: googleAdsImage,
+            keywords: parsedKeywords,
+          });
 
           await CampaignAPI.createGoogleAds({
             clinic_id: clinicId,
@@ -569,7 +586,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             budget: budgets["google_ads"],
             bidding_strategy: "MANUAL_CPC",
             locations: [],
-            keywords: [],
+            // ✅ FIX: Pass actual keywords from form input, not hardcoded []
+            keywords: parsedKeywords,
             cpc_bid: 20,
             ad_group_name: `${campaignName} AdGroup`,
             final_url: clinic?.website ?? "https://example.com",
@@ -578,11 +596,12 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             headline_3: "Contact Us Today",
             description: campaignDescription.slice(0, 90),
             description_2: "Call us now or visit our website.",
+            // ✅ FIX: Pass resolved image url
             image_url: googleAdsImage,
             platform_data: { google_ads: resolvedContent["google_ads"] },
             // ✅ FIX: send campaign_type so Zapier creates only SEARCH, not both Search + Display
             campaign_type: "SEARCH",
-            // ✅ FIX: send internal campaign ID so Zapier callback can link Google IDs back to our DB
+            // ✅ FIX: send internal campaign ID — must be string, not empty
             internal_campaign_id: String(newCampaignId ?? ""),
           });
 
@@ -1106,6 +1125,66 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 </div>
               </div>
             </div>
+
+            {/* ✅ FIX: Google Ads Keywords input — shown when google_ads is selected */}
+            {accounts.includes("google_ads") && (
+              <div className="section-card">
+                <h3>Google Ads Keywords</h3>
+                <p className="section-subtitle">
+                  Enter keywords for your Google Search campaign (comma-separated)
+                </p>
+                <div className="form-group">
+                  <label>Keywords *</label>
+                  <input
+                    value={keywordsInput}
+                    onChange={(e) => setKeywordsInput(e.target.value)}
+                    placeholder="e.g. IVF, fertility clinic, IVF consultation, egg freezing"
+                    style={{ width: "100%" }}
+                  />
+                  <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                    Separate keywords with commas. These will be added as broad match keywords to your Google Search campaign.
+                    {!keywordsInput.trim() && (
+                      <span style={{ color: "#d97706" }}>
+                        {" "}If left empty, fallback keywords will be auto-generated from the campaign name.
+                      </span>
+                    )}
+                  </p>
+                  {/* Live preview of parsed keywords */}
+                  {keywordsInput.trim() && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                      {keywordsInput
+                        .split(",")
+                        .map((k) => k.trim())
+                        .filter(Boolean)
+                        .map((kw, i) => (
+                          <Chip
+                            key={i}
+                            label={kw}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontSize: 11 }}
+                          />
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ✅ FIX: Google Ads Image URL input — shown when google_ads is selected */}
+                <div className="form-group" style={{ marginTop: 12 }}>
+                  <label>Google Ads Image URL (optional)</label>
+                  <input
+                    value={platformImageUrls["google_ads"]}
+                    onChange={(e) => handleImageUrl("google_ads", e.target.value)}
+                    placeholder="https://your-image-url.com/image.jpg"
+                    style={{ width: "100%" }}
+                  />
+                  <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                    If provided, a Display campaign will also be created alongside the Search campaign.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {mode && (
               <div className="section-card">
