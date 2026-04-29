@@ -31,16 +31,54 @@ import {
 } from "../../services/pipeline.api";
 import type { Lead } from "../../services/leads.api";
 
+// ── Storage keys ─────────────────────────────────────────────────────────────
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
+const STORAGE_KEY_FILTERS = "leads_filter_values";
+const STORAGE_KEY_LOCATION = "leads_filter_location";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const defaultFilters = (): FilterValues => ({
+  department: "",
+  assignee: "",
+  status: "",
+  quality: "",
+  source: "",
+  subSource: "",
+  dateFrom: null,
+  dateTo: null,
+});
+
+const loadPersistedFilters = (): FilterValues => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_FILTERS);
+    if (stored) {
+      const parsed = JSON.parse(stored) as FilterValues;
+      return { ...defaultFilters(), ...parsed };
+    }
+  } catch {
+    /* ignore */
+  }
+  return defaultFilters();
+};
+
+const loadPersistedLocation = (): string => {
+  try {
+    return localStorage.getItem(STORAGE_KEY_LOCATION) ?? "";
+  } catch {
+    return "";
+  }
+};
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface FilterDialogProps {
   open: boolean;
   onClose: () => void;
-  onApplyFilters?: (filters: FilterValues) => void;
+  onApplyFilters?: (filters: FilterValues & { location?: string }) => void;
   leads?: Lead[];
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
 const FilterDialog: React.FC<FilterDialogProps> = ({
   open,
   onClose,
@@ -53,33 +91,29 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
 
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>(
-    [],
-  );
+  const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
 
   const setLoadingDepartments = React.useState(false)[1];
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
 
   // ── Pipeline stage names for the Status dropdown ──────────────────────────
-  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>(
-    [],
-  );
+  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
   const [loadingPipeline, setLoadingPipeline] = React.useState(false);
 
-  const [filters, setFilters] = React.useState<FilterValues>({
-    department: "",
-    assignee: "",
-    status: "",
-    quality: "",
-    source: "",
-    subSource: "",
-    dateFrom: null,
-    dateTo: null,
+  // ── Filter state — initialised from localStorage ───────────────────────────
+  const [filters, setFilters] = React.useState<FilterValues>(loadPersistedFilters);
+
+  const [dateFrom, setDateFrom] = React.useState<Dayjs | null>(() => {
+    const persisted = loadPersistedFilters();
+    return persisted.dateFrom ? dayjs(persisted.dateFrom) : null;
   });
 
-  const [dateFrom, setDateFrom] = React.useState<Dayjs | null>(null);
-  const [dateTo, setDateTo] = React.useState<Dayjs | null>(null);
-  const [location, setLocation] = React.useState("");
+  const [dateTo, setDateTo] = React.useState<Dayjs | null>(() => {
+    const persisted = loadPersistedFilters();
+    return persisted.dateTo ? dayjs(persisted.dateTo) : null;
+  });
+
+  const [location, setLocation] = React.useState<string>(loadPersistedLocation);
 
   // ── Unique locations derived from current leads ───────────────────────────
   const availableLocations = React.useMemo(() => {
@@ -92,6 +126,17 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
     });
     return Array.from(locationSet).sort();
   }, [leads]);
+
+  // ── Re-apply persisted filters on mount (so parent table reflects them) ───
+  React.useEffect(() => {
+    const persisted = loadPersistedFilters();
+    const persistedLocation = loadPersistedLocation();
+    const hasFilters = Object.values(persisted).some((v) => v !== "" && v !== null);
+    if (hasFilters || persistedLocation) {
+      if (onApplyFilters) onApplyFilters({ ...persisted, location: persistedLocation });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Load pipeline stages when dialog opens ────────────────────────────────
   React.useEffect(() => {
@@ -134,10 +179,8 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
           .filter((s) => isActiveStageStatus(s.stage_status))
           .filter((s) => s.stage_name.trim())
           .sort((a, b) => {
-            const aOrder =
-              typeof a.stage_order === "number" ? a.stage_order : 0;
-            const bOrder =
-              typeof b.stage_order === "number" ? b.stage_order : 0;
+            const aOrder = typeof a.stage_order === "number" ? a.stage_order : 0;
+            const bOrder = typeof b.stage_order === "number" ? b.stage_order : 0;
             return aOrder - bOrder;
           })
           .map((s) => s.stage_name.trim());
@@ -204,8 +247,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
     const normalize = (s: string) => (s ?? "").trim().toLowerCase();
     setFilteredEmployees(
       employees.filter(
-        (emp) =>
-          normalize(emp.department_name) === normalize(selectedDept.name),
+        (emp) => normalize(emp.department_name) === normalize(selectedDept.name),
       ),
     );
   }, [filters.department, employees, departments]);
@@ -239,26 +281,35 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   };
 
   const handleApply = () => {
-    if (onApplyFilters) onApplyFilters(filters);
+    // Persist filters + location to localStorage
+    try {
+      localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters));
+      localStorage.setItem(STORAGE_KEY_LOCATION, location);
+    } catch {
+      /* ignore storage errors */
+    }
+
+    if (onApplyFilters) onApplyFilters({ ...filters, location });
     onClose();
   };
 
   const handleClearAll = () => {
-    const emptyFilters: FilterValues = {
-      department: "",
-      assignee: "",
-      status: "",
-      quality: "",
-      source: "",
-      subSource: "",
-      dateFrom: null,
-      dateTo: null,
-    };
+    const emptyFilters = defaultFilters();
+
+    // Remove persisted values
+    try {
+      localStorage.removeItem(STORAGE_KEY_FILTERS);
+      localStorage.removeItem(STORAGE_KEY_LOCATION);
+    } catch {
+      /* ignore */
+    }
+
     setFilters(emptyFilters);
     setDateFrom(null);
     setDateTo(null);
     setLocation("");
-    if (onApplyFilters) onApplyFilters(emptyFilters);
+
+    if (onApplyFilters) onApplyFilters({ ...emptyFilters, location: "" });
   };
 
   // ── Styles ────────────────────────────────────────────────────────────────
@@ -297,6 +348,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
     },
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Dialog
       open={open}
@@ -398,9 +450,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   fullWidth
                   size="small"
                   value={filters.quality}
-                  onChange={(e) =>
-                    handleFilterChange("quality", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange("quality", e.target.value)}
                   sx={inputStyle}
                   SelectProps={{ displayEmpty: true }}
                 >
@@ -419,9 +469,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   fullWidth
                   size="small"
                   value={filters.status}
-                  onChange={(e) =>
-                    handleFilterChange("status", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange("status", e.target.value)}
                   disabled={loadingPipeline}
                   sx={inputStyle}
                   SelectProps={{ displayEmpty: true }}
@@ -472,9 +520,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   fullWidth
                   size="small"
                   value={filters.assignee}
-                  onChange={(e) =>
-                    handleFilterChange("assignee", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange("assignee", e.target.value)}
                   disabled={loadingEmployees}
                   sx={inputStyle}
                   SelectProps={{ displayEmpty: true }}
@@ -504,9 +550,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   fullWidth
                   size="small"
                   value={filters.source}
-                  onChange={(e) =>
-                    handleFilterChange("source", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange("source", e.target.value)}
                   sx={inputStyle}
                   SelectProps={{ displayEmpty: true }}
                 >
@@ -525,17 +569,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   fullWidth
                   size="small"
                   value={filters.subSource}
-                  onChange={(e) =>
-                    handleFilterChange("subSource", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange("subSource", e.target.value)}
                   disabled={!filters.source || filters.source === "Other"}
                   sx={inputStyle}
                   SelectProps={{ displayEmpty: true }}
                 >
                   <MenuItem value="">Select Sub-Source</MenuItem>
                   {(() => {
-                    if (!filters.source || filters.source === "Other")
-                      return null;
+                    if (!filters.source || filters.source === "Other") return null;
                     const availableSubSources =
                       filters.source === "Referral"
                         ? REFERRAL_DEPARTMENT_OPTIONS
