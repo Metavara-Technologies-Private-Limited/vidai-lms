@@ -72,6 +72,8 @@ import {
   IS_MEDICAL_APP,
   STATUS_OPTIONS_BY_APP,
 } from "../../config/appType";
+import { clearAuth } from "../../store/authSlice";
+import { useNavigate } from "react-router-dom";
 
 // ====================== Props ======================
 interface Props {
@@ -1353,6 +1355,7 @@ const LeadsBoard: React.FC<Props> = ({
   selectedPipelineId = "",
 }) => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const clinic = useSelector(selectClinic);
 
@@ -1713,6 +1716,12 @@ const LeadsBoard: React.FC<Props> = ({
         </Stack>
       </Box>
     );
+  
+  if (error === "Unauthorized") {
+    
+    dispatch(clearAuth());
+    navigate("/login", { replace: true });
+    }
 
   if (error)
     return (
