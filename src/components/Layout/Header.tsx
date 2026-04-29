@@ -69,6 +69,7 @@ const Header = ({
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down("md"));
   const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
+  const isCompactDesktop = useMediaQuery(theme.breakpoints.down("lg"));
   const user = useSelector(selectUser);
   const dbClinic = useSelector(selectClinic);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
@@ -422,10 +423,10 @@ const Header = ({
       <Toolbar
         sx={{
           justifyContent: "space-between",
-          py: 2,
-          px: { xs: 1.5, sm: 2 },
-          gap: 1.5,
-          flexWrap: { xs: "wrap", lg: "nowrap" },
+          py: { xs: 1.5, lg: isCompactDesktop ? 1.5 : 2 },
+          px: { xs: 1.5, sm: 2, lg: isCompactDesktop ? 1.5 : 2 },
+          gap: { xs: 1.25, lg: isCompactDesktop ? 1 : 1.5 },
+          flexWrap: { xs: "wrap", lg: isCompactDesktop ? "wrap" : "nowrap" },
           alignItems: { xs: "flex-start", lg: "center" },
         }}
       >
@@ -436,7 +437,10 @@ const Header = ({
             alignItems: "center",
             gap: 1,
             minWidth: 0,
-            flex: { xs: "1 1 100%", lg: "1 1 auto" },
+            flex: {
+              xs: "1 1 100%",
+              lg: isCompactDesktop ? "1 1 100%" : "1 1 auto",
+            },
           }}
         >
           {showSidebarToggle && (
@@ -463,13 +467,22 @@ const Header = ({
           sx={{
             display: "flex",
             alignItems: "center",
-            justifyContent: { xs: "space-between", md: "flex-end" },
-            gap: { xs: 1, sm: 1.5, md: 2 },
-            flexWrap: "wrap",
-            width: { xs: "100%", lg: "auto" },
+            justifyContent: {
+              xs: "flex-start",
+              md: isCompactDesktop ? "space-between" : "flex-end",
+            },
+            gap: { xs: 1, sm: 1.25, md: isCompactDesktop ? 1.25 : 2 },
+            flexWrap: "nowrap",
+            width: { xs: "100%", lg: isCompactDesktop ? "100%" : "auto" },
+            minWidth: 0,
+            overflowX: { xs: "auto", md: "visible" },
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": {
+              display: "none",
+            },
           }}
         >
-          <Box>
+          <Box sx={{ flex: { xs: "1 1 auto", md: "0 1 auto" }, minWidth: 0 }}>
             <Box
               onClick={handleClinicOpen}
               sx={{
@@ -478,15 +491,20 @@ const Header = ({
                 gap: 1,
                 cursor: "pointer",
                 background: "#f3f4f6",
-                px: { xs: 1.25, sm: 2 },
-                py: 1,
+                px: { xs: 1, sm: 2 },
+                py: { xs: 0.75, md: isCompactDesktop ? 0.875 : 1 },
                 borderRadius: 2,
-                maxWidth: { xs: "100%", sm: 260 },
+                maxWidth: {
+                  xs: "100%",
+                  sm: isCompactDesktop ? 220 : 260,
+                },
+                minWidth: 0,
               }}
             >
               <Typography
                 variant="body2"
                 sx={{
+                  fontSize: { xs: 12, md: isCompactDesktop ? 13 : undefined },
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -521,28 +539,35 @@ const Header = ({
               key={type}
               onClick={(e) => handleIconClick(e, type)}
               sx={{
-                width: isSmDown ? 42 : 48,
-                height: isSmDown ? 42 : 48,
+                width: isSmDown ? 42 : isCompactDesktop ? 44 : 48,
+                height: isSmDown ? 42 : isCompactDesktop ? 44 : 48,
                 backgroundColor: "#fff",
                 borderRadius: 1,
+                flexShrink: 0,
               }}
             >
-              <Box component="img" src={icon} width={isSmDown ? 20 : 24} />
+              <Box
+                component="img"
+                src={icon}
+                width={isSmDown ? 20 : isCompactDesktop ? 22 : 24}
+              />
             </IconButton>
           ))}
 
           {/* USER */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{ display: "flex", alignItems: "center", gap: 0.75, flexShrink: 0 }}
+          >
             <Avatar
               src={getPhotoSrc(user?.photo)}
               onClick={handlePhotoPopoverOpen}
               sx={{
-                width: 36,
-                height: 36,
+                width: isCompactDesktop ? 34 : 36,
+                height: isCompactDesktop ? 34 : 36,
                 borderRadius: "10px",
                 bgcolor: "#F3E8E2",
                 color: "#A4471C",
-                fontSize: 14,
+                fontSize: isCompactDesktop ? 13 : 14,
                 fontWeight: 700,
                 cursor: "pointer",
               }}
@@ -559,9 +584,17 @@ const Header = ({
               onClick={handleUserMenuOpen}
             >
               <Box sx={{ display: { xs: "none", md: "block" } }}>
-                <Typography fontWeight={600}>{displayUserName}</Typography>
+                <Typography
+                  fontWeight={600}
+                  sx={{ fontSize: isCompactDesktop ? 14 : 16 }}
+                >
+                  {displayUserName}
+                </Typography>
 
-                <Typography fontSize={12} color="#6b7280">
+                <Typography
+                  fontSize={isCompactDesktop ? 11 : 12}
+                  color="#6b7280"
+                >
                   {user?.designation_label || user?.designation || "—"}
                 </Typography>
               </Box>

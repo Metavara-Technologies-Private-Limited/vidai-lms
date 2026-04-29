@@ -16,6 +16,8 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
@@ -48,7 +50,8 @@ export interface SourceTableRow {
 }
 
 const SEARCH_SX = {
-  width: 300,
+  width: { xs: "100%", sm: 300 },
+  minWidth: 0,
   "& .MuiOutlinedInput-root": { height: 38 },
   "& input::placeholder": { fontSize: "14px", color: "#9E9E9E", opacity: 1 },
 };
@@ -136,27 +139,37 @@ export const HeaderWithSearch = ({
 }) => (
   <Box
     display="flex"
-    alignItems="center"
+    alignItems={{ xs: "stretch", md: "center" }}
     justifyContent="space-between"
+    flexDirection={{ xs: "column", md: "row" }}
+    gap={1.5}
     mb={3}
     mt={-2}
   >
     <BackTitle title={title} />
-    {rightSlot ?? (
-      <TextField
-        placeholder={placeholder}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        sx={SEARCH_SX}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon sx={{ fontSize: 20, color: "#9E9E9E" }} />
-            </InputAdornment>
-          ),
-        }}
-      />
-    )}
+    <Box
+      sx={{
+        width: { xs: "100%", md: "auto" },
+        minWidth: 0,
+        ml: { md: "auto" },
+      }}
+    >
+      {rightSlot ?? (
+        <TextField
+          placeholder={placeholder}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={SEARCH_SX}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: 20, color: "#9E9E9E" }} />
+              </InputAdornment>
+            ),
+          }}
+        />
+      )}
+    </Box>
   </Box>
 );
 
@@ -168,36 +181,40 @@ export const PartnerSourceTable = ({
   headers: string[];
 }) => (
   <Paper elevation={0} sx={{ overflow: "hidden" }}>
-    <Table sx={{ borderCollapse: "separate" }}>
-      <TableHead sx={TABLE_HEAD_SX}>
-        <TableRow>
-          {headers.map((h) => (
-            <TableCell key={h}>{h}</TableCell>
-          ))}
-        </TableRow>
-      </TableHead>
-      <TableBody sx={TABLE_BODY_SX}>
-        {rows.map((row) => (
-          <TableRow key={row.id} hover>
-            <TableCell>
-              <Box display="flex" alignItems="center" gap={2}>
-                <Avatar>{row.primary.charAt(0).toUpperCase()}</Avatar>
-                <Typography>{row.primary}</Typography>
-              </Box>
-            </TableCell>
-            <TableCell>
-              <Typography>{row.email}</Typography>
-              <Typography variant="body2" sx={{ mt: 0.5 }}>
-                {row.phone}
-              </Typography>
-            </TableCell>
-            <TableCell>{row.referrals}</TableCell>
-            <TableCell>{row.extra1}</TableCell>
-            {headers.length === 5 && <TableCell>{row.extra2 || ""}</TableCell>}
+    <Box sx={{ overflowX: "auto" }}>
+      <Table sx={{ borderCollapse: "separate", minWidth: 700 }}>
+        <TableHead sx={TABLE_HEAD_SX}>
+          <TableRow>
+            {headers.map((h) => (
+              <TableCell key={h}>{h}</TableCell>
+            ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHead>
+        <TableBody sx={TABLE_BODY_SX}>
+          {rows.map((row) => (
+            <TableRow key={row.id} hover>
+              <TableCell>
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Avatar>{row.primary.charAt(0).toUpperCase()}</Avatar>
+                  <Typography>{row.primary}</Typography>
+                </Box>
+              </TableCell>
+              <TableCell>
+                <Typography>{row.email}</Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                  {row.phone}
+                </Typography>
+              </TableCell>
+              <TableCell>{row.referrals}</TableCell>
+              <TableCell>{row.extra1}</TableCell>
+              {headers.length === 5 && (
+                <TableCell>{row.extra2 || ""}</TableCell>
+              )}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
   </Paper>
 );
 
@@ -216,66 +233,68 @@ export const DoctorsTable = ({
   onRowClick: (id: number, name: string) => void;
 }) => (
   <Paper elevation={0} sx={{ overflow: "hidden" }}>
-    <Table sx={{ borderCollapse: "separate" }}>
-      <TableHead sx={TABLE_HEAD_SX}>
-        <TableRow>
-          <TableCell>Doctors Name</TableCell>
-          <TableCell>Email | Contact No.</TableCell>
-          <TableCell>Referrals</TableCell>
-          <TableCell>Clinic Name</TableCell>
-        </TableRow>
-      </TableHead>
-      <TableBody sx={TABLE_BODY_SX}>
-        {rows.length === 0 ? (
+    <Box sx={{ overflowX: "auto" }}>
+      <Table sx={{ borderCollapse: "separate", minWidth: 760 }}>
+        <TableHead sx={TABLE_HEAD_SX}>
           <TableRow>
-            <TableCell
-              colSpan={4}
-              align="center"
-              sx={{ py: 6, color: "#9E9E9E" }}
-            >
-              No doctors found
-            </TableCell>
+            <TableCell>Doctors Name</TableCell>
+            <TableCell>Email | Contact No.</TableCell>
+            <TableCell>Referrals</TableCell>
+            <TableCell>Clinic Name</TableCell>
           </TableRow>
-        ) : (
-          rows.map((doctor) => {
-            const avatarStyle = getDoctorAvatarStyle(doctor.id);
-            return (
-              <TableRow
-                key={doctor.id}
-                hover
-                sx={{ cursor: "pointer" }}
-                onClick={() => onRowClick(doctor.id, doctor.name)}
+        </TableHead>
+        <TableBody sx={TABLE_BODY_SX}>
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={4}
+                align="center"
+                sx={{ py: 6, color: "#9E9E9E" }}
               >
-                <TableCell>
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Avatar
-                      sx={{
-                        bgcolor: avatarStyle.bg,
-                        color: avatarStyle.color,
-                        fontWeight: 600,
-                        width: 36,
-                        height: 36,
-                      }}
-                    >
-                      {doctor.name.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <Typography>{doctor.name}</Typography>
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  <Typography>{doctor.email}</Typography>
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    {doctor.phone}
-                  </Typography>
-                </TableCell>
-                <TableCell>{doctor.referrals}</TableCell>
-                <TableCell>{doctor.clinicName}</TableCell>
-              </TableRow>
-            );
-          })
-        )}
-      </TableBody>
-    </Table>
+                No doctors found
+              </TableCell>
+            </TableRow>
+          ) : (
+            rows.map((doctor) => {
+              const avatarStyle = getDoctorAvatarStyle(doctor.id);
+              return (
+                <TableRow
+                  key={doctor.id}
+                  hover
+                  sx={{ cursor: "pointer" }}
+                  onClick={() => onRowClick(doctor.id, doctor.name)}
+                >
+                  <TableCell>
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Avatar
+                        sx={{
+                          bgcolor: avatarStyle.bg,
+                          color: avatarStyle.color,
+                          fontWeight: 600,
+                          width: 36,
+                          height: 36,
+                        }}
+                      >
+                        {doctor.name.charAt(0).toUpperCase()}
+                      </Avatar>
+                      <Typography>{doctor.name}</Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography>{doctor.email}</Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                      {doctor.phone}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{doctor.referrals}</TableCell>
+                  <TableCell>{doctor.clinicName}</TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
+    </Box>
 
     {rows.length > 0 && (
       <Box mt={1.5} px={1} pb={1}>
@@ -288,6 +307,8 @@ export const DoctorsTable = ({
 );
 
 export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const treatments = patient.raw.treatment_interest
     ? patient.raw.treatment_interest
         .split(",")
@@ -327,9 +348,9 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         borderRadius: "12px",
         border: "1px solid #F0F0F0",
         bgcolor: "#fff",
-        p: 3,
+        p: { xs: 2, sm: 3 },
         overflowY: "auto",
-        maxHeight: "calc(100vh - 160px)",
+        maxHeight: isMobile ? "none" : "calc(100vh - 160px)",
       }}
     >
       <Box display="flex" alignItems="center" gap={1.5} mb={2.5}>
@@ -380,7 +401,12 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
       >
         Patient Information
       </Typography>
-      <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2.5} mb={3}>
+      <Box
+        display="grid"
+        gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
+        gap={2.5}
+        mb={3}
+      >
         {patientInfo.map((f) => (
           <InfoField key={f.label} label={f.label} value={f.value} />
         ))}
@@ -397,7 +423,12 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
       >
         Partner Information
       </Typography>
-      <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2.5} mb={3}>
+      <Box
+        display="grid"
+        gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
+        gap={2.5}
+        mb={3}
+      >
         {partnerInfo.map((f) => (
           <InfoField key={f.label} label={f.label} value={f.value} />
         ))}

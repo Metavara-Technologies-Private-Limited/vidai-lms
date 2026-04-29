@@ -354,6 +354,7 @@ const UsersList: React.FC<Props> = ({
             onClick={onNewUser}
             disabled={!canAddUsers}
             startIcon={<AddCircleOutlineIcon sx={{ fontSize: 16 }} />}
+            className="mobile-add-button"
             sx={{
               bgcolor: "#505050",
               color: "#FFFFFF",
@@ -368,7 +369,7 @@ const UsersList: React.FC<Props> = ({
               "&:hover": { bgcolor: "#232323", boxShadow: "none" },
             }}
           >
-            New
+            <span className="mobile-add-button-label">New</span>
           </Button>
         </Box>
       </Box>

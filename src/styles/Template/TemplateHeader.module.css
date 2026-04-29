@@ -23,7 +23,10 @@
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
-  width: 100%;
+  margin-left: auto;
+  justify-content: flex-end;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* Search Field Styling */
@@ -32,6 +35,10 @@
   border-radius: 8px;
   width: min(320px, 100%);
   font-size: 14px;
+}
+
+.searchField {
+  flex: 0 1 320px;
 }
 
 .searchField :global(.MuiOutlinedInput-notchedOutline) {
@@ -97,12 +104,23 @@
 
 @media (max-width: 768px) {
   .actions {
-    align-items: stretch;
+    align-items: center;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    gap: 10px;
   }
 
-  .searchField,
-  .searchField :global(.MuiOutlinedInput-root),
-  .newTemplateBtn {
+  .searchField {
+    flex: 1 1 190px;
+    min-width: 0;
+  }
+
+  .searchField :global(.MuiOutlinedInput-root) {
     width: 100%;
+  }
+
+  .newTemplateBtn {
+    width: auto;
   }
 }
