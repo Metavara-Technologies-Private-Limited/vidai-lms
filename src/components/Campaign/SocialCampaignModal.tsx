@@ -580,6 +580,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             description_2: "Call us now or visit our website.",
             image_url: googleAdsImage,
             platform_data: { google_ads: resolvedContent["google_ads"] },
+            // ✅ FIX: send campaign_type so Zapier creates only SEARCH, not both Search + Display
+            campaign_type: "SEARCH",
+            // ✅ FIX: send internal campaign ID so Zapier callback can link Google IDs back to our DB
+            internal_campaign_id: String(newCampaignId ?? ""),
           });
 
           console.log("[GoogleAds] Campaign sent to Zapier successfully");
