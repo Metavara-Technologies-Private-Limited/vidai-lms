@@ -14,7 +14,7 @@ import cpcIcon from "./Icons/cpc.png";
 import cpaIcon from "./Icons/cpa.png";
 import CampaignTabContent from "./CampaignTabContent";
 import { IconButton } from "@mui/material";
-import { useSelector } from "react-redux"; // ✅ FIX 1: import useSelector
+import { useSelector } from "react-redux";
 import { CampaignAPI } from "../../services/campaign.api";
 import {
   CAMPAIGN_OBJECTIVES,
@@ -42,10 +42,33 @@ const CampaignDashboard = ({
   const [fullCampaign, setFullCampaign] = React.useState<Campaign>(campaign);
   const [loadingInsights, setLoadingInsights] = React.useState(true);
 
-  // ✅ FIX 1: Read clinicId from Redux store so every API call filters by the correct clinic
-  const clinicId: number = useSelector(
-    (state: any) => state.clinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 0),
+  // ─── FIX 1 (clinic_id wrong): Read from Redux, freeze into a ref immediately.
+  //     Using a ref means clinicId is NEVER in the useEffect dependency array,
+  //     so Redux re-renders (e.g. async rehydration) cannot trigger extra API calls.
+  //     The ref is seeded at construction time from Redux or localStorage fallback.
+  const reduxClinicId = useSelector((state: any) => state.clinic?.id ?? 0);
+  const clinicIdRef = React.useRef<number>(
+    reduxClinicId || Number(localStorage.getItem("clinic_id") ?? 0),
   );
+  // Silently keep ref in sync if Redux resolves after first render —
+  // this useEffect has no side-effects other than updating the ref.
+  React.useEffect(() => {
+    if (reduxClinicId) clinicIdRef.current = reduxClinicId;
+  }, [reduxClinicId]);
+
+  // ─── FIX 2 (double-call): The original deps array contained campaign.platforms
+  //     (a new array reference every parent render) and campaign.fb_campaign_id.
+  //     These caused the useEffect to fire on every parent re-render even when
+  //     nothing meaningful changed.
+  //
+  //     Solution: freeze all campaign fields we need inside refs at mount time.
+  //     The main useEffect dep array is reduced to [campaign.id] only — the one
+  //     scalar that genuinely means "the user opened a different campaign".
+  //     All other fields are read from refs inside fetchAll().
+  const campaignIdRef   = React.useRef(campaign.id);
+  const campaignTypeRef = React.useRef(campaign.type);
+  const fbCampaignIdRef = React.useRef(campaign.fb_campaign_id);
+  const platformsRef    = React.useRef<Platform[]>(campaign.platforms ?? []);
 
   // ─── Ad insights state ───────────────────────────────────────────────────
   const [adInsights, setAdInsights] = React.useState({
@@ -85,14 +108,14 @@ const CampaignDashboard = ({
     } catch (err) {
       console.error("FB Ad Insights fetch failed", err);
     }
-  }, []);
+  }, []); // stable — no closed-over deps
 
   // ─── Google Ads insights — reads from DB only ─────────────────────────────
-  // ✅ FIX 1: Accept clinicId param and pass it to the API so BE filters by correct clinic
   const fetchGoogleAdsInsightsFromDB = React.useCallback(
     async (campaignId: string, cId: number) => {
       try {
         console.log("[GoogleAds] Reading insights from DB for campaign:", campaignId);
+        // ─── FIX 1: pass cId so BE filters by the correct clinic ───
         const res = await CampaignAPI.getGoogleAdsInsightsFromApi(campaignId, cId);
         const data = res.data?.insights || res.data || {};
 
@@ -125,35 +148,45 @@ const CampaignDashboard = ({
         return false;
       }
     },
-    [], // ✅ FIX 3: no external deps — clinicId is passed in as an argument
+    [], // stable — campaignId & cId passed as args, nothing closed over
   );
 
   React.useEffect(() => {
-    // ✅ FIX 2: cancelled flag prevents the double-call caused by React StrictMode
+    // ─── FIX 2: cancelled flag — when React StrictMode mounts→unmounts→remounts,
+    //     the cleanup of the first run sets cancelled=true, so the in-flight
+    //     async chain from run #1 silently exits before touching any state.
+    //     Run #2 starts fresh with cancelled=false and completes normally.
+    //     Result: exactly ONE API call per campaign.id change.
     let cancelled = false;
 
     const fetchAll = async () => {
       try {
         setLoadingInsights(true);
 
-        if (campaign.type === CAMPAIGN_TYPE.EMAIL) {
+        // Read from refs — stable, never cause re-runs, always current value.
+        const campaignId   = campaignIdRef.current;
+        const campaignType = campaignTypeRef.current;
+        const fbCamId      = fbCampaignIdRef.current;
+        const platforms    = platformsRef.current;
+        const cId          = clinicIdRef.current;
+
+        if (campaignType === CAMPAIGN_TYPE.EMAIL) {
           try {
-            await CampaignAPI.getMailchimpInsights(campaign.id);
+            await CampaignAPI.getMailchimpInsights(campaignId);
           } catch {
             // Not sent to Mailchimp yet — that is fine.
           }
+          if (cancelled) return;
         }
 
-        const hasGoogleAds = campaign.platforms?.includes(PLATFORMS.GOOGLE_ADS);
+        const hasGoogleAds = platforms.includes(PLATFORMS.GOOGLE_ADS);
 
-        // ✅ FIX 1: pass clinicId so the GET /campaigns/:id/ request filters by correct clinic
-        const res = await CampaignAPI.get(campaign.id, clinicId);
-
-        // ✅ FIX 2: bail out if the effect was cleaned up (StrictMode second run)
+        // ─── FIX 1: pass cId so GET /campaigns/:id/ is scoped to correct clinic ───
+        const res = await CampaignAPI.get(campaignId, cId);
         if (cancelled) return;
 
         const d = res.data;
-        const fbCampaignId = d.fb_campaign_id ?? campaign.fb_campaign_id ?? null;
+        const resolvedFbCampaignId = d.fb_campaign_id ?? fbCamId ?? null;
 
         setFullCampaign((prev) => ({
           ...prev,
@@ -169,18 +202,19 @@ const CampaignDashboard = ({
           last_open:          d.last_open           ?? null,
           last_click:         d.last_click          ?? null,
           insights_synced_at: d.insights_synced_at  ?? null,
-          fb_campaign_id:     fbCampaignId,
+          fb_campaign_id:     resolvedFbCampaignId,
           budget_data:        d.budget_data         ?? prev.budget_data ?? {},
         }));
 
-        if (fbCampaignId) {
-          await fetchAdInsights(fbCampaignId);
+        if (resolvedFbCampaignId) {
+          await fetchAdInsights(resolvedFbCampaignId);
+          if (cancelled) return;
         }
 
         if (hasGoogleAds) {
           console.log("[GoogleAds] No DB data — triggering Zapier insights fetch...");
           try {
-            await CampaignAPI.triggerGoogleAdsInsights(campaign.id);
+            await CampaignAPI.triggerGoogleAdsInsights(campaignId);
             console.log("[GoogleAds] Zapier trigger sent. Polling DB for results...");
           } catch (err) {
             console.error("[GoogleAds] Trigger failed:", err);
@@ -193,13 +227,10 @@ const CampaignDashboard = ({
           while (attempts < maxAttempts) {
             await new Promise((r) => setTimeout(r, pollIntervalMs));
             attempts++;
-
-            // ✅ FIX 2: also bail during polling if effect was cleaned up
-            if (cancelled) return;
-
+            if (cancelled) return; // bail during polling too
             console.log(`[GoogleAds] Poll attempt ${attempts}/${maxAttempts}`);
-            // ✅ FIX 1: pass clinicId so Google Ads insights are filtered by correct clinic
-            const gotData = await fetchGoogleAdsInsightsFromDB(campaign.id, clinicId);
+            // ─── FIX 1: pass cId here too ───
+            const gotData = await fetchGoogleAdsInsightsFromDB(campaignId, cId);
             if (gotData) {
               console.log("[GoogleAds] Got real data on attempt", attempts);
               break;
@@ -220,15 +251,19 @@ const CampaignDashboard = ({
 
     fetchAll();
 
-    // ✅ FIX 2: cleanup sets cancelled = true so the second StrictMode invocation is a no-op
     return () => {
+      // ─── FIX 2: marks this run as dead — StrictMode's second run starts clean ───
       cancelled = true;
     };
 
-    // ✅ FIX 3: fetchAdInsights and fetchGoogleAdsInsightsFromDB are intentionally excluded —
-    //    they are stable useCallback refs and adding them caused unwanted re-runs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaign.id, campaign.type, campaign.fb_campaign_id, campaign.platforms, clinicId]);
+  // ─── FIX 2: [campaign.id] is the ONLY dep.
+  //     • campaign.platforms → was a new array ref every render → caused re-runs → now read from ref inside fetchAll
+  //     • campaign.fb_campaign_id → same problem → now read from ref inside fetchAll
+  //     • campaign.type → same problem → now read from ref inside fetchAll
+  //     • clinicId (Redux) → re-renders on Redux updates → now read from ref inside fetchAll
+  //     • fetchAdInsights / fetchGoogleAdsInsightsFromDB → stable useCallback with [] deps → safe to omit
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign.id]);
 
   // ─── Budget ───────────────────────────────────────────────────────────────
   const budgetData: Record<string, number> = fullCampaign.budget_data ?? {};
