@@ -123,8 +123,9 @@ export const CampaignAPI = {
 
   getFacebookStatus: () => http.get("/facebook/status"),
 
-  // ✅ FIX 4: now accepts optional clinicId so the GET /campaigns/:id/ request
-  //    is scoped to the correct clinic instead of fetching all campaigns data.
+  // ✅ FIX (clinic_id): accepts explicit clinicId so GET /campaigns/:id/ is
+  //    scoped to the correct clinic. Without this the BE was returning all-clinic
+  //    data because clinic_id was missing from the query params.
   get: (id: string, clinicId?: number) =>
     http.get<CampaignAPIType>(`/campaigns/${id}/`, {
       params: { clinic_id: clinicId ?? storedClinicId() },
@@ -170,8 +171,9 @@ export const CampaignAPI = {
       params: { campaign_id: campaignId, clinic_id: storedClinicId() },
     }),
 
-  // ✅ FIX 5: now accepts optional clinicId so Google Ads insights are filtered
-  //    by the correct clinic on the backend instead of returning all-clinic data.
+  // ✅ FIX (clinic_id): accepts explicit clinicId so Google Ads insights are
+  //    filtered by the correct clinic on the BE. Previously clinic_id was
+  //    always storedClinicId() which could be stale or 0 on first render.
   getGoogleAdsInsightsFromApi: (campaignId: string, clinicId?: number) =>
     http.get(`/google-ads/insights/`, {
       params: {
