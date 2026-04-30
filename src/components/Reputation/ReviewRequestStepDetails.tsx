@@ -98,14 +98,15 @@ const ReviewRequestStepDetails = ({
           mb: 1.5,
         }}
       >
-        <TextField
-          size="small"
-          fullWidth
-          label="Request Name"
-          value={formData.request_name}
-          onChange={(e) => onRequestNameChange(e.target.value)}
-          onBlur={onRequestNameBlur}
-        />
+<TextField
+  size="small"
+  fullWidth
+  label="Request Name"
+  value={formData.request_name}
+  onChange={(e) => onRequestNameChange(e.target.value)}
+  onBlur={onRequestNameBlur}
+  inputProps={{ maxLength: 100 }}
+/>
         <TextField
           size="small"
           fullWidth
@@ -113,6 +114,7 @@ const ReviewRequestStepDetails = ({
           value={formData.description}
           onChange={(e) => onDescriptionChange(e.target.value)}
           onBlur={onDescriptionBlur}
+          inputProps={{ maxLength: 255 }}
         />
       </Box>
 
@@ -253,7 +255,7 @@ const ReviewRequestStepDetails = ({
             <TextField
               {...params}
               size="small"
-              label="Assignee"
+              label="Search & Select"
               placeholder={
                 leadSelectionType === "all"
                   ? "All leads selected"

@@ -68,8 +68,10 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
   );
   const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
   const [fileName, setFileName] = useState("");
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [defaultClinicEmail, setDefaultClinicEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveDraftFlow, setSaveDraftFlow] = useState(false);
   const isSubmittingRef = useRef(false);
   const [formData, setFormData] = useState<ReviewRequestFormData>(() =>
     createInitialReviewRequestFormData(),
@@ -200,6 +202,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     setLeadSelectionType("all");
     setSelectedLeads([]);
     setFileName("");
+    setAttachmentFiles([]);
     setDefaultClinicEmail("");
     setIsSubmitting(false);
     isSubmittingRef.current = false;
@@ -533,6 +536,7 @@ Please share your valuable feedback here:
 
       const response = (await reputationApi.createRequest(
         payload,
+        attachmentFiles,
       )) as CreateRequestResponse;
 
       // Only prepend the request card if:
@@ -591,12 +595,14 @@ Please share your valuable feedback here:
   const handleSaveAsDraft = async () => {
     if (step === 1) {
       if (!validateStep1()) return;
+      setSaveDraftFlow(true);
       setStep(2);
       return;
     }
 
     if (step === 2) {
       if (!validateStep2()) return;
+      setSaveDraftFlow(true);
       setStep(3);
       return;
     }
@@ -608,12 +614,14 @@ Please share your valuable feedback here:
   const handlePrimaryAction = async () => {
     if (step === 1) {
       if (!validateStep1()) return;
+      setSaveDraftFlow(false);
       setStep(2);
       return;
     }
 
     if (step === 2) {
       if (!validateStep2()) return;
+      setSaveDraftFlow(false);
       setStep(3);
       return;
     }
@@ -637,13 +645,35 @@ Please share your valuable feedback here:
   };
 
   const handleFileSelect = (file: File) => {
+    if (!file?.name) {
+      return;
+    }
     const maxSize = 25 * 1024 * 1024;
     if (file.size > maxSize) {
       showErrorToast("File is too large. Please select a file under 25MB.");
-      setFileName("");
       return;
     }
+    setAttachmentFiles((prev) => {
+      const exists = prev.some(
+        (item) =>
+          item.name === file.name &&
+          item.size === file.size &&
+          item.lastModified === file.lastModified,
+      );
+      if (exists) {
+        return prev;
+      }
+      return [...prev, file];
+    });
     setFileName(file.name);
+  };
+
+  const handleFileRemove = (targetFileName: string) => {
+    setAttachmentFiles((prev) => {
+      const next = prev.filter((file) => file.name !== targetFileName);
+      setFileName(next.length ? next[next.length - 1].name : "");
+      return next;
+    });
   };
 
   return (
@@ -724,6 +754,7 @@ Please share your valuable feedback here:
           <ReviewRequestStepContent
             formData={formData}
             fileName={fileName}
+            attachmentFiles={attachmentFiles}
             coralRadio={coralRadio}
             onModeChange={(value) => {
               setFormData((prev) => ({
@@ -777,6 +808,7 @@ Please share your valuable feedback here:
               }
             }}
             onFileSelect={handleFileSelect}
+            onFileRemove={handleFileRemove}
           />
         )}
 
@@ -894,7 +926,15 @@ Please share your valuable feedback here:
             "&:hover": { background: "#333" },
           }}
         >
-          {isSubmitting ? "Saving..." : "Save & Continue"}
+          {isSubmitting
+            ? "Saving..."
+            : step === 3
+              ? saveDraftFlow
+                ? "Save Request"
+                : formData.is_scheduled === "no"
+                  ? "Send Request"
+                  : "Schedule Request"
+              : "Save & Continue"}
         </Button>
       </Box>
     </Dialog>

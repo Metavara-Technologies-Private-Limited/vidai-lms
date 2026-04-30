@@ -186,7 +186,6 @@ const Header = ({
       allowedClinics[0]?.id ||
       null;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedClinicId(validStored || defaultClinicId);
   }, [clinics, selectedClinicId, userClinics]);
 
@@ -488,31 +487,45 @@ const Header = ({
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
+                gap: 0.75,
                 cursor: "pointer",
                 background: "#f3f4f6",
-                px: { xs: 1, sm: 2 },
+                px: { xs: 0.75, sm: 1.5, md: 2 },
                 py: { xs: 0.75, md: isCompactDesktop ? 0.875 : 1 },
                 borderRadius: 2,
                 maxWidth: {
-                  xs: "100%",
-                  sm: isCompactDesktop ? 220 : 260,
+                  xs: "min(72vw, 280px)",
+                  sm: isCompactDesktop ? 240 : 280,
                 },
                 minWidth: 0,
               }}
             >
               <Typography
-                variant="body2"
+                component="span"
                 sx={{
-                  fontSize: { xs: 12, md: isCompactDesktop ? 13 : undefined },
+                  fontSize: { xs: 10.5, sm: 11.5, md: isCompactDesktop ? 12 : 13 },
+                  color: "#6B7280",
+                  flexShrink: 0,
+                  lineHeight: 1.2,
+                }}
+              >
+                Clinic:
+              </Typography>
+              <Typography
+                component="span"
+                sx={{
+                  fontSize: { xs: 11, sm: 12, md: isCompactDesktop ? 12.5 : 13.5 },
+                  fontWeight: 700,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
+                  minWidth: 0,
+                  flex: 1,
                 }}
               >
-                Clinic: <b>{displayClinicName}</b>
+                {displayClinicName}
               </Typography>
-              <ArrowDropDownIcon />
+              <ArrowDropDownIcon sx={{ fontSize: { xs: 18, sm: 20 }, flexShrink: 0 }} />
             </Box>
 
             <Menu

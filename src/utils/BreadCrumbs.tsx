@@ -89,7 +89,18 @@ React.useEffect(() => {
   );
 
   return (
-    <Breadcrumbs separator={separator} aria-label="breadcrumb">
+    <Breadcrumbs
+      separator={separator}
+      aria-label="breadcrumb"
+      sx={{
+        "& .MuiBreadcrumbs-ol": {
+          flexWrap: "nowrap",
+        },
+        "& .MuiBreadcrumbs-li": {
+          minWidth: 0,
+        },
+      }}
+    >
       {breadcrumbs.map((crumb, idx) => {
         const isLast = idx === breadcrumbs.length - 1;
 
@@ -98,6 +109,11 @@ React.useEffect(() => {
             key={crumb.path}
             fontWeight={700}
             color="text.primary"
+            noWrap
+            sx={{
+              fontSize: { xs: 11, sm: 12, md: 14 },
+              maxWidth: { xs: 150, sm: 220, md: "none" },
+            }}
           >
             {crumb.label}
           </Typography>
@@ -109,6 +125,15 @@ React.useEffect(() => {
             color="text.secondary"
             fontWeight={500}
             underline="none"
+            sx={{
+              fontSize: { xs: 10.5, sm: 11.5, md: 13 },
+              maxWidth: { xs: 120, sm: 180, md: "none" },
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              display: "inline-block",
+              verticalAlign: "bottom",
+            }}
           >
             {crumb.label}
           </Link>

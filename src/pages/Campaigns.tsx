@@ -291,7 +291,7 @@ export default function CampaignsScreen() {
               className={`status-btn ${openStatus ? "active" : ""}`}
               onClick={() => setOpenStatus((prev) => !prev)}
             >
-              {status === "all" ? "All Status" : status}
+              {status === "all" ? "Filter" : status}
             </div>
 
             {openStatus && (
