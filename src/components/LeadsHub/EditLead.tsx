@@ -103,7 +103,8 @@ export default function EditLead() {
     setError,
     saving,
     canEditLeads,
-    campaigns,
+  
+    filteredCampaigns,
     departments,
     loadingDepartments,
     loadingEmployees,
@@ -258,6 +259,12 @@ export default function EditLead() {
     source === "Referral" ||
     (source === "Direct" && subSource !== "Gmail");
 
+  // ── Sub-source options — referral dept names when source is "Referral" ─────
+  const subSourceOptions: string[] =
+    source === "Referral"
+      ? referralDepartments.map((d) => d.name)
+      : (SUB_SOURCE_OPTIONS[source] ?? []);
+
   // ── Input sanitizers ───────────────────────────────────────────────────────
   const handleFullNameChange = (value: string) => {
     const sanitized = sanitizeNameInput(value);
@@ -339,12 +346,6 @@ export default function EditLead() {
     const secondary = option.role || option.designation;
     return secondary ? `${primary} (${secondary})` : primary;
   };
-
-  // Sub-source options — use referral department names when source is "Referral"
-  const subSourceOptions: string[] =
-    source === "Referral"
-      ? referralDepartments.map((d) => d.name)
-      : (SUB_SOURCE_OPTIONS[source] ?? []);
 
   return (
     <Box>
@@ -531,7 +532,6 @@ export default function EditLead() {
                     sx={inputStyle}
                   />
                 </Box>
-                {/* CONTRACTS — Address sits in the same row as lead info */}
                 {IS_CONTRACTS_APP && (
                   <Box>
                     <Typography sx={labelStyle}>Address</Typography>
@@ -611,7 +611,7 @@ export default function EditLead() {
                 </Box>
               )}
 
-              {/* Language Preference — 1 col out of 4 so it matches all other field widths */}
+              {/* Language Preference */}
               <Box
                 sx={{
                   display: "grid",
@@ -787,9 +787,11 @@ export default function EditLead() {
               <Typography sx={sectionLabelStyle}>
                 SOURCE & CAMPAIGN DETAILS
               </Typography>
+
               <Box
                 sx={{
                   display: "grid",
+                  // When campaign is hidden (Referral or Direct+non-Gmail), only 2 cols
                   gridTemplateColumns: isCampaignDisabled
                     ? "repeat(2, 1fr)"
                     : "repeat(3, 1fr)",
@@ -797,130 +799,82 @@ export default function EditLead() {
                   mb: 3,
                 }}
               >
-                {/* Source — read-only when campaign is selected */}
+                {/* ── Source ── */}
                 <Box>
-                  <Typography sx={labelStyle}>
-                    Source
-                    {campaign && (
-                      <Typography
-                        component="span"
-                        sx={{
-                          fontSize: "0.65rem",
-                          color: "#6366F1",
-                          ml: 1,
-                          fontWeight: 500,
-                        }}
-                      >
-                        auto-filled from campaign
-                      </Typography>
-                    )}
-                  </Typography>
-                  {campaign ? (
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={source}
-                      InputProps={{ readOnly: true }}
-                      sx={readOnlyStyle}
-                    />
-                  ) : (
+                  <Typography sx={labelStyle}>Source</Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={source}
+                    onChange={(e) => handleSourceChange(e.target.value)}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- Select Source --</MenuItem>
+                    {SOURCE_OPTIONS.map((s) => (
+                      <MenuItem key={s} value={s}>
+                        {s}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+
+                {/* ── Sub-Source ── */}
+                {source !== "Other" && (
+                  <Box>
+                    <Typography sx={labelStyle}>Sub-Source</Typography>
                     <TextField
                       select
                       fullWidth
                       size="small"
-                      value={source}
-                      onChange={(e) => handleSourceChange(e.target.value)}
+                      value={subSource}
+                      onChange={(e) => handleSubSourceChange(e.target.value)}
+                      disabled={
+                        !source ||
+                        (source === "Referral" && loadingReferralDepts)
+                      }
                       sx={inputStyle}
+                      InputProps={{
+                        endAdornment:
+                          source === "Referral" && loadingReferralDepts ? (
+                            <CircularProgress size={16} sx={{ mr: 3 }} />
+                          ) : null,
+                      }}
                     >
-                      <MenuItem value="">-- Select Source --</MenuItem>
-                      {SOURCE_OPTIONS.map((s) => (
-                        <MenuItem key={s} value={s}>
-                          {s}
+                      <MenuItem value="">-- Select Sub-Source --</MenuItem>
+                      {source === "Referral" && loadingReferralDepts ? (
+                        <MenuItem value="" disabled>
+                          Loading departments...
                         </MenuItem>
-                      ))}
-                    </TextField>
-                  )}
-                </Box>
-
-                {/* Sub-Source — uses referral departments when source is Referral */}
-                {source !== "Other" && (
-                  <Box>
-                    <Typography sx={labelStyle}>
-                      Sub-Source
-                      {campaign && (
-                        <Typography
-                          component="span"
-                          sx={{
-                            fontSize: "0.65rem",
-                            color: "#6366F1",
-                            ml: 1,
-                            fontWeight: 500,
-                          }}
-                        >
-                          auto-filled from campaign
-                        </Typography>
+                      ) : source === "Referral" &&
+                        subSourceOptions.length === 0 ? (
+                        <MenuItem value="" disabled>
+                          No departments available
+                        </MenuItem>
+                      ) : (
+                        subSourceOptions.map((s) => (
+                          <MenuItem key={s} value={s}>
+                            {s}
+                          </MenuItem>
+                        ))
                       )}
-                    </Typography>
-                    {campaign ? (
-                      <TextField
-                        fullWidth
-                        size="small"
-                        value={subSource}
-                        InputProps={{ readOnly: true }}
-                        sx={readOnlyStyle}
-                      />
-                    ) : (
-                      <TextField
-                        select
-                        fullWidth
-                        size="small"
-                        value={subSource}
-                        onChange={(e) => handleSubSourceChange(e.target.value)}
-                        disabled={
-                          !source ||
-                          (source === "Referral" && loadingReferralDepts)
-                        }
-                        sx={inputStyle}
-                        InputProps={{
-                          endAdornment:
-                            source === "Referral" && loadingReferralDepts ? (
-                              <CircularProgress size={16} sx={{ mr: 3 }} />
-                            ) : null,
-                        }}
-                      >
-                        <MenuItem value="">-- Select Sub-Source --</MenuItem>
-                        {source === "Referral" && loadingReferralDepts ? (
-                          <MenuItem value="" disabled>
-                            Loading departments...
-                          </MenuItem>
-                        ) : source === "Referral" &&
-                          subSourceOptions.length === 0 ? (
-                          <MenuItem value="" disabled>
-                            No departments available
-                          </MenuItem>
-                        ) : (
-                          subSourceOptions.map((s) => (
-                            <MenuItem key={s} value={s}>
-                              {s}
-                            </MenuItem>
-                          ))
-                        )}
-                        {!source && (
-                          <MenuItem value="" disabled>
-                            Select source first
-                          </MenuItem>
-                        )}
-                      </TextField>
-                    )}
+                      {!source && (
+                        <MenuItem value="" disabled>
+                          Select source first
+                        </MenuItem>
+                      )}
+                    </TextField>
                   </Box>
                 )}
 
-                {/* Campaign Name — hidden when Referral OR Direct + non-Gmail */}
+                {/* ── Campaign Name ──
+                 *  Now always editable - users can change campaign selection at any time
+                 */}
                 {source !== "Other" && !isCampaignDisabled && (
                   <Box>
                     <Typography sx={labelStyle}>
                       Campaign Name
-                      {subSource && !campaign && (
+                      {subSource && (
                         <Typography
                           component="span"
                           sx={{
@@ -934,41 +888,30 @@ export default function EditLead() {
                         </Typography>
                       )}
                     </Typography>
-                    {campaign ? (
-                      <TextField
-                        fullWidth
-                        size="small"
-                        value={
-                          campaigns.find((c) => String(c.id) === campaign)
-                            ?.name ?? ""
-                        }
-                        InputProps={{ readOnly: true }}
-                        sx={readOnlyStyle}
-                      />
-                    ) : (
-                      <TextField
-                        select
-                        fullWidth
-                        size="small"
-                        value={campaign}
-                        onChange={handleCampaignChange}
-                        disabled={!subSource && !source}
-                        sx={inputStyle}
-                      >
-                        <MenuItem value="">-- None --</MenuItem>
-                        {campaigns.length === 0 ? (
-                          <MenuItem value="" disabled>
-                            No campaigns available
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      value={campaign}
+                      onChange={handleCampaignChange}
+                      disabled={!source && !subSource}
+                      sx={inputStyle}
+                    >
+                      <MenuItem value="">-- None --</MenuItem>
+                      {filteredCampaigns.length === 0 ? (
+                        <MenuItem value="" disabled>
+                          {source || subSource
+                            ? "No campaigns match the selected source / sub-source"
+                            : "No campaigns available"}
+                        </MenuItem>
+                      ) : (
+                        filteredCampaigns.map((c) => (
+                          <MenuItem key={c.id} value={String(c.id)}>
+                            {c.name}
                           </MenuItem>
-                        ) : (
-                          campaigns.map((c) => (
-                            <MenuItem key={c.id} value={String(c.id)}>
-                              {c.name}
-                            </MenuItem>
-                          ))
-                        )}
-                      </TextField>
-                    )}
+                        ))
+                      )}
+                    </TextField>
                   </Box>
                 )}
               </Box>
@@ -1496,7 +1439,6 @@ export default function EditLead() {
 
               {wantAppointment === "yes" && (
                 <Box>
-                  {/* Row 1: Department (MEDICAL) · Personnel · Date · Slot */}
                   <Box
                     sx={{
                       display: "grid",
@@ -1648,7 +1590,6 @@ export default function EditLead() {
                     </Box>
                   </Box>
 
-                  {/* Row 2: Remark — full width */}
                   <Box sx={{ mb: 3 }}>
                     <Typography sx={labelStyle}>Remark</Typography>
                     <TextField

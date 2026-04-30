@@ -42,12 +42,12 @@ import {
   IS_CONTRACTS_APP,
   ACTIVE_FLOW_COPY,
 } from "../../config/appType";
+import { capitalizeFirst } from "../../utils/nameValidation";
 
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 // ====================== Extended Lead type ======================
-// FIX TS2430: Omit 'gender' from Lead so we can widen it to include null
 export interface LeadResponse extends Omit<Lead, "gender"> {
   gender?: "male" | "female" | "other" | null;
   language_preference?: string | null;
@@ -62,6 +62,7 @@ export interface ExistingDocument {
 }
 
 // ====================== Campaign shape ======================
+// Raw shape coming from Redux store (mirrors AddNewLead's CampaignData)
 interface RawCampaign {
   id: string | number;
   campaign_name?: string;
@@ -287,9 +288,8 @@ export const sectionLabelStyle = {
   mb: 1.5,
 } as const;
 
-// ====================== Pipeline action-type helpers (mirrors AddNewLead) ======================
+// ====================== Pipeline action-type helpers ======================
 
-/** Action type labels from a single stage's enabled rules */
 const deriveActionTypeOptions = (stage: PipelineStage): string[] => {
   const labels = stage.rules
     .filter((r) => r.is_enabled)
@@ -299,7 +299,6 @@ const deriveActionTypeOptions = (stage: PipelineStage): string[] => {
   return labels.length > 0 ? labels : [...TASK_TYPES];
 };
 
-/** Union of action type labels across all stages */
 const deriveAllActionTypeOptions = (stages: PipelineStage[]): string[] => {
   const labels = Array.from(
     new Set(
@@ -319,9 +318,6 @@ const deriveAllActionTypeOptions = (stages: PipelineStage[]): string[] => {
 const isTruthy = (val: unknown): boolean =>
   val === true || val === 1 || val === "1" || val === "true";
 
-const capitalizeFirst = (value: string) =>
-  value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
-
 // ====================== Hook ======================
 export function useEditLead() {
   const navigate = useNavigate();
@@ -340,19 +336,35 @@ export function useEditLead() {
     hasAnySubcategoryActionPermission(permissions, ["leads hub"], "edit");
 
   // ── Campaigns from Redux store ──
+  // Normalized exactly the same way as AddNewLead:
+  //   campaign_mode === 3  → Direct / Gmail
+  //   campaign_mode === 1 or 2 → Social Media / <platform title-cased>
   const rawCampaigns = useSelector(selectCampaign);
   const campaigns = React.useMemo<CampaignOption[]>(
     () =>
-      (rawCampaigns || []).map((api: RawCampaign) => ({
-        id: api.id,
-        name: capitalizeFirst(api.campaign_name ?? ""),
-        source: api.campaign_mode === 1 ? "Social Media" : "Email",
-        subSource:
-          api.campaign_mode === 1
-            ? (api.social_media?.[0]?.platform_name ?? "")
-            : "Gmail",
-        isActive: Boolean(api.is_active),
-      })),
+      (rawCampaigns || []).map((api: RawCampaign) => {
+        const isEmail = api.campaign_mode === 3;
+        const rawPlatform = api.social_media?.[0]?.platform_name ?? "";
+
+        // Title-case platform name: "google_ads" → "Google Ads"
+        const platformTitleCase = rawPlatform
+          ? rawPlatform
+              .split("_")
+              .map(
+                (w: string) =>
+                  w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+              )
+              .join(" ")
+          : "";
+
+        return {
+          id: api.id,
+          name: capitalizeFirst(api.campaign_name ?? ""),
+          source: isEmail ? "Direct" : "Social Media",
+          subSource: isEmail ? "Gmail" : platformTitleCase,
+          isActive: Boolean(api.is_active),
+        };
+      }),
     [rawCampaigns],
   );
 
@@ -409,6 +421,7 @@ export function useEditLead() {
   const [source, setSource] = React.useState("");
   const [subSource, setSubSource] = React.useState("");
   const [campaign, setCampaignId] = React.useState<string | number>("");
+  const [campaignName, setCampaignName] = React.useState("");
   const [assignee, setAssignee] = React.useState("");
   const [assigneeName, setAssigneeName] = React.useState("");
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
@@ -478,7 +491,6 @@ export function useEditLead() {
   const [remark, setRemark] = React.useState("");
 
   // ── Pipeline derived options ──────────────────────────────────────────────
-  // Lead status dropdown: all active stages in order
   const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
     () =>
       pipelineStages.map((s) => ({
@@ -488,8 +500,6 @@ export function useEditLead() {
     [pipelineStages],
   );
 
-  // Next action status: only stages with a higher stage_order than the
-  // selected lead status — identical to AddNewLead's filteredNextActionStatusOptions
   const filteredNextActionStatusOptions = React.useMemo<
     NextActionStatusOption[]
   >(() => {
@@ -527,16 +537,23 @@ export function useEditLead() {
     setNextType("");
   }, [nextType, nextActionTypeOptions]);
 
-  // ── Auto-fill source & subSource when campaign changes ──
+  // ── Campaign → source + subSource sync (mirrors AddNewLead exactly) ────────
+  // When campaign is set:   sync source + campaignName from campaign ONLY
+  // When campaign is cleared: reset campaignName only; preserve source/subSource
   React.useEffect(() => {
-    if (!campaign) return;
+    if (!campaign) {
+      setCampaignName("");
+      return;
+    }
     const matched = campaigns.find((c) => String(c.id) === String(campaign));
     if (!matched) return;
+
+    setCampaignName(matched.name);
     setSource(matched.source);
-    setSubSource(matched.subSource);
+    // IMPORTANT: Never override user's sub-source selection with campaign data
   }, [campaign, campaigns]);
 
-  // ── Legacy availableTaskStatuses (kept for backward compat) ──
+  // ── Legacy availableTaskStatuses ──
   const availableTaskStatuses = React.useMemo<
     { label: string; value: string }[]
   >(() => {
@@ -553,7 +570,7 @@ export function useEditLead() {
     );
   }, [nextType]);
 
-  // ====================== Pipeline effect (mirrors AddNewLead exactly) ======================
+  // ====================== Pipeline effect ======================
   React.useEffect(() => {
     const loadFromPipeline = async () => {
       const selectedIndustry =
@@ -601,7 +618,6 @@ export function useEditLead() {
           });
 
         setPipelineStages(activeStages);
-        // Initial options = union across all active stages
         setNextActionTypeOptions(deriveAllActionTypeOptions(activeStages));
       } catch {
         setPipelineStages([]);
@@ -613,16 +629,10 @@ export function useEditLead() {
   }, [clinicId]);
 
   // ── Reconciliation effect ─────────────────────────────────────────────────
-  // Runs once when pipelineStages first populates (lead fetch has already set
-  // leadStatus / nextStatus). Re-derives nextActionTypeOptions from the
-  // pre-populated nextStatus stage so the dropdown shows the correct options
-  // for the existing lead values — identical to how AddNewLead initializes
-  // options when the user first picks a lead status.
   const pipelineStagesLoaded = pipelineStages.length > 0;
   React.useEffect(() => {
     if (!pipelineStagesLoaded) return;
 
-    // Prefer: derive from the stage that matches the saved nextStatus
     const nextStage = pipelineStages.find(
       (s) =>
         s.stage_name.trim().toLowerCase() === nextStatus.trim().toLowerCase(),
@@ -633,7 +643,6 @@ export function useEditLead() {
       return;
     }
 
-    // Fallback: derive from stages after the saved leadStatus
     const leadStage = pipelineStages.find(
       (s) =>
         s.stage_name.trim().toLowerCase() === leadStatus.trim().toLowerCase(),
@@ -653,7 +662,7 @@ export function useEditLead() {
       setNextActionTypeOptions(deriveAllActionTypeOptions(pipelineStages));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pipelineStagesLoaded]); // Only re-run when stages first load
+  }, [pipelineStagesLoaded]);
 
   // ── Fetch Referral Departments ──
   React.useEffect(() => {
@@ -673,14 +682,6 @@ export function useEditLead() {
 
   // ====================== Handlers ======================
 
-  /**
-   * Lead Status Change — mirrors AddNewLead exactly:
-   * 1. Auto-populates Next Action Status with the first stage AFTER the
-   *    selected lead status (by stage_order).
-   * 2. Derives nextActionTypeOptions from that auto-populated next stage
-   *    (NOT from the lead status stage itself).
-   * 3. Clears nextType so the user picks one valid for the new stage.
-   */
   const handleLeadStatusChange = (value: string) => {
     const trimmed = value.trim();
 
@@ -689,7 +690,6 @@ export function useEditLead() {
     );
     setSelectedNextActionStageId(matched?.id ?? null);
 
-    // Stages that come AFTER the selected lead status, sorted by stage_order
     const nextStages = pipelineStages
       .filter((s) => (matched ? s.stage_order > matched.stage_order : true))
       .sort((a, b) => a.stage_order - b.stage_order);
@@ -697,8 +697,6 @@ export function useEditLead() {
     const autoNextStatus =
       trimmed && nextStages[0] ? nextStages[0].stage_name.trim() : "";
 
-    // Derive action type options from the auto-populated next action stage
-    // (same logic as AddNewLead — NOT from the lead status stage itself)
     const autoNextStage = nextStages[0] ?? null;
     const stageActionOptions = autoNextStage
       ? deriveActionTypeOptions(autoNextStage)
@@ -707,14 +705,9 @@ export function useEditLead() {
     setNextActionTypeOptions(stageActionOptions);
     setLeadStatus(trimmed);
     setNextStatus(autoNextStatus);
-    setNextType(""); // clear stale next type
+    setNextType("");
   };
 
-  /**
-   * Next Action Status Change — mirrors AddNewLead exactly:
-   * Re-derives nextActionTypeOptions from the newly selected status stage.
-   * Clears nextType so the user picks one valid for the new stage.
-   */
   const handleNextStatusChange = (value: string) => {
     const trimmed = value.trim();
 
@@ -722,20 +715,15 @@ export function useEditLead() {
       (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
     );
 
-    // Action type options from the selected next action status stage's
-    // enabled rules; fall back to union across all stages when unmatched.
     const stageActionOptions = matched
       ? deriveActionTypeOptions(matched)
       : deriveAllActionTypeOptions(pipelineStages);
 
     setNextActionTypeOptions(stageActionOptions);
     setNextStatus(trimmed);
-    setNextType(""); // clear stale next type
+    setNextType("");
   };
 
-  /**
-   * Next Action Type Change — accepts a plain ChangeEvent from TextField.
-   */
   const handleNextTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNextType(e.target.value);
   };
@@ -743,19 +731,53 @@ export function useEditLead() {
   const handleReferralDepartmentChange = (value: string) =>
     setReferralDepartment(value);
 
+  /**
+   * handleCampaignChange — Never override sub-source:
+   * - Clearing campaign resets campaignName only; source/subSource preserved
+   * - Selecting a campaign auto-fills source only, NEVER changes sub-source
+   * - User's manual sub-source selection is always preserved
+   */
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCampaignId(e.target.value);
+    const value = e.target.value;
+
+    if (!value) {
+      setCampaignId("");
+      setCampaignName("");
+      return;
+    }
+
+    const matched = campaigns.find((c) => String(c.id) === String(value));
+    if (!matched) {
+      setCampaignId(value);
+      return;
+    }
+
+    setCampaignId(value);
+    setCampaignName(matched.name);
+    setSource(matched.source);
+    // IMPORTANT: Never override user's sub-source selection
+    // Even if campaign data has subSource, preserve what user selected
   };
 
+  /**
+   * handleSourceChange — mirrors AddNewLead:
+   * Changing source clears campaign + subSource so the UI stays consistent.
+   */
   const handleSourceChange = (value: string) => {
     setSource(value);
     setSubSource("");
     setCampaignId("");
+    setCampaignName("");
   };
 
+  /**
+   * handleSubSourceChange — mirrors AddNewLead:
+   * Changing sub-source clears campaign so stale campaign is not kept.
+   */
   const handleSubSourceChange = (value: string) => {
     setSubSource(value);
     setCampaignId("");
+    setCampaignName("");
   };
 
   const handleDateChange = (d: Date | Dayjs | null) => {
@@ -826,27 +848,38 @@ export function useEditLead() {
         setEmail(lead.email ?? "");
         setLocation(lead.location ?? "");
         setAddress(lead.address ?? "");
+
+        // ── Source & sub-source — set directly from the saved lead.
+        //    The campaign sync effect will OVERRIDE these if a campaign_id
+        //    is also present, which is the correct behaviour (same as AddNewLead).
         setSource(lead.source ?? "");
         setSubSource(lead.sub_source ?? "");
 
+        // ── Campaign ──
+        // Set the campaign ID first; the campaign→source/subSource sync
+        // useEffect will fire afterward and overwrite source/subSource with
+        // the canonical values from the matched campaign — exactly as
+        // AddNewLead does when loading existing campaign data.
         const campaignId = (
           lead as unknown as { campaign_id?: string | number }
         ).campaign_id;
-        if (campaignId) setCampaignId(String(campaignId));
+        if (campaignId) {
+          setCampaignId(String(campaignId));
+          // campaignName will be set by the sync effect once campaigns list loads
+        }
 
         setAssignee(lead.assigned_to_id?.toString() ?? "");
         setAssigneeName(lead.assigned_to_name ?? "");
-        // hydrate assignee into options so Autocomplete can show it
         if (lead.assigned_to_id != null) {
-          const id = Number(lead.assigned_to_id);
+          const assigneeId = Number(lead.assigned_to_id);
 
           setAssigneeOptions((prev): AssigneeOption[] => {
-            const exists = prev.find((o) => o.id === id);
+            const exists = prev.find((o) => o.id === assigneeId);
             if (exists) return prev;
 
             return [
               {
-                id,
+                id: assigneeId,
                 first_name: lead.assigned_to_name?.split(" ")[0],
                 last_name: lead.assigned_to_name?.split(" ").slice(1).join(" "),
                 username: lead.assigned_to_name,
@@ -874,8 +907,9 @@ export function useEditLead() {
         const rawReferralDept = anyLead.referral_department_id;
         if (rawReferralDept != null)
           setReferralDepartment(String(rawReferralDept));
-        
+
         setLanguage(lead.language_preference ?? "");
+
         // ── MEDICAL-only fields ──
         if (IS_MEDICAL_APP) {
           setGender(
@@ -906,7 +940,6 @@ export function useEditLead() {
         }
 
         // ── CONTRACTS-only fields ──
-        // Field names match the backend API response & LeadPayload type
         if (IS_CONTRACTS_APP) {
           setContactPersonName((anyLead.contact_full_name as string) ?? "");
           setDesignation((anyLead.contact_designation as string) ?? "");
@@ -1143,6 +1176,23 @@ export function useEditLead() {
     );
   }, [department, employees, departments]);
 
+  // ── Filtered campaigns (case-insensitive, same as AddNewLead) ─────────────
+  const filteredCampaigns = React.useMemo<CampaignOption[]>(() => {
+    if (!source && !subSource) return campaigns;
+
+    const normalizeStr = (s: string) => s.trim().toLowerCase();
+
+    return campaigns.filter((c) => {
+      const sourceMatch = source
+        ? normalizeStr(c.source) === normalizeStr(source)
+        : true;
+      const subSourceMatch = subSource
+        ? normalizeStr(c.subSource) === normalizeStr(subSource)
+        : true;
+      return sourceMatch && subSourceMatch;
+    });
+  }, [campaigns, source, subSource]);
+
   // ====================== Save ======================
   const handleSave = () => {
     if (!leadData || !id || saving) return;
@@ -1249,7 +1299,6 @@ export function useEditLead() {
           }
         : {}),
 
-      // ── Contracts-only: correct field names matching LeadPayload & backend ──
       ...(IS_CONTRACTS_APP
         ? {
             contact_full_name: contactPersonName.trim() || null,
@@ -1266,23 +1315,6 @@ export function useEditLead() {
             appointment_date: appointmentDate,
             slot,
             remark: remark || "",
-            // ...(IS_MEDICAL_APP
-            //   ? {
-            //       assigned_to_id: intOrNull(assignee),
-            //       assigned_to_name: appointmentPersonnelSearch,
-            //       personal_id:
-            //         selectedAppointmentPersonnel?.id &&
-            //         selectedAppointmentPersonnel.id !== 0
-            //           ? selectedAppointmentPersonnel.id
-            //           : (intOrNull(appointmentPersonnel) ?? null),
-
-            //       personal_name: selectedAppointmentPersonnel
-            //         ? `${selectedAppointmentPersonnel.first_name ?? ""} ${selectedAppointmentPersonnel.last_name ?? ""}`.trim() ||
-            //           selectedAppointmentPersonnel.username
-            //         : null,
-            //       appointment_personnel_id: intOrNull(appointmentPersonnel),
-            //     }
-            //   : {}),
             personal_id:
               selectedAppointmentPersonnel?.id &&
               selectedAppointmentPersonnel.id !== 0
@@ -1365,6 +1397,7 @@ export function useEditLead() {
     canEditLeads,
     showSuccess,
     campaigns,
+    filteredCampaigns,
     departments,
     employees,
     filteredPersonnel,
@@ -1402,6 +1435,7 @@ export function useEditLead() {
     subSource,
     setSubSource,
     campaign,
+    campaignName,
     handleCampaignChange,
     assignee,
     setAssignee,
