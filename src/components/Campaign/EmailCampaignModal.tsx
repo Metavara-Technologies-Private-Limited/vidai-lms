@@ -47,7 +47,7 @@ interface EmailTemplate {
 }
 interface EmailCampaignModalProps {
   onClose: () => void;
-  onSave: (...args: unknown[]) => void; // ✅ FIXED: accepts any args (including campaign param from CampaignPage)
+  onSave: (...args: unknown[]) => void;
 }
 
 export default function EmailCampaignModal({
@@ -126,7 +126,6 @@ export default function EmailCampaignModal({
         "mail",
         templateId,
       );
-
       setTemplateAttachments(documents ?? []);
     } catch (error) {
       console.error("Failed to fetch template documents:", error);
@@ -191,40 +190,18 @@ export default function EmailCampaignModal({
 
       const createdRes = await CampaignAPI.createEmail(payload);
 
+      // FIX: Pass the created campaign data to onSave so the parent
+      // (CampaignsScreen) can dispatch fetchCampaign() via Redux.
+      // Do NOT call CampaignAPI.list() here — that was causing the
+      // duplicate list/ API call every time a campaign was saved.
       onSave(createdRes?.data ?? payload);
       toast.success("Campaign created successfully");
       onClose();
     } catch (error: unknown) {
-      try {
-        const listRes = await CampaignAPI.list();
-        const list = Array.isArray(listRes.data) ? listRes.data : [];
-        const found = list
-          .filter(
-            (item) =>
-              String(item?.campaign_name ?? "")
-                .trim()
-                .toLowerCase() === campaignName.trim().toLowerCase(),
-          )
-          .sort((a, b) => {
-            const at = new Date(
-              String(a?.modified_at ?? a?.created_at ?? 0),
-            ).getTime();
-            const bt = new Date(
-              String(b?.modified_at ?? b?.created_at ?? 0),
-            ).getTime();
-            return bt - at;
-          })[0];
-
-        if (found) {
-          onSave(found);
-          toast.success("Campaign created successfully");
-          onClose();
-          return;
-        }
-      } catch {
-        // ignore fallback failure
-      }
-
+      // FIX: Removed the CampaignAPI.list() fallback call that was here.
+      // It was calling list() on EVERY failed save attempt, adding an
+      // extra network request. If creation fails, just show the error —
+      // the parent will re-fetch via onSave only on actual success.
       if (error instanceof Error) {
         toast.error(error.message);
       } else {
@@ -596,7 +573,6 @@ export default function EmailCampaignModal({
                   <div
                     className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}
                   >
-                    {/* <label>Select Date</label> */}
                     <div className="form-row">
                       <div
                         className={`form-group half ${submitted && !startDate ? "error" : ""}`}
@@ -620,7 +596,7 @@ export default function EmailCampaignModal({
                             slots={{ openPickerIcon: CalendarTodayIcon }}
                             slotProps={{ textField: { fullWidth: true } }}
                           />
-                        </LocalizationProvider>{" "}
+                        </LocalizationProvider>
                       </div>
 
                       <div
@@ -669,7 +645,6 @@ export default function EmailCampaignModal({
                             ? dayjs()
                             : undefined
                         }
-                        // slotProps={{ textField: { fullWidth: true } }}
                       />
                     </LocalizationProvider>
                   </div>
