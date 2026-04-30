@@ -735,6 +735,8 @@ interface PatientInfoTabProps {
   partnerName: string;
   partnerAge: string;
   partnerGender: string;
+  // ── CHANGE 1: added leadSource ────────────────────────────────────────────
+  leadSource: string;
   leadSubSource: string;
   leadCampaignName: string;
   leadCampaignDuration: string;
@@ -768,6 +770,8 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
   partnerName,
   partnerAge,
   partnerGender,
+  // ── CHANGE 2: destructured leadSource ─────────────────────────────────────
+  leadSource,
   leadSubSource,
   leadCampaignName,
   leadCampaignDuration,
@@ -884,41 +888,27 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
                   "contact_designation",
                   "contactDesignation",
                   "contact_person_designation",
-                  // ── FIX: removed bare "designation" fallback here — it was
-                  //    reading the lead's own designation field instead of the
-                  //    contact person's designation.
                 )}
               />
               <InfoCell
                 label="CONTACT NO"
-                value={
-                  // ── FIX: removed "contact_no" and "contact_number" from
-                  //    this lookup — those keys belong to the LEAD's phone,
-                  //    not the contact person's phone. Also removed the
-                  //    `|| leadPhone` fallback that was pulling the lead's
-                  //    phone as a last resort.
-                  normalizePhoneDisplay(
-                    getLeadField(
-                      lead,
-                      "contact_phone",
-                      "contactPhone",
-                      "contact_person_phone",
-                    ),
-                  )
-                }
+                value={normalizePhoneDisplay(
+                  getLeadField(
+                    lead,
+                    "contact_phone",
+                    "contactPhone",
+                    "contact_person_phone",
+                  ),
+                )}
               />
               <InfoCell
                 label="EMAIL"
-                value={
-                  // ── FIX: removed `|| leadEmail` fallback — the contact
-                  //    person's email should never fall back to the lead's email.
-                  getLeadField(
-                    lead,
-                    "contact_email",
-                    "contactEmail",
-                    "contact_person_email",
-                  )
-                }
+                value={getLeadField(
+                  lead,
+                  "contact_email",
+                  "contactEmail",
+                  "contact_person_email",
+                )}
                 truncate={false}
               />
             </InfoGrid>
@@ -926,15 +916,20 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
           </>
         )}
 
-        {/* SOURCE & CAMPAIGN DETAILS — same for both */}
+        {/* ── CHANGE 3: SOURCE & CAMPAIGN DETAILS — leadSource added first ── */}
         <SectionLabel>Source & Campaign Details</SectionLabel>
-        <InfoGrid>
-          <Box sx={{ minWidth: 0 }}>
-            <Info label="SUB-SOURCE" value={leadSubSource} />
-          </Box>
-          <InfoCell label="CAMPAIGN NAME" value={leadCampaignName} />
-          <InfoCell label="CAMPAIGN DURATION" value={leadCampaignDuration} />
-        </InfoGrid>
+        <Stack spacing={2.5}>
+          <InfoGrid>
+            <InfoCell label="SOURCE" value={leadSource} />
+            <Box sx={{ minWidth: 0 }}>
+              <Info label="SUB-SOURCE" value={leadSubSource} />
+            </Box>
+            <InfoCell label="CAMPAIGN NAME" value={leadCampaignName} />
+          </InfoGrid>
+          <InfoGrid>
+            <InfoCell label="CAMPAIGN DURATION" value={leadCampaignDuration} />
+          </InfoGrid>
+        </Stack>
       </Card>
     </Box>
 

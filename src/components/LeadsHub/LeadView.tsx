@@ -2818,6 +2818,7 @@ export default function LeadDetailView() {
           partnerName={partnerName}
           partnerAge={partnerAge}
           partnerGender={partnerGender}
+          leadSource={leadSource}
           leadSubSource={leadSubSource}
           leadCampaignName={leadCampaignName}
           leadCampaignDuration={leadCampaignDuration}
