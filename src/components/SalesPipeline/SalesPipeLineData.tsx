@@ -67,49 +67,6 @@ type SalesPipeLineDataProps = {
   zoomPercent?: number;
 };
 
-const normalizeLeadStatus = (lead: ApiLead): string => {
-  const raw = (
-    (lead.lead_status as string | undefined) ??
-    (lead as { status?: string }).status ??
-    "new"
-  )
-    .toLowerCase()
-    .trim()
-    .replace(/[\s-]+/g, "_");
-
-  if (raw === "follow_ups" || raw === "followups" || raw === "follow_up")
-    return "follow_up";
-  if (raw === "cycle_conversion") return "cycle_conversion";
-  if (raw === "appointment") return "appointment";
-  if (raw === "converted") return "converted";
-  if (raw === "lost") return "lost";
-  if (raw === "contacted") return "contacted";
-
-  return "new";
-};
-
-const stageToStatusCandidates = (stageName: string): string[] => {
-  const value = stageName.toLowerCase();
-  if (value.includes("follow") || value.includes("qualified"))
-    return ["follow_up", "contacted"];
-  if (
-    value.includes("appointment") ||
-    value.includes("demo") ||
-    value.includes("presentation")
-  )
-    return ["appointment"];
-  if (
-    value.includes("register") ||
-    value.includes("closed") ||
-    value.includes("final") ||
-    value.includes("won") ||
-    value.includes("convert")
-  )
-    return ["converted"];
-  if (value.includes("lost")) return ["lost"];
-  if (value.includes("cycle")) return ["cycle_conversion"];
-  return ["new"];
-};
 
 const toStageLabel = (value?: string): string | undefined => {
   if (!value) return undefined;
@@ -190,26 +147,35 @@ const SalesPipeLineData = ({
 
   const stageMetrics = useMemo(() => {
     const activeLeads = leads.filter((lead) => lead.is_active !== false);
+const leadMatchesStage = (lead: ApiLead, targetStage: StageCard): boolean => {
+  // ✅ PRIMARY MATCH (correct one)
+  if (
+    lead.stage_id !== null &&
+    lead.stage_id !== undefined &&
+    String(lead.stage_id) === String(targetStage.id)
+  ) {
+    return true;
+  }
+  return false;
+};
+
     return stages.map((stage, index) => {
       const stageName = stage.stageName.replace(/^\d+\.\s*/, "");
-      const statusCandidates = stageToStatusCandidates(stageName);
       const leadCount = activeLeads.filter((lead) =>
-        statusCandidates.includes(normalizeLeadStatus(lead)),
+        leadMatchesStage(lead, stage),
       ).length;
 
-      const nextStage = stages[index + 1];
-      let conversionValue: number | null = null;
+const nextStage = stages[index + 1];
+let conversionValue: number | null = null;
 
-      if (nextStage) {
-        const nextCandidates = stageToStatusCandidates(
-          nextStage.stageName.replace(/^\d+\.\s*/, ""),
-        );
-        const nextCount = activeLeads.filter((lead) =>
-          nextCandidates.includes(normalizeLeadStatus(lead)),
-        ).length;
-        conversionValue =
-          leadCount > 0 ? Math.round((nextCount / leadCount) * 100) : 0;
-      }
+if (nextStage) {
+  const nextCount = activeLeads.filter((lead) =>
+    leadMatchesStage(lead, nextStage),
+  ).length;
+
+  conversionValue =
+    leadCount > 0 ? Math.round((nextCount / leadCount) * 100) : 0;
+}
 
       return {
         stage,
