@@ -1716,12 +1716,11 @@ const LeadsBoard: React.FC<Props> = ({
         </Stack>
       </Box>
     );
-  
+
   if (error === "Unauthorized") {
-    
     dispatch(clearAuth());
     navigate("/login", { replace: true });
-    }
+  }
 
   if (error)
     return (
@@ -1789,6 +1788,9 @@ const LeadsBoard: React.FC<Props> = ({
         ) : (
           activeBoardColumns.map((col) => {
             const leadsInCol = filteredLeads.filter((l) => {
+              if (col.stageId != null) {
+                if (String(l.stage_id) === String(col.stageId)) return true;
+              }
               const candidateStatuses = [
                 l.status,
                 l.lead_status,
