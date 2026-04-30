@@ -494,6 +494,10 @@ const ReputationDashboard = () => {
                     borderRadius: "10px",
                     backgroundColor: "#fff",
                   },
+    "& input::placeholder": {   
+      fontSize: "14px",
+      opacity: 0.5,
+    },
                 }}
                 InputProps={{
                   startAdornment: (

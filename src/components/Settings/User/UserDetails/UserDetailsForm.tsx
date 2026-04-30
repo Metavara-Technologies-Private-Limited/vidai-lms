@@ -404,13 +404,10 @@ const UserDetailsForm: React.FC<Props> = ({
     }
   };
 
-
   // Required label helper for plain string labels
   const getRequiredLabel = (label: string) => `${label} *`;
 
   return (
-
-    
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box>
         <Box
@@ -490,12 +487,13 @@ const UserDetailsForm: React.FC<Props> = ({
                 sx={{
                   position: "absolute",
                   bottom: 0,
-                  right: -4,
+                  right: 0,
                   bgcolor: "#505050",
                   color: "#fff",
                   width: 20,
                   height: 20,
                   "&:hover": { bgcolor: "#2E2E2E" },
+                  zIndex: 2,
                 }}
               >
                 <DeleteOutlineIcon sx={{ fontSize: 12 }} />

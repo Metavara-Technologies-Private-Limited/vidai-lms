@@ -54,7 +54,6 @@ const API_BASE_URL = resolveApiBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -254,7 +253,7 @@ export const reputationApi = {
   },
 
   // Create review request
-  createRequest: async (data: CreateReviewRequestPayload) => {
+  createRequest: async (data: CreateReviewRequestPayload, attachments: File[] = []) => {
     const scheduleAt =
       data.schedule_date && data.schedule_time
         ? `${data.schedule_date}T${data.schedule_time}`
@@ -295,6 +294,20 @@ export const reputationApi = {
 
     const variants = [primaryPayload, alternatePayload];
     let lastError: unknown;
+
+    if (attachments.length > 0) {
+      const payload = new FormData();
+      Object.entries(primaryPayload).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          value.forEach((item) => payload.append(key, String(item)));
+          return;
+        }
+        payload.append(key, String(value));
+      });
+      attachments.forEach((file) => payload.append("attachments", file));
+      const response = await apiClient.post("/reputation/requests/create/", payload);
+      return response.data;
+    }
 
     for (let index = 0; index < variants.length; index += 1) {
       try {
