@@ -160,37 +160,31 @@ const CampaignDashboard = ({
         }
 
         if (hasGoogleAds) {
-          const alreadyHasData = await fetchGoogleAdsInsightsFromDB(campaign.id);
+          console.log("[GoogleAds] No DB data — triggering Zapier insights fetch...");
+          try {
+            await CampaignAPI.triggerGoogleAdsInsights(campaign.id);
+            console.log("[GoogleAds] Zapier trigger sent. Polling DB for results...");
+          } catch (err) {
+            console.error("[GoogleAds] Trigger failed:", err);
+          }
 
-          if (!alreadyHasData) {
-            console.log("[GoogleAds] No DB data — triggering Zapier insights fetch...");
-            try {
-              await CampaignAPI.triggerGoogleAdsInsights(campaign.id);
-              console.log("[GoogleAds] Zapier trigger sent. Polling DB for results...");
-            } catch (err) {
-              console.error("[GoogleAds] Trigger failed:", err);
+          let attempts = 0;
+          const maxAttempts = 5;
+          const pollIntervalMs = 3000;
+
+          while (attempts < maxAttempts) {
+            await new Promise((r) => setTimeout(r, pollIntervalMs));
+            attempts++;
+            console.log(`[GoogleAds] Poll attempt ${attempts}/${maxAttempts}`);
+            const gotData = await fetchGoogleAdsInsightsFromDB(campaign.id);
+            if (gotData) {
+              console.log("[GoogleAds] Got real data on attempt", attempts);
+              break;
             }
+          }
 
-            let attempts = 0;
-            const maxAttempts = 5;
-            const pollIntervalMs = 3000;
-
-            while (attempts < maxAttempts) {
-              await new Promise((r) => setTimeout(r, pollIntervalMs));
-              attempts++;
-              console.log(`[GoogleAds] Poll attempt ${attempts}/${maxAttempts}`);
-              const gotData = await fetchGoogleAdsInsightsFromDB(campaign.id);
-              if (gotData) {
-                console.log("[GoogleAds] Got real data on attempt", attempts);
-                break;
-              }
-            }
-
-            if (attempts >= maxAttempts) {
-              console.warn("[GoogleAds] Polling timed out — Zapier may still be processing");
-            }
-          } else {
-            console.log("[GoogleAds] Already have DB insights — skipping Zapier trigger");
+          if (attempts >= maxAttempts) {
+            console.warn("[GoogleAds] Polling timed out — Zapier may still be processing");
           }
         }
 
