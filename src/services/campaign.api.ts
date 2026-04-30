@@ -123,9 +123,11 @@ export const CampaignAPI = {
 
   getFacebookStatus: () => http.get("/facebook/status"),
 
-  get: (id: string) =>
+  // ✅ FIX 4: now accepts optional clinicId so the GET /campaigns/:id/ request
+  //    is scoped to the correct clinic instead of fetching all campaigns data.
+  get: (id: string, clinicId?: number) =>
     http.get<CampaignAPIType>(`/campaigns/${id}/`, {
-      params: { clinic_id: storedClinicId() },
+      params: { clinic_id: clinicId ?? storedClinicId() },
     }),
 
   update: (id: string, data: unknown) =>
@@ -168,8 +170,13 @@ export const CampaignAPI = {
       params: { campaign_id: campaignId, clinic_id: storedClinicId() },
     }),
 
-  getGoogleAdsInsightsFromApi: (campaignId: string) =>
+  // ✅ FIX 5: now accepts optional clinicId so Google Ads insights are filtered
+  //    by the correct clinic on the backend instead of returning all-clinic data.
+  getGoogleAdsInsightsFromApi: (campaignId: string, clinicId?: number) =>
     http.get(`/google-ads/insights/`, {
-      params: { campaign_id: campaignId, clinic_id: storedClinicId() },
+      params: {
+        campaign_id: campaignId,
+        clinic_id: clinicId ?? storedClinicId(),
+      },
     }),
 };
