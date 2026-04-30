@@ -588,15 +588,9 @@ export default function AddNewLead() {
     } satisfies AssigneeOption;
   }, [appointmentPersonnelInput, appointmentPersonnelOptions, form.personnel]);
 
-  // ── FIX: Sync campaign → source + subSource + campaignName ────────────────
-  //
-  // When the user picks a campaign, we ALSO auto-fill source and subSource
-  // from that campaign's stored values. This is the root cause of the mismatch:
-  // the old code only filled campaignName but left source/subSource as whatever
-  // the user had typed, which could be wrong or empty.
-  //
-  // When campaign is cleared (value = ""), we reset only campaignName so the
-  // user's manually chosen source/subSource are preserved.
+  // ── Sync campaign → source + campaignName (preserve user's subSource) ──────
+  // When campaign is cleared: reset only campaignName, preserve source/subSource
+  // When campaign is selected: sync source and campaignName, NEVER override subSource
   React.useEffect(() => {
     if (!form.campaign) {
       setForm((prev) => ({ ...prev, campaignName: "" }));
@@ -608,10 +602,8 @@ export default function AddNewLead() {
     setForm((prev) => ({
       ...prev,
       campaignName: capitalizeFirst(matched.name),
-      // FIX: sync source and subSource from the selected campaign so they
-      // always match what the campaign was created with.
       source: matched.source,
-      subSource: matched.subSource,
+      // IMPORTANT: Never override user's sub-source selection
     }));
   }, [form.campaign, campaigns]);
 
@@ -694,10 +686,7 @@ export default function AddNewLead() {
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // ── FIX: handleCampaignChange now also syncs source + subSource ───────────
-  //
-  // This handles the case where the user changes the campaign via the dropdown
-  // directly (the useEffect above also runs, but this keeps things explicit).
+  // ── handleCampaignChange — never override subSource ──────────────────────
   const handleCampaignChange = (value: string) => {
     if (!value) {
       // Campaign cleared → reset campaign fields only, keep source/subSource
@@ -711,13 +700,13 @@ export default function AddNewLead() {
       return;
     }
 
-    // FIX: set campaign + auto-fill source and subSource from the campaign
+    // Set campaign + auto-fill source, but preserve user's subSource selection
     setForm((prev) => ({
       ...prev,
       campaign: value,
       campaignName: capitalizeFirst(matched.name),
       source: matched.source,
-      subSource: matched.subSource,
+      // IMPORTANT: Never override user's sub-source selection
     }));
   };
 
