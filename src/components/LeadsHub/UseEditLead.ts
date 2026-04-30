@@ -865,8 +865,8 @@ export function useEditLead() {
         // ── Lead Status (pipeline stage) ──
         const anyLead = lead as unknown as Record<string, unknown>;
         const rawLeadStatus =
-          (anyLead.lead_status as string) ??
           (anyLead.stage_name as string) ??
+          (anyLead.lead_status as string) ??
           "";
         setLeadStatus(rawLeadStatus);
 
@@ -874,7 +874,8 @@ export function useEditLead() {
         const rawReferralDept = anyLead.referral_department_id;
         if (rawReferralDept != null)
           setReferralDepartment(String(rawReferralDept));
-
+        
+        setLanguage(lead.language_preference ?? "");
         // ── MEDICAL-only fields ──
         if (IS_MEDICAL_APP) {
           setGender(
@@ -892,7 +893,6 @@ export function useEditLead() {
                 ? "Single"
                 : "",
           );
-          setLanguage(lead.language_preference ?? "");
           setIsCouple(lead.partner_inquiry ? "yes" : "no");
           setPartnerName(lead.partner_full_name ?? "");
           setPartnerAge(lead.partner_age?.toString() ?? "");
@@ -934,15 +934,11 @@ export function useEditLead() {
         setWantAppointment(hasBooking ? "yes" : "no");
 
         if (hasBooking) {
-          const personnelId = anyLead.appointment_personnel_id as
-            | number
-            | undefined;
+          const personnelId = anyLead.personal_id;
 
           setAppointmentPersonnel(personnelId?.toString() ?? "");
           setAppointmentPersonnelSearch(
-            typeof anyLead.appointment_personnel_name === "string"
-              ? anyLead.appointment_personnel_name
-              : "",
+            (anyLead.personal_name as string) ?? "",
           );
           setAppointmentDate(lead.appointment_date ?? "");
           if (lead.appointment_date)
@@ -1233,7 +1229,7 @@ export function useEditLead() {
       is_active: leadData?.is_active !== false,
       book_appointment: bookingActive,
       referral_department_id: referralDeptId ?? null,
-
+      language_preference: language || "",
       ...(IS_MEDICAL_APP
         ? {
             age: intOrNull(age),
@@ -1243,7 +1239,6 @@ export function useEditLead() {
             gender: gender
               ? (gender.toLowerCase() as "male" | "female" | "other")
               : null,
-            language_preference: language || "",
             partner_inquiry: coupleActive,
             partner_full_name: coupleActive ? partnerName || "" : "",
             partner_age: coupleActive ? intOrNull(partnerAge) : null,
@@ -1261,8 +1256,8 @@ export function useEditLead() {
             contact_designation: designation.trim() || null,
             contact_phone: contactPersonPhone.trim() || null,
             contact_email: strOrNull(contactPersonEmail) ?? null,
-            personal_id: resolvedGeneratedById,
-            personal_name: leadGeneratedBy.trim() || null,
+            lead_generated_by_id: resolvedGeneratedById,
+            lead_generated_by_name: leadGeneratedBy.trim() || null,
           }
         : {}),
 
@@ -1271,14 +1266,33 @@ export function useEditLead() {
             appointment_date: appointmentDate,
             slot,
             remark: remark || "",
-            ...(IS_MEDICAL_APP
-              ? {
-                  assigned_to_id: intOrNull(assignee),
-                  assigned_to_name: appointmentPersonnelSearch,
-                  personal_id: resolvedGeneratedById,
-                  appointment_personnel_id: intOrNull(appointmentPersonnel),
-                }
-              : {}),
+            // ...(IS_MEDICAL_APP
+            //   ? {
+            //       assigned_to_id: intOrNull(assignee),
+            //       assigned_to_name: appointmentPersonnelSearch,
+            //       personal_id:
+            //         selectedAppointmentPersonnel?.id &&
+            //         selectedAppointmentPersonnel.id !== 0
+            //           ? selectedAppointmentPersonnel.id
+            //           : (intOrNull(appointmentPersonnel) ?? null),
+
+            //       personal_name: selectedAppointmentPersonnel
+            //         ? `${selectedAppointmentPersonnel.first_name ?? ""} ${selectedAppointmentPersonnel.last_name ?? ""}`.trim() ||
+            //           selectedAppointmentPersonnel.username
+            //         : null,
+            //       appointment_personnel_id: intOrNull(appointmentPersonnel),
+            //     }
+            //   : {}),
+            personal_id:
+              selectedAppointmentPersonnel?.id &&
+              selectedAppointmentPersonnel.id !== 0
+                ? selectedAppointmentPersonnel.id
+                : (intOrNull(appointmentPersonnel) ?? null),
+
+            personal_name: selectedAppointmentPersonnel
+              ? `${selectedAppointmentPersonnel.first_name ?? ""} ${selectedAppointmentPersonnel.last_name ?? ""}`.trim() ||
+                selectedAppointmentPersonnel.username
+              : null,
           }
         : {
             appointment_date: undefined,
