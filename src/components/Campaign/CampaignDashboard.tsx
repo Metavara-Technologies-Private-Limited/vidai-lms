@@ -14,6 +14,7 @@ import cpcIcon from "./Icons/cpc.png";
 import cpaIcon from "./Icons/cpa.png";
 import CampaignTabContent from "./CampaignTabContent";
 import { IconButton } from "@mui/material";
+import { useSelector } from "react-redux"; // ✅ FIX 1: import useSelector
 import { CampaignAPI } from "../../services/campaign.api";
 import {
   CAMPAIGN_OBJECTIVES,
@@ -40,6 +41,11 @@ const CampaignDashboard = ({
 
   const [fullCampaign, setFullCampaign] = React.useState<Campaign>(campaign);
   const [loadingInsights, setLoadingInsights] = React.useState(true);
+
+  // ✅ FIX 1: Read clinicId from Redux store so every API call filters by the correct clinic
+  const clinicId: number = useSelector(
+    (state: any) => state.clinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 0),
+  );
 
   // ─── Ad insights state ───────────────────────────────────────────────────
   const [adInsights, setAdInsights] = React.useState({
@@ -82,43 +88,50 @@ const CampaignDashboard = ({
   }, []);
 
   // ─── Google Ads insights — reads from DB only ─────────────────────────────
-  const fetchGoogleAdsInsightsFromDB = React.useCallback(async (campaignId: string) => {
-    try {
-      console.log("[GoogleAds] Reading insights from DB for campaign:", campaignId);
-      const res = await CampaignAPI.getGoogleAdsInsightsFromApi(campaignId);
-      const data = res.data?.insights || res.data || {};
+  // ✅ FIX 1: Accept clinicId param and pass it to the API so BE filters by correct clinic
+  const fetchGoogleAdsInsightsFromDB = React.useCallback(
+    async (campaignId: string, cId: number) => {
+      try {
+        console.log("[GoogleAds] Reading insights from DB for campaign:", campaignId);
+        const res = await CampaignAPI.getGoogleAdsInsightsFromApi(campaignId, cId);
+        const data = res.data?.insights || res.data || {};
 
-      console.log("[GoogleAds] DB insights raw:", data);
+        console.log("[GoogleAds] DB insights raw:", data);
 
-      const hasRealData =
-        Number(data.impressions ?? 0) > 0 ||
-        Number(data.clicks ?? 0) > 0 ||
-        Number(data.cost ?? 0) > 0;
+        const hasRealData =
+          Number(data.impressions ?? 0) > 0 ||
+          Number(data.clicks ?? 0) > 0 ||
+          Number(data.cost ?? 0) > 0;
 
-      if (hasRealData) {
-        setAdInsights((prev) => ({
-          ...prev,
-          impressions:     Number(data.impressions    ?? prev.impressions),
-          clicks:          Number(data.clicks         ?? prev.clicks),
-          spend:           String(data.cost           ?? prev.spend       ?? "0"),
-          reach:           String(data.reach          ?? prev.reach       ?? "0"),
-          cpc:             parseFloat(String(data.avg_cpc ?? prev.cpc    ?? "0")).toFixed(2),
-          conversions:     Number(data.conversions    ?? prev.conversions),
-          total_budget:    String(data.total_budget   ?? prev.total_budget ?? "0"),
-          conversion_rate: String(data.ctr ?? data.conversion_rate ?? prev.conversion_rate ?? "0%"),
-          ctr:             String(data.ctr            ?? prev.ctr          ?? "0"),
-        }));
-        return true;
+        if (hasRealData) {
+          setAdInsights((prev) => ({
+            ...prev,
+            impressions:     Number(data.impressions    ?? prev.impressions),
+            clicks:          Number(data.clicks         ?? prev.clicks),
+            spend:           String(data.cost           ?? prev.spend       ?? "0"),
+            reach:           String(data.reach          ?? prev.reach       ?? "0"),
+            cpc:             parseFloat(String(data.avg_cpc ?? prev.cpc    ?? "0")).toFixed(2),
+            conversions:     Number(data.conversions    ?? prev.conversions),
+            total_budget:    String(data.total_budget   ?? prev.total_budget ?? "0"),
+            conversion_rate: String(data.ctr ?? data.conversion_rate ?? prev.conversion_rate ?? "0%"),
+            ctr:             String(data.ctr            ?? prev.ctr          ?? "0"),
+          }));
+          return true;
+        }
+
+        return false;
+      } catch (err) {
+        console.error("[GoogleAds] DB insights fetch failed", err);
+        return false;
       }
-
-      return false;
-    } catch (err) {
-      console.error("[GoogleAds] DB insights fetch failed", err);
-      return false;
-    }
-  }, []);
+    },
+    [], // ✅ FIX 3: no external deps — clinicId is passed in as an argument
+  );
 
   React.useEffect(() => {
+    // ✅ FIX 2: cancelled flag prevents the double-call caused by React StrictMode
+    let cancelled = false;
+
     const fetchAll = async () => {
       try {
         setLoadingInsights(true);
@@ -133,7 +146,12 @@ const CampaignDashboard = ({
 
         const hasGoogleAds = campaign.platforms?.includes(PLATFORMS.GOOGLE_ADS);
 
-        const res = await CampaignAPI.get(campaign.id);
+        // ✅ FIX 1: pass clinicId so the GET /campaigns/:id/ request filters by correct clinic
+        const res = await CampaignAPI.get(campaign.id, clinicId);
+
+        // ✅ FIX 2: bail out if the effect was cleaned up (StrictMode second run)
+        if (cancelled) return;
+
         const d = res.data;
         const fbCampaignId = d.fb_campaign_id ?? campaign.fb_campaign_id ?? null;
 
@@ -175,8 +193,13 @@ const CampaignDashboard = ({
           while (attempts < maxAttempts) {
             await new Promise((r) => setTimeout(r, pollIntervalMs));
             attempts++;
+
+            // ✅ FIX 2: also bail during polling if effect was cleaned up
+            if (cancelled) return;
+
             console.log(`[GoogleAds] Poll attempt ${attempts}/${maxAttempts}`);
-            const gotData = await fetchGoogleAdsInsightsFromDB(campaign.id);
+            // ✅ FIX 1: pass clinicId so Google Ads insights are filtered by correct clinic
+            const gotData = await fetchGoogleAdsInsightsFromDB(campaign.id, clinicId);
             if (gotData) {
               console.log("[GoogleAds] Got real data on attempt", attempts);
               break;
@@ -191,12 +214,21 @@ const CampaignDashboard = ({
       } catch (err) {
         console.error("Failed to fetch campaign data:", err);
       } finally {
-        setLoadingInsights(false);
+        if (!cancelled) setLoadingInsights(false);
       }
     };
 
     fetchAll();
-  }, [campaign.id, campaign.type, campaign.fb_campaign_id, campaign.platforms, fetchAdInsights, fetchGoogleAdsInsightsFromDB]);
+
+    // ✅ FIX 2: cleanup sets cancelled = true so the second StrictMode invocation is a no-op
+    return () => {
+      cancelled = true;
+    };
+
+    // ✅ FIX 3: fetchAdInsights and fetchGoogleAdsInsightsFromDB are intentionally excluded —
+    //    they are stable useCallback refs and adding them caused unwanted re-runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign.id, campaign.type, campaign.fb_campaign_id, campaign.platforms, clinicId]);
 
   // ─── Budget ───────────────────────────────────────────────────────────────
   const budgetData: Record<string, number> = fullCampaign.budget_data ?? {};
