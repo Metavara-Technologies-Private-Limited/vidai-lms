@@ -99,11 +99,6 @@ type AssigneeOption = {
   email: string | undefined;
 };
 
-// const asRecord = (value: unknown): Record<string, unknown> | null =>
-//   typeof value === "object" && value !== null
-//     ? (value as Record<string, unknown>)
-//     : null;
-
 const normalizeAssignees = (res: any): AssigneeOption[] => {
   const users = res?.data?.objects || [];
 
@@ -229,14 +224,12 @@ export default function AddNewLead() {
   const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>(
     [],
   );
-  // Store full PipelineStage objects so rules are accessible
   const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>(
     [],
   );
   const [selectedNextActionStageId, setSelectedNextActionStageId] =
     React.useState<string | null>(null);
 
-  // Derived options consumed by Step1 — order comes from stage_order on the objects
   const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
     () =>
       pipelineStages.map((s) => ({
@@ -265,18 +258,39 @@ export default function AddNewLead() {
     _role === "super_admin" ||
     hasAnySubcategoryActionPermission(_perms, ["leads hub"], "add");
 
+  // ── Normalize campaigns so source/subSource match SOURCE_OPTIONS & SUB_SOURCE_OPTIONS ──
+  //
+  // Actual API campaign_mode values:
+  //   1 = Social Media (LinkedIn, Instagram)
+  //   2 = Social Media (Facebook, Google Ads)
+  //   3 = Email (Gmail)
+  //
+  // Modes 1 & 2 are both social — social_media[] has the platform name.
+  // Mode 3 is email — social_media[] is empty → Direct / Gmail.
+  //
+  // Platform names from API use underscores ("google_ads") so we split on "_"
+  // and title-case each word: "google_ads" → "Google Ads", "facebook" → "Facebook".
   const campaigns = React.useMemo(
     () =>
-      (rawCampaigns || []).map((api: CampaignData) => ({
-        id: api.id,
-        name: capitalizeFirst(api.campaign_name ?? ""),
-        source: api.campaign_mode === 1 ? "Social Media" : "Email",
-        subSource:
-          api.campaign_mode === 1
-            ? capitalizeFirst(api.social_media?.[0]?.platform_name ?? "")
-            : "Gmail",
-        isActive: Boolean(api.is_active),
-      })),
+      (rawCampaigns || []).map((api: CampaignData) => {
+        const isEmail = api.campaign_mode === 3;
+        const rawPlatform = api.social_media?.[0]?.platform_name ?? "";
+
+        const platformTitleCase = rawPlatform
+          ? rawPlatform
+              .split("_")
+              .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+              .join(" ")
+          : "";
+
+        return {
+          id: api.id,
+          name: capitalizeFirst(api.campaign_name ?? ""),
+          source: isEmail ? "Direct" : "Social Media",
+          subSource: isEmail ? "Gmail" : platformTitleCase,
+          isActive: Boolean(api.is_active),
+        };
+      }),
     [rawCampaigns],
   );
 
@@ -336,7 +350,6 @@ export default function AddNewLead() {
       return pipelineStageNames.map((name) => ({ label: name, value: name }));
     }
 
-    // Only show stages with a higher stage_order than the selected lead status
     return pipelineStages
       .filter((s) => s.stage_order > currentStage.stage_order)
       .map((s) => ({ label: s.stage_name, value: s.stage_name }));
@@ -421,11 +434,8 @@ export default function AddNewLead() {
         const stageNames = activeStages.map((s) => s.stage_name.trim());
 
         setPipelineStageNames(stageNames);
-        // Store full stage objects — rules are needed for action type derivation
         setPipelineStages(activeStages);
 
-        // Auto-default leadStatus to stage[0] ("New"), nextStatus to stage[1],
-        // and derive nextActionTypeOptions from stage[1]'s enabled rules.
         if (activeStages.length > 0) {
           const firstStage = activeStages[0];
           const secondStage = activeStages[1] ?? null;
@@ -434,15 +444,12 @@ export default function AddNewLead() {
             ? secondStage.stage_name.trim()
             : "";
 
-          // Action type options come from the second stage (the auto-populated
-          // nextStatus). Fall back to union across all stages when only one stage.
           const initialActionTypeOptions = secondStage
             ? deriveActionTypeOptions(secondStage)
             : deriveAllActionTypeOptions(activeStages);
 
           setNextActionTypeOptions(initialActionTypeOptions);
 
-          // Only set defaults if the user hasn't touched the form yet
           setForm((prev) =>
             prev.leadStatus
               ? prev
@@ -453,14 +460,11 @@ export default function AddNewLead() {
                 },
           );
 
-          // Track the stage id for the first stage (used in payload)
           setSelectedNextActionStageId(firstStage.id ?? null);
         } else {
-          // No stages — fall back to static task types
           setNextActionTypeOptions(deriveAllActionTypeOptions(activeStages));
         }
       } catch {
-        // No pipeline configured — fall back to the static task type list
         setNextActionTypeOptions([...TASK_TYPES]);
       }
     };
@@ -505,11 +509,9 @@ export default function AddNewLead() {
           limit: 20,
           offset: 0,
         });
-        console.log("SEARCH RESPONSE:", response); // 👈 add this
-
         setAssigneeOptions(normalizeAssignees(response));
       } catch (err) {
-        console.error("SEARCH ERROR:", err); // 👈 ADD THIS
+        console.error("SEARCH ERROR:", err);
         setAssigneeOptions([]);
       } finally {
         setAssigneeLoading(false);
@@ -586,24 +588,30 @@ export default function AddNewLead() {
     } satisfies AssigneeOption;
   }, [appointmentPersonnelInput, appointmentPersonnelOptions, form.personnel]);
 
-  // ── Auto-fill source/subSource from campaign ───────────────────────────────
+  // ── FIX: Sync campaign → source + subSource + campaignName ────────────────
+  //
+  // When the user picks a campaign, we ALSO auto-fill source and subSource
+  // from that campaign's stored values. This is the root cause of the mismatch:
+  // the old code only filled campaignName but left source/subSource as whatever
+  // the user had typed, which could be wrong or empty.
+  //
+  // When campaign is cleared (value = ""), we reset only campaignName so the
+  // user's manually chosen source/subSource are preserved.
   React.useEffect(() => {
     if (!form.campaign) {
-      setForm((prev) => ({
-        ...prev,
-        campaignName: "",
-        source: "",
-        subSource: "",
-      }));
+      setForm((prev) => ({ ...prev, campaignName: "" }));
       return;
     }
     const matched = campaigns.find((c) => c.id === form.campaign);
     if (!matched) return;
+
     setForm((prev) => ({
       ...prev,
       campaignName: capitalizeFirst(matched.name),
-      source: capitalizeFirst(matched.source),
-      subSource: capitalizeFirst(matched.subSource),
+      // FIX: sync source and subSource from the selected campaign so they
+      // always match what the campaign was created with.
+      source: matched.source,
+      subSource: matched.subSource,
     }));
   }, [form.campaign, campaigns]);
 
@@ -686,12 +694,35 @@ export default function AddNewLead() {
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const handleCampaignChange = (value: string) =>
-    setForm((prev) => ({ ...prev, campaign: value }));
+  // ── FIX: handleCampaignChange now also syncs source + subSource ───────────
+  //
+  // This handles the case where the user changes the campaign via the dropdown
+  // directly (the useEffect above also runs, but this keeps things explicit).
+  const handleCampaignChange = (value: string) => {
+    if (!value) {
+      // Campaign cleared → reset campaign fields only, keep source/subSource
+      setForm((prev) => ({ ...prev, campaign: "", campaignName: "" }));
+      return;
+    }
 
+    const matched = campaigns.find((c) => c.id === value);
+    if (!matched) {
+      setForm((prev) => ({ ...prev, campaign: value }));
+      return;
+    }
+
+    // FIX: set campaign + auto-fill source and subSource from the campaign
+    setForm((prev) => ({
+      ...prev,
+      campaign: value,
+      campaignName: capitalizeFirst(matched.name),
+      source: matched.source,
+      subSource: matched.subSource,
+    }));
+  };
+
+  // ── FIX: handleSourceChange clears campaign + subSource ───────────────────
   const handleSourceChange = (value: string) => {
-    // CHANGE: clear campaign when switching to Referral or any source that
-    // would disable the Campaign field
     setForm((prev) => ({
       ...prev,
       source: value,
@@ -701,8 +732,8 @@ export default function AddNewLead() {
     }));
   };
 
+  // ── FIX: handleSubSourceChange clears campaign ────────────────────────────
   const handleSubSourceChange = (value: string) => {
-    // CHANGE: clear campaign when sub-source changes (e.g. Direct → non-Gmail)
     setForm((prev) => ({
       ...prev,
       subSource: value,
@@ -892,7 +923,6 @@ export default function AddNewLead() {
       assigned_to_name: assigneeName.trim() || null,
       personal_id: selectedAppointmentPersonnel?.id ?? null,
 
-      // lead_generated_by_id: selectedLeadGeneratedBy?.id ?? null,
       personal_name: IS_CONTRACTS_APP
         ? selectedAppointmentPersonnel
           ? `${selectedAppointmentPersonnel.first_name ?? ""} ${selectedAppointmentPersonnel.last_name ?? ""}`.trim() ||
@@ -900,9 +930,6 @@ export default function AddNewLead() {
           : null
         : null,
 
-      // lead_generated_by_name: selectedLeadGeneratedBy
-      //   ? `${selectedLeadGeneratedBy.first_name ?? ""} ${selectedLeadGeneratedBy.last_name ?? ""}`.trim()
-      //   : null,
       age: IS_MEDICAL_APP ? (intOrNull(form.age) ?? null) : null,
       partner_age: IS_MEDICAL_APP ? (intOrNull(form.partnerAge) ?? null) : null,
       partner_inquiry: IS_MEDICAL_APP ? isCouple === "yes" : false,
@@ -910,7 +937,6 @@ export default function AddNewLead() {
       is_active: true,
       referral_department_id: referralDeptId ?? null,
 
-      // ── Contact Information (contracts app) ───────────────────────────
       ...(IS_CONTRACTS_APP && {
         contact_full_name: form.contactFullName.trim() || null,
         contact_designation: form.designation.trim() || null,
@@ -926,10 +952,7 @@ export default function AddNewLead() {
     try {
       setIsSubmitting(true);
       const payload = buildPayload();
-      // const referralDeptNameForEmail =
-      //   referralDepartments.find(
-      //     (d) => d.id === intOrNull(form.referralDepartment),
-      //   )?.name || "-";
+
       const shouldSendAppointmentEmail =
         payload.book_appointment === true &&
         Boolean(payload.appointment_date && payload.slot);
@@ -1001,15 +1024,14 @@ export default function AddNewLead() {
             .split(/\s+/)[0] || "Patient";
         const appointmentDateText = payload.appointment_date || "-";
         const appointmentSlotText = payload.slot || "-";
-        // const appointmentBookedText = payload.book_appointment ? "Yes" : "No";
         const clinicName = selectedClinic?.name || "Our Clinic";
         const senderName = `${clinicName} Team`;
         const senderEmail = selectedClinic?.email || "noreply@clinic.com";
 
-          const subject = payload.book_appointment
+        const subject = payload.book_appointment
           ? `Appointment Confirmed - ${appointmentDateText}`
           : `Your details have been registered with us`;
-        
+
         const emailBody = payload.book_appointment
           ? [
               `Hi ${leadFirstName},`,

@@ -31,7 +31,6 @@ import {
   SUB_SOURCE_OPTIONS,
   TIME_SLOTS,
   inputStyle,
-  readOnlyStyle,
   labelStyle,
   getDocColor,
   type LeadGeneratedByObject,
@@ -71,6 +70,9 @@ const capitalizeWords = (str: string): string =>
     .split(" ")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+
+// ── FIX: normalize for case-insensitive comparison ───────────────────────────
+const normalizeForCompare = (val: string): string => val.trim().toLowerCase();
 
 const SLOT_MENU_PROPS = {
   anchorOrigin: { vertical: "bottom" as const, horizontal: "left" as const },
@@ -174,11 +176,30 @@ export function Step1({
         ? SUB_SOURCE_OPTIONS[form.source]
         : [];
 
-  const filteredCampaigns = form.subSource
-    ? campaigns.filter(
-        (c) => c.subSource.toLowerCase() === form.subSource.toLowerCase(),
-      )
-    : campaigns;
+  // ── FIX: filter campaigns using case-insensitive comparison ──────────────
+  //
+  // Previously: c.subSource.toLowerCase() === form.subSource.toLowerCase()
+  // This still failed when one side had extra whitespace. Using normalizeForCompare
+  // on BOTH sides trims + lowercases, making the match robust.
+  //
+  // Also filter by source so a "Social Media / Facebook" campaign doesn't
+  // appear when the user selects "Direct / Gmail".
+  const filteredCampaigns = React.useMemo(() => {
+    if (!form.source && !form.subSource) return campaigns;
+
+    return campaigns.filter((c) => {
+      const sourceMatch = form.source
+        ? normalizeForCompare(c.source) === normalizeForCompare(form.source)
+        : true;
+
+      const subSourceMatch = form.subSource
+        ? normalizeForCompare(c.subSource) ===
+          normalizeForCompare(form.subSource)
+        : true;
+
+      return sourceMatch && subSourceMatch;
+    });
+  }, [campaigns, form.source, form.subSource]);
 
   const resolvedLeadStatusOptions: NextActionStatusOption[] =
     leadStatusOptions ?? [];
@@ -468,7 +489,6 @@ export function Step1({
       <Box
         sx={{
           display: "grid",
-          // Collapse to 2 columns when Campaign field is hidden
           gridTemplateColumns: isCampaignDisabled
             ? "repeat(2, 1fr)"
             : "repeat(3, 1fr)",
@@ -494,31 +514,21 @@ export function Step1({
               </Typography>
             )}
           </Typography>
-          {campaignSelected ? (
-            <TextField
-              fullWidth
-              size="small"
-              value={form.source}
-              InputProps={{ readOnly: true }}
-              sx={readOnlyStyle}
-            />
-          ) : (
-            <TextField
-              select
-              fullWidth
-              size="small"
-              value={form.source}
-              onChange={(e) => handleSourceChange(e.target.value)}
-              sx={inputStyle}
-            >
-              <MenuItem value="">-- Select --</MenuItem>
-              {SOURCE_OPTIONS.map((s) => (
-                <MenuItem key={s} value={s}>
-                  {s}
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
+          <TextField
+            select
+            fullWidth
+            size="small"
+            value={form.source}
+            onChange={(e) => handleSourceChange(e.target.value)}
+            sx={inputStyle}
+          >
+            <MenuItem value="">-- Select --</MenuItem>
+            {SOURCE_OPTIONS.map((s) => (
+              <MenuItem key={s} value={s}>
+                {s}
+              </MenuItem>
+            ))}
+          </TextField>
         </Box>
 
         {/* Sub-Source */}
@@ -540,61 +550,58 @@ export function Step1({
                 </Typography>
               )}
             </Typography>
-            {campaignSelected ? (
-              <TextField
-                fullWidth
-                size="small"
-                value={form.subSource}
-                InputProps={{ readOnly: true }}
-                sx={readOnlyStyle}
-              />
-            ) : (
-              <TextField
-                select
-                fullWidth
-                size="small"
-                value={form.subSource}
-                onChange={(e) => handleSubSourceChange(e.target.value)}
-                disabled={
-                  !form.source ||
-                  (form.source === "Referral" && loadingReferralDepts)
-                }
-                sx={inputStyle}
-                InputProps={{
-                  endAdornment:
-                    form.source === "Referral" && loadingReferralDepts ? (
-                      <CircularProgress size={16} sx={{ mr: 3 }} />
-                    ) : null,
-                }}
-              >
-                <MenuItem value="">-- Select --</MenuItem>
-                {form.source === "Referral" && loadingReferralDepts ? (
-                  <MenuItem value="" disabled>
-                    Loading departments...
+            <TextField
+              select
+              fullWidth
+              size="small"
+              value={form.subSource}
+              onChange={(e) => handleSubSourceChange(e.target.value)}
+              disabled={
+                !form.source ||
+                (form.source === "Referral" && loadingReferralDepts)
+              }
+              sx={inputStyle}
+              InputProps={{
+                endAdornment:
+                  form.source === "Referral" && loadingReferralDepts ? (
+                    <CircularProgress size={16} sx={{ mr: 3 }} />
+                  ) : null,
+              }}
+            >
+              <MenuItem value="">-- Select --</MenuItem>
+              {form.source === "Referral" && loadingReferralDepts ? (
+                <MenuItem value="" disabled>
+                  Loading departments...
+                </MenuItem>
+              ) : form.source === "Referral" &&
+                availableSubSources.length === 0 ? (
+                <MenuItem value="" disabled>
+                  No departments available
+                </MenuItem>
+              ) : (
+                availableSubSources.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {s}
                   </MenuItem>
-                ) : form.source === "Referral" &&
-                  availableSubSources.length === 0 ? (
-                  <MenuItem value="" disabled>
-                    No departments available
-                  </MenuItem>
-                ) : (
-                  availableSubSources.map((s) => (
-                    <MenuItem key={s} value={s}>
-                      {s}
-                    </MenuItem>
-                  ))
-                )}
-                {!form.source && (
-                  <MenuItem value="" disabled>
-                    Select source first
-                  </MenuItem>
-                )}
-              </TextField>
-            )}
+                ))
+              )}
+              {!form.source && (
+                <MenuItem value="" disabled>
+                  Select source first
+                </MenuItem>
+              )}
+            </TextField>
           </Box>
         )}
 
-        {/* Campaign Name — hidden when source is Referral or Direct + non-Gmail */}
+        {/* ── FIX: Campaign Name dropdown ─────────────────────────────────
+         *
+         * Key changes:
+         * 1. Uses filteredCampaigns (memoized, case-insensitive source+subSource filter)
+         * 2. Shows helpful empty state when source/subSource don't match any campaign
+         * 3. Disabled only when BOTH source and subSource are unset (not when either is set)
+         *    so the user can always see which campaigns exist for the chosen source.
+         */}
         {form.source !== "Other" && !isCampaignDisabled && (
           <Box>
             <Typography sx={labelStyle}>
@@ -613,43 +620,31 @@ export function Step1({
                 </Typography>
               )}
             </Typography>
-            {campaignSelected ? (
-              <TextField
-                fullWidth
-                size="small"
-                value={
-                  form.campaign
-                    ? (filteredCampaigns.find((c) => c.id === form.campaign)
-                        ?.name ?? "")
-                    : ""
-                }
-                InputProps={{ readOnly: true }}
-                sx={readOnlyStyle}
-              />
-            ) : (
-              <TextField
-                select
-                fullWidth
-                size="small"
-                value={form.campaign}
-                onChange={(e) => handleCampaignChange(e.target.value)}
-                disabled={!form.subSource && !form.source}
-                sx={inputStyle}
-              >
-                <MenuItem value="">-- None --</MenuItem>
-                {filteredCampaigns.length === 0 ? (
-                  <MenuItem value="" disabled>
-                    No campaigns available
+            <TextField
+              select
+              fullWidth
+              size="small"
+              value={form.campaign}
+              onChange={(e) => handleCampaignChange(e.target.value)}
+              // FIX: only disable when no source AND no subSource are set
+              disabled={!form.source && !form.subSource}
+              sx={inputStyle}
+            >
+              <MenuItem value="">-- None --</MenuItem>
+              {filteredCampaigns.length === 0 ? (
+                <MenuItem value="" disabled>
+                  {form.source || form.subSource
+                    ? "No campaigns match the selected source / sub-source"
+                    : "No campaigns available"}
+                </MenuItem>
+              ) : (
+                filteredCampaigns.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.name}
                   </MenuItem>
-                ) : (
-                  filteredCampaigns.map((c) => (
-                    <MenuItem key={c.id} value={c.id}>
-                      {c.name}
-                    </MenuItem>
-                  ))
-                )}
-              </TextField>
-            )}
+                ))
+              )}
+            </TextField>
           </Box>
         )}
       </Box>
