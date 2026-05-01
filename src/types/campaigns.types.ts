@@ -236,4 +236,6 @@ export interface GoogleAdsCampaignPayload {
   start_date?: string;
   end_date?: string;
   start_time?: string;
+  // ✅ FIX: campaign status — "live" → ENABLED in Google Ads, else → PAUSED
+  campaign_status?: string;
 }
