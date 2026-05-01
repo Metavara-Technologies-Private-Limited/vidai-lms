@@ -25,6 +25,7 @@ export interface RawLead {
   activity?: string;
   initials?: string;
   department_id?: number;
+  clinic_id?: number | string;
 }
 
 export interface ProcessedLead extends RawLead {
