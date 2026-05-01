@@ -164,14 +164,27 @@ export default function CampaignCard({
                 if (platforms.includes("google_ads")) {
                   try {
                     const res = await CampaignAPI.updateGoogleAdsStatus(c.id, "enable");
-                    if (!res.data?.success || res.data?.skipped) {
-                      shouldSetLive = false;
-                      throw new Error(
-                        res.data?.error || res.data?.message || "Google Ads enable request was skipped or failed"
+
+                    // ✅ FIX: skipped means campaign not found in Google Ads yet
+                    // (e.g. Zapier callback hasn't fired or campaign was just created).
+                    // Treat as a soft warning — still allow local status to go live.
+                    if (res.data?.skipped) {
+                      toast.warn(
+                        "Google Ads campaign not found yet — it may still be creating. Campaign set to Live locally.",
                       );
+                      // do NOT set shouldSetLive = false; let local status update proceed
+                    } else if (!res.data?.success) {
+                      // Hard failure — actual API error
+                      shouldSetLive = false;
+                      toast.warn(
+                        res.data?.error ||
+                          "Google Ads enable failed; campaign remains stopped locally.",
+                      );
+                    } else {
+                      toast.success("Google Ads campaign enabled successfully.");
                     }
-                    toast.success("Google Ads campaign enabled successfully.");
                   } catch (err) {
+                    // ✅ FIX: network/server errors are hard failures
                     shouldSetLive = false;
                     console.error("[GoogleAds] Failed to enable campaign:", err);
                     toast.warn("Google Ads enable failed; campaign remains stopped locally.");
