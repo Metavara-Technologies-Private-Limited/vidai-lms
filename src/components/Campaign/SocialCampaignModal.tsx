@@ -429,9 +429,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   ) => {
     setSubmitted(true);
 
-    const needsSchedule = type === "scheduled" || type === "draft";
+    // ✅ FIX: Only "scheduled" requires date+time. "draft" and "live" save without schedule.
     if (!step1Valid || !step2Valid) return;
-    if (needsSchedule && (!scheduleDate || !scheduleTime)) return;
+    if (type === "scheduled" && (!scheduleDate || !scheduleTime)) return;
 
     try {
       const selectedPlatforms = PLATFORM_LIST.filter((p) =>
@@ -496,12 +496,18 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           .map((p) => resolvedContent[p])
           .find((c) => c.trim() !== "" && !isPlainUrl(c)) ?? campaignName;
 
+      // ✅ FIX: status and is_active correctly reflect the action type
       const statusValue =
         type === "live"
           ? CAMPAIGN_STATUS.LIVE
           : type === "scheduled"
             ? CAMPAIGN_STATUS.SCHEDULED
             : CAMPAIGN_STATUS.DRAFT;
+
+      const isActive = type === "live";
+
+      // ✅ FIX: Google Ads campaign_status — "live" → ENABLED in Google Ads, else PAUSED
+      const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
 
       const campaignMode: ("organic_posting" | "paid_advertising")[] = [
         mode === "paid" ? "paid_advertising" : "organic_posting",
@@ -536,7 +542,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         selected_start: scheduleDate || null,
         selected_end: scheduleDate || null,
         status: statusValue,
-        is_active: type === "live",
+        is_active: isActive,
       };
 
       const createdRes = await CampaignAPI.createSocial(payload);
@@ -582,6 +588,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             start_date: startDate,
             end_date: endDate,
             start_time: scheduleTime || "",
+            campaign_status: googleAdsCampaignStatus,
           });
 
           await CampaignAPI.createGoogleAds({
@@ -614,6 +621,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             start_date: startDate,
             end_date: endDate,
             start_time: scheduleTime || "",
+            // ✅ FIX: pass correct campaign_status — backend maps "live"→ENABLED, else→PAUSED
+            campaign_status: googleAdsCampaignStatus,
           });
 
           console.log("[GoogleAds] Campaign sent to Zapier successfully");
