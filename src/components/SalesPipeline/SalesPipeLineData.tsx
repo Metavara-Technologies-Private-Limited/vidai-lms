@@ -85,6 +85,33 @@ const toStageStatusLabel = (value?: string): string => {
   return "Active";
 };
 
+const calculateStageConversionPercent = (
+  currentStageLeadCount: number,
+  convertedLeadCount: number,
+): number => {
+  if (currentStageLeadCount <= 0 || convertedLeadCount <= 0) return 0;
+
+  const rawPercent = Math.round(
+    (convertedLeadCount / currentStageLeadCount) * 100,
+  );
+  return Math.min(100, Math.max(0, rawPercent));
+};
+
+const isConvertedLead = (lead: ApiLead): boolean => {
+  const normalizedStatus = String(lead.lead_status ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[_\s-]+/g, "-");
+
+  return (
+    normalizedStatus === "converted" ||
+    normalizedStatus === "converted-lead" ||
+    normalizedStatus === "converted-leads" ||
+    normalizedStatus === "cycle-conversion" ||
+    normalizedStatus === "cycleconversion"
+  );
+};
+
 const SalesPipeLineData = ({
   stages,
   canEditPipeline = true,
@@ -159,23 +186,20 @@ const leadMatchesStage = (lead: ApiLead, targetStage: StageCard): boolean => {
   return false;
 };
 
-    return stages.map((stage, index) => {
+    return stages.map((stage) => {
       const stageName = stage.stageName.replace(/^\d+\.\s*/, "");
-      const leadCount = activeLeads.filter((lead) =>
+      const stageLeads = activeLeads.filter((lead) =>
         leadMatchesStage(lead, stage),
+      );
+      const leadCount = stageLeads.length;
+      const convertedLeadCount = stageLeads.filter((lead) =>
+        isConvertedLead(lead),
       ).length;
 
-const nextStage = stages[index + 1];
-let conversionValue: number | null = null;
-
-if (nextStage) {
-  const nextCount = activeLeads.filter((lead) =>
-    leadMatchesStage(lead, nextStage),
-  ).length;
-
-  conversionValue =
-    leadCount > 0 ? Math.round((nextCount / leadCount) * 100) : 0;
-}
+      const conversionValue = calculateStageConversionPercent(
+        leadCount,
+        convertedLeadCount,
+      );
 
       return {
         stage,
@@ -558,53 +582,51 @@ if (nextStage) {
                           </Typography>
                         </Box>
 
-                        {index < stageMetrics.length - 1 && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.8,
+                            border: `1px solid ${theme.palette.grey[200]}`,
+                            borderRadius: 1.5,
+                            px: 0.95,
+                            py: 0.6,
+                          }}
+                        >
                           <Box
                             sx={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 1.2,
                               display: "flex",
                               alignItems: "center",
-                              gap: 0.8,
-                              border: `1px solid ${theme.palette.grey[200]}`,
-                              borderRadius: 1.5,
-                              px: 0.95,
-                              py: 0.6,
+                              justifyContent: "center",
+                              backgroundColor: alpha(
+                                theme.palette.grey[300],
+                                0.35,
+                              ),
+                              color: theme.palette.text.secondary,
                             }}
                           >
-                            <Box
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                borderRadius: 1.2,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                backgroundColor: alpha(
-                                  theme.palette.grey[300],
-                                  0.35,
-                                ),
-                                color: theme.palette.text.secondary,
-                              }}
-                            >
-                              <PublishedWithChangesOutlinedIcon
-                                sx={{ fontSize: 16 }}
-                              />
-                            </Box>
-                            <Typography
-                              sx={{
-                                fontSize: 20,
-                                fontWeight: 700,
-                                lineHeight: 1,
-                              }}
-                            >
-                              {conversionValue ?? 0}%
-                            </Typography>
-                            <Typography
-                              sx={{ fontSize: 12, color: "text.secondary" }}
-                            >
-                              Conv.
-                            </Typography>
+                            <PublishedWithChangesOutlinedIcon
+                              sx={{ fontSize: 16 }}
+                            />
                           </Box>
-                        )}
+                          <Typography
+                            sx={{
+                              fontSize: 20,
+                              fontWeight: 700,
+                              lineHeight: 1,
+                            }}
+                          >
+                            {conversionValue ?? 0}%
+                          </Typography>
+                          <Typography
+                            sx={{ fontSize: 12, color: "text.secondary" }}
+                          >
+                            Conv.
+                          </Typography>
+                        </Box>
                       </Box>
                     </Box>
 
