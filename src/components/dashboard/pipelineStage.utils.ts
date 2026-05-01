@@ -64,15 +64,27 @@ const resolveLeadStatusText = (lead: Lead): string => {
   const anyLead = lead as Lead & {
     stage_name?: string;
     pipeline_stage_name?: string;
+    task_type?: string;
+    task?: string;
   };
 
   return (
     anyLead.stage_name ||
     anyLead.pipeline_stage_name ||
+    anyLead.task_type ||
+    anyLead.task ||
     lead.lead_status ||
     lead.status ||
     ""
   );
+};
+
+const extractStageFromDescription = (
+  description: string | null | undefined,
+): string => {
+  if (!description) return "";
+  const match = description.match(/(?:^|\|)\s*Stage:\s*([^|]+)/i);
+  return match?.[1]?.trim() ?? "";
 };
 
 export const resolveLeadStage = (
@@ -90,14 +102,35 @@ export const resolveLeadStage = (
   const byName = new Map(
     stages.map((stage) => [normalizeStageName(stage.stage_name), stage]),
   );
-  const normalizedLeadStatus = normalizeStageName(resolveLeadStatusText(lead));
-  const exact = byName.get(normalizedLeadStatus);
-  if (exact) return exact;
+  const anyLead = lead as Lead & {
+    stage_name?: string;
+    pipeline_stage_name?: string;
+    task_type?: string;
+    task?: string;
+    next_action_description?: string;
+  };
 
-  const candidateKeys = getEquivalentStatusKeys(normalizedLeadStatus);
-  for (const candidate of candidateKeys) {
-    const matched = byName.get(candidate);
-    if (matched) return matched;
+  const candidateStatuses = [
+    resolveLeadStatusText(lead),
+    anyLead.stage_name,
+    anyLead.pipeline_stage_name,
+    anyLead.task_type,
+    anyLead.task,
+    extractStageFromDescription(anyLead.next_action_description),
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+
+  for (const statusText of candidateStatuses) {
+    const normalizedLeadStatus = normalizeStageName(statusText);
+    const exact = byName.get(normalizedLeadStatus);
+    if (exact) return exact;
+
+    const candidateKeys = getEquivalentStatusKeys(normalizedLeadStatus);
+    for (const candidate of candidateKeys) {
+      const matched = byName.get(candidate);
+      if (matched) return matched;
+    }
   }
 
   return null;

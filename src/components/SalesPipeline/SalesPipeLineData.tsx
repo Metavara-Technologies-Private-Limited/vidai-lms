@@ -98,17 +98,98 @@ const calculateStageConversionPercent = (
 };
 
 const isConvertedLead = (lead: ApiLead): boolean => {
-  const normalizedStatus = String(lead.lead_status ?? "")
-    .toLowerCase()
-    .trim()
-    .replace(/[_\s-]+/g, "-");
+  const leadRecord = lead as unknown as Record<string, unknown>;
+  const normalizeStatusValue = (value: unknown): string =>
+    String(value ?? "")
+      .toLowerCase()
+      .trim()
+      .replace(/[_\s-]+/g, "-");
 
-  return (
-    normalizedStatus === "converted" ||
-    normalizedStatus === "converted-lead" ||
-    normalizedStatus === "converted-leads" ||
-    normalizedStatus === "cycle-conversion" ||
-    normalizedStatus === "cycleconversion"
+  const candidateStatuses = [
+    lead.lead_status,
+    typeof leadRecord.status === "string" ? leadRecord.status : "",
+    typeof leadRecord.stage_name === "string" ? leadRecord.stage_name : "",
+    typeof leadRecord.pipeline_stage_name === "string"
+      ? leadRecord.pipeline_stage_name
+      : "",
+    extractStageFromDescription(
+      typeof lead.next_action_description === "string"
+        ? lead.next_action_description
+        : "",
+    ),
+  ].map((value) => normalizeStatusValue(value));
+
+  const hasConvertedStatus = candidateStatuses.some(
+    (normalizedStatus) =>
+      normalizedStatus === "converted" ||
+      normalizedStatus === "converted-lead" ||
+      normalizedStatus === "converted-leads" ||
+      normalizedStatus === "cycle-conversion" ||
+      normalizedStatus === "cycleconversion",
+  );
+
+  if (hasConvertedStatus) return true;
+
+  const hasConvertedFlag =
+    leadRecord.converted === true ||
+    Boolean(leadRecord.conversion_date) ||
+    normalizeStatusValue(lead.next_action_status) === "completed";
+
+  return hasConvertedFlag;
+};
+
+const getStatusKeys = (status: string): string[] => {
+  const base = status.toLowerCase();
+  const aliases: Record<string, string[]> = {
+    new: ["new"],
+    contacted: ["contacted"],
+    "follow-ups": [
+      "follow-ups",
+      "follow-up",
+      "followup",
+      "follow-up-leads",
+      "follow-up-lead",
+      "follow-up-lead-stage",
+      "follow-up-stage",
+      "contacted",
+    ],
+    converted: ["converted", "converted-lead", "converted-leads"],
+    lost: ["lost", "lost-lead", "lost-leads", "closed", "closed-lost"],
+    "cycle-conversion": ["cycle-conversion", "cycleconversion"],
+    "proposal-sent": ["proposal-sent", "proposal"],
+    "contract-signed": ["contract-signed", "contractsigned", "contract"],
+    "converted lead": ["converted lead", "converted"],
+    "contract signed": ["contract signed", "contracted", "contract"],
+    "proposal sent": ["proposal sent", "proposal"],
+    "follow up": ["follow up", "follow-up", "followup"],
+    appointment: ["appointment", "appointments"],
+    negotiation: ["negotiation", "negotiating"],
+    closed: ["closed", "lost", "closed lost"],
+  };
+  return aliases[base] ?? [base];
+};
+
+const extractStageFromDescription = (
+  description: string | null | undefined,
+): string => {
+  if (!description) return "";
+  const match = description.match(/(?:^|\|)\s*Stage:\s*([^|]+)/i);
+  return match?.[1]?.trim() ?? "";
+};
+
+const getStageStatusKeys = (stage: StageCard): string[] => {
+  const stageName = stage.stageName.toLowerCase().trim();
+  const byName = getStatusKeys(stage.stageName);
+  const byType = stage.stageType ? getStatusKeys(stage.stageType) : [];
+  const byStatus = stage.stageStatus ? getStatusKeys(stage.stageStatus) : [];
+  const explicit = [stageName, stage.stageName, stage.stageStatus ?? "", stage.stageType ?? ""];
+
+  return Array.from(
+    new Set(
+      [...byName, ...byType, ...byStatus, ...explicit]
+        .map((item) => item.toLowerCase().trim())
+        .filter(Boolean),
+    ),
   );
 };
 
@@ -174,22 +255,47 @@ const SalesPipeLineData = ({
 
   const stageMetrics = useMemo(() => {
     const activeLeads = leads.filter((lead) => lead.is_active !== false);
-const leadMatchesStage = (lead: ApiLead, targetStage: StageCard): boolean => {
-  // ✅ PRIMARY MATCH (correct one)
-  if (
-    lead.stage_id !== null &&
-    lead.stage_id !== undefined &&
-    String(lead.stage_id) === String(targetStage.id)
-  ) {
-    return true;
-  }
-  return false;
-};
+
+    const leadMatchesStage = (
+      lead: ApiLead,
+      targetStage: StageCard,
+      targetStageStatusKeys: string[],
+    ): boolean => {
+      if (
+        lead.stage_id !== null &&
+        lead.stage_id !== undefined &&
+        String(lead.stage_id) === String(targetStage.id)
+      ) {
+        return true;
+      }
+
+      const leadRecord = lead as unknown as Record<string, unknown>;
+      const candidateStatuses = [
+        lead.lead_status,
+        typeof leadRecord.status === "string" ? leadRecord.status : "",
+        typeof leadRecord.stage_name === "string" ? leadRecord.stage_name : "",
+        typeof leadRecord.pipeline_stage_name === "string"
+          ? leadRecord.pipeline_stage_name
+          : "",
+        typeof leadRecord.task_type === "string" ? leadRecord.task_type : "",
+        typeof leadRecord.task === "string" ? leadRecord.task : "",
+        extractStageFromDescription(
+          typeof lead.next_action_description === "string"
+            ? lead.next_action_description
+            : "",
+        ),
+      ]
+        .map((value) => String(value ?? "").toLowerCase().trim())
+        .filter(Boolean);
+
+      return targetStageStatusKeys.some((key) => candidateStatuses.includes(key));
+    };
 
     return stages.map((stage) => {
       const stageName = stage.stageName.replace(/^\d+\.\s*/, "");
+      const stageStatusKeys = getStageStatusKeys(stage);
       const stageLeads = activeLeads.filter((lead) =>
-        leadMatchesStage(lead, stage),
+        leadMatchesStage(lead, stage, stageStatusKeys),
       );
       const leadCount = stageLeads.length;
       const convertedLeadCount = stageLeads.filter((lead) =>
@@ -205,6 +311,7 @@ const leadMatchesStage = (lead: ApiLead, targetStage: StageCard): boolean => {
         stage,
         stageName,
         leadCount,
+        convertedLeadCount,
         conversionValue,
       };
     });
@@ -448,7 +555,7 @@ const leadMatchesStage = (lead: ApiLead, targetStage: StageCard): boolean => {
           }}
         >
           {stageMetrics.map(
-            ({ stage, stageName, leadCount, conversionValue }, index) => {
+            ({ stage, stageName, leadCount, convertedLeadCount, conversionValue }, index) => {
               return (
                 <Box
                   key={`${stage.id}-${index}`}
@@ -625,6 +732,11 @@ const leadMatchesStage = (lead: ApiLead, targetStage: StageCard): boolean => {
                             sx={{ fontSize: 12, color: "text.secondary" }}
                           >
                             Conv.
+                          </Typography>
+                          <Typography
+                            sx={{ fontSize: 11, color: "text.secondary", ml: 0.2 }}
+                          >
+                            ({convertedLeadCount}/{leadCount})
                           </Typography>
                         </Box>
                       </Box>
