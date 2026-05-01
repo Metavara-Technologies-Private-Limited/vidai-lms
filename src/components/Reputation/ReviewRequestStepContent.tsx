@@ -25,6 +25,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Select,
 } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import UndoIcon from "@mui/icons-material/Undo";
@@ -53,6 +54,7 @@ import AddIcon from "@mui/icons-material/Add";
 import AI_Suggest, { type AiSuggestionItem } from "./AI_Suggest";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Heading from "@tiptap/extension-heading";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { Underline } from "@tiptap/extension-underline";
 import { Link as TiptapLink } from "@tiptap/extension-link";
@@ -184,6 +186,10 @@ const ReviewRequestStepContent = ({
   const [styleMenuAnchor, setStyleMenuAnchor] = useState<null | HTMLElement>(
     null,
   );
+  const [currentHeading, setCurrentHeading] = useState<
+    "Tt" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6"
+  >("Tt");
+
   const [textColorAnchor, setTextColorAnchor] = useState<null | HTMLElement>(
     null,
   );
@@ -203,10 +209,9 @@ const ReviewRequestStepContent = ({
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        bulletList: false,
-        orderedList: false,
-        listItem: false,
+      StarterKit,
+      Heading.configure({
+        levels: [1, 2, 3, 4, 5, 6],
       }),
       Underline,
       FontFamily,
@@ -247,6 +252,21 @@ const ReviewRequestStepContent = ({
       })),
     [attachmentFiles],
   );
+
+  const attachmentUrls = useMemo(() => {
+    const urls: Record<string, string> = {};
+    attachmentFiles.forEach((file) => {
+      const id = `${file.name}-${file.size}-${file.lastModified}`;
+      urls[id] = URL.createObjectURL(file);
+    });
+    return urls;
+  }, [attachmentFiles]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(attachmentUrls).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [attachmentUrls]);
 
   useEffect(() => {
     if (!editor) return;
@@ -727,6 +747,22 @@ const ReviewRequestStepContent = ({
     saveSelection();
   };
 
+  const handleHeadingChange = (
+    value: "Tt" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6",
+  ) => {
+    if (!editor) return;
+
+    setCurrentHeading(value);
+
+    if (value === "Tt") {
+      editor.chain().focus().setParagraph().run();
+      return;
+    }
+
+    const level = Number(value.replace("H", "")) as 1 | 2 | 3 | 4 | 5 | 6;
+    editor.chain().focus().setHeading({ level }).run();
+  };
+
   const openLinkDialog = (type: "link" | "drive") => {
     saveSelection();
     setLinkDialogType(type);
@@ -997,6 +1033,39 @@ const ReviewRequestStepContent = ({
             </Button>
           </Tooltip>
 
+          <Select
+            size="small"
+            value={currentHeading}
+            onChange={(e) =>
+              handleHeadingChange(
+                e.target.value as
+                  | "Tt"
+                  | "H1"
+                  | "H2"
+                  | "H3"
+                  | "H4"
+                  | "H5"
+                  | "H6",
+              )
+            }
+            sx={{
+              width: 70,
+              height: 28,
+              fontSize: "12px",
+              "& fieldset": { border: "none" },
+            }}
+          >
+            <MenuItem value="Tt">
+              <span style={{ fontWeight: 600, fontSize: "16px" }}>T</span>
+            </MenuItem>
+            <MenuItem value="H1">H1</MenuItem>
+            <MenuItem value="H2">H2</MenuItem>
+            <MenuItem value="H3">H3</MenuItem>
+            <MenuItem value="H4">H4</MenuItem>
+            <MenuItem value="H5">H5</MenuItem>
+            <MenuItem value="H6">H6</MenuItem>
+          </Select>
+
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
           <Tooltip title="Bold">
             <IconButton
@@ -1221,8 +1290,19 @@ const ReviewRequestStepContent = ({
                   key={file.id}
                   size="small"
                   label={`${file.name} (${formatFileSize(file.size)})`}
+                  component="a"
+                  href={attachmentUrls[file.id]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  clickable
                   onDelete={() => removeAttachment(file.id)}
-                  sx={{ maxWidth: 380 }}
+                  sx={{
+                    maxWidth: 380,
+                    textDecoration: "none",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
                 />
               ))}
             </Box>
@@ -1592,6 +1672,13 @@ const ReviewRequestStepContent = ({
                 wordBreak: "break-word",
                 color: "#111827",
                 "& p": { margin: "0 0 8px 0" },
+                "& h1": { fontSize: "28px", fontWeight: 700, margin: "8px 0" },
+                "& h2": { fontSize: "24px", fontWeight: 600, margin: "8px 0" },
+                "& h3": { fontSize: "20px", fontWeight: 600, margin: "8px 0" },
+                "& h4": { fontSize: "18px", fontWeight: 600, margin: "8px 0" },
+                "& h5": { fontSize: "16px", fontWeight: 600, margin: "8px 0" },
+                "& h6": { fontSize: "14px", fontWeight: 600, margin: "8px 0" },
+
                 "& ul": {
                   listStyleType: "disc",
                   paddingLeft: "20px",
