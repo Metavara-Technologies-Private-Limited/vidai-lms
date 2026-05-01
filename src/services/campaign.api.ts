@@ -48,6 +48,12 @@ export const CampaignAPI = {
     campaign_type?: string;
     // ✅ FIX: links Zapier callback response back to our internal campaign DB record
     internal_campaign_id?: string;
+    // ✅ NEW: campaign objective, target audience, schedule dates & time
+    campaign_objective?: string;
+    target_audience?: string;
+    start_date?: string;
+    end_date?: string;
+    start_time?: string;
   }) =>
     http.post("/google-ads/create/", data, {
       params: { clinic_id: data.clinic_id },

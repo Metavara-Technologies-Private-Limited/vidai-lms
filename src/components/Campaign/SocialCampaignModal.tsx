@@ -577,6 +577,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             internal_campaign_id: String(newCampaignId ?? ""),
             image_url: googleAdsImage,
             keywords: parsedKeywords,
+            campaign_objective: objective,
+            target_audience: audience,
+            start_date: startDate,
+            end_date: endDate,
+            start_time: scheduleTime || "",
           });
 
           await CampaignAPI.createGoogleAds({
@@ -603,6 +608,12 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             campaign_type: "SEARCH",
             // ✅ FIX: send internal campaign ID — must be string, not empty
             internal_campaign_id: String(newCampaignId ?? ""),
+            // ✅ NEW: send campaign objective, target audience, dates and schedule time
+            campaign_objective: objective,
+            target_audience: audience,
+            start_date: startDate,
+            end_date: endDate,
+            start_time: scheduleTime || "",
           });
 
           console.log("[GoogleAds] Campaign sent to Zapier successfully");
