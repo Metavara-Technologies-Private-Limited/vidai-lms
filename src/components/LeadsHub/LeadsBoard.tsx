@@ -1381,14 +1381,10 @@ const LeadsBoard: React.FC<Props> = ({
   React.useEffect(() => {
     const fetchPipelineStages = async () => {
       const clinicIdFromStore = Number(clinic?.id ?? 0);
-      const clinicIdFromStorage = Number(
-        localStorage.getItem("clinic_id") ?? 0,
-      );
       const clinicIdFromLeads = Number(
         (reduxLeads[0] as RawLead | undefined)?.clinic_id ?? 0,
       );
-      const clinicId =
-        clinicIdFromStore || clinicIdFromStorage || clinicIdFromLeads;
+      const clinicId = clinicIdFromStore || clinicIdFromLeads;
 
       if (!clinicId) {
         setPipelineColumns([]);

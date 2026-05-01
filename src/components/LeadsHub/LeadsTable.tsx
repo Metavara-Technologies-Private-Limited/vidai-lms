@@ -42,6 +42,7 @@ import {
   selectLeadsLoading,
   selectLeadsError,
 } from "../../store/leadSlice";
+import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
@@ -79,9 +80,6 @@ const toastOptions = {
   autoClose: 3000,
   theme: "colored" as const,
 };
-
-const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
-const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 // Add this helper at the top of LeadsTable.tsx:
 const BACKEND_TO_DISPLAY: Record<string, string> = {
@@ -432,6 +430,7 @@ const LeadsTable: React.FC<Props> = ({
   const leads = useSelector(selectLeads) as RawLead[] | null;
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
+  const clinic = useSelector(selectClinic);
 
   const [localLeads, setLocalLeads] = React.useState<ProcessedLead[]>([]);
   const [page, setPage] = React.useState(1);
@@ -459,15 +458,13 @@ const LeadsTable: React.FC<Props> = ({
 
   React.useEffect(() => {
     const loadEditStatusOptions = async () => {
-      const clinicId = Number(localStorage.getItem("clinic_id") ?? 0);
-      const resolvedSelectedIndustry =
-        selectedIndustry ||
-        localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ||
-        "";
-      const resolvedSelectedPipelineId =
-        selectedPipelineId ||
-        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ||
-        "";
+      const clinicIdFromStore = Number(clinic?.id ?? 0);
+      const clinicIdFromLead = Number(
+        editStatusLead?.clinic_id ?? (leads?.[0] as RawLead | undefined)?.clinic_id ?? 0,
+      );
+      const clinicId = clinicIdFromStore || clinicIdFromLead;
+      const resolvedSelectedIndustry = selectedIndustry;
+      const resolvedSelectedPipelineId = selectedPipelineId;
       const hasSelectionContext =
         Boolean(resolvedSelectedIndustry) ||
         Boolean(resolvedSelectedPipelineId);
@@ -546,7 +543,7 @@ const LeadsTable: React.FC<Props> = ({
 
     if (!editStatusLead) return;
     void loadEditStatusOptions();
-  }, [editStatusLead, selectedIndustry, selectedPipelineId]);
+  }, [clinic?.id, editStatusLead, leads, selectedIndustry, selectedPipelineId]);
 
   React.useEffect(() => {
     if (!leads) return;
@@ -642,9 +639,8 @@ const LeadsTable: React.FC<Props> = ({
 
     try {
       const latestLead = await LeadAPI.getById(editStatusLead.id);
-      const storedClinicId = Number(localStorage.getItem("clinic_id") ?? 0);
       const resolvedClinicId =
-        latestLead.clinic_id ?? editStatusLead.clinic_id ?? storedClinicId;
+        latestLead.clinic_id ?? editStatusLead.clinic_id ?? clinic?.id;
       const resolvedDepartmentId =
         latestLead.department_id ?? editStatusLead.department_id;
 
