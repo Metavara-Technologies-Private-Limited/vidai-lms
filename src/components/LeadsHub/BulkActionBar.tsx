@@ -150,6 +150,7 @@ interface Props {
   onDelete: () => void;
   onArchive: (archive: boolean) => void;
   onExport?: () => void;
+  onExportAll?: () => void;
   onSendEmail?: (to: string, subject: string, body: string, templateId?: string) => void;
   onSendSMS?: (leadIds: string[], message: string) => void;
 }
@@ -208,7 +209,7 @@ const RecipientPickerPopover: React.FC<PickerPopoverProps> = ({ open, anchorEl, 
 );
 
 // ─────────────────────────────────────────────────────────────────────
-const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive, onExport, onSendEmail, onSendSMS }) => {
+const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive, onExport, onExportAll, onSendEmail, onSendSMS }) => {
   const dispatch    = useDispatch<AppDispatch>();
   const deletingIds = useSelector(selectDeletingIds);
 
@@ -560,6 +561,7 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
           {loadingLeads ? "Loading..." : "Email"}
         </Button>
         <Button variant="outlined" startIcon={<img src={ExportIcon} alt="Export" width={18} height={18} />} onClick={onExport} disabled={anyProcessing} sx={{ color: "black", borderColor: "black", "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" } }}>Export</Button>
+        <Button variant="outlined" startIcon={<img src={ExportIcon} alt="Export all leads" width={18} height={18} />} onClick={onExportAll} disabled={anyProcessing} sx={{ color: "black", borderColor: "black", "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" } }}>Export All Leads</Button>
       </Stack>
 
       {/* ── Delete Dialog ── */}

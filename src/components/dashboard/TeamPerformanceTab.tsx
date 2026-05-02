@@ -8,7 +8,7 @@ import {
   Grid,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   LineChart,
   Line,
@@ -21,6 +21,10 @@ import type { TimeRange } from "./TimeRangeSelector";
 import { selectLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
 import { selectClinic } from "../../store/clinicSlice";
+import { loadDashboardCounts, selectCounts } from "../../store/referralSlice";
+import { fetchReferralSources, fetchReferralDepartments } from "../../services/referral.api";
+import type { ReferralSource } from "../../services/referral.api";
+import type { AppDispatch } from "../../store";
 import type { Lead } from "../../services/leads.api";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 import SafeResponsiveContainer from "./SafeResponsiveContainer";
@@ -180,19 +184,14 @@ interface TeamPerformanceTabProps {
 }
 
 const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
+  const dispatch = useDispatch<AppDispatch>();
   const leads = useSelector(selectLeads) as Lead[];
   const campaigns = useSelector(selectCampaign) as CampaignItem[];
+  const referralCounts = useSelector(selectCounts);
   const selectedClinicId = useSelector(selectClinic)?.id;
-  const rawStoredClinicId = localStorage.getItem("clinic_id");
-  const parsedStoredClinicId = rawStoredClinicId
-    ? Number(rawStoredClinicId)
-    : NaN;
-  const storedClinicId =
-    Number.isFinite(parsedStoredClinicId) && parsedStoredClinicId > 0
-      ? parsedStoredClinicId
-      : null;
-  const clinicId = selectedClinicId != null ? selectedClinicId : storedClinicId;
+  const clinicId = Number(selectedClinicId ?? 0);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [referralSources, setReferralSources] = useState<ReferralSource[]>([]);
   const performanceBuckets = useMemo(
     () => getTimeRangeBuckets(timeRange),
     [timeRange],
@@ -202,6 +201,55 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
       performanceBuckets.map((bucket) => ({ label: bucket.label, value: 0 })),
     [performanceBuckets],
   );
+  const referralDashboardTotal = useMemo(
+    () =>
+      Object.values(referralCounts || {}).reduce(
+        (sum, count) => sum + Number(count || 0),
+        0,
+      ),
+    [referralCounts],
+  );
+
+  useEffect(() => {
+    if (!clinicId) return;
+
+    dispatch(loadDashboardCounts(clinicId));
+
+    // Same pattern as ReferralsManager SourceDepartmentPage:
+    // 1. Fetch departments for this clinic.
+    // 2. For each department with a real id, fetch sources in parallel.
+    // 3. If no valid department ids (static fallback with id=0), fetch all
+    //    sources without a department filter — same fallback fetchReferralSources({})
+    //    that fetchReferralDepartments itself uses internally.
+    fetchReferralDepartments(clinicId)
+      .then((depts) => {
+        const validDepts = depts.filter((d) => d.id > 0);
+        if (validDepts.length === 0) {
+          // Static fallback: fetch all sources (no department filter)
+          return fetchReferralSources({});
+        }
+        return Promise.all(
+          validDepts.map((d) =>
+            fetchReferralSources({ referral_department_id: d.id }),
+          ),
+        ).then((results) => {
+          // Flatten and deduplicate by source id
+          const seen = new Set<number>();
+          const flat: ReferralSource[] = [];
+          for (const batch of results) {
+            for (const src of batch) {
+              if (!seen.has(src.id)) {
+                seen.add(src.id);
+                flat.push(src);
+              }
+            }
+          }
+          return flat;
+        });
+      })
+      .then(setReferralSources)
+      .catch(() => setReferralSources([]));
+  }, [clinicId, dispatch]);
 
   const { members, overview, memberStatsMap, memberPerformanceMap } =
     useMemo(() => {
@@ -217,7 +265,7 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
         (campaign) => Boolean(clinicId) && Number(campaign.clinic) === clinicId,
       );
 
-      if (activeLeads.length === 0) {
+      if (referralSources.length === 0) {
         return {
           members: [],
           overview: {
@@ -226,6 +274,7 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
             appointments: "0",
             converted: "0",
             rate: "0.0%",
+            referrals: formatInteger(referralDashboardTotal),
             revenue: "$0",
             sla: "0.0%",
           },
@@ -239,62 +288,43 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
         DerivedMemberStats & { name: string; role: string; img: string }
       >();
 
-      activeLeads.forEach((lead) => {
-        const memberName =
-          (lead.assigned_to_name || "Unassigned").trim() || "Unassigned";
-        const memberId = lead.assigned_to_id
-          ? String(lead.assigned_to_id)
-          : memberName.toLowerCase();
-        const key = `${memberId}::${memberName}`;
+      // ── source.id → memberMap key (all departments including Doctors) ────
+      const sourceIdToKey = new Map<number, string>();
+      // doctor source name (lowercase) → memberMap key (for lead matching by assigned_to_name)
+      const doctorNameToKey = new Map<string, string>();
 
-        if (!memberMap.has(key)) {
-          memberMap.set(key, {
-            name: memberName,
-            role: "Team Member",
-            img: "",
-            assignedLeads: 0,
-            callsMade: 0,
-            followUps: 0,
-            appointments: 0,
-            leadConverted: 0,
-            revenueGenerated: "$0",
-            slaCompliance: "0%",
-            campaigns: 0,
-            conversionRate: 0,
-            revenueValue: 0,
-            slaValue: 0,
-            lostLeads: 0,
-          });
+      // Build all members from the API — same data as Referral Manager.
+      // referral_count is the authoritative assigned-leads count from the backend.
+      referralSources.forEach((source) => {
+        const sourceName = (source.name || "").trim();
+        if (!sourceName) return;
+
+        const sourceKey = `${source.id}::${sourceName}`;
+        sourceIdToKey.set(source.id, sourceKey);
+
+        const deptName = (source.referral_department_name || "").toLowerCase().trim();
+        if (deptName === "doctors") {
+          doctorNameToKey.set(sourceName.toLowerCase(), sourceKey);
         }
 
-        const stats = memberMap.get(key)!;
-        stats.assignedLeads += 1;
-
-        const normalizedStatus = normalizeLeadStatus(lead.lead_status);
-        if (normalizedStatus === "appointment") stats.appointments += 1;
-        if (normalizedStatus === "follow-ups") stats.followUps += 1;
-        if (
-          normalizedStatus === "converted" ||
-          normalizedStatus === "cycle-conversion"
-        )
-          stats.leadConverted += 1;
-        if (normalizedStatus === "lost") stats.lostLeads += 1;
-
-        const actionType = (lead.next_action_type || "").toLowerCase();
-        if (actionType.includes("call") || normalizedStatus === "follow-ups") {
-          stats.callsMade += 1;
-        }
-
-        const referenceDate = new Date(lead.modified_at || lead.created_at);
-        if (!Number.isNaN(referenceDate.getTime())) {
-          // eslint-disable-next-line react-hooks/purity
-          const hoursSinceTouch =
-            // eslint-disable-next-line react-hooks/purity
-            (Date.now() - referenceDate.getTime()) / (1000 * 60 * 60);
-          if (hoursSinceTouch <= 24) {
-            stats.slaValue += 1;
-          }
-        }
+        if (memberMap.has(sourceKey)) return;
+        memberMap.set(sourceKey, {
+          name: sourceName,
+          role: source.referral_department_name ?? "Referral Source",
+          img: "",
+          assignedLeads: source.referral_count ?? 0,
+          callsMade: 0,
+          followUps: 0,
+          appointments: 0,
+          leadConverted: 0,
+          revenueGenerated: "$0",
+          slaCompliance: "0%",
+          campaigns: 0,
+          conversionRate: 0,
+          revenueValue: 0,
+          slaValue: 0,
+          lostLeads: 0,
+        });
       });
 
       clinicCampaigns.forEach((campaign) => {
@@ -308,6 +338,49 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
         const [key, stats] = matchedEntry;
         memberMap.set(key, { ...stats, campaigns: stats.campaigns + 1 });
+      });
+
+      // ── Accumulate real lead stats into each member ───────────────────────
+      activeLeads.forEach((lead) => {
+        let key: string | undefined;
+
+        const deptName = (lead.referral_department_name || "").toLowerCase().trim();
+        if (deptName === "doctors") {
+          // Match doctor by assigned_to_name (same as how Doctors component identifies them)
+          const name = (lead.assigned_to_name || "").trim();
+          key = name ? doctorNameToKey.get(name.toLowerCase()) : undefined;
+        } else if (lead.referral_source_id != null) {
+          key = sourceIdToKey.get(lead.referral_source_id);
+        }
+
+        if (!key || !memberMap.has(key)) return;
+
+        const stats = memberMap.get(key)!;
+
+        const normalizedStatus = normalizeLeadStatus(lead.lead_status);
+        if (normalizedStatus === "appointment") stats.appointments += 1;
+        if (normalizedStatus === "follow-ups") stats.followUps += 1;
+        if (normalizedStatus === "converted" || normalizedStatus === "cycle-conversion") {
+          stats.leadConverted += 1;
+        }
+        if (normalizedStatus === "lost") stats.lostLeads += 1;
+
+        const actionType = (lead.next_action_type || "").toLowerCase();
+        if (actionType.includes("call") || normalizedStatus === "follow-ups") {
+          stats.callsMade += 1;
+        }
+
+        const referenceDate = new Date(lead.modified_at || lead.created_at);
+        if (!Number.isNaN(referenceDate.getTime())) {
+          const rangeAnchorMs =
+            performanceBuckets[performanceBuckets.length - 1]?.end.getTime() ??
+            referenceDate.getTime();
+          const hoursSinceTouch =
+            (rangeAnchorMs - referenceDate.getTime()) / (1000 * 60 * 60);
+          if (hoursSinceTouch <= 24) {
+            stats.slaValue += 1;
+          }
+        }
       });
 
       const membersWithStats = Array.from(memberMap.values()).map((stats) => {
@@ -330,7 +403,7 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
         return {
           ...stats,
-          role: stats.campaigns > 0 ? "Campaign + Leads" : "Leads",
+          role: stats.role,
           conversionRate,
           growth,
           slaValue: slaPercent,
@@ -391,6 +464,7 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
         appointments: formatInteger(totals.appointments),
         converted: formatInteger(totals.converted),
         rate: `${totals.assigned > 0 ? ((totals.converted / totals.assigned) * 100).toFixed(1) : "0.0"}%`,
+        referrals: formatInteger(referralDashboardTotal),
         revenue: `$${totals.revenue.toLocaleString("en-US")}`,
         sla: `${membersWithStats.length > 0 ? (totals.sla / membersWithStats.length).toFixed(1) : "0.0"}%`,
       };
@@ -415,6 +489,11 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
       const memberPerformance: Record<string, PerformanceChartPoint[]> = {};
       membersWithStats.forEach((member) => {
+        // Resolve the memberMap key for this member (needed for lead matching)
+        const memberKey = Array.from(sourceIdToKey.values()).find(
+          (k) => k.endsWith(`::${member.name}`),
+        ) ?? doctorNameToKey.get(member.name.toLowerCase());
+
         const totalsByBucket = new Array<number>(
           performanceBuckets.length,
         ).fill(0);
@@ -423,11 +502,17 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
         ).fill(0);
 
         activeLeads
-          .filter(
-            (lead) =>
-              ((lead.assigned_to_name || "Unassigned").trim() ||
-                "Unassigned") === member.name,
-          )
+          .filter((lead) => {
+            const deptName = (lead.referral_department_name || "").toLowerCase().trim();
+            if (deptName === "doctors") {
+              const name = (lead.assigned_to_name || "").trim();
+              return name ? doctorNameToKey.get(name.toLowerCase()) === memberKey : false;
+            }
+            if (lead.referral_source_id != null) {
+              return sourceIdToKey.get(lead.referral_source_id) === memberKey;
+            }
+            return false;
+          })
           .forEach((lead) => {
             const date = new Date(lead.modified_at || lead.created_at);
             if (Number.isNaN(date.getTime())) return;
@@ -458,33 +543,38 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
         memberStatsMap: derivedMemberStatsMap,
         memberPerformanceMap: memberPerformance,
       };
-    }, [campaigns, clinicId, leads, performanceBuckets, timeRange]);
+    }, [
+      campaigns,
+      clinicId,
+      leads,
+      performanceBuckets,
+      referralDashboardTotal,
+      referralSources,
+      timeRange,
+    ]);
 
   const topPerformer = members.find((m) => m.rank === "1st (Top)");
   const otherTops = members.filter((m) => m.rank === "2nd" || m.rank === "3rd");
   const lowPerformers = members.filter((m) => m.growth.startsWith("-"));
 
-  useEffect(() => {
-    if (!selectedMember) return;
-    const stillExists = members.some(
-      (member) => member.name === selectedMember.name,
-    );
-    if (!stillExists) {
-      setSelectedMember(null);
-    }
+  const activeSelectedMember = useMemo(() => {
+    if (!selectedMember) return null;
+    return members.some((member) => member.name === selectedMember.name)
+      ? selectedMember
+      : null;
   }, [members, selectedMember]);
 
-  const fullPerformanceData: PerformanceChartPoint[] = selectedMember
-    ? memberPerformanceMap[selectedMember.name] &&
-      memberPerformanceMap[selectedMember.name].length > 0
-      ? memberPerformanceMap[selectedMember.name]
+  const fullPerformanceData: PerformanceChartPoint[] = activeSelectedMember
+    ? memberPerformanceMap[activeSelectedMember.name] &&
+      memberPerformanceMap[activeSelectedMember.name].length > 0
+      ? memberPerformanceMap[activeSelectedMember.name]
       : fallbackPerformanceData
     : [];
 
   const performanceData: PerformanceChartPoint[] = fullPerformanceData;
 
-  const memberStats: MemberStats | null = selectedMember
-    ? memberStatsMap[selectedMember.name] || {
+  const memberStats: DerivedMemberStats | null = activeSelectedMember
+    ? memberStatsMap[activeSelectedMember.name] || {
         assignedLeads: 0,
         callsMade: 0,
         followUps: 0,
@@ -492,6 +582,11 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
         leadConverted: 0,
         revenueGenerated: "$0",
         slaCompliance: "0.0%",
+        campaigns: 0,
+        conversionRate: 0,
+        revenueValue: 0,
+        slaValue: 0,
+        lostLeads: 0,
       }
     : null;
   const stats = memberStats!;
@@ -519,9 +614,9 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
         >
           <Avatar
             sx={{
-              bgcolor: selectedMember === null ? "#fff5f5" : "#f5f5f5",
+              bgcolor: activeSelectedMember === null ? "#fff5f5" : "#f5f5f5",
               border:
-                selectedMember === null
+                activeSelectedMember === null
                   ? "2px solid #ff6b6b"
                   : "2px solid transparent",
               width: 56,
@@ -552,11 +647,12 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
                   width: 56,
                   height: 56,
                   border:
-                    selectedMember?.name === member.name
+                    activeSelectedMember?.name === member.name
                       ? "2px solid #1976d2"
                       : "2px solid transparent",
                   opacity:
-                    selectedMember && selectedMember?.name !== member.name
+                    activeSelectedMember &&
+                    activeSelectedMember?.name !== member.name
                       ? 0.5
                       : 1,
                 }}
@@ -600,13 +696,13 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
       </Stack>
 
       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>
-        {selectedMember
-          ? `${selectedMember.name}'s Performance Overview`
+        {activeSelectedMember
+          ? `${activeSelectedMember.name}'s Performance Overview`
           : "Team Performance Overview"}
       </Typography>
 
       {/* INDIVIDUAL MEMBER VIEW */}
-      {selectedMember ? (
+      {activeSelectedMember ? (
         <>
           {/* Member Stats Card */}
           <Card
@@ -618,13 +714,13 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
               position: "relative",
             }}
           >
-            {selectedMember.rank && (
+            {activeSelectedMember.rank && (
               <Box sx={{ position: "absolute", left: 16, top: 10 }}>
                 <MedalIcon
                   type={
-                    selectedMember.rank === "1st (Top)"
+                    activeSelectedMember.rank === "1st (Top)"
                       ? "1st"
-                      : selectedMember.rank === "2nd"
+                      : activeSelectedMember.rank === "2nd"
                         ? "2nd"
                         : "3rd"
                   }
@@ -637,7 +733,7 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
               fontWeight={700}
               sx={{ position: "absolute", right: 16, top: 10 }}
             >
-              {selectedMember.growth}
+              {activeSelectedMember.growth}
             </Typography>
             <Stack
               direction={{ xs: "column", sm: "row" }}
