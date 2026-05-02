@@ -848,12 +848,15 @@ const LeadsTable: React.FC<Props> = ({
     );
     setSelectedIds([]);
   };
-  const handleBulkExport = () => {
-    const selectedLeads = localLeads.filter((lead) =>
-      selectedIds.includes(lead.id),
-    );
-    if (selectedLeads.length === 0) {
-      toast.info("No selected leads to export.", toastOptions);
+
+  const exportLeadsToCsv = (
+    leadsToExport: ProcessedLead[],
+    filePrefix: string,
+    successMessage: string,
+    emptyMessage: string,
+  ) => {
+    if (leadsToExport.length === 0) {
+      toast.info(emptyMessage, toastOptions);
       return;
     }
 
@@ -875,7 +878,7 @@ const LeadsTable: React.FC<Props> = ({
       return text;
     };
 
-    const rows = selectedLeads.map((lead) => [
+    const rows = leadsToExport.map((lead) => [
       lead.id,
       lead.full_name || lead.name || "",
       lead.contact_no || "",
@@ -896,13 +899,34 @@ const LeadsTable: React.FC<Props> = ({
     const anchor = document.createElement("a");
     const stamp = new Date().toISOString().slice(0, 10);
     anchor.href = url;
-    anchor.download = `selected_leads_export_${stamp}.csv`;
+    anchor.download = `${filePrefix}_${stamp}.csv`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
 
-    toast.success("Selected leads exported successfully.", toastOptions);
+    toast.success(successMessage, toastOptions);
+  };
+
+  const handleBulkExport = () => {
+    const selectedLeads = localLeads.filter((lead) =>
+      selectedIds.includes(lead.id),
+    );
+    exportLeadsToCsv(
+      selectedLeads,
+      "selected_leads_export",
+      "Selected leads exported successfully.",
+      "No selected leads to export.",
+    );
+  };
+
+  const handleExportAllLeads = () => {
+    exportLeadsToCsv(
+      sortedLeads,
+      "all_leads_export",
+      "All leads exported successfully.",
+      "No leads available to export.",
+    );
   };
 
   // ── Loading / Error / Empty states ──────────────────────────────────────────
@@ -1685,6 +1709,7 @@ const LeadsTable: React.FC<Props> = ({
         onDelete={handleBulkDelete}
         onArchive={handleBulkArchive}
         onExport={handleBulkExport}
+        onExportAll={handleExportAllLeads}
       />
       <Dialogs />
       <CallDialog
