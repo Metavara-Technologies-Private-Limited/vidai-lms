@@ -94,4 +94,13 @@ export const EXTRA_ROUTES = [
     path: "reputation",
     page: lazy(() => import("../pages/Reputation.tsx")),
   },
+  {
+    key: "referral-source-detail",
+    path: "referrals/source/:type/:id",
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.SourceReferrals,
+      })),
+    ),
+  },
 ];

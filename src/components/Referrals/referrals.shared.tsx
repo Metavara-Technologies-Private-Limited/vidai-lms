@@ -176,9 +176,11 @@ export const HeaderWithSearch = ({
 export const PartnerSourceTable = ({
   rows,
   headers,
+  onRowClick,
 }: {
   rows: SourceTableRow[];
   headers: string[];
+  onRowClick?: (id: number, name: string) => void;
 }) => (
   <Paper elevation={0} sx={{ overflow: "hidden" }}>
     <Box sx={{ overflowX: "auto" }}>
@@ -192,7 +194,12 @@ export const PartnerSourceTable = ({
         </TableHead>
         <TableBody sx={TABLE_BODY_SX}>
           {rows.map((row) => (
-            <TableRow key={row.id} hover>
+            <TableRow
+              key={row.id}
+              hover
+              sx={{ cursor: "pointer" }}
+              onClick={() => onRowClick?.(row.id, row.primary)}
+            >
               <TableCell>
                 <Box display="flex" alignItems="center" gap={2}>
                   <Avatar>{row.primary.charAt(0).toUpperCase()}</Avatar>

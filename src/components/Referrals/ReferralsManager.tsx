@@ -16,7 +16,12 @@ import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined
 import { ClinicAPI, LeadAPI } from "../../services/leads.api";
 import type { Employee, Lead } from "../../services/leads.api";
 import { useDispatch, useSelector } from "react-redux";
-import { clearSources, loadReferralSources, selectSources, selectSourcesLoading } from "../../store/referralSlice";
+import {
+  clearSources,
+  loadReferralSources,
+  selectSources,
+  selectSourcesLoading,
+} from "../../store/referralSlice";
 import type { AppDispatch } from "../../store";
 import { selectClinic } from "../../store/clinicSlice";
 import {
@@ -151,6 +156,7 @@ const SourceDepartmentPage = ({
   pageKey: keyof typeof SOURCE_PAGE_CONFIG;
 }) => {
   const [search, setSearch] = useState("");
+  const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const sources = useSelector(selectSources) as ReferralSource[];
   const config = SOURCE_PAGE_CONFIG[pageKey];
@@ -203,7 +209,15 @@ const SourceDepartmentPage = ({
       {loading ? (
         <CircularProgress />
       ) : (
-        <PartnerSourceTable rows={rows} headers={config.headers} />
+        <PartnerSourceTable
+          rows={rows}
+          headers={config.headers}
+          onRowClick={(id, name) =>
+            navigate(`/referrals/source/${pageKey}/${id}`, {
+              state: { name },
+            })
+          }
+        />
       )}
     </Box>
   );
@@ -216,6 +230,21 @@ export const Doctors: React.FC = () => {
   const navigate = useNavigate();
   const clinic = useSelector(selectClinic);
 
+  const [doctorDeptId, setDoctorDeptId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const loadDept = async () => {
+      const clinicId = Number(localStorage.getItem("clinic_id"));
+      const depts = await fetchReferralDepartments(clinicId);
+
+      const match = depts.find((d) => d.name.toLowerCase() === "doctors");
+
+      if (match) setDoctorDeptId(match.id);
+    };
+
+    loadDept();
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -224,9 +253,8 @@ export const Doctors: React.FC = () => {
           ? await LeadAPI.list(clinic?.id)
           : [];
         const doctorLeads = allLeads.filter(
-          (lead) => lead.referral_department_name === "Doctors",
+          (lead) => lead.referral_department_id === doctorDeptId,
         );
-
         const doctorMap: Record<
           number,
           { id: number; name: string; referrals: number }
@@ -296,7 +324,7 @@ export const Doctors: React.FC = () => {
       }
     };
     fetchData();
-  }, [clinic?.id]);
+  }, [clinic?.id, doctorDeptId]);
 
   const filteredDoctors = useMemo(
     () =>
@@ -342,7 +370,7 @@ export const DoctorReferrals: React.FC = () => {
   const state = location.state as { doctorName?: string } | null;
   const doctorName = state?.doctorName ?? `Doctor #${doctorId}`;
   const dispatch = useDispatch<AppDispatch>();
-const sources = useSelector(selectSources) as ReferralSource[];
+  const sources = useSelector(selectSources) as ReferralSource[];
 
   const [search, setSearch] = useState("");
   const [patients, setPatients] = useState<PatientCard[]>([]);
@@ -350,7 +378,7 @@ const sources = useSelector(selectSources) as ReferralSource[];
   const [loading, setLoading] = useState(true);
   const sourceMap = useMemo(() => {
     const map: Record<number, ReferralSource> = {};
-    sources.forEach(s => {
+    sources.forEach((s) => {
       map[s.id] = s;
     });
     return map;
@@ -627,3 +655,127 @@ export const Diagnostic: React.FC = () => (
 );
 export const Zoya: React.FC = () => <SourceDepartmentPage pageKey="zoya" />;
 export const Practo: React.FC = () => <SourceDepartmentPage pageKey="practo" />;
+
+export const SourceReferrals: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const clinic = useSelector(selectClinic);
+
+  const state = location.state as { name?: string } | null;
+  const sourceName = state?.name ?? `Source #${id}`;
+
+  const [search, setSearch] = useState("");
+  const [patients, setPatients] = useState<PatientCard[]>([]);
+  const [selected, setSelected] = useState<PatientCard | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLeads = async () => {
+      setLoading(true);
+
+      const allLeads: Lead[] = clinic?.id ? await LeadAPI.list(clinic.id) : [];
+
+      const filtered = allLeads.filter(
+        (lead) => String(lead.referral_source_id) === String(id),
+      );
+
+      const cards = filtered.map((lead): PatientCard => {
+        const style = getPatientAvatarStyle(lead.id);
+
+        return {
+          id: lead.id,
+          name: lead.full_name ?? "Unknown",
+          initials: getInitials(lead.full_name ?? "U"),
+          avatarBg: style.bg,
+          avatarColor: style.color,
+          mrn: buildMRN(lead.id),
+          referralDate: formatDate(lead.created_at),
+          raw: lead,
+        };
+      });
+
+      setPatients(cards);
+      if (cards.length > 0) setSelected(cards[0]);
+
+      setLoading(false);
+    };
+
+    fetchLeads();
+  }, [id, clinic?.id]);
+
+  const filtered = useMemo(
+    () =>
+      patients.filter(
+        (p) =>
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          p.mrn.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [patients, search],
+  );
+
+  return (
+    <Box p={1}>
+      <HeaderWithSearch
+        title={`${sourceName} Referrals`}
+        search={search}
+        setSearch={setSearch}
+        placeholder="Search by Lead name/MRN No."
+      />
+
+      {loading ? (
+        <Box display="flex" justifyContent="center" pt={8}>
+          <CircularProgress size={32} />
+        </Box>
+      ) : (
+        <Box
+          display="flex"
+          gap={2.5}
+          flexDirection={{ xs: "column", md: "row" }}
+        >
+          {/* LEFT LIST */}
+          <Paper
+            elevation={0}
+            sx={{
+              width: { xs: "100%", md: 290 },
+              border: "1px solid #F0F0F0",
+              borderRadius: "12px",
+            }}
+          >
+            <Box px={2} py={1.5}>
+              <Typography fontSize="13px" fontWeight={600}>
+                All Referrals ({filtered.length})
+              </Typography>
+            </Box>
+
+            <Box>
+              {filtered.map((p) => (
+                <Box
+                  key={p.id}
+                  onClick={() => setSelected(p)}
+                  sx={{
+                    px: 2,
+                    py: 1.5,
+                    cursor: "pointer",
+                    bgcolor: selected?.id === p.id ? "#EFF6FF" : "transparent",
+                  }}
+                >
+                  <Typography fontSize="13px">{p.name}</Typography>
+                  <Typography fontSize="11px" color="#1D4ED8">
+                    {p.mrn}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Paper>
+
+          {/* RIGHT DETAILS */}
+          {selected ? (
+            <PatientDetails patient={selected} />
+          ) : (
+            <Typography>Select a patient</Typography>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+};
