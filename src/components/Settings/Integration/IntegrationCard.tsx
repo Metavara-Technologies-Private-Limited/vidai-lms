@@ -8,6 +8,8 @@ import NotConnectedLogo from "../../../assets/icons/Not-Connected-Logo.svg";
 import type { IntegrationCardProps } from "../../../types/Settings.types";
 import { styles } from "../../../styles/Settings/Integration.styles";
 import { integrationApi } from "../../../services/integration.api";
+import { selectClinic } from "../../../store/clinicSlice";
+import { useSelector } from "react-redux";
 
 type ExtendedIntegrationCardProps = IntegrationCardProps & {
   isConnected?: boolean;
@@ -26,17 +28,20 @@ const IntegrationCard = ({
 }: ExtendedIntegrationCardProps) => {
   const connected = isConnected;
   const navigate = useNavigate();
+  const selectedClinic = useSelector(selectClinic);
+  const clinicId =
+    selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
 
   const handleConnect = () => {
     if (!canManage) return;
 
     if (name === "LinkedIn") {
-      integrationApi.connectLinkedIn();
+      integrationApi.connectLinkedIn(clinicId);
       return;
     }
 
     if (name === "Facebook" || name === "Instagram") {
-      integrationApi.connectFacebook();
+      integrationApi.connectFacebook(clinicId);
       return;
     }
 
@@ -46,12 +51,12 @@ const IntegrationCard = ({
       );
       if (!customerId) return;
       const cleanId = customerId.replace(/[-\s]/g, "");
-      integrationApi.connectGoogle(cleanId);
+      integrationApi.connectGoogle(clinicId, cleanId);
       return;
     }
 
     if (name === "Google Calendar") {
-      integrationApi.connectGoogle();
+      integrationApi.connectGoogle(clinicId);
       return;
     }
   };
