@@ -39,7 +39,8 @@ import {
 } from "../utils/roleAccess";
 import "../styles/Leads/leads.css";
 
-const STORAGE_KEY_FILTERS = "leads_filters";
+// ── Storage keys — filters intentionally excluded ─────────────────────────────
+// STORAGE_KEY_FILTERS removed: filters must not survive a page refresh
 const STORAGE_KEY_TAB = "leads_active_tab";
 const STORAGE_KEY_VIEW = "leads_view_mode";
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
@@ -313,6 +314,38 @@ const LeadsBulkImportModal = React.lazy(
   () => import("../components/LeadsHub/LeadsBulkImportModal"),
 );
 
+// ── Empty filter default — always the starting point after refresh ────────────
+const defaultFilters = (): FilterValues => ({
+  department: "",
+  assignee: "",
+  status: "",
+  quality: "",
+  source: "",
+  subSource: "",
+  dateFrom: null,
+  dateTo: null,
+});
+
+const loadSavedTab = (): number => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_TAB);
+    if (saved) return parseInt(saved, 10);
+  } catch (error) {
+    console.error("Failed to load saved tab:", error);
+  }
+  return 0;
+};
+
+const loadSavedViewMode = (): "table" | "board" => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_VIEW);
+    if (saved === "board" || saved === "table") return saved;
+  } catch (error) {
+    console.error("Failed to load saved view mode:", error);
+  }
+  return "table";
+};
+
 const Leads: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
@@ -344,7 +377,6 @@ const Leads: React.FC = () => {
   React.useEffect(() => {
     if (canViewLeads) return;
 
-    // Helps verify the live payload shape when a user can see sidebar but cannot view leads.
     console.warn("Leads permission debug", {
       role,
       hasTopLevelPermissions: Boolean(authUser?.permissions),
@@ -366,53 +398,16 @@ const Leads: React.FC = () => {
     permissions,
   ]);
 
-  const loadSavedFilters = (): FilterValues => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_FILTERS);
-      if (saved) return JSON.parse(saved);
-    } catch (error) {
-      console.error("Failed to load saved filters:", error);
-    }
-    return {
-      department: "",
-      assignee: "",
-      status: "",
-      quality: "",
-      source: "",
-      subSource: "",
-      dateFrom: null,
-      dateTo: null,
-    };
-  };
-
-  const loadSavedTab = (): number => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_TAB);
-      if (saved) return parseInt(saved, 10);
-    } catch (error) {
-      console.error("Failed to load saved tab:", error);
-    }
-    return 0;
-  };
-
-  const loadSavedViewMode = (): "table" | "board" => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_VIEW);
-      if (saved === "board" || saved === "table") return saved;
-    } catch (error) {
-      console.error("Failed to load saved view mode:", error);
-    }
-    return "table";
-  };
-
   const [tab, setTab] = React.useState(loadSavedTab());
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [viewMode, setViewMode] = React.useState<"table" | "board">(
     loadSavedViewMode(),
   );
-  const [activeFilters, setActiveFilters] =
-    React.useState<FilterValues>(loadSavedFilters());
+
+  // ── Filters: always start empty on every page load / refresh ─────────────
+  const [activeFilters, setActiveFilters] = React.useState<FilterValues>(defaultFilters);
+
   const [counts, setCounts] = React.useState({
     all: 0,
     followUps: 0,
@@ -555,13 +550,8 @@ const Leads: React.FC = () => {
     [activeFilters],
   );
 
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(activeFilters));
-    } catch (error) {
-      console.error("Failed to save filters:", error);
-    }
-  }, [activeFilters]);
+  // ── Removed: useEffect that wrote activeFilters to localStorage ───────────
+  // Filters are session-only; they must not persist across page refreshes.
 
   React.useEffect(() => {
     try {
@@ -674,13 +664,11 @@ const Leads: React.FC = () => {
   }, [filteredPipelinesByIndustry, selectedPipelineId]);
 
   React.useEffect(() => {
-    // Warm up Calendar chunk so tab switch is instant on first open.
     void import("../components/LeadsHub/LeadsCalendar");
   }, []);
 
   const waitingForContext = React.useMemo(() => {
     if (!authed) return false;
-    // Wait while profile/clinic context is still being hydrated after refresh.
     if (!user) return true;
     if (clinicLoading) return true;
     return false;
@@ -839,7 +827,6 @@ const Leads: React.FC = () => {
 
           createdLeads.push({
             ...createdLead,
-            // If file has date/created-at mapping, keep it for UI ordering.
             created_at: appointmentDate || createdLead.created_at,
           });
         } catch {
@@ -1123,7 +1110,7 @@ const Leads: React.FC = () => {
             />
           </Box>
 
-          {/* ── View Mode Toggle — highlighted when active ── */}
+          {/* View Mode Toggle */}
           <Box
             sx={{
               display: "flex",
@@ -1150,25 +1137,12 @@ const Leads: React.FC = () => {
             >
               <img
                 src={Leads_Tableview_icon}
-                style={{
-                  width: 18,
-                  height: 18,
-                  filter: "none",
-                  transition: "filter 0.15s ease",
-                }}
+                style={{ width: 18, height: 18 }}
                 alt="Table view"
               />
             </IconButton>
 
-            {/* thin divider between icons */}
-            <Box
-              sx={{
-                width: "1px",
-                height: 20,
-                bgcolor: "#E5E7EB",
-                flexShrink: 0,
-              }}
-            />
+            <Box sx={{ width: "1px", height: 20, bgcolor: "#E5E7EB", flexShrink: 0 }} />
 
             <IconButton
               onClick={() => setViewMode("board")}
@@ -1186,12 +1160,7 @@ const Leads: React.FC = () => {
             >
               <img
                 src={Leads_Gridview}
-                style={{
-                  width: 22,
-                  height: 22,
-                  filter: "none",
-                  transition: "filter 0.15s ease",
-                }}
+                style={{ width: 22, height: 22 }}
                 alt="Board view"
               />
             </IconButton>
@@ -1222,14 +1191,8 @@ const Leads: React.FC = () => {
           <Button
             className="add-lead-btn"
             onClick={() => {
-              localStorage.setItem(
-                STORAGE_KEY_SELECTED_INDUSTRY,
-                selectedIndustry,
-              );
-              localStorage.setItem(
-                STORAGE_KEY_SELECTED_PIPELINE,
-                selectedPipelineId,
-              );
+              localStorage.setItem(STORAGE_KEY_SELECTED_INDUSTRY, selectedIndustry);
+              localStorage.setItem(STORAGE_KEY_SELECTED_PIPELINE, selectedPipelineId);
               navigate("/leads/add");
             }}
             disabled={!canAddLeads}
@@ -1255,7 +1218,6 @@ const Leads: React.FC = () => {
           minHeight: 40,
         }}
       >
-        {/* Scroll wrapper: arrows only on small screens */}
         <Box
           sx={{
             display: "flex",
@@ -1265,7 +1227,6 @@ const Leads: React.FC = () => {
             position: "relative",
           }}
         >
-          {/* Left arrow — small screens only */}
           <Box
             className="tab-scroll-arrow tab-scroll-arrow-left"
             onClick={() => scrollTabs("left")}
@@ -1284,7 +1245,6 @@ const Leads: React.FC = () => {
             <ChevronLeftIcon sx={{ fontSize: 16 }} />
           </Box>
 
-          {/* Scrollable tab strip */}
           <Box
             ref={tabScrollRef}
             className="pill-tabs-scroll"
@@ -1297,19 +1257,11 @@ const Leads: React.FC = () => {
               minWidth: 0,
               alignItems: "center",
               pb: { xs: "3px", lg: 0 },
-              /* thin scrollbar only on small screens */
               scrollbarWidth: { xs: "thin", lg: "none" } as never,
               scrollbarColor: "#D1D5DB transparent",
-              "&::-webkit-scrollbar": {
-                height: { xs: "3px", lg: "0px" },
-              },
-              "&::-webkit-scrollbar-track": {
-                background: "transparent",
-              },
-              "&::-webkit-scrollbar-thumb": {
-                background: "#D1D5DB",
-                borderRadius: "4px",
-              },
+              "&::-webkit-scrollbar": { height: { xs: "3px", lg: "0px" } },
+              "&::-webkit-scrollbar-track": { background: "transparent" },
+              "&::-webkit-scrollbar-thumb": { background: "#D1D5DB", borderRadius: "4px" },
             }}
           >
             {tabs.map((t, i) => (
@@ -1317,12 +1269,7 @@ const Leads: React.FC = () => {
                 key={i}
                 className={`pill-tab ${tab === i ? "active" : ""}`}
                 onClick={() => setTab(i)}
-                sx={{
-                  flexShrink: 0,
-                  height: 34,
-                  display: "flex",
-                  alignItems: "center",
-                }}
+                sx={{ flexShrink: 0, height: 34, display: "flex", alignItems: "center" }}
               >
                 {t.label}
                 {t.count !== null && (
@@ -1332,7 +1279,6 @@ const Leads: React.FC = () => {
             ))}
           </Box>
 
-          {/* Right arrow — small screens only */}
           <Box
             className="tab-scroll-arrow tab-scroll-arrow-right"
             onClick={() => scrollTabs("right")}
@@ -1366,13 +1312,7 @@ const Leads: React.FC = () => {
             zIndex: 5,
           }}
         >
-          <Box
-            sx={{
-              width: { xs: "100%", sm: 150, lg: 136 },
-              position: "relative",
-              zIndex: 5,
-            }}
-          >
+          <Box sx={{ width: { xs: "100%", sm: 150, lg: 136 }, position: "relative", zIndex: 5 }}>
             <Box
               component="select"
               aria-label="Select Industry"
@@ -1401,13 +1341,7 @@ const Leads: React.FC = () => {
             </Box>
           </Box>
 
-          <Box
-            sx={{
-              width: { xs: "100%", sm: 170, lg: 148 },
-              position: "relative",
-              zIndex: 5,
-            }}
-          >
+          <Box sx={{ width: { xs: "100%", sm: 170, lg: 148 }, position: "relative", zIndex: 5 }}>
             <Box
               component="select"
               aria-label="Select Pipeline"
@@ -1504,6 +1438,7 @@ const Leads: React.FC = () => {
             ))}
         </React.Suspense>
       )}
+
       {filterOpen && (
         <React.Suspense fallback={null}>
           <FilterDialog
