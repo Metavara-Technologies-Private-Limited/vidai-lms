@@ -484,11 +484,12 @@ const StageConfiguration = ({
 									}
 									sx={{
 										"& .MuiOutlinedInput-root": {
-											borderRadius: 1.4,
-											backgroundColor: "#FFFFFF",
+										  borderRadius: 1.4,
+										  backgroundColor: "#FFFFFF",
 										},
 										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-									}}
+										"& .MuiSelect-select": {textAlign: "left"},
+									  }}
 								>
 								<MenuItem value="">
 									<em>Select stage type</em>
@@ -515,11 +516,12 @@ const StageConfiguration = ({
 									}
 									sx={{
 										"& .MuiOutlinedInput-root": {
-											borderRadius: 1.4,
-											backgroundColor: "#FFFFFF",
+										  borderRadius: 1.4,
+										  backgroundColor: "#FFFFFF",
 										},
 										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-									}}
+										"& .MuiSelect-select": {textAlign: "left"},
+									  }}
 								>
 								<MenuItem value="">
 									<em>Select stage status</em>
@@ -602,11 +604,12 @@ const StageConfiguration = ({
 									}
 									sx={{
 										"& .MuiOutlinedInput-root": {
-											borderRadius: 1.4,
-											backgroundColor: "#FFFFFF",
+										  borderRadius: 1.4,
+										  backgroundColor: "#FFFFFF",
 										},
 										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-									}}
+										"& .MuiSelect-select": {textAlign: "left"},
+									  }}
 								>
 									<MenuItem value="Manual">Manual</MenuItem>
 									<MenuItem value="Auto">Auto</MenuItem>
@@ -656,6 +659,7 @@ const StageConfiguration = ({
 										sx={{
 											display: "flex",
 											alignItems: "center",
+											textAlign: "left",
 											gap: 0.9,
 											cursor: "pointer",
 										}}
