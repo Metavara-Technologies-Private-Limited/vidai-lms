@@ -483,19 +483,6 @@ const ReviewRequestStepContent = ({
     }
   };
 
-  const applyClearFormattingFallback = () => {
-    restoreSelection();
-    if (!isSelectionInsideEditor()) return;
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const plainText = selection.toString();
-    if (!plainText) return;
-    if (insertHtmlUsingRange(selectedTextToHtml(plainText))) {
-      syncEditorToState();
-      saveSelection();
-    }
-  };
-
   const applyEditorCommand = (command: string, value?: string) => {
     restoreSelection();
     runEditorCommand(command, value);
@@ -608,35 +595,18 @@ const ReviewRequestStepContent = ({
     setColorError("");
     setTextColorAnchor(null);
   };
-  const handleAlignLeft = () => {
-    if (editor) {
-      editor.chain().focus().setTextAlign("left").run();
-      syncEditorToState();
-      return;
-    }
 
-    restoreSelection();
-    if (!isSelectionInsideEditor()) {
-      editorRef.current?.focus();
-    }
-    const result = document.execCommand("justifyLeft", false, undefined);
-    if (!result) {
-      const selection = window.getSelection();
-      if (selection?.rangeCount) {
-        const node = selection.getRangeAt(0).commonAncestorContainer;
-        const element: Element | null =
-          node.nodeType === Node.ELEMENT_NODE
-            ? (node as Element)
-            : node.parentElement;
-        const block = element?.closest(
-          "p,div,li,blockquote,h1,h2,h3,h4,h5,h6",
-        ) as HTMLElement | null;
-        if (block) block.style.textAlign = "left";
-      }
-    }
-    syncEditorToState();
-    saveSelection();
-  };
+const handleAlignLeft = () => {
+  if (!editor) return;
+
+  editor.chain()
+  .focus()
+  .clearNodes()
+  .unsetAllMarks()
+  .unsetTextAlign()
+  .setParagraph()   
+  .run();
+};
 
   const handleNumberedList = () => {
     if (editor) {
@@ -726,26 +696,17 @@ const ReviewRequestStepContent = ({
     saveSelection();
   };
 
-  const handleClearFormatting = () => {
-    if (editor) {
-      editor.chain().focus().unsetAllMarks().clearNodes().run();
-      syncEditorToState();
-      return;
-    }
+const handleClearFormatting = () => {
+  if (!editor) return;
 
-    restoreSelection();
-    if (!isSelectionInsideEditor()) {
-      editorRef.current?.focus();
-    }
-    const removed = document.execCommand("removeFormat", false, undefined);
-    document.execCommand("unlink", false, undefined);
-    if (!removed) {
-      applyClearFormattingFallback();
-      return;
-    }
-    syncEditorToState();
-    saveSelection();
-  };
+  editor
+    .chain()
+    .focus()
+    .clearNodes()        // remove headings, lists, quotes
+    .unsetAllMarks()     // remove bold, italic, underline
+    .unsetTextAlign()    // remove alignment
+    .run();
+};
 
   const handleHeadingChange = (
     value: "Tt" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6",
@@ -1108,7 +1069,11 @@ const ReviewRequestStepContent = ({
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
           <Tooltip title="Align Left">
             <span>
-              <IconButton size="small" onClick={handleAlignLeft}>
+              <IconButton
+  size="small"
+  onMouseDown={keepSelection}   // 🔥 REQUIRED
+  onClick={handleAlignLeft}
+>
                 <FormatAlignLeftIcon fontSize="inherit" />
               </IconButton>
             </span>
@@ -1667,6 +1632,15 @@ const ReviewRequestStepContent = ({
                 fontSize: 14,
                 lineHeight: 1.7,
                 padding: "14px 16px",
+                "& [style*='text-align: left']": {
+  textAlign: "left",
+},
+"& [style*='text-align: center']": {
+  textAlign: "center",
+},
+"& [style*='text-align: right']": {
+  textAlign: "right",
+},
                 outline: "none",
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",

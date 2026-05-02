@@ -22,7 +22,7 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin-left: auto;
   justify-content: flex-end;
   flex: 0 1 auto;
@@ -38,7 +38,8 @@
 }
 
 .searchField {
-  flex: 0 1 320px;
+  flex: 1 1 220px;
+  min-width: 160px;
 }
 
 .searchField :global(.MuiOutlinedInput-notchedOutline) {

@@ -282,6 +282,7 @@ export default function CampaignsScreen() {
               placeholder="Search by Campaign name"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              
             />
           </div>
 
