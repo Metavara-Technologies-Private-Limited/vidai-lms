@@ -1055,9 +1055,16 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                     aria-label="Quote"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('blockquote') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('blockquote')}
+                    onClick={() => {
+                      const { from, to } = editor.state.selection;
+                      const selectedText = editor.state.doc.textBetween(from, to, '');
+                      if (selectedText) {
+                        editor.chain().focus().insertContentAt({ from, to }, `\u201c${selectedText}\u201d`).run();
+                      } else {
+                        editor.chain().focus().insertContent('\u201c\u201d').run();
+                      }
+                    }}
+                    sx={{ p: 0.5 }}
                   >
                     <FormatQuoteIcon sx={{ fontSize: 18, color: '#374151' }} />
                   </IconButton>
