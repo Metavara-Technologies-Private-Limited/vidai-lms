@@ -11,7 +11,7 @@ import {
   Typography,
   IconButton,
   Chip,
-  Tooltip,
+  // Tooltip,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -74,7 +74,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   // ─── LinkedIn account status ───────────────────────────────────
   const [linkedInAccountStatus, setLinkedInAccountStatus] =
     useState<LinkedInAccountStatus | null>(null);
-  const [linkedInStatusLoading, setLinkedInStatusLoading] = useState(false);
+  // const [linkedInStatusLoading, setLinkedInStatusLoading] = useState(false);
 
   // ─── Per-campaign LinkedIn live status (after creation) ────────
   const [linkedInLiveStatus, setLinkedInLiveStatus] = useState<string | null>(null);
@@ -120,26 +120,26 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         }
       }
 
-      // ── LinkedIn account setup check ─────────────────────────
-      try {
-        setLinkedInStatusLoading(true);
-        const liRes = await CampaignAPI.getLinkedInAccountStatus(clinic.id);
-        if (isMounted) {
-          setLinkedInAccountStatus(liRes.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch LinkedIn account status", err);
-        if (isMounted) {
-          // Treat as not connected if the endpoint errors
-          setLinkedInAccountStatus({
-            connected: false,
-            setup_complete: false,
-            missing: ["linkedin_account"],
-          });
-        }
-      } finally {
-        if (isMounted) setLinkedInStatusLoading(false);
-      }
+    //   // ── LinkedIn account setup check ─────────────────────────
+    //   try {
+    //     setLinkedInStatusLoading(true);
+    //     const liRes = await CampaignAPI.getLinkedInAccountStatus(clinic.id);
+    //     if (isMounted) {
+    //       setLinkedInAccountStatus(liRes.data);
+    //     }
+    //   } catch (err) {
+    //     console.error("Failed to fetch LinkedIn account status", err);
+    //     if (isMounted) {
+    //       // Treat as not connected if the endpoint errors
+    //       setLinkedInAccountStatus({
+    //         connected: false,
+    //         setup_complete: false,
+    //         missing: ["linkedin_account"],
+    //       });
+    //     }
+    //   } finally {
+    //     if (isMounted) setLinkedInStatusLoading(false);
+    //   }
     };
 
     fetchStatuses();
@@ -383,21 +383,21 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
   const toggleAccount = (id: Platform) => {
     // Warn if LinkedIn is selected but not fully set up
-    if (
-      id === "linkedin" &&
-      !accounts.includes("linkedin") &&
-      linkedInAccountStatus !== null &&
-      !isLinkedInFullySetup
-    ) {
-      const missing = linkedInAccountStatus?.missing ?? [];
-      const missingStr = missing.length
-        ? ` Missing: ${missing.join(", ")}.`
-        : "";
-      toast.warn(
-        `LinkedIn is not fully set up.${missingStr} The campaign will be saved but LinkedIn ads will not be triggered until setup is complete.`,
-        { toastId: "linkedin-not-setup" },
-      );
-    }
+    // if (
+    //   id === "linkedin" &&
+    //   !accounts.includes("linkedin") &&
+    //   linkedInAccountStatus !== null &&
+    //   !isLinkedInFullySetup
+    // ) {
+    //   const missing = linkedInAccountStatus?.missing ?? [];
+    //   const missingStr = missing.length
+    //     ? ` Missing: ${missing.join(", ")}.`
+    //     : "";
+    //   toast.warn(
+    //     `LinkedIn is not fully set up.${missingStr} The campaign will be saved but LinkedIn ads will not be triggered until setup is complete.`,
+    //     { toastId: "linkedin-not-setup" },
+    //   );
+    // }
     setAccounts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
@@ -644,12 +644,15 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       // ─────────────────────────────────────────────────────────
       // LinkedIn: warn if selected but not fully set up
       // ─────────────────────────────────────────────────────────
-      if (accounts.includes("linkedin") && !isLinkedInFullySetup) {
-        const missing = linkedInAccountStatus?.missing ?? [];
-        toast.warn(
-          `Campaign saved. LinkedIn ads were NOT sent because the LinkedIn account setup is incomplete (missing: ${missing.join(", ") || "account details"}). Complete setup in Integrations and retry.`,
-          { autoClose: 8000 },
-        );
+      if (accounts.includes("linkedin") && newCampaignId) {
+        try {
+          await CampaignAPI.createLinkedInCampaign(newCampaignId);
+
+          console.log("[LinkedIn] Campaign sent to Zapier");
+        } catch (err) {
+          console.error("[LinkedIn] Create failed", err);
+          toast.warn("Campaign saved but LinkedIn trigger failed");
+        }
       }
 
       onSave(createdRes?.data ?? payload);
@@ -750,59 +753,59 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     }
   };
 
-  // ─── LinkedIn connection badge shown on platform card ─────────
-  const renderLinkedInBadge = () => {
-    if (linkedInStatusLoading) {
-      return (
-        <Chip
-          label="Checking…"
-          size="small"
-          sx={{ ml: 1, fontSize: "10px", height: 18, bgcolor: "#f0f0f0" }}
-        />
-      );
-    }
-    if (!linkedInAccountStatus) return null;
+  // // ─── LinkedIn connection badge shown on platform card ─────────
+  // const renderLinkedInBadge = () => {
+  //   if (linkedInStatusLoading) {
+  //     return (
+  //       <Chip
+  //         label="Checking…"
+  //         size="small"
+  //         sx={{ ml: 1, fontSize: "10px", height: 18, bgcolor: "#f0f0f0" }}
+  //       />
+  //     );
+  //   }
+  //   if (!linkedInAccountStatus) return null;
 
-    if (!linkedInAccountStatus.connected) {
-      return (
-        <Tooltip title="LinkedIn not connected. Go to Integrations to connect.">
-          <Chip
-            label="Not connected"
-            size="small"
-            color="error"
-            sx={{ ml: 1, fontSize: "10px", height: 18 }}
-          />
-        </Tooltip>
-      );
-    }
+  //   if (!linkedInAccountStatus.connected) {
+  //     return (
+  //       <Tooltip title="LinkedIn not connected. Go to Integrations to connect.">
+  //         <Chip
+  //           label="Not connected"
+  //           size="small"
+  //           color="error"
+  //           sx={{ ml: 1, fontSize: "10px", height: 18 }}
+  //         />
+  //       </Tooltip>
+  //     );
+  //   }
 
-    if (!linkedInAccountStatus.setup_complete) {
-      const missing = linkedInAccountStatus.missing.join(", ");
-      return (
-        <Tooltip
-          title={`LinkedIn connected but setup incomplete. Missing: ${missing}. Go to Integrations.`}
-        >
-          <Chip
-            label="Setup incomplete"
-            size="small"
-            color="warning"
-            sx={{ ml: 1, fontSize: "10px", height: 18 }}
-          />
-        </Tooltip>
-      );
-    }
+  //   if (!linkedInAccountStatus.setup_complete) {
+  //     const missing = linkedInAccountStatus.missing.join(", ");
+  //     return (
+  //       <Tooltip
+  //         title={`LinkedIn connected but setup incomplete. Missing: ${missing}. Go to Integrations.`}
+  //       >
+  //         <Chip
+  //           label="Setup incomplete"
+  //           size="small"
+  //           color="warning"
+  //           sx={{ ml: 1, fontSize: "10px", height: 18 }}
+  //         />
+  //       </Tooltip>
+  //     );
+  //   }
 
-    return (
-      <Tooltip title="LinkedIn fully connected and ready.">
-        <Chip
-          label="Ready"
-          size="small"
-          color="success"
-          sx={{ ml: 1, fontSize: "10px", height: 18 }}
-        />
-      </Tooltip>
-    );
-  };
+  //   return (
+  //     <Tooltip title="LinkedIn fully connected and ready.">
+  //       <Chip
+  //         label="Ready"
+  //         size="small"
+  //         color="success"
+  //         sx={{ ml: 1, fontSize: "10px", height: 18 }}
+  //       />
+  //     </Tooltip>
+  //   );
+  // };
 
   // ─── LinkedIn live controls panel (shown in Step 3 after campaign exists) ─
   const renderLinkedInControls = () => {
@@ -1093,7 +1096,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                       <img src={platformIcons[acc.id]} alt={acc.label} />
                       <span>{acc.label}</span>
                       {/* LinkedIn-specific connection badge */}
-                      {acc.id === "linkedin" && renderLinkedInBadge()}
+                      {/* {acc.id === "linkedin" && renderLinkedInBadge()} */}
                     </div>
                     <div
                       className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}

@@ -73,6 +73,13 @@ export const CampaignAPI = {
    * Trigger LinkedIn campaign insights fetch via Zapier.
    * POST /api/social/campaign/insights/
    */
+
+  createLinkedInCampaign: (campaignId: string) =>
+    http.post("/social/campaign/create/", {
+      campaign_id: campaignId,
+      platform: "linkedin",
+    }),
+
   triggerLinkedInInsights: (campaignId: string) =>
     http.post("/social/campaign/insights/", {
       campaign_id: campaignId,

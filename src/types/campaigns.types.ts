@@ -57,6 +57,23 @@ export interface Campaign {
   last_click?: string | null;
   insights_synced_at?: string | null;
   conversion_rate?: number;
+  // ✅ ADD LINKEDIN FIELDS
+  linkedin_live_status?: string | null;
+  linkedin_external_campaign_id?: string | null;
+  linkedin_account_id?: string | null;
+  linkedin_ads_manager_url?: string | null;
+
+  last_synced_metrics?: {
+    campaign_metrics?: {
+      impressions?: number;
+      clicks?: number;
+      spend?: number;
+      ctr?: number;
+      conversions?: number;
+    };
+  } | null;
+
+  last_metrics_synced_at?: string | null;
 }
 
 // API TYPE
@@ -141,6 +158,23 @@ export interface CampaignAPIType {
   fb_impressions?: number;
   fb_reach?: number;
   fb_clicks?: number;
+
+  linkedin_live_status?: string | null;
+  linkedin_external_campaign_id?: string | null;
+  linkedin_account_id?: string | null;
+  linkedin_ads_manager_url?: string | null;
+
+  last_synced_metrics?: {
+    campaign_metrics?: {
+      impressions?: number;
+      clicks?: number;
+      spend?: number;
+      ctr?: number;
+      conversions?: number;
+    };
+  } | null;
+
+  last_metrics_synced_at?: string | null;
 }
 
 // Payloads
