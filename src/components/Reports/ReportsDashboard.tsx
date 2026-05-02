@@ -385,10 +385,22 @@ const ReportsDashboard = () => {
 
           <TextField
             size="small"
-            placeholder="Search by campaign name"
+            placeholder="Search by Report name"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            sx={{ minWidth: { xs: "100%", md: 260 } }}
+                sx={{
+                  flex: { xs: "1 1 180px", sm: "0 1 auto" },
+                  width: { xs: "auto", sm: 240 },
+                  minWidth: { xs: 0, sm: 220 },
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    backgroundColor: "#fff",
+                  },
+    "& input::placeholder": {   
+      fontSize: "14px",
+      opacity: 0.5,
+    },
+                }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
