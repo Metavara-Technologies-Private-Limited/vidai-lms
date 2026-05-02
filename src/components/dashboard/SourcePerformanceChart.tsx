@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Box,
   RadioGroup,
@@ -50,8 +51,12 @@ const CustomTooltip = ({
   return (
     <Box sx={chartStyles.tooltipContainer}>
       <Typography variant="subtitle2" fontWeight={700}>
+        {(payload[0] as any)?.payload?.name}{" "}
+      </Typography>
+
+      <Typography variant="body2">
         {metric === "revenue" || metric === "cost"
-          ? `$${total.toLocaleString()}`
+          ? `${total.toLocaleString()}`
           : total}
         {unit}
       </Typography>
@@ -89,12 +94,42 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
       ? parsedStoredClinicId
       : null;
   const clinicId = selectedClinicId != null ? selectedClinicId : storedClinicId;
+  const socialMediaRevenueFromCampaigns = (
+    Array.isArray(campaigns) ? campaigns : []
+  )
+    .filter(
+      (c) =>
+        Boolean(clinicId) &&
+        Number(c.clinic) === clinicId &&
+        !c.is_deleted &&
+        isWithinTimeRange(
+          c.modified_at || c.created_at || c.start_date,
+          timeRange,
+        ),
+    )
+    .reduce((sum, c) => {
+      const hasActivePlatform = Object.values(c.platform_data || {}).some(
+        (v) => v && String(v).trim() !== "",
+      );
+
+      if (!hasActivePlatform) return sum;
+
+      const budgetTotal =
+        (c.total_spend ?? 0) > 0
+          ? (c.total_spend ?? 0)
+          : c.budget_data
+            ? Object.values(c.budget_data).reduce(
+                (s: number, v) => s + (Number(v) || 0),
+                0,
+              )
+            : 0;
+
+      return sum + budgetTotal;
+    }, 0);
   const sourceBaseRows = mockData.overview.sourcePerformance.map(
     (row) => row.name,
   );
-  const campaignBaseRows = mockData.overview.sourcePerformance.map(
-    (row) => row.campaign,
-  );
+  // const campaignBaseRows = liveCampaigns.map((c) => c.name);
 
   // Source-based data: Lead Volume, Conversion Rate, Revenue (by lead source)
   const sourceData = useMemo(() => {
@@ -176,20 +211,27 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
     return sourceBaseRows.map((rowName) => {
       const counts = map.get(rowName);
 
+      const total = counts?.total ?? 0;
+      const converted = counts?.converted ?? 0;
+
+      const revenue =
+        rowName === "Social Media"
+          ? socialMediaRevenueFromCampaigns
+          : converted * 100;
+      const cost = total > 0 ? revenue / total : 0;
+
       return {
         name: rowName,
         hot: counts?.hot ?? 0,
         warm: counts?.warm ?? 0,
         cold: counts?.cold ?? 0,
         convRate:
-          counts && counts.total > 0
-            ? Number(((counts.converted / counts.total) * 100).toFixed(1))
-            : 0,
-        revenue: 0,
-        cost: 0,
+          total > 0 ? Number(((converted / total) * 100).toFixed(1)) : 0,
+        revenue,
+        cost,
       };
     });
-  }, [clinicId, leads, sourceBaseRows, timeRange]);
+  }, [clinicId, leads, socialMediaRevenueFromCampaigns, sourceBaseRows, timeRange]);
 
   // Campaign-based data: Revenue (total budget) and Cost per Lead (budget / leads)
   const campaignData = useMemo(() => {
@@ -205,7 +247,6 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
     );
 
     const liveCampaigns = active.map((c) => {
-      // Use total_spend if available, else sum all platform budget_data values
       const budgetTotal =
         (c.total_spend ?? 0) > 0
           ? (c.total_spend ?? 0)
@@ -216,7 +257,9 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
               )
             : 0;
 
-      const leadsCount = c.lead_generated > 0 ? c.lead_generated : 1;
+      const leadsCount = c.lead_generated || 0;
+
+      const cost = leadsCount > 0 ? budgetTotal / leadsCount : 0;
 
       return {
         name: c.campaign_name,
@@ -225,28 +268,62 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
         cold: 0,
         convRate: 0,
         revenue: Number(budgetTotal.toFixed(2)),
-        cost: Number((budgetTotal / leadsCount).toFixed(2)),
+        cost: Number(cost.toFixed(2)),
       };
     });
 
-    return campaignBaseRows.map((rowName, index) => {
-      const liveCampaign = liveCampaigns[index];
+    // const campaignMap = new Map(liveCampaigns.map((c) => [c.name, c]));
 
-      return {
-        name: rowName,
+    // return campaignBaseRows.map((rowName) => {
+    //   const campaign = campaignMap.get(rowName);
+
+    //   return {
+    //     name: rowName,
+    //     hot: 0,
+    //     warm: 0,
+    //     cold: 0,
+    //     convRate: campaign?.convRate ?? 0,
+    //     revenue: campaign?.revenue ?? 0,
+    //     cost: campaign?.cost ?? 0,
+    //   };
+    // });
+    const sorted = [...liveCampaigns].sort((a, b) => b.cost - a.cost);
+
+    const top = sorted.slice(0,10);
+    const others = sorted.slice(10);
+
+    const othersCost = others.reduce((sum, c) => sum + c.cost, 0);
+
+    return [
+      ...top.map((c) => ({
+        name: c.name,
         hot: 0,
         warm: 0,
         cold: 0,
-        convRate: 0,
-        revenue: liveCampaign?.revenue ?? 0,
-        cost: liveCampaign?.cost ?? 0,
-      };
-    });
-  }, [campaignBaseRows, campaigns, clinicId, timeRange]);
+        convRate: c.convRate,
+        revenue: c.revenue,
+        cost: c.cost,
+      })),
+      ...(others.length > 0
+        ? [
+            {
+              name: "Others",
+              hot: 0,
+              warm: 0,
+              cold: 0,
+              convRate: 0,
+              revenue: 0,
+              cost: othersCost,
+            },
+          ]
+        : []),
+    ];
+  }, [campaigns, clinicId, timeRange]);
 
   const data =
-    metric === "cost" || metric === "revenue" ? campaignData : sourceData;
-
+    metric === "cost"
+      ? campaignData 
+      : sourceData;
   const config = {
     volume: { key: "volume", label: "No. of Leads" },
     rate: { key: "convRate", label: "Conversion Rate (in %)" },
@@ -349,20 +426,12 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
               tickLine={false}
               tick={chartStyles.axisTick}
               dy={10}
-              label={{
-                value:
-                  metric === "cost" || metric === "revenue"
-                    ? "Campaigns"
-                    : "Lead Sources",
-                position: "insideBottom",
-                offset: -5,
-                style: {
-                  fontSize: 10,
-                  fill: "#ccc",
-                },
-              }}
+              interval="preserveStartEnd"
+              minTickGap={20}
+              tickFormatter={(value: string) =>
+                value.length > 12 ? value.slice(0, 12) + "..." : value
+              }
             />
-
             <YAxis
               axisLine={false}
               tickLine={false}
