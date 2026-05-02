@@ -31,11 +31,9 @@ import {
 } from "../../services/pipeline.api";
 import type { Lead } from "../../services/leads.api";
 
-// ── Storage keys ─────────────────────────────────────────────────────────────
+// ── Only pipeline/industry keys remain — filter keys are fully removed ────────
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
-const STORAGE_KEY_FILTERS = "leads_filter_values";
-const STORAGE_KEY_LOCATION = "leads_filter_location";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const defaultFilters = (): FilterValues => ({
@@ -48,27 +46,6 @@ const defaultFilters = (): FilterValues => ({
   dateFrom: null,
   dateTo: null,
 });
-
-const loadPersistedFilters = (): FilterValues => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY_FILTERS);
-    if (stored) {
-      const parsed = JSON.parse(stored) as FilterValues;
-      return { ...defaultFilters(), ...parsed };
-    }
-  } catch {
-    /* ignore */
-  }
-  return defaultFilters();
-};
-
-const loadPersistedLocation = (): string => {
-  try {
-    return localStorage.getItem(STORAGE_KEY_LOCATION) ?? "";
-  } catch {
-    return "";
-  }
-};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface FilterDialogProps {
@@ -96,24 +73,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   const setLoadingDepartments = React.useState(false)[1];
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
 
-  // ── Pipeline stage names for the Status dropdown ──────────────────────────
   const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
   const [loadingPipeline, setLoadingPipeline] = React.useState(false);
 
-  // ── Filter state — initialised from localStorage ───────────────────────────
-  const [filters, setFilters] = React.useState<FilterValues>(loadPersistedFilters);
-
-  const [dateFrom, setDateFrom] = React.useState<Dayjs | null>(() => {
-    const persisted = loadPersistedFilters();
-    return persisted.dateFrom ? dayjs(persisted.dateFrom) : null;
-  });
-
-  const [dateTo, setDateTo] = React.useState<Dayjs | null>(() => {
-    const persisted = loadPersistedFilters();
-    return persisted.dateTo ? dayjs(persisted.dateTo) : null;
-  });
-
-  const [location, setLocation] = React.useState<string>(loadPersistedLocation);
+  // ── All filter state starts empty — never read from localStorage ──────────
+  const [filters, setFilters] = React.useState<FilterValues>(defaultFilters);
+  const [dateFrom, setDateFrom] = React.useState<Dayjs | null>(null);
+  const [dateTo, setDateTo] = React.useState<Dayjs | null>(null);
+  const [location, setLocation] = React.useState<string>("");
 
   // ── Unique locations derived from current leads ───────────────────────────
   const availableLocations = React.useMemo(() => {
@@ -126,17 +93,6 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
     });
     return Array.from(locationSet).sort();
   }, [leads]);
-
-  // ── Re-apply persisted filters on mount (so parent table reflects them) ───
-  React.useEffect(() => {
-    const persisted = loadPersistedFilters();
-    const persistedLocation = loadPersistedLocation();
-    const hasFilters = Object.values(persisted).some((v) => v !== "" && v !== null);
-    if (hasFilters || persistedLocation) {
-      if (onApplyFilters) onApplyFilters({ ...persisted, location: persistedLocation });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ── Load pipeline stages when dialog opens ────────────────────────────────
   React.useEffect(() => {
@@ -210,7 +166,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
         setLoadingDepartments(false);
       }
     };
-    fetchDepartments();
+    void fetchDepartments();
   }, [open, clinicId]);
 
   // ── Load employees when dialog opens ─────────────────────────────────────
@@ -228,7 +184,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
         setLoadingEmployees(false);
       }
     };
-    fetchEmployees();
+    void fetchEmployees();
   }, [open, clinicId]);
 
   // ── Filter employees by selected department ───────────────────────────────
@@ -281,14 +237,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   };
 
   const handleApply = () => {
-    // Persist filters + location to localStorage
-    try {
-      localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters));
-      localStorage.setItem(STORAGE_KEY_LOCATION, location);
-    } catch {
-      /* ignore storage errors */
-    }
-
+    // Filters live in React state only — no localStorage write
     if (onApplyFilters) onApplyFilters({ ...filters, location });
     onClose();
   };
@@ -296,10 +245,10 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   const handleClearAll = () => {
     const emptyFilters = defaultFilters();
 
-    // Remove persisted values
+    // One-time cleanup of any stale keys left by the old implementation
     try {
-      localStorage.removeItem(STORAGE_KEY_FILTERS);
-      localStorage.removeItem(STORAGE_KEY_LOCATION);
+      localStorage.removeItem("leads_filter_values");
+      localStorage.removeItem("leads_filter_location");
     } catch {
       /* ignore */
     }
@@ -393,13 +342,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 
             {/* Row 1: From Date & To Date */}
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                gap: 2,
-              }}
-            >
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <Box>
                 <Typography sx={labelStyle}>From Date</Typography>
                 <DatePicker
@@ -407,12 +350,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   onChange={handleDateFromChange}
                   format="DD/MM/YYYY"
                   slotProps={{
-                    textField: {
-                      size: "small",
-                      fullWidth: true,
-                      placeholder: "DD/MM/YYYY",
-                      sx: inputStyle,
-                    },
+                    textField: { size: "small", fullWidth: true, placeholder: "DD/MM/YYYY", sx: inputStyle },
                   }}
                 />
               </Box>
@@ -424,31 +362,18 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   minDate={dateFrom || undefined}
                   format="DD/MM/YYYY"
                   slotProps={{
-                    textField: {
-                      size: "small",
-                      fullWidth: true,
-                      placeholder: "DD/MM/YYYY",
-                      sx: inputStyle,
-                    },
+                    textField: { size: "small", fullWidth: true, placeholder: "DD/MM/YYYY", sx: inputStyle },
                   }}
                 />
               </Box>
             </Box>
 
             {/* Row 2: Lead Quality & Status */}
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                gap: 2,
-              }}
-            >
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <Box>
                 <Typography sx={labelStyle}>Lead Quality</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.quality}
                   onChange={(e) => handleFilterChange("quality", e.target.value)}
                   sx={inputStyle}
@@ -460,14 +385,10 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   <MenuItem value="Cold">Cold</MenuItem>
                 </TextField>
               </Box>
-
-              {/* Status — driven by pipeline stages */}
               <Box>
                 <Typography sx={labelStyle}>Status</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.status}
                   onChange={(e) => handleFilterChange("status", e.target.value)}
                   disabled={loadingPipeline}
@@ -478,28 +399,18 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                     {loadingPipeline ? "Loading…" : "Select Status"}
                   </MenuItem>
                   {pipelineStageNames.map((name) => (
-                    <MenuItem key={name} value={name}>
-                      {name}
-                    </MenuItem>
+                    <MenuItem key={name} value={name}>{name}</MenuItem>
                   ))}
                 </TextField>
               </Box>
             </Box>
 
             {/* Row 3: Location & Assignee */}
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                gap: 2,
-              }}
-            >
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <Box>
                 <Typography sx={labelStyle}>Location</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   sx={inputStyle}
@@ -507,18 +418,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                 >
                   <MenuItem value="">Select Location</MenuItem>
                   {availableLocations.map((loc) => (
-                    <MenuItem key={loc} value={loc}>
-                      {loc}
-                    </MenuItem>
+                    <MenuItem key={loc} value={loc}>{loc}</MenuItem>
                   ))}
                 </TextField>
               </Box>
               <Box>
                 <Typography sx={labelStyle}>Assignee</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.assignee}
                   onChange={(e) => handleFilterChange("assignee", e.target.value)}
                   disabled={loadingEmployees}
@@ -527,28 +434,18 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                 >
                   <MenuItem value="">Select Assignee</MenuItem>
                   {filteredEmployees.map((emp) => (
-                    <MenuItem key={emp.id} value={emp.id.toString()}>
-                      {emp.emp_name}
-                    </MenuItem>
+                    <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name}</MenuItem>
                   ))}
                 </TextField>
               </Box>
             </Box>
 
             {/* Row 4: Source & Sub-Source */}
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                gap: 2,
-              }}
-            >
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <Box>
                 <Typography sx={labelStyle}>Source</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.source}
                   onChange={(e) => handleFilterChange("source", e.target.value)}
                   sx={inputStyle}
@@ -556,18 +453,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                 >
                   <MenuItem value="">Select Source</MenuItem>
                   {SOURCE_OPTIONS.map((value) => (
-                    <MenuItem key={value} value={value}>
-                      {value}
-                    </MenuItem>
+                    <MenuItem key={value} value={value}>{value}</MenuItem>
                   ))}
                 </TextField>
               </Box>
               <Box>
                 <Typography sx={labelStyle}>Sub-Source</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.subSource}
                   onChange={(e) => handleFilterChange("subSource", e.target.value)}
                   disabled={!filters.source || filters.source === "Other"}
@@ -581,17 +474,11 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                       filters.source === "Referral"
                         ? REFERRAL_DEPARTMENT_OPTIONS
                         : (SUB_SOURCE_OPTIONS[filters.source] ?? []);
-                    return availableSubSources.length > 0 ? (
-                      availableSubSources.map((value) => (
-                        <MenuItem key={value} value={value}>
-                          {value}
-                        </MenuItem>
-                      ))
-                    ) : (
-                      <MenuItem value="" disabled>
-                        No sub-sources available
-                      </MenuItem>
-                    );
+                    return availableSubSources.length > 0
+                      ? availableSubSources.map((value) => (
+                          <MenuItem key={value} value={value}>{value}</MenuItem>
+                        ))
+                      : <MenuItem value="" disabled>No sub-sources available</MenuItem>;
                   })()}
                 </TextField>
               </Box>
