@@ -60,14 +60,20 @@ const CampaignTabContent: React.FC<Props> = ({
   >("facebook");
 
   // ─── Resolve content & image for the active platform ────────────────────
-  const platformData_raw: Record<string, string> =
-    (campaign as any).platform_data ?? {};
+ const platformData_raw: Record<string, any> =
+  (campaign as any).platform_data ?? {};
 
-  const activePlatformKey = (activeSubTab || "").toLowerCase();
-  const platformText: string =
-    platformData_raw[activePlatformKey] ||
-    (campaign as any).campaign_content ||
-    "";
+const activePlatformKey = (activeSubTab || "").toLowerCase();
+
+// ✅ FIX: platform_data.linkedin is now a dict {content, location, bid_strategy, bid_amount}
+// Extract .content if it's an object, otherwise use as string directly
+const rawPlatformValue = platformData_raw[activePlatformKey];
+const platformText: string =
+  (typeof rawPlatformValue === "object" && rawPlatformValue !== null
+    ? rawPlatformValue.content ?? ""
+    : rawPlatformValue ?? "") ||
+  (campaign as any).campaign_content ||
+  "";
 
   const imageUrl: string = (campaign as any).image_url || "";
 
