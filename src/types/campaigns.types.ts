@@ -225,7 +225,8 @@ export interface SocialCampaignPayload {
 
   campaign_content: string;
 
-  platform_data: Partial<Record<Platform, string>>;
+  // ✅ FIX: Changed from 'string' to 'any' to allow JSON objects (LinkedIn/Instagram data)
+  platform_data: Partial<Record<Platform, any>>;
 
   image_url: string | null;
 
