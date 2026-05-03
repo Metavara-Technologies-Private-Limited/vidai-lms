@@ -22,7 +22,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import type { Dayjs } from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import type { AppDispatch, RootState } from "../../../store";
+import type { AppDispatch } from "../../../store";
 import { fetchTickets, fetchTicketDashboard } from "../../../store/ticketSlice";
 import { ticketsApi, labsApi, clinicsApi } from "../../../services/tickets.api";
 import { authApi } from "../../../services/auth.api";
@@ -45,6 +45,7 @@ import {
 } from "../../../styles/Settings/Tickets.styles";
 import { selectUser } from "../../../store/authSlice";
 import { selectClinic } from "../../../store/clinicSlice";
+import { selectUsers } from "../../../store/userSlice";
 
 type AssigneeOption = {
   id: number;
@@ -129,7 +130,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   // --- UI States ---
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const users = useSelector((state: RootState) => state.users.data);
+  const users = useSelector(selectUsers);
 
   const authMode = localStorage.getItem("auth_mode");
   const isInternal = authMode === "INT";

@@ -97,6 +97,7 @@ import {
 
 import BookAppointmentModal from "./BookAppointmentModal";
 import type { AppointmentResult } from "./BookAppointmentModal";
+import { selectClinic } from "../../store/clinicSlice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -1493,6 +1494,9 @@ export default function LeadDetailView() {
   const [convertError, setConvertError] = React.useState<string | null>(null);
   const [historyView, setHistoryView] = React.useState<HistoryView>("chatbot");
   const [emailDialogOpen, setEmailDialogOpen] = React.useState(false);
+  const clinic = useSelector(selectClinic);
+
+const clinicName = clinic?.name || "Our Clinic";
 
   // ✅ FIX 1: bookApptOpen state is now correctly inside the component
   const [bookApptOpen, setBookApptOpen] = React.useState(false);
@@ -1604,7 +1608,7 @@ export default function LeadDetailView() {
       leadData,
       eventType,
       appointmentResult,
-      statusLabel,
+      // statusLabel,
     }: {
       leadData: LeadRecord;
       eventType: "appointment" | "update";
@@ -1619,17 +1623,17 @@ export default function LeadDetailView() {
       const appointmentDate =
         appointmentResult?.appointment_date || leadData.appointment_date || "-";
       const appointmentSlot = appointmentResult?.slot || leadData.slot || "-";
-      const appointmentBooked =
-        appointmentResult?.book_appointment || leadData.book_appointment
-          ? "Yes"
-          : "No";
-      const senderName =
-        [authedUser?.first_name, authedUser?.last_name]
-          .filter(Boolean)
-          .join(" ")
-          .trim() ||
-        authedUser?.username ||
-        "Team";
+      // const appointmentBooked =
+      //   appointmentResult?.book_appointment || leadData.book_appointment
+      //     ? "Yes"
+      //     : "No";
+      // const senderName =
+      //   [authedUser?.first_name, authedUser?.last_name]
+      //     .filter(Boolean)
+      //     .join(" ")
+      //     .trim() ||
+      //   authedUser?.username ||
+      //   "Team";
       const senderEmail = authedUser?.email?.trim() || undefined;
 
       const subject =
@@ -1637,38 +1641,36 @@ export default function LeadDetailView() {
           ? `Appointment Booked - ${appointmentDate}`
           : `Lead Updated - ${leadName}`;
 
-      const emailBody = [
-        `Hi ${leadFirstName},`,
-        "",
-        eventType === "appointment"
-          ? `Your appointment has been booked successfully for ${appointmentDate} at ${appointmentSlot}.`
-          : "Your lead details have been updated successfully.",
-        "",
-        "Lead Details:",
-        `- Lead Name: ${leadName || "-"}`,
-        `- Contact Number: ${leadData.contact_no || leadData.phone || leadData.phone_number || "-"}`,
-        `- Email: ${recipientEmail}`,
-        `- Location: ${leadData.location || "-"}`,
-        `- Address: ${leadData.address || "-"}`,
-        `- Department: ${leadData.department_name || leadData.department || "-"}`,
-        `- Source: ${leadData.source || "-"}`,
-        `- Sub Source: ${leadData.sub_source || "-"}`,
-        `- Treatment Interest: ${leadData.treatment_interest || "-"}`,
-        `- Assigned To: ${leadData.assigned_to_name || leadData.assigned || "-"}`,
-        `- Lead Status: ${statusLabel || leadData.status || leadData.lead_status || "-"}`,
-        `- Next Action Type: ${leadData.next_action_type || "-"}`,
-        `- Next Action Status: ${leadData.next_action_status || "-"}`,
-        `- Next Action Description: ${leadData.next_action_description || "-"}`,
-        `- Appointment Booked: ${appointmentBooked}`,
-        `- Appointment Date: ${appointmentDate}`,
-        `- Appointment Slot: ${appointmentSlot}`,
-        `- Remark: ${appointmentResult?.remark || leadData.remark || "-"}`,
-        "",
-        `Sent by: ${senderName}`,
-        `Sender Email: ${senderEmail || "-"}`,
-        "",
-        "Thank you.",
-      ].join("\n");
+          const emailBody = [
+            `Hi ${leadFirstName},`,
+            "",
+
+            `${clinicName} here 👋`,
+            "",
+
+            eventType === "appointment"
+              ? `Your appointment has been successfully scheduled.`
+              : `Your details have been updated in our system.`,
+
+            "",
+
+            `📅 Date: ${appointmentDate}`,
+            `⏰ Time: ${appointmentSlot}`,
+            `👨‍⚕️ Doctor: ${leadData.personal_name || "-"}`,
+            `🏥 Department: ${leadData.department_name || "-"}`,
+
+            "",
+
+            `📝 Note: ${stripHtml(appointmentResult?.remark || leadData.remark || "-")}`,
+
+            "",
+
+            `If you need any changes or assistance, feel free to contact us.`,
+            "",
+
+            `Regards,`,
+            `${clinicName}`,
+          ].join("\n");
 
       await LeadEmailAPI.sendNow({
         lead: String(leadData.id),
@@ -1677,7 +1679,7 @@ export default function LeadDetailView() {
         email_body: emailBody,
       });
     },
-    [authedUser],
+    [authedUser?.email, clinicName],
   );
 
   React.useEffect(() => {
@@ -2253,9 +2255,9 @@ export default function LeadDetailView() {
   const appointmentSlot = hasAppointment
     ? capitalize(activeLead.slot || "N/A")
     : "N/A";
-  const appointmentRemark = hasAppointment
-    ? capitalize(activeLead.remark || "N/A")
-    : "N/A";
+    const appointmentRemark = hasAppointment
+      ? capitalize(stripHtml(activeLead.remark || ""))
+      : "N/A";
   const currentStatus = (
     activeLead?.status ||
     activeLead?.lead_status ||

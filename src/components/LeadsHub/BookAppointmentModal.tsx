@@ -40,6 +40,8 @@ import type { Department } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import type { LeadRecord } from "./LeadDetailTypes";
 import { IS_MEDICAL_APP } from "../../config/appType";
+import { useSelector } from "react-redux";
+import { selectUsers } from "../../store/userSlice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -149,6 +151,19 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const normalizeUsersList = (users: any[]): AssigneeOption[] => {
+  return users.map((u) => ({
+    id: u.id,
+    first_name: u.first_name ?? u.firstName,
+    last_name: u.last_name ?? u.lastName,
+    username: u.username,
+    role: u.role?.name || u.role,
+    designation: undefined,
+    email: u.email,
+  }));
+};
+
 const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
   const root = asRecord(raw);
   const data = asRecord(root?.data);
@@ -233,6 +248,10 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 
   const clinicId = lead?.clinic_id ?? 1;
   const today = dayjs().startOf("day");
+  const users = useSelector(selectUsers);
+
+  const authMode = localStorage.getItem("auth_mode");
+  const isInternal = authMode === "INT";
 
   // ── Reset form when modal opens ──
   React.useEffect(() => {
@@ -272,12 +291,28 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     const timer = window.setTimeout(async () => {
       try {
         setLoadingPersonnel(true);
-        const response = await authApi.searchUsers({
-          search: personnelSearch,
-          limit: 20,
-          offset: 0,
-        });
-        setPersonnelOptions(normalizeAssignees(response));
+
+        if (isInternal) {
+          // LOCAL USERS
+          const normalized = normalizeUsersList(users);
+
+          const filtered = normalized.filter((u) =>
+            `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
+              .toLowerCase()
+              .includes(personnelSearch.toLowerCase()),
+          );
+
+          setPersonnelOptions(filtered);
+        } else {
+          // API
+          const response = await authApi.searchUsers({
+            search: personnelSearch,
+            limit: 20,
+            offset: 0,
+          });
+
+          setPersonnelOptions(normalizeAssignees(response));
+        }
       } catch (e) {
         console.error("Personnel fetch failed:", e);
         setPersonnelOptions([]);
@@ -287,7 +322,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [open, personnelSearch]);
+  }, [open, personnelSearch, isInternal, users]);
 
   // ── Clear selected personnel when department changes ──
   React.useEffect(() => {

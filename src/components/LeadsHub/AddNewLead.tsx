@@ -19,7 +19,7 @@ import {
   loadReferralSources,
   loadDashboardCounts,
 } from "../../store/referralSlice";
-import type { AppDispatch, RootState } from "../../store";
+import type { AppDispatch } from "../../store";
 import {
   resolveUserRole,
   hasAnySubcategoryActionPermission,
@@ -62,6 +62,7 @@ import { sanitizeNameInput, capitalizeFirst } from "../../utils/nameValidation";
 
 import { fetchReferralDepartments } from "../../services/referral.api";
 import type { ReferralDepartment } from "../../services/referral.api";
+import { selectUsers } from "../../store/userSlice";
 
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
@@ -346,7 +347,7 @@ export default function AddNewLead() {
     referralDepartment: "",
   });
 
-  const users = useSelector((state: RootState) => state.users.data);
+  const users = useSelector(selectUsers);
 
   // Next action status = only stages that come AFTER the selected lead status
   const filteredNextActionStatusOptions = React.useMemo<
