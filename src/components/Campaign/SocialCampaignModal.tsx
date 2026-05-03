@@ -1674,58 +1674,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   // // ─── LinkedIn connection badge shown on platform card ─────────
-  // const renderLinkedInBadge = () => {
-  //   if (linkedInStatusLoading) {
-  //     return (
-  //       <Chip
-  //         label="Checking…"
-  //         size="small"
-  //         sx={{ ml: 1, fontSize: "10px", height: 18, bgcolor: "#f0f0f0" }}
-  //       />
-  //     );
-  //   }
-  //   if (!linkedInAccountStatus) return null;
-
-  //   if (!linkedInAccountStatus.connected) {
-  //     return (
-  //       <Tooltip title="LinkedIn not connected. Go to Integrations to connect.">
-  //         <Chip
-  //           label="Not connected"
-  //           size="small"
-  //           color="error"
-  //           sx={{ ml: 1, fontSize: "10px", height: 18 }}
-  //         />
-  //       </Tooltip>
-  //     );
-  //   }
-
-  //   if (!linkedInAccountStatus.setup_complete) {
-  //     const missing = linkedInAccountStatus.missing.join(", ");
-  //     return (
-  //       <Tooltip
-  //         title={`LinkedIn connected but setup incomplete. Missing: ${missing}. Go to Integrations.`}
-  //       >
-  //         <Chip
-  //           label="Setup incomplete"
-  //           size="small"
-  //           color="warning"
-  //           sx={{ ml: 1, fontSize: "10px", height: 18 }}
-  //         />
-  //       </Tooltip>
-  //     );
-  //   }
-
-  //   return (
-  //     <Tooltip title="LinkedIn fully connected and ready.">
-  //       <Chip
-  //         label="Ready"
-  //         size="small"
-  //         color="success"
-  //         sx={{ ml: 1, fontSize: "10px", height: 18 }}
-  //       />
-  //     </Tooltip>
-  //   );
-  // };
+  // const renderLinkedInBadge = () => { ... };
 
   // ─── LinkedIn live controls panel ─────────────────────────────
   const renderLinkedInControls = () => {
@@ -1993,30 +1942,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         {/* STEP 2 */}
         {step === 2 && (
           <div className="step-content">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-              {/* ── BACK BUTTON (step 2) ── */}
-              <IconButton
-                onClick={() => { setStep(1); setSubmitted(false); }}
-                size="small"
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  border: "1px solid #e5e7eb",
-                  backgroundColor: "#f9fafb",
-                  color: "#374151",
-                  flexShrink: 0,
-                  "&:hover": { backgroundColor: "#f3f4f6", borderColor: "#d1d5db" },
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </IconButton>
-              <Typography variant="h6" sx={{ mb: 0 }}>
-                Content & Configuration
-              </Typography>
-            </div>
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Content & Configuration
+            </Typography>
 
             <div
               className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
@@ -2360,30 +2288,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         {/* STEP 3 */}
         {step === 3 && (
           <div className="step-content">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-              {/* ── BACK BUTTON (step 3) ── */}
-              <IconButton
-                onClick={() => { setStep(2); setSubmitted(false); }}
-                size="small"
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  border: "1px solid #e5e7eb",
-                  backgroundColor: "#f9fafb",
-                  color: "#374151",
-                  flexShrink: 0,
-                  "&:hover": { backgroundColor: "#f3f4f6", borderColor: "#d1d5db" },
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </IconButton>
-              <Typography variant="h6" sx={{ mb: 0 }}>
-                Schedule Campaign
-              </Typography>
-            </div>
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Schedule Campaign
+            </Typography>
 
             <div className="section-card">
               <div className="schedule-header">
@@ -2498,6 +2405,15 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           <button className="cancel-btn" onClick={onClose}>
             Cancel
           </button>
+          {/* ── BACK button: shown on step 2 and step 3 ── */}
+          {step > 1 && (
+            <button
+              className="cancel-btn"
+              onClick={() => { setStep(step - 1); setSubmitted(false); }}
+            >
+              Back
+            </button>
+          )}
           {step === 3 ? (
             mode === "paid" ? (
               <>

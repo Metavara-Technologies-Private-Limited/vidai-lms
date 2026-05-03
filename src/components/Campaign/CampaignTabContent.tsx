@@ -60,24 +60,69 @@ const CampaignTabContent: React.FC<Props> = ({
   >("facebook");
 
   // ─── Resolve content & image for the active platform ────────────────────
- const platformData_raw: Record<string, any> =
-  (campaign as any).platform_data ?? {};
+  const platformData_raw: Record<string, any> =
+    (campaign as any).platform_data ?? {};
 
-const activePlatformKey = (activeSubTab || "").toLowerCase();
+  const activePlatformKey = (activeSubTab || "").toLowerCase();
 
-// ✅ FIX: platform_data.linkedin is now a dict {content, location, bid_strategy, bid_amount}
-// Extract .content if it's an object, otherwise use as string directly
-const rawPlatformValue = platformData_raw[activePlatformKey];
-const platformText: string =
-  (typeof rawPlatformValue === "object" && rawPlatformValue !== null
-    ? rawPlatformValue.content ?? ""
-    : rawPlatformValue ?? "") ||
-  (campaign as any).campaign_content ||
-  "";
-
-  const imageUrl: string = (campaign as any).image_url || "";
+  // ✅ FIX: platform_data.linkedin is now a dict {content, location, bid_strategy, bid_amount}
+  // Extract .content if it's an object, otherwise use as string directly
+  const rawPlatformValue = platformData_raw[activePlatformKey];
+  const platformText: string =
+    (typeof rawPlatformValue === "object" && rawPlatformValue !== null
+      ? rawPlatformValue.content ?? ""
+      : rawPlatformValue ?? "") ||
+    (campaign as any).campaign_content ||
+    "";
 
   const URL_REGEX = /https?:\/\/\S+/gi;
+
+  // ✅ FIX: extract image URL from multiple sources
+  // because user may type image URL inside content box instead of image URL field
+  const extractImageUrl = (): string => {
+    // 1. Direct image_url field on campaign
+    const direct = (campaign as any).image_url || "";
+    if (direct) return direct;
+
+    // 2. Scan platformText for image-like URL
+    const urlsInPlatformText = platformText.match(URL_REGEX) || [];
+    const imageFromPlatformText = urlsInPlatformText.find((url) =>
+      /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
+      url.includes("unsplash.com") ||
+      url.includes("images.") ||
+      url.includes("imgur.com") ||
+      url.includes("cloudinary.com") ||
+      url.includes("googleapis.com") ||
+      url.includes("amazonaws.com") ||
+      url.includes("cdn.")
+    );
+    if (imageFromPlatformText) return imageFromPlatformText;
+
+    // 3. First URL found in platformText — ✅ FIX: use ?? "" to avoid undefined
+    if (urlsInPlatformText.length > 0) return urlsInPlatformText[0] ?? "";
+
+    // 4. Scan all platform_data values for any URL
+    for (const key of Object.keys(platformData_raw)) {
+      const val = platformData_raw[key];
+      const text =
+        typeof val === "object" && val !== null
+          ? val.content ?? ""
+          : val ?? "";
+      const urls = String(text).match(URL_REGEX) || [];
+      // ✅ FIX: use ?? "" to avoid undefined
+      if (urls.length > 0) return urls[0] ?? "";
+    }
+
+    // 5. Scan campaign_content for any URL
+    const campaignContent = (campaign as any).campaign_content || "";
+    const urlsInContent = campaignContent.match(URL_REGEX) || [];
+    if (urlsInContent.length > 0) return urlsInContent[0] ?? "";
+
+    return "";
+  };
+
+  const imageUrl: string = extractImageUrl();
+
   const cleanedText = platformText.replace(URL_REGEX, "").trim();
   const lines = cleanedText.split("\n").filter((l) => l.trim());
   const hashtagLine = lines.find((l) => l.trim().startsWith("#")) || "";
@@ -145,9 +190,6 @@ const platformText: string =
     const platforms: string[] = (campaign as any).platforms ?? [];
     const isEmail = campaign.type === "email";
 
-    // ✅ Build real chart data from adInsights — one summary bar per metric
-    // Since we have totals (not time-series), we show a summary metrics bar
-    // and replace the mock line chart with a real metrics display
     const impressions = adInsights?.impressions ?? 0;
     const clicks      = adInsights?.clicks ?? 0;
     const ctr         = adInsights?.ctr ?? "0";
@@ -157,7 +199,6 @@ const platformText: string =
 
     const hasRealData = impressions > 0 || clicks > 0 || parseFloat(spend) > 0;
 
-    // ✅ Build chart data — show metric breakdown as bar-style line chart
     const chartData = hasRealData
       ? [
           { metric: "Impressions", value: impressions },
@@ -166,7 +207,6 @@ const platformText: string =
         ]
       : [];
 
-    // ✅ Platform toggle — only show platforms this campaign has
     const availablePlatforms = platforms.filter((p) =>
       ["facebook", "instagram", "google_ads", "linkedin"].includes(p)
     );
@@ -176,7 +216,6 @@ const platformText: string =
         <h4 className="cd-perf-title">Performance Overview</h4>
         <div className="cd-perf-divider"></div>
 
-        {/* ✅ Platform toggle — dynamic based on campaign platforms */}
         <div className="cd-perf-row">
           <div className="cd-perf-left">
             <div className="cd-perf-number">
@@ -207,7 +246,6 @@ const platformText: string =
           )}
         </div>
 
-        {/* ✅ Real metrics summary cards */}
         {!isEmail && hasRealData && (
           <div style={{
             display: "flex",
@@ -216,12 +254,12 @@ const platformText: string =
             flexWrap: "wrap",
           }}>
             {[
-              { label: "Impressions", value: impressions.toLocaleString(),     color: "#5B6EF5" },
-              { label: "Clicks",      value: clicks.toLocaleString(),           color: "#47B35F" },
-              { label: "CTR",         value: `${parseFloat(ctr).toFixed(2)}%`, color: "#ECB856" },
-              { label: "Avg CPC",     value: `₹${parseFloat(cpc).toFixed(2)}`, color: "#F25B5B" },
+              { label: "Impressions", value: impressions.toLocaleString(),      color: "#5B6EF5" },
+              { label: "Clicks",      value: clicks.toLocaleString(),            color: "#47B35F" },
+              { label: "CTR",         value: `${parseFloat(ctr).toFixed(2)}%`,  color: "#ECB856" },
+              { label: "Avg CPC",     value: `₹${parseFloat(cpc).toFixed(2)}`,  color: "#F25B5B" },
               { label: "Cost",        value: `₹${parseFloat(spend).toFixed(2)}`, color: "#835DEF" },
-              { label: "Conversions", value: String(conversions),               color: "#2D6BF0" },
+              { label: "Conversions", value: String(conversions),                color: "#2D6BF0" },
             ].map((m) => (
               <div key={m.label} style={{
                 flex: "1 1 130px",
@@ -237,15 +275,14 @@ const platformText: string =
           </div>
         )}
 
-        {/* ✅ Chart — real data if available, message if not */}
         {isEmail ? (
           <ResponsiveContainer width="100%" height={210} minWidth={0}>
             <LineChart
               data={[
-                { date: "Opens",       value: (campaign as any).impressions ?? 0 },
-                { date: "Clicks",      value: (campaign as any).clicks ?? 0 },
-                { date: "Bounces",     value: (campaign as any).bounces ?? 0 },
-                { date: "Unsubscribes",value: (campaign as any).unsubscribes ?? 0 },
+                { date: "Opens",        value: (campaign as any).impressions ?? 0 },
+                { date: "Clicks",       value: (campaign as any).clicks ?? 0 },
+                { date: "Bounces",      value: (campaign as any).bounces ?? 0 },
+                { date: "Unsubscribes", value: (campaign as any).unsubscribes ?? 0 },
               ]}
               margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
             >
