@@ -22,7 +22,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import type { Dayjs } from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import type { AppDispatch } from "../../../store";
+import type { AppDispatch, RootState } from "../../../store";
 import { fetchTickets, fetchTicketDashboard } from "../../../store/ticketSlice";
 import { ticketsApi, labsApi, clinicsApi } from "../../../services/tickets.api";
 import { authApi } from "../../../services/auth.api";
@@ -73,6 +73,17 @@ const normalizeAssignees = (res: any): AssigneeOption[] => {
   }));
 };
 
+const normalizeUsersList = (users: any[]): AssigneeOption[] => {
+  return users.map((u) => ({
+    id: u.id,
+    first_name: u.first_name ?? u.firstName,
+    last_name: u.last_name ?? u.lastName,
+    username: u.username,
+    role: u.role?.name || u.role,
+    designation: undefined,
+  }));
+};
+
     const assigneeLabel = (option: AssigneeOption): string => {
       const fullName =
         `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
@@ -118,6 +129,10 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   // --- UI States ---
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const users = useSelector((state: RootState) => state.users.data);
+
+  const authMode = localStorage.getItem("auth_mode");
+  const isInternal = authMode === "INT";
 
   useEffect(() => {
     if (user?.first_name && user?.last_name) {
@@ -141,21 +156,36 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
       try {
         setAssigneeLoading(true);
-        const response = await authApi.searchUsers({
-          search: assigneeSearch,
-          limit: 20,
-          offset: 0,
-        });
-        setAssigneeOptions(normalizeAssignees(response));
+
+        if (isInternal) {
+          const normalized = normalizeUsersList(users);
+
+          const filtered = normalized.filter((u) =>
+            `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
+              .toLowerCase()
+              .includes(assigneeSearch.toLowerCase()),
+          );
+
+          setAssigneeOptions(filtered);
+        } else {
+          // API
+          const response = await authApi.searchUsers({
+            search: assigneeSearch,
+            limit: 20,
+            offset: 0,
+          });
+
+          setAssigneeOptions(normalizeAssignees(response));
+        }
       } catch {
         setAssigneeOptions([]);
       } finally {
         setAssigneeLoading(false);
       }
-    }, 350);
+    }, 300);
 
     return () => clearTimeout(timer);
-  }, [assigneeSearch]);
+  }, [assigneeSearch, isInternal, users]);
 
   // 1. Fetch live data for dropdowns matching Swagger definitions
   useEffect(() => {
