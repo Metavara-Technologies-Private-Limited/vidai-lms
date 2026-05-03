@@ -1176,10 +1176,20 @@ export default function AddNewLead() {
       navigate("/leads", { replace: true });
     } catch (err) {
       const error = err as ApiError;
-      const data = error?.response?.data;
-      const msg = data
-        ? toReadableError(data)
-        : error?.message || "Failed to save lead";
+      const status = error?.response?.status;
+
+      let msg = "Failed to save lead";
+
+      if (status === 500) {
+        msg = "Server error. Please try again later";
+      } else if (status === 400) {
+        msg = "Please fill all required fields correctly";
+      } else {
+        msg = error?.message || "Something went wrong";
+      }
+
+      console.error("CREATE ERROR:", error?.response?.data);
+
       toast.error(msg, {
         position: "top-right",
         autoClose: 3000,

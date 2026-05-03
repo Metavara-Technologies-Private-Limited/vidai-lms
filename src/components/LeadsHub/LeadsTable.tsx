@@ -1552,7 +1552,10 @@ const LeadsTable: React.FC<Props> = ({
                       fontWeight: lead.taskType ? 500 : 400,
                     }}
                   >
-                    {lead.taskType || "—"}
+                    {lead.taskType
+                      ? lead.taskType.charAt(0).toUpperCase() +
+                        lead.taskType.slice(1)
+                      : "—"}
                   </Typography>
                 </TableCell>
 
