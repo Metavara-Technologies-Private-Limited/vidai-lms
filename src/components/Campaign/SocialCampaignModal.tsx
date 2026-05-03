@@ -1038,7 +1038,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         }
       }
 
-<<<<<<< Updated upstream
     //   // ── LinkedIn account setup check ─────────────────────────
     //   try {
     //     setLinkedInStatusLoading(true);
@@ -1059,27 +1058,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     //   } finally {
     //     if (isMounted) setLinkedInStatusLoading(false);
     //   }
-=======
-      // ── LinkedIn account setup check ─────────────────────────
-      try {
-        setLinkedInStatusLoading(true);
-        const liRes = await CampaignAPI.getLinkedInAccountStatus(clinic.id);
-        if (isMounted) {
-          setLinkedInAccountStatus(liRes.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch LinkedIn account status", err);
-        if (isMounted) {
-          setLinkedInAccountStatus({
-            connected: false,
-            setup_complete: false,
-            missing: ["linkedin_account"],
-          });
-        }
-      } finally {
-        if (isMounted) setLinkedInStatusLoading(false);
-      }
->>>>>>> Stashed changes
     };
 
     fetchStatuses();
@@ -1317,7 +1295,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   const toggleAccount = (id: Platform) => {
-<<<<<<< Updated upstream
     // Warn if LinkedIn is selected but not fully set up
     // if (
     //   id === "linkedin" &&
@@ -1334,23 +1311,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     //     { toastId: "linkedin-not-setup" },
     //   );
     // }
-=======
-    if (
-      id === "linkedin" &&
-      !accounts.includes("linkedin") &&
-      linkedInAccountStatus !== null &&
-      !isLinkedInFullySetup
-    ) {
-      const missing = linkedInAccountStatus?.missing ?? [];
-      const missingStr = missing.length
-        ? ` Missing: ${missing.join(", ")}.`
-        : "";
-      toast.warn(
-        `LinkedIn is not fully set up.${missingStr} The campaign will be saved but LinkedIn ads will not be triggered until setup is complete.`,
-        { toastId: "linkedin-not-setup" },
-      );
-    }
->>>>>>> Stashed changes
     setAccounts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
@@ -1601,7 +1561,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         );
       }
 
-<<<<<<< Updated upstream
       // ─────────────────────────────────────────────────────────
       // LinkedIn: warn if selected but not fully set up
       // ─────────────────────────────────────────────────────────
@@ -1614,14 +1573,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           console.error("[LinkedIn] Create failed", err);
           toast.warn("Campaign saved but LinkedIn trigger failed");
         }
-=======
-      if (accounts.includes("linkedin") && !isLinkedInFullySetup) {
-        const missing = linkedInAccountStatus?.missing ?? [];
-        toast.warn(
-          `Campaign saved. LinkedIn ads were NOT sent because the LinkedIn account setup is incomplete (missing: ${missing.join(", ") || "account details"}). Complete setup in Integrations and retry.`,
-          { autoClose: 8000 },
-        );
->>>>>>> Stashed changes
       }
 
       onSave(createdRes?.data ?? payload);
@@ -2085,12 +2036,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     <div className="account-left">
                       <img src={platformIcons[acc.id]} alt={acc.label} />
                       <span>{acc.label}</span>
-<<<<<<< Updated upstream
                       {/* LinkedIn-specific connection badge */}
                       {/* {acc.id === "linkedin" && renderLinkedInBadge()} */}
-=======
-                      {acc.id === "linkedin" && renderLinkedInBadge()}
->>>>>>> Stashed changes
                     </div>
                     <div
                       className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
