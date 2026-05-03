@@ -121,7 +121,24 @@ export const processLead = (lead: RawLead): ProcessedLead => {
     stageTaskType ||
     "";
   const taskType = formatTaskType(rawTaskType);
-  const taskStatus = formatTaskStatus(lead.next_action_status, taskType);
+  const mapTaskStatus = (
+    lead: RawLead,
+  ): "Pending" | "In Progress" | "Completed" => {
+    const status = (lead.next_action_status || "").toLowerCase();
+
+    if (!lead.next_action_type) return "Pending";
+
+    if (status === "completed") return "Completed";
+
+    if (status === "pending") {
+      if (lead.next_action_description) return "In Progress";
+      return "Pending";
+    }
+
+    return "Pending";
+  };
+
+  const taskStatus = mapTaskStatus(lead);
   return {
     ...lead,
     assigned: lead.assigned_to_name || "Unassigned",
