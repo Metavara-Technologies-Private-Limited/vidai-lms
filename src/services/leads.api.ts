@@ -243,7 +243,7 @@ const API_BASE_URL: string =
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
+  // headers: { "Content-Type": "application/json" },
 });
 
 // ── Request interceptor ───────────────────────────────────────────────────────
@@ -262,6 +262,16 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error),
 );
+api.interceptors.request.use((config) => {
+  if (config.data instanceof FormData) {
+    if (config.headers && typeof config.headers.delete === "function") {
+      config.headers.delete("Content-Type");
+    } else if (config.headers) {
+      delete config.headers["Content-Type"];
+    }
+  }
+  return config;
+});
 
 // ── Response interceptor ──────────────────────────────────────────────────────
 let isRefreshing = false;
