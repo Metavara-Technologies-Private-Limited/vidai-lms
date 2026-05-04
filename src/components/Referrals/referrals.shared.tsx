@@ -323,8 +323,8 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         .filter(Boolean)
     : [];
 
-  // ── CHANGE 1: "Contact Information" section — removed Age and Gender ───────
-  const contactInfo = [
+  // ── CHANGE 1: Removed Age and Gender from patient info fields ──
+  const patientInfo = [
     { label: "Contact No.", value: patient.raw.contact_no },
     { label: "Email", value: patient.raw.email },
     { label: "Location", value: patient.raw.location },
@@ -359,7 +359,7 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         maxHeight: isMobile ? "none" : "calc(100vh - 160px)",
       }}
     >
-      {/* ── CHANGE 2: "Patient Info" → "Lead Info" ────────────────────────── */}
+      {/* ── CHANGE 2: "Patient Info" → "Lead Info" ── */}
       <Box display="flex" alignItems="center" gap={1.5} mb={2.5}>
         <Typography fontSize="15px" fontWeight={700} color="#232323">
           Lead Info
@@ -398,8 +398,29 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
       </Box>
 
       <Divider sx={{ mb: 2.5, borderColor: "#F8F8F9" }} />
+      <Typography
+        fontSize="11px"
+        fontWeight={700}
+        color="#9E9E9E"
+        textTransform="uppercase"
+        letterSpacing="0.06em"
+        mb={2}
+      >
+        Patient Information
+      </Typography>
+      <Box
+        display="grid"
+        gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
+        gap={2.5}
+        mb={3}
+      >
+        {patientInfo.map((f) => (
+          <InfoField key={f.label} label={f.label} value={f.value} />
+        ))}
+      </Box>
 
-      {/* ── CHANGE 3: "Patient Information" → "Contact Information" ─────── */}
+      <Divider sx={{ mb: 2.5, borderColor: "#F8F8F9" }} />
+      {/* ── CHANGE 3: "Partner Information" → "Contact Information" ── */}
       <Typography
         fontSize="11px"
         fontWeight={700}
@@ -409,28 +430,6 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         mb={2}
       >
         Contact Information
-      </Typography>
-      <Box
-        display="grid"
-        gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
-        gap={2.5}
-        mb={3}
-      >
-        {contactInfo.map((f) => (
-          <InfoField key={f.label} label={f.label} value={f.value} />
-        ))}
-      </Box>
-
-      <Divider sx={{ mb: 2.5, borderColor: "#F8F8F9" }} />
-      <Typography
-        fontSize="11px"
-        fontWeight={700}
-        color="#9E9E9E"
-        textTransform="uppercase"
-        letterSpacing="0.06em"
-        mb={2}
-      >
-        Partner Information
       </Typography>
       <Box
         display="grid"
