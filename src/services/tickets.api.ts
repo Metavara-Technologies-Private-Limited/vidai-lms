@@ -135,8 +135,10 @@ export const ticketsApi = {
 };
 
 export const labsApi = {
-  getLabs: async (): Promise<Lab[]> => {
-    const response = await apiClient.get("/labs/");
+  getLabs: async (clinicId: number): Promise<Lab[]> => {
+    const response = await apiClient.get("/labs/", {
+      params: { clinic_id: clinicId },
+    });
     // Always return the results array if it exists (for paginated endpoints)
     return response.data?.results || response.data || [];
   },

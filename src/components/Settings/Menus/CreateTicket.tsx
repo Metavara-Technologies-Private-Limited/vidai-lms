@@ -195,7 +195,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
         setLoadingData(true);
         try {
           const results = await Promise.allSettled([
-            labsApi.getLabs(),
+            labsApi.getLabs(clinicId),
             clinicsApi.getClinicDetail(clinicId),
           ]);
 
