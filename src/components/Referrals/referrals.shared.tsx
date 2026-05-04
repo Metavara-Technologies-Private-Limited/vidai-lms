@@ -323,12 +323,11 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         .filter(Boolean)
     : [];
 
-  const patientInfo = [
+  // ── CHANGE 1: "Contact Information" section — removed Age and Gender ───────
+  const contactInfo = [
     { label: "Contact No.", value: patient.raw.contact_no },
     { label: "Email", value: patient.raw.email },
     { label: "Location", value: patient.raw.location },
-    { label: "Gender", value: "—" },
-    { label: "Age", value: patient.raw.age },
     { label: "Address", value: patient.raw.address },
     {
       label: "Language Preference",
@@ -360,9 +359,10 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         maxHeight: isMobile ? "none" : "calc(100vh - 160px)",
       }}
     >
+      {/* ── CHANGE 2: "Patient Info" → "Lead Info" ────────────────────────── */}
       <Box display="flex" alignItems="center" gap={1.5} mb={2.5}>
         <Typography fontSize="15px" fontWeight={700} color="#232323">
-          Patient Info
+          Lead Info
         </Typography>
         <Box
           sx={{
@@ -398,6 +398,8 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
       </Box>
 
       <Divider sx={{ mb: 2.5, borderColor: "#F8F8F9" }} />
+
+      {/* ── CHANGE 3: "Patient Information" → "Contact Information" ─────── */}
       <Typography
         fontSize="11px"
         fontWeight={700}
@@ -406,7 +408,7 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         letterSpacing="0.06em"
         mb={2}
       >
-        Patient Information
+        Contact Information
       </Typography>
       <Box
         display="grid"
@@ -414,7 +416,7 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         gap={2.5}
         mb={3}
       >
-        {patientInfo.map((f) => (
+        {contactInfo.map((f) => (
           <InfoField key={f.label} label={f.label} value={f.value} />
         ))}
       </Box>
