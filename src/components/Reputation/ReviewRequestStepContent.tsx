@@ -6,6 +6,7 @@ import {
   type ClipboardEvent,
   type MouseEvent,
 } from "react";
+import type { JSX } from "react";
 import {
   Box,
   Button,
@@ -175,7 +176,7 @@ const ReviewRequestStepContent = ({
   onFileSelect,
   onFileRemove,
   attachmentFiles,
-}: ReviewRequestStepContentProps) => {
+}: ReviewRequestStepContentProps): JSX.Element => {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
   const [showCc, setShowCc] = useState(formData.cc_emails.length > 0);
@@ -1137,17 +1138,6 @@ const handleClearFormatting = () => {
 
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
           <Tooltip title="Align Left">
-<<<<<<< Updated upstream
-            <span>
-              <IconButton
-  size="small"
-  onMouseDown={keepSelection}   // 🔥 REQUIRED
-  onClick={handleAlignLeft}
->
-                <FormatAlignLeftIcon fontSize="inherit" />
-              </IconButton>
-            </span>
-=======
             <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignLeft}
               sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'left' }) ? '#E5E7EB' : 'transparent' }}>
               <FormatAlignLeftIcon fontSize="inherit" />
@@ -1170,7 +1160,6 @@ const handleClearFormatting = () => {
               sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'justify' }) ? '#E5E7EB' : 'transparent' }}>
               <FormatAlignJustifyIcon fontSize="inherit" />
             </IconButton>
->>>>>>> Stashed changes
           </Tooltip>
           <Tooltip title="Numbered List">
             <IconButton
