@@ -385,10 +385,10 @@ api.interceptors.response.use(
  * Safely appends a LeadPayload field to FormData.
  *
  * Rules:
+ *  - documents  → always skipped (files are appended separately as File objects)
  *  - undefined  → skipped entirely (field not sent)
  *  - null       → skipped entirely (let backend use its default)
- *  - boolean    → "true" / "false"  (not the default String(false) = "false" which is fine,
- *                 but explicit here for clarity and to avoid "null" becoming "")
+ *  - boolean    → "true" / "false"
  *  - Array      → JSON-stringified  (e.g. treatments list)
  *  - everything else → String(value)
  */
@@ -397,6 +397,14 @@ const appendPayloadToFormData = (
   data: LeadPayload | Partial<LeadPayload>,
 ): void => {
   (Object.keys(data) as (keyof typeof data)[]).forEach((key) => {
+    // FIX: Never serialize the documents field — it contains LeadDocument[]
+    // metadata objects from an existing Lead. Actual file uploads are always
+    // appended separately via files.forEach(f => formData.append("documents", f)).
+    // Sending this as a JSON string causes the backend to receive a dict
+    // instead of a list of files, producing:
+    //   documents: ["Expected a list of items but got type \"dict\"."]
+    if ((key as string) === "documents") return;
+
     const value = data[key];
 
     // Skip undefined and null — don't send blank strings in their place
@@ -468,7 +476,8 @@ export const LeadAPI = {
   ): Promise<Lead> => {
     const formData = new FormData();
 
-    // FIX: Use safe helper — skips null/undefined, handles booleans & arrays correctly
+    // Safe helper — skips null/undefined, handles booleans & arrays correctly,
+    // and never serializes the documents field as JSON.
     appendPayloadToFormData(formData, data);
 
     // Referral source must be JSON-stringified in multipart FormData
@@ -537,7 +546,8 @@ export const LeadAPI = {
     const formData = new FormData();
     const sanitizedData = removeBlankUpdateFields(data);
 
-    // FIX: Use safe helper — skips null/undefined, handles booleans & arrays correctly
+    // Safe helper — skips null/undefined, handles booleans & arrays correctly,
+    // and never serializes the documents field as JSON.
     appendPayloadToFormData(formData, sanitizedData as Partial<LeadPayload>);
 
     files.forEach((file) => formData.append("documents", file));
