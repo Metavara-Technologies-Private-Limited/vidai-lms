@@ -380,6 +380,42 @@ api.interceptors.response.use(
   },
 );
 
+// ====================== FormData Helper ======================
+/**
+ * Safely appends a LeadPayload field to FormData.
+ *
+ * Rules:
+ *  - undefined  → skipped entirely (field not sent)
+ *  - null       → skipped entirely (let backend use its default)
+ *  - boolean    → "true" / "false"  (not the default String(false) = "false" which is fine,
+ *                 but explicit here for clarity and to avoid "null" becoming "")
+ *  - Array      → JSON-stringified  (e.g. treatments list)
+ *  - everything else → String(value)
+ */
+const appendPayloadToFormData = (
+  formData: FormData,
+  data: LeadPayload | Partial<LeadPayload>,
+): void => {
+  (Object.keys(data) as (keyof typeof data)[]).forEach((key) => {
+    const value = data[key];
+
+    // Skip undefined and null — don't send blank strings in their place
+    if (value === undefined || value === null) return;
+
+    if (typeof value === "boolean") {
+      formData.append(key, value ? "true" : "false");
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      formData.append(key, JSON.stringify(value));
+      return;
+    }
+
+    formData.append(key, String(value));
+  });
+};
+
 // ====================== Lead API ======================
 const storedClinicId = (): number =>
   Number(localStorage.getItem("clinic_id") ?? 0);
@@ -432,26 +468,37 @@ export const LeadAPI = {
   ): Promise<Lead> => {
     const formData = new FormData();
 
-    // Append all payload fields — null becomes "" so backend receives the field
-    (Object.keys(data) as (keyof LeadPayload)[]).forEach((key) => {
-      const value = data[key];
-      if (value === undefined) return;
-      formData.append(key, value === null ? "" : String(value));
-    });
+    // FIX: Use safe helper — skips null/undefined, handles booleans & arrays correctly
+    appendPayloadToFormData(formData, data);
 
     // Referral source must be JSON-stringified in multipart FormData
     if (referralSource) {
       formData.append("referral_source", JSON.stringify(referralSource));
     }
 
+    // Append each file under the "documents" key
     files.forEach((file) => formData.append("documents", file));
+
+    // DEBUG: Log what is being sent (remove in production)
+    if (import.meta.env.DEV) {
+      console.log("📤 createWithDocuments FormData entries:");
+      for (const [key, value] of formData.entries()) {
+        console.log(
+          `  ${key}:`,
+          value instanceof File ? `File(${value.name}, ${value.size}B)` : value,
+        );
+      }
+    }
 
     const response = await api.post<Lead>(
       `/leads/?clinic_id=${data.clinic_id}`,
       formData,
       {
+        // NOTE: Do NOT manually set Content-Type here.
+        // Axios + browser will automatically set multipart/form-data
+        // with the correct boundary. Setting it manually strips the boundary
+        // and causes a server parse error.
         headers: {
-          "Content-Type": "multipart/form-data",
           "X-Clinic-Id": String(data.clinic_id),
         },
       },
@@ -490,14 +537,8 @@ export const LeadAPI = {
     const formData = new FormData();
     const sanitizedData = removeBlankUpdateFields(data);
 
-    // Append all payload fields — null becomes "" so backend receives the field
-    (Object.keys(sanitizedData) as (keyof Partial<LeadPayload>)[]).forEach(
-      (key) => {
-        const value = sanitizedData[key];
-        if (value === undefined) return;
-        formData.append(key, value === null ? "" : String(value));
-      },
-    );
+    // FIX: Use safe helper — skips null/undefined, handles booleans & arrays correctly
+    appendPayloadToFormData(formData, sanitizedData as Partial<LeadPayload>);
 
     files.forEach((file) => formData.append("documents", file));
 
@@ -506,8 +547,8 @@ export const LeadAPI = {
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
       {
+        // NOTE: Do NOT manually set Content-Type here (same reason as createWithDocuments)
         headers: {
-          "Content-Type": "multipart/form-data",
           "X-Clinic-Id": String(clinicId),
         },
       },
@@ -542,8 +583,8 @@ export const LeadAPI = {
       `/leads/${leadId}/update/?clinic_id=${storedClinicId()}`,
       formData,
       {
+        // NOTE: Do NOT manually set Content-Type here (same reason as createWithDocuments)
         headers: {
-          "Content-Type": "multipart/form-data",
           "X-Clinic-Id": String(storedClinicId()),
         },
       },
@@ -574,8 +615,8 @@ export const LeadAPI = {
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
       {
+        // NOTE: Do NOT manually set Content-Type here (same reason as createWithDocuments)
         headers: {
-          "Content-Type": "multipart/form-data",
           "X-Clinic-Id": String(clinicId),
         },
       },
