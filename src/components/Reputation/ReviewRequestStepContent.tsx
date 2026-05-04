@@ -6,6 +6,7 @@ import {
   type ClipboardEvent,
   type MouseEvent,
 } from "react";
+import type { JSX } from "react";
 import {
   Box,
   Button,
@@ -36,6 +37,9 @@ import FormatItalicIcon from "@mui/icons-material/FormatItalic";
 import FormatUnderlinedIcon from "@mui/icons-material/FormatUnderlined";
 import FormatColorTextIcon from "@mui/icons-material/FormatColorText";
 import FormatAlignLeftIcon from "@mui/icons-material/FormatAlignLeft";
+import FormatAlignCenterIcon from "@mui/icons-material/FormatAlignCenter";
+import FormatAlignRightIcon from "@mui/icons-material/FormatAlignRight";
+import FormatAlignJustifyIcon from "@mui/icons-material/FormatAlignJustify";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import FormatListBulletedIcon from "@mui/icons-material/FormatListBulleted";
 import FormatIndentDecreaseIcon from "@mui/icons-material/FormatIndentDecrease";
@@ -172,7 +176,7 @@ const ReviewRequestStepContent = ({
   onFileSelect,
   onFileRemove,
   attachmentFiles,
-}: ReviewRequestStepContentProps) => {
+}: ReviewRequestStepContentProps): JSX.Element => {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
   const [showCc, setShowCc] = useState(formData.cc_emails.length > 0);
@@ -209,7 +213,11 @@ const ReviewRequestStepContent = ({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+      }),
       Heading.configure({
         levels: [1, 2, 3, 4, 5, 6],
       }),
@@ -220,6 +228,7 @@ const ReviewRequestStepContent = ({
       ListItem,
       TextAlign.configure({
         types: ["heading", "paragraph", "listItem"],
+        alignments: ["left", "center", "right", "justify"],
       }),
       TiptapLink.configure({
         openOnClick: false,
@@ -608,6 +617,42 @@ const handleAlignLeft = () => {
   .run();
 };
 
+  const handleAlignCenter = () => {
+    if (editor) {
+      editor.chain().focus().setTextAlign("center").run();
+      syncEditorToState();
+      return;
+    }
+    restoreSelection();
+    document.execCommand("justifyCenter", false, undefined);
+    syncEditorToState();
+    saveSelection();
+  };
+
+  const handleAlignRight = () => {
+    if (editor) {
+      editor.chain().focus().setTextAlign("right").run();
+      syncEditorToState();
+      return;
+    }
+    restoreSelection();
+    document.execCommand("justifyRight", false, undefined);
+    syncEditorToState();
+    saveSelection();
+  };
+
+  const handleAlignJustify = () => {
+    if (editor) {
+      editor.chain().focus().setTextAlign("justify").run();
+      syncEditorToState();
+      return;
+    }
+    restoreSelection();
+    document.execCommand("justifyFull", false, undefined);
+    syncEditorToState();
+    saveSelection();
+  };
+
   const handleNumberedList = () => {
     if (editor) {
       editor.chain().focus().toggleOrderedList().run();
@@ -654,7 +699,19 @@ const handleAlignLeft = () => {
 
   const handleIndent = () => {
     if (editor) {
-      editor.chain().focus().sinkListItem("listItem").run();
+      if (editor.isActive("listItem")) {
+        editor.chain().focus().sinkListItem("listItem").run();
+      } else {
+        const { $from } = editor.state.selection;
+        const node = $from.parent;
+        const style = (node.attrs?.style as string) || "";
+        const match = /margin-left:\s*(\d+)px/.exec(style);
+        const curr = match ? parseInt(match[1], 10) : 0;
+        const cleaned = style.replace(/margin-left:\s*\d+px;?/g, "").trim();
+        const newStyle = (cleaned ? cleaned + "; " : "") + `margin-left: ${curr + 20}px`;
+        const nodeType = editor.isActive("heading") ? "heading" : "paragraph";
+        editor.chain().focus().updateAttributes(nodeType, { style: newStyle }).run();
+      }
       syncEditorToState();
       return;
     }
@@ -663,7 +720,20 @@ const handleAlignLeft = () => {
 
   const handleOutdent = () => {
     if (editor) {
-      editor.chain().focus().liftListItem("listItem").run();
+      if (editor.isActive("listItem")) {
+        editor.chain().focus().liftListItem("listItem").run();
+      } else {
+        const { $from } = editor.state.selection;
+        const node = $from.parent;
+        const style = (node.attrs?.style as string) || "";
+        const match = /margin-left:\s*(\d+)px/.exec(style);
+        const curr = match ? parseInt(match[1], 10) : 0;
+        const next = Math.max(0, curr - 20);
+        const cleaned = style.replace(/margin-left:\s*\d+px;?/g, "").trim();
+        const newStyle = (cleaned ? cleaned + "; " : "") + `margin-left: ${next}px`;
+        const nodeType = editor.isActive("heading") ? "heading" : "paragraph";
+        editor.chain().focus().updateAttributes(nodeType, { style: newStyle }).run();
+      }
       syncEditorToState();
       return;
     }
@@ -1068,15 +1138,28 @@ const handleClearFormatting = () => {
 
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
           <Tooltip title="Align Left">
-            <span>
-              <IconButton
-  size="small"
-  onMouseDown={keepSelection}   // 🔥 REQUIRED
-  onClick={handleAlignLeft}
->
-                <FormatAlignLeftIcon fontSize="inherit" />
-              </IconButton>
-            </span>
+            <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignLeft}
+              sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'left' }) ? '#E5E7EB' : 'transparent' }}>
+              <FormatAlignLeftIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Align Center">
+            <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignCenter}
+              sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'center' }) ? '#E5E7EB' : 'transparent' }}>
+              <FormatAlignCenterIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Align Right">
+            <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignRight}
+              sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'right' }) ? '#E5E7EB' : 'transparent' }}>
+              <FormatAlignRightIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Justify">
+            <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignJustify}
+              sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'justify' }) ? '#E5E7EB' : 'transparent' }}>
+              <FormatAlignJustifyIcon fontSize="inherit" />
+            </IconButton>
           </Tooltip>
           <Tooltip title="Numbered List">
             <IconButton
