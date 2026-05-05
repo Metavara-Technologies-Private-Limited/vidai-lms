@@ -2,6 +2,7 @@
 // EditLead.tsx  –  Pure JSX / render layer
 // All state & logic lives in useEditLead.ts
 // ============================================================
+import * as React from "react";
 import {
   Box,
   Button,
@@ -93,7 +94,89 @@ const SLOT_MENU_PROPS = {
   },
 };
 
+// ── ALL BCP-47 language codes to iterate over ────────────────────────────────
+const ALL_LANGUAGE_CODES: string[] = [
+  "ab","aa","af","ak","sq","am","ar","an","hy","as","av","ae","ay","az",
+  "bm","ba","eu","be","bn","bh","bi","bs","br","bg","my","ca","ch","ce",
+  "ny","zh","cv","kw","co","cr","hr","cs","da","dv","nl","dz","en","eo",
+  "et","ee","fo","fj","fi","fr","ff","gl","ka","de","el","gn","gu","ht",
+  "ha","he","hz","hi","ho","hu","ia","id","ie","ga","ig","ik","io","is",
+  "it","iu","ja","jv","kl","kn","kr","ks","kk","km","ki","rw","ky","kv",
+  "kg","ko","ku","kj","la","lb","lg","li","ln","lo","lt","lu","lv","gv",
+  "mk","mg","ms","ml","mt","mi","mr","mh","mn","na","nv","nd","ne","ng",
+  "nb","nn","no","ii","nr","oc","oj","cu","om","or","os","pa","pi","fa",
+  "pl","ps","pt","qu","rm","rn","ro","ru","sa","sc","sd","se","sm","sg",
+  "sr","gd","sn","si","sk","sl","so","st","es","su","sw","ss","sv","ta",
+  "te","tg","th","ti","bo","tk","tl","tn","to","tr","ts","tt","tw","ty",
+  "ug","uk","ur","uz","ve","vi","vo","wa","cy","wo","fy","xh","yi","yo",
+  "za","zu",
+  "fil","haw","hmn","ilo","jw","ceb","war","min","bug","ban","ace","mad",
+  "mak","gor","sas","nds","pms","scn","lmo","vec","fur","lij","nap","szl",
+  "csb","hsb","dsb","rue",
+  "zh-Hans","zh-Hant","pt-BR","pt-PT","es-419",
+  "sr-Latn","sr-Cyrl","uz-Latn","uz-Cyrl","az-Latn","az-Cyrl",
+  "bs-Latn","bs-Cyrl",
+];
+
+function getLanguagesFromBrowser(): string[] {
+  try {
+    const displayNames = new Intl.DisplayNames(["en"], { type: "language" });
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const code of ALL_LANGUAGE_CODES) {
+      try {
+        const name = displayNames.of(code);
+        if (name && name !== code && !seen.has(name)) {
+          seen.add(name);
+          result.push(name);
+        }
+      } catch {
+        // skip invalid codes
+      }
+    }
+
+    return result.sort((a, b) => a.localeCompare(b));
+  } catch {
+    return [
+      "Afrikaans","Albanian","Amharic","Arabic","Armenian","Azerbaijani",
+      "Basque","Belarusian","Bengali","Bosnian","Bulgarian","Burmese",
+      "Catalan","Chinese","Croatian","Czech","Danish","Dutch","English",
+      "Esperanto","Estonian","Finnish","French","Galician","Georgian",
+      "German","Greek","Gujarati","Haitian Creole","Hausa","Hebrew",
+      "Hindi","Hungarian","Icelandic","Igbo","Indonesian","Irish",
+      "Italian","Japanese","Javanese","Kannada","Kazakh","Khmer","Korean",
+      "Kurdish","Kyrgyz","Lao","Latin","Latvian","Lithuanian","Macedonian",
+      "Malagasy","Malay","Malayalam","Maltese","Maori","Marathi","Mongolian",
+      "Nepali","Norwegian","Odia","Pashto","Persian","Polish","Portuguese",
+      "Punjabi","Romanian","Russian","Sanskrit","Serbian","Sinhala","Slovak",
+      "Slovenian","Somali","Spanish","Sundanese","Swahili","Swedish","Tagalog",
+      "Tajik","Tamil","Telugu","Thai","Tibetan","Turkish","Turkmen","Ukrainian",
+      "Urdu","Uzbek","Vietnamese","Welsh","Xhosa","Yoruba","Zulu",
+    ].sort();
+  }
+}
+
+// ── Hook: all languages from browser Intl API — no network, no API key ───────
+function useAllLanguages() {
+  const [languages, setLanguages] = React.useState<string[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const id = setTimeout(() => {
+      setLanguages(getLanguagesFromBrowser());
+      setLoading(false);
+    }, 0);
+    return () => clearTimeout(id);
+  }, []);
+
+  return { languages, loading };
+}
+
 export default function EditLead() {
+  // ── Language hook (replaces hardcoded 3-item list) ────────────────────────
+  const { languages: allLanguages, loading: languagesLoading } = useAllLanguages();
+
   const {
     navigate,
     currentStep,
@@ -611,7 +694,7 @@ export default function EditLead() {
                 </Box>
               )}
 
-              {/* Language Preference */}
+              {/* ── Language Preference — dynamic via Intl.DisplayNames ── */}
               <Box
                 sx={{
                   display: "grid",
@@ -628,12 +711,22 @@ export default function EditLead() {
                     size="small"
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
+                    disabled={languagesLoading}
                     sx={inputStyle}
+                    InputProps={{
+                      endAdornment: languagesLoading ? (
+                        <CircularProgress size={16} sx={{ mr: 3 }} />
+                      ) : null,
+                    }}
                   >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="English">English</MenuItem>
-                    <MenuItem value="Hindi">Hindi</MenuItem>
-                    <MenuItem value="Kannada">Kannada</MenuItem>
+                    <MenuItem value="">
+                      {languagesLoading ? "Loading languages…" : "-- Select --"}
+                    </MenuItem>
+                    {allLanguages.map((lang) => (
+                      <MenuItem key={lang} value={lang}>
+                        {lang}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 </Box>
               </Box>
@@ -791,7 +884,6 @@ export default function EditLead() {
               <Box
                 sx={{
                   display: "grid",
-                  // When campaign is hidden (Referral or Direct+non-Gmail), only 2 cols
                   gridTemplateColumns: isCampaignDisabled
                     ? "repeat(2, 1fr)"
                     : "repeat(3, 1fr)",
@@ -867,9 +959,7 @@ export default function EditLead() {
                   </Box>
                 )}
 
-                {/* ── Campaign Name ──
-                 *  Now always editable - users can change campaign selection at any time
-                 */}
+                {/* ── Campaign Name ── */}
                 {source !== "Other" && !isCampaignDisabled && (
                   <Box>
                     <Typography sx={labelStyle}>
