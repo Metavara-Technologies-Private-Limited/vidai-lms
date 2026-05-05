@@ -444,22 +444,22 @@ const Tickets = () => {
                 sx={{ minWidth: columns[8].minWidth }}
               >
                 <Avatar sx={ticketsAvatarSx}>
-                  {t.assigned_to_id
+                  {t.assigned_to_id || t.assigned_to_name
                     ? (
+                        t.assigned_to_name?.trim()?.charAt(0) ||
                         employees
                           .find((item) => item.id === t.assigned_to_id)
                           ?.emp_name?.trim()
                           ?.charAt(0) ||
-                        t.assigned_to_name?.trim()?.charAt(0) ||
                         "?"
                       ).toUpperCase()
                     : "?"}
                 </Avatar>
 
                 <Typography sx={ticketsAssigneeTextSx}>
-                  {employees.find((item) => item.id === t.assigned_to_id)
-                    ?.emp_name ||
-                    t.assigned_to_name ||
+                  {t.assigned_to_name ||
+                    employees.find((item) => item.id === t.assigned_to_id)
+                      ?.emp_name ||
                     "Unassigned"}
                 </Typography>
               </Box>

@@ -85,13 +85,13 @@ const normalizeUsersList = (users: any[]): AssigneeOption[] => {
   }));
 };
 
-    const assigneeLabel = (option: AssigneeOption): string => {
-      const fullName =
-        `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
-      const primary = fullName || option.username || `User ${option.id}`;
-      const secondary = option.role;
-      return secondary ? `${primary} (${secondary})` : primary;
-    };
+const assigneeLabel = (option: AssigneeOption): string => {
+  const fullName =
+    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const primary = fullName || option.username || `User ${option.id}`;
+  const secondary = option.role;
+  return secondary ? `${primary} (${secondary})` : primary;
+};
 
 const MAX_TICKET_SUBJECT_LENGTH = 150;
 const MAX_TICKET_DESCRIPTION_LENGTH = 500;
@@ -117,6 +117,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [departmentId, setDepartmentId] = useState<number | "">("");
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [assigneeId, setAssigneeId] = useState<number | "">("");
+  const [assigneeName, setAssigneeName] = useState("");
   const [assigneeSearch, setAssigneeSearch] = useState("");
   const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = useState(false);
@@ -294,6 +295,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
         priority: priority as TicketPriority,
         status: "new",
         assigned_to: assigneeId ? Number(assigneeId) : null,
+        assigned_to_name: assigneeName || undefined,
         due_date: dueDate ? dueDate.format("YYYY-MM-DD") : null,
       };
 
@@ -350,6 +352,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
     setDepartmentId("");
     setPriority("");
     setAssigneeId("");
+    setAssigneeName("");
     setRequestedBy("");
     setAssigneeSearch("");
     setAssigneeOptions([]);
@@ -605,7 +608,15 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                     );
                   }
                 }}
-                onChange={(_, value) => setAssigneeId(value?.id ?? "")}
+                onChange={(_, value) => {
+                  setAssigneeId(value?.id ?? "");
+                  if (value) {
+                    const fullName = assigneeLabel(value);
+                    setAssigneeName(fullName);
+                  } else {
+                    setAssigneeName("");
+                  }
+                }}
                 getOptionLabel={assigneeLabel}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
                 fullWidth

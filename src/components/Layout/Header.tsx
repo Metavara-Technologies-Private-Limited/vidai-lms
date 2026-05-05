@@ -509,7 +509,7 @@ const Header = ({
                   lineHeight: 1.2,
                 }}
               >
-                Clinic:
+                Lab:
               </Typography>
               <Typography
                 component="span"
