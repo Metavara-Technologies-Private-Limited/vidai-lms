@@ -626,3 +626,60 @@ div[class*="Bulk"] .MuiCheckbox-root svg rect,
 [role="toolbar"] .MuiCheckbox-root svg rect,
 .MuiFade-root .MuiCheckbox-root svg rect,
 .MuiBox-root .MuiCheckbox-root svg rect { rx: 4 !important; ry: 4 !important; }
+
+/* ===============================
+   FIX: ISOLATE LEADS PAGE INPUTS
+   Prevents campaigns (and any other
+   page) CSS from leaking into leads
+   MUI input fields and enlarging them.
+================================ */
+
+.leads-page .MuiInputBase-root,
+.leads-page .MuiOutlinedInput-root,
+.leads-page .MuiInputBase-input,
+.leads-page .MuiOutlinedInput-input {
+  height: auto !important;
+  min-height: unset !important;
+  max-height: unset !important;
+  font-size: 14px !important;
+  padding-top: unset !important;
+  padding-bottom: unset !important;
+  box-sizing: border-box !important;
+}
+
+.leads-page .MuiInputBase-root.MuiInputBase-sizeSmall,
+.leads-page .MuiOutlinedInput-root.MuiInputBase-sizeSmall {
+  height: auto !important;
+  min-height: unset !important;
+}
+
+.leads-page .MuiInputBase-root.MuiInputBase-sizeSmall .MuiInputBase-input,
+.leads-page .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiOutlinedInput-input {
+  padding: 8.5px 14px !important;
+  font-size: 14px !important;
+  height: auto !important;
+  min-height: unset !important;
+}
+
+.leads-page .MuiTextField-root .MuiInputBase-root {
+  height: auto !important;
+  min-height: unset !important;
+}
+
+.leads-page .MuiSelect-select {
+  height: auto !important;
+  min-height: unset !important;
+  padding: 8.5px 14px !important;
+  font-size: 14px !important;
+}
+
+.leads-page .MuiAutocomplete-root .MuiInputBase-root {
+  height: auto !important;
+  min-height: unset !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.leads-page .MuiAutocomplete-root .MuiInputBase-root.MuiInputBase-sizeSmall {
+  padding: 3px 14px 3px 6px !important;
+}
