@@ -683,3 +683,63 @@ div[class*="Bulk"] .MuiCheckbox-root svg rect,
 .leads-page .MuiAutocomplete-root .MuiInputBase-root.MuiInputBase-sizeSmall {
   padding: 3px 14px 3px 6px !important;
 }
+
+/* ===============================
+   FIX: ISOLATE ADD NEW LEAD FORM INPUTS
+   The AddNewLead component renders inside
+   a <Paper> with class "add-lead-page".
+   Same isolation rules applied here to
+   prevent campaign modal CSS leaking in
+   and enlarging input fields after the
+   modal is closed.
+================================ */
+
+.add-lead-page .MuiInputBase-root,
+.add-lead-page .MuiOutlinedInput-root,
+.add-lead-page .MuiInputBase-input,
+.add-lead-page .MuiOutlinedInput-input {
+  height: auto !important;
+  min-height: unset !important;
+  max-height: unset !important;
+  font-size: 14px !important;
+  padding-top: unset !important;
+  padding-bottom: unset !important;
+  box-sizing: border-box !important;
+}
+
+.add-lead-page .MuiInputBase-root.MuiInputBase-sizeSmall,
+.add-lead-page .MuiOutlinedInput-root.MuiInputBase-sizeSmall {
+  height: auto !important;
+  min-height: unset !important;
+}
+
+.add-lead-page .MuiInputBase-root.MuiInputBase-sizeSmall .MuiInputBase-input,
+.add-lead-page .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiOutlinedInput-input {
+  padding: 8.5px 14px !important;
+  font-size: 14px !important;
+  height: auto !important;
+  min-height: unset !important;
+}
+
+.add-lead-page .MuiTextField-root .MuiInputBase-root {
+  height: auto !important;
+  min-height: unset !important;
+}
+
+.add-lead-page .MuiSelect-select {
+  height: auto !important;
+  min-height: unset !important;
+  padding: 8.5px 14px !important;
+  font-size: 14px !important;
+}
+
+.add-lead-page .MuiAutocomplete-root .MuiInputBase-root {
+  height: auto !important;
+  min-height: unset !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.add-lead-page .MuiAutocomplete-root .MuiInputBase-root.MuiInputBase-sizeSmall {
+  padding: 3px 14px 3px 6px !important;
+}
