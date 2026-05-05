@@ -302,13 +302,22 @@ const TicketPropertiesSidebar = ({
               <Typography variant="body2" color="text.secondary">
                 Assigned To :
               </Typography>
-              <Stack direction="row" alignItems="center" spacing={1}>
+              <Stack direction="row" alignItems="flex-start" spacing={1}>
                 <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: "#7B61FF" }}>
                   {(currentAssigneeName.trim().charAt(0) || "U").toUpperCase()}
                 </Avatar>
-                <Typography variant="body2" fontWeight={600}>
-                  {currentAssigneeName || "Unassigned"}
-                </Typography>
+<Typography
+  variant="body2"
+  fontWeight={600}
+  sx={{
+    maxWidth: 140,              // control width
+    whiteSpace: "normal",       // allow wrap
+    wordBreak: "break-word",    // break long names
+    lineHeight: 1.2,
+  }}
+>
+  {currentAssigneeName || "Unassigned"}
+</Typography>
               </Stack>
             </Box>
           </Box>

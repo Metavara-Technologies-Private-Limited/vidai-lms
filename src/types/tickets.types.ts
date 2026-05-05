@@ -48,6 +48,12 @@ export interface CreateTicketRequest {
   status?: TicketStatus;
   due_date?: string | null; // ISO date format (YYYY-MM-DD)
   documents?: TicketDocument[];
+  // Zapier payload fields for backend ticket email webhook
+  event?: "ticket_created";
+  clinicName?: string;
+  to?: string[];
+  cc?: string[];
+  email_body?: string;
 }
 
 // Update Ticket Request
@@ -64,6 +70,12 @@ export interface UpdateTicketRequest {
   type?: string;
   due_date?: string | null;
   documents?: TicketDocument[];
+  // Zapier payload fields for backend ticket email webhook
+  event?: "ticket_updated";
+  clinicName?: string;
+  to?: string[];
+  cc?: string[];
+  email_body?: string;
 }
 
 export interface UpdateTicketStatusPayload {
@@ -72,6 +84,12 @@ export interface UpdateTicketStatusPayload {
   assigned_to?: number | null;
   assigned_to_name?: string;
   type?: string;
+  // Zapier payload fields for backend ticket email webhook
+  event?: "ticket_updated";
+  clinicName?: string;
+  to?: string[];
+  cc?: string[];
+  email_body?: string;
 }
 
 // Ticket List Item (for list view)

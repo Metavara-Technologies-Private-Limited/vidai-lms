@@ -34,6 +34,7 @@ import type { Employee } from "../../../services/leads.api";
 import { toast } from "react-toastify";
 import TicketPropertiesSidebar from "../Menus/TicketPropertiesSidebar";
 import { selectClinic } from "../../../store/clinicSlice";
+import { selectUsers } from "../../../store/userSlice";
 import { useSelector } from "react-redux";
 import { selectUser } from "../../../store/authSlice";
 import {
@@ -151,6 +152,28 @@ const resolveClinicId = (ticketData: unknown): string => {
   return "1";
 };
 
+const findEmailByUserName = (
+  userName: string,
+  availableUsers: {
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    email?: string;
+  }[],
+): string => {
+  const normalizedName = userName.trim().toLowerCase();
+  const match = availableUsers.find((user) => {
+    const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+    return [
+      fullName.toLowerCase(),
+      user.username?.trim().toLowerCase() ?? "",
+      user.email?.trim().toLowerCase() ?? "",
+    ].includes(normalizedName);
+  });
+
+  return match?.email?.trim() || "";
+};
+
 const extractApiErrorMessage = (data: unknown): string | null => {
   if (!data) return null;
 
@@ -180,6 +203,7 @@ const TicketView = () => {
   const navigate = useNavigate();
   const clinic = useSelector(selectClinic);
   const authUser = useSelector(selectUser);
+  const users = useSelector(selectUsers);
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [leads, setLeads] = useState<Array<{ id: string; email?: string }>>([]);
@@ -395,6 +419,28 @@ const TicketView = () => {
     setError(null);
 
     try {
+      const assigneeEmail =
+        employees.find((emp) => emp.id === assignTo)?.email || "";
+      const requestedByEmail =
+        authUser?.email?.trim() ||
+        findEmailByUserName(ticket.requested_by || "", users);
+
+      if (!isEmail(assigneeEmail)) {
+        toast.error(
+          "Assigned user's email is invalid. Please check assignee details.",
+        );
+        setUpdating(false);
+        return;
+      }
+
+      if (!isEmail(requestedByEmail)) {
+        toast.error(
+          "Requested by user's email is invalid. Please verify requester email.",
+        );
+        setUpdating(false);
+        return;
+      }
+
       let hasChanges = false;
 
       if (
@@ -403,6 +449,66 @@ const TicketView = () => {
         assignTo !== (ticket.assigned_to_id || "") ||
         type !== ticket.type
       ) {
+        const clinicName = clinic?.name || ticket.lab_name || "Clinic";
+        const changeLines: string[] = [];
+
+        if (status !== ticket.status) {
+          changeLines.push(
+            `- Status changed from ${ticket.status} → ${status}`,
+          );
+        }
+        if (priority !== ticket.priority) {
+          changeLines.push(
+            `- Priority changed from ${ticket.priority} → ${priority}`,
+          );
+        }
+        if (assignTo !== (ticket.assigned_to_id || "")) {
+          changeLines.push(
+            `- Assigned To changed from ${ticket.assigned_to_name || "Unassigned"} → ${draftAssigneeName || "Unassigned"}`,
+          );
+        }
+        if (type !== ticket.type) {
+          changeLines.push(
+            `- Type changed from ${ticket.type || "Unknown"} → ${type}`,
+          );
+        }
+
+        const currentStatusLines = [
+          "━━━━━━━━━━━━━━━━━━━━━━",
+          "📊 Current Status",
+          "━━━━━━━━━━━━━━━━━━━━━━",
+          `Status        : ${status}`,
+          `Priority      : ${priority}`,
+          `Assigned To   : ${draftAssigneeName || ticket.assigned_to_name || "Unassigned"}`,
+        ];
+
+        const updateBodyLines = [
+          `Hi ${draftAssigneeName || ticket.assigned_to_name || "Team"},`,
+          "",
+          "The following ticket has been updated.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━",
+          "📌 Ticket Details",
+          "━━━━━━━━━━━━━━━━━━━━━━",
+          `Ticket ID     : ${ticket.ticket_no || ticket.id}`,
+          `Subject       : ${ticket.subject}`,
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━",
+          "🔄 Changes Made",
+          "━━━━━━━━━━━━━━━━━━━━━━",
+          ...changeLines,
+          "",
+          ...currentStatusLines,
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━",
+          "👉 Next Steps",
+          "━━━━━━━━━━━━━━━━━━━━━━",
+          "Please review the updates and proceed accordingly.",
+          "",
+          "Regards,",
+          `${clinicName} Support Team`,
+        ];
+
         await ticketsApi.updateTicketStatus(id, {
           status,
           priority,
@@ -411,6 +517,11 @@ const TicketView = () => {
             draftAssigneeName.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH) ||
             undefined,
           type,
+          event: "ticket_updated",
+          clinicName,
+          to: [assigneeEmail],
+          cc: [requestedByEmail],
+          email_body: updateBodyLines.join("\n"),
         });
 
         hasChanges = true;
