@@ -14,6 +14,7 @@ import { USE_CASE_OPTIONS, USE_CASE_BODY_SUGGESTIONS } from "./LeadsTable.types"
 import { extractErrorMessage, normalizePhone } from "./LeadsTable.helpers";
 import { getUseCaseChipSx, outlineBtn, darkBtn } from "./LeadsTable.styles";
 import { TwilioAPI } from "../../services/leads.api";
+import type { TwilioSMS } from "../../services/leads.api";
 import TemplateService from "../../services/templates.api";
 
 // ── Shared toast options — identical to useEditLead.ts ────────────────
@@ -308,7 +309,7 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
 interface SMSDialogProps {
   open: boolean;
   lead: ProcessedLead | null;
-  onClose: () => void;
+  onClose: (sent?: boolean, sentItem?: TwilioSMS) => void;
 }
 
 export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
@@ -317,7 +318,7 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
   const [error, setError] = React.useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
 
-  const handleClose = () => { if (sending) return; setMessage(""); setError(null); onClose(); };
+  const handleClose = () => { if (sending) return; setMessage(""); setError(null); onClose(false); };
 
   // ── Check for unfilled variables like {name}, {date} etc ──────────────
   const unfilledVars = React.useMemo(() => {
@@ -342,7 +343,16 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
       await TwilioAPI.sendSMS({ lead_uuid: lead.id, to: phone, message: message.trim() });
       toast.success(`SMS sent to ${lead?.full_name || lead?.name}!`, toastOptions);
       setMessage("");
-      onClose();
+      onClose(true, {
+        id: `optimistic-${Date.now()}`,
+        sid: `optimistic-${Date.now()}`,
+        to_number: phone,
+        from_number: "",
+        body: message.trim(),
+        status: "sent",
+        direction: "outbound",
+        created_at: new Date().toISOString(),
+      } as TwilioSMS);
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to send SMS. Please try again."));
     } finally {

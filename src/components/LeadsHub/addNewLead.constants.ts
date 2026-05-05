@@ -17,7 +17,7 @@ export const SOURCE_OPTIONS = ["Direct", "Referral", "Social Media", "Other"] as
 // "Referral" sub-sources are fetched dynamically from the backend referral departments API
 export const SUB_SOURCE_OPTIONS: Record<string, string[]> = {
   "Social Media": ["Facebook", "Instagram", "LinkedIn", "Google Ads"],
-  Direct: ["Walk-in", "Phone Call", "Website", "Google", "Gmail"],
+  Direct: ["Walk-in", "Conference","Phone Call", "Website", "Google", "Gmail"],
 };
 
 // ====================== Referral Department Options ======================

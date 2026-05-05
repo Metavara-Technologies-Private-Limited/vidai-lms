@@ -493,7 +493,7 @@ export default function EditLead() {
                 }}
               >
                 <Box>
-                  <Typography sx={labelStyle}>Full Name *</Typography>
+                  <Typography sx={labelStyle}>Lab Name *</Typography>
                   <TextField
                     fullWidth
                     size="small"

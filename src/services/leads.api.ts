@@ -191,15 +191,38 @@ export type LeadEmailResponse = {
 };
 
 export type LeadMailListItem = {
-  id: number;
-  lead_uuid: string;
+  id: number | string;
+  lead_uuid?: string;
   subject: string;
   sender_email?: string | null;
   email_body: string;
-  status: LeadEmailStatus;
+  status: LeadEmailStatus | string;
   failed_reason?: string | null;
   scheduled_at?: string | null;
   sent_at?: string | null;
+  created_at: string;
+};
+
+// ====================== Twilio Types ======================
+export type TwilioSMS = {
+  id: string | number;
+  sid: string;
+  to_number: string;
+  from_number: string;
+  body: string;
+  status: string;
+  direction: string;
+  created_at: string;
+};
+
+export type TwilioCall = {
+  id: string | number;
+  sid: string;
+  to_number: string;
+  from_number: string;
+  status: string;
+  direction: string;
+  duration?: string | number;
   created_at: string;
 };
 
@@ -407,17 +430,10 @@ const appendPayloadToFormData = (
   data: LeadPayload | Partial<LeadPayload>,
 ): void => {
   (Object.keys(data) as (keyof typeof data)[]).forEach((key) => {
-    // FIX: Never serialize the documents field — it contains LeadDocument[]
-    // metadata objects from an existing Lead. Actual file uploads are always
-    // appended separately via files.forEach(f => formData.append("documents", f)).
-    // Sending this as a JSON string causes the backend to receive a dict
-    // instead of a list of files, producing:
-    //   documents: ["Expected a list of items but got type \"dict\"."]
     if ((key as string) === "documents") return;
 
     const value = data[key];
 
-    // Skip undefined and null — don't send blank strings in their place
     if (value === undefined || value === null) return;
 
     if (typeof value === "boolean") {
@@ -443,7 +459,6 @@ const removeBlankUpdateFields = <T extends Record<string, unknown>>(
 ): Partial<T> => {
   const next = { ...payload } as Record<string, unknown>;
 
-  // Backend rejects blank or null contact_no on update; omit it when empty/null so existing value is preserved.
   if (
     next.contact_no === null ||
     next.contact_no === undefined ||
@@ -486,19 +501,14 @@ export const LeadAPI = {
   ): Promise<Lead> => {
     const formData = new FormData();
 
-    // Safe helper — skips null/undefined, handles booleans & arrays correctly,
-    // and never serializes the documents field as JSON.
     appendPayloadToFormData(formData, data);
 
-    // Referral source must be JSON-stringified in multipart FormData
     if (referralSource) {
       formData.append("referral_source", JSON.stringify(referralSource));
     }
 
-    // Append each file under the "documents" key
     files.forEach((file) => formData.append("documents", file));
 
-    // DEBUG: Log what is being sent (remove in production)
     if (import.meta.env.DEV) {
       console.log("📤 createWithDocuments FormData entries:");
       for (const [key, value] of formData.entries()) {
@@ -513,10 +523,6 @@ export const LeadAPI = {
       `/leads/?clinic_id=${data.clinic_id}`,
       formData,
       {
-        // NOTE: Do NOT manually set Content-Type here.
-        // Axios + browser will automatically set multipart/form-data
-        // with the correct boundary. Setting it manually strips the boundary
-        // and causes a server parse error.
         headers: {
           "X-Clinic-Id": String(data.clinic_id),
         },
@@ -556,8 +562,6 @@ export const LeadAPI = {
     const formData = new FormData();
     const sanitizedData = removeBlankUpdateFields(data);
 
-    // Safe helper — skips null/undefined, handles booleans & arrays correctly,
-    // and never serializes the documents field as JSON.
     appendPayloadToFormData(formData, sanitizedData as Partial<LeadPayload>);
 
     files.forEach((file) => formData.append("documents", file));
@@ -567,7 +571,6 @@ export const LeadAPI = {
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
       {
-        // NOTE: Do NOT manually set Content-Type here (same reason as createWithDocuments)
         headers: {
           "X-Clinic-Id": String(clinicId),
         },
@@ -603,7 +606,6 @@ export const LeadAPI = {
       `/leads/${leadId}/update/?clinic_id=${storedClinicId()}`,
       formData,
       {
-        // NOTE: Do NOT manually set Content-Type here (same reason as createWithDocuments)
         headers: {
           "X-Clinic-Id": String(storedClinicId()),
         },
@@ -635,7 +637,6 @@ export const LeadAPI = {
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
       {
-        // NOTE: Do NOT manually set Content-Type here (same reason as createWithDocuments)
         headers: {
           "X-Clinic-Id": String(clinicId),
         },
@@ -760,6 +761,20 @@ export const TwilioAPI = {
   }): Promise<unknown> => {
     const response = await api.post("/twilio/send-sms/", payload);
     console.log("💬 SMS sent:", response.data);
+    return response.data;
+  },
+
+  getSMSHistory: async (leadUuid: string): Promise<TwilioSMS[]> => {
+    const response = await api.get<TwilioSMS[]>(
+      `/twilio/sms-history/?lead_uuid=${leadUuid}`,
+    );
+    return response.data;
+  },
+
+  getCallHistory: async (leadUuid: string): Promise<TwilioCall[]> => {
+    const response = await api.get<TwilioCall[]>(
+      `/twilio/call-history/?lead_uuid=${leadUuid}`,
+    );
     return response.data;
   },
 };

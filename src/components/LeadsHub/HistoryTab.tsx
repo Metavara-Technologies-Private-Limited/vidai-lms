@@ -40,6 +40,7 @@ import { TwilioAPI } from "../../services/leads.api";
 import type { LeadMailListItem } from "../../services/leads.api";
 import CallDialog from "./CallDialog";
 import { EmailDialog } from "../LeadsHub/EmailDialogs";
+import { SMSDialog } from "../LeadsHub/SmsDialogs";
 
 /* ── Pure helpers ────────────────────────────────────────────────────────────── */
 
@@ -305,11 +306,30 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   ]);
 
   const [composeOpen, setComposeOpen] = React.useState(false);
+  const [smsDialogOpen, setSmsDialogOpen] = React.useState(false);
   const [callDialogOpen, setCallDialogOpen] = React.useState(false);
   const [callSnackbar, setCallSnackbar] = React.useState<{
     open: boolean;
     message: string;
   }>({ open: false, message: "" });
+
+  // ── Email: immediate refresh when sent=true ──────────────────────────────
+  const handleEmailDialogClose = React.useCallback(
+    (sent?: boolean) => {
+      setComposeOpen(false);
+      if (sent) onRefreshEmailHistory();
+    },
+    [onRefreshEmailHistory],
+  );
+
+  // ── SMS: immediate refresh when sent=true ───────────────────────────────
+  const handleSmsDialogClose = React.useCallback(
+    (sent?: boolean) => {
+      setSmsDialogOpen(false);
+      if (sent) onRefreshSmsHistory();
+    },
+    [onRefreshSmsHistory],
+  );
 
   const handleCallOpen = async () => {
     const phone = normalizePhone(lead?.contact_no || leadPhone);
@@ -405,8 +425,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     <>
       <EmailDialog
         open={composeOpen}
-        onClose={() => setComposeOpen(false)}
+        onClose={handleEmailDialogClose}
         lead={lead as never}
+      />
+      <SMSDialog
+        open={smsDialogOpen}
+        lead={lead as never}
+        onClose={handleSmsDialogClose}
       />
       <Stack direction="row" spacing={3}>
         {/* LEFT: Activity Timeline */}
@@ -702,18 +727,48 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                       }}
                     />
                   </Stack>
-                  <IconButton
-                    size="small"
-                    onClick={onRefreshSmsHistory}
-                    sx={{
-                      bgcolor: "#F8FAFC",
-                      "&:hover": { bgcolor: "#E2E8F0" },
-                    }}
-                  >
-                    <Typography fontSize="11px" px={1}>
-                      Refresh
-                    </Typography>
-                  </IconButton>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <IconButton
+                      size="small"
+                      onClick={onRefreshSmsHistory}
+                      disabled={smsHistoryLoading}
+                      sx={{
+                        bgcolor: "#F8FAFC",
+                        "&:hover": { bgcolor: "#E2E8F0" },
+                        width: 30,
+                        height: 30,
+                      }}
+                    >
+                      {smsHistoryLoading ? (
+                        <CircularProgress size={14} />
+                      ) : (
+                        <RefreshIcon sx={{ fontSize: 16, color: "#64748B" }} />
+                      )}
+                    </IconButton>
+                    <Button
+                      onClick={() => setSmsDialogOpen(true)}
+                      size="small"
+                      variant="outlined"
+                      startIcon={<AddIcon sx={{ fontSize: 15 }} />}
+                      sx={{
+                        textTransform: "none",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        borderRadius: "8px",
+                        borderColor: "#E9D5FF",
+                        color: "#8B5CF6",
+                        bgcolor: "#F5F3FF",
+                        px: 1.5,
+                        py: 0.5,
+                        "&:hover": {
+                          bgcolor: "#EDE9FE",
+                          borderColor: "#C4B5FD",
+                        },
+                      }}
+                    >
+                      New SMS
+                    </Button>
+                  </Stack>
                 </Stack>
               </Box>
               <Box
@@ -747,9 +802,36 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     <Typography color="text.secondary" fontWeight={600}>
                       No SMS Sent Yet
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      mt={0.5}
+                    >
                       SMS messages sent to this lead will appear here.
                     </Typography>
+                    <Button
+                      onClick={() => setSmsDialogOpen(true)}
+                      size="small"
+                      variant="outlined"
+                      startIcon={<AddIcon sx={{ fontSize: 15 }} />}
+                      sx={{
+                        mt: 2,
+                        textTransform: "none",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        borderRadius: "8px",
+                        borderColor: "#E9D5FF",
+                        color: "#8B5CF6",
+                        bgcolor: "#F5F3FF",
+                        "&:hover": {
+                          bgcolor: "#EDE9FE",
+                          borderColor: "#C4B5FD",
+                        },
+                      }}
+                    >
+                      Send First SMS
+                    </Button>
                   </Box>
                 ) : (
                   <Stack spacing={2}>
