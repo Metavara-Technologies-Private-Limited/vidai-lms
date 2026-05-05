@@ -72,6 +72,19 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
     .filter((item): item is AssigneeOption => item !== null);
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const normalizeUsersList = (users: any[]): AssigneeOption[] => {
+  return users.map((u) => ({
+    id: u.id,
+    first_name: u.first_name ?? u.firstName,
+    last_name: u.last_name ?? u.lastName,
+    username: u.username,
+    email: u.email,
+    role: u.role?.name || u.role,
+    designation: undefined,
+  }));
+};
+
 const assigneeLabel = (option: AssigneeOption): string => {
   const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
@@ -95,6 +108,8 @@ import {
   statusChipSx,
   ticketDetailsTabsSx,
 } from "../../../styles/Settings/Tickets.styles";
+import { useSelector } from "react-redux";
+import { selectUsers } from "../../../store/userSlice";
 
 interface Props {
   ticket: TicketDetail | null;
@@ -153,26 +168,51 @@ const TicketPropertiesSidebar = ({
   const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = useState(false);
   const [selectedAssigneeOption, setSelectedAssigneeOption] = useState<AssigneeOption | null>(null);
+  const users = useSelector(selectUsers);
 
+  const authMode = localStorage.getItem("auth_mode");
+  const isInternal = authMode === "INT";
+  
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (!assigneeSearch.trim()) {
         setAssigneeOptions([]);
         return;
       }
+
       try {
         setAssigneeLoading(true);
-        const response = await authApi.searchUsers({ search: assigneeSearch, limit: 20, offset: 0 });
-        setAssigneeOptions(normalizeAssignees(response));
+
+        if (isInternal) {
+          // LOCAL USERS
+          const normalized = normalizeUsersList(users);
+
+          const filtered = normalized.filter((u) =>
+            `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
+              .toLowerCase()
+              .includes(assigneeSearch.toLowerCase()),
+          );
+
+          setAssigneeOptions(filtered);
+        } else {
+          // API
+          const response = await authApi.searchUsers({
+            search: assigneeSearch,
+            limit: 20,
+            offset: 0,
+          });
+
+          setAssigneeOptions(normalizeAssignees(response));
+        }
       } catch {
         setAssigneeOptions([]);
       } finally {
         setAssigneeLoading(false);
       }
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [assigneeSearch]);
+    }, 300);
 
+    return () => clearTimeout(timer);
+  }, [assigneeSearch, isInternal, users]);
   if (!ticket) return null;
 
   const currentAssigneeName =
