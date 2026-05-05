@@ -40,7 +40,17 @@ export const ticketsApi = {
       },
     });
     // Defensive check for Django Rest Framework pagination
-    return response.data?.results || response.data || [];
+    const tickets = response.data?.results || response.data || [];
+    console.log(
+      "Tickets API response with assigned_to_name:",
+      tickets.map((t: any) => ({
+        id: t.id,
+        ticket_no: t.ticket_no,
+        assigned_to_id: t.assigned_to_id,
+        assigned_to_name: t.assigned_to_name,
+      })),
+    );
+    return tickets;
   },
 
   createTicket: async (data: CreateTicketRequest): Promise<TicketDetail> => {
