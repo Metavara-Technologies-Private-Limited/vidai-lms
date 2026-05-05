@@ -94,6 +94,7 @@ export type FormState = {
   nextType: string;
   nextStatus: string;
   nextDesc: string;
+  actionStatus: string; 
 
   // ✅ ADDED: lead lifecycle status — user picks during creation
   // Maps to backend lead_status field (null=True, blank=True, default=None)
