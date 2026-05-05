@@ -323,7 +323,7 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         .filter(Boolean)
     : [];
 
-  // ── CHANGE 1: Removed Age and Gender from patient info fields ──
+  // ── Patient info fields ────────────────────────────────────────────────────
   const patientInfo = [
     { label: "Contact No.", value: patient.raw.contact_no },
     { label: "Email", value: patient.raw.email },
@@ -340,10 +340,24 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
     },
   ];
 
-  const partnerInfo = [
-    { label: "Full Name", value: patient.raw.partner_full_name },
-    { label: "Age", value: patient.raw.partner_age },
-    { label: "Gender", value: patient.raw.partner_gender },
+  // ── FIX: Contact Information — now correctly reads contact_* fields ────────
+  // These fields are saved from AddNewLead Step1:
+  //   contactFullName  → contact_full_name
+  //   designation      → contact_designation
+  //   contactPhone     → contact_phone
+  //   contactEmail     → contact_email
+  const rawLead = patient.raw as Lead & {
+    contact_full_name?: string;
+    contact_designation?: string;
+    contact_phone?: string;
+    contact_email?: string;
+  };
+
+  const contactInfo = [
+    { label: "Full Name", value: rawLead.contact_full_name },
+    { label: "Designation", value: rawLead.contact_designation },
+    { label: "Contact No.", value: rawLead.contact_phone },
+    { label: "Email", value: rawLead.contact_email },
   ];
 
   return (
@@ -359,7 +373,7 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         maxHeight: isMobile ? "none" : "calc(100vh - 160px)",
       }}
     >
-      {/* ── CHANGE 2: "Patient Info" → "Lead Info" ── */}
+      {/* Lead Info Header */}
       <Box display="flex" alignItems="center" gap={1.5} mb={2.5}>
         <Typography fontSize="15px" fontWeight={700} color="#232323">
           Lead Info
@@ -398,6 +412,8 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
       </Box>
 
       <Divider sx={{ mb: 2.5, borderColor: "#F8F8F9" }} />
+
+      {/* Patient Information */}
       <Typography
         fontSize="11px"
         fontWeight={700}
@@ -420,7 +436,8 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
       </Box>
 
       <Divider sx={{ mb: 2.5, borderColor: "#F8F8F9" }} />
-      {/* ── CHANGE 3: "Partner Information" → "Contact Information" ── */}
+
+      {/* ── FIX: Contact Information — shows real data from add new lead ── */}
       <Typography
         fontSize="11px"
         fontWeight={700}
@@ -437,12 +454,14 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         gap={2.5}
         mb={3}
       >
-        {partnerInfo.map((f) => (
+        {contactInfo.map((f) => (
           <InfoField key={f.label} label={f.label} value={f.value} />
         ))}
       </Box>
 
       <Divider sx={{ mb: 2.5, borderColor: "#F8F8F9" }} />
+
+      {/* Treatment Interest */}
       <Typography
         fontSize="11px"
         fontWeight={700}
@@ -478,6 +497,7 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
         )}
       </Box>
 
+      {/* Documents */}
       {patient.raw.documents && patient.raw.documents.length > 0 && (
         <>
           <Divider sx={{ mb: 2.5, borderColor: "#F8F8F9" }} />
@@ -494,9 +514,10 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
           <Box display="flex" flexDirection="column" gap={1}>
             {patient.raw.documents.map((doc: LeadDocument) => {
               const fileName = doc.file?.split("/").pop() ?? "Document";
+              // ── FIX: use full URL if already absolute, else prepend base ──
               const fileUrl = doc.file?.startsWith("http")
                 ? doc.file
-                : `http://127.0.0.1:8000${doc.file}`;
+                : `${import.meta.env.VITE_API_BASE_URL?.replace("/api", "") ?? "http://127.0.0.1:8000"}${doc.file}`;
               return (
                 <Box
                   key={doc.id}
@@ -539,12 +560,30 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
                       <IconButton
                         size="small"
                         sx={{ color: "#626262" }}
-                        onClick={() => {
+                        onClick={async () => {
                           if (!doc.file) return;
-                          const a = document.createElement("a");
-                          a.href = fileUrl;
-                          a.download = fileName;
-                          a.click();
+                          try {
+                            const res = await fetch(fileUrl);
+                            if (!res.ok) throw new Error();
+                            const blob = await res.blob();
+                            const blobUrl = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = blobUrl;
+                            a.download = fileName;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+                          } catch {
+                            // fallback
+                            const a = document.createElement("a");
+                            a.href = fileUrl;
+                            a.download = fileName;
+                            a.target = "_blank";
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }
                         }}
                       >
                         <DownloadOutlinedIcon sx={{ fontSize: 16 }} />

@@ -48,6 +48,7 @@ import {
   type NextActionStatusOption,
   type CampaignData,
   type ApiError,
+  type ActionStatusValue,          // ← NEW
 } from "../LeadsHub/addNewLead.constants";
 
 import { validateStep } from "../LeadsHub/addNewLead.validation";
@@ -114,7 +115,6 @@ const normalizeUsersList = (users: any[]): AssigneeOption[] => {
 
 const normalizeAssignees = (res: any): AssigneeOption[] => {
   const users = res?.data?.objects || [];
-
   return users.map((u: any) => ({
     id: u.id,
     first_name: u.first_name,
@@ -199,30 +199,20 @@ export default function AddNewLead() {
 
   const [assigneeName, setAssigneeName] = React.useState("");
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
-  const [assigneeOptions, setAssigneeOptions] = React.useState<
-    AssigneeOption[]
-  >([]);
+  const [assigneeOptions, setAssigneeOptions] = React.useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = React.useState(false);
 
   const [leadGeneratedBySearch, setLeadGeneratedBySearch] = React.useState("");
   const [selectedLeadGeneratedBy, setSelectedLeadGeneratedBy] =
     React.useState<LeadGeneratedByObject | null>(null);
-  const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<
-    AssigneeOption[]
-  >([]);
-  const [leadGeneratedByLoading, setLeadGeneratedByLoading] =
-    React.useState(false);
+  const [leadGeneratedByOptions, setLeadGeneratedByOptions] = React.useState<AssigneeOption[]>([]);
+  const [leadGeneratedByLoading, setLeadGeneratedByLoading] = React.useState(false);
 
-  const [appointmentPersonnelInput, setAppointmentPersonnelInput] =
-    React.useState("");
-  const [appointmentPersonnelOptions, setAppointmentPersonnelOptions] =
-    React.useState<AssigneeOption[]>([]);
-  const [appointmentPersonnelLoading, setAppointmentPersonnelLoading] =
-    React.useState(false);
+  const [appointmentPersonnelInput, setAppointmentPersonnelInput] = React.useState("");
+  const [appointmentPersonnelOptions, setAppointmentPersonnelOptions] = React.useState<AssigneeOption[]>([]);
+  const [appointmentPersonnelLoading, setAppointmentPersonnelLoading] = React.useState(false);
 
-  const [referralDepartments, setReferralDepartments] = React.useState<
-    ReferralDepartment[]
-  >([]);
+  const [referralDepartments, setReferralDepartments] = React.useState<ReferralDepartment[]>([]);
   const [loadingReferralDepts, setLoadingReferralDepts] = React.useState(false);
 
   // ── File state ─────────────────────────────────────────────────────────────
@@ -231,17 +221,10 @@ export default function AddNewLead() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // ── Pipeline / stage state ─────────────────────────────────────────────────
-  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<
-    string[]
-  >([]);
-  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>(
-    [],
-  );
-  const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>(
-    [],
-  );
-  const [selectedNextActionStageId, setSelectedNextActionStageId] =
-    React.useState<string | null>(null);
+  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<string[]>([]);
+  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
+  const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>([]);
+  const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string | null>(null);
 
   const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
     () =>
@@ -273,31 +256,17 @@ export default function AddNewLead() {
     _role === "super_admin" ||
     hasAnySubcategoryActionPermission(_perms, ["leads hub"], "add");
 
-  // ── Normalize campaigns so source/subSource match SOURCE_OPTIONS & SUB_SOURCE_OPTIONS ──
-  //
-  // Actual API campaign_mode values:
-  //   1 = Social Media (LinkedIn, Instagram)
-  //   2 = Social Media (Facebook, Google Ads)
-  //   3 = Email (Gmail)
-  //
-  // Modes 1 & 2 are both social — social_media[] has the platform name.
-  // Mode 3 is email — social_media[] is empty → Direct / Gmail.
-  //
-  // Platform names from API use underscores ("google_ads") so we split on "_"
-  // and title-case each word: "google_ads" → "Google Ads", "facebook" → "Facebook".
   const campaigns = React.useMemo(
     () =>
       (rawCampaigns || []).map((api: CampaignData) => {
         const isEmail = api.campaign_mode === 3;
         const rawPlatform = api.social_media?.[0]?.platform_name ?? "";
-
         const platformTitleCase = rawPlatform
           ? rawPlatform
               .split("_")
               .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
               .join(" ")
           : "";
-
         return {
           id: api.id,
           name: capitalizeFirst(api.campaign_name ?? ""),
@@ -331,6 +300,7 @@ export default function AddNewLead() {
     nextStatus: "",
     nextDesc: "",
     leadStatus: "",
+    actionStatus: "",              // ← NEW
     treatmentInterest: "",
     treatments: [],
     wantAppointment: "no",
@@ -350,23 +320,18 @@ export default function AddNewLead() {
   const users = useSelector(selectUsers);
 
   // Next action status = only stages that come AFTER the selected lead status
-  const filteredNextActionStatusOptions = React.useMemo<
-    NextActionStatusOption[]
-  >(() => {
+  const filteredNextActionStatusOptions = React.useMemo<NextActionStatusOption[]>(() => {
     if (!form.leadStatus) {
       return pipelineStageNames.map((name) => ({ label: name, value: name }));
     }
-
     const currentStage = pipelineStages.find(
       (s) =>
         s.stage_name.trim().toLowerCase() ===
         form.leadStatus.trim().toLowerCase(),
     );
-
     if (!currentStage) {
       return pipelineStageNames.map((name) => ({ label: name, value: name }));
     }
-
     return pipelineStages
       .filter((s) => s.stage_order > currentStage.stage_order)
       .map((s) => ({ label: s.stage_name, value: s.stage_name }));
@@ -440,10 +405,8 @@ export default function AddNewLead() {
           .filter((s) => isActiveStageStatus(s.stage_status))
           .filter((s) => s.stage_name.trim())
           .sort((a, b) => {
-            const aOrder =
-              typeof a.stage_order === "number" ? a.stage_order : 0;
-            const bOrder =
-              typeof b.stage_order === "number" ? b.stage_order : 0;
+            const aOrder = typeof a.stage_order === "number" ? a.stage_order : 0;
+            const bOrder = typeof b.stage_order === "number" ? b.stage_order : 0;
             if (aOrder === bOrder) return 0;
             return aOrder - bOrder;
           });
@@ -457,9 +420,7 @@ export default function AddNewLead() {
           const firstStage = activeStages[0];
           const secondStage = activeStages[1] ?? null;
           const firstStageName = firstStage.stage_name.trim();
-          const secondStageName = secondStage
-            ? secondStage.stage_name.trim()
-            : "";
+          const secondStageName = secondStage ? secondStage.stage_name.trim() : "";
 
           const initialActionTypeOptions = secondStage
             ? deriveActionTypeOptions(secondStage)
@@ -519,23 +480,17 @@ export default function AddNewLead() {
         setAssigneeOptions([]);
         return;
       }
-
       try {
         setAssigneeLoading(true);
-
         if (isInternal) {
-          // LOCAL FILTER (NO API)
           const normalized = normalizeUsersList(users);
-
           const filtered = normalized.filter((u) =>
             `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
               .toLowerCase()
               .includes(assigneeSearch.toLowerCase()),
           );
-
           setAssigneeOptions(filtered);
         } else {
-          // EXISTING API FLOW
           const response = await authApi.searchUsers({
             search: assigneeSearch,
             limit: 20,
@@ -550,7 +505,6 @@ export default function AddNewLead() {
         setAssigneeLoading(false);
       }
     }, 300);
-
     return () => clearTimeout(timer);
   }, [assigneeSearch, isInternal, users]);
 
@@ -561,19 +515,15 @@ export default function AddNewLead() {
         setLeadGeneratedByOptions([]);
         return;
       }
-
       try {
         setLeadGeneratedByLoading(true);
-
         if (isInternal) {
           const normalized = normalizeUsersList(users);
-
           const filtered = normalized.filter((u) =>
             `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
               .toLowerCase()
               .includes(leadGeneratedBySearch.toLowerCase()),
           );
-
           setLeadGeneratedByOptions(filtered);
         } else {
           const response = await authApi.searchUsers({
@@ -581,7 +531,6 @@ export default function AddNewLead() {
             limit: 20,
             offset: 0,
           });
-
           setLeadGeneratedByOptions(normalizeAssignees(response));
         }
       } catch {
@@ -590,7 +539,6 @@ export default function AddNewLead() {
         setLeadGeneratedByLoading(false);
       }
     }, 300);
-
     return () => clearTimeout(timer);
   }, [isInternal, leadGeneratedBySearch, users]);
 
@@ -601,29 +549,22 @@ export default function AddNewLead() {
         setAppointmentPersonnelOptions([]);
         return;
       }
-
       try {
         setAppointmentPersonnelLoading(true);
-
         if (isInternal) {
-          // LOCAL USERS FILTER
           const normalized = normalizeUsersList(users);
-
           const filtered = normalized.filter((u) =>
             `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
               .toLowerCase()
               .includes(appointmentPersonnelInput.toLowerCase()),
           );
-
           setAppointmentPersonnelOptions(filtered);
         } else {
-          // API FLOW
           const response = await authApi.searchUsers({
             search: appointmentPersonnelInput,
             limit: 20,
             offset: 0,
           });
-
           setAppointmentPersonnelOptions(normalizeAssignees(response));
         }
       } catch {
@@ -632,22 +573,13 @@ export default function AddNewLead() {
         setAppointmentPersonnelLoading(false);
       }
     }, 300);
-
     return () => clearTimeout(timer);
-  }, [
-    appointmentPersonnelInput,
-    form.department,
-    form.wantAppointment,
-    isInternal,
-    users,
-  ]);
+  }, [appointmentPersonnelInput, form.department, form.wantAppointment, isInternal, users]);
 
   const selectedAppointmentPersonnel = React.useMemo(() => {
     const selectedId = Number(form.personnel);
     if (Number.isFinite(selectedId)) {
-      const matched = appointmentPersonnelOptions.find(
-        (o) => o.id === selectedId,
-      );
+      const matched = appointmentPersonnelOptions.find((o) => o.id === selectedId);
       if (matched) return matched;
     }
     if (!appointmentPersonnelInput.trim()) return null;
@@ -662,9 +594,7 @@ export default function AddNewLead() {
     } satisfies AssigneeOption;
   }, [appointmentPersonnelInput, appointmentPersonnelOptions, form.personnel]);
 
-  // ── Sync campaign → source + campaignName (preserve user's subSource) ──────
-  // When campaign is cleared: reset only campaignName, preserve source/subSource
-  // When campaign is selected: sync source and campaignName, NEVER override subSource
+  // ── Sync campaign → source + campaignName ─────────────────────────────────
   React.useEffect(() => {
     if (!form.campaign) {
       setForm((prev) => ({ ...prev, campaignName: "" }));
@@ -672,12 +602,10 @@ export default function AddNewLead() {
     }
     const matched = campaigns.find((c) => c.id === form.campaign);
     if (!matched) return;
-
     setForm((prev) => ({
       ...prev,
       campaignName: capitalizeFirst(matched.name),
       source: matched.source,
-      // IMPORTANT: Never override user's sub-source selection
     }));
   }, [form.campaign, campaigns]);
 
@@ -685,7 +613,6 @@ export default function AddNewLead() {
   const handleChange =
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
       const rawValue = e.target.value;
-
       if (field === "full_name") {
         const sanitized = sanitizeNameInput(rawValue);
         if (sanitized !== rawValue)
@@ -697,20 +624,14 @@ export default function AddNewLead() {
         const sanitized = sanitizeNameInput(rawValue);
         if (sanitized !== rawValue)
           showInputToast("add-lead-name-invalid", "enter only alphanumeric");
-        setForm((prev) => ({
-          ...prev,
-          partnerName: capitalizeFirst(sanitized),
-        }));
+        setForm((prev) => ({ ...prev, partnerName: capitalizeFirst(sanitized) }));
         return;
       }
       if (field === "contactFullName") {
         const sanitized = sanitizeNameInput(rawValue);
         if (sanitized !== rawValue)
           showInputToast("add-lead-name-invalid", "enter only alphanumeric");
-        setForm((prev) => ({
-          ...prev,
-          contactFullName: capitalizeFirst(sanitized),
-        }));
+        setForm((prev) => ({ ...prev, contactFullName: capitalizeFirst(sanitized) }));
         return;
       }
       if (field === "contact") {
@@ -736,20 +657,14 @@ export default function AddNewLead() {
       if (field === "email") {
         const sanitized = sanitizeEmailInput(rawValue);
         if (sanitized !== rawValue.toLowerCase())
-          showInputToast(
-            "add-lead-email-invalid",
-            "enter valid email characters only",
-          );
+          showInputToast("add-lead-email-invalid", "enter valid email characters only");
         setForm((prev) => ({ ...prev, email: sanitized }));
         return;
       }
       if (field === "contactEmail") {
         const sanitized = sanitizeEmailInput(rawValue);
         if (sanitized !== rawValue.toLowerCase())
-          showInputToast(
-            "add-lead-email-invalid",
-            "enter valid email characters only",
-          );
+          showInputToast("add-lead-email-invalid", "enter valid email characters only");
         setForm((prev) => ({ ...prev, contactEmail: sanitized }));
         return;
       }
@@ -760,31 +675,24 @@ export default function AddNewLead() {
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  // ── handleCampaignChange — never override subSource ──────────────────────
   const handleCampaignChange = (value: string) => {
     if (!value) {
-      // Campaign cleared → reset campaign fields only, keep source/subSource
       setForm((prev) => ({ ...prev, campaign: "", campaignName: "" }));
       return;
     }
-
     const matched = campaigns.find((c) => c.id === value);
     if (!matched) {
       setForm((prev) => ({ ...prev, campaign: value }));
       return;
     }
-
-    // Set campaign + auto-fill source, but preserve user's subSource selection
     setForm((prev) => ({
       ...prev,
       campaign: value,
       campaignName: capitalizeFirst(matched.name),
       source: matched.source,
-      // IMPORTANT: Never override user's sub-source selection
     }));
   };
 
-  // ── FIX: handleSourceChange clears campaign + subSource ───────────────────
   const handleSourceChange = (value: string) => {
     setForm((prev) => ({
       ...prev,
@@ -795,7 +703,6 @@ export default function AddNewLead() {
     }));
   };
 
-  // ── FIX: handleSubSourceChange clears campaign ────────────────────────────
   const handleSubSourceChange = (value: string) => {
     setForm((prev) => ({
       ...prev,
@@ -810,29 +717,22 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, department: value, personnel: "" }));
   };
 
-  // ── Lead Status Change ────────────────────────────────────────────────────
   const handleLeadStatusChange = (value: string) => {
     const trimmed = value.trim();
-
     const matched = pipelineStages.find(
       (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
     );
     setSelectedNextActionStageId(matched?.id ?? null);
-
     const nextStages = pipelineStages
       .filter((s) => (matched ? s.stage_order > matched.stage_order : true))
       .sort((a, b) => a.stage_order - b.stage_order);
-
     const autoNextStatus =
       trimmed && nextStages[0] ? nextStages[0].stage_name.trim() : "";
-
     const autoNextStage = nextStages[0] ?? null;
     const stageActionOptions = autoNextStage
       ? deriveActionTypeOptions(autoNextStage)
       : deriveAllActionTypeOptions(pipelineStages);
-
     setNextActionTypeOptions(stageActionOptions);
-
     setForm((prev) => ({
       ...prev,
       leadStatus: trimmed,
@@ -844,20 +744,15 @@ export default function AddNewLead() {
   const handleNextTypeChange = (value: string) =>
     setForm((prev) => ({ ...prev, nextType: value }));
 
-  // ── Next Action Status Change ─────────────────────────────────────────────
   const handleNextStatusChange = (value: string) => {
     const trimmed = value.trim();
-
     const matched = pipelineStages.find(
       (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
     );
-
     const stageActionOptions = matched
       ? deriveActionTypeOptions(matched)
       : deriveAllActionTypeOptions(pipelineStages);
-
     setNextActionTypeOptions(stageActionOptions);
-
     setForm((prev) => ({ ...prev, nextStatus: trimmed, nextType: "" }));
   };
 
@@ -962,9 +857,7 @@ export default function AddNewLead() {
       sub_source: form.subSource || "",
       treatment_interest:
         form.treatments.join(",") || form.treatmentInterest || "General",
-      appointment_date: shouldBookAppointment
-        ? (form.appointmentDate ?? null)
-        : null,
+      appointment_date: shouldBookAppointment ? (form.appointmentDate ?? null) : null,
       slot: shouldBookAppointment ? (form.slot ?? "") : "",
       campaign_id: strOrNull(form.campaign),
       email: strOrNull(form.email || form.contactEmail) ?? null,
@@ -982,24 +875,22 @@ export default function AddNewLead() {
       ...(form.leadStatus
         ? { lead_status: form.leadStatus as LeadPayload["lead_status"] }
         : {}),
+      action_status: (form.actionStatus as ActionStatusValue) || null,   // ← NEW
       assigned_to_id: intOrNull(form.assignee) ?? null,
       assigned_to_name: assigneeName.trim() || null,
       personal_id: selectedAppointmentPersonnel?.id ?? null,
-
       personal_name: IS_CONTRACTS_APP
         ? selectedAppointmentPersonnel
           ? `${selectedAppointmentPersonnel.first_name ?? ""} ${selectedAppointmentPersonnel.last_name ?? ""}`.trim() ||
             selectedAppointmentPersonnel.username
           : null
         : null,
-
       age: IS_MEDICAL_APP ? (intOrNull(form.age) ?? null) : null,
       partner_age: IS_MEDICAL_APP ? (intOrNull(form.partnerAge) ?? null) : null,
       partner_inquiry: IS_MEDICAL_APP ? isCouple === "yes" : false,
       book_appointment: shouldBookAppointment,
       is_active: true,
       referral_department_id: referralDeptId ?? null,
-
       ...(IS_CONTRACTS_APP && {
         contact_full_name: form.contactFullName.trim() || null,
         contact_designation: form.designation.trim() || null,
@@ -1032,11 +923,7 @@ export default function AddNewLead() {
 
       const response =
         pendingFiles.length > 0
-          ? await LeadAPI.createWithDocuments(
-              payload,
-              pendingFiles,
-              referralSourceObject,
-            )
+          ? await LeadAPI.createWithDocuments(payload, pendingFiles, referralSourceObject)
           : await LeadAPI.create(payload, referralSourceObject);
 
       if (shouldSendAppointmentEmail) {
@@ -1044,7 +931,6 @@ export default function AddNewLead() {
           pipelineStageNames.find((s) => s.toLowerCase() === "appointment") ??
           pipelineStageNames[pipelineStageNames.length - 1] ??
           null;
-
         try {
           await LeadAPI.update(String(response.id), {
             clinic_id: response.clinic_id ?? payload.clinic_id,
@@ -1052,25 +938,20 @@ export default function AddNewLead() {
             full_name: response.full_name || payload.full_name,
             contact_no: response.contact_no || payload.contact_no,
             source: response.source || payload.source,
-            treatment_interest:
-              response.treatment_interest || payload.treatment_interest,
+            treatment_interest: response.treatment_interest || payload.treatment_interest,
             next_action_status: postAppointmentStage,
             book_appointment: true,
             appointment_date: payload.appointment_date,
             slot: payload.slot,
-            partner_inquiry:
-              response.partner_inquiry ?? payload.partner_inquiry,
+            partner_inquiry: response.partner_inquiry ?? payload.partner_inquiry,
             is_active: response.is_active !== false,
           });
         } catch {
-          toast.warning(
-            "Lead was created, but appointment status update failed.",
-            {
-              position: "top-right",
-              autoClose: 2500,
-              theme: "colored",
-            },
-          );
+          toast.warning("Lead was created, but appointment status update failed.", {
+            position: "top-right",
+            autoClose: 2500,
+            theme: "colored",
+          });
         }
       }
 
@@ -1144,14 +1025,11 @@ export default function AddNewLead() {
             email_body: emailBody,
           });
         } catch {
-          toast.warning(
-            "Lead was created, but confirmation email could not be sent.",
-            {
-              position: "top-right",
-              autoClose: 2500,
-              theme: "colored",
-            },
-          );
+          toast.warning("Lead was created, but confirmation email could not be sent.", {
+            position: "top-right",
+            autoClose: 2500,
+            theme: "colored",
+          });
         }
       }
 
@@ -1163,11 +1041,7 @@ export default function AddNewLead() {
 
       if (payload.referral_department_id) {
         try {
-          dispatch(
-            loadReferralSources({
-              referral_department_id: payload.referral_department_id,
-            }),
-          );
+          dispatch(loadReferralSources({ referral_department_id: payload.referral_department_id }));
           dispatch(loadDashboardCounts(clinicId));
         } catch (err) {
           console.warn("Failed to refresh referral data:", err);
@@ -1178,9 +1052,7 @@ export default function AddNewLead() {
     } catch (err) {
       const error = err as ApiError;
       const status = error?.response?.status;
-
       let msg = "Failed to save lead";
-
       if (status === 500) {
         msg = "Server error. Please try again later";
       } else if (status === 400) {
@@ -1188,9 +1060,7 @@ export default function AddNewLead() {
       } else {
         msg = error?.message || "Something went wrong";
       }
-
       console.error("CREATE ERROR:", error?.response?.data);
-
       toast.error(msg, {
         position: "top-right",
         autoClose: 3000,
@@ -1243,10 +1113,7 @@ export default function AddNewLead() {
           }}
         >
           {steps.map(({ label, step }) => (
-            <Box
-              key={step}
-              sx={{ display: "flex", alignItems: "center", gap: 1 }}
-            >
+            <Box key={step} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Box
                 sx={{
                   width: 24,
@@ -1421,12 +1288,7 @@ export default function AddNewLead() {
       >
         <Button
           onClick={() => navigate("/leads")}
-          sx={{
-            textTransform: "none",
-            color: "#64748B",
-            fontWeight: 700,
-            px: 3,
-          }}
+          sx={{ textTransform: "none", color: "#64748B", fontWeight: 700, px: 3 }}
         >
           Cancel
         </Button>
