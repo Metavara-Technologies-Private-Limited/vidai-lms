@@ -237,7 +237,7 @@ export function Step1({
       >
         {(
           [
-            ["Full Name", "full_name"],
+            ["Lab Name", "full_name"],
             ["Contact No.", "contact"],
             ["Email", "email"],
             ["Location", "location"],

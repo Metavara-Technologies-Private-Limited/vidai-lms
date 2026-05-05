@@ -45,7 +45,7 @@ import {
   MoreMenu,
 } from "./LeadsTable.toolbarcomponents";
 import { EmailTemplateAPI, LeadEmailAPI } from "../../services/leads.api";
-import type { EmailTemplate } from "../../services/leads.api";
+import type { EmailTemplate, LeadMailListItem } from "../../services/leads.api";
 import { clinicsApi } from "../../services/tickets.api";
 
 // ── Shared toast options ──────────────────────────────────────────────────────
@@ -545,7 +545,7 @@ export const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({
 interface EmailDialogProps {
   open: boolean;
   lead: ProcessedLead | null;
-  onClose: () => void;
+  onClose: (sent?: boolean, sentItem?: LeadMailListItem) => void;
 }
 
 export const EmailDialog: React.FC<EmailDialogProps> = ({
@@ -563,8 +563,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
   const [error, setError] = React.useState<string | null>(null);
 
   /* ── From ─────────────────────────────────────────────────────────────── */
-  // FIX: initialise directly to DEFAULT_FROM_EMAIL so the field is never empty
-  // while the async clinic fetch is in-flight or if it fails.
   const [fromEmail, setFromEmail] = React.useState<string>(DEFAULT_FROM_EMAIL);
 
   /* ── To / CC / BCC ────────────────────────────────────────────────────── */
@@ -684,9 +682,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
     setToInput("");
     setCcInput("");
     setBccInput("");
-    // FIX: always reset to a valid non-empty default first, then try to
-    // load the clinic's real sender address. This ensures fromEmail is
-    // never an empty string when the user hits Send.
     setFromEmail(DEFAULT_FROM_EMAIL);
     setToAnchorEl(null);
     setCcAnchorEl(null);
@@ -695,22 +690,18 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
     setFormatAnchor(null);
     setMoreAnchor(null);
 
-    // Load clinic from-emails — only overwrite if we get a valid address back
     (async () => {
       try {
         const clinicData = await clinicsApi.getClinicDetail(CLINIC_ID);
         const emails = extractClinicEmails(clinicData);
-        // FIX: only update if we actually received a valid email address
         if (emails.length > 0 && isValidEmail(emails[0])) {
           setFromEmail(emails[0]);
         }
-        // else: keep the DEFAULT_FROM_EMAIL that was set above
       } catch {
-        // Swallow error — DEFAULT_FROM_EMAIL is already set, nothing to do
+        // keep DEFAULT_FROM_EMAIL
       }
     })();
 
-    // Load templates
     setLoadingTemplates(true);
     setTemplateError(null);
     EmailTemplateAPI.list()
@@ -866,8 +857,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
       return;
     }
 
-    // FIX: derive a clean sender value — never send an empty string.
-    // If the user cleared the From field, fall back to the default.
     const senderEmail =
       fromEmail.trim() && isValidEmail(fromEmail.trim())
         ? fromEmail.trim()
@@ -880,14 +869,21 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
         lead: lead.id,
         subject: subject.trim(),
         email_body: body.trim(),
-        // FIX: always pass a valid sender_email — never undefined or empty
         sender_email: senderEmail,
         cc: ccEmails,
         bcc: bccEmails,
         additional_to: toEmails.filter((e) => e !== leadEmail),
       });
       toast.success(`Email sent to ${leadName}!`, toastOptions);
-      onClose();
+      onClose(true, {
+        id: `optimistic-${Date.now()}`,
+        subject: subject.trim(),
+        email_body: body.trim(),
+        sender_email: senderEmail,
+        status: "SENT",
+        created_at: new Date().toISOString(),
+        sent_at: new Date().toISOString(),
+      } as LeadMailListItem);
     } catch (err: unknown) {
       setError(
         extractErrorMessage(err, "Failed to send email. Please try again."),
@@ -899,7 +895,6 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
 
   const handleSaveAsDraft = async () => {
     if (!subject.trim() || !body.trim() || !lead?.id) return;
-    // FIX: same fallback logic for draft saves
     const senderEmail =
       fromEmail.trim() && isValidEmail(fromEmail.trim())
         ? fromEmail.trim()
@@ -982,7 +977,7 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
   };
 
   const handleClose = () => {
-    if (!sending) onClose();
+    if (!sending) onClose(false);
   };
 
   const retryTemplates = () => {

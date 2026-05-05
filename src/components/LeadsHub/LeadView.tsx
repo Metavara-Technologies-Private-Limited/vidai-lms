@@ -93,6 +93,7 @@ import {
   APP_TYPE,
   STATUS_OPTIONS_BY_APP,
   FLOW_COPY_BY_APP,
+  IS_CONTRACTS_APP, // ✅ FIX: import IS_CONTRACTS_APP to gate AI Score display
 } from "../../config/appType";
 
 import BookAppointmentModal from "./BookAppointmentModal";
@@ -1496,9 +1497,8 @@ export default function LeadDetailView() {
   const [emailDialogOpen, setEmailDialogOpen] = React.useState(false);
   const clinic = useSelector(selectClinic);
 
-const clinicName = clinic?.name || "Our Clinic";
+  const clinicName = clinic?.name || "Our Clinic";
 
-  // ✅ FIX 1: bookApptOpen state is now correctly inside the component
   const [bookApptOpen, setBookApptOpen] = React.useState(false);
 
   const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>(
@@ -1608,7 +1608,6 @@ const clinicName = clinic?.name || "Our Clinic";
       leadData,
       eventType,
       appointmentResult,
-      // statusLabel,
     }: {
       leadData: LeadRecord;
       eventType: "appointment" | "update";
@@ -1623,17 +1622,6 @@ const clinicName = clinic?.name || "Our Clinic";
       const appointmentDate =
         appointmentResult?.appointment_date || leadData.appointment_date || "-";
       const appointmentSlot = appointmentResult?.slot || leadData.slot || "-";
-      // const appointmentBooked =
-      //   appointmentResult?.book_appointment || leadData.book_appointment
-      //     ? "Yes"
-      //     : "No";
-      // const senderName =
-      //   [authedUser?.first_name, authedUser?.last_name]
-      //     .filter(Boolean)
-      //     .join(" ")
-      //     .trim() ||
-      //   authedUser?.username ||
-      //   "Team";
       const senderEmail = authedUser?.email?.trim() || undefined;
 
       const subject =
@@ -1641,36 +1629,27 @@ const clinicName = clinic?.name || "Our Clinic";
           ? `Appointment Booked - ${appointmentDate}`
           : `Lead Updated - ${leadName}`;
 
-          const emailBody = [
-            `Hi ${leadFirstName},`,
-            "",
-
-            `${clinicName} here 👋`,
-            "",
-
-            eventType === "appointment"
-              ? `Your appointment has been successfully scheduled.`
-              : `Your details have been updated in our system.`,
-
-            "",
-
-            `📅 Date: ${appointmentDate}`,
-            `⏰ Time: ${appointmentSlot}`,
-            `👨‍⚕️ Doctor: ${leadData.personal_name || "-"}`,
-            `🏥 Department: ${leadData.department_name || "-"}`,
-
-            "",
-
-            `📝 Note: ${stripHtml(appointmentResult?.remark || leadData.remark || "-")}`,
-
-            "",
-
-            `If you need any changes or assistance, feel free to contact us.`,
-            "",
-
-            `Regards,`,
-            `${clinicName}`,
-          ].join("\n");
+      const emailBody = [
+        `Hi ${leadFirstName},`,
+        "",
+        `${clinicName} here 👋`,
+        "",
+        eventType === "appointment"
+          ? `Your appointment has been successfully scheduled.`
+          : `Your details have been updated in our system.`,
+        "",
+        `📅 Date: ${appointmentDate}`,
+        `⏰ Time: ${appointmentSlot}`,
+        `👨‍⚕️ Doctor: ${leadData.personal_name || "-"}`,
+        `🏥 Department: ${leadData.department_name || "-"}`,
+        "",
+        `📝 Note: ${stripHtml(appointmentResult?.remark || leadData.remark || "-")}`,
+        "",
+        `If you need any changes or assistance, feel free to contact us.`,
+        "",
+        `Regards,`,
+        `${clinicName}`,
+      ].join("\n");
 
       await LeadEmailAPI.sendNow({
         lead: String(leadData.id),
@@ -2046,8 +2025,6 @@ const clinicName = clinic?.name || "Our Clinic";
     });
   };
 
-  // ✅ FIX 2: handleBookAppointment now correctly opens the modal inline
-  // instead of navigating away — uses bookApptOpen state defined above
   const handleBookAppointment = React.useCallback(() => {
     if (!activeLead) return;
     setBookApptOpen(true);
@@ -2082,11 +2059,9 @@ const clinicName = clinic?.name || "Our Clinic";
         );
       });
 
-      // Keep detail pane in sync immediately after booking from this view.
       setFullLead((prev) => {
         const base = prev ?? activeLead ?? null;
         if (!base) return prev;
-
         return {
           ...base,
           book_appointment: true,
@@ -2195,9 +2170,14 @@ const clinicName = clinic?.name || "Our Clinic";
   );
   const leadStatus = selectedLeadStatus;
   const leadQuality = capitalize(activeLead.quality || "N/A");
-  const leadScore = String(activeLead.score || 0).includes("%")
-    ? activeLead.score
-    : `${activeLead.score || 0}%`;
+
+  // ✅ FIX: Only compute leadScore for medical app — hidden for contracts app
+  const leadScore = !IS_CONTRACTS_APP
+    ? String(activeLead.score || 0).includes("%")
+      ? activeLead.score
+      : `${activeLead.score || 0}%`
+    : null;
+
   const leadSource = capitalizeWords(activeLead.source || "Unknown");
   const leadSubSource = capitalizeWords(activeLead.sub_source || "N/A");
   const leadCampaignName = capitalizeWords(activeLead.campaign_name || "N/A");
@@ -2255,9 +2235,9 @@ const clinicName = clinic?.name || "Our Clinic";
   const appointmentSlot = hasAppointment
     ? capitalize(activeLead.slot || "N/A")
     : "N/A";
-    const appointmentRemark = hasAppointment
-      ? capitalize(stripHtml(activeLead.remark || ""))
-      : "N/A";
+  const appointmentRemark = hasAppointment
+    ? capitalize(stripHtml(activeLead.remark || ""))
+    : "N/A";
   const currentStatus = (
     activeLead?.status ||
     activeLead?.lead_status ||
@@ -2435,7 +2415,7 @@ const clinicName = clinic?.name || "Our Clinic";
                 color="text.secondary"
                 fontSize="10px"
               >
-                Lead Name
+                Lab Name
               </Typography>
               <Typography fontWeight={700} variant="body1" fontSize="12px">
                 {leadName}
@@ -2553,25 +2533,31 @@ const clinicName = clinic?.name || "Our Clinic";
                 }
               />
             </Stack>
-            <Stack
-              spacing={0.5}
-              sx={{
-                flex: 1.3,
-                transform: { xs: "none", md: "translateY(14px)" },
-                minWidth: { xs: "100%", md: 0 },
-              }}
-            >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                fontSize="10px"
+
+            {/* ✅ FIX: AI Lead Score hidden for contracts app, shown for medical app
+                Matches the same {!IS_CONTRACTS_APP && ...} pattern used in
+                LeadsTable and LeadsFollowUp */}
+            {!IS_CONTRACTS_APP && (
+              <Stack
+                spacing={0.5}
+                sx={{
+                  flex: 1.3,
+                  transform: { xs: "none", md: "translateY(14px)" },
+                  minWidth: { xs: "100%", md: 0 },
+                }}
               >
-                AI Lead Score
-              </Typography>
-              <Typography fontWeight={700} color="#EC4899" fontSize="12px">
-                {leadScore}
-              </Typography>
-            </Stack>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  fontSize="10px"
+                >
+                  AI Lead Score
+                </Typography>
+                <Typography fontWeight={700} color="#EC4899" fontSize="12px">
+                  {leadScore}
+                </Typography>
+              </Stack>
+            )}
           </Stack>
         </Stack>
       </Card>
@@ -2917,7 +2903,6 @@ const clinicName = clinic?.name || "Our Clinic";
         />
       )}
 
-      {/* ✅ FIX 3: BookAppointmentModal is now correctly placed inside the JSX return */}
       <BookAppointmentModal
         open={bookApptOpen}
         lead={activeLead}
