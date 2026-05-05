@@ -54,12 +54,10 @@ type AssigneeOption = {
   username: string | undefined;
   role: string | undefined;
   designation: string | undefined;
+  email?: string;
 };
 
-// const asRecord = (value: unknown): Record<string, unknown> | null =>
-//   typeof value === "object" && value !== null
-//     ? (value as Record<string, unknown>)
-//     : null;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const normalizeAssignees = (res: any): AssigneeOption[] => {
   const users = res?.data?.objects || [];
@@ -71,6 +69,13 @@ const normalizeAssignees = (res: any): AssigneeOption[] => {
     username: u.username,
     role: u.role_label || u.role,
     designation: u.designation,
+    email:
+      u.email ||
+      u.emp_email ||
+      u.user_email ||
+      u.official_email ||
+      u?.user?.email ||
+      undefined,
   }));
 };
 
@@ -82,8 +87,12 @@ const normalizeUsersList = (users: any[]): AssigneeOption[] => {
     username: u.username,
     role: u.role?.name || u.role,
     designation: undefined,
+    email: u.email ?? undefined,
   }));
 };
+
+const isValidEmail = (email: string | undefined): email is string =>
+  typeof email === "string" && EMAIL_REGEX.test(email.trim());
 
 const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =
@@ -123,6 +132,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [assigneeLoading, setAssigneeLoading] = useState(false);
   const [requestedBy, setRequestedBy] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
   // --- Data States (Dropdowns) ---
   const [labs, setLabs] = useState<Lab[]>([]);
@@ -135,6 +145,38 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
   const authMode = localStorage.getItem("auth_mode");
   const isInternal = authMode === "INT";
+
+  const getAssigneeEmailById = (id: number | "") => {
+    if (!id) return "";
+
+    const assigneeFromOptions = assigneeOptions.find(
+      (option) => option.id === id,
+    );
+    if (assigneeFromOptions?.email) return assigneeFromOptions.email.trim();
+
+    const assigneeFromUsers = users.find((u) => u.id === id);
+    if (assigneeFromUsers?.email) return assigneeFromUsers.email.trim();
+
+    return "";
+  };
+
+  const getRequestedByEmail = () => {
+    if (user?.email && isValidEmail(user.email)) {
+      return user.email.trim();
+    }
+
+    const normalizedRequestedBy = requestedBy.trim().toLowerCase();
+    const requestedUser = users.find((u) => {
+      const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
+      return (
+        u.email?.trim().toLowerCase() === normalizedRequestedBy ||
+        u.username?.trim().toLowerCase() === normalizedRequestedBy ||
+        fullName.toLowerCase() === normalizedRequestedBy
+      );
+    });
+
+    return requestedUser?.email?.trim() || "";
+  };
 
   useEffect(() => {
     if (user?.first_name && user?.last_name) {
@@ -284,8 +326,59 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
       return;
     }
 
+    const assigneeEmail = getAssigneeEmailById(assigneeId);
+    const requestedByEmail = getRequestedByEmail();
+
+    if (!isValidEmail(assigneeEmail)) {
+      toast.error(
+        "Assigned user's email is invalid. Please choose a valid assignee.",
+      );
+      return;
+    }
+
+    if (!isValidEmail(requestedByEmail)) {
+      toast.error(
+        "Requested by user's email is invalid. Please verify your login email.",
+      );
+      return;
+    }
+
     setLoading(true);
     try {
+      const clinicName = selectedClinic?.name || "Clinic";
+      const dueDateString = dueDate ? dueDate.format("YYYY-MM-DD") : "";
+      const createdBodyLines = [
+        `Hi ${assigneeName || "Team"},`,
+        "",
+        "A new support ticket has been created and assigned to you.",
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "📌 Ticket Details",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        `Subject       : ${subject.trim()}`,
+        `Priority      : ${priority}`,
+        `Status        : New`,
+        `Due Date      : ${dueDateString}`,
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "📝 Description",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        description.trim(),
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "👤 Requested By",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        requestedBy.trim(),
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "👉 Action Required",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "Please review the ticket and take necessary action.",
+        "",
+        "Regards,",
+        `${clinicName} Support Team`,
+      ].join("\n");
+
       const payload: CreateTicketRequest = {
         subject: subject.trim(),
         description: description.trim() || "No description provided",
@@ -297,6 +390,11 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
         assigned_to: assigneeId ? Number(assigneeId) : null,
         assigned_to_name: assigneeName || undefined,
         due_date: dueDate ? dueDate.format("YYYY-MM-DD") : null,
+        event: "ticket_created",
+        clinicName,
+        to: [assigneeEmail],
+        cc: [requestedByEmail],
+        email_body: createdBodyLines,
       };
 
       const res = await ticketsApi.createTicket(payload);
@@ -342,6 +440,18 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size should be less than 25MB");
+      return;
+    }
+
+    setSelectedFile(file);
   };
 
   const reset = () => {
@@ -661,10 +771,22 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
             >
               <TextField
                 label="Upload Documents"
-                value={selectedFile?.name || ""}
-                placeholder="No file Choosen"
                 fullWidth
-                sx={createTicketFocusedFieldSx}
+                value=""
+                placeholder="No file chosen"
+                sx={{
+                  ...createTicketFocusedFieldSx,
+
+                  // 🔥 reduce height
+                  "& .MuiInputBase-root": {
+                    height: 40,
+                    paddingRight: "8px",
+                  },
+
+                  "& input": {
+                    padding: "6px 8px",
+                  },
+                }}
                 InputLabelProps={{ shrink: true }}
                 disabled={loading}
                 InputProps={{
@@ -672,21 +794,72 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                     <Button
                       component="label"
                       disabled={loading}
-                      sx={createTicketUploadButtonSx}
+                      sx={{
+                        ...createTicketUploadButtonSx,
+                        height: 28, // 🔥 smaller button
+                        fontSize: 12,
+                        px: 1.5,
+                      }}
                     >
                       Choose File
                       <input
                         hidden
                         type="file"
-                        onChange={(e) =>
-                          setSelectedFile(e.target.files?.[0] || null)
-                        }
+                        onChange={(e) => handleFileChange(e)}
                       />
                     </Button>
                   ),
+
+                  // ✅ FILE DISPLAY INSIDE BOX
+                  endAdornment: selectedFile ? (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        maxWidth: "70%",
+                      }}
+                    >
+                      {/* FILE NAME */}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontSize: 13,
+                          cursor: "pointer",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        onClick={() => {
+                          const url = URL.createObjectURL(selectedFile);
+                          window.open(url, "_blank");
+                        }}
+                      >
+                        {selectedFile.name}
+                      </Typography>
+
+                      {/* ❌ SMALL REMOVE */}
+                      <IconButton
+                        size="small"
+                        onClick={() => setSelectedFile(null)}
+                        sx={{ p: 0.3 }}
+                      >
+                        ✕
+                      </IconButton>
+                    </Box>
+                  ) : null,
+
                   readOnly: true,
                 }}
               />
+
+              {/* HELPER TEXT */}
+              <Typography
+                variant="caption"
+                sx={{ mt: 0.5, display: "block", color: "text.secondary" }}
+              >
+                All formats accepted. Max file size 25 MB
+              </Typography>
             </Box>
 
             <Stack direction="row" justifyContent="flex-end" spacing={2} pt={1}>
