@@ -46,7 +46,7 @@ import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
-import { LeadAPI, TwilioAPI } from "../../services/leads.api";
+import { LeadAPI } from "../../services/leads.api";
 import { pipelineApi } from "../../services/pipeline.api";
 import CallDialog from "./CallDialog";
 
@@ -575,7 +575,9 @@ const LeadsTable: React.FC<Props> = ({
     );
   const isSelected = (id: string) => selectedIds.includes(id);
 
-  const handleCallOpen = async (e: React.MouseEvent, lead: ProcessedLead) => {
+  // ✅ FIXED: handleCallOpen now just opens CallDialog with lead data
+  // CallDialog itself handles the Twilio browser call — no more TwilioAPI.makeCall here
+  const handleCallOpen = (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
     const phone = normalizePhone(lead.contact_no);
     if (!phone) {
@@ -587,15 +589,6 @@ const LeadsTable: React.FC<Props> = ({
       return;
     }
     setCallLead(lead);
-    try {
-      await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
-    } catch (err: unknown) {
-      setCallLead(null);
-      toast.error(
-        extractErrorMessage(err, "Failed to initiate call."),
-        toastOptions,
-      );
-    }
   };
 
   const handleSMSOpen = (e: React.MouseEvent, lead: ProcessedLead) => {
@@ -1715,11 +1708,17 @@ const LeadsTable: React.FC<Props> = ({
         onExportAll={handleExportAllLeads}
       />
       <Dialogs />
+
+      {/* ✅ FIXED: CallDialog now receives toNumber and leadUuid for real Twilio browser call */}
       <CallDialog
         open={Boolean(callLead)}
         name={callLead?.full_name || callLead?.name || "Unknown"}
+        toNumber={normalizePhone(callLead?.contact_no)}
+        leadUuid={callLead?.id || ""}
+        agentIdentity="agent"
         onClose={() => setCallLead(null)}
       />
+
       <SMSDialog
         open={Boolean(smsLead)}
         lead={smsLead}

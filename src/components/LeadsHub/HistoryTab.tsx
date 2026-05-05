@@ -36,7 +36,6 @@ import type {
   TwilioSMS,
   HistoryView,
 } from "./LeadDetailTypes";
-import { TwilioAPI } from "../../services/leads.api";
 import type { LeadMailListItem } from "../../services/leads.api";
 import CallDialog from "./CallDialog";
 import { EmailDialog } from "../LeadsHub/EmailDialogs";
@@ -51,20 +50,6 @@ const normalizePhone = (phone: string | undefined): string => {
   if (/^\d{10}$/.test(cleaned)) return `+91${cleaned}`;
   if (/^91\d{10}$/.test(cleaned)) return `+${cleaned}`;
   return `+${cleaned}`;
-};
-
-interface ApiErrorShape {
-  response?: { data?: { detail?: string; message?: string } };
-  message?: string;
-}
-const extractErrorMessage = (err: unknown, fallback: string): string => {
-  const e = err as ApiErrorShape;
-  return (
-    e?.response?.data?.detail ||
-    e?.response?.data?.message ||
-    e?.message ||
-    fallback
-  );
 };
 
 // ── Chatbot helpers ───────────────────────────────────────────────────────────
@@ -331,7 +316,9 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     [onRefreshSmsHistory],
   );
 
-  const handleCallOpen = async () => {
+  // ✅ FIXED: handleCallOpen now just validates and opens CallDialog
+  // CallDialog itself handles the Twilio browser call — no more TwilioAPI.makeCall here
+  const handleCallOpen = () => {
     const phone = normalizePhone(lead?.contact_no || leadPhone);
     if (!phone) {
       setCallSnackbar({
@@ -348,15 +335,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       return;
     }
     setCallDialogOpen(true);
-    try {
-      await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
-    } catch (err: unknown) {
-      setCallDialogOpen(false);
-      setCallSnackbar({
-        open: true,
-        message: extractErrorMessage(err, "Failed to initiate call."),
-      });
-    }
   };
 
   // Chatbot state
@@ -1636,9 +1614,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
         </Card>
       </Stack>
 
+      {/* ✅ FIXED: CallDialog now receives toNumber and leadUuid for real Twilio browser call */}
       <CallDialog
         open={callDialogOpen}
         name={leadName || "Unknown"}
+        toNumber={normalizePhone(lead?.contact_no || leadPhone)}
+        leadUuid={lead?.id || ""}
+        agentIdentity="agent"
         onClose={() => setCallDialogOpen(false)}
       />
 
