@@ -1083,7 +1083,9 @@ export default function AddNewLead() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
+    // ↓ "add-lead-page" className activates the isolation CSS rules in leads.css
     <Paper
+      className="add-lead-page"
       sx={{
         overflow: "hidden",
         minHeight: "88vh",
