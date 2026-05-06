@@ -29,9 +29,11 @@ export interface RawLead {
   clinic_id?: number | string;
 }
 
+export type Quality = "Hot" | "Warm" | "Cold";
+
 export interface ProcessedLead extends RawLead {
   assigned: string;
-  quality: "Hot" | "Warm" | "Cold";
+  quality: Quality;
   displayId: string;
   taskType: string;
   taskStatus: string;
