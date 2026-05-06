@@ -1,6 +1,5 @@
 // services/leads.api.ts
 import axios, { type AxiosRequestConfig } from "axios";
-import type { TreatmentInterest } from "../types/leads.types";
 
 // ====================== Types ======================
 export type Department = {
@@ -24,6 +23,13 @@ export type Employee = {
   emp_email?: string;
   user_email?: string;
   official_email?: string;
+};
+
+export type Interest = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  clinic: number;
 };
 
 export type LeadDocument = {
@@ -70,7 +76,7 @@ export type Lead = {
   assigned_to_name?: string;
   created_by_id?: number;
   created_by_name?: string;
-  treatment_interest?: string[] | TreatmentInterest[];
+  treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string;
   slot: string;
@@ -136,7 +142,7 @@ export type LeadPayload = {
   next_action_description?: string;
   next_action_type?: string;
   action_status?: "to_do" | "in_progress" | "completed" | null;
-  treatment_interest: string[];
+  treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string | null;
   slot: string;
@@ -445,9 +451,7 @@ const appendPayloadToFormData = (
     }
 
     if (Array.isArray(value)) {
-      value.forEach((item) => {
-        formData.append(key, String(item));
-      });
+      formData.append(key, JSON.stringify(value));
       return;
     }
 
@@ -627,26 +631,20 @@ export const LeadAPI = {
   uploadDocuments: async (leadId: string, files: File[]): Promise<Lead> => {
     const current = await LeadAPI.getById(leadId);
     const formData = new FormData();
-    const safeFields: Record<string, string | string[] | TreatmentInterest[]> = {
+    const safeFields: Record<string, string> = {
       clinic_id: String(current.clinic_id ?? 1),
       department_id: String(current.department_id ?? 1),
       full_name: current.full_name ?? "",
       contact_no: current.contact_no ?? "",
       source: current.source ?? "",
-      treatment_interest: current.treatment_interest ?? [],
+      treatment_interest: current.treatment_interest ?? "",
       book_appointment: current.book_appointment ? "true" : "false",
       appointment_date: current.appointment_date ?? "",
       slot: current.slot ?? "",
       partner_inquiry: current.partner_inquiry ? "true" : "false",
       is_active: current.is_active ? "true" : "false",
     };
-    Object.entries(safeFields).forEach(([k, v]) => {
-      if (Array.isArray(v)) {
-        formData.append(k, JSON.stringify(v));
-      } else {
-        formData.append(k, v);
-      }
-    });
+    Object.entries(safeFields).forEach(([k, v]) => formData.append(k, v));
     files.forEach((file) => formData.append("documents", file));
     const clinicId = current.clinic_id ?? storedClinicId();
     const response = await api.put<Lead>(
@@ -864,6 +862,18 @@ export const DepartmentAPI = {
   },
 };
 
+// ====================== Interest API ======================
+export const InterestAPI = {
+  listActiveByClinic: async (clinicId: number): Promise<Interest[]> => {
+    const response = await api.get<Interest[] | { results: Interest[] }>(
+      `/interests/?clinic_id=${clinicId}&is_active=true`,
+    );
+    const data = response.data;
+    const all = Array.isArray(data) ? data : (data.results ?? []);
+    return all.filter((i) => i.is_active);
+  },
+};
+
 // ====================== Employee API ======================
 export const EmployeeAPI = {
   listByClinic: async (clinicId: number): Promise<Employee[]> =>
@@ -877,20 +887,6 @@ export const EmployeeAPI = {
     emp_name: string;
   }): Promise<Employee> => {
     const response = await api.post<Employee>("/employees/", data);
-    return response.data;
-  },
-};
-
-export const InterestAPI = {
-  async list() {
-    const clinicId = localStorage.getItem("clinic_id");
-
-    const response = await api.get("/interests/", {
-      headers: {
-        "X-Clinic-Id": clinicId,
-      },
-    });
-
     return response.data;
   },
 };
