@@ -89,7 +89,8 @@ const TemplatesPage: React.FC = () => {
     whatsapp: [],
   });
 
-  const [useCases, setUseCases] = useState<UseCase[]>([]); // ✅ ADDED
+  // ✅ Single useCases state (removed duplicate)
+  const [useCases, setUseCases] = useState<UseCase[]>([]);
 
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
   const [viewMode, setViewMode] = useState<"create" | "edit" | "view">(
@@ -103,25 +104,6 @@ const TemplatesPage: React.FC = () => {
   const [activeFilters, setActiveFilters] = useState<TemplateFilters | null>(
     null,
   );
-  const [useCases, setUseCases] = useState<
-    {
-      id: string;
-      name: string;
-    }[]
-  >([]);
-
-  useEffect(() => {
-    const fetchUseCases = async () => {
-      try {
-        const data = await UseCaseAPI.list();
-        setUseCases(data || []);
-      } catch (error) {
-        console.error("Failed to fetch use cases:", error);
-      }
-    };
-
-    fetchUseCases();
-  }, []);
 
   const useCaseOptions = React.useMemo(() => {
     const allTemplates = [

@@ -17,14 +17,16 @@ export const CopyDetailsModal: React.FC<Props> = ({ open, template, onClose, onC
   const templateName = template.name || "Untitled";
   const useCase =
     typeof template.use_case === "object"
-      ? template.use_case?.name
-      : template.use_case_name ||
+      ? (template.use_case as { name?: string })?.name
+      : (template as unknown as Record<string, unknown>)["use_case_name"] as string ||
         template.useCase ||
         template.use_case ||
         "General";
   const createdBy = template.createdBy || "Admin";
   const lastUpdatedRaw =
-    template.modified_at || template.lastUpdatedAt || template.created_at;
+    (template as unknown as Record<string, unknown>)["modified_at"] as string ||
+    template.lastUpdatedAt ||
+    (template as unknown as Record<string, unknown>)["created_at"] as string;
 
   const lastUpdated = lastUpdatedRaw
     ? new Date(lastUpdatedRaw).toLocaleDateString()

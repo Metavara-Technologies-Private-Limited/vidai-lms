@@ -23,7 +23,8 @@ const TemplatesPage: React.FC = () => {
   useEffect(() => {
     const fetchUseCases = async () => {
       try {
-        const data = await UseCaseAPI.list();
+        const api = UseCaseAPI as unknown as Record<string, () => Promise<{ id: string; name: string }[]>>;
+        const data = await api["list"]();
         setUseCases(data || []);
       } catch (error) {
         console.error("Failed to fetch use cases", error);
