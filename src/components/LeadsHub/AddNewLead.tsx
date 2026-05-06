@@ -48,7 +48,7 @@ import {
   type NextActionStatusOption,
   type CampaignData,
   type ApiError,
-  type ActionStatusValue,          // ← NEW
+  type TaskStatusValue,          // ← renamed from ActionStatusValue
 } from "../LeadsHub/addNewLead.constants";
 
 import { validateStep } from "../LeadsHub/addNewLead.validation";
@@ -300,7 +300,7 @@ export default function AddNewLead() {
     nextStatus: "",
     nextDesc: "",
     leadStatus: "",
-    actionStatus: "",              // ← NEW
+    taskStatus: "",              // ← renamed from actionStatus
     treatmentInterest: "",
     treatments: [],
     wantAppointment: "no",
@@ -875,7 +875,7 @@ export default function AddNewLead() {
       ...(form.leadStatus
         ? { lead_status: form.leadStatus as LeadPayload["lead_status"] }
         : {}),
-      action_status: (form.actionStatus as ActionStatusValue) || null,   // ← NEW
+      action_status: (form.taskStatus.trim().toLowerCase() as TaskStatusValue) || null,   // ← trim & normalize
       assigned_to_id: intOrNull(form.assignee) ?? null,
       assigned_to_name: assigneeName.trim() || null,
       personal_id: selectedAppointmentPersonnel?.id ?? null,
@@ -1083,7 +1083,6 @@ export default function AddNewLead() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    // ↓ "add-lead-page" className activates the isolation CSS rules in leads.css
     <Paper
       className="add-lead-page"
       sx={{

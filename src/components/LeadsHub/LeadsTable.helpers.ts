@@ -124,6 +124,13 @@ export const processLead = (lead: RawLead): ProcessedLead => {
   const mapTaskStatus = (
     lead: RawLead,
   ): "Pending" | "In Progress" | "Completed" => {
+    // ── Use action_status from API if available (takes priority) ──
+    const actionStatus = (lead.action_status || "").toLowerCase();
+    if (actionStatus === "completed") return "Completed";
+    if (actionStatus === "in_progress") return "In Progress";
+    if (actionStatus === "to_do") return "Pending";
+
+    // ── Fallback to next_action_status if action_status not set ──
     const status = (lead.next_action_status || "").toLowerCase();
 
     if (!lead.next_action_type) return "Pending";

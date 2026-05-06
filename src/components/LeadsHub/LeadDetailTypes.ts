@@ -88,6 +88,7 @@ export interface LeadRecord {
   next_action_type?: string;
   next_action_status?: string;
   next_action_description?: string;
+  action_status?: string;
   task?: string;
   taskStatus?: string;
   is_active?: boolean;

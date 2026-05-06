@@ -64,6 +64,7 @@ export type Lead = {
   next_action_type?: string;
   next_action_status?: string;
   next_action_description?: string;
+  action_status?: "to_do" | "in_progress" | "completed" | null;
   assigned_to_id?: number;
   assigned_to_name?: string;
   created_by_id?: number;
@@ -133,6 +134,7 @@ export type LeadPayload = {
   next_action_status?: string | null;
   next_action_description?: string;
   next_action_type?: string;
+  action_status?: "to_do" | "in_progress" | "completed" | null;
   treatment_interest: string;
   book_appointment: boolean;
   appointment_date: string | null;
@@ -459,6 +461,7 @@ const removeBlankUpdateFields = <T extends Record<string, unknown>>(
 ): Partial<T> => {
   const next = { ...payload } as Record<string, unknown>;
 
+  // ── Remove blank contact_no ──
   if (
     next.contact_no === null ||
     next.contact_no === undefined ||
@@ -466,6 +469,10 @@ const removeBlankUpdateFields = <T extends Record<string, unknown>>(
   ) {
     delete next.contact_no;
   }
+
+  // ── Keep action_status (task status) even if empty/null for update ──
+  // This ensures it gets properly processed by the backend
+  // (removing it would prevent updates to clear the field)
 
   return next as Partial<T>;
 };

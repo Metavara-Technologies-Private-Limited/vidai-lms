@@ -59,9 +59,6 @@ export type LeadActivity = {
   taskStatus: TaskStatus;
 };
 
-/* ================= NEXT ACTION STATUS ================= */
-export type NextActionStatus = "pending" | "completed";
-
 /*=====================Add New Lead=====================*/
 export type FormState = {
   full_name: string;
@@ -94,7 +91,7 @@ export type FormState = {
   nextType: string;
   nextStatus: string;
   nextDesc: string;
-  actionStatus: string; 
+  taskStatus: string;          // ← renamed from actionStatus
 
   // ✅ ADDED: lead lifecycle status — user picks during creation
   // Maps to backend lead_status field (null=True, blank=True, default=None)

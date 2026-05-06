@@ -11,14 +11,14 @@ export const TASK_TYPES = [
 
 export type TaskType = (typeof TASK_TYPES)[number];
 
-// ====================== Action Status Options ======================
-export const ACTION_STATUS_OPTIONS = [
+// ====================== Task Status Options ======================
+export const TASK_STATUS_OPTIONS = [
   { label: "To-do",       value: "to_do"       },
   { label: "In Progress", value: "in_progress" },
   { label: "Completed",   value: "completed"   },
 ] as const;
 
-export type ActionStatusValue = "to_do" | "in_progress" | "completed";
+export type TaskStatusValue = "to_do" | "in_progress" | "completed";
 
 // ====================== Source Options ======================
 export const SOURCE_OPTIONS = ["Direct", "Referral", "Social Media", "Other"] as const;
@@ -103,7 +103,7 @@ export type LeadPayload = {
   next_action_status?: string | null;
   next_action_description?: string;
   next_action_type?: string;
-  action_status?: ActionStatusValue | null;    // ← NEW
+  action_status?: TaskStatusValue | null;    // ← backend field stays as action_status
   lead_status?:
     | "new"
     | "contacted"
