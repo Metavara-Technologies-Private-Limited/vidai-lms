@@ -93,7 +93,7 @@ import {
   APP_TYPE,
   STATUS_OPTIONS_BY_APP,
   FLOW_COPY_BY_APP,
-  IS_CONTRACTS_APP, // ✅ FIX: import IS_CONTRACTS_APP to gate AI Score display
+  IS_CONTRACTS_APP,
 } from "../../config/appType";
 
 import BookAppointmentModal from "./BookAppointmentModal";
@@ -138,6 +138,33 @@ function capitalizeWords(val: string | undefined | null): string {
 function capitalize(val: string | undefined | null): string {
   if (!val) return "N/A";
   return val.charAt(0).toUpperCase() + val.slice(1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getLeadTaskStatus
+// Reads ONLY action_status from the backend.
+// Backend values : "to_do" | "in_progress" | "completed" | null | ""
+// UI display     : "To Do" | "In Progress"  | "Completed" | ""
+// Returns ""  when action_status is not set — chip is hidden, shows "—"
+// ─────────────────────────────────────────────────────────────────────────────
+type LeadWithApiFields = LeadRecord & { action_status?: string };
+
+function getLeadTaskStatus(
+  lead?: LeadWithApiFields,
+): "To Do" | "In Progress" | "Completed" | "" {
+  if (!lead) return "";
+
+  const raw = (lead.action_status ?? "").trim().toLowerCase();
+
+  if (raw === "to_do") return "To Do";
+  if (raw === "in_progress") return "In Progress";
+  if (raw === "completed") return "Completed";
+  // Legacy display-value strings that may arrive from older records
+  if (raw === "to do") return "To Do";
+  if (raw === "in progress") return "In Progress";
+  if (raw === "pending") return "To Do"; // old records stored "pending"
+
+  return ""; // not set → caller renders "—"
 }
 
 function toDisplayPhone(val: string | undefined | null): string {
@@ -727,9 +754,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
                       maxHeight: 340,
                       overflowY: "auto",
                       paddingRight: "4px",
-                      "&::-webkit-scrollbar": {
-                        width: "6px",
-                      },
+                      "&::-webkit-scrollbar": { width: "6px" },
                       "&::-webkit-scrollbar-track": {
                         backgroundColor: "#F5F5F5",
                         borderRadius: "4px",
@@ -738,9 +763,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
                         backgroundColor: "#D0D0D0",
                         borderRadius: "4px",
                         transition: "backgroundColor 0.2s",
-                        "&:hover": {
-                          backgroundColor: "#B0B0B0",
-                        },
+                        "&:hover": { backgroundColor: "#B0B0B0" },
                       },
                     }}
                   >
@@ -1496,11 +1519,8 @@ export default function LeadDetailView() {
   const [historyView, setHistoryView] = React.useState<HistoryView>("chatbot");
   const [emailDialogOpen, setEmailDialogOpen] = React.useState(false);
   const clinic = useSelector(selectClinic);
-
   const clinicName = clinic?.name || "Our Clinic";
-
   const [bookApptOpen, setBookApptOpen] = React.useState(false);
-
   const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>(
     [],
   );
@@ -1513,7 +1533,7 @@ export default function LeadDetailView() {
       const data = await LeadEmailAPI.listByLead(leadId);
       setEmailHistory(Array.isArray(data) ? data : []);
     } catch {
-      // silent
+      /* silent */
     } finally {
       setEmailHistoryLoading(false);
     }
@@ -1616,19 +1636,16 @@ export default function LeadDetailView() {
     }) => {
       const recipientEmail = (leadData.email || "").trim();
       if (!recipientEmail) return;
-
       const leadName = (leadData.full_name || leadData.name || "Lead").trim();
       const leadFirstName = leadName.split(/\s+/)[0] || "Lead";
       const appointmentDate =
         appointmentResult?.appointment_date || leadData.appointment_date || "-";
       const appointmentSlot = appointmentResult?.slot || leadData.slot || "-";
       const senderEmail = authedUser?.email?.trim() || undefined;
-
       const subject =
         eventType === "appointment"
           ? `Appointment Booked - ${appointmentDate}`
           : `Lead Updated - ${leadName}`;
-
       const emailBody = [
         `Hi ${leadFirstName},`,
         "",
@@ -1650,7 +1667,6 @@ export default function LeadDetailView() {
         `Regards,`,
         `${clinicName}`,
       ].join("\n");
-
       await LeadEmailAPI.sendNow({
         lead: String(leadData.id),
         subject,
@@ -1901,7 +1917,11 @@ export default function LeadDetailView() {
           full_name: activeLead.full_name || activeLead.name,
           ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
           source: activeLead.source || "Unknown",
-          treatment_interest: activeLead.treatment_interest || "N/A",
+          treatment_interest: Array.isArray(activeLead.treatment_interest)
+            ? activeLead.treatment_interest.map((t) =>
+                typeof t === "string" ? t : t.id,
+              )
+            : [],
           book_appointment: activeLead.book_appointment || false,
           appointment_date: activeLead.appointment_date || "",
           slot: activeLead.slot || "",
@@ -1948,7 +1968,6 @@ export default function LeadDetailView() {
     setConvertError(null);
     setOpenConvertPopup(true);
   };
-
   const handleClosePopup = () => {
     setOpenConvertPopup(false);
     setConvertError(null);
@@ -2001,7 +2020,7 @@ export default function LeadDetailView() {
             JSON.stringify([...ids, leadUuid]),
           );
       } catch {
-        // no-op
+        /* no-op */
       }
       setOpenConvertPopup(false);
     } catch (err: unknown) {
@@ -2033,7 +2052,6 @@ export default function LeadDetailView() {
   const handleAppointmentSaved = React.useCallback(
     (result: AppointmentResult) => {
       setBookApptOpen(false);
-
       const mailLeadData = {
         ...(activeLead ?? {}),
         book_appointment: true,
@@ -2046,7 +2064,6 @@ export default function LeadDetailView() {
         department_id: result.department_id ?? activeLead?.department_id,
         department_name: result.departmentName || activeLead?.department_name,
       } as LeadRecord;
-
       void sendLeadSummaryEmail({
         leadData: mailLeadData,
         eventType: "appointment",
@@ -2058,7 +2075,6 @@ export default function LeadDetailView() {
           toastOptions,
         );
       });
-
       setFullLead((prev) => {
         const base = prev ?? activeLead ?? null;
         if (!base) return prev;
@@ -2076,7 +2092,6 @@ export default function LeadDetailView() {
           department_name: result.departmentName || base.department_name,
         } as LeadRecord;
       });
-
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
     },
     [activeLead, dispatch, sendLeadSummaryEmail],
@@ -2170,14 +2185,11 @@ export default function LeadDetailView() {
   );
   const leadStatus = selectedLeadStatus;
   const leadQuality = capitalize(activeLead.quality || "N/A");
-
-  // ✅ FIX: Only compute leadScore for medical app — hidden for contracts app
   const leadScore = !IS_CONTRACTS_APP
     ? String(activeLead.score || 0).includes("%")
       ? activeLead.score
       : `${activeLead.score || 0}%`
     : null;
-
   const leadSource = capitalizeWords(activeLead.source || "Unknown");
   const leadSubSource = capitalizeWords(activeLead.sub_source || "N/A");
   const leadCampaignName = capitalizeWords(activeLead.campaign_name || "N/A");
@@ -2208,11 +2220,21 @@ export default function LeadDetailView() {
   const nextActionDescription = capitalize(
     activeLead.next_action_description || "N/A",
   );
-  const treatmentInterest = activeLead.treatment_interest
-    ? activeLead.treatment_interest
-        .split(",")
-        .map((t) => capitalizeWords(t.trim()))
-    : [];
+
+  // ── Task status: reads action_status only, returns "To Do"|"In Progress"|"Completed"|""
+  const leadTaskStatus = getLeadTaskStatus(activeLead);
+
+  // ── FIX: treatment_interest may be an array or a string from the API
+  const treatmentInterest = (() => {
+    const val = activeLead.treatment_interest;
+    if (!val) return [];
+    if (Array.isArray(val))
+      return val.map((t) => capitalizeWords(String(t).trim()));
+    if (typeof val === "string")
+      return val.split(",").map((t) => capitalizeWords(t.trim()));
+    return [];
+  })();
+
   const hasAppointment = activeLead.book_appointment === true;
   const appointmentDepartment = hasAppointment
     ? capitalizeWords(
@@ -2256,7 +2278,6 @@ export default function LeadDetailView() {
     convertedLeadIds.includes(leadUuidRaw) ||
     currentStatus === "converted" ||
     (activeLead?.lead_status || "").toLowerCase() === "converted";
-
   const leadStatusPill = LEAD_STATUS_PILL_COLORS[leadStatus] ?? {
     color: "#6B7280",
     bg: "#F3F4F6",
@@ -2267,7 +2288,6 @@ export default function LeadDetailView() {
     setDraftLeadStatus(selectedLeadStatus);
     setStatusDialogOpen(true);
   };
-
   const closeStatusDialog = () => {
     if (statusSaving) return;
     setStatusDialogOpen(false);
@@ -2288,7 +2308,11 @@ export default function LeadDetailView() {
           activeLead.phone_number ||
           "",
         source: activeLead.source || "Unknown",
-        treatment_interest: activeLead.treatment_interest || "N/A",
+        treatment_interest: Array.isArray(activeLead.treatment_interest)
+          ? activeLead.treatment_interest.map((t) =>
+              typeof t === "string" ? t : t.id,
+            )
+          : [],
         book_appointment: activeLead.book_appointment || false,
         appointment_date: activeLead.appointment_date || null,
         slot: activeLead.slot || "",
@@ -2300,15 +2324,12 @@ export default function LeadDetailView() {
       setSelectedLeadStatus(draftLeadStatus);
       setStatusDialogOpen(false);
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-
-      const mailLeadData = {
-        ...(activeLead ?? {}),
-        ...(updatedLead as unknown as LeadRecord),
-        status: draftLeadStatus,
-      } as LeadRecord;
-
       void sendLeadSummaryEmail({
-        leadData: mailLeadData,
+        leadData: {
+          ...(activeLead ?? {}),
+          ...(updatedLead as unknown as LeadRecord),
+          status: draftLeadStatus,
+        } as LeadRecord,
         eventType: "update",
         statusLabel: draftLeadStatus,
       }).catch(() => {
@@ -2317,7 +2338,6 @@ export default function LeadDetailView() {
           toastOptions,
         );
       });
-
       toast.success("Lead status updated.", toastOptions);
     } catch (err) {
       toast.error(
@@ -2402,6 +2422,8 @@ export default function LeadDetailView() {
             >
               {leadInitials}
             </Avatar>
+
+            {/* Lab Name */}
             <Stack
               spacing={0.5}
               sx={{
@@ -2421,6 +2443,8 @@ export default function LeadDetailView() {
                 {leadName}
               </Typography>
             </Stack>
+
+            {/* Lead ID */}
             <Stack
               spacing={0.5}
               sx={{
@@ -2440,6 +2464,8 @@ export default function LeadDetailView() {
                 {leadDisplayId}
               </Typography>
             </Stack>
+
+            {/* Source */}
             <Stack
               spacing={0.5}
               sx={{
@@ -2469,6 +2495,8 @@ export default function LeadDetailView() {
                 </Typography>
               </Stack>
             </Stack>
+
+            {/* Lead Status */}
             <Stack
               spacing={0.5}
               sx={{
@@ -2506,6 +2534,8 @@ export default function LeadDetailView() {
                 </IconButton>
               </Stack>
             </Stack>
+
+            {/* Lead Quality */}
             <Stack
               spacing={0.5}
               sx={{
@@ -2534,9 +2564,48 @@ export default function LeadDetailView() {
               />
             </Stack>
 
-            {/* ✅ FIX: AI Lead Score hidden for contracts app, shown for medical app
-                Matches the same {!IS_CONTRACTS_APP && ...} pattern used in
-                LeadsTable and LeadsFollowUp */}
+            {/* ── Task Status ─────────────────────────────────────────────────
+                Reads action_status from API only.
+                "to_do"       → "To Do"      (blue chip)
+                "in_progress" → "In Progress" (indigo chip)
+                "completed"   → "Completed"  (green chip)
+                null / ""     → "—"          (no chip rendered)
+            ────────────────────────────────────────────────────────────────── */}
+            <Stack
+              spacing={0.5}
+              sx={{
+                flex: 1.3,
+                transform: { xs: "none", md: "translateY(14px)" },
+                minWidth: { xs: "100%", md: 0 },
+              }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+              >
+                Task Status
+              </Typography>
+              {leadTaskStatus ? (
+                <Chip
+                  label={leadTaskStatus}
+                  size="small"
+                  sx={
+                    leadTaskStatus === "Completed"
+                      ? pillChipSx("#52C41A", "rgba(82,196,26,0.10)")
+                      : leadTaskStatus === "In Progress"
+                        ? pillChipSx("#2F54EB", "rgba(47,84,235,0.10)")
+                        : pillChipSx("#1890FF", "rgba(24,144,255,0.10)") // "To Do"
+                  }
+                />
+              ) : (
+                <Typography fontSize="12px" color="#94A3B8">
+                  —
+                </Typography>
+              )}
+            </Stack>
+
+            {/* AI Lead Score — medical app only */}
             {!IS_CONTRACTS_APP && (
               <Stack
                 spacing={0.5}
@@ -2562,6 +2631,7 @@ export default function LeadDetailView() {
         </Stack>
       </Card>
 
+      {/* Edit Status Dialog */}
       <Dialog
         open={statusDialogOpen}
         onClose={closeStatusDialog}
@@ -2604,10 +2674,7 @@ export default function LeadDetailView() {
               renderValue={(value) => {
                 const style = LEAD_STATUS_PILL_COLORS[
                   value as LeadStatusOption
-                ] ?? {
-                  color: "#6B7280",
-                  bg: "#F3F4F6",
-                };
+                ] ?? { color: "#6B7280", bg: "#F3F4F6" };
                 return (
                   <Chip
                     label={value}

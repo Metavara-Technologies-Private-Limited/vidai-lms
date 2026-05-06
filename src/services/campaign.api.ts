@@ -166,6 +166,9 @@ export const CampaignAPI = {
   getFBAdInsights: (fbCampaignId: string) =>
     http.get(`/fb/campaigns/${fbCampaignId}/insights/?date_preset=maximum`),
 
+  updateFacebookStatus: (campaignId: string, action: "enable" | "disable") =>
+    http.post(`/fb/campaigns/${campaignId}/status/`, { action }),
+
   getFacebookDebug: (campaignId: string) =>
     http.get(`/campaigns/${campaignId}/facebook-debug/`, {
       params: { clinic_id: storedClinicId() },

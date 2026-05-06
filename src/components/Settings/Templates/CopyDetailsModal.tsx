@@ -15,9 +15,20 @@ export const CopyDetailsModal: React.FC<Props> = ({ open, template, onClose, onC
 
   // Formatting values for the clipboard string
   const templateName = template.name || "Untitled";
-  const useCase = template.useCase || "General";
+  const useCase =
+    typeof template.use_case === "object"
+      ? template.use_case?.name
+      : template.use_case_name ||
+        template.useCase ||
+        template.use_case ||
+        "General";
   const createdBy = template.createdBy || "Admin";
-  const lastUpdated = template.lastUpdatedAt || "N/A";
+  const lastUpdatedRaw =
+    template.modified_at || template.lastUpdatedAt || template.created_at;
+
+  const lastUpdated = lastUpdatedRaw
+    ? new Date(lastUpdatedRaw).toLocaleDateString()
+    : "N/A";
 
   const copyText = `
 Template Name: ${templateName}

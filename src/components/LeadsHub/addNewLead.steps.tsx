@@ -25,7 +25,7 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 import type { Department } from "../../services/leads.api";
 import type { ReferralDepartment } from "../../services/referral.api";
-import type { FormState } from "../../types/leads.types";
+import type { FormState, Interest } from "../../types/leads.types";
 import {
   SOURCE_OPTIONS,
   SUB_SOURCE_OPTIONS,
@@ -33,7 +33,7 @@ import {
   inputStyle,
   labelStyle,
   getDocColor,
-  ACTION_STATUS_OPTIONS,          // ← NEW
+  TASK_STATUS_OPTIONS,          // ← renamed from ACTION_STATUS_OPTIONS
   type LeadGeneratedByObject,
   type NextActionStatusOption,
 } from "../LeadsHub/addNewLead.constants";
@@ -715,13 +715,13 @@ export function Step1({
         )}
       </Box>
 
-      {/* Row 2: Lead Status | Next Action Status | Next Action Type | Action Status | Next Action Description */}
+      {/* Row 2: Lead Status | Next Action Status | Next Action Type | Task Status | Next Action Description */}
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: IS_CONTRACTS_APP
-            ? "repeat(5, 1fr)"   // ← was 4, now 5 to fit Action Status
-            : "repeat(4, 1fr)",  // ← was 3, now 4 to fit Action Status
+            ? "repeat(5, 1fr)"
+            : "repeat(4, 1fr)",
           gap: 2,
           mb: 2,
         }}
@@ -787,17 +787,17 @@ export function Step1({
           </TextField>
         </Box>
 
-        {/* ── Action Status — NEW ───────────────────────────────────────── */}
+        {/* ── Task Status ───────────────────────────────────────────────── */}
         <Box>
-          <Typography sx={labelStyle}>Action Status</Typography>
+          <Typography sx={labelStyle}>Task Status</Typography>
           <TextField
             select fullWidth size="small"
-            value={form.actionStatus}
-            onChange={handleSelectChange("actionStatus")}
+            value={form.taskStatus}                        // ← renamed from actionStatus
+            onChange={handleSelectChange("taskStatus")}    // ← renamed from actionStatus
             sx={inputStyle}
           >
             <MenuItem value="">-- Select --</MenuItem>
-            {ACTION_STATUS_OPTIONS.map((opt) => (
+            {TASK_STATUS_OPTIONS.map((opt) => (            // ← renamed from ACTION_STATUS_OPTIONS
               <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
             ))}
           </TextField>
@@ -844,6 +844,8 @@ interface Step2Props {
   addFiles: (files: File[]) => void;
   removeFile: (index: number) => void;
   handleFileInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  interests: Interest[];
+  loadingInterests: boolean;
 }
 
 export function Step2({
@@ -856,80 +858,158 @@ export function Step2({
   addFiles,
   removeFile,
   handleFileInputChange,
+  interests,
+  loadingInterests,
 }: Step2Props) {
   const sectionHeading = IS_MEDICAL_APP ? "TREATMENT INFORMATION" : "PRODUCT INFORMATION";
   const interestLabel = ACTIVE_FLOW_COPY.treatmentLabel;
-  const interestOptions = ACTIVE_FLOW_COPY.treatmentOptions;
+  // const interestOptions = ACTIVE_FLOW_COPY.treatmentOptions;
 
   return (
     <Box>
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         {sectionHeading}
       </Typography>
 
       <Box sx={{ mb: 3 }}>
         <Typography sx={labelStyle}>{interestLabel}</Typography>
-        <TextField
-          select fullWidth size="small"
-          value={form.treatmentInterest}
-          onChange={(e) => {
-            const value = e.target.value;
+        <Autocomplete
+          multiple
+          options={interests}
+          loading={loadingInterests}
+          value={interests.filter((i) => form.treatments.includes(i.id))}
+          onChange={(_, value) => {
             setForm((prev) => ({
               ...prev,
-              treatmentInterest: value,
-              treatments: prev.treatments.includes(value) ? prev.treatments : [...prev.treatments, value],
+              treatments: value.map((v) => v.id),
             }));
           }}
-          sx={{ ...inputStyle, maxWidth: "50%" }}
-          SelectProps={{ displayEmpty: true }}
-        >
-          <MenuItem value="" disabled>Select</MenuItem>
-          {interestOptions.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
-        </TextField>
+          getOptionLabel={(option) => option.name}
+          isOptionEqualToValue={(a, b) => a.id === b.id}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => (
+              <Chip
+                {...getTagProps({ index })}
+                key={option.id}
+                label={option.name}
+              />
+            ))
+          }
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              size="small"
+              placeholder={`Select ${interestLabel}`}
+              sx={{ ...inputStyle, maxWidth: "50%" }}
+            />
+          )}
+        />
       </Box>
 
       {form.treatments.length > 0 && (
         <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-          {form.treatments.map((t) => (
-            <Chip
-              key={t} label={t}
-              onDelete={() => setForm((prev) => ({ ...prev, treatments: prev.treatments.filter((x) => x !== t) }))}
-              sx={{
-                bgcolor: "#FEE2E2", color: "#B91C1C", fontWeight: 600, border: "1px solid #FCA5A5",
-                "& .MuiChip-deleteIcon": { color: "#B91C1C", "&:hover": { color: "#991B1B" } },
-              }}
-            />
-          ))}
+          {form.treatments.map((t) => {
+            const interest = interests.find((i) => i.id === t);
+
+            return (
+              <Chip
+                key={t}
+                label={interest?.name || t}
+                onDelete={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    treatments: prev.treatments.filter((x) => x !== t),
+                  }))
+                }
+                sx={{
+                  bgcolor: "#FEE2E2",
+                  color: "#B91C1C",
+                  fontWeight: 600,
+                  border: "1px solid #FCA5A5",
+                  "& .MuiChip-deleteIcon": {
+                    color: "#B91C1C",
+                    "&:hover": { color: "#991B1B" },
+                  },
+                }}
+              />
+            );
+          })}
         </Stack>
       )}
 
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         DOCUMENTS & REPORTS (Optional)
       </Typography>
 
       <Box
-        onDrop={(e) => { e.preventDefault(); setDocDragOver(false); addFiles(Array.from(e.dataTransfer.files)); }}
-        onDragOver={(e) => { e.preventDefault(); setDocDragOver(true); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDocDragOver(false);
+          addFiles(Array.from(e.dataTransfer.files));
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDocDragOver(true);
+        }}
         onDragLeave={() => setDocDragOver(false)}
         onClick={() => fileInputRef.current?.click()}
         sx={{
           border: docDragOver ? "2px dashed #6366F1" : "2px dashed #E2E8F0",
-          borderRadius: "12px", p: 3, display: "inline-flex", flexDirection: "column",
-          alignItems: "center", textAlign: "center",
+          borderRadius: "12px",
+          p: 3,
+          display: "inline-flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
           bgcolor: docDragOver ? "rgba(99,102,241,0.04)" : "#F8FAFC",
-          minWidth: "400px", transition: "all 0.2s", cursor: "pointer",
+          minWidth: "400px",
+          transition: "all 0.2s",
+          cursor: "pointer",
         }}
       >
-        <input ref={fileInputRef} type="file" hidden multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp" onChange={handleFileInputChange} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          hidden
+          multiple
+          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+          onChange={handleFileInputChange}
+        />
         <UploadFileIcon sx={{ fontSize: 28, color: "#94A3B8", mb: 1 }} />
         <Button
-          variant="contained" component="span"
-          onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-          sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, px: 3, py: 1, "&:hover": { bgcolor: "#475569" } }}
+          variant="contained"
+          component="span"
+          onClick={(e) => {
+            e.stopPropagation();
+            fileInputRef.current?.click();
+          }}
+          sx={{
+            bgcolor: "#64748B",
+            textTransform: "none",
+            borderRadius: "8px",
+            fontWeight: 600,
+            px: 3,
+            py: 1,
+            "&:hover": { bgcolor: "#475569" },
+          }}
         >
           Choose File
         </Button>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 1 }}
+        >
           {pendingFiles.length > 0
             ? `${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""} selected`
             : "No File Chosen · PDF, Word, JPG, PNG up to 10MB"}
@@ -943,14 +1023,43 @@ export function Step2({
             const ext = file.name.split(".").pop()?.toUpperCase() ?? "FILE";
             return (
               <Stack
-                key={`${file.name}-${index}`} direction="row" alignItems="center" spacing={2}
-                sx={{ px: 2, py: 1, borderRadius: "8px", border: "1px solid #E2E8F0", bgcolor: "#F8FAFC" }}
+                key={`${file.name}-${index}`}
+                direction="row"
+                alignItems="center"
+                spacing={2}
+                sx={{
+                  px: 2,
+                  py: 1,
+                  borderRadius: "8px",
+                  border: "1px solid #E2E8F0",
+                  bgcolor: "#F8FAFC",
+                }}
               >
-                <Box sx={{ width: 32, height: 32, borderRadius: "6px", bgcolor: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "6px",
+                    bgcolor: `${color}18`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
                   <InsertDriveFileOutlinedIcon sx={{ fontSize: 16, color }} />
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" fontWeight={600} color="#1E293B" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    color="#1E293B"
+                    sx={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {file.name}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
@@ -958,7 +1067,14 @@ export function Step2({
                   </Typography>
                 </Box>
                 <Tooltip title="Remove">
-                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); removeFile(index); }} sx={{ color: "#94A3B8", "&:hover": { color: "#EF4444" } }}>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(index);
+                    }}
+                    sx={{ color: "#94A3B8", "&:hover": { color: "#EF4444" } }}
+                  >
                     <CloseIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>

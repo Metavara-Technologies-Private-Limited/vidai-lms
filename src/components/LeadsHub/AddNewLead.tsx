@@ -25,8 +25,8 @@ import {
   hasAnySubcategoryActionPermission,
 } from "../../utils/roleAccess";
 
-import type { FormState } from "../../types/leads.types";
-import { LeadAPI, DepartmentAPI, LeadEmailAPI } from "../../services/leads.api";
+import type { FormState, Interest } from "../../types/leads.types";
+import { LeadAPI, DepartmentAPI, LeadEmailAPI, InterestAPI } from "../../services/leads.api";
 import type { Department } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import {
@@ -48,7 +48,7 @@ import {
   type NextActionStatusOption,
   type CampaignData,
   type ApiError,
-  type ActionStatusValue,          // ← NEW
+  type TaskStatusValue,          // ← renamed from ActionStatusValue
 } from "../LeadsHub/addNewLead.constants";
 
 import { validateStep } from "../LeadsHub/addNewLead.validation";
@@ -225,6 +225,28 @@ export default function AddNewLead() {
   const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
   const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>([]);
   const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string | null>(null);
+  
+  // ── Interests ─────────────────────────────────────────────────
+  const [interests, setInterests] = React.useState<Interest[]>([]);
+  const [loadingInterests, setLoadingInterests] = React.useState(false);
+
+  React.useEffect(() => {
+    const loadInterests = async () => {
+      try {
+        setLoadingInterests(true);
+
+        const data = await InterestAPI.list();
+
+        setInterests(data);
+      } catch {
+        setInterests([]);
+      } finally {
+        setLoadingInterests(false);
+      }
+    };
+
+    loadInterests();
+  }, []);
 
   const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
     () =>
@@ -300,7 +322,7 @@ export default function AddNewLead() {
     nextStatus: "",
     nextDesc: "",
     leadStatus: "",
-    actionStatus: "",              // ← NEW
+    taskStatus: "",              // ← renamed from actionStatus
     treatmentInterest: "",
     treatments: [],
     wantAppointment: "no",
@@ -855,9 +877,10 @@ export default function AddNewLead() {
       contact_no: form.contact.trim() || "",
       source: form.source || "Direct",
       sub_source: form.subSource || "",
-      treatment_interest:
-        form.treatments.join(",") || form.treatmentInterest || "General",
-      appointment_date: shouldBookAppointment ? (form.appointmentDate ?? null) : null,
+      treatment_interest: form.treatments,
+      appointment_date: shouldBookAppointment
+        ? (form.appointmentDate ?? null)
+        : null,
       slot: shouldBookAppointment ? (form.slot ?? "") : "",
       campaign_id: strOrNull(form.campaign),
       email: strOrNull(form.email || form.contactEmail) ?? null,
@@ -875,7 +898,7 @@ export default function AddNewLead() {
       ...(form.leadStatus
         ? { lead_status: form.leadStatus as LeadPayload["lead_status"] }
         : {}),
-      action_status: (form.actionStatus as ActionStatusValue) || null,   // ← NEW
+      action_status: (form.taskStatus.trim().toLowerCase() as TaskStatusValue) || null,   // ← trim & normalize
       assigned_to_id: intOrNull(form.assignee) ?? null,
       assigned_to_name: assigneeName.trim() || null,
       personal_id: selectedAppointmentPersonnel?.id ?? null,
@@ -900,12 +923,28 @@ export default function AddNewLead() {
     };
   };
 
+  const getInterestNames = (
+    interests: string[] | { id: string; name: string }[] | undefined | null,
+  ) => {
+    if (!interests || interests.length === 0) {
+      return "-";
+    }
+
+    if (typeof interests[0] === "string") {
+      return (interests as string[]).join(", ");
+    }
+
+    return (interests as { id: string; name: string }[])
+      .map((i) => i.name)
+      .join(", ");
+  };
   // ── Submit ─────────────────────────────────────────────────────────────────
   const submitForm = async () => {
     if (isSubmitting) return;
     try {
       setIsSubmitting(true);
       const payload = buildPayload();
+      
 
       const shouldSendAppointmentEmail =
         payload.book_appointment === true &&
@@ -938,12 +977,13 @@ export default function AddNewLead() {
             full_name: response.full_name || payload.full_name,
             contact_no: response.contact_no || payload.contact_no,
             source: response.source || payload.source,
-            treatment_interest: response.treatment_interest || payload.treatment_interest,
+            treatment_interest: payload.treatment_interest,
             next_action_status: postAppointmentStage,
             book_appointment: true,
             appointment_date: payload.appointment_date,
             slot: payload.slot,
-            partner_inquiry: response.partner_inquiry ?? payload.partner_inquiry,
+            partner_inquiry:
+              response.partner_inquiry ?? payload.partner_inquiry,
             is_active: response.is_active !== false,
           });
         } catch {
@@ -988,7 +1028,9 @@ export default function AddNewLead() {
               `Details:`,
               `- Name: ${response.full_name || payload.full_name || "-"}`,
               `- Contact: ${response.contact_no || payload.contact_no || "-"}`,
-              `- Treatment Interest: ${response.treatment_interest || payload.treatment_interest || "-"}`,
+              `- Treatment Interest: ${getInterestNames(
+                response.treatment_interest || payload.treatment_interest,
+              )}`,
               "",
               `If you need to reschedule or have any questions, please contact us.`,
               "",
@@ -1007,7 +1049,9 @@ export default function AddNewLead() {
               `- Contact: ${response.contact_no || payload.contact_no || "-"}`,
               `- Email: ${recipientEmail}`,
               `- Location: ${response.location || payload.location || "-"}`,
-              `- Treatment Interest: ${response.treatment_interest || payload.treatment_interest || "-"}`,
+              `- Treatment Interest: ${getInterestNames(
+                response.treatment_interest || payload.treatment_interest,
+              )}`,
               "",
               `Our team will review your details and get in touch with you shortly.`,
               "",
@@ -1083,7 +1127,6 @@ export default function AddNewLead() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    // ↓ "add-lead-page" className activates the isolation CSS rules in leads.css
     <Paper
       className="add-lead-page"
       sx={{
@@ -1245,6 +1288,8 @@ export default function AddNewLead() {
             addFiles={addFiles}
             removeFile={removeFile}
             handleFileInputChange={handleFileInputChange}
+            interests={interests}
+            loadingInterests={loadingInterests}
           />
         )}
         {currentStep === 3 && (

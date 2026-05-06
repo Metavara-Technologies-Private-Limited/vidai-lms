@@ -224,7 +224,7 @@ export const bookAppointment = createAsyncThunk<
       full_name: lead.full_name,
       contact_no: lead.contact_no,
       source: lead.source || "Unknown",
-      treatment_interest: lead.treatment_interest || "N/A",
+      treatment_interest: lead.treatment_interest || [],
       book_appointment: true,
       appointment_date: normalizedAppointmentDate,
       slot: payload.slot,
@@ -276,7 +276,7 @@ export const convertLead = createAsyncThunk<
       full_name: lead.full_name,
       contact_no: lead.contact_no,
       source: lead.source || "Unknown",
-      treatment_interest: lead.treatment_interest || "N/A",
+      treatment_interest: lead.treatment_interest || [],
       book_appointment: shouldKeepAppointment,
       appointment_date: shouldKeepAppointment
         ? normalizedAppointmentDate

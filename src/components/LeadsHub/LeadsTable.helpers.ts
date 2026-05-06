@@ -1,5 +1,11 @@
-import type { RawLead, ApiErrorShape, ProcessedLead } from "./LeadsTable.types";
-import { VALID_TASK_TYPES } from "./LeadsTable.types";
+import type {
+  RawLead,
+  ApiErrorShape,
+  ProcessedLead,
+  Quality,
+} from "./LeadsTable.types";
+
+import { VALID_TASK_TYPES } from "./LeadsTable.types";;
 
 // ====================== Error extractor ======================
 export const extractErrorMessage = (err: unknown, fallback: string): string => {
@@ -106,6 +112,26 @@ const extractStageFromDescription = (
   return match?.[1]?.trim() ?? "";
 };
 
+// ====================== action_status → display value ======================
+// Backend stores : "to_do" | "in_progress" | "completed" | null | ""
+// UI displays    : "To Do" | "In Progress"  | "Completed" | ""
+//
+// "to_do"  → "To Do"   ← exact label, never "Pending"
+// null/""  → ""        ← table renders "—", no default injected
+export const mapActionStatus = (
+  raw: string | null | undefined,
+): "To Do" | "In Progress" | "Completed" | "" => {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (v === "to_do")       return "To Do";
+  if (v === "in_progress") return "In Progress";
+  if (v === "completed")   return "Completed";
+  // Legacy display-value strings from older records
+  if (v === "to do")       return "To Do";
+  if (v === "in progress") return "In Progress";
+  if (v === "pending")     return "To Do"; // old records used "pending" → map to To Do
+  return "";                               // not set → caller decides display
+};
+
 // ====================== Lead processor ======================
 export const processLead = (lead: RawLead): ProcessedLead => {
   const stageTaskType = extractStageFromDescription(
@@ -121,24 +147,14 @@ export const processLead = (lead: RawLead): ProcessedLead => {
     stageTaskType ||
     "";
   const taskType = formatTaskType(rawTaskType);
-  const mapTaskStatus = (
-    lead: RawLead,
-  ): "Pending" | "In Progress" | "Completed" => {
-    const status = (lead.next_action_status || "").toLowerCase();
 
-    if (!lead.next_action_type) return "Pending";
+  // ── Task status: action_status is the ONLY source of truth ────────────────
+  // next_action_status stores pipeline stage names (e.g. "follow up"),
+  // NOT task completion state — never fall back to it.
+  // null/empty action_status → "" so the table shows "—" instead of a
+  // misleading default label.
+  const taskStatus = mapActionStatus(lead.action_status);
 
-    if (status === "completed") return "Completed";
-
-    if (status === "pending") {
-      if (lead.next_action_description) return "In Progress";
-      return "Pending";
-    }
-
-    return "Pending";
-  };
-
-  const taskStatus = mapTaskStatus(lead);
   return {
     ...lead,
     assigned: lead.assigned_to_name || "Unassigned",
@@ -146,10 +162,11 @@ export const processLead = (lead: RawLead): ProcessedLead => {
       stageStatus || lead.status || lead.lead_status || "New",
     ),
     lead_status: stageStatus || lead.lead_status || lead.status || "New",
-    name: lead.full_name || lead.name || "",
-    quality: deriveQuality(lead),
-    displayId: formatLeadId(lead.id),
+    quality: (lead as unknown as { quality?: Quality}).quality || deriveQuality(lead),
+    score: lead.score ?? 0,
     taskType,
     taskStatus,
+    displayId: formatLeadId(lead.id),
+    initials: (lead.full_name || "?").charAt(0).toUpperCase(),
   };
 };

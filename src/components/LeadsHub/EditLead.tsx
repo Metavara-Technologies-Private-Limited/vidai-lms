@@ -45,6 +45,7 @@ import {
   readOnlyStyle,
   labelStyle,
   sectionLabelStyle,
+  TASK_STATUS_OPTIONS,
 } from "./UseEditLead";
 import { sanitizeNameInput } from "../../utils/nameValidation";
 import { capitalizeFirst } from "../../utils/nameValidation";
@@ -233,6 +234,9 @@ export default function EditLead() {
     nextDesc,
     setNextDesc,
     handleNextTypeChange,
+    // ── Task Status ── NEW
+    taskStatus,
+    setTaskStatus,
     // ── Medical-only fields ──
     gender,
     setGender,
@@ -293,6 +297,7 @@ export default function EditLead() {
     IS_MEDICAL_APP,
     IS_CONTRACTS_APP,
     ACTIVE_FLOW_COPY,
+    interests,
   } = useEditLead();
 
   // ====================== Loading / Error states ======================
@@ -1140,11 +1145,11 @@ export default function EditLead() {
                 </Box>
               </Box>
 
-              {/* Row 2: Next Action Type · Next Action Description */}
+              {/* Row 2: Next Action Type · Task Status · Next Action Description */}
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gridTemplateColumns: "repeat(3, 1fr)",
                   gap: 2,
                   mb: 3,
                 }}
@@ -1174,6 +1179,26 @@ export default function EditLead() {
                         </MenuItem>
                       ))
                     )}
+                  </TextField>
+                </Box>
+
+                {/* ── Task Status ── NEW */}
+                <Box>
+                  <Typography sx={labelStyle}>Task Status</Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={taskStatus}
+                    onChange={(e) => setTaskStatus(e.target.value)}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {TASK_STATUS_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 </Box>
 
@@ -1227,9 +1252,9 @@ export default function EditLead() {
                     <MenuItem value="" disabled>
                       Select
                     </MenuItem>
-                    {ACTIVE_FLOW_COPY.treatmentOptions.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
+                    {interests.map((opt) => (
+                      <MenuItem value={opt} value={opt.id}>
+                        {opt.name}
                       </MenuItem>
                     ))}
                   </TextField>

@@ -2,6 +2,7 @@
 // Types, interfaces, column config, time slots, quality helper, raw→LeadItem mapper
 
 import type { Department, Employee } from "../../services/leads.api";
+import type { TreatmentInterest } from "../../types/leads.types";
 
 // ====================== Core Lead Type ======================
 // FIX: [key: string]: unknown added so LeadItem is assignable to
@@ -65,7 +66,7 @@ export interface LeadItem {
   remark: string;
   book_appointment: boolean;
   contact_no: string;
-  treatment_interest: string;
+  treatment_interest?: string[] | TreatmentInterest[];
   partner_inquiry: boolean;
   clinic_id: number | null;
   campaign_id: string | null;
@@ -136,7 +137,7 @@ export interface RawLead {
   remark?: string;
   book_appointment?: boolean;
   contact_no?: string;
-  treatment_interest?: string;
+  treatment_interest?: string[] | TreatmentInterest[];
   partner_inquiry?: boolean;
   clinic_id?: number | null;
   campaign_id?: string | null;
@@ -393,7 +394,7 @@ export const mapRawToLeadItem = (lead: RawLead): LeadItem => {
     book_appointment: lead.book_appointment ?? false,
     contact_no:
       lead.contact_no ?? lead.phone ?? lead.mobile ?? lead.phone_number ?? "",
-    treatment_interest: lead.treatment_interest ?? "",
+    treatment_interest: lead.treatment_interest ?? [],
     partner_inquiry: lead.partner_inquiry ?? false,
     clinic_id: lead.clinic_id ?? null,
     campaign_id: lead.campaign_id ?? null,

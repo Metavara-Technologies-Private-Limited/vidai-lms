@@ -5,6 +5,7 @@ import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import ImageIcon from "@mui/icons-material/Image";
 import type { Platform } from "../../constants/campaigns.constants";
+import "../../styles/Campaign/SocialContentBox.css";
 
 interface Props {
   platform: Platform;
@@ -67,7 +68,11 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
           onInput={(e) =>
             onInput(
               platform,
-              (e.currentTarget.innerText || e.currentTarget.textContent || "").trim()
+              (
+                e.currentTarget.innerText ||
+                e.currentTarget.textContent ||
+                ""
+              ).trim(),
             )
           }
         />
@@ -75,14 +80,9 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
         {/* Image URL input */}
         <div className="image-url-section">
           <label className="image-url-label">
-            <ImageIcon
-              fontSize="small"
-              style={{ verticalAlign: "middle", marginRight: 4, color: "#555" }}
-            />
+            <ImageIcon fontSize="small" style={{ marginRight: 4 }} />
             Image URL
-            <span style={{ color: "#888", fontWeight: 400, marginLeft: 4 }}>
-              (optional – paste a public image URL)
-            </span>
+            <span style={{ marginLeft: 4, color: "#999" }}>(optional)</span>
           </label>
           <input
             type="url"
@@ -113,7 +113,14 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
             </div>
           )}
           {imageUrl && previewError && (
-            <p style={{ color: "#d32f2f", fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+            <p
+              style={{
+                color: "#d32f2f",
+                fontSize: 12,
+                marginTop: 4,
+                marginBottom: 0,
+              }}
+            >
               ⚠️ Cannot load preview — make sure the URL is publicly accessible.
             </p>
           )}
@@ -122,10 +129,18 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
         {/* Toolbar */}
         <div className="social-toolbar-container">
           <div className="social-toolbar">
-            <span title="Bold"><TextFieldsIcon onClick={onText} /></span>
-            <span title="Insert link"><LinkIcon onClick={() => onLink(platform)} /></span>
-            <span title="Insert emoji"><EmojiEmotionsIcon onClick={() => onEmoji(platform)} /></span>
-            <span title="Attach file"><AttachFileIcon onClick={() => onAttachment(platform)} /></span>
+            <span title="Bold">
+              <TextFieldsIcon onClick={onText} />
+            </span>
+            <span title="Insert link">
+              <LinkIcon onClick={() => onLink(platform)} />
+            </span>
+            <span title="Insert emoji">
+              <EmojiEmotionsIcon onClick={() => onEmoji(platform)} />
+            </span>
+            <span title="Attach file">
+              <AttachFileIcon onClick={() => onAttachment(platform)} />
+            </span>
           </div>
         </div>
       </div>

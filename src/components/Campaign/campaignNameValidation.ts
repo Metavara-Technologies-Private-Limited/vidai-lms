@@ -1,4 +1,4 @@
-export const CAMPAIGN_NAME_ALLOWED_PATTERN = /^[A-Za-z][A-Za-z0-9_ ]*$/;
+export const CAMPAIGN_NAME_ALLOWED_PATTERN = /^[A-Za-z][A-Za-z0-9_ \-–]*$/;
 
 export const getCampaignNameValidationError = (
   value: string,
@@ -29,5 +29,5 @@ export const canTypeCampaignName = (value: string): boolean => {
     return false;
   }
 
-  return /^[A-Za-z0-9_ ]*$/.test(value);
+  return /^[A-Za-z0-9_ \-–]*$/.test(value);
 };

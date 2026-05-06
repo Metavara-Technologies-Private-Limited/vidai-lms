@@ -161,21 +161,11 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   };
 
   const getRequestedByEmail = () => {
+    // Always use the logged-in user's email as the requester
     if (user?.email && isValidEmail(user.email)) {
       return user.email.trim();
     }
-
-    const normalizedRequestedBy = requestedBy.trim().toLowerCase();
-    const requestedUser = users.find((u) => {
-      const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
-      return (
-        u.email?.trim().toLowerCase() === normalizedRequestedBy ||
-        u.username?.trim().toLowerCase() === normalizedRequestedBy ||
-        fullName.toLowerCase() === normalizedRequestedBy
-      );
-    });
-
-    return requestedUser?.email?.trim() || "";
+    return "";
   };
 
   useEffect(() => {
@@ -352,28 +342,20 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
         "",
         "A new support ticket has been created and assigned to you.",
         "",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        "📌 Ticket Details",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        `Subject       : ${subject.trim()}`,
-        `Priority      : ${priority}`,
-        `Status        : New`,
-        `Due Date      : ${dueDateString}`,
+        "Ticket Details:",
+        `Ticket ID: Pending`,
+        `Subject: ${subject.trim()}`,
+        `Priority: ${priority}`,
+        `Status: New`,
+        `Due Date: ${dueDateString || "Not set"}`,
         "",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        "📝 Description",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        description.trim(),
+        "Description:",
+        description.trim() || "No description provided.",
         "",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        "👤 Requested By",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        requestedBy.trim(),
+        "Requested By:",
+        requestedBy.trim() || "Unknown",
         "",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        "👉 Action Required",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        "Please review the ticket and take necessary action.",
+        "Please review and respond to this ticket at your earliest convenience.",
         "",
         "Regards,",
         `${clinicName} Support Team`,

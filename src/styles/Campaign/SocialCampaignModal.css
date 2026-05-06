@@ -338,11 +338,12 @@ select:invalid {
   flex: 1;
   border: 1.5px solid #CBD5E1;
   border-radius: 16px;
-  padding: 16px 18px;
+  padding: 20px 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
+  position: relative;
 }
 
 .account-card.selected {
@@ -1062,4 +1063,15 @@ select:invalid {
   font-weight: bold;
   cursor: pointer;
   padding: 0;
+}
+
+.connection-chip {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  height: 18px !important;
+  font-size: 10px !important;
+  border-radius: 16px !important;
+  padding: 0 2px !important;
+  z-index: 2;
 }
