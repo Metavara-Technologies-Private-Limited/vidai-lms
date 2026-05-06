@@ -57,7 +57,7 @@ export interface CreateTicketRequest {
 }
 
 // Update Ticket Request
-export interface UpdateTicketRequest {
+export type UpdateTicketRequest = Partial<{
   subject: string;
   description: string;
   lab: string;
@@ -70,14 +70,12 @@ export interface UpdateTicketRequest {
   type?: string;
   due_date?: string | null;
   documents?: TicketDocument[];
-  // Zapier payload fields for backend ticket email webhook
   event?: "ticket_updated";
   clinicName?: string;
   to?: string[];
   cc?: string[];
   email_body?: string;
-}
-
+}>;
 export interface UpdateTicketStatusPayload {
   status: TicketStatus;
   priority: TicketPriority;
@@ -107,6 +105,7 @@ export interface TicketListItem {
   priority: TicketPriority;
   assigned_to_id?: number | null;
   assigned_to_name?: string;
+  assigned_to_email?: string;
   status: TicketStatus;
 }
 
@@ -124,6 +123,7 @@ export interface TicketDetail {
   type: string;
   assigned_to_id?: number | null;
   assigned_to_name?: string;
+  assigned_to_email?: string; 
   priority: TicketPriority;
   status: TicketStatus;
   due_date?: string | null;
@@ -135,6 +135,8 @@ export interface TicketDetail {
   deleted_at?: string | null;
   documents?: TicketDocument[];
   timeline?: TicketTimeline[];
+  email_history?: TicketReplyResponse[];
+  
 }
 
 // Ticket Filters (for list API)

@@ -32,6 +32,9 @@ const asRecordSafe = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+const getTextValue = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
 const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
   const root = asRecordSafe(raw);
   const list: unknown[] = Array.isArray(raw)
@@ -43,6 +46,7 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
         : Array.isArray(root?.data)
           ? (root?.data as unknown[])
           : [];
+
   return list
     .map((item) => {
       const record = asRecordSafe(item);
@@ -55,18 +59,34 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
             ? Number(idValue)
             : NaN;
       if (!Number.isFinite(id)) return null;
+
+      const userRecord = asRecordSafe(record.user);
+      // Prioritize actual email fields, excluding username
+      const emailCandidates = [
+        getTextValue(record.email),
+        getTextValue(record.emp_email),
+        getTextValue(record.official_email),
+        getTextValue(record.user_email),
+        getTextValue(userRecord?.email),
+      ];
+      const email = emailCandidates.find((candidate) =>
+        candidate.includes("@"),
+      );
+
       return {
         id,
-        first_name: typeof record.first_name === "string" ? record.first_name : undefined,
-        last_name: typeof record.last_name === "string" ? record.last_name : undefined,
-        username: typeof record.username === "string" ? record.username : undefined,
-        email: typeof record.email === "string"
-          ? record.email
-          : typeof record.username === "string" && record.username.includes("@")
-            ? record.username
-            : undefined,
+        first_name:
+          typeof record.first_name === "string" ? record.first_name : undefined,
+        last_name:
+          typeof record.last_name === "string" ? record.last_name : undefined,
+        username:
+          typeof record.username === "string" ? record.username : undefined,
+        email: email || undefined,
         role: typeof record.role === "string" ? record.role : undefined,
-        designation: typeof record.designation === "string" ? record.designation : undefined,
+        designation:
+          typeof record.designation === "string"
+            ? record.designation
+            : undefined,
       };
     })
     .filter((item): item is AssigneeOption => item !== null);
@@ -86,7 +106,8 @@ const normalizeUsersList = (users: any[]): AssigneeOption[] => {
 };
 
 const assigneeLabel = (option: AssigneeOption): string => {
-  const fullName = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const fullName =
+    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
   const secondary = option.role || option.designation;
   return secondary ? `${primary} (${secondary})` : primary;
@@ -167,12 +188,13 @@ const TicketPropertiesSidebar = ({
   const [assigneeSearch, setAssigneeSearch] = useState("");
   const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = useState(false);
-  const [selectedAssigneeOption, setSelectedAssigneeOption] = useState<AssigneeOption | null>(null);
+  const [selectedAssigneeOption, setSelectedAssigneeOption] =
+    useState<AssigneeOption | null>(null);
   const users = useSelector(selectUsers);
 
   const authMode = localStorage.getItem("auth_mode");
   const isInternal = authMode === "INT";
-  
+
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (!assigneeSearch.trim()) {
@@ -298,26 +320,38 @@ const TicketPropertiesSidebar = ({
             <DetailRow label="Department" value={ticket.department_name} />
 
             {/* ASSIGNED TO with avatar */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={1.5}
+            >
               <Typography variant="body2" color="text.secondary">
                 Assigned To :
               </Typography>
               <Stack direction="row" alignItems="flex-start" spacing={1}>
-                <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: "#7B61FF" }}>
+                <Avatar
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    fontSize: 12,
+                    bgcolor: "#7B61FF",
+                  }}
+                >
                   {(currentAssigneeName.trim().charAt(0) || "U").toUpperCase()}
                 </Avatar>
-<Typography
-  variant="body2"
-  fontWeight={600}
-  sx={{
-    maxWidth: 140,              // control width
-    whiteSpace: "normal",       // allow wrap
-    wordBreak: "break-word",    // break long names
-    lineHeight: 1.2,
-  }}
->
-  {currentAssigneeName || "Unassigned"}
-</Typography>
+                <Typography
+                  variant="body2"
+                  fontWeight={600}
+                  sx={{
+                    maxWidth: 140, // control width
+                    whiteSpace: "normal", // allow wrap
+                    wordBreak: "break-word", // break long names
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {currentAssigneeName || "Unassigned"}
+                </Typography>
               </Stack>
             </Box>
           </Box>
@@ -415,9 +449,13 @@ const TicketPropertiesSidebar = ({
                   <li {...props} key={option.id}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <Avatar sx={{ width: 24, height: 24, fontSize: 11 }}>
-                        {(assigneeLabel(option).trim().charAt(0) || "U").toUpperCase()}
+                        {(
+                          assigneeLabel(option).trim().charAt(0) || "U"
+                        ).toUpperCase()}
                       </Avatar>
-                      <Typography fontSize={13}>{assigneeLabel(option)}</Typography>
+                      <Typography fontSize={13}>
+                        {assigneeLabel(option)}
+                      </Typography>
                     </Stack>
                   </li>
                 )}
@@ -428,12 +466,18 @@ const TicketPropertiesSidebar = ({
                     placeholder={ticket.assigned_to_name || "Search assignee"}
                     size="small"
                     sx={propertyFieldSx}
-                    InputLabelProps={{ ...params.InputLabelProps, sx: floatingLabelSx, shrink: true }}
+                    InputLabelProps={{
+                      ...params.InputLabelProps,
+                      sx: floatingLabelSx,
+                      shrink: true,
+                    }}
                     InputProps={{
                       ...params.InputProps,
                       endAdornment: (
                         <>
-                          {assigneeLoading ? <CircularProgress size={14} /> : null}
+                          {assigneeLoading ? (
+                            <CircularProgress size={14} />
+                          ) : null}
                           {params.InputProps.endAdornment}
                         </>
                       ),
@@ -484,10 +528,10 @@ const TicketPropertiesSidebar = ({
             if (hasPendingAssignmentChange && pendingAssigneeName) {
               const oldAssignedName =
                 ticket.assigned_to_name ||
-                employees.find((e) => e.id === ticket.assigned_to_id)?.emp_name ||
+                employees.find((e) => e.id === ticket.assigned_to_id)
+                  ?.emp_name ||
                 "Unassigned";
-              const pendingAction =
-                `Assigned changed from ${oldAssignedName} to ${pendingAssigneeName}`;
+              const pendingAction = `Assigned changed from ${oldAssignedName} to ${pendingAssigneeName}`;
 
               const hasPendingAction = displayItems.some(
                 (t) =>
@@ -559,7 +603,9 @@ const TicketPropertiesSidebar = ({
                   >
                     {isAssigned ? (
                       <Avatar sx={{ width: 34, height: 34 }}>
-                        {(currentAssigneeName.trim().charAt(0) || "U").toUpperCase()}
+                        {(
+                          currentAssigneeName.trim().charAt(0) || "U"
+                        ).toUpperCase()}
                       </Avatar>
                     ) : (
                       <Box
@@ -576,9 +622,7 @@ const TicketPropertiesSidebar = ({
                   {/* TEXT CONTENT */}
                   <Box ml={5}>
                     <Typography fontSize={14} fontWeight={500}>
-                      {item.is_injected
-                        ? currentAssignmentAction
-                        : item.action}
+                      {item.is_injected ? currentAssignmentAction : item.action}
                     </Typography>
 
                     {isAssigned && item.is_injected && currentAssigneeEmail ? (

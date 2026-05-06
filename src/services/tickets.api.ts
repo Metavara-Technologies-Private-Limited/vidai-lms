@@ -67,15 +67,19 @@ export const ticketsApi = {
     return response.data;
   },
 
-  updateTicket: async (
-    ticketId: string,
-    data: UpdateTicketRequest,
-  ): Promise<TicketDetail> => {
-    const response = await apiClient.put(`/tickets/${ticketId}/update/`, data, {
+updateTicket: async (
+  ticketId: string,
+  data: UpdateTicketRequest,
+): Promise<TicketDetail> => {
+  const response = await apiClient.put(
+    `/tickets/${ticketId}/update/`,
+    data,
+    {
       params: { clinic_id: storedClinicId() },
-    });
-    return response.data;
-  },
+    }
+  );
+  return response.data;
+},
 
   assignTicket: async (
     ticketId: string,
