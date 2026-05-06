@@ -151,12 +151,8 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
   });
 
   const [showPreview, setShowPreview] = useState(false);
-  const [useCases, setUseCases] = useState<
-    {
-      id: string;
-      name: string;
-    }[]
-  >([]);
+  // ✅ REMOVED: duplicate `useCases` state and the useEffect that called UseCaseAPI.list()
+  //    useCases is now received as a prop from the parent (already fetched there)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [existingDocuments, setExistingDocuments] = useState<TemplateDocument[]>([]);
   const [removedExistingDocumentIds, setRemovedExistingDocumentIds] = useState<string[]>([]);
@@ -181,20 +177,6 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
     }
     return true;
   };
-
-  useEffect(() => {
-    const fetchUseCases = async () => {
-      try {
-        const response = await UseCaseAPI.list();
-
-        setUseCases(response || []);
-      } catch (error) {
-        console.error("Failed to fetch use cases", error);
-      }
-    };
-
-    fetchUseCases();
-  }, []);
 
   // Sync formData when initialData changes (for edit/view mode)
   React.useEffect(() => {

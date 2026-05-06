@@ -54,4 +54,7 @@ const UseCaseService = {
   },
 };
 
+// Named export alias so existing imports of `UseCaseAPI` continue to work
+export const UseCaseAPI = UseCaseService;
+
 export default UseCaseService;
