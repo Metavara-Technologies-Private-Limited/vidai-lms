@@ -125,13 +125,13 @@ const extractEmployeeEmail = (employeeData: unknown): string => {
   const record = asRecord(employeeData);
   const userRecord = asRecord(record.user);
 
+  // Prioritize actual email fields, excluding username which may not be a valid email
   const candidates = [
     getString(record.email),
     getString(record.emp_email),
     getString(record.user_email),
     getString(record.official_email),
     getString(userRecord.email),
-    getString(userRecord.username),
   ];
 
   const firstValid = candidates.find((mail) => mail && isEmail(mail));
@@ -419,13 +419,16 @@ const TicketView = () => {
     setError(null);
 
     try {
-      const assigneeEmail =
-        employees.find((emp) => emp.id === assignTo)?.email || "";
-      const requestedByEmail =
-        authUser?.email?.trim() ||
-        findEmailByUserName(ticket.requested_by || "", users);
+      const selectedAssigneeEmail =
+        assigneeEmail?.trim() ||
+        employees.find((emp) => emp.id === assignTo)?.email?.trim() ||
+        "";
+      const requestedByEmail = isEmail(ticket.requested_by?.trim())
+        ? ticket.requested_by.trim()
+        : authUser?.email?.trim() ||
+          findEmailByUserName(ticket.requested_by || "", users);
 
-      if (!isEmail(assigneeEmail)) {
+      if (assignTo !== "" && !isEmail(selectedAssigneeEmail)) {
         toast.error(
           "Assigned user's email is invalid. Please check assignee details.",
         );
@@ -464,7 +467,7 @@ const TicketView = () => {
         }
         if (assignTo !== (ticket.assigned_to_id || "")) {
           changeLines.push(
-            `- Assigned To changed from ${ticket.assigned_to_name || "Unassigned"} → ${draftAssigneeName || "Unassigned"}`,
+            `<strong>- Assigned To changed from ${ticket.assigned_to_name || "Unassigned"} → ${draftAssigneeName || "Unassigned"}</strong>`,
           );
         }
         if (type !== ticket.type) {
@@ -474,35 +477,29 @@ const TicketView = () => {
         }
 
         const currentStatusLines = [
-          "━━━━━━━━━━━━━━━━━━━━━━",
-          "📊 Current Status",
-          "━━━━━━━━━━━━━━━━━━━━━━",
-          `Status        : ${status}`,
-          `Priority      : ${priority}`,
-          `Assigned To   : ${draftAssigneeName || ticket.assigned_to_name || "Unassigned"}`,
+          "Current Status:",
+          `Status: ${status}`,
+          `Priority: ${priority}`,
+          `Assigned To: ${draftAssigneeName || ticket.assigned_to_name || "Unassigned"}`,
         ];
 
         const updateBodyLines = [
           `Hi ${draftAssigneeName || ticket.assigned_to_name || "Team"},`,
           "",
-          "The following ticket has been updated.",
+          "<strong>The following ticket has been updated.</strong>",
           "",
-          "━━━━━━━━━━━━━━━━━━━━━━",
-          "📌 Ticket Details",
-          "━━━━━━━━━━━━━━━━━━━━━━",
-          `Ticket ID     : ${ticket.ticket_no || ticket.id}`,
-          `Subject       : ${ticket.subject}`,
+          "Ticket Details:",
+          `Ticket ID: ${ticket.ticket_no || ticket.id}`,
+          `Subject: ${ticket.subject}`,
           "",
-          "━━━━━━━━━━━━━━━━━━━━━━",
-          "🔄 Changes Made",
-          "━━━━━━━━━━━━━━━━━━━━━━",
+          "<strong>Description:</strong>",
+          getPlainTextFromHtml(description) || "No description provided.",
+          "",
+          "<strong>Updates:</strong>",
           ...changeLines,
           "",
           ...currentStatusLines,
           "",
-          "━━━━━━━━━━━━━━━━━━━━━━",
-          "👉 Next Steps",
-          "━━━━━━━━━━━━━━━━━━━━━━",
           "Please review the updates and proceed accordingly.",
           "",
           "Regards,",
@@ -519,7 +516,7 @@ const TicketView = () => {
           type,
           event: "ticket_updated",
           clinicName,
-          to: [assigneeEmail],
+          to: [selectedAssigneeEmail],
           cc: [requestedByEmail],
           email_body: updateBodyLines.join("\n"),
         });
@@ -893,11 +890,13 @@ const TicketView = () => {
           canEdit={canEditTickets}
           canReply={canAddTickets}
           setDescription={setDescription}
+          onTicketUpdate={(updated) => setTicket(updated)}
           handlePreviewOpen={handlePreviewOpen}
           openReply={openReply}
           setOpenReply={setOpenReply}
           assigneeName={currentAssigneeName}
           assigneeEmail={currentAssigneeEmail}
+          employees={employees}
           replyProps={{
             openReply,
             setOpenReply,
@@ -947,6 +946,7 @@ const TicketView = () => {
           setAssigneeName={(name) =>
             setDraftAssigneeName(name.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH))
           }
+          setAssigneeEmail={setAssigneeEmail}
           selectedAssigneeEmail={currentAssigneeEmail}
           canEdit={canEditTickets}
           handleUpdate={handleUpdate}

@@ -14,13 +14,15 @@ import type { TicketReplyEditorProps } from "./TicketReplyEditor";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch } from "../../../store";
 import { addEmail } from "../../../store/emailHistorySlice";
+import { selectUser } from "../../../store/authSlice";
 import type {
   TicketDetail,
   TicketDocument,
 } from "../../../types/tickets.types";
 import { selectLeads, fetchLeads } from "../../../store/leadSlice";
-import { useEffect, useMemo } from "react";
-
+import { useEffect, useMemo, useState } from "react";
+import { ticketsApi } from "../../../services/tickets.api";
+import { toast } from "react-toastify";
 interface Lead {
   id: string;
   patient_name?: string;
@@ -30,12 +32,23 @@ interface Lead {
   email_id?: string;
 }
 
+interface Employee {
+  id: number;
+  emp_name?: string;
+  email?: string;
+  emp_email?: string;
+  user_email?: string;
+  official_email?: string;
+}
+
 interface Props {
   ticket: TicketDetail | null;
   description: string;
+  onTicketUpdate?: (ticket: TicketDetail) => void;
   replyProps?: TicketReplyEditorProps | null;
   assigneeName?: string;
   assigneeEmail?: string;
+  employees?: Employee[];
   canEdit?: boolean;
   canReply?: boolean;
 
@@ -51,21 +64,53 @@ const TicketContentPanel = ({
   ticket,
   description,
   setDescription,
+  onTicketUpdate,
   handlePreviewOpen,
   openReply,
   setOpenReply,
   replyProps,
   assigneeName,
   assigneeEmail,
+  employees = [],
   canEdit = true,
   canReply = true,
 }: Props) => {
   const dispatch = useDispatch<AppDispatch>();
   const leadsFromStore = useSelector(selectLeads);
+  const authUser = useSelector(selectUser);
 
   const leads: Lead[] = useMemo(() => {
     return Array.isArray(leadsFromStore) ? leadsFromStore : [];
   }, [leadsFromStore]);
+
+  const [isEditing, setIsEditing] = useState(false);
+
+  const editUpdateButtonSx = {
+    textTransform: "none",
+    minHeight: "34px",
+    height: "34px",
+    px: 2,
+    backgroundColor: "#505050",
+    color: "#FFFFFF",
+    border: "none",
+    "&:hover": {
+      backgroundColor: "#232323",
+      color: "#FFFFFF",
+    },
+  };
+
+  const replyButtonSx = {
+    textTransform: "none",
+    minHeight: "34px",
+    height: "34px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    p: 0,
+    "& img": {
+      display: "block",
+    },
+  };
 
   useEffect(() => {
     // dispatch one time only; guard is checked at mount so doc avoids loops
@@ -85,15 +130,129 @@ const TicketContentPanel = ({
 
   if (!ticket) return null;
 
-  const displayName = assigneeName?.trim() || ticket.requested_by;
-  const normalizedFallback = ticket.requested_by
-    .toLowerCase()
-    .replace(/\s/g, ".");
-  const displayEmail =
-    assigneeEmail?.trim() ||
-    (normalizedFallback.includes("@")
-      ? normalizedFallback
-      : `${normalizedFallback}@fertility.com`);
+  const displayName =
+    assigneeName?.trim() || ticket.assigned_to_name || ticket.requested_by;
+
+  // Get the actual email for the assignee with proper fallbacks
+  const getEmployeeEmail = (): string => {
+    const candidateEmail = assigneeEmail?.trim();
+    if (candidateEmail && candidateEmail.includes("@")) {
+      return candidateEmail;
+    }
+
+    if (ticket.assigned_to_id && employees.length > 0) {
+      const emp = employees.find(
+        (e) => Number(e.id) === Number(ticket.assigned_to_id),
+      );
+
+      if (emp) {
+        const email =
+          emp.email || emp.emp_email || emp.user_email || emp.official_email;
+
+        if (email && email.includes("@")) {
+          return email.trim();
+        }
+      }
+    }
+
+    if (ticket.assigned_to_email && ticket.assigned_to_email.includes("@")) {
+      return ticket.assigned_to_email.trim();
+    }
+
+    return "No Email";
+  };
+
+  const displayEmail = getEmployeeEmail();
+
+  const isValidEmail = (value: string): boolean =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+  const uniqueValidEmails = (items: Array<string | undefined>): string[] => {
+    const seen = new Set<string>();
+
+    items.forEach((item) => {
+      const trimmed = item?.trim();
+      if (!trimmed || !isValidEmail(trimmed)) return;
+      seen.add(trimmed.toLowerCase());
+    });
+
+    return Array.from(seen);
+  };
+
+  const getRequestedByEmail = (): string => {
+    const requestedBy = ticket.requested_by?.trim() || "";
+    return isValidEmail(requestedBy) ? requestedBy : "";
+  };
+
+  const getEditorEmail = (): string => {
+    const editorEmail = authUser?.email?.trim() || "";
+    return isValidEmail(editorEmail) ? editorEmail : "";
+  };
+
+  const buildDescriptionUpdateBody = (): string => {
+    const assignee = displayName || "Team";
+    const descriptionValue = description.trim() || "No description provided.";
+
+    const lines = [
+      `Hi ${assignee},`,
+      "",
+      "<strong>The ticket description has been updated.</strong>",
+      "",
+      "Ticket Details:",
+      `Ticket ID: ${ticket.ticket_no || ticket.id}`,
+      `Subject: ${ticket.subject}`,
+      "",
+      "<strong>Updated Description:</strong>",
+      descriptionValue,
+      "",
+      "Please review the updated ticket and take any required action.",
+      "",
+      "Regards,",
+      `${ticket.lab_name || "Clinic"} Support Team`,
+    ];
+
+    return lines.join("\n");
+  };
+
+  const handleUpdate = async () => {
+    try {
+      const assigneeEmailValue = getEmployeeEmail();
+
+      if (!isValidEmail(assigneeEmailValue)) {
+        console.error("Assigned user's email is invalid.");
+        return;
+      }
+
+      const requestedByEmail = getRequestedByEmail();
+      const editorEmail = getEditorEmail();
+      const ccRecipients = uniqueValidEmails([requestedByEmail, editorEmail]);
+
+      const updatedTicket = await ticketsApi.updateTicket(ticket.id, {
+        subject: ticket.subject,
+        description: description,
+        lab: ticket.lab,
+        department: ticket.department,
+        requested_by: ticket.requested_by,
+        priority: ticket.priority,
+        status: ticket.status,
+        assigned_to: ticket.assigned_to_id ?? null,
+        assigned_to_name: ticket.assigned_to_name || displayName,
+        event: "ticket_updated",
+        clinicName: ticket.lab_name || "Clinic",
+        to: [assigneeEmailValue],
+        cc: ccRecipients.length > 0 ? ccRecipients : undefined,
+        email_body: buildDescriptionUpdateBody(),
+      });
+
+      setDescription(updatedTicket.description);
+      const latestTicket = await ticketsApi.getTicketById(ticket.id);
+      onTicketUpdate?.(latestTicket);
+      setIsEditing(false);
+      toast.success("Mail sent with edited description");
+    } catch (err) {
+      console.error("Update failed", err);
+    }
+  };
 
   return (
     <Box
@@ -148,7 +307,7 @@ const TicketContentPanel = ({
           multiline
           rows={6}
           value={description}
-          disabled={!canEdit}
+          disabled={!isEditing}
           onChange={(e) => setDescription(e.target.value)}
           variant="standard"
           placeholder="Describe the issue in detail..."
@@ -197,15 +356,38 @@ const TicketContentPanel = ({
         </Stack>
       </Box>
 
-      {/* Reply Button */}
-      {canReply && !openReply && (
-        <Button
-          onClick={() => setOpenReply(true)}
-          sx={{ textTransform: "none", mt: 2 }}
-        >
-          <img src={ReplyMail} alt="Reply" />
-        </Button>
-      )}
+      {/* Actions */}
+      <Stack direction="row" spacing={2} mt={2} alignItems="center">
+        {/* Edit / Update */}
+        {canEdit &&
+          (isEditing ? (
+            <Button
+              variant="contained"
+              onClick={handleUpdate}
+              sx={editUpdateButtonSx}
+            >
+              Update
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              onClick={() => setIsEditing(true)}
+              sx={editUpdateButtonSx}
+            >
+              Edit
+            </Button>
+          ))}
+
+        {/* Reply Button */}
+        {canReply && !openReply && (
+          <Button
+            onClick={() => setOpenReply(true)}
+            sx={replyButtonSx}
+          >
+            <img src={ReplyMail} alt="Reply" />
+          </Button>
+        )}
+      </Stack>
 
       {/* Reply Editor shows BELOW */}
       {openReply && replyProps ? (
