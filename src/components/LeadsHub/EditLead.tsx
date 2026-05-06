@@ -297,6 +297,7 @@ export default function EditLead() {
     IS_MEDICAL_APP,
     IS_CONTRACTS_APP,
     ACTIVE_FLOW_COPY,
+    interests,
   } = useEditLead();
 
   // ====================== Loading / Error states ======================
@@ -1251,9 +1252,9 @@ export default function EditLead() {
                     <MenuItem value="" disabled>
                       Select
                     </MenuItem>
-                    {ACTIVE_FLOW_COPY.treatmentOptions.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
+                    {interests.map((opt) => (
+                      <MenuItem value={opt} value={opt.id}>
+                        {opt.name}
                       </MenuItem>
                     ))}
                   </TextField>

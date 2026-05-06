@@ -43,6 +43,8 @@ import type { EmailTemplate } from '../../../types/tickets.types';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { selectClinic } from '../../../store/clinicSlice';
+import { UseCaseAPI } from '../../../services/usecase.api';
+import { getUseCaseStyles } from '../../../utils/usecases';
 
 const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
 const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1000;
@@ -144,33 +146,39 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
   // Normalize useCase to match MenuItem values (capitalize first letter)
   // Also handles API responses that might come in different formats
-  const normalizeUseCase = (value: string | undefined) => {
-    if (!value) return "";
-    const trimmed = value.trim().toLowerCase();
+  // const normalizeUseCase = (value: string | undefined) => {
+  //   if (!value) return "";
+  //   const trimmed = value.trim().toLowerCase();
     
-    // Map common API variations to canonical form
-    const mapping: Record<string, string> = {
-      'appointment': 'Appointment',
-      'confirm': 'Appointment',
-      'confirmation': 'Appointment',
-      'reminder': 'Reminder',
-      'follow-up': 'Follow-up',
-      'followup': 'Follow-up',
-      'onboarding': 'Appointment'
-    };
+  //   // Map common API variations to canonical form
+  //   const mapping: Record<string, string> = {
+  //     'appointment': 'Appointment',
+  //     'confirm': 'Appointment',
+  //     'confirmation': 'Appointment',
+  //     'reminder': 'Reminder',
+  //     'follow-up': 'Follow-up',
+  //     'followup': 'Follow-up',
+  //     'onboarding': 'Appointment'
+  //   };
     
-    return mapping[trimmed] || value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-  };
+  //   return mapping[trimmed] || value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+  // };
 
   const [formData, setFormData] = useState({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    name: ((initialData as any)?.name || ''),
+    name: (initialData as any)?.name || "",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useCase: normalizeUseCase((initialData as any)?.use_case || (initialData as any)?.useCase || ''),
-    subject: ((initialData as EmailTemplate)?.subject || ''),
+    use_case: (initialData as any)?.use_case || "",
+    subject: (initialData as EmailTemplate)?.subject || "",
   });
 
   const [showPreview, setShowPreview] = useState(false);
+  const [useCases, setUseCases] = useState<
+    {
+      id: string;
+      name: string;
+    }[]
+  >([]);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [existingDocuments, setExistingDocuments] = useState<TemplateDocument[]>([]);
   const [removedExistingDocumentIds, setRemovedExistingDocumentIds] = useState<string[]>([]);
@@ -196,16 +204,30 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
     return true;
   };
 
+  useEffect(() => {
+    const fetchUseCases = async () => {
+      try {
+        const response = await UseCaseAPI.list();
+
+        setUseCases(response || []);
+      } catch (error) {
+        console.error("Failed to fetch use cases", error);
+      }
+    };
+
+    fetchUseCases();
+  }, []);
+
   // Sync formData when initialData changes (for edit/view mode)
   React.useEffect(() => {
     if (initialData) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = initialData as any;
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         name: data?.name || prev.name,
-        useCase: normalizeUseCase(data?.use_case || data?.useCase || prev.useCase),
-        subject: data?.subject || prev.subject
+        use_case: data?.use_case || prev.use_case,
+        subject: data?.subject || prev.subject,
       }));
       setExistingDocuments(extractDocuments(initialData));
       setRemovedExistingDocumentIds([]);
@@ -584,8 +606,11 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       return;
     }
 
-    if (!formData.useCase) {
-      toast.error('Use case is mandatory', { toastId: 'template-usecase-required' });
+    if (!formData.use_case) {
+      toast.error("Use case is mandatory", {
+        toastId: "template-usecase-required",
+      });
+
       return;
     }
 
@@ -612,7 +637,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
     const apiPayload = {
       name: formData.name,
-      use_case: formData.useCase,
+      use_case: formData.use_case,
       body: editor?.getHTML() || '',
       subject: trimmedSubject,
       clinic: clinicId,
@@ -629,7 +654,6 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
    
   const generateId = () => {
      
-    // eslint-disable-next-line react-hooks/purity
     return Math.random().toString(36).substr(2, 9);
   };
 
@@ -640,7 +664,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       name: formData.name,
       subject: formData.subject,
       body: editor?.getHTML() || '',
-      useCase: formData.useCase as "Appointment" | "Reminder" | "Feedback" | "Follow-Up" | "Re-engagement" | "No-Show" | "Marketing" | undefined,
+      use_case: formData.use_case,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       lastUpdatedAt: ((initialData as any)?.lastUpdatedAt || new Date().toLocaleDateString('en-GB') + ' | ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -727,10 +751,13 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
           <Select 
             fullWidth 
             size="small" 
-            value={formData.useCase}
+            value={formData.use_case}
             displayEmpty
             disabled={isViewOnly}
-            onChange={(e) => { setFormData({ ...formData, useCase: e.target.value }); }}
+            onChange={(e) => { setFormData({
+              ...formData,
+              use_case: e.target.value,
+            }); }}
             IconComponent={KeyboardArrowDownIcon}
             sx={{ 
               fontSize: '14px',
@@ -742,7 +769,32 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
             <MenuItem value="" disabled>
               <Box component="span" sx={{ color: '#9CA3AF', fontSize: '14px' }}>Select Use Case</Box>
             </MenuItem>
-            <MenuItem value="Appointment">
+            {useCases.map((useCase) => {
+              const ui = getUseCaseStyles(useCase.name);
+
+              return (
+                <MenuItem
+                  key={useCase.id}
+                  value={useCase.id}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      color: ui.color,
+                      bgcolor: ui.bgColor,
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {useCase.name}
+                  </Box>
+                </MenuItem>
+              );
+            })}
+            {/* <MenuItem value="Appointment">
                <Box component="span" sx={{ 
                  color: '#16A34A', 
                  bgcolor: '#F0FDF4', 
@@ -780,7 +832,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
                }}>
                  Reminder
                </Box>
-            </MenuItem>
+            </MenuItem> */}
           </Select>
         </Box>
 

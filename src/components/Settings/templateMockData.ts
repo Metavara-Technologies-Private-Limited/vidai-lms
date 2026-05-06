@@ -4,7 +4,7 @@ export interface Template {
   subject: string;
   content?: string;
   body: string; // This was missing in your data
-  useCase: 'Appointment' | 'Follow-Up' | 'Reminder' | 'Re-engagement' | 'No-Show' | 'Feedback' | 'Marketing';
+  useCase: string;
   lastUpdatedAt: string;
   createdBy: string;
   type: 'email' | 'sms' | 'whatsapp';

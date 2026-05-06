@@ -1917,7 +1917,11 @@ export default function LeadDetailView() {
           full_name: activeLead.full_name || activeLead.name,
           ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
           source: activeLead.source || "Unknown",
-          treatment_interest: activeLead.treatment_interest || "N/A",
+          treatment_interest: Array.isArray(activeLead.treatment_interest)
+            ? activeLead.treatment_interest.map((t) =>
+                typeof t === "string" ? t : t.id,
+              )
+            : [],
           book_appointment: activeLead.book_appointment || false,
           appointment_date: activeLead.appointment_date || "",
           slot: activeLead.slot || "",
@@ -2304,7 +2308,11 @@ export default function LeadDetailView() {
           activeLead.phone_number ||
           "",
         source: activeLead.source || "Unknown",
-        treatment_interest: activeLead.treatment_interest || "N/A",
+        treatment_interest: Array.isArray(activeLead.treatment_interest)
+          ? activeLead.treatment_interest.map((t) =>
+              typeof t === "string" ? t : t.id,
+            )
+          : [],
         book_appointment: activeLead.book_appointment || false,
         appointment_date: activeLead.appointment_date || null,
         slot: activeLead.slot || "",

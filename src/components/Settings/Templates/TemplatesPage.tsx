@@ -21,6 +21,7 @@ import {
   hasAnySubcategoryActionPermission,
   resolveUserRole,
 } from "../../../utils/roleAccess";
+import { UseCaseAPI } from "../../../services/usecase.api";
 
 const TemplateHeader = lazy(() =>
   import("./TemplateHeader").then((module) => ({
@@ -100,6 +101,25 @@ const TemplatesPage: React.FC = () => {
   const [activeFilters, setActiveFilters] = useState<TemplateFilters | null>(
     null,
   );
+  const [useCases, setUseCases] = useState<
+    {
+      id: string;
+      name: string;
+    }[]
+  >([]);
+
+  useEffect(() => {
+    const fetchUseCases = async () => {
+      try {
+        const data = await UseCaseAPI.list();
+        setUseCases(data || []);
+      } catch (error) {
+        console.error("Failed to fetch use cases:", error);
+      }
+    };
+
+    fetchUseCases();
+  }, []);
 
   const useCaseOptions = React.useMemo(() => {
     const allTemplates = [
@@ -201,7 +221,12 @@ const TemplatesPage: React.FC = () => {
       type: typeMapping[activeTab],
       name: (tAny.audience_name || tAny.name || "") as string,
       body: (tAny.email_body || tAny.body || "") as string,
-      useCase: (tAny.use_case || tAny.useCase || "") as string,
+      useCase:
+        typeof tAny.use_case === "object"
+          ? tAny.use_case?.name
+          : useCases.find((u) => u.id === tAny.use_case)?.name ||
+            tAny.useCase ||
+            "General",
       createdBy: (tAny.created_by_name || tAny.createdBy || "Admin") as string,
     } as Template & Record<string, unknown>;
 
@@ -297,12 +322,13 @@ const TemplatesPage: React.FC = () => {
               </Box>
             }
           >
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {activeTab === "Email" && (
               <EmailTemplateTable
                 data={getFilteredData()}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onAction={handleAction as any}
                 canEditTemplate={canEditTemplates}
+                useCases={useCases}
               />
             )}
             {activeTab === "SMS" && (
@@ -342,9 +368,10 @@ const TemplatesPage: React.FC = () => {
         <Suspense fallback={null}>
           <DeleteConfirmModal
             open={isDeleteModalOpen}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             templateName={
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (templateInAction as any)?.audience_name ||
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (templateInAction as any)?.name ||
               ""
             }

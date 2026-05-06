@@ -128,3 +128,13 @@ export interface FilterValues {
   dateFrom: string | null;
   dateTo: string | null;
 }
+
+export type Interest = {
+  id: string;
+  name: string;
+  is_active: boolean;
+};
+export type TreatmentInterest = {
+  id: string;
+  name: string;
+};

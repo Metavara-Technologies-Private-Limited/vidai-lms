@@ -1,3 +1,5 @@
+import type { TreatmentInterest } from "../../types/leads.types";
+
 // ====================== Task Type Config ======================
 export const TASK_TYPES = [
   "Follow Up",
@@ -116,7 +118,7 @@ export type LeadPayload = {
     | "cycle_conversion"
     | "lost"
     | "lost lead";
-  treatment_interest: string;
+  treatment_interest?: string[] | TreatmentInterest[];
   book_appointment: boolean;
   appointment_date: string | null;
   slot: string;

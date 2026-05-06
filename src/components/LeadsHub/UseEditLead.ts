@@ -9,7 +9,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
-import { LeadAPI, DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
+import { LeadAPI, DepartmentAPI, EmployeeAPI, InterestAPI } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import {
   pipelineApi,
@@ -42,6 +42,7 @@ import {
   ACTIVE_FLOW_COPY,
 } from "../../config/appType";
 import { capitalizeFirst } from "../../utils/nameValidation";
+import type { Interest } from "../../types/leads.types";
 
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
@@ -462,10 +463,40 @@ export function useEditLead() {
   // Step 2
   const [treatmentInterest, setTreatmentInterest] = React.useState("");
   const [treatments, setTreatments] = React.useState<string[]>([]);
+  const [interests, setInterests] = React.useState<Interest[]>([]);
   const [documents, setDocuments] = React.useState<File[]>([]);
   const [existingDocuments, setExistingDocuments] = React.useState<ExistingDocument[]>([]);
   const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
+  const [loadingInterests, setLoadingInterests] = React.useState(false);
+
+  React.useEffect(() => {
+    const loadInterests = async () => {
+      try {
+        setLoadingInterests(true);
+
+        const data = await InterestAPI.list();
+
+        setInterests(data);
+      } catch {
+        setInterests([]);
+      } finally {
+        setLoadingInterests(false);
+      }
+    };
+
+    loadInterests();
+  }, []);
+
+  React.useEffect(() => {
+    if (!interests.length || !treatments.length) return;
+
+    const selectedInterestNames = interests
+      .filter((interest) => treatments.includes(String(interest.id)))
+      .map((interest) => interest.name);
+
+    setTreatmentInterest(selectedInterestNames.join(", "));
+  }, [interests, treatments]);
 
   // Step 3
   const [wantAppointment, setWantAppointment] = React.useState<"yes" | "no">("no");
@@ -869,10 +900,30 @@ export function useEditLead() {
           );
         }
 
-        setTreatmentInterest(lead.treatment_interest ?? "");
-        if (lead.treatment_interest) {
-          setTreatments(lead.treatment_interest.split(",").map((t) => t.trim()));
-        }
+        const treatmentInterestData = lead.treatment_interest;
+
+let normalizedTreatmentIds: string[] = [];
+
+if (Array.isArray(treatmentInterestData)) {
+  normalizedTreatmentIds = treatmentInterestData.map((item: any) =>
+    String(typeof item === "object" ? item.id : item),
+  );
+} else if (typeof treatmentInterestData === "string") {
+  normalizedTreatmentIds = treatmentInterestData
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+setTreatments(normalizedTreatmentIds);
+
+const selectedInterestNames = interests
+  .filter((interest) =>
+    normalizedTreatmentIds.includes(String(interest.id)),
+  )
+  .map((interest) => interest.name);
+
+setTreatmentInterest(selectedInterestNames.join(", "));
 
         const hasBooking = isTruthy(lead.book_appointment);
         setWantAppointment(hasBooking ? "yes" : "no");
@@ -1384,5 +1435,6 @@ export function useEditLead() {
     IS_MEDICAL_APP,
     IS_CONTRACTS_APP,
     ACTIVE_FLOW_COPY,
+    interests,
   };
 }

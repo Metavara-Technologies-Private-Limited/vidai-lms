@@ -41,6 +41,7 @@ import {
   selectLeads,
   selectLeadsLoading,
   selectLeadsError,
+  clearError,
 } from "../../store/leadSlice";
 import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Leads/leads.css";
@@ -955,8 +956,10 @@ const LeadsTable: React.FC<Props> = ({
             cursor: "pointer",
             textDecoration: "underline",
           }}
-          onClick={() =>
+          onClick={() => {
+            dispatch(clearError());
             dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])
+          }
           }
         >
           Try again

@@ -1,5 +1,7 @@
 // ====================== Shared Types ======================
 
+import type { TreatmentInterest } from "../../types/leads.types";
+
 export interface NoteData {
   id: string;
   uuid?: string;
@@ -80,7 +82,7 @@ export interface LeadRecord {
   appointment_slot?: string;
   remark?: string;
   appointment_remark?: string;
-  treatment_interest?: string;
+  treatment_interest?: string[] | TreatmentInterest[];
   partner_name?: string;
   partner_full_name?: string;
   partner_age?: number | string;
