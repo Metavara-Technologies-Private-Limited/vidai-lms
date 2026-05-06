@@ -268,9 +268,6 @@ export default function AppRoutes() {
             typeof profile.email === "string"
           ) {
             await syncClinic(defaultClinic, profile.email, loginType);
-          } else {
-            // EXT users or INT users with no clinics
-            await dispatch(fetchClinic(1));
           }
         }
 
