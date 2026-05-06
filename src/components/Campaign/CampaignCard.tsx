@@ -153,17 +153,44 @@ export default function CampaignCard({
           <button
             className="action-btn pause-btn"
             disabled={!canEditCampaign}
-            title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+            title={
+              !canEditCampaign ? "No permission to edit campaigns" : undefined
+            }
             onClick={async (e) => {
               e.stopPropagation();
               if (!canEditCampaign) return;
               if (c.status === CAMPAIGN_STATUS.STOPPED) {
                 let shouldSetLive = true;
 
+                // ── Enable FB Insta Ads ──
+                if (
+                  platforms.includes("facebook") ||
+                  platforms.includes("instagram")
+                ) {
+                  try {
+                    await CampaignAPI.updateFacebookStatus(c.id, "enable");
+
+                    toast.success(
+                      "Facebook/Instagram campaign enabled successfully.",
+                    );
+                  } catch (err) {
+                    shouldSetLive = false;
+
+                    console.error("[Facebook] Failed to enable campaign:", err);
+
+                    toast.warn(
+                      "Facebook enable failed; campaign remains stopped locally.",
+                    );
+                  }
+                }
+
                 // ── Enable Google Ads ──
                 if (platforms.includes("google_ads")) {
                   try {
-                    const res = await CampaignAPI.updateGoogleAdsStatus(c.id, "enable");
+                    const res = await CampaignAPI.updateGoogleAdsStatus(
+                      c.id,
+                      "enable",
+                    );
 
                     // ✅ FIX: skipped means campaign not found in Google Ads yet
                     // (e.g. Zapier callback hasn't fired or campaign was just created).
@@ -181,13 +208,20 @@ export default function CampaignCard({
                           "Google Ads enable failed; campaign remains stopped locally.",
                       );
                     } else {
-                      toast.success("Google Ads campaign enabled successfully.");
+                      toast.success(
+                        "Google Ads campaign enabled successfully.",
+                      );
                     }
                   } catch (err) {
                     // ✅ FIX: network/server errors are hard failures
                     shouldSetLive = false;
-                    console.error("[GoogleAds] Failed to enable campaign:", err);
-                    toast.warn("Google Ads enable failed; campaign remains stopped locally.");
+                    console.error(
+                      "[GoogleAds] Failed to enable campaign:",
+                      err,
+                    );
+                    toast.warn(
+                      "Google Ads enable failed; campaign remains stopped locally.",
+                    );
                   }
                 }
 
@@ -199,7 +233,9 @@ export default function CampaignCard({
                   } catch (err) {
                     shouldSetLive = false;
                     console.error("[LinkedIn] Failed to enable campaign:", err);
-                    toast.warn("LinkedIn enable failed; campaign remains stopped locally.");
+                    toast.warn(
+                      "LinkedIn enable failed; campaign remains stopped locally.",
+                    );
                   }
                 }
 
@@ -225,7 +261,9 @@ export default function CampaignCard({
               className="action-btn more-btn"
               onClick={toggleMenu}
               disabled={!canEditCampaign}
-              title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+              title={
+                !canEditCampaign ? "No permission to edit campaigns" : undefined
+              }
             >
               <img src={moreIcon} alt="More" width={20} height={20} />
             </button>
@@ -244,10 +282,18 @@ export default function CampaignCard({
                     setOpenMenuId(null);
                     onEdit?.(c);
                   }}
-                  title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+                  title={
+                    !canEditCampaign
+                      ? "No permission to edit campaigns"
+                      : undefined
+                  }
                   style={
                     !canEditCampaign
-                      ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
+                      ? {
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                          pointerEvents: "none",
+                        }
                       : undefined
                   }
                 >
@@ -262,14 +308,26 @@ export default function CampaignCard({
                     setOpenMenuId(null);
                     onDuplicate?.(c);
                   }}
-                  title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+                  title={
+                    !canEditCampaign
+                      ? "No permission to edit campaigns"
+                      : undefined
+                  }
                   style={
                     !canEditCampaign
-                      ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
+                      ? {
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                          pointerEvents: "none",
+                        }
                       : undefined
                   }
                 >
-                  <img src={duplicateIcon} alt="Duplicate" className="menu-icon" />
+                  <img
+                    src={duplicateIcon}
+                    alt="Duplicate"
+                    className="menu-icon"
+                  />
                   Duplicate
                 </div>
                 {!INACTIVE_STATUSES.has(c.status) && (
@@ -281,10 +339,18 @@ export default function CampaignCard({
                       setOpenMenuId(null);
                       setShowStopModal(true);
                     }}
-                    title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+                    title={
+                      !canEditCampaign
+                        ? "No permission to edit campaigns"
+                        : undefined
+                    }
                     style={
                       !canEditCampaign
-                        ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
+                        ? {
+                            opacity: 0.5,
+                            cursor: "not-allowed",
+                            pointerEvents: "none",
+                          }
                         : undefined
                     }
                   >
@@ -304,8 +370,76 @@ export default function CampaignCard({
           platforms={platforms}
           campaignId={c.id}
           onClose={() => setShowStopModal(false)}
-          onStop={() => {
-            onStatusChange(c.id, CAMPAIGN_STATUS.STOPPED);
+          onStop={async () => {
+            let shouldStop = true;
+
+            // ── Stop FB/Insta ──
+            if (
+              platforms.includes("facebook") ||
+              platforms.includes("instagram")
+            ) {
+              try {
+                await CampaignAPI.updateFacebookStatus(c.id, "disable");
+
+                toast.success(
+                  "Facebook/Instagram campaign stopped successfully.",
+                );
+              } catch (err) {
+                shouldStop = false;
+
+                console.error("[Facebook] Failed to stop campaign:", err);
+
+                toast.warn(
+                  "Facebook stop failed; campaign remains live locally.",
+                );
+              }
+            }
+
+            // ── Stop Google Ads ──
+            if (platforms.includes("google_ads")) {
+              try {
+                const res = await CampaignAPI.updateGoogleAdsStatus(
+                  c.id,
+                  "pause",
+                );
+
+                if (!res.data?.success) {
+                  shouldStop = false;
+
+                  toast.warn(res.data?.error || "Google Ads stop failed.");
+                } else {
+                  toast.success("Google Ads campaign stopped successfully.");
+                }
+              } catch (err) {
+                shouldStop = false;
+
+                console.error("[GoogleAds] Failed to stop campaign:", err);
+
+                toast.warn("Google Ads stop failed.");
+              }
+            }
+
+            // ── Stop LinkedIn ──
+            if (platforms.includes("linkedin")) {
+              try {
+                await CampaignAPI.updateLinkedInStatus(c.id, "PAUSED");
+
+                toast.success("LinkedIn campaign stopped successfully.");
+              } catch (err) {
+                shouldStop = false;
+
+                console.error("[LinkedIn] Failed to stop campaign:", err);
+
+                toast.warn("LinkedIn stop failed.");
+              }
+            }
+
+            if (shouldStop) {
+              onStatusChange(c.id, CAMPAIGN_STATUS.STOPPED);
+
+              toast.success("Campaign stopped successfully.");
+            }
+
             setShowStopModal(false);
           }}
         />
