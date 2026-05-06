@@ -427,12 +427,16 @@ api.interceptors.response.use(
  * Safely appends a LeadPayload field to FormData.
  *
  * Rules:
- *  - documents  → always skipped (files are appended separately as File objects)
- *  - undefined  → skipped entirely (field not sent)
- *  - null       → skipped entirely (let backend use its default)
- *  - boolean    → "true" / "false"
- *  - Array      → JSON-stringified  (e.g. treatments list)
- *  - everything else → String(value)
+ *  - documents         → always skipped (files are appended separately as File objects)
+ *  - undefined / null  → skipped entirely (field not sent)
+ *  - boolean           → "true" / "false"
+ *  - treatment_interest (Array) → each item appended as a separate string value
+ *                        so Django REST Framework receives repeated fields and
+ *                        deserialises them as a proper list (avoids the
+ *                        "Not a valid string." error that occurs when the whole
+ *                        array is JSON-stringified into a single form value)
+ *  - other Arrays      → JSON-stringified
+ *  - everything else   → String(value)
  */
 const appendPayloadToFormData = (
   formData: FormData,
@@ -451,7 +455,23 @@ const appendPayloadToFormData = (
     }
 
     if (Array.isArray(value)) {
-      formData.append(key, JSON.stringify(value));
+      // ── treatment_interest: append each item individually so DRF reads them
+      // as a proper string list rather than a single JSON-encoded string.
+      if (key === "treatment_interest") {
+        (value as unknown[]).forEach((item) => {
+          const str =
+            item == null
+              ? ""
+              : typeof item === "string"
+                ? item
+                : typeof item === "object" && "name" in (item as object)
+                  ? (item as { name: string }).name
+                  : String(item);
+          if (str) formData.append(key, str);
+        });
+      } else {
+        formData.append(key, JSON.stringify(value));
+      }
       return;
     }
 
@@ -638,8 +658,8 @@ export const LeadAPI = {
       contact_no: current.contact_no ?? "",
       source: current.source ?? "",
       treatment_interest: Array.isArray(current.treatment_interest)
-      ? (current.treatment_interest as string[]).join(",")
-      : (current.treatment_interest as string) ?? "",
+        ? (current.treatment_interest as string[]).join(",")
+        : (current.treatment_interest as string) ?? "",
       book_appointment: current.book_appointment ? "true" : "false",
       appointment_date: current.appointment_date ?? "",
       slot: current.slot ?? "",
