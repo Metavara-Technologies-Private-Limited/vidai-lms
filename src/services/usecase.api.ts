@@ -1,67 +1,57 @@
-import { api } from "./leads.api";
+import { http } from "./http";
 
-export type UseCase = {
+export interface UseCase {
   id: string;
   name: string;
-  is_active?: boolean;
-};
+  clinic: string;
+  is_active: boolean;
+  created_at: string;
+}
 
-const storedClinicId = (): number =>
-  Number(localStorage.getItem("clinic_id") ?? 0);
-
-export const UseCaseAPI = {
-  async list(): Promise<UseCase[]> {
-    const clinicId = storedClinicId();
-
-    const response = await api.get<UseCase[]>(
-      "/usecases/",
-      {
-        headers: {
-          "X-Clinic-Id": String(clinicId),
-        },
-      },
-    );
-
+const UseCaseService = {
+  /**
+   * List all active use cases for a clinic
+   * GET /api/usecases/
+   */
+  getUseCases: async (clinicId: string | number): Promise<UseCase[]> => {
+    const response = await http.get(`/usecases/`, {
+      headers: { "X-Clinic-Id": String(clinicId) },
+    });
     return response.data;
   },
 
-  async create(payload: {
-    name: string;
-  }): Promise<UseCase> {
-    const clinicId = storedClinicId();
-
-    const response = await api.post<UseCase>(
-      "/usecases/create/",
-      payload,
-      {
-        headers: {
-          "X-Clinic-Id": String(clinicId),
-        },
-      },
+  /**
+   * Create a new use case
+   * POST /api/usecases/create/
+   */
+  createUseCase: async (
+    clinicId: string | number,
+    name: string
+  ): Promise<UseCase> => {
+    const response = await http.post(
+      `/usecases/create/`,
+      { name },
+      { headers: { "X-Clinic-Id": String(clinicId) } }
     );
-
     return response.data;
   },
 
-  async update(
+  /**
+   * Update an existing use case
+   * PUT /api/usecases/{id}/update/
+   */
+  updateUseCase: async (
+    clinicId: string | number,
     id: string,
-    payload: {
-      name?: string;
-      is_active?: boolean;
-    },
-  ): Promise<UseCase> {
-    const clinicId = storedClinicId();
-
-    const response = await api.put<UseCase>(
+    name: string
+  ): Promise<UseCase> => {
+    const response = await http.put(
       `/usecases/${id}/update/`,
-      payload,
-      {
-        headers: {
-          "X-Clinic-Id": String(clinicId),
-        },
-      },
+      { name },
+      { headers: { "X-Clinic-Id": String(clinicId) } }
     );
-
     return response.data;
   },
 };
+
+export default UseCaseService;
