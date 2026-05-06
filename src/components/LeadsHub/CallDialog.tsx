@@ -155,7 +155,7 @@ const CallDialog: React.FC<Props> = ({
     try {
       const audio = new Audio(
         ringingAudioUrl ||
-          "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg"
+          "https://upload.wikimedia.org/wikipedia/commons/7/7c/Executed.ogg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original",
       );
       audio.loop = true;
       audio.play().catch(() => {});
