@@ -140,6 +140,35 @@ function capitalize(val: string | undefined | null): string {
   return val.charAt(0).toUpperCase() + val.slice(1);
 }
 
+type LeadWithApiFields = LeadRecord & { action_status?: string };
+
+function getLeadTaskStatus(
+  lead?: LeadWithApiFields,
+): "Pending" | "In Progress" | "Completed" {
+  if (!lead) return "Pending";
+
+  const rawTaskStatus = String(lead.taskStatus || "").trim().toLowerCase();
+  if (rawTaskStatus === "completed") return "Completed";
+  if (rawTaskStatus === "in progress") return "In Progress";
+  if (rawTaskStatus === "pending") return "Pending";
+
+  const rawActionStatus = String(lead.action_status || "").trim().toLowerCase();
+  if (rawActionStatus === "completed") return "Completed";
+  if (rawActionStatus === "in_progress") return "In Progress";
+  if (rawActionStatus === "to_do") return "Pending";
+
+  const rawNextActionStatus = String(lead.next_action_status || "").trim().toLowerCase();
+  if (rawNextActionStatus === "completed") return "Completed";
+  if (rawNextActionStatus === "in progress" || rawNextActionStatus === "in_progress")
+    return "In Progress";
+  if (rawNextActionStatus === "pending" || rawNextActionStatus === "to_do") {
+    if (lead.next_action_description) return "In Progress";
+    return "Pending";
+  }
+
+  return "Pending";
+}
+
 function toDisplayPhone(val: string | undefined | null): string {
   if (!val) return "N/A";
   const trimmed = val.trim();
@@ -2208,6 +2237,7 @@ export default function LeadDetailView() {
   const nextActionDescription = capitalize(
     activeLead.next_action_description || "N/A",
   );
+  const leadTaskStatus = getLeadTaskStatus(activeLead);
   const treatmentInterest = activeLead.treatment_interest
     ? activeLead.treatment_interest
         .split(",")
@@ -2530,6 +2560,34 @@ export default function LeadDetailView() {
                     : leadQuality === "Warm"
                       ? pillChipSx("#FFC53D", "rgba(255,197,61,0.10)")
                       : pillChipSx("#52C41A", "rgba(82,196,26,0.10)")
+                }
+              />
+            </Stack>
+
+            <Stack
+              spacing={0.5}
+              sx={{
+                flex: 1.3,
+                transform: { xs: "none", md: "translateY(14px)" },
+                minWidth: { xs: "100%", md: 0 },
+              }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+              >
+                Task Status
+              </Typography>
+              <Chip
+                label={capitalize(leadTaskStatus)}
+                size="small"
+                sx={
+                  leadTaskStatus === "Completed"
+                    ? pillChipSx("#52C41A", "rgba(82,196,26,0.10)")
+                    : leadTaskStatus === "In Progress"
+                      ? pillChipSx("#2F54EB", "rgba(47,84,235,0.10)")
+                      : pillChipSx("#1890FF", "rgba(24,144,255,0.10)")
                 }
               />
             </Stack>

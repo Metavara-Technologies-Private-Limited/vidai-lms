@@ -33,7 +33,7 @@ import {
   inputStyle,
   labelStyle,
   getDocColor,
-  ACTION_STATUS_OPTIONS,          // ← NEW
+  TASK_STATUS_OPTIONS,          // ← renamed from ACTION_STATUS_OPTIONS
   type LeadGeneratedByObject,
   type NextActionStatusOption,
 } from "../LeadsHub/addNewLead.constants";
@@ -715,13 +715,13 @@ export function Step1({
         )}
       </Box>
 
-      {/* Row 2: Lead Status | Next Action Status | Next Action Type | Action Status | Next Action Description */}
+      {/* Row 2: Lead Status | Next Action Status | Next Action Type | Task Status | Next Action Description */}
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: IS_CONTRACTS_APP
-            ? "repeat(5, 1fr)"   // ← was 4, now 5 to fit Action Status
-            : "repeat(4, 1fr)",  // ← was 3, now 4 to fit Action Status
+            ? "repeat(5, 1fr)"
+            : "repeat(4, 1fr)",
           gap: 2,
           mb: 2,
         }}
@@ -787,17 +787,17 @@ export function Step1({
           </TextField>
         </Box>
 
-        {/* ── Action Status — NEW ───────────────────────────────────────── */}
+        {/* ── Task Status ───────────────────────────────────────────────── */}
         <Box>
-          <Typography sx={labelStyle}>Action Status</Typography>
+          <Typography sx={labelStyle}>Task Status</Typography>
           <TextField
             select fullWidth size="small"
-            value={form.actionStatus}
-            onChange={handleSelectChange("actionStatus")}
+            value={form.taskStatus}                        // ← renamed from actionStatus
+            onChange={handleSelectChange("taskStatus")}    // ← renamed from actionStatus
             sx={inputStyle}
           >
             <MenuItem value="">-- Select --</MenuItem>
-            {ACTION_STATUS_OPTIONS.map((opt) => (
+            {TASK_STATUS_OPTIONS.map((opt) => (            // ← renamed from ACTION_STATUS_OPTIONS
               <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
             ))}
           </TextField>

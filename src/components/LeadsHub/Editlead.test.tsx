@@ -1,506 +1,1243 @@
+// ============================================================
+// EditLead.tsx  –  Pure JSX / render layer
+// All state & logic lives in useEditLead.ts
+// ============================================================
 import * as React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import "@testing-library/jest-dom";
-import EditLead from "./EditLead";
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Paper,
+  MenuItem,
+  Stack,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  Chip,
+  Alert,
+  CircularProgress,
+  IconButton,
+  Autocomplete,
+} from "@mui/material";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import CloseIcon from "@mui/icons-material/Close";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import { toast } from "react-toastify";
 
-// ---------------- MOCK useEditLead hook ----------------
-const mockNavigate = vi.fn();
+import {
+  SOURCE_OPTIONS,
+  SUB_SOURCE_OPTIONS,
+} from "../LeadsHub/addNewLead.constants";
+import {
+  useEditLead,
+  formatLeadId,
+  formatBytes,
+  getFileTypeLabel,
+  TIME_SLOTS,
+  STEPS,
+  TOTAL_STEPS,
+  inputStyle,
+  readOnlyStyle,
+  labelStyle,
+  sectionLabelStyle,
+  TASK_STATUS_OPTIONS,
+} from "./UseEditLead";
+import { sanitizeNameInput } from "../../utils/nameValidation";
+import { capitalizeFirst } from "../../utils/nameValidation";
+import {
+  sanitizePhoneInput,
+  sanitizeEmailFieldInput,
+  sanitizeLocationInput,
+  sanitizeAddressInput,
+} from "../../utils/leadFieldValidation";
 
-// Explicit interface prevents TypeScript from narrowing nullable/array fields
-// (e.g. error: null → string | null, treatments: [] → string[])
-// which would cause type errors when spreading overrides in individual tests.
-interface MockHook {
-  navigate: ReturnType<typeof vi.fn>;
-  currentStep: number;
-  setCurrentStep: ReturnType<typeof vi.fn>;
-  showSuccess: boolean;
-  loading: boolean;
-  error: string | null;
-  setError: ReturnType<typeof vi.fn>;
-  saving: boolean;
-  departments: { id: number; name: string }[];
-  employees: { id: number; emp_name: string; emp_type: string; department_name?: string }[];
-  filteredPersonnel: { id: number; emp_name: string; emp_type: string }[];
-  loadingDepartments: boolean;
-  loadingEmployees: boolean;
-  employeeError: string | null;
-  setEmployeeError: ReturnType<typeof vi.fn>;
-  leadData: { id: number } | null;
-  fullName: string;
-  setFullName: ReturnType<typeof vi.fn>;
-  contactNo: string;
-  setContactNo: ReturnType<typeof vi.fn>;
-  email: string;
-  setEmail: ReturnType<typeof vi.fn>;
-  location: string;
-  setLocation: ReturnType<typeof vi.fn>;
-  gender: string;
-  setGender: ReturnType<typeof vi.fn>;
-  age: string;
-  setAge: ReturnType<typeof vi.fn>;
-  marital: string;
-  setMarital: ReturnType<typeof vi.fn>;
-  address: string;
-  setAddress: ReturnType<typeof vi.fn>;
-  language: string;
-  setLanguage: ReturnType<typeof vi.fn>;
-  isCouple: "yes" | "no";
-  setIsCouple: ReturnType<typeof vi.fn>;
-  partnerName: string;
-  setPartnerName: ReturnType<typeof vi.fn>;
-  partnerAge: string;
-  setPartnerAge: ReturnType<typeof vi.fn>;
-  partnerGender: string;
-  setPartnerGender: ReturnType<typeof vi.fn>;
-  source: string;
-  setSource: ReturnType<typeof vi.fn>;
-  subSource: string;
-  setSubSource: ReturnType<typeof vi.fn>;
-  campaign: string;
-  setCampaign: ReturnType<typeof vi.fn>;
-  assignee: string;
-  setAssignee: ReturnType<typeof vi.fn>;
-  nextType: string;
-  nextStatus: string;
-  setNextStatus: ReturnType<typeof vi.fn>;
-  nextDesc: string;
-  setNextDesc: ReturnType<typeof vi.fn>;
-  availableTaskStatuses: { value: string; label: string }[];
-  handleNextTypeChange: ReturnType<typeof vi.fn>;
-  treatmentInterest: string;
-  setTreatmentInterest: ReturnType<typeof vi.fn>;
-  treatments: string[];
-  setTreatments: ReturnType<typeof vi.fn>;
-  wantAppointment: "yes" | "no";
-  setWantAppointment: ReturnType<typeof vi.fn>;
-  department: string;
-  setDepartment: ReturnType<typeof vi.fn>;
-  selectedDate: unknown;
-  handleDateChange: ReturnType<typeof vi.fn>;
-  slot: string;
-  setSlot: ReturnType<typeof vi.fn>;
-  remark: string;
-  setRemark: ReturnType<typeof vi.fn>;
-  handleSave: ReturnType<typeof vi.fn>;
-}
+const INPUT_TOAST_OPTIONS = { position: "top-right" as const, autoClose: 1400 };
 
-const baseHook: MockHook = {
-  navigate: mockNavigate,
-  currentStep: 1,
-  setCurrentStep: vi.fn(),
-  showSuccess: false,
-  loading: false,
-  error: null,
-  setError: vi.fn(),
-  saving: false,
-  departments: [],
-  employees: [],
-  filteredPersonnel: [],
-  loadingDepartments: false,
-  loadingEmployees: false,
-  employeeError: null,
-  setEmployeeError: vi.fn(),
-  leadData: { id: 101 },
-  fullName: "John Smith",
-  setFullName: vi.fn(),
-  contactNo: "9876543210",
-  setContactNo: vi.fn(),
-  email: "john@example.com",
-  setEmail: vi.fn(),
-  location: "Bangalore",
-  setLocation: vi.fn(),
-  gender: "Male",
-  setGender: vi.fn(),
-  age: "32",
-  setAge: vi.fn(),
-  marital: "Married",
-  setMarital: vi.fn(),
-  address: "123 Main St",
-  setAddress: vi.fn(),
-  language: "English",
-  setLanguage: vi.fn(),
-  isCouple: "no" as "yes" | "no",
-  setIsCouple: vi.fn(),
-  partnerName: "",
-  setPartnerName: vi.fn(),
-  partnerAge: "",
-  setPartnerAge: vi.fn(),
-  partnerGender: "",
-  setPartnerGender: vi.fn(),
-  source: "Website",
-  setSource: vi.fn(),
-  subSource: "Google",
-  setSubSource: vi.fn(),
-  campaign: "Spring2024",
-  setCampaign: vi.fn(),
-  assignee: "",
-  setAssignee: vi.fn(),
-  nextType: "",
-  nextStatus: "",
-  setNextStatus: vi.fn(),
-  nextDesc: "",
-  setNextDesc: vi.fn(),
-  availableTaskStatuses: [{ value: "Pending", label: "Pending" }],
-  handleNextTypeChange: vi.fn(),
-  treatmentInterest: "",
-  setTreatmentInterest: vi.fn(),
-  treatments: [],
-  setTreatments: vi.fn(),
-  wantAppointment: "no" as "yes" | "no",
-  setWantAppointment: vi.fn(),
-  department: "",
-  setDepartment: vi.fn(),
-  selectedDate: null,
-  handleDateChange: vi.fn(),
-  slot: "",
-  setSlot: vi.fn(),
-  remark: "",
-  setRemark: vi.fn(),
-  handleSave: vi.fn(),
+const showInputToast = (toastId: string, message: string) => {
+  if (!toast.isActive(toastId)) {
+    toast.error(message, { ...INPUT_TOAST_OPTIONS, toastId });
+  }
 };
 
-// Mutable ref so individual tests can override fields
-let mockHookValues = { ...baseHook };
+const capitalizeWords = (str: string): string =>
+  str
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 
-vi.mock("./useEditLead", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./UseEditLead")>();
-  return {
-    ...actual,
-    useEditLead: () => mockHookValues,
-  };
-});
+const SLOT_MENU_PROPS = {
+  anchorOrigin: { vertical: "bottom" as const, horizontal: "left" as const },
+  transformOrigin: { vertical: "top" as const, horizontal: "left" as const },
+  PaperProps: {
+    sx: {
+      "& .MuiMenu-list": {
+        maxHeight: "200px",
+        overflowY: "auto",
+        scrollbarWidth: "thin",
+        "&::-webkit-scrollbar": { width: "4px" },
+        "&::-webkit-scrollbar-thumb": {
+          backgroundColor: "#CBD5E1",
+          borderRadius: "4px",
+        },
+      },
+      "& .MuiMenuItem-root": {
+        justifyContent: "flex-start",
+        fontSize: "0.875rem",
+        whiteSpace: "nowrap",
+      },
+    },
+  },
+};
 
-// ---------------- MOCK MUI DatePicker (avoid complex setup) ----------------
-vi.mock("@mui/x-date-pickers/DatePicker", () => ({
-  DatePicker: ({ onChange }: { onChange: (v: unknown) => void }) => (
-    <input
-      data-testid="date-picker"
-      onChange={(e) => onChange(e.target.value)}
-    />
-  ),
-}));
+const ALL_LANGUAGE_CODES: string[] = [
+  "ab","aa","af","ak","sq","am","ar","an","hy","as","av","ae","ay","az",
+  "bm","ba","eu","be","bn","bh","bi","bs","br","bg","my","ca","ch","ce",
+  "ny","zh","cv","kw","co","cr","hr","cs","da","dv","nl","dz","en","eo",
+  "et","ee","fo","fj","fi","fr","ff","gl","ka","de","el","gn","gu","ht",
+  "ha","he","hz","hi","ho","hu","ia","id","ie","ga","ig","ik","io","is",
+  "it","iu","ja","jv","kl","kn","kr","ks","kk","km","ki","rw","ky","kv",
+  "kg","ko","ku","kj","la","lb","lg","li","ln","lo","lt","lu","lv","gv",
+  "mk","mg","ms","ml","mt","mi","mr","mh","mn","na","nv","nd","ne","ng",
+  "nb","nn","no","ii","nr","oc","oj","cu","om","or","os","pa","pi","fa",
+  "pl","ps","pt","qu","rm","rn","ro","ru","sa","sc","sd","se","sm","sg",
+  "sr","gd","sn","si","sk","sl","so","st","es","su","sw","ss","sv","ta",
+  "te","tg","th","ti","bo","tk","tl","tn","to","tr","ts","tt","tw","ty",
+  "ug","uk","ur","uz","ve","vi","vo","wa","cy","wo","fy","xh","yi","yo",
+  "za","zu",
+  "fil","haw","hmn","ilo","jw","ceb","war","min","bug","ban","ace","mad",
+  "mak","gor","sas","nds","pms","scn","lmo","vec","fur","lij","nap","szl",
+  "csb","hsb","dsb","rue",
+  "zh-Hans","zh-Hant","pt-BR","pt-PT","es-419",
+  "sr-Latn","sr-Cyrl","uz-Latn","uz-Cyrl","az-Latn","az-Cyrl",
+  "bs-Latn","bs-Cyrl",
+];
 
-vi.mock("@mui/x-date-pickers/LocalizationProvider", () => ({
-  LocalizationProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-vi.mock("@mui/x-date-pickers/AdapterDayjs", () => ({
-  AdapterDayjs: class {},
-}));
-
-// ---------------- RENDER HELPER ----------------
-function renderComponent() {
-  return render(<EditLead />);
+function getLanguagesFromBrowser(): string[] {
+  try {
+    const displayNames = new Intl.DisplayNames(["en"], { type: "language" });
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const code of ALL_LANGUAGE_CODES) {
+      try {
+        const name = displayNames.of(code);
+        if (name && name !== code && !seen.has(name)) {
+          seen.add(name);
+          result.push(name);
+        }
+      } catch {
+        // skip invalid codes
+      }
+    }
+    return result.sort((a, b) => a.localeCompare(b));
+  } catch {
+    return [
+      "Afrikaans","Albanian","Amharic","Arabic","Armenian","Azerbaijani",
+      "Basque","Belarusian","Bengali","Bosnian","Bulgarian","Burmese",
+      "Catalan","Chinese","Croatian","Czech","Danish","Dutch","English",
+      "Esperanto","Estonian","Finnish","French","Galician","Georgian",
+      "German","Greek","Gujarati","Haitian Creole","Hausa","Hebrew",
+      "Hindi","Hungarian","Icelandic","Igbo","Indonesian","Irish",
+      "Italian","Japanese","Javanese","Kannada","Kazakh","Khmer","Korean",
+      "Kurdish","Kyrgyz","Lao","Latin","Latvian","Lithuanian","Macedonian",
+      "Malagasy","Malay","Malayalam","Maltese","Maori","Marathi","Mongolian",
+      "Nepali","Norwegian","Odia","Pashto","Persian","Polish","Portuguese",
+      "Punjabi","Romanian","Russian","Sanskrit","Serbian","Sinhala","Slovak",
+      "Slovenian","Somali","Spanish","Sundanese","Swahili","Swedish","Tagalog",
+      "Tajik","Tamil","Telugu","Thai","Tibetan","Turkish","Turkmen","Ukrainian",
+      "Urdu","Uzbek","Vietnamese","Welsh","Xhosa","Yoruba","Zulu",
+    ].sort();
+  }
 }
 
-// =====================================================
-// TESTS
-// =====================================================
+function useAllLanguages() {
+  const [languages, setLanguages] = React.useState<string[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  React.useEffect(() => {
+    const id = setTimeout(() => {
+      setLanguages(getLanguagesFromBrowser());
+      setLoading(false);
+    }, 0);
+    return () => clearTimeout(id);
+  }, []);
+  return { languages, loading };
+}
 
-describe("EditLead", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockHookValues = { ...baseHook };
-  });
+export default function EditLead() {
+  const { languages: allLanguages, loading: languagesLoading } = useAllLanguages();
 
-  // ---- Loading state ----
+  const {
+    navigate,
+    currentStep,
+    setCurrentStep,
+    loading,
+    error,
+    setError,
+    saving,
+    canEditLeads,
+    filteredCampaigns,
+    departments,
+    loadingDepartments,
+    loadingEmployees,
+    employeeError,
+    setEmployeeError,
+    leadData,
+    // ── Pipeline / stage ──
+    leadStatusOptions,
+    filteredNextActionStatusOptions,
+    nextActionTypeOptions,
+    leadStatus,
+    handleLeadStatusChange,
+    handleNextStatusChange,
+    handleSourceChange,
+    handleSubSourceChange,
+    referralDepartments,
+    loadingReferralDepts,
+    referralDepartment,
+    // ── Shared fields ──
+    fullName,
+    setFullName,
+    contactNo,
+    setContactNo,
+    email,
+    setEmail,
+    location,
+    setLocation,
+    address,
+    setAddress,
+    source,
+    subSource,
+    campaign,
+    handleCampaignChange,
+    assignee,
+    setAssignee,
+    assigneeName,
+    setAssigneeName,
+    setAssigneeSearch,
+    assigneeOptions,
+    assigneeLoading,
+    nextType,
+    nextStatus,
+    nextDesc,
+    setNextDesc,
+    handleNextTypeChange,
+    // ── Task Status ── NEW
+    taskStatus,
+    setTaskStatus,
+    // ── Medical-only fields ──
+    gender,
+    setGender,
+    age,
+    setAge,
+    marital,
+    setMarital,
+    language,
+    setLanguage,
+    isCouple,
+    setIsCouple,
+    partnerName,
+    setPartnerName,
+    partnerAge,
+    setPartnerAge,
+    partnerGender,
+    setPartnerGender,
+    // ── Contracts-only fields ──
+    contactPersonName,
+    setContactPersonName,
+    designation,
+    setDesignation,
+    contactPersonPhone,
+    setContactPersonPhone,
+    contactPersonEmail,
+    setContactPersonEmail,
+    // ── Step 2 ──
+    treatmentInterest,
+    setTreatmentInterest,
+    treatments,
+    setTreatments,
+    documents,
+    handleFileChange,
+    handleRemoveDocument,
+    existingDocuments,
+    docsLoading,
+    handleRemoveExistingDocument,
+    // ── Step 3 ──
+    wantAppointment,
+    department,
+    setDepartment,
+    setAppointmentPersonnel,
+    appointmentPersonnelSearch,
+    setAppointmentPersonnelSearch,
+    appointmentPersonnelOptions,
+    appointmentPersonnelLoading,
+    selectedAppointmentPersonnel,
+    personnelOptionLabel,
+    selectedDate,
+    handleDateChange,
+    slot,
+    setSlot,
+    remark,
+    setRemark,
+    handleSave,
+    handleWantAppointmentChange,
+    // ── App-type flags ──
+    IS_MEDICAL_APP,
+    IS_CONTRACTS_APP,
+    ACTIVE_FLOW_COPY,
+  } = useEditLead();
 
-  it("shows loading spinner when loading is true", () => {
-    mockHookValues = { ...baseHook, loading: true, leadData: null };
-    renderComponent();
-    expect(screen.getByRole("progressbar")).toBeInTheDocument();
-    expect(screen.getByText("Loading lead...")).toBeInTheDocument();
-  });
+  // ====================== Loading / Error states ======================
+  if (loading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+        <Stack alignItems="center" spacing={2}>
+          <CircularProgress />
+          <Typography color="text.secondary">Loading lead...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
 
-  // ---- Error state (no leadData) ----
+  if (error && !leadData) {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          <Typography fontWeight={600}>Failed to load lead</Typography>
+          <Typography variant="body2">{error}</Typography>
+        </Alert>
+        <Button onClick={() => navigate("/leads")}>Back to Leads</Button>
+      </Box>
+    );
+  }
 
-  it("shows error message when error exists and no leadData", () => {
-    mockHookValues = {
-      ...baseHook,
-      error: "Network error",
-      leadData: null,
-    };
-    renderComponent();
-    expect(screen.getByText("Failed to load lead")).toBeInTheDocument();
-    expect(screen.getByText("Network error")).toBeInTheDocument();
-  });
+  if (!leadData) {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Typography>Lead not found</Typography>
+        <Button onClick={() => navigate("/leads")}>Back to Leads</Button>
+      </Box>
+    );
+  }
 
-  it("shows Back to Leads button on error screen", () => {
-    mockHookValues = { ...baseHook, error: "Not found", leadData: null };
-    renderComponent();
-    expect(screen.getByText("Back to Leads")).toBeInTheDocument();
-  });
+  const leadLabel = leadData.id ? formatLeadId(leadData.id.toString()) : "";
 
-  it("navigates to /leads when Back to Leads is clicked on error screen", () => {
-    mockHookValues = { ...baseHook, error: "Not found", leadData: null };
-    renderComponent();
-    fireEvent.click(screen.getByText("Back to Leads"));
-    expect(mockNavigate).toHaveBeenCalledWith("/leads");
-  });
+  const isCampaignDisabled =
+    source === "Referral" || (source === "Direct" && subSource !== "Gmail");
 
-  // ---- Not found state ----
+  const subSourceOptions: string[] =
+    source === "Referral"
+      ? referralDepartments.map((d) => d.name)
+      : (SUB_SOURCE_OPTIONS[source] ?? []);
 
-  it("shows Lead not found when leadData is null and no error", () => {
-    mockHookValues = { ...baseHook, leadData: null };
-    renderComponent();
-    expect(screen.getByText("Lead not found")).toBeInTheDocument();
-  });
+  // ── Input sanitizers ───────────────────────────────────────────────────────
+  const handleFullNameChange = (value: string) => {
+    const sanitized = sanitizeNameInput(value);
+    if (sanitized !== value)
+      showInputToast("edit-lead-name-invalid", "Only letters, numbers and spaces allowed");
+    setFullName(capitalizeFirst(sanitized));
+  };
 
-  // ---- Normal render ----
+  const handlePartnerNameChange = (value: string) => {
+    const sanitized = sanitizeNameInput(value);
+    if (sanitized !== value)
+      showInputToast("edit-lead-name-invalid", "Only letters, numbers and spaces allowed");
+    setPartnerName(capitalizeFirst(sanitized));
+  };
 
-  it("renders the Edit Lead Details header", () => {
-    renderComponent();
-    expect(screen.getByText(/Edit Lead Details/)).toBeInTheDocument();
-  });
+  const handleContactPersonNameChange = (value: string) => {
+    const sanitized = sanitizeNameInput(value);
+    if (sanitized !== value)
+      showInputToast("edit-lead-name-invalid", "Only letters, numbers and spaces allowed");
+    setContactPersonName(capitalizeFirst(sanitized));
+  };
 
-  it("displays the formatted lead ID in the header", () => {
-    renderComponent();
-    // formatLeadId(101) — just check something in parentheses exists
-    expect(screen.getByText(/\(.*\)/)).toBeInTheDocument();
-  });
+  const handleContactChange = (value: string) => {
+    const { value: sanitized, error } = sanitizePhoneInput(value);
+    if (error) showInputToast("edit-lead-contact-invalid", error);
+    setContactNo(sanitized);
+  };
 
-  it("renders the stepper with step labels", () => {
-    renderComponent();
-    // Actual STEPS = ["Patient Details", "Medical Details", "Book Appointment"]
-    expect(screen.getByText("Patient Details")).toBeInTheDocument();
-    expect(screen.getByText("Medical Details")).toBeInTheDocument();
-    expect(screen.getByText("Book Appointment")).toBeInTheDocument();
-  });
+  const handleEmailChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeEmailFieldInput(value);
+    if (error) showInputToast("edit-lead-email-invalid", error);
+    setEmail(sanitized);
+  };
 
-  // ---- Step 1 form fields ----
+  const handleLocationChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeLocationInput(value);
+    if (error) showInputToast("edit-lead-location-invalid", error);
+    setLocation(sanitized);
+  };
 
-  it("renders Full Name field with current value on step 1", () => {
-    renderComponent();
-    expect(screen.getByDisplayValue("John Smith")).toBeInTheDocument();
-  });
+  const handleAddressChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeAddressInput(value);
+    if (error) showInputToast("edit-lead-address-invalid", error);
+    setAddress(sanitized);
+  };
 
-  it("renders Contact No field on step 1", () => {
-    renderComponent();
-    expect(screen.getByDisplayValue("9876543210")).toBeInTheDocument();
-  });
+  const handleContactPersonPhoneChange = (value: string) => {
+    const { value: sanitized, error } = sanitizePhoneInput(value);
+    if (error) showInputToast("edit-lead-contact-person-phone-invalid", error);
+    setContactPersonPhone(sanitized);
+  };
 
-  it("renders Email field on step 1", () => {
-    renderComponent();
-    expect(screen.getByDisplayValue("john@example.com")).toBeInTheDocument();
-  });
+  const handleContactPersonEmailChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeEmailFieldInput(value);
+    if (error) showInputToast("edit-lead-contact-person-email-invalid", error);
+    setContactPersonEmail(sanitized);
+  };
 
-  it("calls setFullName when Full Name field is changed", () => {
-    renderComponent();
-    const input = screen.getByDisplayValue("John Smith");
-    fireEvent.change(input, { target: { value: "Jane Doe" } });
-    expect(mockHookValues.setFullName).toHaveBeenCalledWith("Jane Doe");
-  });
+  const assigneeOptionLabel = (option: {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    role?: string;
+    designation?: string;
+  }): string => {
+    const fullNameStr = `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+    const primary = fullNameStr || option.username || `User ${option.id}`;
+    const secondary = option.role || option.designation;
+    return secondary ? `${primary} (${secondary})` : primary;
+  };
 
-  it("calls setContactNo when Contact No field is changed", () => {
-    renderComponent();
-    const input = screen.getByDisplayValue("9876543210");
-    fireEvent.change(input, { target: { value: "1234567890" } });
-    expect(mockHookValues.setContactNo).toHaveBeenCalledWith("1234567890");
-  });
+  return (
+    <Box>
+      {!canEditLeads && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          You have view-only access. Lead edit is disabled for your role.
+        </Alert>
+      )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {employeeError && (
+        <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setEmployeeError(null)}>
+          Could not load employees: <strong>{employeeError}</strong>
+        </Alert>
+      )}
 
-  it("calls setEmail when Email field is changed", () => {
-    renderComponent();
-    const input = screen.getByDisplayValue("john@example.com");
-    fireEvent.change(input, { target: { value: "new@email.com" } });
-    expect(mockHookValues.setEmail).toHaveBeenCalledWith("new@email.com");
-  });
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: "12px",
+          overflow: "hidden",
+          height: "88vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* ── Header ── */}
+        <Box sx={{ bgcolor: "#FFFFFF", px: 1, py: 1 }}>
+          <Typography fontSize="18px" fontWeight={700} color="#0F172A">
+            Edit Lead Details{" "}
+            <Typography component="span" fontSize="14px" fontWeight={400} color="#64748B">
+              ({leadLabel})
+            </Typography>
+          </Typography>
+        </Box>
 
-  // ---- Partner section ----
+        {/* ── Stepper ── */}
+        <Box sx={{ bgcolor: "white", px: 1, pt: 1, pb: 3 }}>
+          <Box
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              bgcolor: "#F8FAFC",
+              px: 3,
+              py: 1.5,
+              borderRadius: "12px",
+              border: "1px solid #E2E8F0",
+            }}
+          >
+            {STEPS.map((label, index) => {
+              const step = index + 1;
+              const completed = currentStep > step;
+              const active = currentStep === step;
+              return (
+                <Box key={step} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: "50%",
+                      bgcolor: completed ? "#10B981" : active ? (step === 3 ? "#3B82F6" : "#F97316") : "#E2E8F0",
+                      color: "white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                    }}
+                  >
+                    {completed ? "✓" : step}
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    sx={{
+                      fontSize: "0.875rem",
+                      color: completed ? "#10B981" : active ? (step === 3 ? "#3B82F6" : "#F97316") : "#94A3B8",
+                    }}
+                  >
+                    {label}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
 
-  it("does not show partner fields when isCouple is 'no'", () => {
-    renderComponent();
-    expect(screen.queryByText(/Partner.*Full Name|Full Name.*Partner/i)).toBeNull();
-  });
+        {/* ── Scrollable Form Body ── */}
+        <Box
+          sx={{
+            bgcolor: "white",
+            p: 1,
+            flex: 1,
+            overflowY: "auto",
+            "&::-webkit-scrollbar": { width: "8px" },
+            "&::-webkit-scrollbar-thumb": { backgroundColor: "#CBD5E1", borderRadius: "4px" },
+          }}
+        >
+          {/* ===== STEP 1 ===== */}
+          {currentStep === 1 && (
+            <Box>
+              {/* ── SECTION: Lead Information ── */}
+              <Typography sx={sectionLabelStyle}>LEAD INFORMATION</Typography>
 
-  it("shows partner fields when isCouple is 'yes'", () => {
-    mockHookValues = { ...baseHook, isCouple: "yes" };
-    renderComponent();
-    // Lead section labels include asterisk ("Full Name *"), partner section uses plain "Full Name"
-    // So when isCouple is yes, the plain "Full Name" label (partner) appears in the DOM
-    expect(screen.getByText("Full Name")).toBeInTheDocument();
-    // Partner-specific unique fields — Age and Gender appear in partner grid (no asterisk)
-    expect(screen.getByText("Age")).toBeInTheDocument();
-  });
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: IS_CONTRACTS_APP ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
+                <Box>
+                  <Typography sx={labelStyle}>Lab Name *</Typography>
+                  <TextField
+                    fullWidth size="small"
+                    value={fullName}
+                    onChange={(e) => handleFullNameChange(e.target.value)}
+                    sx={inputStyle}
+                  />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Contact No. *</Typography>
+                  <TextField
+                    fullWidth size="small"
+                    value={contactNo}
+                    onChange={(e) => handleContactChange(e.target.value)}
+                    sx={inputStyle}
+                  />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Email</Typography>
+                  <TextField
+                    fullWidth size="small"
+                    value={email}
+                    onChange={(e) => handleEmailChange(e.target.value)}
+                    sx={inputStyle}
+                  />
+                </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Location</Typography>
+                  <TextField
+                    fullWidth size="small"
+                    value={location}
+                    onChange={(e) => handleLocationChange(e.target.value)}
+                    sx={inputStyle}
+                  />
+                </Box>
+                {IS_CONTRACTS_APP && (
+                  <Box>
+                    <Typography sx={labelStyle}>Address</Typography>
+                    <TextField
+                      fullWidth size="small"
+                      value={address}
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      sx={inputStyle}
+                    />
+                  </Box>
+                )}
+              </Box>
 
-  // ---- Inline error / warning banners ----
+              {/* MEDICAL — Row 2 */}
+              {IS_MEDICAL_APP && (
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
+                  <Box>
+                    <Typography sx={labelStyle}>Gender *</Typography>
+                    <TextField select fullWidth size="small" value={gender} onChange={(e) => setGender(e.target.value)} sx={inputStyle}>
+                      <MenuItem value="">-- Select --</MenuItem>
+                      <MenuItem value="Male">Male</MenuItem>
+                      <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
+                    </TextField>
+                  </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Age *</Typography>
+                    <TextField fullWidth size="small" type="number" value={age} onChange={(e) => setAge(e.target.value)} sx={inputStyle} />
+                  </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Marital Status</Typography>
+                    <TextField select fullWidth size="small" value={marital} onChange={(e) => setMarital(e.target.value)} sx={inputStyle}>
+                      <MenuItem value="">-- Select --</MenuItem>
+                      <MenuItem value="Married">Married</MenuItem>
+                      <MenuItem value="Single">Single</MenuItem>
+                    </TextField>
+                  </Box>
+                  <Box>
+                    <Typography sx={labelStyle}>Address</Typography>
+                    <TextField fullWidth size="small" value={address} onChange={(e) => handleAddressChange(e.target.value)} sx={inputStyle} />
+                  </Box>
+                </Box>
+              )}
 
-  it("shows inline error alert when error exists but leadData is present", () => {
-    mockHookValues = { ...baseHook, error: "Save failed" };
-    renderComponent();
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.getByText("Save failed")).toBeInTheDocument();
-  });
+              {/* Language Preference */}
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
+                <Box>
+                  <Typography sx={labelStyle}>Language Preference</Typography>
+                  <TextField
+                    select fullWidth size="small"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    disabled={languagesLoading}
+                    sx={inputStyle}
+                    InputProps={{
+                      endAdornment: languagesLoading ? <CircularProgress size={16} sx={{ mr: 3 }} /> : null,
+                    }}
+                  >
+                    <MenuItem value="">{languagesLoading ? "Loading languages…" : "-- Select --"}</MenuItem>
+                    {allLanguages.map((lang) => (
+                      <MenuItem key={lang} value={lang}>{lang}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+              </Box>
 
-  it("shows warning alert when employeeError is set", () => {
-    mockHookValues = { ...baseHook, employeeError: "Could not fetch employees" };
-    renderComponent();
-    expect(screen.getByText(/Could not load employees/)).toBeInTheDocument();
-    expect(screen.getByText("Could not fetch employees")).toBeInTheDocument();
-  });
+              {/* MEDICAL — Partner Information */}
+              {IS_MEDICAL_APP && (
+                <>
+                  <Typography sx={sectionLabelStyle}>PARTNER INFORMATION</Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography sx={{ ...labelStyle, mb: 0.5 }}>Is This Inquiry For A Couple?</Typography>
+                    <RadioGroup row value={isCouple} onChange={(e) => setIsCouple(e.target.value as "yes" | "no")}>
+                      <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
+                      <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+                    </RadioGroup>
+                  </Box>
+                  {isCouple === "yes" && (
+                    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
+                      <Box>
+                        <Typography sx={labelStyle}>Full Name</Typography>
+                        <TextField fullWidth size="small" value={partnerName} onChange={(e) => handlePartnerNameChange(e.target.value)} sx={inputStyle} />
+                      </Box>
+                      <Box>
+                        <Typography sx={labelStyle}>Age</Typography>
+                        <TextField fullWidth size="small" type="number" value={partnerAge} onChange={(e) => setPartnerAge(e.target.value)} sx={inputStyle} />
+                      </Box>
+                      <Box>
+                        <Typography sx={labelStyle}>Gender</Typography>
+                        <TextField select fullWidth size="small" value={partnerGender} onChange={(e) => setPartnerGender(e.target.value)} sx={inputStyle}>
+                          <MenuItem value="">-- Select --</MenuItem>
+                          <MenuItem value="Male">Male</MenuItem>
+                          <MenuItem value="Female">Female</MenuItem>
+                        </TextField>
+                      </Box>
+                    </Box>
+                  )}
+                </>
+              )}
 
-  // ---- Footer navigation buttons ----
+              {/* CONTRACTS — Contact Person Information */}
+              {IS_CONTRACTS_APP && (
+                <>
+                  <Typography sx={sectionLabelStyle}>{ACTIVE_FLOW_COPY.contactSectionLabel}</Typography>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
+                    <Box>
+                      <Typography sx={labelStyle}>Full Name</Typography>
+                      <TextField fullWidth size="small" value={contactPersonName} onChange={(e) => handleContactPersonNameChange(e.target.value)} sx={inputStyle} />
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Designation</Typography>
+                      <TextField fullWidth size="small" value={designation} onChange={(e) => setDesignation(e.target.value)} sx={inputStyle} />
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Contact No.</Typography>
+                      <TextField fullWidth size="small" value={contactPersonPhone} onChange={(e) => handleContactPersonPhoneChange(e.target.value)} sx={inputStyle} />
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Email</Typography>
+                      <TextField fullWidth size="small" value={contactPersonEmail} onChange={(e) => handleContactPersonEmailChange(e.target.value)} sx={inputStyle} />
+                    </Box>
+                  </Box>
+                </>
+              )}
 
-  it("shows Cancel and Next buttons on step 1", () => {
-    renderComponent();
-    expect(screen.getByText("Cancel")).toBeInTheDocument();
-    expect(screen.getByText("Next")).toBeInTheDocument();
-  });
+              {/* ── SECTION: Source & Campaign ── */}
+              <Typography sx={sectionLabelStyle}>SOURCE & CAMPAIGN DETAILS</Typography>
 
-  it("does not show Back button on step 1", () => {
-    renderComponent();
-    expect(screen.queryByText("Back")).toBeNull();
-  });
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: isCampaignDisabled ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
+                <Box>
+                  <Typography sx={labelStyle}>Source</Typography>
+                  <TextField select fullWidth size="small" value={source} onChange={(e) => handleSourceChange(e.target.value)} sx={inputStyle}>
+                    <MenuItem value="">-- Select Source --</MenuItem>
+                    {SOURCE_OPTIONS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  </TextField>
+                </Box>
 
-  it("shows Back button on step 2", () => {
-    mockHookValues = { ...baseHook, currentStep: 2 };
-    renderComponent();
-    expect(screen.getByText("Back")).toBeInTheDocument();
-  });
+                {source !== "Other" && (
+                  <Box>
+                    <Typography sx={labelStyle}>Sub-Source</Typography>
+                    <TextField
+                      select fullWidth size="small"
+                      value={subSource}
+                      onChange={(e) => handleSubSourceChange(e.target.value)}
+                      disabled={!source || (source === "Referral" && loadingReferralDepts)}
+                      sx={inputStyle}
+                      InputProps={{
+                        endAdornment: source === "Referral" && loadingReferralDepts
+                          ? <CircularProgress size={16} sx={{ mr: 3 }} /> : null,
+                      }}
+                    >
+                      <MenuItem value="">-- Select Sub-Source --</MenuItem>
+                      {source === "Referral" && loadingReferralDepts ? (
+                        <MenuItem value="" disabled>Loading departments...</MenuItem>
+                      ) : source === "Referral" && subSourceOptions.length === 0 ? (
+                        <MenuItem value="" disabled>No departments available</MenuItem>
+                      ) : (
+                        subSourceOptions.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)
+                      )}
+                      {!source && <MenuItem value="" disabled>Select source first</MenuItem>}
+                    </TextField>
+                  </Box>
+                )}
 
-  it("shows Save button on last step", () => {
-    mockHookValues = { ...baseHook, currentStep: 3 };
-    renderComponent();
-    expect(screen.getByText("Save")).toBeInTheDocument();
-  });
+                {source !== "Other" && !isCampaignDisabled && (
+                  <Box>
+                    <Typography sx={labelStyle}>
+                      Campaign Name
+                      {subSource && (
+                        <Typography component="span" sx={{ fontSize: "0.65rem", color: "#94A3B8", ml: 1, fontWeight: 500 }}>
+                          linked with {subSource}
+                        </Typography>
+                      )}
+                    </Typography>
+                    <TextField
+                      select fullWidth size="small"
+                      value={campaign}
+                      onChange={handleCampaignChange}
+                      disabled={!source && !subSource}
+                      sx={inputStyle}
+                    >
+                      <MenuItem value="">-- None --</MenuItem>
+                      {filteredCampaigns.length === 0 ? (
+                        <MenuItem value="" disabled>
+                          {source || subSource ? "No campaigns match the selected source / sub-source" : "No campaigns available"}
+                        </MenuItem>
+                      ) : (
+                        filteredCampaigns.map((c) => (
+                          <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>
+                        ))
+                      )}
+                    </TextField>
+                  </Box>
+                )}
+              </Box>
 
-  it("does not show Next button on last step", () => {
-    mockHookValues = { ...baseHook, currentStep: 3 };
-    renderComponent();
-    expect(screen.queryByText("Next")).toBeNull();
-  });
+              {/* ── SECTION: Assignee & Next Action ── */}
+              <Typography sx={sectionLabelStyle}>ASSIGNEE & NEXT ACTION DETAILS</Typography>
 
-  it("calls setCurrentStep with incremented value when Next is clicked", () => {
-    renderComponent();
-    fireEvent.click(screen.getByText("Next"));
-    expect(mockHookValues.setCurrentStep).toHaveBeenCalled();
-  });
+              {/* Row 1: Assigned To · Referral Dept · Lead Status · Next Action Status */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: IS_CONTRACTS_APP ? "repeat(3, 1fr)" : "repeat(4, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
+                {/* Assigned To */}
+                <Box>
+                  <Typography sx={labelStyle}>Assigned To</Typography>
+                  <Autocomplete
+                    options={assigneeOptions}
+                    loading={assigneeLoading}
+                    clearOnBlur={false}
+                    filterOptions={(options) => options}
+                    value={
+                      assigneeOptions.find((o) => String(o.id) === assignee) ||
+                      (assignee ? { id: Number(assignee), username: assigneeName } : null)
+                    }
+                    inputValue={assigneeName}
+                    onInputChange={(_, value, reason) => {
+                      if (reason === "reset") return;
+                      setAssigneeSearch(value);
+                      setAssigneeName(value);
+                      setAssignee("");
+                    }}
+                    onChange={(_, value) => {
+                      setAssignee(value ? String(value.id) : "");
+                      setAssigneeName(value ? assigneeOptionLabel(value) : "");
+                    }}
+                    getOptionLabel={assigneeOptionLabel}
+                    isOptionEqualToValue={(o, v) => o.id === v.id}
+                    noOptionsText="Type to search assignee"
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.id}>{assigneeOptionLabel(option)}</li>
+                    )}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params} fullWidth size="small" placeholder="Search assignee" sx={inputStyle}
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {assigneeLoading ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
+                </Box>
 
-  it("calls setCurrentStep with decremented value when Back is clicked", () => {
-    mockHookValues = { ...baseHook, currentStep: 2 };
-    renderComponent();
-    fireEvent.click(screen.getByText("Back"));
-    expect(mockHookValues.setCurrentStep).toHaveBeenCalled();
-  });
+                {/* NON-CONTRACTS: Referral Department read-only */}
+                {!IS_CONTRACTS_APP && (
+                  <Box>
+                    <Typography sx={labelStyle}>Referral Department</Typography>
+                    <TextField
+                      fullWidth size="small"
+                      value={referralDepartments.find((d) => String(d.id) === referralDepartment)?.name ?? referralDepartment}
+                      InputProps={{ readOnly: true }}
+                      sx={readOnlyStyle}
+                    />
+                  </Box>
+                )}
 
-  it("navigates to /leads when Cancel is clicked", () => {
-    renderComponent();
-    fireEvent.click(screen.getByText("Cancel"));
-    expect(mockNavigate).toHaveBeenCalledWith("/leads");
-  });
+                {/* Lead Status */}
+                <Box>
+                  <Typography sx={labelStyle}>Lead Status</Typography>
+                  <TextField
+                    select fullWidth size="small"
+                    value={leadStatus}
+                    onChange={(e) => handleLeadStatusChange(e.target.value)}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {leadStatusOptions.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
 
-  it("calls handleSave when Save is clicked on last step", () => {
-    mockHookValues = { ...baseHook, currentStep: 3 };
-    renderComponent();
-    fireEvent.click(screen.getByText("Save"));
-    expect(mockHookValues.handleSave).toHaveBeenCalled();
-  });
+                {/* Next Action Status */}
+                <Box>
+                  <Typography sx={labelStyle}>Next Action Status</Typography>
+                  <TextField
+                    select fullWidth size="small"
+                    value={nextStatus}
+                    onChange={(e) => handleNextStatusChange(e.target.value)}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {filteredNextActionStatusOptions.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+              </Box>
 
-  // ---- Saving state ----
+              {/* Row 2: Next Action Type · Task Status · Next Action Description */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
+                {/* Next Action Type */}
+                <Box>
+                  <Typography sx={labelStyle}>Next Action Type</Typography>
+                  <TextField
+                    select fullWidth size="small"
+                    value={nextType}
+                    onChange={handleNextTypeChange}
+                    sx={inputStyle}
+                    disabled={nextActionTypeOptions.length === 0}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {nextActionTypeOptions.length === 0 ? (
+                      <MenuItem value="" disabled>
+                        {leadStatus ? "No actions configured for this stage" : "Select a lead status first"}
+                      </MenuItem>
+                    ) : (
+                      nextActionTypeOptions.map((t) => (
+                        <MenuItem key={t} value={t}>{capitalizeWords(t)}</MenuItem>
+                      ))
+                    )}
+                  </TextField>
+                </Box>
 
-  it("shows spinner inside Save button when saving is true", () => {
-    mockHookValues = { ...baseHook, currentStep: 3, saving: true };
-    renderComponent();
-    expect(screen.getByRole("progressbar")).toBeInTheDocument();
-    expect(screen.queryByText("Save")).toBeNull();
-  });
+                {/* ── Task Status ── NEW */}
+                <Box>
+                  <Typography sx={labelStyle}>Task Status</Typography>
+                  <TextField
+                    select fullWidth size="small"
+                    value={taskStatus}
+                    onChange={(e) => setTaskStatus(e.target.value)}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {TASK_STATUS_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
 
-  it("disables Cancel, Back, and Save buttons when saving", () => {
-    mockHookValues = { ...baseHook, currentStep: 3, saving: true };
-    renderComponent();
-    const cancelBtn = screen.getByText("Cancel").closest("button")!;
-    expect(cancelBtn).toBeDisabled();
-  });
+                {/* Next Action Description */}
+                <Box>
+                  <Typography sx={labelStyle}>Next Action Description</Typography>
+                  <TextField
+                    fullWidth size="small"
+                    value={nextDesc}
+                    onChange={(e) => setNextDesc(e.target.value)}
+                    sx={inputStyle}
+                  />
+                </Box>
+              </Box>
+            </Box>
+          )}
 
-  // ---- Step 1 step indicator ----
+          {/* ===== STEP 2 ===== */}
+          {currentStep === 2 && (
+            <Box>
+              <Typography sx={sectionLabelStyle}>{ACTIVE_FLOW_COPY.medicalSection.toUpperCase()}</Typography>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 2 }}>
+                <Box>
+                  <Typography sx={labelStyle}>{ACTIVE_FLOW_COPY.treatmentLabel} *</Typography>
+                  <TextField
+                    select fullWidth size="small"
+                    value={treatmentInterest}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTreatmentInterest(v);
+                      if (v && !treatments.includes(v)) setTreatments((prev) => [...prev, v]);
+                    }}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="" disabled>Select</MenuItem>
+                    {ACTIVE_FLOW_COPY.treatmentOptions.map((opt) => (
+                      <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+              </Box>
 
-  it("shows 'Step 1 of 3' footer label", () => {
-    renderComponent();
-    expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
-  });
+              {treatments.length > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mb: 3, flexWrap: "wrap" }}>
+                  {treatments.map((t) => (
+                    <Chip
+                      key={t} label={t} size="small"
+                      onDelete={() => setTreatments((prev) => prev.filter((x) => x !== t))}
+                      sx={{
+                        bgcolor: "#FEE2E2", color: "#B91C1C", fontWeight: 600, border: "1px solid #FCA5A5",
+                        "& .MuiChip-deleteIcon": { color: "#B91C1C", "&:hover": { color: "#991B1B" } },
+                      }}
+                    />
+                  ))}
+                </Stack>
+              )}
 
-  it("shows 'Step 2 of 3' footer label on step 2", () => {
-    mockHookValues = { ...baseHook, currentStep: 2 };
-    renderComponent();
-    expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
-  });
+              <Typography sx={sectionLabelStyle}>DOCUMENTS & REPORTS</Typography>
 
-  // ---- Step 2 ----
+              {docsLoading && (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                  <CircularProgress size={14} />
+                  <Typography fontSize="0.78rem" color="text.secondary">Loading saved documents…</Typography>
+                </Box>
+              )}
 
-  it("renders Treatment Interest section on step 2", () => {
-    mockHookValues = { ...baseHook, currentStep: 2 };
-    renderComponent();
-    expect(screen.getByText("TREATMENT INFORMATION")).toBeInTheDocument();
-  });
+              {!docsLoading && existingDocuments.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography sx={{ ...sectionLabelStyle, mb: 1 }}>PREVIOUSLY UPLOADED</Typography>
+                  <Stack spacing={1} sx={{ maxWidth: 470 }}>
+                    {existingDocuments.map((doc, idx) => {
+                      const isPdf = doc.name.toLowerCase().endsWith(".pdf");
+                      const ext = doc.name.split(".").pop()?.toUpperCase() ?? "FILE";
+                      return (
+                        <Box
+                          key={`existing-${idx}`}
+                          sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.25, border: "1px solid #E2E8F0", borderRadius: "10px", bgcolor: "#F8FAFC" }}
+                        >
+                          {isPdf
+                            ? <PictureAsPdfIcon sx={{ fontSize: 28, color: "#EF4444", flexShrink: 0 }} />
+                            : <InsertDriveFileIcon sx={{ fontSize: 28, color: "#6366F1", flexShrink: 0 }} />}
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography fontSize="0.82rem" fontWeight={600} color="#1E293B" noWrap title={doc.name}>{doc.name}</Typography>
+                            <Typography fontSize="0.72rem" color="#94A3B8">{ext} · Saved</Typography>
+                          </Box>
+                          {doc.url && (
+                            <IconButton
+                              size="small" component="a" href={doc.url} target="_blank" rel="noopener noreferrer"
+                              sx={{ color: "#6366F1", flexShrink: 0, "&:hover": { bgcolor: "#EEF2FF" } }}
+                            >
+                              <OpenInNewIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRemoveExistingDocument(idx)}
+                            sx={{ color: "#94A3B8", flexShrink: 0, "&:hover": { color: "#EF4444", bgcolor: "#FEF2F2" } }}
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              )}
 
-  it("renders treatment chips on step 2 when treatments exist", () => {
-    mockHookValues = { ...baseHook, currentStep: 2, treatments: ["IVF", "IUI"] };
-    renderComponent();
-    expect(screen.getByText("IVF")).toBeInTheDocument();
-    expect(screen.getByText("IUI")).toBeInTheDocument();
-  });
+              <Box
+                sx={{
+                  border: "2px dashed #E2E8F0", borderRadius: "10px", p: 3, bgcolor: "#F8FAFC",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, width: 370,
+                }}
+              >
+                <Box sx={{ color: "#94A3B8", fontSize: 36, lineHeight: 1 }}>
+                  <InsertDriveFileIcon sx={{ fontSize: 36 }} />
+                </Box>
+                <Button
+                  variant="contained" component="label"
+                  sx={{ bgcolor: "#64748B", textTransform: "none", borderRadius: "8px", fontWeight: 600, px: 3, "&:hover": { bgcolor: "#475569" } }}
+                >
+                  Choose File
+                  <input type="file" hidden multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif" onChange={handleFileChange} />
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  {documents.length === 0
+                    ? "No File Chosen"
+                    : `${documents.length} new file${documents.length > 1 ? "s" : ""} selected`}
+                </Typography>
+              </Box>
 
-  it("calls setTreatments when a chip delete icon is clicked", () => {
-    mockHookValues = { ...baseHook, currentStep: 2, treatments: ["IVF"] };
-    renderComponent();
-    const deleteIcon = document.querySelector(".MuiChip-deleteIcon")!;
-    fireEvent.click(deleteIcon);
-    expect(mockHookValues.setTreatments).toHaveBeenCalled();
-  });
+              {documents.length > 0 && (
+                <Stack spacing={1} sx={{ mt: 2, width: 470 }}>
+                  <Typography sx={{ ...sectionLabelStyle, mb: 0.5 }}>NEW FILES TO UPLOAD</Typography>
+                  {documents.map((file, idx) => {
+                    const isPdf = file.type === "application/pdf";
+                    const typeLabel = getFileTypeLabel(file);
+                    return (
+                      <Box
+                        key={`${file.name}-${idx}`}
+                        sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.25, border: "1px solid #E2E8F0", borderRadius: "10px", bgcolor: "#FFFFFF" }}
+                      >
+                        {isPdf
+                          ? <PictureAsPdfIcon sx={{ fontSize: 28, color: "#EF4444", flexShrink: 0 }} />
+                          : <InsertDriveFileIcon sx={{ fontSize: 28, color: "#6366F1", flexShrink: 0 }} />}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography fontSize="0.82rem" fontWeight={600} color="#1E293B" noWrap title={file.name}>{file.name}</Typography>
+                          <Typography fontSize="0.72rem" color="#94A3B8">{typeLabel} · {formatBytes(file.size)}</Typography>
+                        </Box>
+                        <IconButton
+                          size="small" onClick={() => handleRemoveDocument(idx)}
+                          sx={{ color: "#94A3B8", flexShrink: 0, "&:hover": { color: "#EF4444", bgcolor: "#FEF2F2" } }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Box>
+          )}
 
-  // ---- Step 3 ----
+          {/* ===== STEP 3 ===== */}
+          {currentStep === 3 && (
+            <Box>
+              <Typography sx={sectionLabelStyle}>APPOINTMENT DETAILS</Typography>
+              <Box sx={{ mb: 1.5 }}>
+                <Typography sx={{ ...labelStyle, mb: 0.5 }}>Want to Book an Appointment?</Typography>
+                <RadioGroup
+                  row value={wantAppointment}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "yes" || val === "no") handleWantAppointmentChange(val);
+                  }}
+                >
+                  <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
+                  <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+                </RadioGroup>
+              </Box>
 
-  it("renders Appointment Details section on step 3", () => {
-    mockHookValues = { ...baseHook, currentStep: 3 };
-    renderComponent();
-    expect(screen.getByText("APPOINTMENT DETAILS")).toBeInTheDocument();
-  });
+              {wantAppointment === "yes" && (
+                <Box>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: IS_MEDICAL_APP ? "repeat(4, 1fr)" : "repeat(3, 1fr)",
+                      gap: 2,
+                      mb: 3,
+                    }}
+                  >
+                    {IS_MEDICAL_APP && (
+                      <Box>
+                        <Typography sx={labelStyle}>Department *</Typography>
+                        <TextField
+                          select fullWidth size="small" value={department}
+                          onChange={(e) => {
+                            setDepartment(e.target.value);
+                            setAppointmentPersonnel("");
+                            setAppointmentPersonnelSearch("");
+                          }}
+                          sx={inputStyle} disabled={loadingDepartments}
+                          InputProps={{
+                            endAdornment: loadingDepartments ? <CircularProgress size={14} sx={{ mr: 1 }} /> : null,
+                          }}
+                        >
+                          <MenuItem value=""><em>-- Select Department --</em></MenuItem>
+                          {departments.map((dept) => (
+                            <MenuItem key={dept.id} value={dept.id.toString()}>{dept.name}</MenuItem>
+                          ))}
+                        </TextField>
+                      </Box>
+                    )}
+                    <Box>
+                      <Typography sx={labelStyle}>Personnel</Typography>
+                      <Autocomplete
+                        options={appointmentPersonnelOptions}
+                        loading={appointmentPersonnelLoading || loadingEmployees}
+                        clearOnBlur={false}
+                        filterOptions={(options) => options}
+                        value={selectedAppointmentPersonnel}
+                        inputValue={appointmentPersonnelSearch}
+                        onInputChange={(_, value, reason) => {
+                          if (reason === "reset") return;
+                          setAppointmentPersonnelSearch(value);
+                          setAppointmentPersonnel("");
+                        }}
+                        onChange={(_, value) => {
+                          setAppointmentPersonnel(value ? String(value.id) : "");
+                          setAppointmentPersonnelSearch(value ? personnelOptionLabel(value) : "");
+                        }}
+                        getOptionLabel={personnelOptionLabel}
+                        isOptionEqualToValue={(o, v) => o.id === v.id}
+                        disabled={loadingEmployees || (IS_MEDICAL_APP && !department)}
+                        noOptionsText={IS_MEDICAL_APP && !department ? "Select department first" : "Type to search personnel"}
+                        renderOption={(props, option) => (
+                          <li {...props} key={option.id}>{personnelOptionLabel(option)}</li>
+                        )}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params} fullWidth size="small" placeholder="Search appointment personnel" sx={inputStyle}
+                            InputProps={{
+                              ...params.InputProps,
+                              endAdornment: (
+                                <>
+                                  {appointmentPersonnelLoading || loadingEmployees
+                                    ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+                                  {params.InputProps.endAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Date *</Typography>
+                      <LocalizationProvider dateAdapter={AdapterDayjs}>
+                        <DatePicker
+                          value={selectedDate} format="DD/MM/YYYY" disablePast
+                          onChange={(val) => handleDateChange(val)}
+                          slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
+                        />
+                      </LocalizationProvider>
+                    </Box>
+                    <Box>
+                      <Typography sx={labelStyle}>Select Slot *</Typography>
+                      <TextField
+                        select fullWidth size="small" value={slot}
+                        onChange={(e) => setSlot(e.target.value)}
+                        sx={inputStyle}
+                        SelectProps={{ native: false, MenuProps: SLOT_MENU_PROPS }}
+                      >
+                        <MenuItem value=""><em>Select Time Slot</em></MenuItem>
+                        {TIME_SLOTS.map((ts) => <MenuItem key={ts} value={ts}>{ts}</MenuItem>)}
+                      </TextField>
+                    </Box>
+                  </Box>
 
-  it("renders Department field on step 3", () => {
-    mockHookValues = { ...baseHook, currentStep: 3 };
-    renderComponent();
-    expect(screen.getByText("Department *")).toBeInTheDocument();
-  });
+                  <Box sx={{ mb: 3 }}>
+                    <Typography sx={labelStyle}>Remark</Typography>
+                    <TextField
+                      fullWidth size="small" multiline rows={2} placeholder="Type Here..."
+                      value={remark} onChange={(e) => setRemark(e.target.value)} sx={inputStyle}
+                    />
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
 
-  it("renders date picker on step 3", () => {
-    mockHookValues = { ...baseHook, currentStep: 3 };
-    renderComponent();
-    expect(screen.getByTestId("date-picker")).toBeInTheDocument();
-  });
-
-  it("renders Remark field on step 3", () => {
-    mockHookValues = { ...baseHook, currentStep: 3 };
-    renderComponent();
-    expect(screen.getByPlaceholderText("Type Here...")).toBeInTheDocument();
-  });
-
-  it("calls setRemark when Remark field is changed", () => {
-    mockHookValues = { ...baseHook, currentStep: 3 };
-    renderComponent();
-    const remarkField = screen.getByPlaceholderText("Type Here...");
-    fireEvent.change(remarkField, { target: { value: "Follow up needed" } });
-    expect(mockHookValues.setRemark).toHaveBeenCalledWith("Follow up needed");
-  });
-
-  // ---- Success toast ----
-
-  it("renders success toast when showSuccess is true", () => {
-    mockHookValues = { ...baseHook, showSuccess: true };
-    renderComponent();
-    expect(screen.getByText("Saved Successfully!")).toBeInTheDocument();
-  });
-
-  it("does not render success toast when showSuccess is false", () => {
-    renderComponent();
-    // MUI <Fade in={false}> keeps children in the DOM but sets visibility:hidden / opacity:0
-    // So we check the element is not visible rather than not in the DOM
-    const toast = screen.queryByText("Saved Successfully!");
-    if (toast) {
-      // If rendered, its ancestor Fade wrapper must be hidden (opacity 0 / not visible)
-      const wrapper = toast.closest("[style]") as HTMLElement | null;
-      const style = wrapper?.getAttribute("style") ?? "";
-      expect(style).toMatch(/opacity:\s*0|visibility:\s*hidden/);
-    }
-    // If not in DOM at all, the test also passes
-  });
-});
+        {/* ── Footer ── */}
+        <Box
+          sx={{
+            bgcolor: "white", p: 3,
+            display: "flex", justifyContent: "flex-end", gap: 2,
+            borderTop: "1px solid #F1F5F9",
+          }}
+        >
+          <Button
+            onClick={() => navigate("/leads")} disabled={saving}
+            sx={{ textTransform: "none", color: "#64748B", fontWeight: 700, px: 3 }}
+          >
+            Cancel
+          </Button>
+          {currentStep > 1 && (
+            <Button
+              onClick={() => setCurrentStep((s) => s - 1)} variant="outlined" disabled={saving}
+              sx={{ textTransform: "none", borderColor: "#E2E8F0", color: "#1E293B", fontWeight: 700, px: 3, "&:hover": { borderColor: "#CBD5E1" } }}
+            >
+              Back
+            </Button>
+          )}
+          {currentStep < TOTAL_STEPS ? (
+            <Button
+              onClick={() => setCurrentStep((s) => s + 1)} variant="contained" disabled={saving}
+              sx={{ bgcolor: "#334155", textTransform: "none", fontWeight: 700, px: 4, "&:hover": { bgcolor: "#1E293B" } }}
+            >
+              Next
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSave} variant="contained" disabled={saving || !canEditLeads}
+              sx={{ bgcolor: "#334155", textTransform: "none", fontWeight: 700, px: 4, minWidth: "100px", "&:hover": { bgcolor: "#1E293B" } }}
+            >
+              {saving ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Save"}
+            </Button>
+          )}
+        </Box>
+      </Paper>
+    </Box>
+  );
+}

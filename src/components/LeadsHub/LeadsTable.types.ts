@@ -10,6 +10,7 @@ export interface RawLead {
   next_action_description?: string;
   next_action_status?: string;
   next_action_type?: string;
+  action_status?: string;
   task_type?: string;
   nextActionType?: string;
   taskType?: string;
