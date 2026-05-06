@@ -18,6 +18,7 @@ import { NewSMSTemplateForm } from "./NewSMSTemplateForm";
 import { NewWhatsAppTemplateForm } from "./NewWhatsAppTemplateForm";
 import TemplateService, { type APITemplateType } from "../../../services/templates.api";
 import type { EmailTemplate, SMSTemplate, WhatsAppTemplate } from '../../../types/templates.types';
+import type { UseCase } from "../../../services/usecase.api"; // ✅ ADDED
 
 interface ModalProps {
   open: boolean;
@@ -25,6 +26,8 @@ interface ModalProps {
   onSave: (template: unknown) => void | Promise<void>;
   initialData?: EmailTemplate | SMSTemplate | WhatsAppTemplate | undefined;
   mode: "create" | "edit" | "view";
+  useCases?: UseCase[];           // ✅ ADDED
+  onUseCaseCreated?: () => void;  // ✅ ADDED
 }
 
 export const NewTemplateModal: React.FC<ModalProps> = ({
@@ -33,6 +36,8 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
   onSave,
   initialData,
   mode,
+  useCases = [],          // ✅ ADDED
+  onUseCaseCreated,       // ✅ ADDED
 }) => {
   const [view, setView] = useState<"select" | "email" | "sms" | "whatsapp">("select");
   const [loading, setLoading] = useState(false);
@@ -264,7 +269,14 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay}
-        <NewEmailTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={resolvedInitialData as EmailTemplate | undefined} mode={mode} />
+        <NewEmailTemplateForm
+          onClose={handleClose}
+          onSave={handleFormSave}
+          initialData={resolvedInitialData as EmailTemplate | undefined}
+          mode={mode}
+          useCases={useCases}                  // ✅ ADDED
+          onUseCaseCreated={onUseCaseCreated}  // ✅ ADDED
+        />
       </Dialog>
     );
   }

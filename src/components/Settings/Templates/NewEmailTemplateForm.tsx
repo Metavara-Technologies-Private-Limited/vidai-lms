@@ -43,6 +43,7 @@ import type { EmailTemplate } from '../../../types/tickets.types';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { selectClinic } from '../../../store/clinicSlice';
+import type { UseCase } from '../../../services/usecase.api'; // ✅ ADDED
 
 const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
 const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1000;
@@ -110,37 +111,16 @@ const BlockStyleExtension = Extension.create({
   },
 });
 
-export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onClose, onSave, initialData, mode }) => {
+// ✅ ADDED: extend props type to accept useCases and onUseCaseCreated
+interface NewEmailTemplateFormExtendedProps extends NewEmailTemplateFormProps {
+  useCases?: UseCase[];
+  onUseCaseCreated?: () => void;
+}
+
+export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> = ({ onClose, onSave, initialData, mode, useCases = [] }) => { // ✅ ADDED useCases = []
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
   const isViewOnly = mode === 'view';
-
-  // Get clinic ID from various possible sources
-  // const getClinicId = (): number => {
-  //   // Try localStorage first
-  //   const storedClinicId = localStorage.getItem("clinic_id");
-  //   if (storedClinicId) return parseInt(storedClinicId, 10);
-    
-  //   // Try from user data
-  //   const userData = localStorage.getItem("user");
-  //   if (userData) {
-  //     try {
-  //       const user = JSON.parse(userData);
-  //       if (user.clinic_id) return user.clinic_id;
-  //     } catch (err) {
-  //       console.error("Failed to parse user data", err);
-  //     }
-  //   }
-    
-  //   // Try from initial data
-  //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //   const formData = initialData as any;
-  //   if (formData?.clinic) return formData.clinic;
-    
-  //   // Default fallback - you should replace this with actual clinic ID
-  //   console.warn("No clinic ID found, using default. Please set clinic_id in localStorage or context.");
-  //   return 1;
-  // };
 
   // Normalize useCase to match MenuItem values (capitalize first letter)
   // Also handles API responses that might come in different formats
@@ -561,9 +541,13 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
   };
 
   // ─── ONLY CHANGE: pass uploadedFiles as second argument ──────────────────────
-  // NewTemplateModal.handleFormSaveWithFiles(payload, files) receives both,
-  // saves the template first (gets id back), then POSTs each file to
-  // POST /api/templates/mail/{id}/documents/ → inserts into restapi_template_mail_document
+  // Form components call: onSave(payload, files?)
+  // This function:
+  //   1. Validates template name
+  //   2. Calls createTemplate/updateTemplate → gets response WITH id
+  //   3. If files present, POSTs each to /templates/{type}/{id}/documents/
+  //      which inserts rows into restapi_template_mail_document
+  //   4. Calls parent onSave(response) → triggers loadTemplates()
   const handleSave = async () => {
     if (!formData.name.trim()) {
       toast.error('Name filed is mandtory', { toastId: 'template-name-required' });
@@ -607,8 +591,6 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
       toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
       return;
     }
-
-    // const clinicId = getClinicId();
 
     const apiPayload = {
       name: formData.name,
@@ -665,6 +647,17 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
 
   const openColorPicker = Boolean(colorAnchor);
 
+  // ✅ ADDED: derive use case color styles for dynamic items (mirrors original hardcoded logic)
+  const getUseCaseChipStyle = (name: string) => {
+    const lower = name.trim().toLowerCase();
+    if (lower === 'appointment') return { color: '#16A34A', bgcolor: '#F0FDF4' };
+    if (lower === 'follow-up' || lower === 'followup') return { color: '#3B82F6', bgcolor: '#EFF6FF' };
+    if (lower === 'reminder') return { color: '#D97706', bgcolor: '#FFFBEB' };
+    if (lower === 're-engagement' || lower === 'reengagement') return { color: '#7C3AED', bgcolor: '#F5F3FF' };
+    if (lower === 'feedback') return { color: '#EA580C', bgcolor: '#FFF7ED' };
+    return { color: '#6B7280', bgcolor: '#F9FAFB' };
+  };
+
   return (
     <Box sx={{ width: '100%', bgcolor: 'white', borderRadius: '12px' }}>
       {/* Header */}
@@ -719,7 +712,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
           />
         </Box>
 
-        {/* Use Case */}
+        {/* Use Case - ✅ CHANGED: dynamic items from useCases prop instead of hardcoded */}
         <Box sx={{ mb: 2.5 }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
             Use Case
@@ -742,45 +735,40 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormProps> = ({ onCl
             <MenuItem value="" disabled>
               <Box component="span" sx={{ color: '#9CA3AF', fontSize: '14px' }}>Select Use Case</Box>
             </MenuItem>
-            <MenuItem value="Appointment">
-               <Box component="span" sx={{ 
-                 color: '#16A34A', 
-                 bgcolor: '#F0FDF4', 
-                 px: 1.5, 
-                 py: 0.5, 
-                 borderRadius: '4px', 
-                 fontSize: '12px', 
-                 fontWeight: 600 
-               }}>
-                 Appointment
-               </Box>
-            </MenuItem>
-            <MenuItem value="Follow-up">
-               <Box component="span" sx={{ 
-                 color: '#3B82F6', 
-                 bgcolor: '#EFF6FF', 
-                 px: 1.5, 
-                 py: 0.5, 
-                 borderRadius: '4px', 
-                 fontSize: '12px', 
-                 fontWeight: 600 
-               }}>
-                 Follow-up
-               </Box>
-            </MenuItem>
-            <MenuItem value="Reminder">
-               <Box component="span" sx={{ 
-                 color: '#D97706', 
-                 bgcolor: '#FFFBEB', 
-                 px: 1.5, 
-                 py: 0.5, 
-                 borderRadius: '4px', 
-                 fontSize: '12px', 
-                 fontWeight: 600 
-               }}>
-                 Reminder
-               </Box>
-            </MenuItem>
+            {/* ✅ CHANGED: render from API; falls back gracefully to empty if no useCases loaded */}
+            {useCases.length > 0 ? (
+              useCases.map((uc) => {
+                const chipStyle = getUseCaseChipStyle(uc.name);
+                return (
+                  <MenuItem key={uc.id} value={uc.name}>
+                    <Box component="span" sx={{
+                      color: chipStyle.color,
+                      bgcolor: chipStyle.bgcolor,
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}>
+                      {uc.name}
+                    </Box>
+                  </MenuItem>
+                );
+              })
+            ) : (
+              // ✅ Fallback: show hardcoded options if API hasn't loaded yet
+              <>
+                <MenuItem value="Appointment">
+                  <Box component="span" sx={{ color: '#16A34A', bgcolor: '#F0FDF4', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>Appointment</Box>
+                </MenuItem>
+                <MenuItem value="Follow-up">
+                  <Box component="span" sx={{ color: '#3B82F6', bgcolor: '#EFF6FF', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>Follow-up</Box>
+                </MenuItem>
+                <MenuItem value="Reminder">
+                  <Box component="span" sx={{ color: '#D97706', bgcolor: '#FFFBEB', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>Reminder</Box>
+                </MenuItem>
+              </>
+            )}
           </Select>
         </Box>
 

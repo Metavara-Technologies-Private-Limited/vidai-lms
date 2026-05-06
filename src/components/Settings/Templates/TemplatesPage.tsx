@@ -21,6 +21,7 @@ import {
   hasAnySubcategoryActionPermission,
   resolveUserRole,
 } from "../../../utils/roleAccess";
+import UseCaseService, { type UseCase } from "../../../services/usecase.api"; // ✅ ADDED
 
 const TemplateHeader = lazy(() =>
   import("./TemplateHeader").then((module) => ({
@@ -88,6 +89,8 @@ const TemplatesPage: React.FC = () => {
     whatsapp: [],
   });
 
+  const [useCases, setUseCases] = useState<UseCase[]>([]); // ✅ ADDED
+
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
   const [viewMode, setViewMode] = useState<"create" | "edit" | "view">(
     "create",
@@ -153,9 +156,22 @@ const TemplatesPage: React.FC = () => {
     }
   }, [canViewTemplates]);
 
+  // ✅ ADDED: fetch use cases for the current clinic
+  const loadUseCases = useCallback(async () => {
+    if (!clinic?.id) return;
+    try {
+      const data = await UseCaseService.getUseCases(clinic.id);
+      setUseCases(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to fetch use cases:", error);
+    }
+  }, [clinic?.id]);
+
   useEffect(() => {
     loadTemplates();
   }, [loadTemplates, clinic?.id]);
+
+  useEffect(() => { loadUseCases(); }, [loadUseCases]); // ✅ ADDED
 
   const getFilteredData = () => {
     const currentType = getApiType(activeTab);
@@ -334,6 +350,8 @@ const TemplatesPage: React.FC = () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             initialData={(activeTemplate as any) || undefined}
             mode={viewMode}
+            useCases={useCases}         // ✅ ADDED
+            onUseCaseCreated={loadUseCases} // ✅ ADDED
           />
         </Suspense>
       )}
