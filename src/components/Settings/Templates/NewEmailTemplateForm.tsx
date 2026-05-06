@@ -45,7 +45,7 @@ import { toast } from 'react-toastify';
 import { selectClinic } from '../../../store/clinicSlice';
 import type { UseCase } from '../../../services/usecase.api'; // ✅ ADDED
 
-const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
+const TEMPLATE_NAME_REGEX = /^[A-Za-z\s-]*$/;
 const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1000;
 const SUBJECT_MUST_CONTAIN_LETTER_REGEX = /[A-Za-z]/;
 
@@ -663,215 +663,317 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
   };
 
   return (
-    <Box sx={{ width: '100%', bgcolor: 'white', borderRadius: '12px' }}>
+    <Box sx={{ width: "100%", bgcolor: "white", borderRadius: "12px" }}>
       {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        p: 2.5, 
-        borderBottom: '1px solid #E5E7EB' 
-      }}>
-        <Typography sx={{ fontSize: '18px', fontWeight: 600, color: '#111827' }}>
-          {isViewOnly ? 'View Email Template' : mode === 'edit' ? 'Edit Email Template' : 'New Email Template'}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          p: 2.5,
+          borderBottom: "1px solid #E5E7EB",
+        }}
+      >
+        <Typography
+          sx={{ fontSize: "18px", fontWeight: 600, color: "#111827" }}
+        >
+          {isViewOnly
+            ? "View Email Template"
+            : mode === "edit"
+              ? "Edit Email Template"
+              : "New Email Template"}
         </Typography>
-        <IconButton onClick={onClose} size="small" sx={{ color: '#6B7280' }}>
+        <IconButton onClick={onClose} size="small" sx={{ color: "#6B7280" }}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
 
       {/* Body */}
-      <Box sx={{ p: 3, maxHeight: '70vh', overflowY: 'auto' }}>
+      <Box sx={{ p: 3, maxHeight: "70vh", overflowY: "auto" }}>
         {/* Name Field */}
         <Box sx={{ mb: 2.5 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
-            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 0.75,
+            }}
+          >
+            <Typography
+              sx={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}
+            >
               Name
             </Typography>
-            <Typography sx={{ fontSize: '11px', color: formData.name.length >= 50 ? '#EF4444' : '#9CA3AF' }}>
+            <Typography
+              sx={{
+                fontSize: "11px",
+                color: formData.name.length >= 50 ? "#EF4444" : "#9CA3AF",
+              }}
+            >
               {formData.name.length}/50
             </Typography>
           </Box>
-          <TextField 
-            fullWidth 
-            size="small" 
+          <TextField
+            fullWidth
+            size="small"
             value={formData.name}
             disabled={isViewOnly}
             inputProps={{ maxLength: 50 }}
             onChange={(e) => {
               const value = e.target.value;
               if (!TEMPLATE_NAME_REGEX.test(value)) {
-                toast.error('Template name contain only alphbets', { toastId: 'template-name-alpha' });
+                toast.error(
+                  "Template name can only contain letters, spaces, and hyphens",
+                  { toastId: "template-name-alpha" },
+                );
                 return;
               }
               setFormData({ ...formData, name: value });
             }}
-            sx={{ 
-              '& .MuiOutlinedInput-root': {
-                fontSize: '14px',
-                bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
-                '& fieldset': { borderColor: formData.name.length >= 50 ? '#EF4444' : '#E5E7EB' }
-              }
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                fontSize: "14px",
+                bgcolor: isViewOnly ? "#F9FAFB" : "#fff",
+                "& fieldset": {
+                  borderColor:
+                    formData.name.length >= 50 ? "#EF4444" : "#E5E7EB",
+                },
+              },
             }}
           />
         </Box>
 
         {/* Use Case - ✅ CHANGED: dynamic items from useCases prop instead of hardcoded */}
         <Box sx={{ mb: 2.5 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+          <Typography
+            sx={{
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "#374151",
+              mb: 0.75,
+            }}
+          >
             Use Case
           </Typography>
-          <Select 
-            fullWidth 
-            size="small" 
+          <Select
+            fullWidth
+            size="small"
             value={formData.use_case}
             displayEmpty
             disabled={isViewOnly}
-            onChange={(e) => { setFormData({
-              ...formData,
-              use_case: e.target.value,
-            }); }}
+            onChange={(e) => {
+              setFormData({
+                ...formData,
+                use_case: e.target.value,
+              });
+            }}
             IconComponent={KeyboardArrowDownIcon}
-            sx={{ 
-              fontSize: '14px',
-              borderRadius: '6px', 
-              bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
-              '& fieldset': { borderColor: '#E5E7EB' }
+            sx={{
+              fontSize: "14px",
+              borderRadius: "6px",
+              bgcolor: isViewOnly ? "#F9FAFB" : "#fff",
+              "& fieldset": { borderColor: "#E5E7EB" },
             }}
           >
             <MenuItem value="" disabled>
-              <Box component="span" sx={{ color: '#9CA3AF', fontSize: '14px' }}>Select Use Case</Box>
+              <Box component="span" sx={{ color: "#9CA3AF", fontSize: "14px" }}>
+                Select Use Case
+              </Box>
             </MenuItem>
             {/* ✅ CHANGED: render from API; falls back gracefully to empty if no useCases loaded */}
-            {useCases.length > 0 ? (
-              useCases.map((uc) => {
-                const chipStyle = getUseCaseChipStyle(uc.name);
-                return (
-                  <MenuItem key={uc.id} value={uc.id}>
-                    <Box
-                      component="span"
-                      sx={{
-                        color: chipStyle.color,
-                        bgcolor: chipStyle.bgcolor,
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: "4px",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {uc.name}
-                    </Box>
-                  </MenuItem>
-                );
-              })
-            ) : (
-              // ✅ Fallback: show hardcoded options if API hasn't loaded yet
-              <>
-                <MenuItem value="Appointment">
-                  <Box component="span" sx={{ color: '#16A34A', bgcolor: '#F0FDF4', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>Appointment</Box>
+            {useCases.map((uc) => {
+              const chipStyle = getUseCaseChipStyle(uc.name);
+              return (
+                <MenuItem key={uc.id} value={uc.id}>
+                  <Box
+                    component="span"
+                    sx={{
+                      color: chipStyle.color,
+                      bgcolor: chipStyle.bgcolor,
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {uc.name}
+                  </Box>
                 </MenuItem>
-                <MenuItem value="Follow-up">
-                  <Box component="span" sx={{ color: '#3B82F6', bgcolor: '#EFF6FF', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>Follow-up</Box>
-                </MenuItem>
-                <MenuItem value="Reminder">
-                  <Box component="span" sx={{ color: '#D97706', bgcolor: '#FFFBEB', px: 1.5, py: 0.5, borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>Reminder</Box>
-                </MenuItem>
-              </>
-            )}
+              );
+            })}
           </Select>
         </Box>
 
         {/* Subject Field */}
         <Box sx={{ mb: 2.5 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
-            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 0.75,
+            }}
+          >
+            <Typography
+              sx={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}
+            >
               Subject
             </Typography>
-            <Typography sx={{ fontSize: '11px', color: formData.subject.length > 150 ? '#EF4444' : '#9CA3AF' }}>
+            <Typography
+              sx={{
+                fontSize: "11px",
+                color: formData.subject.length > 150 ? "#EF4444" : "#9CA3AF",
+              }}
+            >
               {formData.subject.length}/150
             </Typography>
           </Box>
-          <TextField 
-            fullWidth 
-            size="small" 
+          <TextField
+            fullWidth
+            size="small"
             value={formData.subject}
             disabled={isViewOnly}
             inputProps={{ maxLength: 150 }}
-            onChange={(e) => { setFormData({ ...formData, subject: e.target.value }); }}
-            sx={{ 
-              '& .MuiOutlinedInput-root': {
-                fontSize: '14px',
-                bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
-                '& fieldset': { borderColor: formData.subject.length >= 150 ? '#EF4444' : '#E5E7EB' }
-              }
+            onChange={(e) => {
+              setFormData({ ...formData, subject: e.target.value });
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                fontSize: "14px",
+                bgcolor: isViewOnly ? "#F9FAFB" : "#fff",
+                "& fieldset": {
+                  borderColor:
+                    formData.subject.length >= 150 ? "#EF4444" : "#E5E7EB",
+                },
+              },
             }}
           />
         </Box>
 
         {/* Body Editor */}
         <Box sx={{ mb: 2.5 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
-            <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 0.75,
+            }}
+          >
+            <Typography
+              sx={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}
+            >
               Body
             </Typography>
-            <Typography sx={{ fontSize: '11px', color: (editor?.getText().length ?? 0) > MAX_EMAIL_TEMPLATE_BODY_LENGTH ? '#EF4444' : '#9CA3AF' }}>
+            <Typography
+              sx={{
+                fontSize: "11px",
+                color:
+                  (editor?.getText().length ?? 0) >
+                  MAX_EMAIL_TEMPLATE_BODY_LENGTH
+                    ? "#EF4444"
+                    : "#9CA3AF",
+              }}
+            >
               {editor?.getText().length ?? 0}/{MAX_EMAIL_TEMPLATE_BODY_LENGTH}
             </Typography>
           </Box>
           <Box
-            sx={{ 
-              border: '1px solid #E5E7EB', 
-              borderRadius: '8px',
-              bgcolor: isViewOnly ? '#F9FAFB' : '#fff',
-            }}>
+            sx={{
+              border: "1px solid #E5E7EB",
+              borderRadius: "8px",
+              bgcolor: isViewOnly ? "#F9FAFB" : "#fff",
+            }}
+          >
             {/* Editor Content */}
-            <Box sx={{
-              '& .ProseMirror': {
-                minHeight: '200px',
-                maxHeight: '300px',
-                overflowY: 'auto',
-                padding: '12px 16px',
-                outline: 'none',
-                fontSize: '13px',
-                lineHeight: 1.6,
-                color: '#374151',
-                '& p': { margin: '0 0 4px 0' },
-                '& h1': { fontSize: '2rem', fontWeight: 700, margin: '8px 0' },
-                '& h2': { fontSize: '1.5rem', fontWeight: 600, margin: '8px 0' },
-                '& ul': { listStyleType: 'disc', paddingLeft: '20px', margin: '4px 0' },
-                '& ol': { listStyleType: 'decimal', paddingLeft: '20px', margin: '4px 0' },
-                '& li': { display: 'list-item' },
-                '& li p': { margin: 0 },
-                '& blockquote': {
-                  borderLeft: '3px solid #D1D5DB',
-                  margin: '8px 0',
-                  paddingLeft: '12px',
-                  color: '#4B5563',
+            <Box
+              sx={{
+                "& .ProseMirror": {
+                  minHeight: "200px",
+                  maxHeight: "300px",
+                  overflowY: "auto",
+                  padding: "12px 16px",
+                  outline: "none",
+                  fontSize: "13px",
+                  lineHeight: 1.6,
+                  color: "#374151",
+                  "& p": { margin: "0 0 4px 0" },
+                  "& h1": {
+                    fontSize: "2rem",
+                    fontWeight: 700,
+                    margin: "8px 0",
+                  },
+                  "& h2": {
+                    fontSize: "1.5rem",
+                    fontWeight: 600,
+                    margin: "8px 0",
+                  },
+                  "& ul": {
+                    listStyleType: "disc",
+                    paddingLeft: "20px",
+                    margin: "4px 0",
+                  },
+                  "& ol": {
+                    listStyleType: "decimal",
+                    paddingLeft: "20px",
+                    margin: "4px 0",
+                  },
+                  "& li": { display: "list-item" },
+                  "& li p": { margin: 0 },
+                  "& blockquote": {
+                    borderLeft: "3px solid #D1D5DB",
+                    margin: "8px 0",
+                    paddingLeft: "12px",
+                    color: "#4B5563",
+                  },
+                  "& a": { color: "#6366F1", textDecoration: "underline" },
+                  "& img": {
+                    maxWidth: "100%",
+                    height: "auto",
+                    borderRadius: "4px",
+                  },
                 },
-                '& a': { color: '#6366F1', textDecoration: 'underline' },
-                '& img': { maxWidth: '100%', height: 'auto', borderRadius: '4px' },
-              }
-            }}>
+              }}
+            >
               <EditorContent editor={editor} />
             </Box>
 
             {/* Toolbar - First Row */}
             {!isViewOnly && (
               <>
-                <Box sx={{
-                  display: 'flex',
-                  gap: 0.5,
-                  p: 1,
-                  borderTop: '1px solid #E5E7EB',
-                  bgcolor: '#FAFBFC',
-                  flexWrap: 'wrap'
-                }}>
-                  <IconButton title="Undo" aria-label="Undo" size="small" onMouseDown={keepSelection} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} sx={{ p: 0.5 }}>
-                    <UndoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 0.5,
+                    p: 1,
+                    borderTop: "1px solid #E5E7EB",
+                    bgcolor: "#FAFBFC",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <IconButton
+                    title="Undo"
+                    aria-label="Undo"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().undo().run()}
+                    disabled={!editor.can().undo()}
+                    sx={{ p: 0.5 }}
+                  >
+                    <UndoIcon sx={{ fontSize: 18, color: "#6B7280" }} />
                   </IconButton>
-                  <IconButton title="Redo" aria-label="Redo" size="small" onMouseDown={keepSelection} onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} sx={{ p: 0.5 }}>
-                    <RedoIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                  <IconButton
+                    title="Redo"
+                    aria-label="Redo"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => editor.chain().focus().redo().run()}
+                    disabled={!editor.can().redo()}
+                    sx={{ p: 0.5 }}
+                  >
+                    <RedoIcon sx={{ fontSize: 18, color: "#6B7280" }} />
                   </IconButton>
 
                   {/* Font family selector */}
@@ -879,20 +981,47 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     size="small"
                     value={currentFont}
                     onChange={(e) => handleFontChange(e.target.value as string)}
-                    sx={{ width: 120, height: 28, fontSize: '12px', ml: 1, '& fieldset': { border: 'none' } }}
+                    sx={{
+                      width: 120,
+                      height: 28,
+                      fontSize: "12px",
+                      ml: 1,
+                      "& fieldset": { border: "none" },
+                    }}
                   >
-                    <MenuItem value="Nunito" sx={{ fontFamily: 'Nunito' }}>Nunito</MenuItem>
-                    <MenuItem value="Arial" sx={{ fontFamily: 'Arial' }}>Arial</MenuItem>
-                    <MenuItem value="Times New Roman" sx={{ fontFamily: 'Times New Roman' }}>Times New Roman</MenuItem>
-                    <MenuItem value="Courier New" sx={{ fontFamily: 'Courier New' }}>Courier New</MenuItem>
+                    <MenuItem value="Nunito" sx={{ fontFamily: "Nunito" }}>
+                      Nunito
+                    </MenuItem>
+                    <MenuItem value="Arial" sx={{ fontFamily: "Arial" }}>
+                      Arial
+                    </MenuItem>
+                    <MenuItem
+                      value="Times New Roman"
+                      sx={{ fontFamily: "Times New Roman" }}
+                    >
+                      Times New Roman
+                    </MenuItem>
+                    <MenuItem
+                      value="Courier New"
+                      sx={{ fontFamily: "Courier New" }}
+                    >
+                      Courier New
+                    </MenuItem>
                   </Select>
 
                   {/* Size / Heading selector */}
                   <Select
                     size="small"
                     value={currentHeading}
-                    onChange={(e) => handleHeadingChange(e.target.value as 'Tt' | 'H1' | 'H2')}
-                    sx={{ width: 60, height: 28, fontSize: '12px', '& fieldset': { border: 'none' } }}
+                    onChange={(e) =>
+                      handleHeadingChange(e.target.value as "Tt" | "H1" | "H2")
+                    }
+                    sx={{
+                      width: 60,
+                      height: 28,
+                      fontSize: "12px",
+                      "& fieldset": { border: "none" },
+                    }}
                   >
                     <MenuItem value="Tt">Tt</MenuItem>
                     <MenuItem value="H1">H1</MenuItem>
@@ -905,10 +1034,15 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     size="small"
                     onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleBold().run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('bold') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('bold')}
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("bold")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive("bold")}
                   >
-                    <FormatBoldIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatBoldIcon sx={{ fontSize: 18, color: "#374151" }} />
                   </IconButton>
 
                   <IconButton
@@ -917,10 +1051,15 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     size="small"
                     onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleItalic().run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('italic') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('italic')}
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("italic")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive("italic")}
                   >
-                    <FormatItalicIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatItalicIcon sx={{ fontSize: 18, color: "#374151" }} />
                   </IconButton>
 
                   <IconButton
@@ -928,11 +1067,20 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     aria-label="Underline"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().toggleUnderline().run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('underline') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('underline')}
+                    onClick={() =>
+                      editor.chain().focus().toggleUnderline().run()
+                    }
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("underline")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive("underline")}
                   >
-                    <FormatUnderlinedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatUnderlinedIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
 
                   <IconButton
@@ -941,10 +1089,17 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     size="small"
                     onMouseDown={keepSelection}
                     onClick={() => editor.chain().focus().toggleStrike().run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('strike') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('strike')}
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("strike")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive("strike")}
                   >
-                    <StrikethroughSIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <StrikethroughSIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
 
                   <IconButton
@@ -953,9 +1108,16 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     size="small"
                     onMouseDown={keepSelection}
                     onClick={handleColorClick}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('textStyle') ? '#E5E7EB' : 'transparent' }}
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("textStyle")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
                   >
-                    <FormatColorTextIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatColorTextIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
 
                   <IconButton
@@ -963,44 +1125,80 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     aria-label="Align Left"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().setTextAlign('left').run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'left' }) ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive({ textAlign: 'left' })}
+                    onClick={() =>
+                      editor.chain().focus().setTextAlign("left").run()
+                    }
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive({ textAlign: "left" })
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive({ textAlign: "left" })}
                   >
-                    <FormatAlignLeftIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatAlignLeftIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
                   <IconButton
                     title="Align Center"
                     aria-label="Align Center"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().setTextAlign('center').run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'center' }) ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive({ textAlign: 'center' })}
+                    onClick={() =>
+                      editor.chain().focus().setTextAlign("center").run()
+                    }
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive({ textAlign: "center" })
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive({ textAlign: "center" })}
                   >
-                    <FormatAlignCenterIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatAlignCenterIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
                   <IconButton
                     title="Align Right"
                     aria-label="Align Right"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().setTextAlign('right').run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'right' }) ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive({ textAlign: 'right' })}
+                    onClick={() =>
+                      editor.chain().focus().setTextAlign("right").run()
+                    }
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive({ textAlign: "right" })
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive({ textAlign: "right" })}
                   >
-                    <FormatAlignRightIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatAlignRightIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
                   <IconButton
                     title="Justify"
                     aria-label="Justify"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive({ textAlign: 'justify' }) ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive({ textAlign: 'justify' })}
+                    onClick={() =>
+                      editor.chain().focus().setTextAlign("justify").run()
+                    }
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive({ textAlign: "justify" })
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive({ textAlign: "justify" })}
                   >
-                    <FormatAlignJustifyIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatAlignJustifyIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
 
                   <IconButton
@@ -1008,22 +1206,40 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     aria-label="Bulleted List"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().toggleBulletList().run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('bulletList') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('bulletList')}
+                    onClick={() =>
+                      editor.chain().focus().toggleBulletList().run()
+                    }
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("bulletList")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive("bulletList")}
                   >
-                    <FormatListBulletedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatListBulletedIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
                   <IconButton
                     title="Numbered List"
                     aria-label="Numbered List"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('orderedList') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('orderedList')}
+                    onClick={() =>
+                      editor.chain().focus().toggleOrderedList().run()
+                    }
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("orderedList")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive("orderedList")}
                   >
-                    <FormatListNumberedIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatListNumberedIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
 
                   {/* Indent controls */}
@@ -1035,7 +1251,9 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     onClick={() => adjustIndent(-20)}
                     sx={{ p: 0.5 }}
                   >
-                    <FormatIndentDecreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatIndentDecreaseIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
                   <IconButton
                     title="Increase Indent"
@@ -1045,7 +1263,9 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     onClick={() => adjustIndent(20)}
                     sx={{ p: 0.5 }}
                   >
-                    <FormatIndentIncreaseIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatIndentIncreaseIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
 
                   <IconButton
@@ -1055,42 +1275,73 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     onMouseDown={keepSelection}
                     onClick={() => {
                       const { from, to } = editor.state.selection;
-                      const selectedText = editor.state.doc.textBetween(from, to, '');
+                      const selectedText = editor.state.doc.textBetween(
+                        from,
+                        to,
+                        "",
+                      );
                       if (selectedText) {
-                        editor.chain().focus().insertContentAt({ from, to }, `\u201c${selectedText}\u201d`).run();
+                        editor
+                          .chain()
+                          .focus()
+                          .insertContentAt(
+                            { from, to },
+                            `\u201c${selectedText}\u201d`,
+                          )
+                          .run();
                       } else {
-                        editor.chain().focus().insertContent('\u201c\u201d').run();
+                        editor
+                          .chain()
+                          .focus()
+                          .insertContent("\u201c\u201d")
+                          .run();
                       }
                     }}
                     sx={{ p: 0.5 }}
                   >
-                    <FormatQuoteIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <FormatQuoteIcon sx={{ fontSize: 18, color: "#374151" }} />
                   </IconButton>
                   <IconButton
                     title="Code Block"
                     aria-label="Code Block"
                     size="small"
                     onMouseDown={keepSelection}
-                    onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('codeBlock') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('codeBlock')}
+                    onClick={() =>
+                      editor.chain().focus().toggleCodeBlock().run()
+                    }
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("codeBlock")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive("codeBlock")}
                   >
-                    <CodeIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <CodeIcon sx={{ fontSize: 18, color: "#374151" }} />
                   </IconButton>
                 </Box>
 
                 {/* Toolbar - Second Row */}
-                <Box sx={{
-                  display: 'flex',
-                  gap: 0.5,
-                  px: 1,
-                  pb: 1,
-                  bgcolor: '#FAFBFC',
-                  borderBottomLeftRadius: '8px',
-                  borderBottomRightRadius: '8px'
-                }}>
-                  <IconButton title="Attach File" aria-label="Attach File" size="small" onMouseDown={keepSelection} onClick={() => fileInputRef.current?.click()} sx={{ p: 0.5 }}>
-                    <AttachFileIcon sx={{ fontSize: 18, color: '#374151' }} />
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 0.5,
+                    px: 1,
+                    pb: 1,
+                    bgcolor: "#FAFBFC",
+                    borderBottomLeftRadius: "8px",
+                    borderBottomRightRadius: "8px",
+                  }}
+                >
+                  <IconButton
+                    title="Attach File"
+                    aria-label="Attach File"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={() => fileInputRef.current?.click()}
+                    sx={{ p: 0.5 }}
+                  >
+                    <AttachFileIcon sx={{ fontSize: 18, color: "#374151" }} />
                   </IconButton>
                   <IconButton
                     title="Insert Link"
@@ -1098,16 +1349,37 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                     size="small"
                     onMouseDown={keepSelection}
                     onClick={addLink}
-                    sx={{ p: 0.5, bgcolor: editor.isActive('link') ? '#E5E7EB' : 'transparent' }}
-                    aria-pressed={editor.isActive('link')}
+                    sx={{
+                      p: 0.5,
+                      bgcolor: editor.isActive("link")
+                        ? "#E5E7EB"
+                        : "transparent",
+                    }}
+                    aria-pressed={editor.isActive("link")}
                   >
-                    <LinkIcon sx={{ fontSize: 18, color: '#374151' }} />
+                    <LinkIcon sx={{ fontSize: 18, color: "#374151" }} />
                   </IconButton>
-                  <IconButton title="Insert Emoji" aria-label="Insert Emoji" size="small" onMouseDown={keepSelection} onClick={handleEmojiClick} sx={{ p: 0.5 }}>
-                    <EmojiEmotionsIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  <IconButton
+                    title="Insert Emoji"
+                    aria-label="Insert Emoji"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={handleEmojiClick}
+                    sx={{ p: 0.5 }}
+                  >
+                    <EmojiEmotionsIcon
+                      sx={{ fontSize: 18, color: "#374151" }}
+                    />
                   </IconButton>
-                  <IconButton title="Insert Image" aria-label="Insert Image" size="small" onMouseDown={keepSelection} onClick={addImage} sx={{ p: 0.5 }}>
-                    <ImageIcon sx={{ fontSize: 18, color: '#374151' }} />
+                  <IconButton
+                    title="Insert Image"
+                    aria-label="Insert Image"
+                    size="small"
+                    onMouseDown={keepSelection}
+                    onClick={addImage}
+                    sx={{ p: 0.5 }}
+                  >
+                    <ImageIcon sx={{ fontSize: 18, color: "#374151" }} />
                   </IconButton>
                 </Box>
               </>
@@ -1117,60 +1389,97 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
 
         {/* Upload Documents */}
         <Box>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#374151', mb: 0.75 }}>
+          <Typography
+            sx={{
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "#374151",
+              mb: 0.75,
+            }}
+          >
             Upload Documents
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
-            <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-            <Button 
-              variant="contained" 
-              onClick={() => !isViewOnly && fileInputRef.current?.click()} 
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileUpload}
+              style={{ display: "none" }}
+            />
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              style={{ display: "none" }}
+            />
+            <Button
+              variant="contained"
+              onClick={() => !isViewOnly && fileInputRef.current?.click()}
               disabled={isViewOnly}
-              sx={{ 
-                bgcolor: '#6B7280',
-                textTransform: 'none',
-                fontSize: '13px',
+              sx={{
+                bgcolor: "#6B7280",
+                textTransform: "none",
+                fontSize: "13px",
                 px: 2,
                 py: 0.75,
-                boxShadow: 'none',
-                '&:hover': { bgcolor: '#4B5563' }
+                boxShadow: "none",
+                "&:hover": { bgcolor: "#4B5563" },
               }}
             >
               Choose File
             </Button>
-            <Typography sx={{ color: '#9CA3AF', fontSize: '12px' }}>
-              {uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s) selected` : 'No File Chosen'}
+            <Typography sx={{ color: "#9CA3AF", fontSize: "12px" }}>
+              {uploadedFiles.length > 0
+                ? `${uploadedFiles.length} file(s) selected`
+                : "No File Chosen"}
             </Typography>
           </Box>
 
           {existingDocuments.length > 0 && (
-            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Box
+              sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: 1 }}
+            >
               {existingDocuments.map((doc) => {
                 const url = getDocumentUrl(doc);
                 const name = getDocumentName(doc);
                 return (
-                  <Box key={String(doc.id ?? name)} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: '#F9FAFB', borderRadius: '6px' }}>
-                    <AttachFileIcon sx={{ fontSize: 16, color: '#6B7280' }} />
+                  <Box
+                    key={String(doc.id ?? name)}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      p: 1,
+                      bgcolor: "#F9FAFB",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    <AttachFileIcon sx={{ fontSize: 16, color: "#6B7280" }} />
                     <Typography
-                      component={url ? 'a' : 'span'}
+                      component={url ? "a" : "span"}
                       href={url || undefined}
-                      target={url ? '_blank' : undefined}
-                      rel={url ? 'noopener noreferrer' : undefined}
+                      target={url ? "_blank" : undefined}
+                      rel={url ? "noopener noreferrer" : undefined}
                       sx={{
                         flex: 1,
-                        fontSize: '12px',
-                        color: url ? '#2563EB' : '#374151',
-                        textDecoration: url ? 'underline' : 'none',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        fontSize: "12px",
+                        color: url ? "#2563EB" : "#374151",
+                        textDecoration: url ? "underline" : "none",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {name}
                     </Typography>
                     {!isViewOnly && (
-                      <IconButton size="small" onClick={() => removeExistingDocument(doc.id)} sx={{ p: 0.5 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => removeExistingDocument(doc.id)}
+                        sx={{ p: 0.5 }}
+                      >
                         <CloseIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     )}
@@ -1181,13 +1490,33 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
           )}
 
           {uploadedFiles.length > 0 && (
-            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Box
+              sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: 1 }}
+            >
               {uploadedFiles.map((file, index) => (
-                <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: '#F9FAFB', borderRadius: '6px' }}>
-                  <AttachFileIcon sx={{ fontSize: 16, color: '#6B7280' }} />
-                  <Typography sx={{ flex: 1, fontSize: '12px', color: '#374151' }}>{file.name}</Typography>
+                <Box
+                  key={index}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    p: 1,
+                    bgcolor: "#F9FAFB",
+                    borderRadius: "6px",
+                  }}
+                >
+                  <AttachFileIcon sx={{ fontSize: 16, color: "#6B7280" }} />
+                  <Typography
+                    sx={{ flex: 1, fontSize: "12px", color: "#374151" }}
+                  >
+                    {file.name}
+                  </Typography>
                   {!isViewOnly && (
-                    <IconButton size="small" onClick={() => removeFile(index)} sx={{ p: 0.5 }}>
+                    <IconButton
+                      size="small"
+                      onClick={() => removeFile(index)}
+                      sx={{ p: 0.5 }}
+                    >
                       <CloseIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   )}
@@ -1199,53 +1528,55 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
       </Box>
 
       {/* Footer */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'flex-end', 
-        gap: 1.5, 
-        p: 2.5, 
-        borderTop: '1px solid #E5E7EB' 
-      }}>
-        <Button 
-          onClick={onClose} 
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 1.5,
+          p: 2.5,
+          borderTop: "1px solid #E5E7EB",
+        }}
+      >
+        <Button
+          onClick={onClose}
           variant="outlined"
           sx={{
-            textTransform: 'none',
-            fontSize: '14px',
-            borderColor: '#D1D5DB',
-            color: '#374151',
+            textTransform: "none",
+            fontSize: "14px",
+            borderColor: "#D1D5DB",
+            color: "#374151",
             px: 3,
-            '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+            "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" },
           }}
         >
           Cancel
         </Button>
         {!isViewOnly && (
           <>
-            <Button 
-              variant="outlined" 
+            <Button
+              variant="outlined"
               onClick={handlePreview}
               sx={{
-                textTransform: 'none',
-                fontSize: '14px',
-                borderColor: '#D1D5DB',
-                color: '#374151',
+                textTransform: "none",
+                fontSize: "14px",
+                borderColor: "#D1D5DB",
+                color: "#374151",
                 px: 3,
-                '&:hover': { borderColor: '#9CA3AF', bgcolor: '#F9FAFB' }
+                "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" },
               }}
             >
               Preview
             </Button>
-            <Button 
-              variant="contained" 
-              onClick={handleSave} 
-              sx={{ 
-                textTransform: 'none',
-                fontSize: '14px',
-                bgcolor: '#111827',
+            <Button
+              variant="contained"
+              onClick={handleSave}
+              sx={{
+                textTransform: "none",
+                fontSize: "14px",
+                bgcolor: "#111827",
                 px: 3,
-                boxShadow: 'none',
-                '&:hover': { bgcolor: '#000' }
+                boxShadow: "none",
+                "&:hover": { bgcolor: "#000" },
               }}
             >
               Save
@@ -1260,15 +1591,23 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
         anchorEl={colorAnchor}
         onClose={handleColorClose}
         anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
+          vertical: "bottom",
+          horizontal: "left",
         }}
         transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
+          vertical: "top",
+          horizontal: "left",
         }}
       >
-        <Box sx={{ p: 2, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1, maxWidth: '220px' }}>
+        <Box
+          sx={{
+            p: 2,
+            display: "grid",
+            gridTemplateColumns: "repeat(6, 1fr)",
+            gap: 1,
+            maxWidth: "220px",
+          }}
+        >
           {colors.map((color) => (
             <Box
               key={color}
@@ -1277,14 +1616,14 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
                 width: 30,
                 height: 30,
                 bgcolor: color,
-                borderRadius: '4px',
-                cursor: 'pointer',
-                border: color === '#FFFFFF' ? '1px solid #E5E7EB' : 'none',
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'scale(1.1)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                }
+                borderRadius: "4px",
+                cursor: "pointer",
+                border: color === "#FFFFFF" ? "1px solid #E5E7EB" : "none",
+                transition: "transform 0.2s",
+                "&:hover": {
+                  transform: "scale(1.1)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                },
               }}
             />
           ))}
@@ -1296,18 +1635,23 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
         anchorEl={emojiAnchor}
         onClose={handleEmojiClose}
         anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
+          vertical: "bottom",
+          horizontal: "left",
         }}
         transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
+          vertical: "top",
+          horizontal: "left",
         }}
       >
         <EmojiPicker onEmojiClick={onEmojiSelect} />
       </Popover>
 
-      <Dialog open={linkDialogOpen} onClose={() => setLinkDialogOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={linkDialogOpen}
+        onClose={() => setLinkDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>Add Link</DialogTitle>
         <DialogContent>
           <TextField
@@ -1322,7 +1666,9 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleApplyLink}>Apply</Button>
+          <Button variant="contained" onClick={handleApplyLink}>
+            Apply
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

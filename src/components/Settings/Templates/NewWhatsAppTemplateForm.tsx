@@ -22,7 +22,7 @@ import type {
 import type { UseCase } from "../../../services/usecase.api";
 import { toast } from "react-toastify";
 
-const TEMPLATE_NAME_REGEX = /^[A-Za-z\s]*$/;
+const TEMPLATE_NAME_REGEX = /^[A-Za-z\s-]*$/;
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
   const candidate = doc.file_url || doc.file || doc.url || "";
@@ -194,9 +194,12 @@ export const NewWhatsAppTemplateForm: React.FC<
   const handleInputChange = (field: string, value: string) => {
     if (field === "name") {
       if (!TEMPLATE_NAME_REGEX.test(value)) {
-        toast.error("Template name contain only alphbets", {
-          toastId: "template-name-alpha",
-        });
+        toast.error(
+          "Template name can only contain letters, spaces, and hyphens",
+          {
+            toastId: "template-name-alpha",
+          },
+        );
         return;
       }
       if (value.length > 50) return;
