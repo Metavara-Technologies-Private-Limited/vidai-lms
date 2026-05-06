@@ -747,16 +747,19 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
               useCases.map((uc) => {
                 const chipStyle = getUseCaseChipStyle(uc.name);
                 return (
-                  <MenuItem key={uc.id} value={uc.name}>
-                    <Box component="span" sx={{
-                      color: chipStyle.color,
-                      bgcolor: chipStyle.bgcolor,
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                    }}>
+                  <MenuItem key={uc.id} value={uc.id}>
+                    <Box
+                      component="span"
+                      sx={{
+                        color: chipStyle.color,
+                        bgcolor: chipStyle.bgcolor,
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: "4px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                      }}
+                    >
                       {uc.name}
                     </Box>
                   </MenuItem>

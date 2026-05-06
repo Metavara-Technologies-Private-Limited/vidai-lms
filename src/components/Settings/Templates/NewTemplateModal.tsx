@@ -285,7 +285,13 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay}
-        <NewSMSTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={resolvedInitialData as SMSTemplate | undefined} mode={mode} />
+        <NewSMSTemplateForm
+          onClose={handleClose}
+          onSave={handleFormSave}
+          initialData={resolvedInitialData as SMSTemplate | undefined}
+          mode={mode}
+          useCases={useCases}
+        />
       </Dialog>
     );
   }
@@ -294,7 +300,13 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         {LoaderOverlay}
-        <NewWhatsAppTemplateForm onClose={handleClose} onSave={handleFormSave} initialData={resolvedInitialData as WhatsAppTemplate | undefined} mode={mode} />
+        <NewWhatsAppTemplateForm
+          onClose={handleClose}
+          onSave={handleFormSave}
+          initialData={resolvedInitialData as WhatsAppTemplate | undefined}
+          mode={mode}
+          useCases={useCases}
+        />
       </Dialog>
     );
   }

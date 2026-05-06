@@ -333,6 +333,7 @@ const TemplatesPage: React.FC = () => {
                 data={getFilteredData()}
                 onAction={handleAction}
                 canEditTemplate={canEditTemplates}
+                useCases={useCases}
               />
             )}
             {activeTab === "WhatsApp" && (
@@ -340,6 +341,7 @@ const TemplatesPage: React.FC = () => {
                 data={getFilteredData()}
                 onAction={handleAction}
                 canEditTemplate={canEditTemplates}
+                useCases={useCases}
               />
             )}
           </Suspense>
@@ -357,7 +359,7 @@ const TemplatesPage: React.FC = () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             initialData={(activeTemplate as any) || undefined}
             mode={viewMode}
-            useCases={useCases}         // ✅ ADDED
+            useCases={useCases} // ✅ ADDED
             onUseCaseCreated={loadUseCases} // ✅ ADDED
           />
         </Suspense>
