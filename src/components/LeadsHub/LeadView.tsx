@@ -2231,7 +2231,7 @@ export default function LeadDetailView() {
     if (Array.isArray(val))
       return val.map((t) => capitalizeWords(String(t).trim()));
     if (typeof val === "string")
-      return val.split(",").map((t) => capitalizeWords(t.trim()));
+      return (val as string).split(",").map((t: string) => capitalizeWords(t.trim()));
     return [];
   })();
 

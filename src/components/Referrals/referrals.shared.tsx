@@ -316,12 +316,12 @@ export const DoctorsTable = ({
 export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const treatments = patient.raw.treatment_interest
-    ? patient.raw.treatment_interest
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean)
-    : [];
+  const treatments: string[] = (() => {
+  const ti = patient.raw.treatment_interest;
+  if (!ti) return [];
+  if (Array.isArray(ti)) return (ti as string[]).map((t: string) => t.trim()).filter(Boolean);
+  return (ti as string).split(",").map((t: string) => t.trim()).filter(Boolean);
+})();
 
   // ── Patient info fields ────────────────────────────────────────────────────
   const patientInfo = [

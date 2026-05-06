@@ -24,6 +24,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 import type { Department } from "../../services/leads.api";
+import type { Interest } from "../../services/leads.api";
 import type { ReferralDepartment } from "../../services/referral.api";
 import type { FormState } from "../../types/leads.types";
 import {
@@ -844,7 +845,10 @@ interface Step2Props {
   addFiles: (files: File[]) => void;
   removeFile: (index: number) => void;
   handleFileInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  // ── NEW: dynamic interest options fetched from backend ────────────────────
+  // ── dynamic interest objects fetched from backend ─────────────────────────
+  interests?: Interest[];
+  loadingInterests?: boolean;
+  // ── legacy flat-string options (kept for backward compat) ─────────────────
   interestOptions?: string[];
   interestOptionsLoading?: boolean;
 }
@@ -859,18 +863,28 @@ export function Step2({
   addFiles,
   removeFile,
   handleFileInputChange,
+  interests,
+  loadingInterests = false,
   interestOptions,
   interestOptionsLoading = false,
 }: Step2Props) {
   const sectionHeading = IS_MEDICAL_APP ? "TREATMENT INFORMATION" : "PRODUCT INFORMATION";
   const interestLabel = ACTIVE_FLOW_COPY.treatmentLabel;
 
-  // Use backend-fetched options if provided and non-empty, otherwise fall back
-  // to the static list from ACTIVE_FLOW_COPY so nothing breaks if the API fails
-  const resolvedInterestOptions: string[] =
-    interestOptions && interestOptions.length > 0
-      ? interestOptions
-      : ACTIVE_FLOW_COPY.treatmentOptions;
+  const isLoading = loadingInterests || interestOptionsLoading;
+
+  // Build the flat string list to display in the dropdown.
+  // Priority: Interest[] objects from backend → flat string interestOptions → static fallback
+  const resolvedInterestOptions: string[] = React.useMemo(() => {
+    if (interests && interests.length > 0) {
+      return interests.map((i) => i.name);
+    }
+    if (interestOptions && interestOptions.length > 0) {
+      return [...interestOptions];
+    }
+    // Spread into a new mutable array so readonly tuples are accepted
+    return [...ACTIVE_FLOW_COPY.treatmentOptions];
+  }, [interests, interestOptions]);
 
   return (
     <Box>
@@ -897,15 +911,15 @@ export function Step2({
           }}
           sx={{ ...inputStyle, maxWidth: "50%" }}
           SelectProps={{ displayEmpty: true }}
-          disabled={interestOptionsLoading}
+          disabled={isLoading}
           InputProps={{
-            endAdornment: interestOptionsLoading
+            endAdornment: isLoading
               ? <CircularProgress size={16} sx={{ mr: 3 }} />
               : null,
           }}
         >
           <MenuItem value="" disabled>
-            {interestOptionsLoading ? "Loading…" : "Select"}
+            {isLoading ? "Loading…" : "Select"}
           </MenuItem>
           {resolvedInterestOptions.map((opt) => (
             <MenuItem key={opt} value={opt}>{opt}</MenuItem>

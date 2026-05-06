@@ -1374,7 +1374,7 @@ const LeadsBoard: React.FC<Props> = ({
 
   React.useEffect(() => {
     if (reduxLeads && reduxLeads.length > 0) {
-      setLeads((reduxLeads as RawLead[]).map(mapRawToLeadItem));
+      setLeads((reduxLeads as unknown as RawLead[]).map(mapRawToLeadItem));
     }
   }, [reduxLeads]);
 
@@ -1382,7 +1382,7 @@ const LeadsBoard: React.FC<Props> = ({
     const fetchPipelineStages = async () => {
       const clinicIdFromStore = Number(clinic?.id ?? 0);
       const clinicIdFromLeads = Number(
-        (reduxLeads[0] as RawLead | undefined)?.clinic_id ?? 0,
+        (reduxLeads[0] as unknown as RawLead | undefined)?.clinic_id ?? 0,
       );
       const clinicId = clinicIdFromStore || clinicIdFromLeads;
 

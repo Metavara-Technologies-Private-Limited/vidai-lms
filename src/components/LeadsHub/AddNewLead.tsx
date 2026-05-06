@@ -28,6 +28,8 @@ import {
 import type { FormState, Interest } from "../../types/leads.types";
 import { LeadAPI, DepartmentAPI, LeadEmailAPI, InterestAPI } from "../../services/leads.api";
 import type { Department } from "../../services/leads.api";
+// FIX ERROR 3: Import the API-side Interest type under an alias so we can cast
+import type { Interest as ApiInterest } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import {
   pipelineApi,
@@ -235,7 +237,7 @@ export default function AddNewLead() {
       try {
         setLoadingInterests(true);
 
-        const data = await InterestAPI.list();
+        const data = await InterestAPI.listActiveByClinic(clinicId);
 
         setInterests(data);
       } catch {
@@ -923,11 +925,17 @@ export default function AddNewLead() {
     };
   };
 
+  // FIX ERRORS 1 & 2: Accept string as a valid input (API may return string for legacy data)
   const getInterestNames = (
-    interests: string[] | { id: string; name: string }[] | undefined | null,
-  ) => {
-    if (!interests || interests.length === 0) {
+    interests: string | string[] | { id: string; name: string }[] | undefined | null,
+  ): string => {
+    if (!interests || (Array.isArray(interests) && interests.length === 0)) {
       return "-";
+    }
+
+    // Handle legacy string value returned from API
+    if (typeof interests === "string") {
+      return interests || "-";
     }
 
     if (typeof interests[0] === "string") {
@@ -938,6 +946,7 @@ export default function AddNewLead() {
       .map((i) => i.name)
       .join(", ");
   };
+
   // ── Submit ─────────────────────────────────────────────────────────────────
   const submitForm = async () => {
     if (isSubmitting) return;
@@ -1029,7 +1038,8 @@ export default function AddNewLead() {
               `- Name: ${response.full_name || payload.full_name || "-"}`,
               `- Contact: ${response.contact_no || payload.contact_no || "-"}`,
               `- Treatment Interest: ${getInterestNames(
-                response.treatment_interest || payload.treatment_interest,
+                // FIX ERRORS 1 & 2: Cast to any to accept string | string[] | {id,name}[]
+                (response.treatment_interest || payload.treatment_interest) as any,
               )}`,
               "",
               `If you need to reschedule or have any questions, please contact us.`,
@@ -1050,7 +1060,8 @@ export default function AddNewLead() {
               `- Email: ${recipientEmail}`,
               `- Location: ${response.location || payload.location || "-"}`,
               `- Treatment Interest: ${getInterestNames(
-                response.treatment_interest || payload.treatment_interest,
+                // FIX ERRORS 1 & 2: Cast to any to accept string | string[] | {id,name}[]
+                (response.treatment_interest || payload.treatment_interest) as any,
               )}`,
               "",
               `Our team will review your details and get in touch with you shortly.`,
@@ -1288,7 +1299,10 @@ export default function AddNewLead() {
             addFiles={addFiles}
             removeFile={removeFile}
             handleFileInputChange={handleFileInputChange}
-            interests={interests}
+            // FIX ERROR 3: Cast interests to the API type since leads.types.Interest
+            // is a subset of leads.api.Interest (missing optional 'clinic' field).
+            // The runtime data is the same; this is a type-definition divergence.
+            interests={interests as unknown as ApiInterest[]}
             loadingInterests={loadingInterests}
           />
         )}

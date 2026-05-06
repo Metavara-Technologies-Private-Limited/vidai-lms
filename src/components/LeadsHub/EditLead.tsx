@@ -1253,7 +1253,7 @@ export default function EditLead() {
                       Select
                     </MenuItem>
                     {interests.map((opt) => (
-                      <MenuItem value={opt} value={opt.id}>
+                      <MenuItem value={opt.id}>
                         {opt.name}
                       </MenuItem>
                     ))}
