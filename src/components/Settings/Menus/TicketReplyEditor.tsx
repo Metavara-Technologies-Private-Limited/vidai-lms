@@ -9,9 +9,13 @@ import {
   Button,
   Checkbox,
   TextField,
+  IconButton,
 } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import CloseIcon from "@mui/icons-material/Close";
 import LinkIcon from "@mui/icons-material/Link";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined";
@@ -44,6 +48,9 @@ export interface TicketReplyEditorProps {
 
   replyMessage: string;
   setReplyMessage: (v: string) => void;
+  replyAttachments?: ReplyAttachment[];
+  onViewAttachment?: (file: string) => void;
+  onRemoveAttachment?: (id: string) => void;
 
   recipients?: LeadRecipient[];
   employees?: unknown[];
@@ -71,6 +78,12 @@ interface LeadRecipient {
   id: string;
   name: string;
   email: string;
+}
+
+interface ReplyAttachment {
+  id: string;
+  name: string;
+  file: string;
 }
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
@@ -102,6 +115,9 @@ const TicketReplyEditor = ({
   setReplySubject,
   replyMessage,
   setReplyMessage,
+  replyAttachments = [],
+  onViewAttachment,
+  onRemoveAttachment,
   recipients = [],
   anchorEl,
   setAnchorEl,
@@ -276,6 +292,25 @@ const TicketReplyEditor = ({
   const handleUnderline = () => {
     editorRef.current?.focus();
     document.execCommand("underline");
+  };
+
+  const handleEditorClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const anchor = target.closest("a");
+
+    if (!anchor?.href) return;
+
+    event.preventDefault();
+    window.open(anchor.href, "_blank", "noopener,noreferrer");
+  };
+
+  const commitPendingRecipientInputs = () => {
+    addEmailsFromInput(toInput, replyTo, setReplyTo);
+    addEmailsFromInput(ccInput, replyCc, setReplyCc);
+    addEmailsFromInput(bccInput, replyBcc, setReplyBcc);
+    setToInput("");
+    setCcInput("");
+    setBccInput("");
   };
 
   return (
@@ -795,6 +830,7 @@ const TicketReplyEditor = ({
         role="textbox"
         aria-label="Write your reply..."
         suppressContentEditableWarning
+        onClick={handleEditorClick}
         onInput={(e) => setReplyMessage((e.target as HTMLDivElement).innerHTML)}
         sx={{
           mt: 1,
@@ -813,6 +849,64 @@ const TicketReplyEditor = ({
         }}
         data-placeholder="Write your reply..."
       />
+
+      {replyAttachments.length > 0 && (
+        <Stack direction="row" spacing={1.2} flexWrap="wrap" useFlexGap mt={1.5}>
+          {replyAttachments.map((attachment) => (
+            <Box
+              key={attachment.id}
+              sx={{
+                minWidth: 220,
+                maxWidth: "100%",
+                p: 1,
+                border: "1px solid #DADCE0",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                bgcolor: "#FFFFFF",
+              }}
+            >
+              <InsertDriveFileOutlinedIcon
+                sx={{ fontSize: 22, color: "#5F6368", flexShrink: 0 }}
+              />
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography
+                  fontSize={13}
+                  fontWeight={600}
+                  noWrap
+                  title={attachment.name}
+                >
+                  {attachment.name}
+                </Typography>
+                <Typography
+                  component="button"
+                  type="button"
+                  onClick={() => onViewAttachment?.(attachment.file)}
+                  sx={{
+                    border: 0,
+                    p: 0,
+                    bgcolor: "transparent",
+                    color: "#D85B45",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  View
+                </Typography>
+              </Box>
+              <IconButton
+                size="small"
+                onClick={() => onRemoveAttachment?.(attachment.id)}
+                sx={{ color: "#5F6368" }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+        </Stack>
+      )}
 
       <Divider sx={{ my: 1.5 }} />
 
@@ -874,7 +968,10 @@ const TicketReplyEditor = ({
 
         <Button
           variant="contained"
-          onClick={handleSendReply}
+          onClick={() => {
+            commitPendingRecipientInputs();
+            handleSendReply();
+          }}
           sx={{
             height: 32,
             px: 2.2,

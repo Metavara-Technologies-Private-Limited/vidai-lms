@@ -43,7 +43,7 @@ export const ticketsApi = {
     const tickets = response.data?.results || response.data || [];
     console.log(
       "Tickets API response with assigned_to_name:",
-      tickets.map((t: any) => ({
+      (tickets as TicketListItem[]).map((t) => ({
         id: t.id,
         ticket_no: t.ticket_no,
         assigned_to_id: t.assigned_to_id,
@@ -112,7 +112,7 @@ updateTicket: async (
     return response.data;
   },
 
-  uploadDocument: async (ticketId: string, file: File): Promise<unknown> => {
+  uploadDocument: async (ticketId: string, file: File): Promise<TicketDetail> => {
     const formData = new FormData();
     formData.append("file", file);
     const response = await apiClient.post(
@@ -120,6 +120,19 @@ updateTicket: async (
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
+        params: { clinic_id: storedClinicId() },
+      },
+    );
+    return response.data;
+  },
+
+  deleteDocument: async (
+    ticketId: string,
+    documentId: string,
+  ): Promise<TicketDetail> => {
+    const response = await apiClient.delete(
+      `/tickets/${ticketId}/documents/${documentId}/`,
+      {
         params: { clinic_id: storedClinicId() },
       },
     );

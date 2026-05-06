@@ -231,9 +231,11 @@ export interface EmailTemplate {
 export interface TicketReplyRequest {
   subject: string;
   message: string;
+  sender_email?: string | null;
   to: string[];
   cc?: string[];
   bcc?: string[];
+  attachment_ids?: string[];
 }
 
 export interface TicketReplyResponse {

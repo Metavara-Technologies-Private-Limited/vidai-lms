@@ -6,7 +6,12 @@ import {
   Stack,
   TextField,
   Button,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
+import { useRef } from "react";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import CloseIcon from "@mui/icons-material/Close";
 import ReplyMail from "../../../assets/icons/Reply_Ticket_Mail.svg";
 import dayjs from "dayjs";
 import TicketReplyEditor from "./TicketReplyEditor";
@@ -84,6 +89,7 @@ const TicketContentPanel = ({
   }, [leadsFromStore]);
 
   const [isEditing, setIsEditing] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const editUpdateButtonSx = {
     textTransform: "none",
@@ -214,6 +220,19 @@ const TicketContentPanel = ({
     return lines.join("\n");
   };
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const uniqueDocuments = useMemo(() => {
+    const seen = new Set<string>();
+
+    return (ticket.documents ?? []).filter((doc) => {
+      if (!doc.file) return false;
+      const fileName = doc.file.split("/").pop()?.toLowerCase() || doc.file;
+      if (seen.has(fileName)) return false;
+      seen.add(fileName);
+      return true;
+    });
+  }, [ticket.documents]);
+
   const handleUpdate = async () => {
     try {
       const assigneeEmailValue = getEmployeeEmail();
@@ -251,6 +270,63 @@ const TicketContentPanel = ({
       toast.success("Mail sent with edited description");
     } catch (err) {
       console.error("Update failed", err);
+    }
+  };
+
+  const handleEditAttachmentSelected = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+
+    if (files.length === 0) return;
+
+    try {
+      let latestTicket = ticket;
+      for (const file of files) {
+        latestTicket = await ticketsApi.uploadDocument(ticket.id, file);
+      }
+
+      onTicketUpdate?.(latestTicket);
+      toast.success("Attachment added");
+    } catch (err) {
+      console.error("Attachment upload failed", err);
+      toast.error("Failed to add attachment");
+    }
+  };
+
+  const handleRemoveAttachment = async (documentId?: string) => {
+    if (!documentId) return;
+
+    try {
+      const target = ticket.documents?.find((doc) => doc.id === documentId);
+      const targetName = target?.file?.split("/").pop()?.toLowerCase();
+      const duplicateIds = (ticket.documents ?? [])
+        .filter((doc) => doc.id && doc.file?.split("/").pop()?.toLowerCase() === targetName)
+        .map((doc) => doc.id!);
+
+      let updatedTicket = ticket;
+      for (const id of duplicateIds.length > 0 ? duplicateIds : [documentId]) {
+        updatedTicket = await ticketsApi.deleteDocument(ticket.id, id);
+      }
+
+      onTicketUpdate?.(updatedTicket);
+      toast.success("Attachment removed");
+    } catch (err) {
+      console.error("Attachment remove failed", err);
+      toast.error("Failed to remove attachment");
+    }
+  };
+
+  const handleCancelEdit = async () => {
+    try {
+      const latestTicket = await ticketsApi.getTicketById(ticket.id);
+      setDescription(latestTicket.description);
+      onTicketUpdate?.(latestTicket);
+    } catch (err) {
+      console.error("Failed to reload ticket", err);
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -325,8 +401,8 @@ const TicketContentPanel = ({
         />
 
         {/* Attachments */}
-        <Stack direction="row" spacing={2}>
-          {ticket.documents?.map((doc: TicketDocument) => (
+        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+          {uniqueDocuments.map((doc: TicketDocument) => (
             <Box
               key={doc.id}
               sx={{
@@ -336,9 +412,10 @@ const TicketContentPanel = ({
                 display: "flex",
                 alignItems: "center",
                 gap: 2,
+                maxWidth: 320,
               }}
             >
-              <Typography variant="body2" fontWeight={600}>
+              <Typography variant="body2" fontWeight={600} noWrap>
                 {doc.file?.split("/").pop()}
               </Typography>
 
@@ -351,8 +428,39 @@ const TicketContentPanel = ({
               >
                 View
               </Button>
+
+              {isEditing && (
+                <Tooltip title="Remove attachment">
+                  <IconButton
+                    size="small"
+                    onClick={() => handleRemoveAttachment(doc.id)}
+                    sx={{ color: "#D85B45" }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
           ))}
+
+          {isEditing && (
+            <Tooltip title="Add more files to this ticket">
+              <Button
+                variant="outlined"
+                startIcon={<AttachFileIcon />}
+                onClick={() => editFileInputRef.current?.click()}
+                sx={{
+                  minHeight: 52,
+                  borderRadius: 2,
+                  textTransform: "none",
+                  borderColor: "#D0D0D0",
+                  color: "#505050",
+                }}
+              >
+                Add attachment
+              </Button>
+            </Tooltip>
+          )}
         </Stack>
       </Box>
 
@@ -361,13 +469,22 @@ const TicketContentPanel = ({
         {/* Edit / Update */}
         {canEdit &&
           (isEditing ? (
-            <Button
-              variant="contained"
-              onClick={handleUpdate}
-              sx={editUpdateButtonSx}
-            >
-              Update
-            </Button>
+            <>
+              <Button
+                variant="contained"
+                onClick={handleUpdate}
+                sx={editUpdateButtonSx}
+              >
+                Update
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={handleCancelEdit}
+                sx={{ textTransform: "none", height: "34px" }}
+              >
+                Cancel
+              </Button>
+            </>
           ) : (
             <Button
               variant="contained"
@@ -420,8 +537,17 @@ const TicketContentPanel = ({
           }}
         />
       ) : null}
+
+      <input
+        ref={editFileInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={handleEditAttachmentSelected}
+      />
     </Box>
   );
 };
 
 export default TicketContentPanel;
+

@@ -41,8 +41,7 @@ import {
   resolveUserRole,
   hasSubcategoryActionPermission,
 } from "../../../utils/roleAccess";
-
-const FILE_BASE_URL = "http://127.0.0.1:8000";
+import { toSafePhotoUrl } from "../../../utils/mediaUrl";
 
 const ticketTypes = [
   "Question",
@@ -228,6 +227,10 @@ const TicketView = () => {
   const [replyTo, setReplyTo] = useState<string[]>([]);
   const [replyCc, setReplyCc] = useState<string[]>([]);
   const [replyBcc, setReplyBcc] = useState<string[]>([]);
+  const [replyAttachmentIds, setReplyAttachmentIds] = useState<string[]>([]);
+  const [replyAttachments, setReplyAttachments] = useState<
+    Array<{ id: string; name: string; file: string }>
+  >([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [replySubject, setReplySubject] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -241,6 +244,7 @@ const TicketView = () => {
   const [viewTemplateOpen, setViewTemplateOpen] = useState(false);
   const [viewTemplateData, setViewTemplateData] =
     useState<EmailTemplate | null>(null);
+  const previousTicketIdRef = useRef<string | null>(null);
 
   const role = resolveUserRole(authUser as Record<string, unknown> | null);
   const isSuperAdmin = role === "super_admin";
@@ -285,18 +289,17 @@ const TicketView = () => {
       setTicket(ticketData);
       setLeads(Array.isArray(leadsData) ? leadsData : []);
 
+      const loggedInUserEmail = authUser?.email?.trim() || "";
+
       try {
         const clinicData = await clinicsApi.getClinicDetail(clinicId);
         const clinicEmails = extractClinicEmails(clinicData);
 
-        setReplyFrom((prev) => {
-          const prevNormalized = prev.trim().toLowerCase();
-          if (prevNormalized && clinicEmails.includes(prevNormalized))
-            return prev;
-          return clinicEmails[0] || "";
-        });
+        setReplyFrom(
+          isEmail(loggedInUserEmail) ? loggedInUserEmail : clinicEmails[0] || "",
+        );
       } catch {
-        setReplyFrom("");
+        setReplyFrom(isEmail(loggedInUserEmail) ? loggedInUserEmail : "");
       }
 
       // ✅ Normalize employee type
@@ -333,7 +336,7 @@ const TicketView = () => {
     } finally {
       setLoading(false);
     }
-  }, [clinic?.id, id]);
+  }, [authUser?.email, clinic?.id, id]);
 
   useEffect(() => {
     loadData();
@@ -383,17 +386,25 @@ const TicketView = () => {
   }, [ticket]);
 
   useEffect(() => {
+    if (!ticket?.id || previousTicketIdRef.current === ticket.id) return;
+
+    previousTicketIdRef.current = ticket.id;
     setReplyTo([]);
     setReplyCc([]);
     setReplyBcc([]);
-  }, [ticket]);
+    setReplyAttachmentIds([]);
+    setReplyAttachments([]);
+  }, [ticket?.id]);
 
   //  File Preview Handlers
   const handlePreviewOpen = (file: string) => {
-    const fullUrl = file.startsWith("http") ? file : `${FILE_BASE_URL}${file}`;
+    const fileUrl = toSafePhotoUrl(file);
+    if (!fileUrl) {
+      toast.warn("Document link is not available.");
+      return;
+    }
 
-    setPreviewFile(fullUrl);
-    setPreviewOpen(true);
+    window.open(fileUrl, "_blank", "noopener,noreferrer");
   };
 
   const handlePreviewClose = () => {
@@ -555,8 +566,8 @@ const TicketView = () => {
       return;
     }
 
-    if (!replyMessage.trim()) {
-      toast.warn("Reply message cannot be empty.");
+    if (!replyMessage.trim() && replyAttachmentIds.length === 0) {
+      toast.warn("Reply message or attachment is required.");
       return;
     }
 
@@ -580,13 +591,42 @@ const TicketView = () => {
     const toastId = toast.loading("Sending reply...");
 
     try {
-      await ticketsApi.sendTicketReply(id, {
-        subject: replySubject || "Reply",
-        message: replyMessage,
-        to: replyTo,
-        cc: replyCc,
-        bcc: replyBcc,
-      });
+// 🔥 FILTER VALID EMAILS
+const validTo = (replyTo || []).filter(
+  (email) => email && email.includes("@")
+);
+
+const validCc = (replyCc || []).filter(
+  (email) => email && email.includes("@")
+);
+
+const validBcc = (replyBcc || []).filter(
+  (email) => email && email.includes("@")
+);
+
+// 🔥 FILTER VALID ATTACHMENTS (VERY IMPORTANT)
+const validAttachmentIds = (replyAttachmentIds || []).filter((attId) =>
+  ticket?.documents?.some((doc) => doc.id === attId)
+);
+
+// 🔥 EXTRA SAFETY
+if (validTo.length === 0) {
+  toast.warn("Please select at least one valid recipient.");
+  return;
+}
+
+await ticketsApi.sendTicketReply(id, {
+  subject: replySubject?.trim() || "Reply",
+  message: replyMessage?.trim() || "Message",
+
+  sender_email: replyFrom?.trim(),
+
+  to: validTo,
+  cc: validCc,
+  bcc: validBcc,
+
+  attachment_ids: validAttachmentIds, 
+});
 
       toast.update(toastId, {
         render: "Reply sent successfully!",
@@ -599,6 +639,8 @@ const TicketView = () => {
       setReplyTo([]);
       setReplyCc([]);
       setReplyBcc([]);
+      setReplyAttachmentIds([]);
+      setReplyAttachments([]);
       setOpenReply(false);
       setReplySubject("");
     } catch (err) {
@@ -622,6 +664,21 @@ const TicketView = () => {
             ),
           );
 
+          const selectedAttachments = (ticket?.documents ?? []).filter(
+            (doc) => Boolean(doc.id) && replyAttachmentIds.includes(doc.id as string),
+          );
+          const attachmentLines = selectedAttachments
+            .map((doc) => {
+              const fileName = doc.file?.split("/").pop() || "Attachment";
+              const fileUrl = toSafePhotoUrl(doc.file || "") || doc.file || "";
+              return fileUrl ? `- ${fileName}: ${fileUrl}` : `- ${fileName}`;
+            })
+            .filter(Boolean);
+          const fallbackBody =
+            attachmentLines.length > 0
+              ? `${replyMessage}\n\nAttachments:\n${attachmentLines.join("\n")}`
+              : replyMessage;
+
           const leadMatches = allRecipients
             .map((email) =>
               leads.find((lead) => lead.email?.trim().toLowerCase() === email),
@@ -640,7 +697,7 @@ const TicketView = () => {
                   LeadEmailAPI.sendNow({
                     lead: lead.id,
                     subject: replySubject || "Reply",
-                    email_body: replyMessage,
+                    email_body: fallbackBody,
                     sender_email: replyFrom || null,
                   }),
                 ),
@@ -657,6 +714,8 @@ const TicketView = () => {
               setReplyTo([]);
               setReplyCc([]);
               setReplyBcc([]);
+              setReplyAttachmentIds([]);
+              setReplyAttachments([]);
               setOpenReply(false);
               setReplySubject("");
               return;
@@ -688,6 +747,8 @@ const TicketView = () => {
     setReplyTo([]);
     setReplyCc([]);
     setReplyBcc([]);
+    setReplyAttachmentIds([]);
+    setReplyAttachments([]);
     setReplySubject("");
   };
 
@@ -699,18 +760,91 @@ const TicketView = () => {
     imageInputRef.current?.click();
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const addUploadedFileToReply = async (file: File) => {
+    if (!id) return;
 
-    setReplyMessage((prev) => prev + `\n📎 Attached: ${file.name}\n`);
+    const toastId = toast.loading("Uploading attachment...");
+
+    try {
+      const existingDocIds = new Set(
+        (ticket?.documents ?? []).map((doc) => doc.id).filter(Boolean),
+      );
+      const updatedTicket = await ticketsApi.uploadDocument(id, file);
+      setTicket(updatedTicket);
+
+      const uploadedDocument = [...(updatedTicket.documents ?? [])]
+        .reverse()
+        .find((doc) => doc.id && !existingDocIds.has(doc.id)) ??
+        [...(updatedTicket.documents ?? [])]
+          .reverse()
+          .find((doc) => doc.file?.split("/").pop() === file.name);
+
+      if (!uploadedDocument?.id || !uploadedDocument.file) {
+        toast.update(toastId, {
+          render: "Attachment uploaded, but the document link was not returned.",
+          type: "warning",
+          isLoading: false,
+          autoClose: 4000,
+        });
+        return;
+      }
+
+      setReplyAttachmentIds((prev) =>
+        prev.includes(uploadedDocument.id!)
+          ? prev
+          : [...prev, uploadedDocument.id!],
+      );
+      setReplyAttachments((prev) =>
+        prev.some((item) => item.id === uploadedDocument.id)
+          ? prev
+          : [
+              ...prev,
+              {
+                id: uploadedDocument.id!,
+                name: file.name,
+                file: uploadedDocument.file!,
+              },
+            ],
+      );
+
+      toast.update(toastId, {
+        render: "Attachment uploaded.",
+        type: "success",
+        isLoading: false,
+        autoClose: 2500,
+      });
+    } catch (error) {
+      console.error("Attachment upload failed:", error);
+      toast.update(toastId, {
+        render: "Failed to upload attachment.",
+        type: "error",
+        isLoading: false,
+        autoClose: 4000,
+      });
+    }
   };
 
-  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setReplyMessage((prev) => prev + `\n🖼 Image: ${file.name}\n`);
+    await addUploadedFileToReply(file);
+    e.target.value = "";
+  };
+
+  const handleImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    await addUploadedFileToReply(file);
+    e.target.value = "";
+  };
+
+  const handleRemoveReplyAttachment = (attachmentId: string) => {
+    setReplyAttachmentIds((prev) => prev.filter((id) => id !== attachmentId));
+    setReplyAttachments((prev) =>
+      prev.filter((attachment) => attachment.id !== attachmentId),
+    );
   };
 
   const handleEmojiInsert = (emoji: string) => {
@@ -912,6 +1046,9 @@ const TicketView = () => {
             setReplySubject,
             replyMessage,
             setReplyMessage,
+            replyAttachments,
+            onViewAttachment: handlePreviewOpen,
+            onRemoveAttachment: handleRemoveReplyAttachment,
             anchorEl,
             setAnchorEl,
             showEmoji,
