@@ -468,12 +468,12 @@ export function useEditLead() {
   const [existingDocuments, setExistingDocuments] = React.useState<ExistingDocument[]>([]);
   const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
-  const [_loadingInterests, setLoadingInterests] = React.useState(false);
+  // const [_loadingInterests, setLoadingInterests] = React.useState(false);
 
   React.useEffect(() => {
     const loadInterests = async () => {
       try {
-        setLoadingInterests(true);
+        // setLoadingInterests(true);
 
         const data = await InterestAPI.listActiveByClinic(clinicId);
 
@@ -481,12 +481,12 @@ export function useEditLead() {
       } catch {
         setInterests([]);
       } finally {
-        setLoadingInterests(false);
+        // setLoadingInterests(false);
       }
     };
 
     loadInterests();
-  }, []);
+  }, [clinicId]);
 
   React.useEffect(() => {
     if (!interests.length || !treatments.length) return;
@@ -812,7 +812,9 @@ export function useEditLead() {
         setSource(lead.source ?? "");
         setSubSource(lead.sub_source ?? "");
 
-        const campaignId = (lead as unknown as { campaign_id?: string | number }).campaign_id;
+        const campaignId = (
+          lead as unknown as { campaign_id?: string | number }
+        ).campaign_id;
         if (campaignId) {
           setCampaignId(String(campaignId));
         }
@@ -850,19 +852,26 @@ export function useEditLead() {
 
         // ── Lead Status (pipeline stage) ──
         const rawLeadStatus =
-          (anyLead.stage_name as string) ?? (anyLead.lead_status as string) ?? "";
+          (anyLead.stage_name as string) ??
+          (anyLead.lead_status as string) ??
+          "";
         setLeadStatus(rawLeadStatus);
 
         // ── Referral Department ──
         const rawReferralDept = anyLead.referral_department_id;
-        if (rawReferralDept != null) setReferralDepartment(String(rawReferralDept));
+        if (rawReferralDept != null)
+          setReferralDepartment(String(rawReferralDept));
 
         setLanguage(lead.language_preference ?? "");
 
         // ── MEDICAL-only fields ──
         if (IS_MEDICAL_APP) {
           setGender(
-            lead.gender === "male" ? "Male" : lead.gender === "female" ? "Female" : "",
+            lead.gender === "male"
+              ? "Male"
+              : lead.gender === "female"
+                ? "Female"
+                : "",
           );
           setAge(lead.age?.toString() ?? "");
           setMarital(
@@ -896,34 +905,56 @@ export function useEditLead() {
               "",
           );
           setLeadGeneratedById(
-            (anyLead.personal_id as number | string | undefined)?.toString() ?? "",
+            (anyLead.personal_id as number | string | undefined)?.toString() ??
+              "",
           );
         }
 
+        // In the load effect inside useEditLead.ts, replace:
         const treatmentInterestData = lead.treatment_interest;
+        const normalizedTreatmentIds: string[] = [];
 
-let normalizedTreatmentIds: string[] = [];
+        if (Array.isArray(treatmentInterestData)) {
+          treatmentInterestData.forEach((item: any) => {
+            const rawId = String(typeof item === "object" ? item.id : item);
+            // The item.name might itself be comma-joined IDs — flatten them
+            if (typeof item === "object" && item?.name) {
+              const UUID_RE =
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+              const nameParts = String(item.name)
+                .split(",")
+                .map((p: string) => p.trim())
+                .filter(Boolean);
+              const allUUIDs = nameParts.every((p: string) => UUID_RE.test(p));
+              if (allUUIDs && nameParts.length > 0) {
+                // name is actually a list of sub-IDs — use those as the real IDs
+                nameParts.forEach((subId: string) =>
+                  normalizedTreatmentIds.push(subId),
+                );
+              } else {
+                normalizedTreatmentIds.push(rawId);
+              }
+            } else {
+              normalizedTreatmentIds.push(rawId);
+            }
+          });
+        } else if (typeof treatmentInterestData === "string") {
+          treatmentInterestData
+            .split(",")
+            .map((t: string) => t.trim())
+            .filter(Boolean)
+            .forEach((id: string) => normalizedTreatmentIds.push(id));
+        }
 
-if (Array.isArray(treatmentInterestData)) {
-  normalizedTreatmentIds = treatmentInterestData.map((item: any) =>
-    String(typeof item === "object" ? item.id : item),
-  );
-} else if (typeof treatmentInterestData === "string") {
-  normalizedTreatmentIds = treatmentInterestData
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
-}
+        setTreatments(normalizedTreatmentIds);
 
-setTreatments(normalizedTreatmentIds);
+        // const selectedInterestNames = interests
+        //   .filter((interest) =>
+        //     normalizedTreatmentIds.includes(String(interest.id)),
+        //   )
+        //   .map((interest) => interest.name);
 
-const selectedInterestNames = interests
-  .filter((interest) =>
-    normalizedTreatmentIds.includes(String(interest.id)),
-  )
-  .map((interest) => interest.name);
-
-setTreatmentInterest(selectedInterestNames.join(", "));
+        // setTreatmentInterest(selectedInterestNames.join(", "));
 
         const hasBooking = isTruthy(lead.book_appointment);
         setWantAppointment(hasBooking ? "yes" : "no");
@@ -931,15 +962,19 @@ setTreatmentInterest(selectedInterestNames.join(", "));
         if (hasBooking) {
           const personnelId = anyLead.personal_id;
           setAppointmentPersonnel(personnelId?.toString() ?? "");
-          setAppointmentPersonnelSearch((anyLead.personal_name as string) ?? "");
+          setAppointmentPersonnelSearch(
+            (anyLead.personal_name as string) ?? "",
+          );
           setAppointmentDate(lead.appointment_date ?? "");
-          if (lead.appointment_date) setSelectedDate(dayjs(lead.appointment_date));
+          if (lead.appointment_date)
+            setSelectedDate(dayjs(lead.appointment_date));
           setSlot(lead.slot ?? "");
           setRemark(lead.remark ?? "");
         }
 
         // ── Existing documents ──
-        const embeddedDocs = (lead as unknown as { documents?: unknown[] }).documents;
+        const embeddedDocs = (lead as unknown as { documents?: unknown[] })
+          .documents;
         if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
           const normalized = embeddedDocs.map((d) =>
             normalizeDocument(d as Parameters<typeof normalizeDocument>[0]),
@@ -953,7 +988,9 @@ setTreatmentInterest(selectedInterestNames.join(", "));
             if (Array.isArray(rawDocs) && rawDocs.length > 0) {
               setExistingDocuments(
                 rawDocs.map((d) =>
-                  normalizeDocument(d as Parameters<typeof normalizeDocument>[0]),
+                  normalizeDocument(
+                    d as Parameters<typeof normalizeDocument>[0],
+                  ),
                 ),
               );
             }
@@ -1207,8 +1244,11 @@ setTreatmentInterest(selectedInterestNames.join(", "));
       next_action_status: resolvedStatus,
       next_action_description: nextDesc || "",
       // ── Task Status → action_status ── NEW
-      action_status: (taskStatus.trim().toLowerCase() as TaskStatusValue) || null,
-      ...(leadStatus ? { lead_status: leadStatus as LeadPayload["lead_status"] } : {}),
+      action_status:
+        (taskStatus.trim().toLowerCase() as TaskStatusValue) || null,
+      ...(leadStatus
+        ? { lead_status: leadStatus as LeadPayload["lead_status"] }
+        : {}),
       treatment_interest:
         treatments.length > 0 ? treatments.join(",") : treatmentInterest || "",
       is_active: leadData?.is_active !== false,
@@ -1218,8 +1258,12 @@ setTreatmentInterest(selectedInterestNames.join(", "));
       ...(IS_MEDICAL_APP
         ? {
             age: intOrNull(age),
-            marital_status: marital ? (marital.toLowerCase() as "single" | "married") : null,
-            gender: gender ? (gender.toLowerCase() as "male" | "female" | "other") : null,
+            marital_status: marital
+              ? (marital.toLowerCase() as "single" | "married")
+              : null,
+            gender: gender
+              ? (gender.toLowerCase() as "male" | "female" | "other")
+              : null,
             partner_inquiry: coupleActive,
             partner_full_name: coupleActive ? partnerName || "" : "",
             partner_age: coupleActive ? intOrNull(partnerAge) : null,
@@ -1245,7 +1289,8 @@ setTreatmentInterest(selectedInterestNames.join(", "));
             slot,
             remark: remark || "",
             personal_id:
-              selectedAppointmentPersonnel?.id && selectedAppointmentPersonnel.id !== 0
+              selectedAppointmentPersonnel?.id &&
+              selectedAppointmentPersonnel.id !== 0
                 ? selectedAppointmentPersonnel.id
                 : (intOrNull(appointmentPersonnel) ?? null),
             personal_name: selectedAppointmentPersonnel

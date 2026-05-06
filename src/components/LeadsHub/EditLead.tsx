@@ -1242,10 +1242,29 @@ export default function EditLead() {
                     size="small"
                     value={treatmentInterest}
                     onChange={(e) => {
-                      const v = e.target.value;
-                      setTreatmentInterest(v);
-                      if (v && !treatments.includes(v))
-                        setTreatments((prev) => [...prev, v]);
+                      const selectedId = String(e.target.value);
+
+                      const selectedInterest = interests.find(
+                        (interest) => String(interest.id) === selectedId,
+                      );
+
+                      if (!selectedInterest) return;
+
+                      if (!treatments.includes(selectedId)) {
+                        setTreatments((prev) => [...prev, selectedId]);
+                      }
+
+                      setTreatmentInterest((prev) => {
+                        const names = prev
+                          ? prev.split(",").map((x) => x.trim())
+                          : [];
+
+                        if (names.includes(selectedInterest.name)) {
+                          return prev;
+                        }
+
+                        return [...names, selectedInterest.name].join(", ");
+                      });
                     }}
                     sx={inputStyle}
                   >
@@ -1253,9 +1272,7 @@ export default function EditLead() {
                       Select
                     </MenuItem>
                     {interests.map((opt) => (
-                      <MenuItem value={opt.id}>
-                        {opt.name}
-                      </MenuItem>
+                      <MenuItem value={opt.id}>{opt.name}</MenuItem>
                     ))}
                   </TextField>
                 </Box>
@@ -1266,26 +1283,47 @@ export default function EditLead() {
                   spacing={1}
                   sx={{ mb: 3, flexWrap: "wrap" }}
                 >
-                  {treatments.map((t) => (
-                    <Chip
-                      key={t}
-                      label={t}
-                      size="small"
-                      onDelete={() =>
-                        setTreatments((prev) => prev.filter((x) => x !== t))
-                      }
-                      sx={{
-                        bgcolor: "#FEE2E2",
-                        color: "#B91C1C",
-                        fontWeight: 600,
-                        border: "1px solid #FCA5A5",
-                        "& .MuiChip-deleteIcon": {
+                  {treatmentInterest
+                    .split(",")
+                    .filter(Boolean)
+                    .map((t) => (
+                      <Chip
+                        key={t}
+                        label={t}
+                        size="small"
+                        onDelete={() => {
+                          const interestToRemove = interests.find(
+                            (interest) => interest.name === t,
+                          );
+
+                          if (!interestToRemove) return;
+
+                          setTreatments((prev) =>
+                            prev.filter(
+                              (id) => id !== String(interestToRemove.id),
+                            ),
+                          );
+
+                          setTreatmentInterest((prev) =>
+                            prev
+                              .split(",")
+                              .map((x) => x.trim())
+                              .filter((name) => name !== t)
+                              .join(", "),
+                          );
+                        }}
+                        sx={{
+                          bgcolor: "#FEE2E2",
                           color: "#B91C1C",
-                          "&:hover": { color: "#991B1B" },
-                        },
-                      }}
-                    />
-                  ))}
+                          fontWeight: 600,
+                          border: "1px solid #FCA5A5",
+                          "& .MuiChip-deleteIcon": {
+                            color: "#B91C1C",
+                            "&:hover": { color: "#991B1B" },
+                          },
+                        }}
+                      />
+                    ))}
                 </Stack>
               )}
 

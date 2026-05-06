@@ -67,6 +67,7 @@ import {
   LeadAPI,
   LeadEmailAPI,
   EmailTemplateAPI,
+  InterestAPI,
 } from "../../services/leads.api";
 import type {
   EmailTemplate,
@@ -1580,6 +1581,9 @@ export default function LeadDetailView() {
   const [draftLeadStatus, setDraftLeadStatus] =
     React.useState<LeadStatusOption>("New");
   const [statusSaving, setStatusSaving] = React.useState(false);
+  const [interests, setInterests] = React.useState<
+    { id: string; name: string }[]
+    >([]);
 
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px",
@@ -1676,6 +1680,20 @@ export default function LeadDetailView() {
     },
     [authedUser?.email, clinicName],
   );
+
+    React.useEffect(() => {
+      const clinicId = activeLead?.clinic_id;
+
+      if (!clinicId) return;
+
+      InterestAPI.listActiveByClinic(clinicId)
+        .then((data) => {
+          setInterests(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          setInterests([]);
+        });
+    }, [activeLead?.clinic_id]);
 
   React.useEffect(() => {
     const current = normalizeLeadStatusForPill(
@@ -2226,13 +2244,68 @@ export default function LeadDetailView() {
 
   // ── FIX: treatment_interest may be an array or a string from the API
   const treatmentInterest = (() => {
-    const val = activeLead.treatment_interest;
-    if (!val) return [];
-    if (Array.isArray(val))
-      return val.map((t) => capitalizeWords(String(t).trim()));
-    if (typeof val === "string")
-      return (val as string).split(",").map((t: string) => capitalizeWords(t.trim()));
-    return [];
+    const raw = activeLead.treatment_interest;
+    if (!raw) return [];
+
+    // Collect all IDs from the raw value
+    const ids: string[] = [];
+
+    if (Array.isArray(raw)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      raw.forEach((item: any) => {
+        if (typeof item === "object" && item !== null) {
+          if (item.id) ids.push(String(item.id).trim());
+        } else {
+          String(item)
+            .split(",")
+            .forEach((id) => {
+              const cleaned = id.trim();
+              if (cleaned) ids.push(cleaned);
+            });
+        }
+      });
+    } else if (typeof raw === "string") {
+      String(raw)
+        .split(",")
+        .forEach((id) => {
+          const cleaned = id.trim();
+          if (cleaned) ids.push(cleaned);
+        });
+    }
+
+    // UUID pattern for detection
+    const UUID_RE =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    // Expand: some IDs may themselves resolve to multiple names
+    const resolved: string[] = [];
+    ids.forEach((id) => {
+      const found = interests.find((i) => String(i.id).trim() === id);
+      if (!found) {
+        resolved.push(capitalizeWords(id));
+        return;
+      }
+
+      const nameVal = found.name ?? "";
+      const parts = nameVal
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+      const allUUIDs = parts.every((p) => UUID_RE.test(p));
+
+      if (allUUIDs && parts.length > 0) {
+        // The interest's name is a list of sub-IDs — resolve each
+        parts.forEach((subId) => {
+          const sub = interests.find((i) => String(i.id).trim() === subId);
+          resolved.push(capitalizeWords(sub?.name || subId));
+        });
+      } else {
+        resolved.push(capitalizeWords(nameVal || id));
+      }
+    });
+
+    // Deduplicate
+    return [...new Set(resolved)];
   })();
 
   const hasAppointment = activeLead.book_appointment === true;

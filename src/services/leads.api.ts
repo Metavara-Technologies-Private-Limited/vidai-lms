@@ -886,13 +886,14 @@ export const DepartmentAPI = {
 
 // ====================== Interest API ======================
 export const InterestAPI = {
-  listActiveByClinic: async (clinicId: number): Promise<Interest[]> => {
-    const response = await api.get<Interest[] | { results: Interest[] }>(
-      `/interests/?clinic_id=${clinicId}&is_active=true`,
-    );
-    const data = response.data;
-    const all = Array.isArray(data) ? data : (data.results ?? []);
-    return all.filter((i) => i.is_active);
+  listActiveByClinic: async (clinicId: number) => {
+    const res = await api.get("/interests/", {
+      headers: {
+        "X-Clinic-Id": clinicId,
+      },
+    });
+
+    return res.data;
   },
 };
 

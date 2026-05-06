@@ -41,7 +41,7 @@ import {
   selectLeads,
   selectLeadsLoading,
   selectLeadsError,
-  clearError,
+  // clearError,
 } from "../../store/leadSlice";
 import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Leads/leads.css";
@@ -957,8 +957,7 @@ const LeadsTable: React.FC<Props> = ({
             textDecoration: "underline",
           }}
           onClick={() => {
-            dispatch(clearError());
-            dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])
+            window.location.reload();
           }
           }
         >
