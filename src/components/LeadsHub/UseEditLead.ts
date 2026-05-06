@@ -468,14 +468,14 @@ export function useEditLead() {
   const [existingDocuments, setExistingDocuments] = React.useState<ExistingDocument[]>([]);
   const initialExistingDocuments = React.useRef<ExistingDocument[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
-  const [loadingInterests, setLoadingInterests] = React.useState(false);
+  const [_loadingInterests, setLoadingInterests] = React.useState(false);
 
   React.useEffect(() => {
     const loadInterests = async () => {
       try {
         setLoadingInterests(true);
 
-        const data = await InterestAPI.list();
+        const data = await InterestAPI.listActiveByClinic(clinicId);
 
         setInterests(data);
       } catch {
