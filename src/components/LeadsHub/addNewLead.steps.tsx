@@ -25,7 +25,7 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 import type { Department } from "../../services/leads.api";
 import type { ReferralDepartment } from "../../services/referral.api";
-import type { FormState, Interest } from "../../types/leads.types";
+import type { FormState } from "../../types/leads.types";
 import {
   SOURCE_OPTIONS,
   SUB_SOURCE_OPTIONS,
@@ -33,7 +33,7 @@ import {
   inputStyle,
   labelStyle,
   getDocColor,
-  TASK_STATUS_OPTIONS,          // ← renamed from ACTION_STATUS_OPTIONS
+  TASK_STATUS_OPTIONS,
   type LeadGeneratedByObject,
   type NextActionStatusOption,
 } from "../LeadsHub/addNewLead.constants";
@@ -792,12 +792,12 @@ export function Step1({
           <Typography sx={labelStyle}>Task Status</Typography>
           <TextField
             select fullWidth size="small"
-            value={form.taskStatus}                        // ← renamed from actionStatus
-            onChange={handleSelectChange("taskStatus")}    // ← renamed from actionStatus
+            value={form.taskStatus}
+            onChange={handleSelectChange("taskStatus")}
             sx={inputStyle}
           >
             <MenuItem value="">-- Select --</MenuItem>
-            {TASK_STATUS_OPTIONS.map((opt) => (            // ← renamed from ACTION_STATUS_OPTIONS
+            {TASK_STATUS_OPTIONS.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
             ))}
           </TextField>
@@ -844,8 +844,9 @@ interface Step2Props {
   addFiles: (files: File[]) => void;
   removeFile: (index: number) => void;
   handleFileInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  interests: Interest[];
-  loadingInterests: boolean;
+  // ── NEW: dynamic interest options fetched from backend ────────────────────
+  interestOptions?: string[];
+  interestOptionsLoading?: boolean;
 }
 
 export function Step2({
@@ -858,96 +859,88 @@ export function Step2({
   addFiles,
   removeFile,
   handleFileInputChange,
-  interests,
-  loadingInterests,
+  interestOptions,
+  interestOptionsLoading = false,
 }: Step2Props) {
   const sectionHeading = IS_MEDICAL_APP ? "TREATMENT INFORMATION" : "PRODUCT INFORMATION";
   const interestLabel = ACTIVE_FLOW_COPY.treatmentLabel;
-  // const interestOptions = ACTIVE_FLOW_COPY.treatmentOptions;
+
+  // Use backend-fetched options if provided and non-empty, otherwise fall back
+  // to the static list from ACTIVE_FLOW_COPY so nothing breaks if the API fails
+  const resolvedInterestOptions: string[] =
+    interestOptions && interestOptions.length > 0
+      ? interestOptions
+      : ACTIVE_FLOW_COPY.treatmentOptions;
 
   return (
     <Box>
-      <Typography
-        variant="subtitle2"
-        fontWeight={700}
-        color="#1E293B"
-        sx={{ mb: 2 }}
-      >
+      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
         {sectionHeading}
       </Typography>
 
       <Box sx={{ mb: 3 }}>
         <Typography sx={labelStyle}>{interestLabel}</Typography>
-        <Autocomplete
-          multiple
-          options={interests}
-          loading={loadingInterests}
-          value={interests.filter((i) => form.treatments.includes(i.id))}
-          onChange={(_, value) => {
+        <TextField
+          select
+          fullWidth
+          size="small"
+          value={form.treatmentInterest}
+          onChange={(e) => {
+            const value = e.target.value;
             setForm((prev) => ({
               ...prev,
-              treatments: value.map((v) => v.id),
+              treatmentInterest: value,
+              treatments: prev.treatments.includes(value)
+                ? prev.treatments
+                : [...prev.treatments, value],
             }));
           }}
-          getOptionLabel={(option) => option.name}
-          isOptionEqualToValue={(a, b) => a.id === b.id}
-          renderTags={(value, getTagProps) =>
-            value.map((option, index) => (
-              <Chip
-                {...getTagProps({ index })}
-                key={option.id}
-                label={option.name}
-              />
-            ))
-          }
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              size="small"
-              placeholder={`Select ${interestLabel}`}
-              sx={{ ...inputStyle, maxWidth: "50%" }}
-            />
-          )}
-        />
+          sx={{ ...inputStyle, maxWidth: "50%" }}
+          SelectProps={{ displayEmpty: true }}
+          disabled={interestOptionsLoading}
+          InputProps={{
+            endAdornment: interestOptionsLoading
+              ? <CircularProgress size={16} sx={{ mr: 3 }} />
+              : null,
+          }}
+        >
+          <MenuItem value="" disabled>
+            {interestOptionsLoading ? "Loading…" : "Select"}
+          </MenuItem>
+          {resolvedInterestOptions.map((opt) => (
+            <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+          ))}
+        </TextField>
       </Box>
 
       {form.treatments.length > 0 && (
         <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-          {form.treatments.map((t) => {
-            const interest = interests.find((i) => i.id === t);
-
-            return (
-              <Chip
-                key={t}
-                label={interest?.name || t}
-                onDelete={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    treatments: prev.treatments.filter((x) => x !== t),
-                  }))
-                }
-                sx={{
-                  bgcolor: "#FEE2E2",
+          {form.treatments.map((t) => (
+            <Chip
+              key={t}
+              label={t}
+              onDelete={() =>
+                setForm((prev) => ({
+                  ...prev,
+                  treatments: prev.treatments.filter((x) => x !== t),
+                }))
+              }
+              sx={{
+                bgcolor: "#FEE2E2",
+                color: "#B91C1C",
+                fontWeight: 600,
+                border: "1px solid #FCA5A5",
+                "& .MuiChip-deleteIcon": {
                   color: "#B91C1C",
-                  fontWeight: 600,
-                  border: "1px solid #FCA5A5",
-                  "& .MuiChip-deleteIcon": {
-                    color: "#B91C1C",
-                    "&:hover": { color: "#991B1B" },
-                  },
-                }}
-              />
-            );
-          })}
+                  "&:hover": { color: "#991B1B" },
+                },
+              }}
+            />
+          ))}
         </Stack>
       )}
 
-      <Typography
-        variant="subtitle2"
-        fontWeight={700}
-        color="#1E293B"
-        sx={{ mb: 2 }}
-      >
+      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
         DOCUMENTS & REPORTS (Optional)
       </Typography>
 
@@ -1005,11 +998,7 @@ export function Step2({
         >
           Choose File
         </Button>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "block", mt: 1 }}
-        >
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
           {pendingFiles.length > 0
             ? `${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""} selected`
             : "No File Chosen · PDF, Word, JPG, PNG up to 10MB"}
@@ -1054,11 +1043,7 @@ export function Step2({
                     variant="body2"
                     fontWeight={600}
                     color="#1E293B"
-                    sx={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
+                    sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                   >
                     {file.name}
                   </Typography>
@@ -1129,7 +1114,13 @@ export function Step3({
     setForm((prev) => ({
       ...prev,
       wantAppointment: value,
-      ...(value === "no" && { department: "", personnel: "", appointmentDate: "", slot: "", remark: "" }),
+      ...(value === "no" && {
+        department: "",
+        personnel: "",
+        appointmentDate: "",
+        slot: "",
+        remark: "",
+      }),
     }));
     if (value === "no") setSelectedDate(null);
   };
@@ -1141,7 +1132,11 @@ export function Step3({
       </Typography>
       <Box sx={{ mb: 3 }}>
         <Typography sx={{ ...labelStyle, mb: 1 }}>Want to Book an Appointment?</Typography>
-        <RadioGroup row value={form.wantAppointment} onChange={(e) => handleWantAppointmentChange(e.target.value as "yes" | "no")}>
+        <RadioGroup
+          row
+          value={form.wantAppointment}
+          onChange={(e) => handleWantAppointmentChange(e.target.value as "yes" | "no")}
+        >
           <FormControlLabel value="yes" control={<Radio size="small" />} label="Yes" />
           <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
         </RadioGroup>
@@ -1149,23 +1144,44 @@ export function Step3({
 
       {!noAppointment && (
         <>
-          <Box sx={{ display: "grid", gridTemplateColumns: IS_MEDICAL_APP ? "repeat(2, 1fr)" : "1fr", gap: 2, mb: 2 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: IS_MEDICAL_APP ? "repeat(2, 1fr)" : "1fr",
+              gap: 2,
+              mb: 2,
+            }}
+          >
             {IS_MEDICAL_APP && (
               <Box>
                 <Typography sx={labelStyle}>Department</Typography>
                 <Autocomplete
-                  options={departments} loading={loadingDepartments} disabled={loadingDepartments}
+                  options={departments}
+                  loading={loadingDepartments}
+                  disabled={loadingDepartments}
                   value={departments.find((d) => d.id.toString() === form.department) ?? null}
                   getOptionLabel={(d) => d.name}
                   isOptionEqualToValue={(a, b) => a.id === b.id}
-                  onChange={(_, dept) => handleDepartmentChange(dept ? dept.id.toString() : "")}
-                  renderOption={(props, dept) => <li {...props} key={dept.id}>{dept.name}</li>}
+                  onChange={(_, dept) =>
+                    handleDepartmentChange(dept ? dept.id.toString() : "")
+                  }
+                  renderOption={(props, dept) => (
+                    <li {...props} key={dept.id}>{dept.name}</li>
+                  )}
                   renderInput={(params) => (
-                    <TextField {...params} size="small" fullWidth placeholder="Search department" sx={inputStyle}
+                    <TextField
+                      {...params}
+                      size="small"
+                      fullWidth
+                      placeholder="Search department"
+                      sx={inputStyle}
                       InputProps={{
                         ...params.InputProps,
                         endAdornment: (
-                          <>{loadingDepartments ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}{params.InputProps.endAdornment}</>
+                          <>
+                            {loadingDepartments ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
                         ),
                       }}
                     />
@@ -1178,33 +1194,56 @@ export function Step3({
             <Box>
               <Typography sx={labelStyle}>Appointment Personnel</Typography>
               <Autocomplete
-                options={personnelOptions} loading={personnelLoading || loadingEmployees}
-                clearOnBlur={false} filterOptions={(options) => options}
-                value={selectedPersonnel} inputValue={personnelInput}
-                onInputChange={(_, value: string, reason) => { if (reason === "reset") return; handlePersonnelInputChange(value); }}
+                options={personnelOptions}
+                loading={personnelLoading || loadingEmployees}
+                clearOnBlur={false}
+                filterOptions={(options) => options}
+                value={selectedPersonnel}
+                inputValue={personnelInput}
+                onInputChange={(_, value: string, reason) => {
+                  if (reason === "reset") return;
+                  handlePersonnelInputChange(value);
+                }}
                 onChange={(_, value: AssigneeOption | null) => handlePersonnelChange(value)}
                 getOptionLabel={assigneeLabel}
                 isOptionEqualToValue={(a, b) => a.id === b.id}
                 disabled={loadingEmployees || (IS_MEDICAL_APP ? !form.department : false)}
-                noOptionsText={IS_MEDICAL_APP && !form.department ? "Select department first" : "Type to search personnel"}
+                noOptionsText={
+                  IS_MEDICAL_APP && !form.department
+                    ? "Select department first"
+                    : "Type to search personnel"
+                }
                 renderOption={(props, option) => (
                   <li {...props} key={option.id}>
                     <Box>
                       <Typography variant="body2" fontWeight={600}>
-                        {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() || option.username}
+                        {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() ||
+                          option.username}
                       </Typography>
                       {(option.role || option.designation) && (
-                        <Typography variant="caption" color="text.secondary">{option.role || option.designation}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.role || option.designation}
+                        </Typography>
                       )}
                     </Box>
                   </li>
                 )}
                 renderInput={(params) => (
-                  <TextField {...params} fullWidth size="small" placeholder="Search appointment personnel" sx={inputStyle}
+                  <TextField
+                    {...params}
+                    fullWidth
+                    size="small"
+                    placeholder="Search appointment personnel"
+                    sx={inputStyle}
                     InputProps={{
                       ...params.InputProps,
                       endAdornment: (
-                        <>{personnelLoading || loadingEmployees ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}{params.InputProps.endAdornment}</>
+                        <>
+                          {personnelLoading || loadingEmployees ? (
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                          ) : null}
+                          {params.InputProps.endAdornment}
+                        </>
                       ),
                     }}
                   />
@@ -1218,29 +1257,55 @@ export function Step3({
               <Typography sx={labelStyle}>Date</Typography>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DatePicker
-                  value={selectedDate} format="DD/MM/YYYY" disablePast
+                  value={selectedDate}
+                  format="DD/MM/YYYY"
+                  disablePast
                   onChange={(newDate) => {
                     const asDayjs = newDate ? dayjs(newDate as Dayjs | Date) : null;
                     const validDate = asDayjs && asDayjs.isValid() ? asDayjs : null;
                     setSelectedDate(validDate);
-                    setForm((prev) => ({ ...prev, appointmentDate: validDate ? validDate.format("YYYY-MM-DD") : "" }));
+                    setForm((prev) => ({
+                      ...prev,
+                      appointmentDate: validDate ? validDate.format("YYYY-MM-DD") : "",
+                    }));
                   }}
-                  slotProps={{ textField: { size: "small", fullWidth: true, sx: inputStyle } }}
+                  slotProps={{
+                    textField: { size: "small", fullWidth: true, sx: inputStyle },
+                  }}
                 />
               </LocalizationProvider>
             </Box>
             <Box>
               <Typography sx={labelStyle}>Select Slot</Typography>
-              <TextField select fullWidth size="small" value={form.slot} onChange={handleChange("slot")} sx={inputStyle} SelectProps={{ native: false, MenuProps: SLOT_MENU_PROPS }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                value={form.slot}
+                onChange={handleChange("slot")}
+                sx={inputStyle}
+                SelectProps={{ native: false, MenuProps: SLOT_MENU_PROPS }}
+              >
                 <MenuItem value="">-- Select --</MenuItem>
-                {TIME_SLOTS.map((slot, i) => <MenuItem key={i} value={slot}>{slot}</MenuItem>)}
+                {TIME_SLOTS.map((slot, i) => (
+                  <MenuItem key={i} value={slot}>{slot}</MenuItem>
+                ))}
               </TextField>
             </Box>
           </Box>
 
           <Box>
             <Typography sx={labelStyle}>Remark</Typography>
-            <TextField fullWidth size="small" multiline rows={2} placeholder="Type Here..." value={form.remark} onChange={handleChange("remark")} sx={inputStyle} />
+            <TextField
+              fullWidth
+              size="small"
+              multiline
+              rows={2}
+              placeholder="Type Here..."
+              value={form.remark}
+              onChange={handleChange("remark")}
+              sx={inputStyle}
+            />
           </Box>
         </>
       )}
