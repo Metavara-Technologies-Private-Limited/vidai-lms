@@ -16,8 +16,8 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs, { Dayjs } from "dayjs";
 
-import { DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
-import type { Department, Employee } from "../../services/leads.api";
+// import { DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
+// import type { Department, Employee } from "../../services/leads.api";
 import {
   SOURCE_OPTIONS,
   SUB_SOURCE_OPTIONS,
@@ -66,12 +66,12 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
     Number(localStorage.getItem("clinic_id") ?? 1),
   );
 
-  const [departments, setDepartments] = React.useState<Department[]>([]);
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
+  // const [departments, setDepartments] = React.useState<Department[]>([]);
+  // const [employees, setEmployees] = React.useState<Employee[]>([]);
+  // const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
 
-  const setLoadingDepartments = React.useState(false)[1];
-  const [loadingEmployees, setLoadingEmployees] = React.useState(false);
+  // const setLoadingDepartments = React.useState(false)[1];
+  // const [loadingEmployees, setLoadingEmployees] = React.useState(false);
 
   const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
   const [loadingPipeline, setLoadingPipeline] = React.useState(false);
@@ -92,6 +92,21 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
       }
     });
     return Array.from(locationSet).sort();
+  }, [leads]);
+
+  const availableAssignees = React.useMemo(() => {
+    const map = new Map();
+
+    leads.forEach((lead) => {
+      if (lead.assigned_to_id && lead.assigned_to_name) {
+        map.set(lead.assigned_to_id, lead.assigned_to_name);
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, name]) => ({
+      id,
+      name,
+    }));
   }, [leads]);
 
   // ── Load pipeline stages when dialog opens ────────────────────────────────
@@ -153,60 +168,60 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   }, [open, clinicId]);
 
   // ── Load departments when dialog opens ────────────────────────────────────
-  React.useEffect(() => {
-    if (!open) return;
-    const fetchDepartments = async () => {
-      try {
-        setLoadingDepartments(true);
-        const data = await DepartmentAPI.listActiveByClinic(clinicId);
-        setDepartments(data);
-      } catch (err) {
-        console.error("Failed to load departments:", err);
-      } finally {
-        setLoadingDepartments(false);
-      }
-    };
-    void fetchDepartments();
-  }, [open, clinicId]);
+  // React.useEffect(() => {
+  //   if (!open) return;
+  //   const fetchDepartments = async () => {
+  //     try {
+  //       setLoadingDepartments(true);
+  //       const data = await DepartmentAPI.listActiveByClinic(clinicId);
+  //       setDepartments(data);
+  //     } catch (err) {
+  //       console.error("Failed to load departments:", err);
+  //     } finally {
+  //       setLoadingDepartments(false);
+  //     }
+  //   };
+  //   void fetchDepartments();
+  // }, [open, clinicId]);
 
   // ── Load employees when dialog opens ─────────────────────────────────────
-  React.useEffect(() => {
-    if (!open) return;
-    const fetchEmployees = async () => {
-      try {
-        setLoadingEmployees(true);
-        const data = await EmployeeAPI.listByClinic(clinicId);
-        setEmployees(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("Failed to load employees:", err);
-        setEmployees([]);
-      } finally {
-        setLoadingEmployees(false);
-      }
-    };
-    void fetchEmployees();
-  }, [open, clinicId]);
+  // React.useEffect(() => {
+  //   if (!open) return;
+  //   const fetchEmployees = async () => {
+  //     try {
+  //       setLoadingEmployees(true);
+  //       const data = await EmployeeAPI.listByClinic(clinicId);
+  //       setEmployees(Array.isArray(data) ? data : []);
+  //     } catch (err) {
+  //       console.error("Failed to load employees:", err);
+  //       setEmployees([]);
+  //     } finally {
+  //       setLoadingEmployees(false);
+  //     }
+  //   };
+  //   void fetchEmployees();
+  // }, [open, clinicId]);
 
   // ── Filter employees by selected department ───────────────────────────────
-  React.useEffect(() => {
-    if (!filters.department || employees.length === 0) {
-      setFilteredEmployees(employees);
-      return;
-    }
-    const selectedDept = departments.find(
-      (d) => d.id === Number(filters.department),
-    );
-    if (!selectedDept) {
-      setFilteredEmployees(employees);
-      return;
-    }
-    const normalize = (s: string) => (s ?? "").trim().toLowerCase();
-    setFilteredEmployees(
-      employees.filter(
-        (emp) => normalize(emp.department_name) === normalize(selectedDept.name),
-      ),
-    );
-  }, [filters.department, employees, departments]);
+  // React.useEffect(() => {
+  //   if (!filters.department || employees.length === 0) {
+  //     setFilteredEmployees(employees);
+  //     return;
+  //   }
+  //   const selectedDept = departments.find(
+  //     (d) => d.id === Number(filters.department),
+  //   );
+  //   if (!selectedDept) {
+  //     setFilteredEmployees(employees);
+  //     return;
+  //   }
+  //   const normalize = (s: string) => (s ?? "").trim().toLowerCase();
+  //   setFilteredEmployees(
+  //     employees.filter(
+  //       (emp) => normalize(emp.department_name) === normalize(selectedDept.name),
+  //     ),
+  //   );
+  // }, [filters.department, employees, departments]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleFilterChange = (field: keyof FilterValues, value: string) => {
@@ -428,13 +443,15 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                   select fullWidth size="small"
                   value={filters.assignee}
                   onChange={(e) => handleFilterChange("assignee", e.target.value)}
-                  disabled={loadingEmployees}
+                  // disabled={loadingEmployees}
                   sx={inputStyle}
                   SelectProps={{ displayEmpty: true }}
                 >
                   <MenuItem value="">Select Assignee</MenuItem>
-                  {filteredEmployees.map((emp) => (
-                    <MenuItem key={emp.id} value={emp.id.toString()}>{emp.emp_name}</MenuItem>
+                  {availableAssignees.map((a) => (
+                    <MenuItem key={a.id} value={a.id.toString()}>
+                      {a.name}
+                    </MenuItem>
                   ))}
                 </TextField>
               </Box>
