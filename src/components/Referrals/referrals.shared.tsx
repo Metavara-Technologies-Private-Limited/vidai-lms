@@ -319,7 +319,18 @@ export const PatientDetails = ({ patient }: { patient: PatientCard }) => {
   const treatments: string[] = (() => {
   const ti = patient.raw.treatment_interest;
   if (!ti) return [];
-  if (Array.isArray(ti)) return (ti as string[]).map((t: string) => t.trim()).filter(Boolean);
+  if (Array.isArray(ti)) {
+    return ti
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((t: any) => {
+        if (typeof t === "string") return t.trim();
+        if (typeof t === "object" && t !== null) {
+          return String(t.name || t.label || t.id || "").trim();
+        }
+        return String(t || "").trim();
+      })
+      .filter(Boolean);
+  }
   return (ti as string).split(",").map((t: string) => t.trim()).filter(Boolean);
 })();
 
