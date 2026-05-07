@@ -140,7 +140,6 @@ export const SmsTemplateTable: React.FC<Props> = ({
           <TableHead>
             <TableRow>
               <TableCell className={styles.headCell}>Template Name</TableCell>
-              <TableCell className={styles.headCell}>Content</TableCell>
               <TableCell className={styles.headCell}>Use Case</TableCell>
               <TableCell className={styles.headCell}>Last Updated At</TableCell>
               <TableCell className={styles.headCell}>Created By</TableCell>
@@ -153,7 +152,7 @@ export const SmsTemplateTable: React.FC<Props> = ({
             {visibleRows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={5}
                   align="center"
                   sx={{ py: 3, color: "#6B7280" }}
                 >
@@ -166,8 +165,6 @@ export const SmsTemplateTable: React.FC<Props> = ({
                 // DB Field Mapping: Map audience_name and email_body from your API
                 const templateName =
                   record.audience_name || record.name || "Untitled SMS";
-                const bodyContent =
-                  record.email_body || record.subject || record.body || "--";
                   const useCaseId = record.use_case || record.useCase || "";
                   const useCase = getUseCaseName(useCaseId);
                 const date =
@@ -188,9 +185,6 @@ export const SmsTemplateTable: React.FC<Props> = ({
                   >
                     <TableCell className={styles.nameCell}>
                       {templateName}
-                    </TableCell>
-                    <TableCell className={styles.subjectCell}>
-                      {bodyContent}
                     </TableCell>
                     <TableCell>
                       <Chip
