@@ -45,7 +45,7 @@ import { toast } from 'react-toastify';
 import { selectClinic } from '../../../store/clinicSlice';
 import type { UseCase } from '../../../services/usecase.api'; // ✅ ADDED
 
-const TEMPLATE_NAME_REGEX = /^[A-Za-z\s-]*$/;
+const TEMPLATE_NAME_REGEX = /^[A-Za-z0-9\s–-]*$/;
 const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1000;
 const SUBJECT_MUST_CONTAIN_LETTER_REGEX = /[A-Za-z]/;
 
@@ -724,8 +724,10 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
               const value = e.target.value;
               if (!TEMPLATE_NAME_REGEX.test(value)) {
                 toast.error(
-                  "Template name can only contain letters, spaces, and hyphens",
-                  { toastId: "template-name-alpha" },
+                  "Template name can only contain letters, numbers, spaces, and hyphens",
+                  {
+                    toastId: "template-name-alpha",
+                  },
                 );
                 return;
               }

@@ -121,10 +121,12 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
       ? ((formData.get("name") ?? formData.get("audience_name") ?? "") as string)
       : ((formData?.name ?? formData?.audience_name ?? "") as string);
     const templateName = rawName.trim();
-    const alphabetOnlyPattern = /^[A-Za-z\s]+$/;
+    const templateNamePattern = /^[A-Za-z0-9\s–-]+$/;
 
-    if (!templateName || !alphabetOnlyPattern.test(templateName)) {
-      toast.error("Template name should contain only alphabets.");
+    if (!templateName || !templateNamePattern.test(templateName)) {
+      toast.error(
+        "Template name can only contain letters, numbers, spaces, and hyphens.",
+      );
       return;
     }
 

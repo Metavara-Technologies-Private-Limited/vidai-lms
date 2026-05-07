@@ -22,7 +22,7 @@ import type {
 import type { UseCase } from "../../../services/usecase.api";
 import { toast } from "react-toastify";
 
-const TEMPLATE_NAME_REGEX = /^[A-Za-z\s-]*$/;
+const TEMPLATE_NAME_REGEX = /^[A-Za-z0-9\s–-]*$/;
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
   const candidate = doc.file_url || doc.file || doc.url || "";
@@ -195,7 +195,7 @@ export const NewWhatsAppTemplateForm: React.FC<
     if (field === "name") {
       if (!TEMPLATE_NAME_REGEX.test(value)) {
         toast.error(
-          "Template name can only contain letters, spaces, and hyphens",
+          "Template name can only contain letters, numbers, spaces, and hyphens",
           {
             toastId: "template-name-alpha",
           },
