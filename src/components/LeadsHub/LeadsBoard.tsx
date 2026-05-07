@@ -17,6 +17,7 @@ import {
   selectLeadsLoading,
   selectLeadsError,
 } from "../../store/leadSlice";
+import { selectUsers } from "../../store/userSlice";
 import { selectClinic } from "../../store/clinicSlice";
 import {
   pipelineApi,
@@ -25,9 +26,9 @@ import {
 } from "../../services/pipeline.api";
 import {
   DepartmentAPI,
-  EmployeeAPI,
   TwilioAPI,
 } from "../../services/leads.api";
+import { authApi } from "../../services/auth.api";
 import type { FilterValues } from "../../types/leads.types";
 import TemplateService from "../../services/templates.api";
 
@@ -111,6 +112,89 @@ const extractErrorMessage = (err: unknown, fallback: string): string => {
     e?.message ||
     fallback
   );
+};
+
+type PersonnelApiItem = {
+  id?: number | string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  role?: { name?: string } | string;
+};
+
+type InternalUserItem = {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  role?: { name?: string } | string;
+};
+
+const normalizePersonnelList = (raw: unknown) => {
+  const root =
+    typeof raw === "object" && raw !== null
+      ? (raw as {
+          data?: { objects?: PersonnelApiItem[] } | PersonnelApiItem[];
+          results?: PersonnelApiItem[];
+        })
+      : null;
+
+  const list: PersonnelApiItem[] = Array.isArray(raw)
+    ? (raw as PersonnelApiItem[])
+    : Array.isArray(root?.data) // API can return list in data
+      ? (root.data as PersonnelApiItem[])
+      : Array.isArray(root?.data?.objects)
+        ? (root.data.objects as PersonnelApiItem[])
+        : Array.isArray(root?.results)
+          ? (root.results as PersonnelApiItem[])
+          : [];
+
+  return list
+    .map((user) => {
+      const id =
+        typeof user.id === "number"
+          ? user.id
+          : typeof user.id === "string"
+            ? Number(user.id)
+            : NaN;
+
+      if (!Number.isFinite(id)) return null;
+
+      const fullName = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
+      const roleName =
+        typeof user.role === "object"
+          ? user.role?.name ?? ""
+          : typeof user.role === "string"
+            ? user.role
+            : "";
+
+      return {
+        id,
+        emp_name: fullName || user.username || `User #${id}`,
+        emp_type: roleName,
+        department_name: "",
+      };
+    })
+    .filter((item): item is { id: number; emp_name: string; emp_type: string; department_name: string } => Boolean(item));
+};
+
+const normalizeInternalUsers = (users: InternalUserItem[]) => {
+  return users.map((user) => {
+    const fullName = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
+    const roleName =
+      typeof user.role === "object"
+        ? user.role?.name ?? ""
+        : typeof user.role === "string"
+          ? user.role
+          : "";
+
+    return {
+      id: user.id,
+      emp_name: fullName || user.username || `User #${user.id}`,
+      emp_type: roleName,
+      department_name: "",
+    };
+  });
 };
 
 // ====================== Empty appointment state ======================
@@ -1358,6 +1442,7 @@ const LeadsBoard: React.FC<Props> = ({
   const navigate = useNavigate();
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const clinic = useSelector(selectClinic);
+  const users = useSelector(selectUsers);
 
   const reduxLeads = useSelector(selectLeads);
   const loading = useSelector(selectLeadsLoading);
@@ -1506,7 +1591,19 @@ const LeadsBoard: React.FC<Props> = ({
   };
 
   React.useEffect(() => {
-    if (!openBookModal || !selectedLead?.clinic_id) return;
+    if (!openBookModal) return;
+
+    const resolvedClinicId = Number(selectedLead?.clinic_id ?? clinic?.id ?? 0);
+    if (!Number.isFinite(resolvedClinicId) || resolvedClinicId <= 0) {
+      setAppointment((prev) => ({
+        ...prev,
+        loadingDepartments: false,
+        loadingEmployees: false,
+        error: "Clinic is missing for this lead. Please refresh and try again.",
+      }));
+      return;
+    }
+
     const fetchAll = async () => {
       setAppointment((prev) => ({
         ...prev,
@@ -1515,12 +1612,45 @@ const LeadsBoard: React.FC<Props> = ({
         error: null,
       }));
       try {
-        const [departments, employees] = await Promise.all([
-          DepartmentAPI.listActiveByClinic(selectedLead.clinic_id as number),
-          EmployeeAPI.listByClinic(selectedLead.clinic_id as number),
+        const [departments, usersResponse] = await Promise.all([
+          DepartmentAPI.listActiveByClinic(resolvedClinicId),
+          authApi.searchUsers({
+            search: "",
+            limit: 100,
+            offset: 0,
+          }),
         ]);
-        setAppointment((prev) => ({ ...prev, departments, employees }));
+
+        const resolvedEmployees = normalizePersonnelList(usersResponse);
+
+        const fallbackUsers = Array.isArray(users)
+          ? normalizeInternalUsers(users as InternalUserItem[])
+          : [];
+
+        const personnelOptions =
+          resolvedEmployees.length > 0 ? resolvedEmployees : fallbackUsers;
+
+        setAppointment((prev) => ({
+          ...prev,
+          departments,
+          employees: personnelOptions,
+          filteredEmployees: personnelOptions,
+        }));
       } catch {
+        const fallbackUsers = Array.isArray(users)
+          ? normalizeInternalUsers(users as InternalUserItem[])
+          : [];
+
+        if (fallbackUsers.length > 0) {
+          setAppointment((prev) => ({
+            ...prev,
+            employees: fallbackUsers,
+            filteredEmployees: fallbackUsers,
+            error: null,
+          }));
+          return;
+        }
+
         setAppointment((prev) => ({
           ...prev,
           error: "Failed to load departments/personnel. Please try again.",
@@ -1534,7 +1664,7 @@ const LeadsBoard: React.FC<Props> = ({
       }
     };
     fetchAll();
-  }, [openBookModal, selectedLead]);
+  }, [clinic?.id, openBookModal, selectedLead, users]);
 
   React.useEffect(() => {
     setAppointment((prev) => {
@@ -1546,9 +1676,10 @@ const LeadsBoard: React.FC<Props> = ({
       const deptName =
         prev.departments.find((d) => d.id === Number(prev.selectedDepartmentId))
           ?.name ?? "";
-      const filtered = prev.employees.filter(
+      const filteredByName = prev.employees.filter(
         (emp) => emp.department_name?.toLowerCase() === deptName.toLowerCase(),
       );
+      const filtered = filteredByName.length > 0 ? filteredByName : prev.employees;
       const empStillPresent = filtered.some(
         (e) => e.id === Number(prev.selectedEmployeeId),
       );
@@ -1630,9 +1761,45 @@ const LeadsBoard: React.FC<Props> = ({
       }));
       return;
     }
+
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const selectedDay = new Date(appointment.date);
+    selectedDay.setHours(0, 0, 0, 0);
+
+    if (selectedDay.getTime() < today.getTime()) {
+      setAppointment((p) => ({
+        ...p,
+        error: "Cannot book appointment for a past date.",
+      }));
+      return;
+    }
+
     if (!appointment.slot) {
       setAppointment((p) => ({ ...p, error: "Please select a time slot." }));
       return;
+    }
+
+    const slotMatch = appointment.slot.match(/^(\d{1,2}):(\d{2})\s(AM|PM)/);
+    if (selectedDay.getTime() === today.getTime() && slotMatch) {
+      let hour = Number(slotMatch[1]);
+      const minute = Number(slotMatch[2]);
+      const meridiem = slotMatch[3];
+
+      if (meridiem === "PM" && hour !== 12) hour += 12;
+      if (meridiem === "AM" && hour === 12) hour = 0;
+
+      const slotStart = new Date(now);
+      slotStart.setHours(hour, minute, 0, 0);
+
+      if (slotStart.getTime() <= now.getTime()) {
+        setAppointment((p) => ({
+          ...p,
+          error: "Cannot book appointment for a past time.",
+        }));
+        return;
+      }
     }
 
     setAppointment((p) => ({ ...p, submitting: true, error: null }));
@@ -1653,6 +1820,7 @@ const LeadsBoard: React.FC<Props> = ({
             assigned_to_id: Number(appointment.selectedEmployeeId),
           }),
         },
+        leadSnapshot: selectedLead,
       }),
     );
 

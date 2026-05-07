@@ -660,13 +660,13 @@ export default function AddNewLead() {
       }
       if (field === "contact") {
         const rawDigits = rawValue.replace(/\D/g, "");
-        const digitsOnly = rawDigits.slice(0, 10);
+        const digitsOnly = rawDigits.slice(0, 15);
         setForm((prev) => ({ ...prev, contact: digitsOnly }));
         return;
       }
       if (field === "contactPhone") {
         const rawDigits = rawValue.replace(/\D/g, "");
-        const digitsOnly = rawDigits.slice(0, 10);
+        const digitsOnly = rawDigits.slice(0, 15);
         setForm((prev) => ({ ...prev, contactPhone: digitsOnly }));
         return;
       }

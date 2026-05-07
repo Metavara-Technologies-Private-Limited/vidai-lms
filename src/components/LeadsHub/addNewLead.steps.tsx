@@ -76,6 +76,20 @@ const capitalizeWords = (str: string): string =>
 // ── FIX: normalize for case-insensitive comparison ───────────────────────────
 const normalizeForCompare = (val: string): string => val.trim().toLowerCase();
 
+const parseSlotStartTime = (slotStr: string): dayjs.Dayjs | null => {
+  const match = slotStr.match(/^(\d{1,2}):(\d{2})\s(AM|PM)/);
+  if (!match) return null;
+
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const meridiem = match[3];
+
+  if (meridiem === "PM" && hour !== 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+
+  return dayjs().set("hour", hour).set("minute", minute).set("second", 0);
+};
+
 const SLOT_MENU_PROPS = {
   anchorOrigin: { vertical: "bottom" as const, horizontal: "left" as const },
   transformOrigin: { vertical: "top" as const, horizontal: "left" as const },
@@ -343,7 +357,7 @@ export function Step1({
               size="small"
               value={form[field] as string}
               onChange={handleChange(field)}
-              inputProps={field === "contact" ? { maxLength: 10, inputMode: "numeric" } : undefined}
+              inputProps={field === "contact" ? { maxLength: 15, inputMode: "numeric" } : undefined}
               sx={inputStyle}
             />
           </Box>
@@ -459,7 +473,7 @@ export function Step1({
                   size="small"
                   value={(form[field] as string) ?? ""}
                   onChange={handleChange(field)}
-                  inputProps={field === "contactPhone" ? { maxLength: 10, inputMode: "numeric" } : undefined}
+                  inputProps={field === "contactPhone" ? { maxLength: 15, inputMode: "numeric" } : undefined}
                   sx={inputStyle}
                 />
               </Box>
@@ -1184,6 +1198,36 @@ export function Step3({
 }: Step3Props) {
   const noAppointment = form.wantAppointment === "no";
 
+  const availableSlots = React.useMemo<string[]>(() => {
+    if (!selectedDate) return TIME_SLOTS;
+
+    const selectedDateStartOfDay = selectedDate.startOf("day");
+    const today = dayjs().startOf("day");
+    const isToday = selectedDateStartOfDay.isSame(today, "day");
+    if (!isToday) return TIME_SLOTS;
+
+    const now = dayjs();
+    return TIME_SLOTS.filter((slotStr) => {
+      const slotTime = parseSlotStartTime(slotStr);
+      if (!slotTime) return true;
+      const slotTimeToday = dayjs()
+        .set("hour", slotTime.hour())
+        .set("minute", slotTime.minute())
+        .set("second", 0);
+      return slotTimeToday.isAfter(now);
+    });
+  }, [selectedDate]);
+
+  React.useEffect(() => {
+    if (!form.slot) return;
+    if (availableSlots.includes(form.slot)) return;
+
+    setForm((prev) => ({
+      ...prev,
+      slot: "",
+    }));
+  }, [availableSlots, form.slot, setForm]);
+
   const handleWantAppointmentChange = (value: "yes" | "no") => {
     setForm((prev) => ({
       ...prev,
@@ -1361,9 +1405,12 @@ export function Step3({
                 SelectProps={{ native: false, MenuProps: SLOT_MENU_PROPS }}
               >
                 <MenuItem value="">-- Select --</MenuItem>
-                {TIME_SLOTS.map((slot, i) => (
+                {availableSlots.map((slot, i) => (
                   <MenuItem key={i} value={slot}>{slot}</MenuItem>
                 ))}
+                {selectedDate && availableSlots.length === 0 && (
+                  <MenuItem disabled>No slots available for selected time</MenuItem>
+                )}
               </TextField>
             </Box>
           </Box>

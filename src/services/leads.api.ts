@@ -672,82 +672,22 @@ export const LeadAPI = {
     files: File[],
     referralSource?: ReferralSourceObject,
   ): Promise<Lead> => {
-    const formData = new FormData();
-    const sanitized = sanitizeLeadCreatePayload(data);
+    const createdLead = await LeadAPI.create(data, referralSource);
 
-    appendPayloadToFormData(formData, sanitized);
-
-    if (referralSource) {
-      formData.append("referral_source", JSON.stringify(referralSource));
-    }
-
-    files.forEach((file) => formData.append("documents", file));
-
-    if (import.meta.env.DEV) {
-      console.log("📤 createWithDocuments FormData entries:");
-      for (const [key, value] of formData.entries()) {
-        console.log(
-          `  ${key}:`,
-          value instanceof File ? `File(${value.name}, ${value.size}B)` : value,
-        );
-      }
+    if (!files.length) {
+      return createdLead;
     }
 
     try {
-      const response = await api.post<Lead>(
-        `/leads/?clinic_id=${data.clinic_id}`,
-        formData,
-        {
-          headers: {
-            "X-Clinic-Id": String(data.clinic_id),
-          },
-        },
-      );
-      console.log("✅ Lead + documents created:", response.data);
-      return response.data;
-    } catch (error) {
-      if (!isServer500(error)) {
-        throw error;
-      }
-
-      const minimal = buildMinimalLeadCreatePayload(sanitized);
-      const minimalFormData = new FormData();
-      appendPayloadToFormData(minimalFormData, minimal);
-      if (referralSource) {
-        minimalFormData.append("referral_source", JSON.stringify(referralSource));
-      }
-      files.forEach((file) => minimalFormData.append("documents", file));
-
+      const updatedLead = await LeadAPI.uploadDocuments(getLeadId(createdLead), files);
+      console.log("✅ Lead created and documents uploaded:", updatedLead);
+      return updatedLead;
+    } catch (uploadError) {
       console.warn(
-        "[LeadAPI.createWithDocuments] Full payload create failed with 500. Retrying with minimal payload.",
+        "[LeadAPI.createWithDocuments] Lead was created, but document upload failed.",
+        uploadError,
       );
-
-      const retryResponse = await api.post<Lead>(
-        `/leads/?clinic_id=${data.clinic_id}`,
-        minimalFormData,
-        {
-          headers: {
-            "X-Clinic-Id": String(data.clinic_id),
-          },
-        },
-      );
-
-      const createdLead = retryResponse.data;
-
-      try {
-        const enrichedLead = await LeadAPI.update(getLeadId(createdLead), {
-          ...sanitized,
-          clinic_id: createdLead.clinic_id ?? sanitized.clinic_id,
-          department_id: createdLead.department_id ?? sanitized.department_id,
-        });
-        return enrichedLead;
-      } catch (enrichError) {
-        console.warn(
-          "[LeadAPI.createWithDocuments] Minimal create succeeded, but enrich update failed.",
-          enrichError,
-        );
-        return createdLead;
-      }
+      return createdLead;
     }
   },
 

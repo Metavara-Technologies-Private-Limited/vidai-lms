@@ -20,6 +20,7 @@ import CallTranscriptPopup from "./CallTranscriptPopup";
 import { LeadAPI, api, type Lead } from "../../services/leads.api";
 import type { CallReportRow, CallViewMode } from "../../types/reports.types";
 import { selectClinic } from "../../store/clinicSlice";
+import { selectLeads } from "../../store/leadSlice";
 import { useSelector } from "react-redux";
 
 interface CallReportsProps {
@@ -41,6 +42,8 @@ type TwilioCallRecord = {
   duration_sec?: number | string;
   duration_seconds?: number | string;
 };
+
+const CALL_ROWS_CACHE = new Map<number, CallReportRow[]>();
 
 const tableStyles = {
   container: {
@@ -138,15 +141,51 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
   const [callRows, setCallRows] = useState<CallReportRow[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(false);
   const clinic = useSelector(selectClinic);
+  const reduxLeads = useSelector(selectLeads);
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchCallRows = async () => {
       try {
+        const clinicId = Number(clinic?.id ?? 0);
+
+        // Instant paint from cache for snappier UX on revisits/tab switches.
+        const cached = clinicId > 0 ? CALL_ROWS_CACHE.get(clinicId) : undefined;
+        if (cached) {
+          if (isMounted) {
+            setCallRows(cached);
+            setLoadingCalls(false);
+          }
+          return;
+        }
+
         setLoadingCalls(true);
 
-        const leads = clinic?.id ? await LeadAPI.list(clinic?.id) : [];
+        if (!clinic?.id) {
+          if (isMounted) {
+            setCallRows([]);
+          }
+          return;
+        }
+
+        const clinicLeadsFromStore = reduxLeads.filter(
+          (lead) => Number(lead?.clinic_id ?? 0) === clinic.id,
+        );
+
+        const leadsPromise =
+          clinicLeadsFromStore.length > 0
+            ? Promise.resolve(clinicLeadsFromStore as Lead[])
+            : LeadAPI.list(clinic.id);
+
+        const [leads, callsResponse] = await Promise.all([
+          leadsPromise,
+          api
+            .get<TwilioCallRecord[] | { results?: TwilioCallRecord[] }>(
+              `/twilio/calls/?clinic_id=${clinic.id}`,
+            )
+            .catch(() => ({ data: [] as TwilioCallRecord[] })),
+        ]);
         const leadById = new Map<string, Lead>();
         leads.forEach((lead: Lead) => {
           if (lead?.id) {
@@ -154,35 +193,29 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
           }
         });
 
-        let allCalls: TwilioCallRecord[] = [];
-
-        try {
-          const response = await api.get<TwilioCallRecord[] | { results?: TwilioCallRecord[] }>("/twilio/calls/");
-          const payload = response.data;
-          allCalls = Array.isArray(payload) ? payload : payload?.results ?? [];
-        } catch {
-          const perLeadCalls = await Promise.allSettled(
-            leads.map(async (lead: Lead) => {
-              const response = await api.get<TwilioCallRecord[] | { results?: TwilioCallRecord[] }>(`/twilio/calls/?lead_uuid=${lead.id}`);
-              const payload = response.data;
-              return Array.isArray(payload) ? payload : payload?.results ?? [];
-            }),
-          );
-
-          allCalls = perLeadCalls
-            .filter((result): result is PromiseFulfilledResult<TwilioCallRecord[]> => result.status === "fulfilled")
-            .flatMap((result) => result.value);
-        }
+        const payload = callsResponse.data;
+        const allCalls: TwilioCallRecord[] = Array.isArray(payload)
+          ? payload
+          : payload?.results ?? [];
 
         const uniqueCalls = new Map<string, TwilioCallRecord>();
         allCalls.forEach((call, index) => {
+          if (call.lead_uuid && !leadById.has(String(call.lead_uuid))) {
+            return;
+          }
           const key = String(call.id ?? call.sid ?? index);
           if (!uniqueCalls.has(key)) {
             uniqueCalls.set(key, call);
           }
         });
 
-        const mappedRows: CallReportRow[] = Array.from(uniqueCalls.values()).map((call, index) => {
+        const sortedCalls = Array.from(uniqueCalls.values()).sort((a, b) => {
+          const first = new Date(a.created_at ?? "").getTime();
+          const second = new Date(b.created_at ?? "").getTime();
+          return (Number.isFinite(second) ? second : 0) - (Number.isFinite(first) ? first : 0);
+        });
+
+        const mappedRows: CallReportRow[] = sortedCalls.map((call, index) => {
           const lead = leadById.get(String(call.lead_uuid ?? ""));
           const durationInSeconds = getDurationSeconds(call);
 
@@ -198,13 +231,8 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
           };
         });
 
-        mappedRows.sort((a, b) => {
-          const first = new Date(a.dateTime.replace(" | ", " ")).getTime();
-          const second = new Date(b.dateTime.replace(" | ", " ")).getTime();
-          return Number.isNaN(second - first) ? 0 : second - first;
-        });
-
         if (!isMounted) return;
+        CALL_ROWS_CACHE.set(clinic.id, mappedRows);
         setCallRows(mappedRows);
       } catch (error) {
         console.error("Failed to fetch call history:", error);
@@ -222,7 +250,7 @@ const CallReports = ({ searchQuery }: CallReportsProps) => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [clinic?.id, reduxLeads]);
 
   const modeRows = useMemo(() => {
     return callRows.filter((item) => item.mode === viewMode);
