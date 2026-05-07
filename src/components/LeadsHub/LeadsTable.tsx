@@ -631,8 +631,12 @@ const LeadsTable: React.FC<Props> = ({
       nextStatusLabel,
     );
 
+    
     try {
       const latestLead = await LeadAPI.getById(editStatusLead.id);
+      const treatmentInterest =
+        latestLead.treatment_interest ?? editStatusLead.treatment_interest;
+
       const resolvedClinicId =
         latestLead.clinic_id ?? editStatusLead.clinic_id ?? clinic?.id;
       const resolvedDepartmentId =
@@ -653,10 +657,12 @@ const LeadsTable: React.FC<Props> = ({
           "",
         ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
         source: latestLead.source || editStatusLead.source || "",
-        treatment_interest:
-          latestLead.treatment_interest ||
-          editStatusLead.treatment_interest ||
-          "",
+        treatment_interest: Array.isArray(treatmentInterest)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? treatmentInterest.map((item: any) =>
+              typeof item === "object" ? item.id : item,
+            )
+          : [],
         book_appointment:
           latestLead.book_appointment ??
           editStatusLead.book_appointment ??

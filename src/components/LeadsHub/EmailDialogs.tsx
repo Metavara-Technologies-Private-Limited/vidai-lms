@@ -47,6 +47,10 @@ import {
 import { EmailTemplateAPI, LeadEmailAPI } from "../../services/leads.api";
 import type { EmailTemplate, LeadMailListItem } from "../../services/leads.api";
 import { clinicsApi } from "../../services/tickets.api";
+import { UseCaseAPI } from "../../services/usecase.api";
+import type { UseCase } from "../../services/usecase.api";
+import { useSelector } from "react-redux";
+import { selectClinic } from "../../store/clinicSlice";
 
 // ── Shared toast options ──────────────────────────────────────────────────────
 const toastOptions = {
@@ -56,7 +60,7 @@ const toastOptions = {
 };
 
 // ── Clinic ID ─────────────────────────────────────────────────────────────────
-const CLINIC_ID = 1;
+// const CLINIC_ID = 1;
 
 // ── Default fallback from-email ───────────────────────────────────────────────
 const DEFAULT_FROM_EMAIL = "noreply@fertility.com";
@@ -131,6 +135,31 @@ const getUseCaseSx = (useCase?: string) => {
       color: "#64748B",
     }
   );
+};
+
+const getUseCaseName = (useCase: unknown, useCases: UseCase[]): string => {
+  if (!useCase) return "";
+
+  // already object
+  if (typeof useCase === "object" && useCase !== null) {
+    const uc = useCase as { id?: string; name?: string };
+
+    if (uc.name) return uc.name;
+
+    if (uc.id) {
+      const found = useCases.find((item) => String(item.id) === String(uc.id));
+
+      return found?.name || uc.id;
+    }
+  }
+
+  // uuid lookup
+  const found = useCases.find((uc) => String(uc.id) === String(useCase));
+
+  if (found?.name) return found.name;
+
+  // already plain name
+  return String(useCase);
 };
 
 // ── Clinic email extraction ───────────────────────────────────────────────────
@@ -359,6 +388,8 @@ export const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({
   const [body, setBody] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const clinic = useSelector(selectClinic);
+  const CLINIC_ID = clinic?.id;
 
   React.useEffect(() => {
     if (!open) {
@@ -383,6 +414,7 @@ export const NewEmailTemplateDialog: React.FC<NewEmailTemplateDialogProps> = ({
       setError("Body is required.");
       return;
     }
+    if (!CLINIC_ID) return;
     setSaving(true);
     setError(null);
     try {
@@ -618,7 +650,8 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
     null,
   );
   const [moreAnchor, setMoreAnchor] = React.useState<HTMLElement | null>(null);
-
+  
+  const [useCases, setUseCases] = React.useState<UseCase[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const bodyRef = React.useRef<HTMLTextAreaElement>(null);
@@ -626,6 +659,8 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
     start: 0,
     end: 0,
   });
+  const clinic = useSelector(selectClinic);
+  const CLINIC_ID = clinic?.id;
 
   const leadEmail = lead?.email ?? "";
   const leadName =
@@ -666,7 +701,14 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
 
   /* ── Reset + load on open ─────────────────────────────────────────────── */
   React.useEffect(() => {
-    if (!open) return;
+    if (!open || !CLINIC_ID) return;
+    UseCaseAPI.getUseCases(CLINIC_ID)
+      .then((data) => {
+        setUseCases(data || []);
+      })
+      .catch(() => {
+        setUseCases([]);
+      });
     setStep("selector");
     setSubject("");
     setBody("");
@@ -715,7 +757,7 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
         setEmailTemplates([]);
       })
       .finally(() => setLoadingTemplates(false));
-  }, [open, leadEmail]);
+  }, [open, leadEmail, CLINIC_ID]);
 
   /* ── Template selection ───────────────────────────────────────────────── */
   const handleSelectTemplate = (t: EmailTemplate) => {
@@ -1240,10 +1282,12 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
                       </Typography>
                       {t.use_case && (
                         <Chip
-                          label={t.use_case}
+                          label={getUseCaseName(t.use_case, useCases)}
                           size="small"
                           sx={{
-                            ...getUseCaseSx(t.use_case),
+                            ...getUseCaseSx(
+                              getUseCaseName(t.use_case, useCases),
+                            ),
                             fontSize: "11px",
                             height: 20,
                             textTransform: "capitalize",
@@ -1346,10 +1390,12 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
             <Typography fontWeight={600}>{previewTemplate?.name}</Typography>
             {previewTemplate?.use_case && (
               <Chip
-                label={previewTemplate.use_case}
+                label={getUseCaseName(previewTemplate.use_case, useCases)}
                 size="small"
                 sx={{
-                  ...getUseCaseSx(previewTemplate.use_case),
+                  ...getUseCaseSx(
+                    getUseCaseName(previewTemplate.use_case, useCases),
+                  ),
                   fontSize: "11px",
                   height: 20,
                   mt: 0.5,

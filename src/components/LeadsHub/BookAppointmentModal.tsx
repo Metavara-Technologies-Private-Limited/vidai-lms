@@ -378,7 +378,12 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         full_name: lead.full_name || lead.name,
         ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
         source: lead.source || "Unknown",
-        treatment_interest: lead.treatment_interest || "N/A",
+        treatment_interest: Array.isArray(lead.treatment_interest)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? lead.treatment_interest.map((item: any) =>
+              typeof item === "object" ? item.id : item,
+            )
+          : [],
         lead_status: "appointment",
         book_appointment: true,
         appointment_date: appointmentDateStr,
