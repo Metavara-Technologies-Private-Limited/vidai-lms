@@ -269,9 +269,22 @@ export const clearTokens = (): void => {
 };
 
 // ====================== Axios Instance ======================
-const API_BASE_URL: string =
-  (import.meta as unknown as { env: Record<string, string> }).env
-    ?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api";
+const resolveApiBaseUrl = (): string => {
+  const configured = (
+    (import.meta as unknown as { env: Record<string, string | undefined> }).env
+      ?.VITE_API_BASE_URL
+  )?.trim();
+
+  if (configured) return configured;
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/api`;
+  }
+
+  return "http://127.0.0.1:8000/api";
+};
+
+const API_BASE_URL: string = resolveApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
