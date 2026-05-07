@@ -276,7 +276,16 @@ export const convertLead = createAsyncThunk<
       full_name: lead.full_name,
       contact_no: lead.contact_no,
       source: lead.source || "Unknown",
-      treatment_interest: lead.treatment_interest || [],
+      treatment_interest: Array.isArray(lead.treatment_interest)
+        ? lead.treatment_interest.map((t: any) =>
+            typeof t === "string" ? t : t.id,
+          )
+        : typeof lead.treatment_interest === "string"
+          ? lead.treatment_interest
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : [],
       book_appointment: shouldKeepAppointment,
       appointment_date: shouldKeepAppointment
         ? normalizedAppointmentDate
