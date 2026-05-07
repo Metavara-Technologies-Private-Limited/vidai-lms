@@ -112,7 +112,7 @@ const defaultForm: UserFormData = {
   removeProfilePhoto: false,
 };
 
-const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
+const MAX_PROFILE_PHOTO_SIZE = 5 * 1024 * 1024;
 
 const FieldGrid = ({ children }: { children: React.ReactNode }) => (
   <Grid size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>{children}</Grid>
@@ -295,7 +295,7 @@ const UserDetailsForm: React.FC<Props> = ({
     }
 
     if (file.size > MAX_PROFILE_PHOTO_SIZE) {
-      toast.error("Profile photo must be 20MB or smaller");
+      toast.error("Profile photo size must be up to 5MB");
       e.target.value = "";
       return;
     }

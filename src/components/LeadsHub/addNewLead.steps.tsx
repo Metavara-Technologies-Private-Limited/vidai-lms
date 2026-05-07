@@ -248,6 +248,35 @@ export function Step1({
   const [leadGeneratedByOpen, setLeadGeneratedByOpen] = React.useState(false);
   const { languages: usLanguages, loading: languagesLoading } = useUSLanguages();
 
+  const selectedLeadGeneratedByOption = React.useMemo<AssigneeOption | null>(() => {
+    if (!selectedLeadGeneratedBy) return null;
+
+    const selectedId = Number(selectedLeadGeneratedBy.id);
+    if (Number.isFinite(selectedId) && selectedId > 0) {
+      const matched = leadGeneratedByOptions.find((o) => o.id === selectedId);
+      if (matched) return matched;
+      return {
+        id: selectedId,
+        first_name: selectedLeadGeneratedBy.first_name,
+        last_name: selectedLeadGeneratedBy.last_name,
+        username: undefined,
+        role: selectedLeadGeneratedBy.role,
+        designation: selectedLeadGeneratedBy.role,
+        email: selectedLeadGeneratedBy.email,
+      };
+    }
+
+    return {
+      id: -1,
+      first_name: selectedLeadGeneratedBy.first_name,
+      last_name: selectedLeadGeneratedBy.last_name,
+      username: undefined,
+      role: selectedLeadGeneratedBy.role,
+      designation: selectedLeadGeneratedBy.role,
+      email: selectedLeadGeneratedBy.email,
+    };
+  }, [leadGeneratedByOptions, selectedLeadGeneratedBy]);
+
   const availableSubSources: string[] =
     form.source === "Referral"
       ? referralDepartments.map((d) => d.name)
@@ -314,7 +343,7 @@ export function Step1({
               size="small"
               value={form[field] as string}
               onChange={handleChange(field)}
-              inputProps={field === "contact" ? { maxLength: 15 } : undefined}
+              inputProps={field === "contact" ? { maxLength: 10, inputMode: "numeric" } : undefined}
               sx={inputStyle}
             />
           </Box>
@@ -430,7 +459,7 @@ export function Step1({
                   size="small"
                   value={(form[field] as string) ?? ""}
                   onChange={handleChange(field)}
-                  inputProps={field === "contactPhone" ? { maxLength: 15 } : undefined}
+                  inputProps={field === "contactPhone" ? { maxLength: 10, inputMode: "numeric" } : undefined}
                   sx={inputStyle}
                 />
               </Box>
@@ -612,7 +641,7 @@ export function Step1({
               open={leadGeneratedByOpen}
               onOpen={() => setLeadGeneratedByOpen(true)}
               onClose={() => setLeadGeneratedByOpen(false)}
-              value={leadGeneratedByOptions.find((o) => assigneeLabel(o) === leadGeneratedByInput) || null}
+              value={selectedLeadGeneratedByOption}
               inputValue={leadGeneratedByInput}
               onInputChange={(_, value: string, reason) => {
                 if (reason === "reset") return;
@@ -898,7 +927,10 @@ export function Step2({
       </Typography>
 
       <Box sx={{ mb: 3 }}>
-        <Typography sx={labelStyle}>{interestLabel}</Typography>
+        <Typography sx={labelStyle}>
+          {interestLabel}
+          <span style={{ color: "red", marginLeft: "4px" }}>*</span>
+        </Typography>
         <TextField
           select
           fullWidth

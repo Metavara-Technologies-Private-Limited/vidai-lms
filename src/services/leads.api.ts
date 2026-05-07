@@ -582,6 +582,24 @@ const sanitizeLeadCreatePayload = (data: LeadPayload): LeadPayload => {
   return next as LeadPayload;
 };
 
+const buildMinimalLeadCreatePayload = (data: LeadPayload): LeadPayload => ({
+  clinic_id: data.clinic_id,
+  department_id: data.department_id,
+  full_name: data.full_name,
+  contact_no: data.contact_no,
+  source: data.source,
+  partner_inquiry: data.partner_inquiry,
+  book_appointment: false,
+  appointment_date: null,
+  slot: "",
+  is_active: data.is_active,
+});
+
+const isServer500 = (error: unknown): boolean =>
+  axios.isAxiosError(error) && error.response?.status === 500;
+
+const getLeadId = (lead: Lead): string => String(lead.id);
+
 export const LeadAPI = {
   list: (clinicId: number) =>
     api.get(`/leads/list/?clinic_id=${clinicId}`).then((res) => res.data),
@@ -594,17 +612,59 @@ export const LeadAPI = {
     const body = referralSource
       ? { ...sanitized, referral_source: referralSource }
       : sanitized;
-    const response = await api.post<Lead>(
-      `/leads/?clinic_id=${data.clinic_id}`,
-      body,
-      {
-        headers: {
-          "X-Clinic-Id": String(data.clinic_id),
+    try {
+      const response = await api.post<Lead>(
+        `/leads/?clinic_id=${data.clinic_id}`,
+        body,
+        {
+          headers: {
+            "X-Clinic-Id": String(data.clinic_id),
+          },
         },
-      },
-    );
-    console.log("✅ Lead created:", response.data);
-    return response.data;
+      );
+      console.log("✅ Lead created:", response.data);
+      return response.data;
+    } catch (error) {
+      if (!isServer500(error)) {
+        throw error;
+      }
+
+      const minimal = buildMinimalLeadCreatePayload(sanitized);
+      const minimalBody = referralSource
+        ? { ...minimal, referral_source: referralSource }
+        : minimal;
+
+      console.warn(
+        "[LeadAPI.create] Full payload create failed with 500. Retrying with minimal payload.",
+      );
+
+      const retryResponse = await api.post<Lead>(
+        `/leads/?clinic_id=${data.clinic_id}`,
+        minimalBody,
+        {
+          headers: {
+            "X-Clinic-Id": String(data.clinic_id),
+          },
+        },
+      );
+
+      const createdLead = retryResponse.data;
+
+      try {
+        const enrichedLead = await LeadAPI.update(getLeadId(createdLead), {
+          ...sanitized,
+          clinic_id: createdLead.clinic_id ?? sanitized.clinic_id,
+          department_id: createdLead.department_id ?? sanitized.department_id,
+        });
+        return enrichedLead;
+      } catch (enrichError) {
+        console.warn(
+          "[LeadAPI.create] Minimal create succeeded, but enrich update failed.",
+          enrichError,
+        );
+        return createdLead;
+      }
+    }
   },
 
   createWithDocuments: async (
@@ -633,17 +693,62 @@ export const LeadAPI = {
       }
     }
 
-    const response = await api.post<Lead>(
-      `/leads/?clinic_id=${data.clinic_id}`,
-      formData,
-      {
-        headers: {
-          "X-Clinic-Id": String(data.clinic_id),
+    try {
+      const response = await api.post<Lead>(
+        `/leads/?clinic_id=${data.clinic_id}`,
+        formData,
+        {
+          headers: {
+            "X-Clinic-Id": String(data.clinic_id),
+          },
         },
-      },
-    );
-    console.log("✅ Lead + documents created:", response.data);
-    return response.data;
+      );
+      console.log("✅ Lead + documents created:", response.data);
+      return response.data;
+    } catch (error) {
+      if (!isServer500(error)) {
+        throw error;
+      }
+
+      const minimal = buildMinimalLeadCreatePayload(sanitized);
+      const minimalFormData = new FormData();
+      appendPayloadToFormData(minimalFormData, minimal);
+      if (referralSource) {
+        minimalFormData.append("referral_source", JSON.stringify(referralSource));
+      }
+      files.forEach((file) => minimalFormData.append("documents", file));
+
+      console.warn(
+        "[LeadAPI.createWithDocuments] Full payload create failed with 500. Retrying with minimal payload.",
+      );
+
+      const retryResponse = await api.post<Lead>(
+        `/leads/?clinic_id=${data.clinic_id}`,
+        minimalFormData,
+        {
+          headers: {
+            "X-Clinic-Id": String(data.clinic_id),
+          },
+        },
+      );
+
+      const createdLead = retryResponse.data;
+
+      try {
+        const enrichedLead = await LeadAPI.update(getLeadId(createdLead), {
+          ...sanitized,
+          clinic_id: createdLead.clinic_id ?? sanitized.clinic_id,
+          department_id: createdLead.department_id ?? sanitized.department_id,
+        });
+        return enrichedLead;
+      } catch (enrichError) {
+        console.warn(
+          "[LeadAPI.createWithDocuments] Minimal create succeeded, but enrich update failed.",
+          enrichError,
+        );
+        return createdLead;
+      }
+    }
   },
 
   getById: async (leadId: string): Promise<Lead> => {
