@@ -243,10 +243,17 @@ export default function CampaignsScreen() {
           You do not have permission to view campaigns.
         </Alert>
       )}
+
+      {/* ── Header: title + filter dropdown + add button ── */}
       <CampaignHeader
         onAddNew={() => setShowAddCampaign(true)}
         canAddCampaign={canAddCampaigns}
+        status={status}
+        onStatusChange={setStatus}
+        openStatus={openStatus}
+        setOpenStatus={setOpenStatus}
       />
+
       <div className="filters-row">
         {/* Header Filter */}
         <div className="tabs">
@@ -282,42 +289,7 @@ export default function CampaignsScreen() {
               placeholder="Search by Campaign name"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              
             />
-          </div>
-
-          {/* Header Status Filter */}
-          <div className="status-dropdown">
-            <div
-              className={`status-btn ${openStatus ? "active" : ""}`}
-              onClick={() => setOpenStatus((prev) => !prev)}
-            >
-              {status === "all" ? "Filter" : status}
-            </div>
-
-            {openStatus && (
-              <div className="status-menu">
-                {(
-                  ["all", ...Object.values(CAMPAIGN_STATUS)] as (
-                    | CampaignStatus
-                    | "all"
-                  )[]
-                ).map((item) => (
-                  <div
-                    key={item}
-                    className={`status-item ${
-                      status === item ? "selected" : ""
-                    }`}
-                    onClick={() => {
-                      setStatus(item);
-                      setOpenStatus(false);
-                    }}
-                  >
-                    {item === "all" ? "All Status" : item}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
