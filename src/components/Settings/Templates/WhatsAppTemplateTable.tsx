@@ -150,7 +150,6 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({
           <TableHead>
             <TableRow>
               <TableCell className={styles.headCell}>Template Name</TableCell>
-              <TableCell className={styles.headCell}>Content</TableCell>
               <TableCell className={styles.headCell}>Use Case</TableCell>
               <TableCell className={styles.headCell}>Last Updated At</TableCell>
               <TableCell className={styles.headCell}>Created By</TableCell>
@@ -163,7 +162,7 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({
             {visibleRows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={5}
                   align="center"
                   sx={{ py: 3, color: "#6B7280" }}
                 >
@@ -178,9 +177,6 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({
                 const ui = getUseCaseStyles(useCase);
                 const templateName =
                   record.audience_name || record.name || "Untitled WhatsApp";
-                const bodyContent =
-                  record.email_body || record.subject || record.body || "--";
-
                 const rawDate =
                   record.modified_at ||
                   record.lastUpdatedAt ||
@@ -196,15 +192,6 @@ export const WhatsAppTemplateTable: React.FC<Props> = ({
                   >
                     <TableCell className={styles.nameCell}>
                       {templateName}
-                    </TableCell>
-                    <TableCell className={styles.subjectCell}>
-                      <Typography
-                        variant="body2"
-                        noWrap
-                        sx={{ maxWidth: "250px", fontSize: "13px" }}
-                      >
-                        {bodyContent}
-                      </Typography>
                     </TableCell>
                     <TableCell>
                       <Chip
