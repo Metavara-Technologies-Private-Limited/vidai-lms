@@ -464,8 +464,8 @@ const appendPayloadToFormData = (
               ? ""
               : typeof item === "string"
                 ? item
-                : typeof item === "object" && "name" in (item as object)
-                  ? (item as { name: string }).name
+                : typeof item === "object" && "id" in (item as object)
+                  ? String((item as { id: string }).id)
                   : String(item);
           if (str) formData.append(key, str);
         });
