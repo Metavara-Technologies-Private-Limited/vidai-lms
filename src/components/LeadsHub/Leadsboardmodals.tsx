@@ -34,6 +34,42 @@ import type { LeadItem, AppointmentState } from "./Leadsboardtypes";
 import { TIME_SLOTS } from "./Leadsboardtypes";
 import { IS_MEDICAL_APP } from "../../config/appType";
 
+const parseSlotStartTime = (
+  slot: string,
+): { hour: number; minute: number } | null => {
+  const match = slot.match(/^(\d{1,2}):(\d{2})\s(AM|PM)/);
+  if (!match) return null;
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const meridiem = match[3];
+
+  if (meridiem === "PM" && hour !== 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+
+  return { hour, minute };
+};
+
+const isSlotAvailableForDate = (selectedDate: Date | null, slot: string): boolean => {
+  if (!selectedDate) return true;
+
+  const chosenDay = new Date(selectedDate);
+  chosenDay.setHours(0, 0, 0, 0);
+
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  if (chosenDay.getTime() !== today.getTime()) return true;
+
+  const parsed = parseSlotStartTime(slot);
+  if (!parsed) return true;
+
+  const slotStart = new Date(now);
+  slotStart.setHours(parsed.hour, parsed.minute, 0, 0);
+  return slotStart.getTime() > now.getTime();
+};
+
 // ── Shared field style ────────────────────────────────────────────────────────
 const fieldSx = {
   "& .MuiOutlinedInput-root": {
@@ -228,7 +264,15 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
             <Select value={appointment.slot} label="Select Slot *" notched
               onChange={(e) => setSlot(e.target.value)} disabled={appointment.submitting}>
               <MenuItem value="" disabled><Typography color="text.secondary" sx={{ fontSize: "0.85rem" }}>Select Time Slot</Typography></MenuItem>
-              {TIME_SLOTS.map((s) => <MenuItem key={s} value={s} sx={{ fontSize: "0.9rem" }}>{s}</MenuItem>)}
+              {TIME_SLOTS.filter((s) => isSlotAvailableForDate(appointment.date, s)).map((s) => (
+                <MenuItem key={s} value={s} sx={{ fontSize: "0.9rem" }}>{s}</MenuItem>
+              ))}
+              {appointment.date &&
+                TIME_SLOTS.filter((s) => isSlotAvailableForDate(appointment.date, s)).length === 0 && (
+                  <MenuItem disabled sx={{ fontSize: "0.85rem", color: "#9CA3AF" }}>
+                    No slots available for selected time
+                  </MenuItem>
+                )}
             </Select>
           </FormControl>
         </Box>

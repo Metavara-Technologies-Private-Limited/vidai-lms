@@ -164,6 +164,36 @@ const formatDateForApi = (value: unknown): string => {
   return "";
 };
 
+const normalizeTreatmentInterestForUpdate = (
+  value: Lead["treatment_interest"],
+): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object") {
+          const obj = item as { id?: unknown; name?: unknown };
+          if (typeof obj.id === "string") return obj.id.trim();
+          if (typeof obj.id === "number") return String(obj.id);
+          if (typeof obj.name === "string") return obj.name.trim();
+        }
+        return "";
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    return trimmed
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 // ====================== Async Thunks ======================
 
 /** Fetch all leads */
@@ -201,13 +231,22 @@ export const fetchLeads = createAsyncThunk<
 /** Book Appointment */
 export const bookAppointment = createAsyncThunk<
   { leadId: string; appointmentData: any },
-  { leadId: string; payload: any },
+  { leadId: string; payload: any; leadSnapshot?: Partial<Lead> },
   { rejectValue: string; state: { leads: LeadState } }
 >(
   "leads/bookAppointment",
-  async ({ leadId, payload }, { rejectWithValue, getState }) => {
-    const lead = getState().leads.leads.find((l) => l.id === leadId);
-    if (!lead) return rejectWithValue("Lead not found in state");
+  async ({ leadId, payload, leadSnapshot }, { rejectWithValue, getState }) => {
+    const normalizedLeadId = String(leadId).replace(/^#/, "").trim();
+
+    const leadFromState = getState().leads.leads.find((l) => {
+      const currentId = String(l.id ?? "").replace(/^#/, "").trim();
+      return currentId === normalizedLeadId;
+    });
+
+    const lead = leadFromState ?? (leadSnapshot as Lead | undefined);
+    if (!lead) {
+      return rejectWithValue("Lead not found for appointment update");
+    }
 
     const normalizedAppointmentDate = formatDateForApi(
       payload.appointment_date,
@@ -224,7 +263,9 @@ export const bookAppointment = createAsyncThunk<
       full_name: lead.full_name,
       contact_no: lead.contact_no,
       source: lead.source || "Unknown",
-      treatment_interest: lead.treatment_interest || [],
+      treatment_interest: normalizeTreatmentInterestForUpdate(
+        lead.treatment_interest,
+      ),
       book_appointment: true,
       appointment_date: normalizedAppointmentDate,
       slot: payload.slot,
@@ -237,10 +278,10 @@ export const bookAppointment = createAsyncThunk<
 
     try {
       await api.put(
-        `/leads/${leadId}/update/?clinic_id=${lead.clinic_id}`,
+        `/leads/${normalizedLeadId}/update/?clinic_id=${lead.clinic_id}`,
         apiPayload,
       );
-      console.log("✅ Appointment saved to server:", leadId);
+      console.log("✅ Appointment saved to server:", normalizedLeadId);
     } catch (err) {
       const error = err as ApiError;
       const message =

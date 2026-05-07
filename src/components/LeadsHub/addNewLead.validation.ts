@@ -1,5 +1,20 @@
 import { toast } from "react-toastify";
+import dayjs from "dayjs";
 import type { FormState } from "../../types/leads.types";
+
+const parseSlotStartTime = (slotStr: string): dayjs.Dayjs | null => {
+  const match = slotStr.match(/^(\d{1,2}):(\d{2})\s(AM|PM)/);
+  if (!match) return null;
+
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const meridiem = match[3];
+
+  if (meridiem === "PM" && hour !== 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+
+  return dayjs().set("hour", hour).set("minute", minute).set("second", 0);
+};
 
 // ====================== Toast Message Type ======================
 export type ToastMessage = { type: "error" | "warning" | "info"; text: string };
@@ -50,10 +65,10 @@ export const validateStep = async (
   _isCouple: "yes" | "no",
   _hasPendingFiles: boolean,
 ): Promise<boolean> => {
-  // Validate Step 1: Full Name is required
+  // Validate Step 1: Lab Name is required
   if (step === 1) {
     if (!form.full_name || form.full_name.trim().length === 0) {
-      toast.error("Please enter Full Name", {
+      toast.error("Lab Name is required", {
         position: "top-right",
         autoClose: 3000,
         theme: "colored",
@@ -70,6 +85,58 @@ export const validateStep = async (
       theme: "colored",
     });
     return false;
+  }
+
+  if (step === 3 && form.wantAppointment === "yes") {
+    if (!form.appointmentDate) {
+      toast.error("Please select an appointment date.", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return false;
+    }
+
+    if (!form.slot) {
+      toast.error("Please select a time slot.", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return false;
+    }
+
+    const selectedDate = dayjs(form.appointmentDate).startOf("day");
+    const today = dayjs().startOf("day");
+
+    if (selectedDate.isBefore(today)) {
+      toast.error("Cannot book appointment for a past date.", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return false;
+    }
+
+    if (selectedDate.isSame(today, "day")) {
+      const slotTime = parseSlotStartTime(form.slot);
+      if (slotTime) {
+        const now = dayjs();
+        const slotTimeToday = dayjs()
+          .set("hour", slotTime.hour())
+          .set("minute", slotTime.minute())
+          .set("second", 0);
+
+        if (!slotTimeToday.isAfter(now)) {
+          toast.error("Cannot book appointment for a past time.", {
+            position: "top-right",
+            autoClose: 3000,
+            theme: "colored",
+          });
+          return false;
+        }
+      }
+    }
   }
 
   return true;
