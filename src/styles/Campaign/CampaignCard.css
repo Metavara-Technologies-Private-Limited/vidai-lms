@@ -4,19 +4,19 @@
   background: #ffffff;
   border-radius: 16px;
   padding: 20px;
-  border: 1.5px solid #E4E8EF;
+  border: 2px solid #D0D7E3;
   display: flex;
   flex-direction: column;
   gap: 12px;
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 }
 
 .campaign-card:hover {
-  border-color: #B8C8E8;
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.10), 0 1px 6px rgba(0, 0, 0, 0.06);
-  transform: translateY(-1px);
+  border-color: #93B4E8;
+  box-shadow: 0 8px 28px rgba(59, 130, 246, 0.13), 0 2px 8px rgba(0, 0, 0, 0.07);
+  transform: translateY(-2px);
 }
 
 /* ================= CARD HEADER ================= */
