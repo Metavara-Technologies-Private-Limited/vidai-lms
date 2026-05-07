@@ -660,21 +660,13 @@ export default function AddNewLead() {
       }
       if (field === "contact") {
         const rawDigits = rawValue.replace(/\D/g, "");
-        const digitsOnly = rawDigits.slice(0, 15);
-        if (/\D/.test(rawValue))
-          showInputToast("add-lead-contact-invalid", "only digits are allowed");
-        if (rawDigits.length > 15)
-          showInputToast("add-lead-contact-length", "only 15 digits allowed");
+        const digitsOnly = rawDigits.slice(0, 10);
         setForm((prev) => ({ ...prev, contact: digitsOnly }));
         return;
       }
       if (field === "contactPhone") {
         const rawDigits = rawValue.replace(/\D/g, "");
-        const digitsOnly = rawDigits.slice(0, 15);
-        if (/\D/.test(rawValue))
-          showInputToast("add-lead-contact-invalid", "only digits are allowed");
-        if (rawDigits.length > 15)
-          showInputToast("add-lead-contact-length", "only 15 digits allowed");
+        const digitsOnly = rawDigits.slice(0, 10);
         setForm((prev) => ({ ...prev, contactPhone: digitsOnly }));
         return;
       }
@@ -953,7 +945,6 @@ export default function AddNewLead() {
     try {
       setIsSubmitting(true);
       const payload = buildPayload();
-      
 
       const shouldSendAppointmentEmail =
         payload.book_appointment === true &&

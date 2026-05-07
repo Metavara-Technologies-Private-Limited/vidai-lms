@@ -50,10 +50,27 @@ export const validateStep = async (
   isCouple: "yes" | "no",
   hasPendingFiles: boolean,
 ): Promise<boolean> => {
-  void step;
-  void form;
-  void isCouple;
-  void hasPendingFiles;
+  // Validate Step 1: Full Name is required
+  if (step === 1) {
+    if (!form.full_name || form.full_name.trim().length === 0) {
+      toast.error("Please enter Full Name", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return false;
+    }
+  }
+
+  // Validate Product Interest is selected only when leaving Step 2
+  if (step === 2 && (!form.treatments || form.treatments.length === 0)) {
+    toast.error("Please select at least one Product Interest", {
+      position: "top-right",
+      autoClose: 3000,
+      theme: "colored",
+    });
+    return false;
+  }
 
   return true;
 };

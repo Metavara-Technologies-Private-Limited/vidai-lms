@@ -247,8 +247,38 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const [loadingPersonnel, setLoadingPersonnel] = React.useState(false);
 
   const clinicId = lead?.clinic_id ?? 1;
-  const today = dayjs().startOf("day");
+  const now = dayjs();
+  const today = now.startOf("day");
   const users = useSelector(selectUsers);
+
+  // Parse time slot start time (e.g., "02:00 PM" from "02:00 PM - 02:30 PM")
+  const parseSlotStartTime = (slotStr: string): dayjs.Dayjs | null => {
+    const match = slotStr.match(/^(\d{1,2}):(\d{2})\s(AM|PM)/);
+    if (!match) return null;
+    let hour = parseInt(match[1]);
+    const minute = parseInt(match[2]);
+    const meridiem = match[3];
+    if (meridiem === "PM" && hour !== 12) hour += 12;
+    if (meridiem === "AM" && hour === 12) hour = 0;
+    return dayjs().set("hour", hour).set("minute", minute);
+  };
+
+  // Filter slots: if today, exclude past times; otherwise show all
+  const availableSlots = React.useMemo<string[]>(() => {
+    if (!selectedDate) return SLOT_OPTIONS;
+    const selectedDateStartOfDay = selectedDate.startOf("day");
+    const isToday = selectedDateStartOfDay.isSame(today, "day");
+    if (!isToday) return SLOT_OPTIONS;
+
+    return SLOT_OPTIONS.filter((slotStr) => {
+      const slotTime = parseSlotStartTime(slotStr);
+      if (!slotTime) return true;
+      const slotTimeToday = dayjs()
+        .set("hour", slotTime.hour())
+        .set("minute", slotTime.minute());
+      return slotTimeToday.isAfter(now);
+    });
+  }, [selectedDate]);
 
   const authMode = localStorage.getItem("auth_mode");
   const isInternal = authMode === "INT";
@@ -346,10 +376,35 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
       toast.error("Please select a date.", toastOptions);
       return;
     }
+
+    // Prevent booking for past date/time
+    const selectedDateStartOfDay = selectedDate.startOf("day");
+    if (selectedDateStartOfDay.isBefore(today)) {
+      setError(null);
+      toast.error("Cannot book appointment for a past date.", toastOptions);
+      return;
+    }
+
     if (!slot) {
       setError(null);
       toast.error("Please select a time slot.", toastOptions);
       return;
+    }
+
+    // Prevent booking for past time on today
+    const isToday = selectedDateStartOfDay.isSame(today, "day");
+    if (isToday) {
+      const slotTime = parseSlotStartTime(slot);
+      if (slotTime) {
+        const slotTimeToday = dayjs()
+          .set("hour", slotTime.hour())
+          .set("minute", slotTime.minute());
+        if (slotTimeToday.isBefore(now)) {
+          setError(null);
+          toast.error("Cannot book appointment for a past time.", toastOptions);
+          return;
+        }
+      }
     }
 
     const appointmentDateStr = selectedDate.format("YYYY-MM-DD");
@@ -642,16 +697,22 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
               label="Select Slot *"
               notched
               onChange={(e) => setSlot(e.target.value)}
-              disabled={saving}
+              disabled={saving || !selectedDate}
             >
               <MenuItem value="">
                 <em>Select Time Slot</em>
               </MenuItem>
-              {SLOT_OPTIONS.map((s) => (
-                <MenuItem key={s} value={s}>
-                  {s}
+              {availableSlots.length > 0 ? (
+                availableSlots.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {s}
+                  </MenuItem>
+                ))
+              ) : (
+                <MenuItem value="" disabled>
+                  <em>No available slots for selected date</em>
                 </MenuItem>
-              ))}
+              )}
             </Select>
           </FormControl>
         </Box>
