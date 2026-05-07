@@ -42,6 +42,7 @@ import {
   hasSubcategoryActionPermission,
 } from "../../../utils/roleAccess";
 import { toSafePhotoUrl } from "../../../utils/mediaUrl";
+import { usersApi } from "../../../services/users.api";
 
 const ticketTypes = [
   "Question",
@@ -120,22 +121,22 @@ const extractClinicEmails = (clinicData: unknown): string[] => {
   return uniqueEmails([...directCandidates, ...nestedEmails]);
 };
 
-const extractEmployeeEmail = (employeeData: unknown): string => {
-  const record = asRecord(employeeData);
-  const userRecord = asRecord(record.user);
+// const extractEmployeeEmail = (employeeData: unknown): string => {
+//   const record = asRecord(employeeData);
+//   const userRecord = asRecord(record.user);
 
-  // Prioritize actual email fields, excluding username which may not be a valid email
-  const candidates = [
-    getString(record.email),
-    getString(record.emp_email),
-    getString(record.user_email),
-    getString(record.official_email),
-    getString(userRecord.email),
-  ];
+//   // Prioritize actual email fields, excluding username which may not be a valid email
+//   const candidates = [
+//     getString(record.email),
+//     getString(record.emp_email),
+//     getString(record.user_email),
+//     getString(record.official_email),
+//     getString(userRecord.email),
+//   ];
 
-  const firstValid = candidates.find((mail) => mail && isEmail(mail));
-  return firstValid || "";
-};
+//   const firstValid = candidates.find((mail) => mail && isEmail(mail));
+//   return firstValid || "";
+// };
 
 const resolveClinicId = (ticketData: unknown): string => {
   const ticketRecord = asRecord(ticketData);
@@ -259,20 +260,20 @@ const TicketView = () => {
     isSuperAdmin ||
     hasSubcategoryActionPermission(permissions, "tickets", "edit");
 
-  type TicketEmployeeApi = {
-    id: number;
-    emp_name: string;
-    emp_type: string;
-    department_name?: string;
-    email?: string;
-    emp_email?: string;
-    user_email?: string;
-    official_email?: string;
-    user?: {
-      email?: string;
-      username?: string;
-    };
-  };
+  // type TicketEmployeeApi = {
+  //   id: number;
+  //   emp_name: string;
+  //   emp_type: string;
+  //   department_name?: string;
+  //   email?: string;
+  //   emp_email?: string;
+  //   user_email?: string;
+  //   official_email?: string;
+  //   user?: {
+  //     email?: string;
+  //     username?: string;
+  //   };
+  // };
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -281,8 +282,8 @@ const TicketView = () => {
       const ticketData = await ticketsApi.getTicketById(id);
       const clinicId = resolveClinicId(ticketData);
 
-      const [empData, leadsData] = await Promise.all([
-        clinicsApi.getClinicEmployees(clinicId),
+      const [usersData, leadsData] = await Promise.all([
+        usersApi.list(),
         clinic?.id ? LeadAPI.list(clinic?.id) : Promise.resolve([]),
       ]);
 
@@ -303,14 +304,12 @@ const TicketView = () => {
       }
 
       // ✅ Normalize employee type
-      const normalizedEmployees: Employee[] = (
-        empData as TicketEmployeeApi[]
-      ).map((emp) => ({
-        id: emp.id,
-        emp_name: emp.emp_name,
-        emp_type: emp.emp_type,
-        department_name: emp.department_name ?? "",
-        email: extractEmployeeEmail(emp),
+      const normalizedEmployees: Employee[] = usersData.map((user) => ({
+        id: user.id,
+        emp_name: `${user.firstName} ${user.lastName}`.trim() || user.username,
+        emp_type: user.role || "",
+        department_name: "",
+        email: user.email || "",
       }));
 
       setEmployees(normalizedEmployees);
