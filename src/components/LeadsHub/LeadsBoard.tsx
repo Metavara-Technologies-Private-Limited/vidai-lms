@@ -1820,7 +1820,20 @@ const LeadsBoard: React.FC<Props> = ({
             assigned_to_id: Number(appointment.selectedEmployeeId),
           }),
         },
-        leadSnapshot: selectedLead,
+        leadSnapshot: {
+          clinic_id: selectedLead.clinic_id ?? undefined,
+          department_id: selectedLead.department_id ?? undefined,
+          full_name: selectedLead.full_name || selectedLead.name || "",
+          contact_no:
+            selectedLead.contact_no ||
+            selectedLead.phone ||
+            selectedLead.phone_number ||
+            "",
+          source: selectedLead.source || "Unknown",
+          treatment_interest: selectedLead.treatment_interest,
+          is_active: selectedLead.is_active !== false,
+          partner_inquiry: selectedLead.partner_inquiry ?? false,
+        },
       }),
     );
 
