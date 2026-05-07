@@ -47,8 +47,8 @@ export const showWarningsNonBlocking = (messages: ToastMessage[]) => {
 export const validateStep = async (
   step: number,
   form: FormState,
-  isCouple: "yes" | "no",
-  hasPendingFiles: boolean,
+  _isCouple: "yes" | "no",
+  _hasPendingFiles: boolean,
 ): Promise<boolean> => {
   // Validate Step 1: Full Name is required
   if (step === 1) {
