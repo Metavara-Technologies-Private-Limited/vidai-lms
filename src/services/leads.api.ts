@@ -517,6 +517,71 @@ const removeBlankUpdateFields = <T extends Record<string, unknown>>(
   return next as Partial<T>;
 };
 
+const normalizeTreatmentInterest = (
+  value: LeadPayload["treatment_interest"],
+): string | string[] | undefined => {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }
+
+  const normalized = (value as unknown[])
+    .map((item) => {
+      if (item == null) return "";
+      if (typeof item === "string") return item.trim();
+      if (typeof item === "object" && "id" in (item as object)) {
+        return String((item as { id: string }).id).trim();
+      }
+      return String(item).trim();
+    })
+    .filter(Boolean);
+
+  return normalized.length ? normalized : undefined;
+};
+
+const sanitizeLeadCreatePayload = (data: LeadPayload): LeadPayload => {
+  const requiredKeys: (keyof LeadPayload)[] = [
+    "clinic_id",
+    "department_id",
+    "full_name",
+    "contact_no",
+    "source",
+    "partner_inquiry",
+    "book_appointment",
+    "is_active",
+    "slot",
+  ];
+
+  const next = { ...data } as Record<string, unknown>;
+
+  next.treatment_interest = normalizeTreatmentInterest(data.treatment_interest);
+
+  if (!data.book_appointment) {
+    delete next.appointment_date;
+    if (typeof next.slot === "string" && next.slot.trim() === "") {
+      delete next.slot;
+    }
+  }
+
+  (Object.keys(next) as (keyof LeadPayload)[]).forEach((key) => {
+    if (requiredKeys.includes(key)) return;
+
+    const value = next[key as string];
+
+    if (value === undefined || value === null) {
+      delete next[key as string];
+      return;
+    }
+
+    if (typeof value === "string" && value.trim() === "") {
+      delete next[key as string];
+    }
+  });
+
+  return next as LeadPayload;
+};
+
 export const LeadAPI = {
   list: (clinicId: number) =>
     api.get(`/leads/list/?clinic_id=${clinicId}`).then((res) => res.data),
@@ -525,9 +590,10 @@ export const LeadAPI = {
     data: LeadPayload,
     referralSource?: ReferralSourceObject,
   ): Promise<Lead> => {
+    const sanitized = sanitizeLeadCreatePayload(data);
     const body = referralSource
-      ? { ...data, referral_source: referralSource }
-      : data;
+      ? { ...sanitized, referral_source: referralSource }
+      : sanitized;
     const response = await api.post<Lead>(
       `/leads/?clinic_id=${data.clinic_id}`,
       body,
@@ -547,8 +613,9 @@ export const LeadAPI = {
     referralSource?: ReferralSourceObject,
   ): Promise<Lead> => {
     const formData = new FormData();
+    const sanitized = sanitizeLeadCreatePayload(data);
 
-    appendPayloadToFormData(formData, data);
+    appendPayloadToFormData(formData, sanitized);
 
     if (referralSource) {
       formData.append("referral_source", JSON.stringify(referralSource));
