@@ -1107,15 +1107,20 @@ export default function AddNewLead() {
     } catch (err) {
       const error = err as ApiError;
       const status = error?.response?.status;
+      const serverDetails = toReadableError(error?.response?.data) || "";
       let msg = "Failed to save lead";
       if (status === 500) {
-        msg = "Server error. Please try again later";
+        msg = serverDetails || "Server error. Please try again later";
       } else if (status === 400) {
-        msg = "Please fill all required fields correctly";
+        msg = serverDetails || "Please fill all required fields correctly";
       } else {
-        msg = error?.message || "Something went wrong";
+        msg = serverDetails || error?.message || "Something went wrong";
       }
-      console.error("CREATE ERROR:", error?.response?.data);
+      console.error("CREATE ERROR:", {
+        status,
+        url: "/leads/",
+        details: error?.response?.data,
+      });
       toast.error(msg, {
         position: "top-right",
         autoClose: 3000,
