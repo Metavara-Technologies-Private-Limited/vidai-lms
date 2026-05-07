@@ -173,7 +173,7 @@ export default function CampaignsScreen() {
   }, [rawCampaigns]);
 
   // UI States
-  const [tab, setTab] = useState<Tab>(CAMPAIGN_TABS.ALL);
+  const [tab, setTab] = useState<Tab>(CAMPAIGN_TABS.SOCIAL);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CampaignStatus | "all">("all");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -215,7 +215,6 @@ export default function CampaignsScreen() {
     });
   }, [campaigns, tab, search, status]);
 
-  const allCount = campaigns.length;
   const socialCount = campaigns.filter(
     (c) => c.type === CAMPAIGN_TYPE.SOCIAL,
   ).length;
@@ -255,15 +254,8 @@ export default function CampaignsScreen() {
       />
 
       <div className="filters-row">
-        {/* Header Filter */}
+        {/* Tabs — only Social and Email, All Campaigns removed */}
         <div className="tabs">
-          <button
-            className={`tab-btn ${tab === CAMPAIGN_TABS.ALL ? "active" : ""}`}
-            onClick={() => setTab(CAMPAIGN_TABS.ALL)}
-          >
-            All Campaigns ({allCount})
-          </button>
-
           <button
             className={`tab-btn ${
               tab === CAMPAIGN_TABS.SOCIAL ? "active" : ""
@@ -281,7 +273,7 @@ export default function CampaignsScreen() {
           </button>
         </div>
 
-        {/* Header Search */}
+        {/* Search bar stays here */}
         <div className="right-filters">
           <div className="search-input">
             <img src={searchIcon} alt="Search" className="search-icon" />
