@@ -888,7 +888,12 @@ export function Step2({
 
   return (
     <Box>
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         {sectionHeading}
       </Typography>
 
@@ -900,61 +905,76 @@ export function Step2({
           size="small"
           value={form.treatmentInterest}
           onChange={(e) => {
-            const value = e.target.value;
+            const selectedName = e.target.value;
+            // Find the matching interest object to get its ID
+            const matched = interests?.find((i) => i.name === selectedName);
+            const selectedId = matched ? String(matched.id) : selectedName;
+
             setForm((prev) => ({
               ...prev,
-              treatmentInterest: value,
-              treatments: prev.treatments.includes(value)
+              treatmentInterest: selectedName, // display value only
+              treatments: prev.treatments.includes(selectedId)
                 ? prev.treatments
-                : [...prev.treatments, value],
+                : [...prev.treatments, selectedId],
             }));
           }}
           sx={{ ...inputStyle, maxWidth: "50%" }}
           SelectProps={{ displayEmpty: true }}
           disabled={isLoading}
           InputProps={{
-            endAdornment: isLoading
-              ? <CircularProgress size={16} sx={{ mr: 3 }} />
-              : null,
+            endAdornment: isLoading ? (
+              <CircularProgress size={16} sx={{ mr: 3 }} />
+            ) : null,
           }}
         >
           <MenuItem value="" disabled>
             {isLoading ? "Loading…" : "Select"}
           </MenuItem>
           {resolvedInterestOptions.map((opt) => (
-            <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+            <MenuItem key={opt} value={opt}>
+              {opt}
+            </MenuItem>
           ))}
         </TextField>
       </Box>
 
       {form.treatments.length > 0 && (
         <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-          {form.treatments.map((t) => (
-            <Chip
-              key={t}
-              label={t}
-              onDelete={() =>
-                setForm((prev) => ({
-                  ...prev,
-                  treatments: prev.treatments.filter((x) => x !== t),
-                }))
-              }
-              sx={{
-                bgcolor: "#FEE2E2",
-                color: "#B91C1C",
-                fontWeight: 600,
-                border: "1px solid #FCA5A5",
-                "& .MuiChip-deleteIcon": {
+          {form.treatments.map((id) => {
+            const matched = interests?.find((i) => String(i.id) === id);
+            const label = matched?.name ?? id;
+            return (
+              <Chip
+                key={id}
+                label={label}
+                onDelete={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    treatments: prev.treatments.filter((x) => x !== id),
+                  }))
+                }
+                sx={{
+                  bgcolor: "#FEE2E2",
                   color: "#B91C1C",
-                  "&:hover": { color: "#991B1B" },
-                },
-              }}
-            />
-          ))}
+                  fontWeight: 600,
+                  border: "1px solid #FCA5A5",
+                  "& .MuiChip-deleteIcon": {
+                    color: "#B91C1C",
+                    "&:hover": { color: "#991B1B" },
+                  },
+                }}
+              />
+            );
+          })}
         </Stack>
       )}
 
-      <Typography variant="subtitle2" fontWeight={700} color="#1E293B" sx={{ mb: 2 }}>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        color="#1E293B"
+        sx={{ mb: 2 }}
+      >
         DOCUMENTS & REPORTS (Optional)
       </Typography>
 
@@ -1012,7 +1032,11 @@ export function Step2({
         >
           Choose File
         </Button>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 1 }}
+        >
           {pendingFiles.length > 0
             ? `${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""} selected`
             : "No File Chosen · PDF, Word, JPG, PNG up to 10MB"}
@@ -1057,7 +1081,11 @@ export function Step2({
                     variant="body2"
                     fontWeight={600}
                     color="#1E293B"
-                    sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    sx={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
                   >
                     {file.name}
                   </Typography>

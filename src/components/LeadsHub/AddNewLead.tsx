@@ -232,24 +232,6 @@ export default function AddNewLead() {
   const [interests, setInterests] = React.useState<Interest[]>([]);
   const [loadingInterests, setLoadingInterests] = React.useState(false);
 
-  React.useEffect(() => {
-    const loadInterests = async () => {
-      try {
-        setLoadingInterests(true);
-
-        const data = await InterestAPI.listActiveByClinic(clinicId);
-
-        setInterests(data);
-      } catch {
-        setInterests([]);
-      } finally {
-        setLoadingInterests(false);
-      }
-    };
-
-    loadInterests();
-  }, []);
-
   const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
     () =>
       pipelineStages.map((s) => ({
@@ -301,6 +283,24 @@ export default function AddNewLead() {
       }),
     [rawCampaigns],
   );
+  
+  React.useEffect(() => {
+    const loadInterests = async () => {
+      try {
+        setLoadingInterests(true);
+
+        const data = await InterestAPI.listActiveByClinic(clinicId);
+
+        setInterests(data);
+      } catch {
+        setInterests([]);
+      } finally {
+        setLoadingInterests(false);
+      }
+    };
+
+    loadInterests();
+  }, [clinicId]);
 
   const [form, setForm] = React.useState<FormState>({
     full_name: "",
