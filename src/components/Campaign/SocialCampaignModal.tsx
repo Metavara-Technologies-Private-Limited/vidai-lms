@@ -220,12 +220,12 @@
     >(null);
 
     /* ================= STEP 1 ================= */
-    const [campaignName, setCampaignName] = useState("a");
-    const [campaignDescription, setCampaignDescription] = useState("a");
-    const [objective, setObjective] = useState("a");
-    const [audience, setAudience] = useState("a");
-    const [startDate, setStartDate] = useState("a");
-    const [endDate, setEndDate] = useState("a");
+    const [campaignName, setCampaignName] = useState("");
+    const [campaignDescription, setCampaignDescription] = useState("");
+    const [objective, setObjective] = useState("");
+    const [audience, setAudience] = useState("");
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
 
     const step1Valid =
       campaignName.trim() &&
