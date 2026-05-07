@@ -2,8 +2,8 @@
 
 import { http } from "./http";
 
-const REFERRAL_DEPARTMENTS_UNSUPPORTED_SESSION_KEY =
-  "referral_departments_endpoint_unsupported";
+// const REFERRAL_DEPARTMENTS_UNSUPPORTED_SESSION_KEY =
+//   "referral_departments_endpoint_unsupported";
 
 // -------------------------------------------------------------
 // Types
@@ -31,33 +31,33 @@ export interface ReferralSourcesParams {
   search?: string;
 }
 
-const isReferralDepartmentsEndpointUnsupported = (): boolean =>
-  sessionStorage.getItem(REFERRAL_DEPARTMENTS_UNSUPPORTED_SESSION_KEY) === "1";
+// const isReferralDepartmentsEndpointUnsupported = (): boolean =>
+//   sessionStorage.getItem(REFERRAL_DEPARTMENTS_UNSUPPORTED_SESSION_KEY) === "1";
 
-const markReferralDepartmentsEndpointUnsupported = (): void => {
-  sessionStorage.setItem(REFERRAL_DEPARTMENTS_UNSUPPORTED_SESSION_KEY, "1");
-};
+// const markReferralDepartmentsEndpointUnsupported = (): void => {
+//   sessionStorage.setItem(REFERRAL_DEPARTMENTS_UNSUPPORTED_SESSION_KEY, "1");
+// };
 
-const mapSourcesToDepartments = (
-  sources: ReferralSource[],
-): ReferralDepartment[] => {
-  const seen = new Set<string>();
-  const departments: ReferralDepartment[] = [];
+// const mapSourcesToDepartments = (
+//   sources: ReferralSource[],
+// ): ReferralDepartment[] => {
+//   const seen = new Set<string>();
+//   const departments: ReferralDepartment[] = [];
 
-  sources.forEach((source) => {
-    const id = Number(source.referral_department_id ?? 0);
-    const name = (source.referral_department_name ?? "").trim();
-    if (!name) return;
+//   sources.forEach((source) => {
+//     const id = Number(source.referral_department_id ?? 0);
+//     const name = (source.referral_department_name ?? "").trim();
+//     if (!name) return;
 
-    const key = `${id}::${name.toLowerCase()}`;
-    if (seen.has(key)) return;
+//     const key = `${id}::${name.toLowerCase()}`;
+//     if (seen.has(key)) return;
 
-    seen.add(key);
-    departments.push({ id, name });
-  });
+//     seen.add(key);
+//     departments.push({ id, name });
+//   });
 
-  return departments;
-};
+//   return departments;
+// };
 
 // -------------------------------------------------------------
 // fetchDashboardCounts
@@ -134,45 +134,29 @@ export const STATIC_REFERRAL_DEPARTMENTS: ReferralDepartment[] = [
 export async function fetchReferralDepartments(
   clinicId?: number,
 ): Promise<ReferralDepartment[]> {
-  if (isReferralDepartmentsEndpointUnsupported()) {
-    const fallbackSources = await fetchReferralSources({});
-    const inferredDepartments = mapSourcesToDepartments(fallbackSources);
-    return inferredDepartments.length > 0
-      ? inferredDepartments
-      : STATIC_REFERRAL_DEPARTMENTS;
-  }
-
   try {
     const params: Record<string, number> = {};
-    if (clinicId) params.clinic_id = clinicId;
+
+    if (clinicId) {
+      params.clinic_id = clinicId;
+    }
+
     const response = await http.get("/referral-departments/", { params });
 
-    if (
-      response.data?.success &&
-      Array.isArray(response.data.data) &&
-      response.data.data.length > 0
-    ) {
+    if (response.data?.success && Array.isArray(response.data.data)) {
       return response.data.data;
     }
-    if (Array.isArray(response.data) && response.data.length > 0)
-      return response.data;
-    if (
-      Array.isArray(response.data?.results) &&
-      response.data.results.length > 0
-    )
-      return response.data.results;
 
-    return [];
-  } catch (error) {
-    const status =
-      (error as { response?: { status?: number } })?.response?.status ?? 0;
-    if (status === 404 || status === 405 || status === 501) {
-      markReferralDepartmentsEndpointUnsupported();
-      const fallbackSources = await fetchReferralSources({});
-      const inferredDepartments = mapSourcesToDepartments(fallbackSources);
-      return inferredDepartments;
+    if (Array.isArray(response.data)) {
+      return response.data;
     }
 
+    if (Array.isArray(response.data?.results)) {
+      return response.data.results;
+    }
+
+    return [];
+  } catch {
     return [];
   }
 }
