@@ -83,9 +83,27 @@ const rowCanView = (value: unknown): boolean => {
   return isTrueFlag(row.can_view) || isTrueFlag(row.canView);
 };
 
+const valueContainsViewGrant = (value: unknown): boolean => {
+  if (!value) return false;
+
+  if (Array.isArray(value)) {
+    return value.some((row) => rowCanView(row));
+  }
+
+  if (typeof value !== "object") {
+    return false;
+  }
+
+  if (rowCanView(value)) {
+    return true;
+  }
+
+  const rec = value as Record<string, unknown>;
+  return Object.values(rec).some((child) => valueContainsViewGrant(child));
+};
+
 const rowsContainView = (value: unknown): boolean => {
-  if (!Array.isArray(value)) return false;
-  return value.some((row) => rowCanView(row));
+  return valueContainsViewGrant(value);
 };
 
 const collectPermissionState = (user: UserLike): PermissionState => {
@@ -168,6 +186,19 @@ const collectPermissionState = (user: UserLike): PermissionState => {
           const rec = row as Record<string, unknown>;
           const subcategory = rec.subcategory ?? rec.subcategory_key;
           addLabel(subcategory);
+        }
+      } else if (subVal && typeof subVal === "object") {
+        // Support map shape: settings -> { user: {can_view: true, ...}, ... }
+        for (const [subKey, subPerm] of Object.entries(
+          subVal as Record<string, unknown>,
+        )) {
+          if (subKey === "_" || subKey === "can_view" || subKey === "can_add" || subKey === "can_edit" || subKey === "can_print") {
+            continue;
+          }
+
+          if (valueContainsViewGrant(subPerm)) {
+            addLabel(subKey);
+          }
         }
       }
     }
@@ -489,12 +520,38 @@ export const hasSubcategoryActionPermission = (
   };
 
   const rowsAllowAction = (value: unknown, fallbackLabel?: string): boolean => {
-    if (!Array.isArray(value)) return false;
-    return value.some((row) => {
-      if (!row || typeof row !== "object") return false;
-      const rec = row as Record<string, unknown>;
-      return rowMatchesSubcategory(rec, fallbackLabel) && hasActionFlag(rec, action);
-    });
+    if (!value) return false;
+
+    if (Array.isArray(value)) {
+      return value.some((row) => rowsAllowAction(row, fallbackLabel));
+    }
+
+    if (typeof value !== "object") return false;
+
+    const rec = value as Record<string, unknown>;
+    if (rowMatchesSubcategory(rec, fallbackLabel) && hasActionFlag(rec, action)) {
+      return true;
+    }
+
+    // Support nested map payloads like:
+    // permissions[module][category][subcategory] = { can_view, can_add, ... }
+    for (const [childKey, childValue] of Object.entries(rec)) {
+      if (
+        childKey === "can_view" ||
+        childKey === "can_add" ||
+        childKey === "can_edit" ||
+        childKey === "can_print"
+      ) {
+        continue;
+      }
+
+      const nextFallback = childKey === "_" ? fallbackLabel : childKey;
+      if (rowsAllowAction(childValue, nextFallback)) {
+        return true;
+      }
+    }
+
+    return false;
   };
 
   for (const [moduleKey, moduleValue] of Object.entries(root)) {

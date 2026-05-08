@@ -27,6 +27,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import { useSelector } from "react-redux";
 import { selectLeads } from "../../store/leadSlice";
+import { selectUser } from "../../store/authSlice";
 import type { Lead } from "../../services/leads.api";
 import { api } from "../../services/leads.api";
 import { formatLeadId } from "./LeadDetailHelpers";
@@ -42,6 +43,7 @@ interface BaseActivity {
   timestamp: string;
   leadId?: string;
   leadName?: string;
+  assigneeId?: number;
   assigneeName?: string;
   assigneeAvatar?: string;
   leadStatus?: string;
@@ -176,6 +178,9 @@ const avatarColor = (name?: string): string => {
   return colors[name.charCodeAt(0) % colors.length];
 };
 
+const normalizePhone = (value?: string | null): string =>
+  (value ?? "").replace(/\D/g, "");
+
 // ─────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────
@@ -187,12 +192,49 @@ const Activity = () => {
   const [error, setError] = React.useState<string | null>(null);
 
   const allLeads = useSelector(selectLeads);
+  const user = useSelector(selectUser);
+
+  const currentUserId = React.useMemo(() => {
+    const resolved = user?.id ?? user?.user_id;
+    return typeof resolved === "number" ? resolved : null;
+  }, [user?.id, user?.user_id]);
 
   const leadLookup = React.useMemo(() => {
-    const map: Record<string, { leadName: string; assigneeName: string; leadStatus: string }> = {};
+    const map: Record<string, { leadName: string; assigneeId: number | null; assigneeName: string; leadStatus: string }> = {};
     allLeads.forEach((lead: Lead) => {
       map[lead.id] = {
         leadName: lead.full_name,
+        assigneeId: typeof lead.assigned_to_id === "number" ? lead.assigned_to_id : null,
+        assigneeName: lead.assigned_to_name ?? "Unassigned",
+        leadStatus: lead.lead_status ?? "new",
+      };
+    });
+    return map;
+  }, [allLeads]);
+
+  const leadLookupByPhone = React.useMemo(() => {
+    const map: Record<string, { leadName: string; assigneeId: number | null; assigneeName: string; leadStatus: string }> = {};
+    allLeads.forEach((lead: Lead) => {
+      const phone = normalizePhone(lead.contact_no);
+      if (!phone) return;
+      map[phone] = {
+        leadName: lead.full_name,
+        assigneeId: typeof lead.assigned_to_id === "number" ? lead.assigned_to_id : null,
+        assigneeName: lead.assigned_to_name ?? "Unassigned",
+        leadStatus: lead.lead_status ?? "new",
+      };
+    });
+    return map;
+  }, [allLeads]);
+
+  const leadLookupByEmail = React.useMemo(() => {
+    const map: Record<string, { leadName: string; assigneeId: number | null; assigneeName: string; leadStatus: string }> = {};
+    allLeads.forEach((lead: Lead) => {
+      const email = String(lead.email ?? "").trim().toLowerCase();
+      if (!email) return;
+      map[email] = {
+        leadName: lead.full_name,
+        assigneeId: typeof lead.assigned_to_id === "number" ? lead.assigned_to_id : null,
         assigneeName: lead.assigned_to_name ?? "Unassigned",
         leadStatus: lead.lead_status ?? "new",
       };
@@ -220,10 +262,16 @@ const Activity = () => {
             status?: string; direction?: string; created_at: string;
           }> = callsRes.value.data ?? [];
           calls.forEach((c) => {
-            const info = c.lead_uuid ? leadLookup[c.lead_uuid] : undefined;
+            const toPhone = normalizePhone(c.to_number);
+            const fromPhone = normalizePhone(c.from_number);
+            const info =
+              (c.lead_uuid ? leadLookup[c.lead_uuid] : undefined) ??
+              (toPhone ? leadLookupByPhone[toPhone] : undefined) ??
+              (fromPhone ? leadLookupByPhone[fromPhone] : undefined);
             merged.push({
               id: `call-${c.id}`, type: "call", timestamp: c.created_at,
               leadId: c.lead_uuid, leadName: info?.leadName,
+              assigneeId: info?.assigneeId ?? null,
               assigneeName: info?.assigneeName, leadStatus: info?.leadStatus,
               fromNumber: c.from_number, toNumber: c.to_number,
               status: c.status, direction: c.direction,
@@ -238,10 +286,16 @@ const Activity = () => {
             direction: "inbound" | "outbound"; created_at: string;
           }> = smsRes.value.data ?? [];
           messages.forEach((m) => {
-            const info = m.lead_uuid ? leadLookup[m.lead_uuid] : undefined;
+            const toPhone = normalizePhone(m.to_number);
+            const fromPhone = normalizePhone(m.from_number);
+            const info =
+              (m.lead_uuid ? leadLookup[m.lead_uuid] : undefined) ??
+              (toPhone ? leadLookupByPhone[toPhone] : undefined) ??
+              (fromPhone ? leadLookupByPhone[fromPhone] : undefined);
             merged.push({
               id: `sms-${m.id}`, type: "sms", timestamp: m.created_at,
               leadId: m.lead_uuid, leadName: info?.leadName,
+              assigneeId: info?.assigneeId ?? null,
               assigneeName: info?.assigneeName, leadStatus: info?.leadStatus,
               body: m.body, fromNumber: m.from_number, toNumber: m.to_number,
               status: m.status, direction: m.direction,
@@ -252,14 +306,23 @@ const Activity = () => {
         if (emailRes.status === "fulfilled") {
           const emails: Array<{
             id: number; lead_uuid?: string; subject: string;
-            sender_email?: string; status: string; sent_at?: string; created_at: string;
+            sender_email?: string; receiver_email?: string; to_email?: string;
+            status: string; sent_at?: string; created_at: string;
           }> = emailRes.value.data ?? [];
           emails.forEach((e) => {
-            const info = e.lead_uuid ? leadLookup[e.lead_uuid] : undefined;
+            const receiverEmail = String(
+              e.receiver_email ?? e.to_email ?? "",
+            )
+              .trim()
+              .toLowerCase();
+            const info =
+              (e.lead_uuid ? leadLookup[e.lead_uuid] : undefined) ??
+              (receiverEmail ? leadLookupByEmail[receiverEmail] : undefined);
             merged.push({
               id: `email-${e.id}`, type: "email",
               timestamp: e.sent_at ?? e.created_at,
               leadId: e.lead_uuid, leadName: info?.leadName,
+              assigneeId: info?.assigneeId ?? null,
               assigneeName: info?.assigneeName, leadStatus: info?.leadStatus,
               subject: e.subject, emailStatus: e.status,
               senderEmail: e.sender_email, sentAt: e.sent_at,
@@ -273,6 +336,10 @@ const Activity = () => {
               id: `appt-${lead.id}`, type: "appointment",
               timestamp: lead.modified_at ?? lead.created_at,
               leadId: lead.id, leadName: lead.full_name,
+              assigneeId:
+                typeof lead.assigned_to_id === "number"
+                  ? lead.assigned_to_id
+                  : null,
               assigneeName: lead.assigned_to_name ?? "Unassigned",
               leadStatus: lead.lead_status ?? "appointment",
               appointmentDate: lead.appointment_date, slot: lead.slot,
@@ -280,8 +347,13 @@ const Activity = () => {
           }
         });
 
-        merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setActivities(merged);
+        const userScoped =
+          currentUserId == null
+            ? merged
+            : merged.filter((activity) => activity.assigneeId === currentUserId);
+
+        userScoped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setActivities(userScoped);
       } catch (err) {
         console.error("Activity fetch error:", err);
         setError("Failed to load activity data.");
@@ -294,7 +366,7 @@ const Activity = () => {
     const interval = setInterval(fetchData, 60_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadLookup]);
+  }, [leadLookup, leadLookupByPhone, leadLookupByEmail, currentUserId]);
 
   React.useEffect(() => { setPage(1); }, [filter, activities.length]);
 

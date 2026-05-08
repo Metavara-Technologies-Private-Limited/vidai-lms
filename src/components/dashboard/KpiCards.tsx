@@ -132,7 +132,15 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
     [leads],
   );
   const pipelineStages = useMemo(
-    () => getActivePipelineStages(pipelines),
+    () => {
+      // sort ASCENDING by stage_order to match the pipeline stages view
+      const stages = getActivePipelineStages(pipelines);
+      return [...stages].sort((a, b) => {
+        const aOrder = typeof a.stage_order === 'number' ? a.stage_order : 0;
+        const bOrder = typeof b.stage_order === 'number' ? b.stage_order : 0;
+        return aOrder - bOrder;
+      });
+    },
     [pipelines],
   );
   const theme = useTheme();
@@ -142,10 +150,12 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  const counts = useMemo<ExtendedKpiCounts>(() => {
+  const filteredLeads = useMemo<Lead[]>(() => {
     const bounds = getTimeRangeBounds(timeRange);
-    const filteredLeads = sourceLeads.filter((lead) => {
+    const isAllTime = timeRange === "all";
+    return sourceLeads.filter((lead) => {
       if (lead?.is_active === false) return false;
+      if (isAllTime) return true;
       const rawDate = lead.modified_at || lead.created_at;
       if (!rawDate) return false;
       const leadDate = new Date(rawDate);
@@ -153,15 +163,21 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
       if (bounds && !isDateWithinBounds(leadDate, bounds)) return false;
       return true;
     });
+  }, [sourceLeads, timeRange]);
 
-    const activeLeadCount = filteredLeads.reduce(
-      (count, lead) => (lead?.is_active === false ? count : count + 1),
-      0,
-    );
+  // Shared stage count map — computed once, used by both counts and dynamicKpis
+  const stageCounts = useMemo(
+    () => buildStageCountMap(filteredLeads, pipelineStages),
+    [filteredLeads, pipelineStages],
+  );
+
+  const counts = useMemo<ExtendedKpiCounts>(() => {
+    // totalLeads = ALL active leads regardless of time range
+    const totalLeads = sourceLeads.filter((l) => l.is_active !== false).length;
 
     if (filteredLeads.length === 0 || pipelineStages.length === 0) {
       return {
-        totalLeads: activeLeadCount,
+        totalLeads,
         newLeads: 0,
         appointments: 0,
         followUps: 0,
@@ -175,8 +191,6 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
         contractSigned: 0,
       };
     }
-
-    const stageCounts = buildStageCountMap(filteredLeads, pipelineStages);
 
     const sumCountsByStatusKey = (statusKey: string): number =>
       pipelineStages.reduce((total, stage) => {
@@ -197,7 +211,7 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
     const totalConverted = converted + cycleConversion + contractSigned;
 
     return {
-      totalLeads: activeLeadCount,
+      totalLeads,
       newLeads,
       appointments,
       followUps,
@@ -210,7 +224,7 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
       proposalSent,
       contractSigned,
     };
-  }, [pipelineStages, sourceLeads, timeRange]);
+  }, [pipelineStages, filteredLeads, stageCounts, sourceLeads]);
 
   // Fully dynamic: show a KPI card for every pipeline stage with a random icon
   const dynamicKpis = useMemo<DynamicKpiCardData[]>(() => {
@@ -231,14 +245,14 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
       cards.push({
         id: normalizeStageName(stage.stage_name) as KpiCardId,
         label: stage.stage_name,
-        value: buildStageCountMap(sourceLeads, pipelineStages)[stage.id] || 0,
+        value: stageCounts[stage.id] || 0,
         icon,
         cardStyle,
       });
     });
 
     return cards;
-  }, [counts, pipelineStages, sourceLeads]);
+  }, [counts, pipelineStages, stageCounts]);
 
   const checkScroll = useCallback(() => {
     if (scrollContainerRef.current) {

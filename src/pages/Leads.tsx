@@ -676,13 +676,13 @@ const Leads: React.FC = () => {
 
   React.useEffect(() => {
     if (leads && leads.length > 0) {
-      const followUpStatuses = ["new", "lost", "cycle conversion"];
+      const followUpStatuses = ["new", "lost", "cycle conversion", "follow up", "follow-up", "followup", "follow ups", "follow-ups"];
       const filteredLeads = applyFilters(leads);
       const allCount = filteredLeads.filter(
         (l) => l.is_active !== false,
       ).length;
       const followUpCount = filteredLeads.filter((l) => {
-        const status = (l.lead_status || "").toLowerCase().trim();
+        const status = (l.lead_status || l.status || "").toLowerCase().trim();
         return l.is_active !== false && followUpStatuses.includes(status);
       }).length;
       const archivedCount = filteredLeads.filter(
