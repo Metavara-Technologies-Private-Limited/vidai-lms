@@ -151,7 +151,30 @@ export const ensureReviewLinkCallToAction = (
 };
 
 export const normalizeMessageForRequest = (message: string) => {
-  return message
+  if (!message) {
+    return "";
+  }
+
+  const container = document.createElement("div");
+  container.innerHTML = message;
+
+  // Remove editor-related attributes/classes
+  container.querySelectorAll("*").forEach((el) => {
+    el.removeAttribute("contenteditable");
+    el.removeAttribute("role");
+    el.removeAttribute("tabindex");
+    el.removeAttribute("translate");
+
+    // Remove ProseMirror / tiptap classes
+    if (
+      el.classList.contains("ProseMirror") ||
+      el.classList.contains("tiptap")
+    ) {
+      el.removeAttribute("class");
+    }
+  });
+
+  return container.innerHTML
     .replace(/\r\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

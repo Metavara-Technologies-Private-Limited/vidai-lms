@@ -1163,7 +1163,6 @@ const handleClearFormatting = () => {
           </Tooltip>
           <Tooltip title="Numbered List">
             <IconButton
-              title="Numbered List"
               aria-label="Numbered List"
               size="small"
               onMouseDown={keepSelection}
@@ -1180,7 +1179,6 @@ const handleClearFormatting = () => {
           </Tooltip>
           <Tooltip title="Bulleted List">
             <IconButton
-              title="Bulleted List"
               aria-label="Bulleted List"
               size="small"
               onMouseDown={keepSelection}
@@ -1197,7 +1195,6 @@ const handleClearFormatting = () => {
           </Tooltip>
           <Tooltip title="Decrease Indent">
             <IconButton
-              title="Decrease Indent"
               aria-label="Decrease Indent"
               size="small"
               onMouseDown={keepSelection}
@@ -1209,7 +1206,6 @@ const handleClearFormatting = () => {
           </Tooltip>
           <Tooltip title="Increase Indent">
             <IconButton
-              title="Increase Indent"
               aria-label="Increase Indent"
               size="small"
               onMouseDown={keepSelection}
@@ -1221,7 +1217,6 @@ const handleClearFormatting = () => {
           </Tooltip>
           <Tooltip title="Quote">
             <IconButton
-              title="Quote"
               aria-label="Quote"
               size="small"
               onMouseDown={keepSelection}
@@ -1240,7 +1235,6 @@ const handleClearFormatting = () => {
 
           <Tooltip title="Clear Formatting">
             <IconButton
-              title="Clear Formatting"
               aria-label="Clear Formatting"
               size="small"
               onMouseDown={keepSelection}
