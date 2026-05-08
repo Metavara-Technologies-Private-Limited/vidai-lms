@@ -922,7 +922,16 @@ export const TwilioAPI = {
     lead_uuid: string;
     to: string;
   }): Promise<unknown> => {
-    const response = await api.post("/twilio/make-call/", payload);
+    const clinicId = storedClinicId();
+    const response = await api.post("/twilio/make-call/", payload, {
+      params: clinicId > 0 ? { clinic_id: clinicId } : undefined,
+      headers:
+        clinicId > 0
+          ? {
+              "X-Clinic-Id": String(clinicId),
+            }
+          : undefined,
+    });
     console.log("📞 Call initiated:", response.data);
     return response.data;
   },
@@ -932,7 +941,16 @@ export const TwilioAPI = {
     to: string;
     message: string;
   }): Promise<unknown> => {
-    const response = await api.post("/twilio/send-sms/", payload);
+    const clinicId = storedClinicId();
+    const response = await api.post("/twilio/send-sms/", payload, {
+      params: clinicId > 0 ? { clinic_id: clinicId } : undefined,
+      headers:
+        clinicId > 0
+          ? {
+              "X-Clinic-Id": String(clinicId),
+            }
+          : undefined,
+    });
     console.log("💬 SMS sent:", response.data);
     return response.data;
   },
