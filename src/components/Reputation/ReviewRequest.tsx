@@ -83,6 +83,8 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     }
   }, [open, allLeads.length, dispatch]);
 
+
+
   useEffect(() => {
     if (!open) {
       return;
@@ -182,6 +184,24 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
   const showWarningToast = (message: string) => {
     toast.warning(message, { toastId: `review-request-warning-${message}` });
   };
+
+useEffect(() => {
+  const handleInvalidDescription = () => {
+    showErrorToast("Starts with Alphabets only");
+  };
+
+  window.addEventListener(
+    "review-description-invalid",
+    handleInvalidDescription,
+  );
+
+  return () => {
+    window.removeEventListener(
+      "review-description-invalid",
+      handleInvalidDescription,
+    );
+  };
+}, []);
 
   const showSavingToast = () =>
     toast.loading("Saving review request...", {
@@ -634,6 +654,9 @@ Please share your valuable feedback here:
   };
 
   const handleRequestNameChange = (rawValue: string) => {
+
+
+
     const sanitized = sanitizeRequestNameInput(rawValue);
 
     if (sanitized === null) {
@@ -643,6 +666,27 @@ Please share your valuable feedback here:
 
     setFormData((prev) => ({ ...prev, request_name: sanitized }));
   };
+
+const handleDescriptionChange = (rawValue: string) => {
+  // Allow empty for clearing
+  if (rawValue === "") {
+    setFormData((prev) => ({ ...prev, description: "" }));
+    return;
+  }
+
+  // Check ONLY first character
+  const firstChar = rawValue.charAt(0);
+
+  if (!/[A-Za-z]/.test(firstChar)) {
+    showErrorToast("Starts with Alphabets only");
+    return;
+  }
+
+  setFormData((prev) => ({
+    ...prev,
+    description: rawValue,
+  }));
+};
 
   const handleFileSelect = (file: File) => {
     if (!file?.name) {
@@ -732,14 +776,17 @@ Please share your valuable feedback here:
             onRequestNameBlur={() => {
               validateRequestName(formData.request_name, true);
             }}
-            onDescriptionChange={(value) => {
-              setFormData((prev) => ({ ...prev, description: value }));
-            }}
-            onDescriptionBlur={() => {
-              if (!isFieldFilled(formData.description)) {
-                showErrorToast("Description needed");
-              }
-            }}
+onDescriptionChange={handleDescriptionChange}
+onDescriptionBlur={() => {
+  if (!isFieldFilled(formData.description)) {
+    showErrorToast("Description needed");
+    return;
+  }
+
+  if (!/^[A-Za-z]/.test(formData.description)) {
+    showErrorToast("Starts with Alphabets only");
+  }
+}}
             onLeadSelectionTypeChange={handleLeadSelectionTypeChange}
             onSelectedLeadsChange={setSelectedLeads}
             leadActionFilter={leadActionFilter}
