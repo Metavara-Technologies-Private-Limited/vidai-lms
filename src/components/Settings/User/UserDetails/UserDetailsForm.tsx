@@ -216,6 +216,8 @@ const PasswordField = ({
   show,
   onToggle,
   onFocus,
+  autoComplete,
+  name,
 }: {
   label: string;
   value: string;
@@ -223,11 +225,15 @@ const PasswordField = ({
   show: boolean;
   onToggle: () => void;
   onFocus?: () => void;
+  autoComplete?: string;
+  name?: string;
 }) => (
   <TextField
     fullWidth
     label={label}
     placeholder="Type Here..."
+    name={name}
+    autoComplete={autoComplete}
     type={show ? "text" : "password"}
     value={value}
     onChange={(e) => onChange(e.target.value)}
@@ -375,8 +381,8 @@ const UserDetailsForm: React.FC<Props> = ({
       return false;
     }
 
-    if (form.mobileNo.trim() && !/^\d{10}$/.test(form.mobileNo)) {
-      toast.error("Mobile Number must be 10 digits");
+    if (form.mobileNo.trim() && !/^\d{7,15}$/.test(form.mobileNo)) {
+      toast.error("Mobile Number must be between 7 and 15 digits");
       return false;
     }
 
@@ -409,7 +415,7 @@ const UserDetailsForm: React.FC<Props> = ({
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Box>
+      <Box component="form" autoComplete="off">
         <Box
           sx={{
             display: "flex",
@@ -633,14 +639,14 @@ const UserDetailsForm: React.FC<Props> = ({
               placeholder="Type Here..."
               value={form.mobileNo}
               onChange={(e) => {
-                if (/\D/.test(e.target.value)) {
+                const onlyDigits = e.target.value
+                  .replace(/\D/g, "")
+                  .slice(0, 15);
+                if (/\D/.test(e.target.value) && onlyDigits.length >= 15) {
                   toast.error("Enter only digits", {
                     toastId: "user-mobile-only-digits",
                   });
                 }
-                const onlyDigits = e.target.value
-                  .replace(/\D/g, "")
-                  .slice(0, 10);
                 setForm((prev) => ({ ...prev, mobileNo: onlyDigits }));
               }}
               sx={inputSx}
@@ -653,6 +659,8 @@ const UserDetailsForm: React.FC<Props> = ({
               fullWidth
               label={getRequiredLabel("Email")}
               placeholder="Type Here..."
+              name="new-user-email"
+              autoComplete="off"
               value={form.emailId}
               onChange={(e) =>
                 setForm((prev) => ({
@@ -668,6 +676,8 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <PasswordField
               label={getRequiredLabel("Password")}
+              name="new-user-password"
+              autoComplete="new-password"
               value={form.password}
               onChange={(v) => setForm((prev) => ({ ...prev, password: v }))}
               onFocus={() => {
@@ -686,6 +696,8 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <PasswordField
               label={getRequiredLabel("Confirm Password")}
+              name="new-user-confirm-password"
+              autoComplete="new-password"
               value={form.confirmPassword}
               onChange={(v) =>
                 setForm((prev) => ({ ...prev, confirmPassword: v }))
