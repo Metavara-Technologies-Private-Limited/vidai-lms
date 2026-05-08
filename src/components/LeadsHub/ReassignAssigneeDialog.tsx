@@ -1,4 +1,6 @@
 import * as React from "react";
+import { useSelector } from "react-redux";
+import { selectUsers } from "../../store/userSlice";
 import {
   Dialog,
   DialogTitle,
@@ -11,15 +13,15 @@ import {
   MenuItem,
   TextField,
   Alert,
-  CircularProgress,
+  // CircularProgress,
   Box,
   IconButton,
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useDispatch } from "react-redux";
-import { EmployeeAPI, LeadAPI } from "../../services/leads.api";
-import type { Employee, LeadPayload } from "../../services/leads.api";
+import { LeadAPI } from "../../services/leads.api";
+import type { LeadPayload } from "../../services/leads.api";
 import { fetchLeads } from "../../store/leadSlice";
 
 // ── Typed error helper ──────────────────────────────────────────────────────
@@ -36,6 +38,60 @@ const getErrorMessage = (err: unknown, fallback: string): string => {
     e?.message ||
     fallback
   );
+};
+
+type AssigneeOption = {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  role?: string;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const normalizeUsersList = (users: any[]): AssigneeOption[] => {
+  return users.map((u) => ({
+    id: u.id,
+    first_name: u.first_name || u.firstName,
+    last_name: u.last_name || u.lastName,
+    username: u.username,
+    role: u.role?.name || u.role || "",
+  }));
+};
+
+const assigneeLabel = (option: AssigneeOption): string => {
+  const fullName =
+    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+
+  const primary = fullName || option.username || `User ${option.id}`;
+
+  return option.role ? `${primary} (${option.role})` : primary;
+};
+const getSelectedAssigneeName = (
+  assignees: AssigneeOption[],
+  id: number | null,
+): string | null => {
+  if (!id) return null;
+
+  const matched = assignees.find((a) => a.id === id);
+
+  return matched ? assigneeLabel(matched) : null;
+};
+
+const normalizeTreatmentInterest = (
+  value: string | string[] | { id: string; name: string }[] | undefined,
+): string[] => {
+  if (!value) return [];
+
+  if (typeof value === "string") {
+    return [value];
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => (typeof item === "object" ? item.id : item));
+  }
+
+  return [];
 };
 
 // ── Sanitize helpers — narrow loose strings to literal unions ───────────────
@@ -68,8 +124,8 @@ interface LeadProp {
   contact_no?: string;
   contact?: string;
   source?: string;
-  treatment_interest?: string;
-  treatmentInterest?: string;
+  treatment_interest?: string | string[] | { id: string; name: string }[];
+  treatmentInterest?: string | string[] | { id: string; name: string }[];
   appointment_date?: string;
   appointmentDate?: string;
   date?: string;
@@ -129,7 +185,10 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
   const dispatch = useDispatch();
 
   // ── State ────────────────────────────────────────────────────────────────
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
+  // const [employees, setEmployees] = React.useState<Employee[]>([]);
+  const users = useSelector(selectUsers);
+
+  const [assignees, setAssignees] = React.useState<AssigneeOption[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = React.useState<
     number | null
   >(null);
@@ -140,40 +199,40 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
   const [nextActionDesc, setNextActionDesc] = React.useState("");
 
   const [loading, setLoading] = React.useState(false);
-  const [fetchingEmployees, setFetchingEmployees] = React.useState(false);
+  // const [fetchingEmployees, setFetchingEmployees] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   // ── Fetch employees & pre-populate ──────────────────────────────────────
   React.useEffect(() => {
-    const load = async () => {
-      if (!open || !lead.clinic_id) return;
-      try {
-        setFetchingEmployees(true);
-        setError(null);
-        const list = await EmployeeAPI.listByClinic(lead.clinic_id);
-        setEmployees(list);
-        if (lead.assigned_to_id) setSelectedEmployeeId(lead.assigned_to_id);
-        if (lead.next_action_type) setNextActionType(lead.next_action_type);
-        if (lead.next_action_status)
-          setNextActionStatus(toNextActionStatus(lead.next_action_status));
-        if (lead.next_action_description)
-          setNextActionDesc(lead.next_action_description);
-      } catch (err: unknown) {
-        setError(getErrorMessage(err, "Failed to load employees"));
-      } finally {
-        setFetchingEmployees(false);
-      }
-    };
-    load();
+    if (!open) return;
+
+    const normalized = normalizeUsersList(users);
+
+    setAssignees(normalized);
+
+    if (lead.assigned_to_id) {
+      setSelectedEmployeeId(lead.assigned_to_id);
+    }
+
+    if (lead.next_action_type) {
+      setNextActionType(lead.next_action_type);
+    }
+
+    if (lead.next_action_status) {
+      setNextActionStatus(toNextActionStatus(lead.next_action_status));
+    }
+
+    if (lead.next_action_description) {
+      setNextActionDesc(lead.next_action_description);
+    }
   }, [
     open,
-    lead.clinic_id,
+    users,
     lead.assigned_to_id,
     lead.next_action_type,
     lead.next_action_status,
     lead.next_action_description,
   ]);
-
   // ── Save ─────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!selectedEmployeeId) {
@@ -190,8 +249,9 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
         full_name: lead.full_name ?? lead.name,
         contact_no: lead.contact_no ?? lead.contact,
         source: lead.source,
-        treatment_interest:
-          lead.treatment_interest ?? lead.treatmentInterest ?? "",
+        treatment_interest: normalizeTreatmentInterest(
+          lead.treatment_interest ?? lead.treatmentInterest,
+        ),
         appointment_date:
           lead.appointment_date ??
           lead.appointmentDate ??
@@ -201,6 +261,10 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
 
         // Reassign fields
         assigned_to_id: selectedEmployeeId,
+        assigned_to_name: getSelectedAssigneeName(
+          assignees,
+          selectedEmployeeId,
+        ),
         next_action_type: nextActionType || undefined,
         next_action_status: nextActionStatus, // "pending" | "completed" ✅
         next_action_description: nextActionDesc || undefined,
@@ -230,7 +294,7 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
       // ⚡ Optimistic close for snappy UX
       onClose();
 
-      LeadAPI.update(lead.id, updatePayload)
+      await LeadAPI.update(lead.id, updatePayload)
         .then(() => {
           dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
           window.dispatchEvent(
@@ -238,6 +302,10 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
               detail: {
                 id: lead.id,
                 assigned_to_id: selectedEmployeeId,
+                assigned_to_name: getSelectedAssigneeName(
+                  assignees,
+                  selectedEmployeeId,
+                ),
                 next_action_type: nextActionType,
                 next_action_status: nextActionStatus,
                 next_action_description: nextActionDesc,
@@ -319,11 +387,7 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
           )}
 
           {/* Assignee */}
-          <FormControl
-            fullWidth
-            disabled={fetchingEmployees || loading}
-            size="small"
-          >
+          <FormControl fullWidth disabled={loading} size="small">
             <InputLabel
               sx={{ fontSize: "14px", "&.Mui-focused": { color: "#1976d2" } }}
             >
@@ -346,32 +410,15 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
                 },
               }}
             >
-              {fetchingEmployees ? (
-                <MenuItem disabled>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <CircularProgress size={16} />
-                    <Typography fontSize="14px">
-                      Loading employees...
-                    </Typography>
-                  </Box>
+              {assignees.map((user) => (
+                <MenuItem
+                  key={user.id}
+                  value={user.id}
+                  sx={{ fontSize: "14px" }}
+                >
+                  {assigneeLabel(user)}
                 </MenuItem>
-              ) : employees.length === 0 ? (
-                <MenuItem disabled>
-                  <Typography fontSize="14px">
-                    No employees available
-                  </Typography>
-                </MenuItem>
-              ) : (
-                employees.map((emp) => (
-                  <MenuItem
-                    key={emp.id}
-                    value={emp.id}
-                    sx={{ fontSize: "14px" }}
-                  >
-                    {emp.emp_name}
-                  </MenuItem>
-                ))
-              )}
+              ))}
             </Select>
           </FormControl>
 
@@ -499,7 +546,7 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
         <Button
           onClick={handleSave}
           variant="contained"
-          disabled={loading || fetchingEmployees || !selectedEmployeeId}
+          disabled={loading || !selectedEmployeeId}
           sx={{
             minWidth: 100,
             textTransform: "none",

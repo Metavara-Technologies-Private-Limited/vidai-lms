@@ -782,9 +782,6 @@ export const LeadAPI = {
       full_name: current.full_name ?? "",
       contact_no: current.contact_no ?? "",
       source: current.source ?? "",
-      treatment_interest: Array.isArray(current.treatment_interest)
-        ? (current.treatment_interest as string[]).join(",")
-        : (current.treatment_interest as string) ?? "",
       book_appointment: current.book_appointment ? "true" : "false",
       appointment_date: current.appointment_date ?? "",
       slot: current.slot ?? "",
@@ -792,6 +789,21 @@ export const LeadAPI = {
       is_active: current.is_active ? "true" : "false",
     };
     Object.entries(safeFields).forEach(([k, v]) => formData.append(k, v));
+    const normalizedTreatmentInterest = Array.isArray(
+      current.treatment_interest,
+    )
+      ? current.treatment_interest
+      : current.treatment_interest
+        ? [current.treatment_interest]
+        : [];
+
+    normalizedTreatmentInterest.forEach((item) => {
+      const value = typeof item === "object" ? item.id : String(item);
+
+      if (value) {
+        formData.append("treatment_interest", value);
+      }
+    });
     files.forEach((file) => formData.append("documents", file));
     const clinicId = current.clinic_id ?? storedClinicId();
     const response = await api.put<Lead>(
