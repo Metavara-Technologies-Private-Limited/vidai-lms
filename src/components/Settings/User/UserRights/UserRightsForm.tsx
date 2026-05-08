@@ -16,18 +16,21 @@ import EditIcon from "@mui/icons-material/Edit";
 import CancelIcon from "@mui/icons-material/Cancel";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { LEADS_MENU } from "../../../../config/sidebar.menu";
-import { selectUser } from "../../../../store/authSlice";
+import { selectUser, setUser } from "../../../../store/authSlice";
+import type { AppDispatch } from "../../../../store";
 import {
   hasAnySubcategoryActionPermission,
+  resolveUserRole,
 } from "../../../../utils/roleAccess";
 import {
   roleApi,
   type RolePermissionPayload,
   type RoleRead,
 } from "../../../../services/role.api.ts";
-import { usersApi, type UserRecord } from "../../../../services/users.api";
+import { authApi } from "../../../../services/auth.api";
+import { usersApi, type UserRecord, type UserPermissionRecord } from "../../../../services/users.api";
 
 type RoleName = "Super Admin" | "Admin" | "User";
 
@@ -110,6 +113,62 @@ const fromApiRole = (r: RoleRead): Partial<RoleEntry> => {
   return { apiId: r.id, rights, permissions };
 };
 
+const userPermissionsToRights = (
+  apiPerms: UserPermissionRecord[],
+): { rights: RoleRights; permissions: Record<string, PermissionFlags> } => {
+  const rights: RoleRights = { modules: [], categories: [], subCategories: [] };
+  const permissions: Record<string, PermissionFlags> = {};
+
+  for (const p of apiPerms) {
+    const flags: PermissionFlags = {
+      add: p.can_add,
+      edit: p.can_edit,
+      view: p.can_view,
+      print: p.can_print,
+    };
+    if (p.module_key !== "_") {
+      rights.modules.push(p.module_key);
+      permissions[p.module_key] = flags;
+    } else if (p.category_key !== "_") {
+      rights.categories.push(p.category_key);
+      permissions[p.category_key] = flags;
+    } else if (p.subcategory_key) {
+      rights.subCategories.push(p.subcategory_key);
+      permissions[p.subcategory_key] = flags;
+    }
+  }
+
+  rights.modules = compactUnique(rights.modules);
+  rights.categories = compactUnique(rights.categories);
+  rights.subCategories = compactUnique(rights.subCategories);
+
+  return { rights, permissions };
+};
+
+const rightsToUserPermissions = (
+  rights: RoleRights,
+  perms: Record<string, PermissionFlags>,
+): UserPermissionRecord[] => {
+  const result: UserPermissionRecord[] = [];
+
+  for (const item of compactUnique(rights.modules)) {
+    const flags = perms[item] ?? emptyPerm();
+    result.push({ module_key: item, category_key: "_", subcategory_key: null, can_view: flags.view, can_add: flags.add, can_edit: flags.edit, can_print: flags.print });
+  }
+
+  for (const item of compactUnique(rights.categories)) {
+    const flags = perms[item] ?? emptyPerm();
+    result.push({ module_key: "_", category_key: item, subcategory_key: null, can_view: flags.view, can_add: flags.add, can_edit: flags.edit, can_print: flags.print });
+  }
+
+  for (const item of compactUnique(rights.subCategories)) {
+    const flags = perms[item] ?? emptyPerm();
+    result.push({ module_key: "_", category_key: "_", subcategory_key: item, can_view: flags.view, can_add: flags.add, can_edit: flags.edit, can_print: flags.print });
+  }
+
+  return result;
+};
+
 const toApiPermissions = (
   rights: RoleRights,
   perms: Record<string, PermissionFlags>,
@@ -157,6 +216,7 @@ const toApiPermissions = (
     });
 
   return [
+    ...build("module", rights.modules, (item) => ({ module_key: item, category_key: "_", subcategory_key: null })),
     ...build("category", rights.categories, (item) => ({ module_key: "_", category_key: item, subcategory_key: null })),
     ...build("subcategory", rights.subCategories, (item) => ({ module_key: "_", category_key: "_", subcategory_key: item })),
   ];
@@ -167,7 +227,7 @@ type Props = {
   onSave: () => void;
 };
 
-type ViewMode = "empty" | "summary" | "edit";
+type ViewMode = "empty" | "summary" | "edit" | "user-summary" | "user-edit";
 
 const STEP_LABELS = ["Module", "Category", "Sub Category"];
 const MODULE_OPTIONS = ["Vidai Leads"];
@@ -318,17 +378,22 @@ const chipStyleByType: Record<"module" | "category" | "subcategory", { border: s
 };
 
 const UserRightsForm: React.FC<Props> = ({ onSave }) => {
+  const dispatch = useDispatch<AppDispatch>();
   const theme = useTheme();
   const isCompactDesktop = useMediaQuery(theme.breakpoints.down("xl"));
   const isTabletDown = useMediaQuery(theme.breakpoints.down("lg"));
   const user = useSelector(selectUser);
   const authUser = user as unknown as Record<string, unknown> | null;
+  const authRole = resolveUserRole(authUser);
   const permissions = authUser?.permissions;
   const userRightsAliases = ["user", "users"];
+  const isSuperAdmin = authRole === "super_admin";
   const canViewUserRights =
+    isSuperAdmin ||
     hasAnySubcategoryActionPermission(permissions, userRightsAliases, "view") ||
     hasAnySubcategoryActionPermission(permissions, userRightsAliases, "print");
   const canManageUserRights =
+    isSuperAdmin ||
     hasAnySubcategoryActionPermission(permissions, userRightsAliases, "add") ||
     hasAnySubcategoryActionPermission(permissions, userRightsAliases, "edit");
 
@@ -353,6 +418,11 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     Admin: new Set<number>(),
     User: new Set<number>(),
   });
+
+  // Individual user permission state
+  const [focusedUser, setFocusedUser] = useState<UserRecord | null>(null);
+  const [loadingUserPerms, setLoadingUserPerms] = useState(false);
+  const [userHasIndividualPerms, setUserHasIndividualPerms] = useState(false);
 
   // ── Fetch roles from backend ──────────────────────────────────────────────
   useEffect(() => {
@@ -484,6 +554,37 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     setDraftPerms(role.permissions);
     setActiveStep(0);
     setMode("summary");
+    setFocusedUser(null);
+  };
+
+  const openUserPermissions = (user: UserRecord) => {
+    if (!canViewUserRights) return;
+    setFocusedUser(user);
+    setLoadingUserPerms(true);
+    setMode("user-summary");
+
+    usersApi.getIndividualPermissions(user.id)
+      .then((apiPerms) => {
+        const hasOwn = apiPerms.length > 0;
+        setUserHasIndividualPerms(hasOwn);
+        if (hasOwn) {
+          const { rights, permissions } = userPermissionsToRights(apiPerms);
+          setDraftRights(rights);
+          setDraftPerms(permissions);
+        } else {
+          // Fall back to the role's permissions
+          const roleForUser = roles.find((r) => r.name.toLowerCase() === (user.role || "").toLowerCase());
+          setDraftRights(roleForUser?.rights ?? emptyRights());
+          setDraftPerms(roleForUser?.permissions ?? {});
+        }
+      })
+      .catch(() => {
+        const roleForUser = roles.find((r) => r.name.toLowerCase() === (user.role || "").toLowerCase());
+        setDraftRights(roleForUser?.rights ?? emptyRights());
+        setDraftPerms(roleForUser?.permissions ?? {});
+        setUserHasIndividualPerms(false);
+      })
+      .finally(() => setLoadingUserPerms(false));
   };
 
   const toggleOption = (label: string, checked: boolean) => {
@@ -624,6 +725,61 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
           ?.response?.data?.non_field_errors?.[0] ??
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
         "Failed to save role. Please try again.";
+      const { toast } = await import("react-toastify");
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveUserPermissions = async () => {
+    if (!canManageUserRights || !focusedUser) return;
+    const permissions = rightsToUserPermissions(draftRights, draftPerms);
+    setSaving(true);
+    try {
+      await usersApi.saveIndividualPermissions(focusedUser.id, permissions);
+
+      const authUserId = Number((authUser?.id ?? authUser?.user_id) ?? 0);
+      if (authUserId > 0 && focusedUser.id === authUserId && authUser) {
+        const myPermPayload = await authApi.getMyPermissions().catch(() => null);
+        if (myPermPayload && typeof myPermPayload === "object") {
+          const merged = {
+            ...(authUser as Record<string, unknown>),
+            permissions:
+              (myPermPayload as { permissions?: unknown }).permissions ??
+              (authUser as Record<string, unknown>).permissions,
+          };
+          dispatch(setUser(merged as never));
+        }
+      }
+
+      setUserHasIndividualPerms(permissions.length > 0);
+      setMode("user-summary");
+      onSave();
+    } catch (err: unknown) {
+      const msg =
+        (err as { message?: string })?.message ?? "Failed to save user permissions.";
+      const { toast } = await import("react-toastify");
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetUserPermissions = async () => {
+    if (!canManageUserRights || !focusedUser) return;
+    setSaving(true);
+    try {
+      await usersApi.clearIndividualPermissions(focusedUser.id);
+      // Reload from role
+      const roleForUser = roles.find((r) => r.name.toLowerCase() === (focusedUser.role || "").toLowerCase());
+      setDraftRights(roleForUser?.rights ?? emptyRights());
+      setDraftPerms(roleForUser?.permissions ?? {});
+      setUserHasIndividualPerms(false);
+      setMode("user-summary");
+    } catch (err: unknown) {
+      const msg =
+        (err as { message?: string })?.message ?? "Failed to reset user permissions.";
       const { toast } = await import("react-toastify");
       toast.error(msg);
     } finally {
@@ -791,16 +947,17 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                         {roleUsers.map((user) => (
                           <Box
                             key={user.id}
-                            onClick={() => toggleUserSelection(role.name, user.id)}
+                            onClick={() => openUserPermissions(user)}
                             sx={{
                               px: 1,
                               py: 0.6,
                               borderRadius: "6px",
-                              bgcolor: "#FFFFFF",
+                              bgcolor: focusedUser?.id === user.id ? "#FFF3EE" : "#FFFFFF",
                               display: "flex",
                               alignItems: "center",
                               gap: 0.8,
                               cursor: "pointer",
+                              "&:hover": { bgcolor: "#FFF8F5" },
                             }}
                           >
                             <Checkbox
@@ -1012,6 +1169,201 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                 Save &amp; Grant Access
               </Button>
             </Box>
+          </Box>
+        )}
+
+        {(mode === "user-summary" || mode === "user-edit") && focusedUser && (
+          <Box sx={{ border: "1px solid #E0E0E0", borderRadius: "10px", bgcolor: "#fff", p: 2 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 1,
+                flexWrap: "wrap",
+                bgcolor: "#F6F6F6",
+                borderRadius: "10px",
+                px: 2,
+                py: 1.2,
+                mb: 1.5,
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <PersonOutlineIcon sx={{ fontSize: 20, color: "#E17E61" }} />
+                <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
+                  {focusedUser.firstName || focusedUser.username || focusedUser.email}
+                  {(focusedUser.lastName) ? ` ${focusedUser.lastName}` : ""}
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "#738091", ml: 0.5 }}>
+                  ({focusedUser.role})
+                </Typography>
+                {userHasIndividualPerms && (
+                  <Box sx={{ fontSize: 11, bgcolor: "#FFF3EE", border: "1px solid #E17E61", borderRadius: "6px", px: 1, py: 0.3, color: "#E17E61", fontWeight: 600 }}>
+                    Custom
+                  </Box>
+                )}
+              </Box>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                {userHasIndividualPerms && mode === "user-summary" && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleResetUserPermissions}
+                    disabled={saving || !canManageUserRights}
+                    sx={{ textTransform: "none", borderRadius: "8px", fontSize: 12, borderColor: "#E57373", color: "#E57373" }}
+                  >
+                    Reset to Role
+                  </Button>
+                )}
+                {mode === "user-summary" && (
+                  <IconButton
+                    onClick={() => { setActiveStep(0); setMode("user-edit"); }}
+                    disabled={!canManageUserRights}
+                    sx={{ color: canManageUserRights ? "#6D9CF1" : "#BDBDBD" }}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                )}
+              </Box>
+            </Box>
+
+            {loadingUserPerms ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : mode === "user-summary" ? (
+              <Box sx={{ overflowX: "auto" }}>
+                <Box sx={{ minWidth: isCompactDesktop ? 620 : 720 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(4, minmax(72px, 1fr))", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "8px", px: 1.2, py: 1.2, mb: 0.8 }}>
+                    <Box />
+                    {["Add", "Edit", "View", "Print"].map((h) => (
+                      <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
+                    ))}
+                  </Box>
+                  {summaryRows.map((row) => {
+                    const perm = draftPerms[row.label] ?? emptyPerm();
+                    return (
+                      <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(4, minmax(72px, 1fr))", alignItems: "center", px: 1.2, py: 1 }}>
+                        <Box sx={{ borderLeft: "6px solid #3A7BD5", bgcolor: "#EDF2F8", borderRadius: "4px", px: 1.3, py: 0.8, fontSize: 13 }}>{row.label}</Box>
+                        <Tick checked={perm.add} />
+                        <Tick checked={perm.edit} />
+                        <Tick checked={perm.view} />
+                        <Tick checked={perm.print} />
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            ) : (
+              /* user-edit mode */
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Page Access</Typography>
+
+                <Box sx={{ border: "1px solid #ECECEC", borderRadius: "12px", px: 2, py: 1, display: "flex", alignItems: "center", width: "100%", flexWrap: "wrap", rowGap: 1 }}>
+                  {STEP_LABELS.map((label, idx) => (
+                    <React.Fragment key={label}>
+                      <StepDot
+                        index={idx}
+                        label={label}
+                        active={activeStep === idx}
+                        done={idx < activeStep}
+                        onClick={() => setActiveStep(idx)}
+                      />
+                      {idx < STEP_LABELS.length - 1 && <StepConnector done={idx < activeStep} />}
+                    </React.Fragment>
+                  ))}
+                </Box>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 1.2 }}>
+                  {optionList.map((label) => (
+                    <FormControlLabel
+                      key={label}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={draftRights[rightsKey].includes(label)}
+                          onChange={(e) => toggleOption(label, e.target.checked)}
+                          disabled={!canManageUserRights}
+                          sx={{ p: 0, mr: 0.8, color: "#CDCDCD", "&.Mui-checked": { color: "#4CAF50" } }}
+                        />
+                      }
+                      label={<Typography sx={{ fontSize: 13 }}>{label}</Typography>}
+                      sx={{ m: 0 }}
+                    />
+                  ))}
+                </Box>
+
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={allSelected}
+                        onChange={(e) => toggleSelectAll(e.target.checked)}
+                        disabled={!canManageUserRights}
+                        sx={{ p: 0, mr: 0.8, color: "#CDCDCD", "&.Mui-checked": { color: "#4CAF50" } }}
+                      />
+                    }
+                    label={<Typography sx={{ fontSize: 13 }}>{allSelected ? "Deselect All" : "Select All"}</Typography>}
+                    sx={{ m: 0 }}
+                  />
+                  <Box sx={{ flex: 1, minWidth: 0 }} />
+                  <Button variant="outlined" onClick={activeStep < 2 ? handleNext : handleSave} disabled={!canManageUserRights || (activeStep < 2 ? !hasStepSelection : !hasAnySelection)} sx={{ textTransform: "none", minWidth: { xs: "100%", sm: 110 }, borderRadius: "10px", fontSize: 14, color: "#5C5C5C", borderColor: "#C5C5C5" }}>{activeStep < 2 ? "Next" : "Save"}</Button>
+                </Box>
+
+                <Box sx={{ overflowX: "auto" }}>
+                  <Box sx={{ minWidth: isCompactDesktop ? 700 : 820 }}>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(5, minmax(72px, 1fr))", alignItems: "center", bgcolor: "#F7F7F7", borderRadius: "10px", px: 1.2, py: 1 }}>
+                      <Box />
+                      {["All", "Add", "Edit", "View", "Print"].map((h) => (
+                        <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
+                      ))}
+                    </Box>
+                    <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
+                      {editRows.map((row) => {
+                        const itemType = getItemType(row.label, draftRights);
+                        const chipColors = chipStyleByType[itemType];
+                        return (
+                          <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(5, minmax(72px, 1fr))", alignItems: "center", px: 1, py: 0.8 }}>
+                            <Box sx={{ display: "flex", alignItems: "center" }}>
+                              <Box sx={{ border: `1px solid ${chipColors.border}`, bgcolor: chipColors.bg, borderRadius: "8px", px: 1.1, py: 0.5, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 0.8 }}>
+                                {row.label}
+                                <CancelIcon sx={{ fontSize: 15, color: "#E17E61", cursor: "pointer" }} onClick={() => removeRow(row.label)} />
+                              </Box>
+                            </Box>
+                            <Tick checked={row.perm.add && row.perm.edit && row.perm.view && row.perm.print} onClick={() => {
+                              if (!canManageUserRights) return;
+                              const allOn = row.perm.add && row.perm.edit && row.perm.view && row.perm.print;
+                              setDraftPerms((prev) => ({
+                                ...prev,
+                                [row.label]: { ...row.perm, add: !allOn, edit: !allOn, view: !allOn, print: !allOn },
+                              }));
+                            }} />
+                            <Tick checked={row.perm.add} onClick={canManageUserRights ? () => togglePerm(row.label, "add") : undefined} />
+                            <Tick checked={row.perm.edit} onClick={canManageUserRights ? () => togglePerm(row.label, "edit") : undefined} />
+                            <Tick checked={row.perm.view} onClick={canManageUserRights ? () => togglePerm(row.label, "view") : undefined} />
+                            <Tick checked={row.perm.print} onClick={canManageUserRights ? () => togglePerm(row.label, "print") : undefined} />
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                </Box>
+
+                <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.2, flexWrap: "wrap" }}>
+                  <Button variant="outlined" onClick={() => setMode("user-summary")} sx={{ textTransform: "none", minWidth: 130, borderRadius: "12px", fontSize: 14 }}>Cancel</Button>
+                  <Button
+                    variant="contained"
+                    onClick={handleSaveUserPermissions}
+                    disabled={saving || !canManageUserRights}
+                    sx={{ textTransform: "none", minWidth: { xs: "100%", sm: 240 }, borderRadius: "12px", bgcolor: "#545454", fontSize: 14, "&:hover": { bgcolor: "#232323" } }}
+                  >
+                    {saving ? <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} /> : null}
+                    Save User Permissions
+                  </Button>
+                </Box>
+              </Box>
+            )}
           </Box>
         )}
       </Box>

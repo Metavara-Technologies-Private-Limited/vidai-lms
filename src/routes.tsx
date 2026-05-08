@@ -161,6 +161,9 @@ export default function AppRoutes() {
       try {
         if (loginType !== "EXT") {
           const profile = await authApi.getProfile();
+          const permissionPayload = await authApi
+            .getMyPermissions()
+            .catch(() => null);
           const profileRecord =
             profile && typeof profile === "object"
               ? (profile as Record<string, unknown>)
@@ -219,6 +222,15 @@ export default function AppRoutes() {
                 profileRoleName ||
                 undefined,
               role: currentUser?.role || profileRoleName || undefined,
+              permissions:
+                (permissionPayload &&
+                typeof permissionPayload === "object" &&
+                "permissions" in permissionPayload
+                  ? (permissionPayload as { permissions?: { modules: [] } })
+                      .permissions
+                  : null) ??
+                currentUser?.permissions ??
+                { modules: [] },
               clinics:
                 currentUser?.clinics && currentUser.clinics.length > 0
                   ? currentUser.clinics

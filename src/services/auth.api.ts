@@ -80,6 +80,11 @@ export const authApi = {
     }
   },
 
+  getMyPermissions: async () => {
+    const res = await http.get("/users/permissions/");
+    return unwrapResponseData<Record<string, unknown>>(res.data);
+  },
+
   updateMyPhoto: async (payload: FormData) => {
     try {
       const res = await http.patch("/me/photo/", payload);

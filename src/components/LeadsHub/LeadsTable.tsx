@@ -708,7 +708,7 @@ const LeadsTable: React.FC<Props> = ({
   const filteredLeads = React.useMemo(() => {
     const result = localLeads.filter((lead: ProcessedLead) => {
       const searchStr =
-        `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
+        `${lead.full_name || lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
       const matchTab =
         tab === "archived"
