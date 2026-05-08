@@ -25,7 +25,7 @@ import {
 import { selectLoginType, selectUser, setUser } from "../../../store/authSlice";
 import { fetchUsers } from "../../../store/userSlice";
 import { toSafePhotoUrl } from "../../../utils/mediaUrl";
-import { hasAnySubcategoryActionPermission } from "../../../utils/roleAccess";
+import { hasAnySubcategoryActionPermission, resolveUserRole } from "../../../utils/roleAccess";
 import type { AppDispatch, RootState } from "../../../store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -104,20 +104,19 @@ const UsersPage: React.FC = () => {
     (currentRoleName === "super admin" || currentRoleName === "superadmin");
   const usersPermissions = (authUser as Record<string, unknown> | null)
     ?.permissions;
+  const isSuperAdmin =
+    resolveUserRole(authUser as Record<string, unknown> | null) === "super_admin";
   const userAliases = ["user", "users"];
   const canViewUsers =
+    isSuperAdmin ||
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "view") ||
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "print");
-  const canAddUsers = hasAnySubcategoryActionPermission(
-    usersPermissions,
-    userAliases,
-    "add",
-  );
-  const canEditUsers = hasAnySubcategoryActionPermission(
-    usersPermissions,
-    userAliases,
-    "edit",
-  );
+  const canAddUsers =
+    isSuperAdmin ||
+    hasAnySubcategoryActionPermission(usersPermissions, userAliases, "add");
+  const canEditUsers =
+    isSuperAdmin ||
+    hasAnySubcategoryActionPermission(usersPermissions, userAliases, "edit");
 
   const extractApiErrorMessage = (error: unknown): string => {
     const payload =
