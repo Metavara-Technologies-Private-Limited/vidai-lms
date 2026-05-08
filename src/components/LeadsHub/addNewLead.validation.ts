@@ -62,13 +62,45 @@ export const showWarningsNonBlocking = (messages: ToastMessage[]) => {
 export const validateStep = async (
   step: number,
   form: FormState,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _isCouple: "yes" | "no",
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _hasPendingFiles: boolean,
 ): Promise<boolean> => {
-  // Validate Step 1: Lab Name is required
+  // Validate Step 1: Lab Name and Assigned To are required
   if (step === 1) {
     if (!form.full_name || form.full_name.trim().length === 0) {
       toast.error("Lab Name is required", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return false;
+    }
+
+    if (!form.assignee || form.assignee.trim().length === 0) {
+      toast.error("Assigned To is required", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return false;
+    }
+  }
+
+  // Validate Step 2 required fields
+  if (step === 1) {
+    if (!form.leadStatus || form.leadStatus.trim().length === 0) {
+      toast.error("Lead Status is required", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return false;
+    }
+
+    if (!form.nextStatus || form.nextStatus.trim().length === 0) {
+      toast.error("Next Action Status is required", {
         position: "top-right",
         autoClose: 3000,
         theme: "colored",
