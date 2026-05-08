@@ -73,7 +73,15 @@ export default function CampaignCard({
   return (
     <div
       className="campaign-card"
+      tabIndex={0}
+      role="button"
       onClick={() => onViewDetail(c)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onViewDetail(c);
+        }
+      }}
       style={{ cursor: "pointer" }}
     >
       <div className="card-header">
