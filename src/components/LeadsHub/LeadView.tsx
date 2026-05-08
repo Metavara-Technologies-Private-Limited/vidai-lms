@@ -1592,7 +1592,8 @@ export default function LeadDetailView() {
     height: 22,
     px: 1,
     width: "fit-content",
-    flex: "0 0 auto",
+    flex: "0 1 auto",
+    maxWidth: "100%",
     alignSelf: "flex-start",
     border: "1.5px solid",
     borderColor: color,
@@ -2570,14 +2571,14 @@ export default function LeadDetailView() {
             </Stack>
 
             {/* Lead Status */}
-            <Stack
-              spacing={0.5}
-              sx={{
-                flex: 1.3,
-                transform: { xs: "none", md: "translateY(14px)" },
-                minWidth: { xs: "100%", md: 0 },
-              }}
-            >
+<Stack
+  spacing={0.5}
+  sx={{
+    flex: "1 1 180px",
+    transform: { xs: "none", md: "translateY(14px)" },
+    minWidth: 0,
+  }}
+>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -2585,8 +2586,14 @@ export default function LeadDetailView() {
               >
                 Lead Status
               </Typography>
-              <Stack direction="row" alignItems="center" spacing={0.5}>
-                <Chip
+<Stack
+  direction="row"
+  alignItems="center"
+  spacing={0.5}
+  flexWrap="wrap"
+  useFlexGap
+>
+                  <Chip
                   label={leadStatus}
                   size="small"
                   sx={pillChipSx(leadStatusPill.color, leadStatusPill.bg)}
