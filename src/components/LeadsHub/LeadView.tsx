@@ -23,6 +23,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+//import BackwardIcon from "../../assets/icons/Backward_icon.svg";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -204,7 +205,6 @@ const LEAD_STATUS_API_VALUES: Record<LeadStatusOption, string> = {
   "Converted Lead": "converted",
   "Lost Lead": "lost",
 } as Record<LeadStatusOption, string>;
-
 const toastOptions = {
   position: "top-right" as const,
   autoClose: 3000,
@@ -1490,6 +1490,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
 // LeadDetailView
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LeadDetailView() {
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { id } = useParams();
@@ -2436,7 +2437,16 @@ export default function LeadDetailView() {
       ];
 
   return (
-    <Box p={1} sx={{ minHeight: "80vh", overflowY: "auto" }}>
+<Box
+  p={1}
+  sx={{
+    minHeight: "80vh",
+    overflowY: "auto",
+    position: "relative",
+  }}
+>
+
+
       <Card
         elevation={0}
         sx={{
@@ -2449,6 +2459,7 @@ export default function LeadDetailView() {
           boxShadow: "none",
         }}
       >
+
         <Box
           component="img"
           src={Lead_Subtract}
@@ -2500,11 +2511,11 @@ export default function LeadDetailView() {
             {/* Lab Name */}
             <Stack
               spacing={0.5}
-              sx={{
-                flex: 1.3,
-                transform: { xs: "none", md: "translateY(14px)" },
-                minWidth: { xs: "100%", md: 0 },
-              }}
+sx={{
+  flex: "1 1 140px",
+  minWidth: 0,
+  transform: { xs: "none", md: "translateY(14px)" },
+}}
             >
               <Typography
                 variant="caption"
