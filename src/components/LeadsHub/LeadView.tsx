@@ -23,6 +23,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+//import BackwardIcon from "../../assets/icons/Backward_icon.svg";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -199,6 +200,33 @@ function toDisplayPhone(val: string | undefined | null): string {
   return trimmed;
 }
 
+const LEAD_STATUS_OPTIONS = STATUS_OPTIONS_BY_APP[APP_TYPE];
+type LeadStatusOption = (typeof LEAD_STATUS_OPTIONS)[number];
+
+const LEAD_STATUS_PILL_COLORS: Record<
+  LeadStatusOption,
+  { color: string; bg: string }
+> = {
+  New: { color: "#5B8FF9", bg: "rgba(91,143,249,0.10)" },
+  Appointment: { color: "#7C3AED", bg: "rgba(124,58,237,0.10)" },
+  "Follow Up": { color: "#F59E0B", bg: "rgba(245,158,11,0.10)" },
+  Negotiation: { color: "#D97706", bg: "rgba(217,119,6,0.10)" },
+  "Proposal Sent": { color: "#4F46E5", bg: "rgba(79,70,229,0.10)" },
+  "Contract Signed": { color: "#0D9488", bg: "rgba(13,148,136,0.10)" },
+  "Converted Lead": { color: "#16A34A", bg: "rgba(22,163,74,0.10)" },
+  "Lost Lead": { color: "#EF4444", bg: "rgba(239,68,68,0.10)" },
+} as Record<LeadStatusOption, { color: string; bg: string }>;
+
+const LEAD_STATUS_API_VALUES: Record<LeadStatusOption, string> = {
+  New: "new",
+  Appointment: "appointment",
+  "Follow Up": "follow up",
+  Negotiation: "negotiation",
+  "Proposal Sent": "proposal sent",
+  "Contract Signed": "contract signed",
+  "Converted Lead": "converted",
+  "Lost Lead": "lost",
+} as Record<LeadStatusOption, string>;
 const toastOptions = {
   position: "top-right" as const,
   autoClose: 3000,
@@ -1465,6 +1493,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
 // LeadDetailView
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LeadDetailView() {
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { id } = useParams();
@@ -2594,7 +2623,16 @@ export default function LeadDetailView() {
       ];
 
   return (
-    <Box p={1} sx={{ minHeight: "80vh", overflowY: "auto" }}>
+<Box
+  p={1}
+  sx={{
+    minHeight: "80vh",
+    overflowY: "auto",
+    position: "relative",
+  }}
+>
+
+
       <Card
         elevation={0}
         sx={{
@@ -2607,6 +2645,7 @@ export default function LeadDetailView() {
           boxShadow: "none",
         }}
       >
+
         <Box
           sx={{
             position: "absolute",
@@ -2676,12 +2715,13 @@ export default function LeadDetailView() {
             }}
           >
             {/* Lab Name */}
-            <Box
-              sx={{
-                flex: "1 1 0",
-                minWidth: 0,
-                px: { xs: 0, md: 1.5 },
-              }}
+            <Stack
+              spacing={0.5}
+sx={{
+  flex: "1 1 140px",
+  minWidth: 0,
+  transform: { xs: "none", md: "translateY(14px)" },
+}}
             >
               <Typography
                 variant="caption"
