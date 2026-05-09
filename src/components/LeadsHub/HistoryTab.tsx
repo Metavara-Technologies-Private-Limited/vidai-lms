@@ -174,17 +174,29 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   }, []);
 
   const sortedSmsHistory = React.useMemo(
-    () => [...smsHistory].sort((a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)),
+    () =>
+      [...smsHistory].sort(
+        (a, b) =>
+          parseTimestamp(b.created_at) - parseTimestamp(a.created_at),
+      ),
     [smsHistory, parseTimestamp],
   );
 
   const sortedCallHistory = React.useMemo(
-    () => [...callHistory].sort((a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)),
+    () =>
+      [...callHistory].sort(
+        (a, b) =>
+          parseTimestamp(b.created_at) - parseTimestamp(a.created_at),
+      ),
     [callHistory, parseTimestamp],
   );
 
   const sortedEmailHistory = React.useMemo(
-    () => [...emailHistory].sort((a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)),
+    () =>
+      [...emailHistory].sort(
+        (a, b) =>
+          parseTimestamp(b.created_at) - parseTimestamp(a.created_at),
+      ),
     [emailHistory, parseTimestamp],
   );
 
@@ -208,58 +220,87 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     if (hasAppointment) {
       items.push({
         key: "appointment",
-        timestamp: parseTimestamp(lead.appointment_date) || parseTimestamp(lead.created_at),
+        timestamp:
+          parseTimestamp(lead.appointment_date) ||
+          parseTimestamp(lead.created_at),
         node: {
           icon: <EventNoteIcon sx={{ fontSize: 16, color: "#10B981" }} />,
           title: `Appointment Booked - ${appointmentDate} at ${appointmentSlot}`,
-          time: appointmentDate !== "N/A" ? `${appointmentDate} ${appointmentSlot !== "N/A" ? `(${appointmentSlot})` : ""}`.trim() : leadCreatedAt,
+          time:
+            appointmentDate !== "N/A"
+              ? `${appointmentDate} ${appointmentSlot !== "N/A" ? `(${appointmentSlot})` : ""}`.trim()
+              : leadCreatedAt,
           onClick: () => setHistoryView("appointment"),
           isClickable: true,
         },
       });
     }
 
-    if (sortedSmsHistory.length > 0) {
-      items.push({
-        key: "sms",
-        timestamp: parseTimestamp(sortedSmsHistory[0]?.created_at),
-        node: {
-          icon: <SmsOutlinedIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />,
-          title: `SMS History (${sortedSmsHistory.length} messages)`,
-          time: formatDateTime(sortedSmsHistory[0].created_at),
-          onClick: () => setHistoryView("sms"),
-          isClickable: true,
-        },
-      });
-    }
+    // ✅ Always show SMS — count only when > 0
+    items.push({
+      key: "sms",
+      timestamp:
+        sortedSmsHistory.length > 0
+          ? parseTimestamp(sortedSmsHistory[0]?.created_at)
+          : parseTimestamp(lead.created_at),
+      node: {
+        icon: <SmsOutlinedIcon sx={{ fontSize: 16, color: "#8B5CF6" }} />,
+        title:
+          sortedSmsHistory.length > 0
+            ? `SMS History (${sortedSmsHistory.length} messages)`
+            : "SMS History",
+        time:
+          sortedSmsHistory.length > 0
+            ? formatDateTime(sortedSmsHistory[0].created_at)
+            : leadCreatedAt,
+        onClick: () => setHistoryView("sms"),
+        isClickable: true,
+      },
+    });
 
-    if (sortedCallHistory.length > 0) {
-      items.push({
-        key: "call",
-        timestamp: parseTimestamp(sortedCallHistory[0]?.created_at),
-        node: {
-          icon: <CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />,
-          title: `Call History (${sortedCallHistory.length} calls)`,
-          time: formatDateTime(sortedCallHistory[0].created_at),
-          onClick: () => setHistoryView("call"),
-          isClickable: true,
-        },
-      });
-    }
+    // ✅ Always show Call — count only when > 0
+    items.push({
+      key: "call",
+      timestamp:
+        sortedCallHistory.length > 0
+          ? parseTimestamp(sortedCallHistory[0]?.created_at)
+          : parseTimestamp(lead.created_at),
+      node: {
+        icon: <CallOutlinedIcon sx={{ fontSize: 16, color: "#10B981" }} />,
+        title:
+          sortedCallHistory.length > 0
+            ? `Call History (${sortedCallHistory.length} calls)`
+            : "Call History",
+        time:
+          sortedCallHistory.length > 0
+            ? formatDateTime(sortedCallHistory[0].created_at)
+            : leadCreatedAt,
+        onClick: () => setHistoryView("call"),
+        isClickable: true,
+      },
+    });
 
-    if (sortedEmailHistory.length > 0) {
-      items.push({
-        key: "email",
-        timestamp: parseTimestamp(sortedEmailHistory[0]?.created_at),
-        node: {
-          icon: <EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />,
-          title: `Email History (${sortedEmailHistory.length} email${sortedEmailHistory.length !== 1 ? "s" : ""})`,
-          time: formatDateTime(sortedEmailHistory[0].created_at),
-          onClick: () => setHistoryView("email"),
-          isClickable: true,
-        },
-      });
-    }
+    // ✅ Always show Email — count only when > 0
+    items.push({
+      key: "email",
+      timestamp:
+        sortedEmailHistory.length > 0
+          ? parseTimestamp(sortedEmailHistory[0]?.created_at)
+          : parseTimestamp(lead.created_at),
+      node: {
+        icon: <EmailOutlinedIcon sx={{ fontSize: 16, color: "#F59E0B" }} />,
+        title:
+          sortedEmailHistory.length > 0
+            ? `Email History (${sortedEmailHistory.length} email${sortedEmailHistory.length !== 1 ? "s" : ""})`
+            : "Email History",
+        time:
+          sortedEmailHistory.length > 0
+            ? formatDateTime(sortedEmailHistory[0].created_at)
+            : leadCreatedAt,
+        onClick: () => setHistoryView("email"),
+        isClickable: true,
+      },
+    });
 
     if (leadAssigned && leadAssigned !== "N/A") {
       items.push({
@@ -298,7 +339,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     message: string;
   }>({ open: false, message: "" });
 
-  // ── Email: immediate refresh when sent=true ──────────────────────────────
   const handleEmailDialogClose = React.useCallback(
     (sent?: boolean) => {
       setComposeOpen(false);
@@ -307,7 +347,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     [onRefreshEmailHistory],
   );
 
-  // ── SMS: immediate refresh when sent=true ───────────────────────────────
   const handleSmsDialogClose = React.useCallback(
     (sent?: boolean) => {
       setSmsDialogOpen(false);
@@ -316,8 +355,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     [onRefreshSmsHistory],
   );
 
-  // ✅ FIXED: handleCallOpen now just validates and opens CallDialog
-  // CallDialog itself handles the Twilio browser call — no more TwilioAPI.makeCall here
   const handleCallOpen = () => {
     const phone = normalizePhone(lead?.contact_no || leadPhone);
     if (!phone) {
@@ -693,17 +730,19 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     <Typography variant="subtitle1" fontWeight={700}>
                       SMS History
                     </Typography>
-                    <Chip
-                      label={`${sortedSmsHistory.length} messages`}
-                      size="small"
-                      sx={{
-                        bgcolor: "#F5F3FF",
-                        color: "#7C3AED",
-                        fontWeight: 600,
-                        fontSize: "11px",
-                        height: 20,
-                      }}
-                    />
+                    {sortedSmsHistory.length > 0 && (
+                      <Chip
+                        label={`${sortedSmsHistory.length} messages`}
+                        size="small"
+                        sx={{
+                          bgcolor: "#F5F3FF",
+                          color: "#7C3AED",
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          height: 20,
+                        }}
+                      />
+                    )}
                   </Stack>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <IconButton
@@ -946,17 +985,19 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     <Typography variant="subtitle1" fontWeight={700}>
                       Call History
                     </Typography>
-                    <Chip
-                      label={`${sortedCallHistory.length} calls`}
-                      size="small"
-                      sx={{
-                        bgcolor: "#F0FDF4",
-                        color: "#10B981",
-                        fontWeight: 600,
-                        fontSize: "11px",
-                        height: 20,
-                      }}
-                    />
+                    {sortedCallHistory.length > 0 && (
+                      <Chip
+                        label={`${sortedCallHistory.length} calls`}
+                        size="small"
+                        sx={{
+                          bgcolor: "#F0FDF4",
+                          color: "#10B981",
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          height: 20,
+                        }}
+                      />
+                    )}
                   </Stack>
                   <Stack direction="row" spacing={1}>
                     <IconButton
@@ -1346,7 +1387,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     <Typography variant="subtitle1" fontWeight={700}>
                       Email History
                     </Typography>
-                    {!emailHistoryLoading && (
+                    {!emailHistoryLoading && sortedEmailHistory.length > 0 && (
                       <Chip
                         label={`${sortedEmailHistory.length} email${sortedEmailHistory.length !== 1 ? "s" : ""}`}
                         size="small"
@@ -1614,7 +1655,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
         </Card>
       </Stack>
 
-      {/* ✅ FIXED: CallDialog now receives toNumber and leadUuid for real Twilio browser call */}
       <CallDialog
         open={callDialogOpen}
         name={leadName || "Unknown"}
