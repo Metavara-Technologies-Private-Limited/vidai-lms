@@ -24,6 +24,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CallOutlinedIcon from "@mui/icons-material/CallOutlined";
 import SendIcon from "@mui/icons-material/Send";
 import PhoneIcon from "@mui/icons-material/Phone";
+import { toast } from "react-toastify";
 
 import type { LeadRecord, NoteData } from "./LeadDetailTypes";
 import { TwilioAPI } from "../../services/leads.api";
@@ -31,14 +32,12 @@ import CallDialog from "./CallDialog";
 
 interface NextActionTabProps {
   lead: LeadRecord;
-  // Next action fields
   nextActionType: string;
   nextActionStatus: string;
   nextActionDescription: string;
   isAppointment: boolean;
   isFollowUp: boolean;
   availableActions: { value: string; label: string }[];
-  // Add action dialog
   openAddActionDialog: boolean;
   setOpenAddActionDialog: (open: boolean) => void;
   actionType: string;
@@ -52,7 +51,8 @@ interface NextActionTabProps {
   setActionError: (err: string | null) => void;
   onAddNextAction: () => void;
   onCloseActionDialog: () => void;
-  // Notes
+  taskStatus?: string;
+  onMarkDone?: () => Promise<void>;
   notes: NoteData[];
   notesLoading: boolean;
   notesError: string | null;
@@ -77,7 +77,7 @@ interface NextActionTabProps {
   onDeleteNote: (noteId: string) => void;
 }
 
-// ── Phone normalizer (same as LeadsTable) ──
+// ── Phone normalizer ──
 const normalizePhone = (phone: string | undefined): string => {
   if (!phone) return "";
   const cleaned = phone.replace(/\s+/g, "").replace(/-/g, "");
@@ -101,6 +101,19 @@ const extractErrorMessage = (err: unknown, fallback: string): string => {
   );
 };
 
+// ── Status chip config ──
+const STATUS_CHIP_STYLES: Record<string, { bgcolor: string; color: string }> = {
+  completed: { bgcolor: "#F0FDF4", color: "#16A34A" },
+  pending: { bgcolor: "#EFF6FF", color: "#3B82F6" },
+  default: { bgcolor: "#EFF6FF", color: "#3B82F6" },
+};
+
+function getStatusChipStyle(status: string) {
+  const key = status?.toLowerCase();
+  return STATUS_CHIP_STYLES[key] ?? STATUS_CHIP_STYLES.default;
+}
+
+
 const NextActionTab: React.FC<NextActionTabProps> = ({
   lead,
   nextActionType,
@@ -122,6 +135,8 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
   setActionError,
   onAddNextAction,
   onCloseActionDialog,
+  taskStatus = "",
+  onMarkDone,
   notes,
   notesLoading,
   notesError,
@@ -145,10 +160,45 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
   onAddNote,
   onDeleteNote,
 }) => {
-
-  // ── Call state (mirrors LeadsTable) ──
+  // ── Call state ──
   const [callDialogOpen, setCallDialogOpen] = React.useState(false);
-  const [callSnackbar, setCallSnackbar] = React.useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [callSnackbar, setCallSnackbar] = React.useState<{
+    open: boolean;
+    message: string;
+  }>({ open: false, message: "" });
+
+  // ── Mark Done state ──
+  const [markDoneLoading, setMarkDoneLoading] = React.useState(false);
+  const [markDoneError, setMarkDoneError] = React.useState<string | null>(null);
+  const [localTaskStatus, setLocalTaskStatus] = React.useState<string>(taskStatus);
+
+  React.useEffect(() => {
+    setLocalTaskStatus(taskStatus);
+  }, [taskStatus]);
+
+  const isAlreadyCompleted = localTaskStatus?.toLowerCase() === "completed";
+
+  const handleMarkDone = async () => {
+    if (!onMarkDone || isAlreadyCompleted || markDoneLoading) return;
+    setMarkDoneLoading(true);
+    setMarkDoneError(null);
+    setLocalTaskStatus("completed");
+    try {
+      await onMarkDone();
+      toast.success("Task status updated to Completed", {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+    } catch (err: unknown) {
+      setLocalTaskStatus(taskStatus);
+      setMarkDoneError(
+        extractErrorMessage(err, "Failed to mark action as done. Please try again.")
+      );
+    } finally {
+      setMarkDoneLoading(false);
+    }
+  };
 
   const handleCallOpen = async () => {
     const phone = normalizePhone(lead?.contact_no);
@@ -157,7 +207,10 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
       return;
     }
     if (!lead?.id) {
-      setCallSnackbar({ open: true, message: "Lead ID is missing. Cannot initiate call." });
+      setCallSnackbar({
+        open: true,
+        message: "Lead ID is missing. Cannot initiate call.",
+      });
       return;
     }
     setCallDialogOpen(true);
@@ -165,9 +218,14 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
       await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
     } catch (err: unknown) {
       setCallDialogOpen(false);
-      setCallSnackbar({ open: true, message: extractErrorMessage(err, "Failed to initiate call.") });
+      setCallSnackbar({
+        open: true,
+        message: extractErrorMessage(err, "Failed to initiate call."),
+      });
     }
   };
+
+  const chipStyle = getStatusChipStyle(nextActionStatus);
 
   return (
     <>
@@ -225,6 +283,17 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                 </Typography>
               </Box>
 
+              {/* Mark Done error banner */}
+              {markDoneError && (
+                <Alert
+                  severity="error"
+                  onClose={() => setMarkDoneError(null)}
+                  sx={{ mb: 2, borderRadius: "10px", fontSize: "12px", py: 0.5 }}
+                >
+                  {markDoneError}
+                </Alert>
+              )}
+
               {/* Current Next Action */}
               <Typography
                 variant="caption"
@@ -241,18 +310,34 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
               </Typography>
               <Card
                 variant="outlined"
-                sx={{ p: 2, borderRadius: "12px", mb: 3, border: "1px solid #E2E8F0" }}
+                sx={{
+                  p: 2,
+                  borderRadius: "12px",
+                  mb: 3,
+                  border: isAlreadyCompleted
+                    ? "1px solid #BBF7D0"
+                    : "1px solid #E2E8F0",
+                  bgcolor: isAlreadyCompleted ? "#F0FDF4" : "transparent",
+                  transition: "all 0.3s ease",
+                }}
               >
                 <Stack direction="row" spacing={1.5} alignItems="flex-start">
                   <Box
                     sx={{
                       p: 1,
-                      bgcolor: "#EFF6FF",
+                      bgcolor: isAlreadyCompleted ? "#DCFCE7" : "#EFF6FF",
                       borderRadius: "8px",
                       mt: 0.25,
+                      transition: "background-color 0.3s ease",
                     }}
                   >
-                    <CallOutlinedIcon sx={{ color: "#3B82F6", fontSize: 20 }} />
+                    {isAlreadyCompleted ? (
+                      <CheckCircleOutlineIcon
+                        sx={{ color: "#16A34A", fontSize: 20 }}
+                      />
+                    ) : (
+                      <CallOutlinedIcon sx={{ color: "#3B82F6", fontSize: 20 }} />
+                    )}
                   </Box>
                   <Box sx={{ flexGrow: 1 }}>
                     <Typography variant="body2" fontWeight={700} mb={1.5}>
@@ -291,15 +376,20 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                         </Typography>
                         <Box mt={0.25}>
                           <Chip
-                            label={nextActionStatus}
+                            label={
+                              nextActionStatus
+                                ? nextActionStatus.charAt(0).toUpperCase() +
+                                  nextActionStatus.slice(1)
+                                : nextActionStatus
+                            }
                             size="small"
                             sx={{
-                              bgcolor: "#EFF6FF",
-                              color: "#3B82F6",
+                              ...chipStyle,
                               fontWeight: 600,
                               borderRadius: "6px",
                               height: 22,
                               fontSize: "0.7rem",
+                              transition: "all 0.3s ease",
                             }}
                           />
                         </Box>
@@ -321,22 +411,52 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                       <Typography variant="body2">{nextActionDescription}</Typography>
                     </Box>
                     <Stack direction="row" spacing={1}>
+                      {/* ── Mark Done Button ── */}
                       <Button
                         variant="outlined"
                         size="small"
-                        startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 14 }} />}
+                        startIcon={
+                          markDoneLoading ? (
+                            <CircularProgress size={12} sx={{ color: "inherit" }} />
+                          ) : (
+                            <CheckCircleOutlineIcon sx={{ fontSize: 14 }} />
+                          )
+                        }
+                        onClick={handleMarkDone}
+                        disabled={isAlreadyCompleted || markDoneLoading || !onMarkDone}
                         sx={{
                           textTransform: "none",
                           borderRadius: "8px",
-                          borderColor: "#E2E8F0",
-                          color: "#475569",
                           fontSize: "0.75rem",
                           py: 0.5,
+                          transition: "all 0.2s ease",
+                          ...(isAlreadyCompleted
+                            ? {
+                                borderColor: "#BBF7D0",
+                                color: "#16A34A",
+                                bgcolor: "#F0FDF4",
+                                "&.Mui-disabled": {
+                                  borderColor: "#BBF7D0",
+                                  color: "#16A34A",
+                                  bgcolor: "#F0FDF4",
+                                  opacity: 0.8,
+                                },
+                              }
+                            : {
+                                borderColor: "#E2E8F0",
+                                color: "#475569",
+                                "&:hover": {
+                                  borderColor: "#BBF7D0",
+                                  color: "#16A34A",
+                                  bgcolor: "#F0FDF4",
+                                },
+                              }),
                         }}
                       >
-                        Mark Done
+                        {isAlreadyCompleted ? "Completed" : "Mark Done"}
                       </Button>
-                      {/* Working Call Button — same logic as LeadsTable */}
+
+                      {/* ── Call Button ── */}
                       <Button
                         variant="outlined"
                         size="small"
@@ -480,7 +600,6 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                 >
                   {notes.map((note) =>
                     editingNoteId === note.id ? (
-                      /* Edit mode */
                       <Card
                         key={note.id}
                         variant="outlined"
@@ -497,7 +616,9 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                           onChange={(e) => setEditTitle(e.target.value)}
                           variant="standard"
                           placeholder="Title"
-                          inputProps={{ style: { fontWeight: 700, fontSize: "0.875rem" } }}
+                          inputProps={{
+                            style: { fontWeight: 700, fontSize: "0.875rem" },
+                          }}
                           sx={{
                             mb: 1,
                             "& .MuiInput-underline:before": {
@@ -571,7 +692,6 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                         </Stack>
                       </Card>
                     ) : (
-                      /* View mode */
                       <Card
                         key={note.id}
                         variant="outlined"
@@ -604,14 +724,20 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                             <IconButton
                               size="small"
                               onClick={() => onStartEditNote(note)}
-                              sx={{ color: "#3B82F6", "&:hover": { bgcolor: "#EFF6FF" } }}
+                              sx={{
+                                color: "#3B82F6",
+                                "&:hover": { bgcolor: "#EFF6FF" },
+                              }}
                             >
                               <EditIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                             <IconButton
                               size="small"
                               onClick={() => setDeleteNoteDialog(note.id)}
-                              sx={{ color: "#EF4444", "&:hover": { bgcolor: "#FEF2F2" } }}
+                              sx={{
+                                color: "#EF4444",
+                                "&:hover": { bgcolor: "#FEF2F2" },
+                              }}
                             >
                               <DeleteOutlineIcon sx={{ fontSize: 14 }} />
                             </IconButton>
@@ -626,7 +752,11 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
               {/* Add Note Input */}
               <Card
                 variant="outlined"
-                sx={{ borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden" }}
+                sx={{
+                  borderRadius: "12px",
+                  border: "1px solid #E2E8F0",
+                  overflow: "hidden",
+                }}
               >
                 <TextField
                   fullWidth
@@ -678,11 +808,13 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                       disabled={noteSubmitting}
                       sx={{
                         bgcolor:
-                          (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting
+                          (newNoteTitle.trim() || newNoteContent.trim()) &&
+                          !noteSubmitting
                             ? "#334155"
                             : "#F1F5F9",
                         color:
-                          (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting
+                          (newNoteTitle.trim() || newNoteContent.trim()) &&
+                          !noteSubmitting
                             ? "white"
                             : "#94A3B8",
                         width: 36,
@@ -690,7 +822,8 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                         transition: "all 0.2s",
                         "&:hover": {
                           bgcolor:
-                            (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting
+                            (newNoteTitle.trim() || newNoteContent.trim()) &&
+                            !noteSubmitting
                               ? "#1E293B"
                               : "#E2E8F0",
                         },
@@ -719,7 +852,11 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
         >
           <DialogContent sx={{ p: 0 }}>
             <Stack spacing={3}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="flex-start"
+              >
                 <Box>
                   <Typography variant="h6" fontWeight={700}>
                     Add Next Action
@@ -751,8 +888,8 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
 
               {isAppointment && (
                 <Alert severity="info" sx={{ borderRadius: "10px", fontSize: "13px" }}>
-                  This lead already has an <strong>Appointment</strong> status. Fields are
-                  disabled.
+                  This lead already has an <strong>Appointment</strong> status. Fields
+                  are disabled.
                 </Alert>
               )}
               {actionError && (
@@ -990,7 +1127,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
         </Dialog>
       </Stack>
 
-      {/* ── Call Dialog (same as LeadsTable) ── */}
+      {/* ── Call Dialog ── */}
       <CallDialog
         open={callDialogOpen}
         name={lead?.full_name || lead?.name || "Unknown"}
@@ -1004,10 +1141,16 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
         onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))} severity="error" sx={{ borderRadius: "10px" }}>
+        <Alert
+          onClose={() => setCallSnackbar((s) => ({ ...s, open: false }))}
+          severity="error"
+          sx={{ borderRadius: "10px" }}
+        >
           {callSnackbar.message}
         </Alert>
       </Snackbar>
+
+
     </>
   );
 };
