@@ -92,14 +92,41 @@ import type {
 
 import {
   APP_TYPE,
-  STATUS_OPTIONS_BY_APP,
   FLOW_COPY_BY_APP,
   IS_CONTRACTS_APP,
 } from "../../config/appType";
 
+import {
+  pipelineApi,
+  isActiveStageStatus,
+  type PipelineStage,
+} from "../../services/pipeline.api";
+
 import BookAppointmentModal from "./BookAppointmentModal";
 import type { AppointmentResult } from "./BookAppointmentModal";
 import { selectClinic } from "../../store/clinicSlice";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pipeline stage status colours (generated dynamically)
+// ─────────────────────────────────────────────────────────────────────────────
+const STAGE_PILL_PALETTE: { color: string; bg: string }[] = [
+  { color: "#5B8FF9", bg: "rgba(91,143,249,0.10)" },
+  { color: "#7C3AED", bg: "rgba(124,58,237,0.10)" },
+  { color: "#F59E0B", bg: "rgba(245,158,11,0.10)" },
+  { color: "#D97706", bg: "rgba(217,119,6,0.10)" },
+  { color: "#4F46E5", bg: "rgba(79,70,229,0.10)" },
+  { color: "#0D9488", bg: "rgba(13,148,136,0.10)" },
+  { color: "#16A34A", bg: "rgba(22,163,74,0.10)" },
+  { color: "#EF4444", bg: "rgba(239,68,68,0.10)" },
+  { color: "#EC4899", bg: "rgba(236,72,153,0.10)" },
+  { color: "#06B6D4", bg: "rgba(6,182,212,0.10)" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Storage keys (same as AddNewLead)
+// ─────────────────────────────────────────────────────────────────────────────
+const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
+const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -143,10 +170,6 @@ function capitalize(val: string | undefined | null): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // getLeadTaskStatus
-// Reads ONLY action_status from the backend.
-// Backend values : "to_do" | "in_progress" | "completed" | null | ""
-// UI display     : "To Do" | "In Progress"  | "Completed" | ""
-// Returns ""  when action_status is not set — chip is hidden, shows "—"
 // ─────────────────────────────────────────────────────────────────────────────
 type LeadWithApiFields = LeadRecord & { action_status?: string };
 
@@ -160,12 +183,11 @@ function getLeadTaskStatus(
   if (raw === "to_do") return "To Do";
   if (raw === "in_progress") return "In Progress";
   if (raw === "completed") return "Completed";
-  // Legacy display-value strings that may arrive from older records
   if (raw === "to do") return "To Do";
   if (raw === "in progress") return "In Progress";
-  if (raw === "pending") return "To Do"; // old records stored "pending"
+  if (raw === "pending") return "To Do";
 
-  return ""; // not set → caller renders "—"
+  return "";
 }
 
 function toDisplayPhone(val: string | undefined | null): string {
@@ -177,55 +199,11 @@ function toDisplayPhone(val: string | undefined | null): string {
   return trimmed;
 }
 
-const LEAD_STATUS_OPTIONS = STATUS_OPTIONS_BY_APP[APP_TYPE];
-type LeadStatusOption = (typeof LEAD_STATUS_OPTIONS)[number];
-
-const LEAD_STATUS_PILL_COLORS: Record<
-  LeadStatusOption,
-  { color: string; bg: string }
-> = {
-  New: { color: "#5B8FF9", bg: "rgba(91,143,249,0.10)" },
-  Appointment: { color: "#7C3AED", bg: "rgba(124,58,237,0.10)" },
-  "Follow Up": { color: "#F59E0B", bg: "rgba(245,158,11,0.10)" },
-  Negotiation: { color: "#D97706", bg: "rgba(217,119,6,0.10)" },
-  "Proposal Sent": { color: "#4F46E5", bg: "rgba(79,70,229,0.10)" },
-  "Contract Signed": { color: "#0D9488", bg: "rgba(13,148,136,0.10)" },
-  "Converted Lead": { color: "#16A34A", bg: "rgba(22,163,74,0.10)" },
-  "Lost Lead": { color: "#EF4444", bg: "rgba(239,68,68,0.10)" },
-} as Record<LeadStatusOption, { color: string; bg: string }>;
-
-const LEAD_STATUS_API_VALUES: Record<LeadStatusOption, string> = {
-  New: "new",
-  Appointment: "appointment",
-  "Follow Up": "follow up",
-  Negotiation: "negotiation",
-  "Proposal Sent": "proposal sent",
-  "Contract Signed": "contract signed",
-  "Converted Lead": "converted",
-  "Lost Lead": "lost",
-} as Record<LeadStatusOption, string>;
-
 const toastOptions = {
   position: "top-right" as const,
   autoClose: 3000,
   theme: "colored" as const,
 };
-
-function normalizeLeadStatusForPill(
-  status: string | undefined,
-): LeadStatusOption {
-  const normalized = (status || "").trim().toLowerCase();
-  if (normalized === "appointment") return "Appointment";
-  if (normalized === "follow up" || normalized === "follow-up")
-    return "Follow Up";
-  if (normalized === "negotiation") return "Negotiation";
-  if (normalized === "proposal sent") return "Proposal Sent";
-  if (normalized === "contract signed") return "Contract Signed";
-  if (normalized === "converted" || normalized === "converted lead")
-    return "Converted Lead";
-  if (normalized === "lost" || normalized === "lost lead") return "Lost Lead";
-  return "New";
-}
 
 const TAB_LABELS = [
   FLOW_COPY_BY_APP[APP_TYPE].infoTab,
@@ -511,9 +489,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
               setFromEmail(clinicEmail);
             }
           })
-          .catch(() => {
-            // Keep fallback sender when clinic email fetch fails.
-          });
+          .catch(() => {});
       }
     }
   }, [open, loadEmailTemplates, lead?.clinic_id]);
@@ -763,7 +739,6 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
                       "&::-webkit-scrollbar-thumb": {
                         backgroundColor: "#D0D0D0",
                         borderRadius: "4px",
-                        transition: "backgroundColor 0.2s",
                         "&:hover": { backgroundColor: "#B0B0B0" },
                       },
                     }}
@@ -1513,6 +1488,162 @@ export default function LeadDetailView() {
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
 
+  // ── Pipeline stages (fetched dynamically, same logic as AddNewLead) ────────
+  const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>(
+    [],
+  );
+  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>(
+    [],
+  );
+  const [pipelineLoading, setPipelineLoading] = React.useState(false);
+
+  const selectedClinic = useSelector(selectClinic);
+  const clinicId =
+    selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
+
+  // Pill colour helper — cycles through palette by stage index
+  const getStagePillColor = React.useCallback(
+    (stageName: string): { color: string; bg: string } => {
+      const idx = pipelineStageNames.findIndex(
+        (n) => n.trim().toLowerCase() === stageName.trim().toLowerCase(),
+      );
+      if (idx === -1) return { color: "#6B7280", bg: "#F3F4F6" };
+      return STAGE_PILL_PALETTE[idx % STAGE_PILL_PALETTE.length];
+    },
+    [pipelineStageNames],
+  );
+
+  // Map a raw lead status string → the matching pipeline stage name (display)
+  const normalizeLeadStatusForPill = React.useCallback(
+    (status: string | undefined): string => {
+      const raw = (status || "").trim().toLowerCase();
+      if (!raw) return pipelineStageNames[0] ?? "New";
+
+      // Direct match against loaded stage names (case-insensitive)
+      const direct = pipelineStageNames.find(
+        (n) => n.trim().toLowerCase() === raw,
+      );
+      if (direct) return direct;
+
+      // Legacy API value mappings → display name
+      const legacyMap: Record<string, string> = {
+        new: "New",
+        appointment: "Appointment",
+        "follow up": "Follow Up",
+        "follow-up": "Follow Up",
+        negotiation: "Negotiation",
+        "proposal sent": "Proposal Sent",
+        "contract signed": "Contract Signed",
+        converted: "Converted Lead",
+        "converted lead": "Converted Lead",
+        lost: "Lost Lead",
+        "lost lead": "Lost Lead",
+      };
+      const legacy = legacyMap[raw];
+      if (legacy) {
+        // Check if pipeline has that stage, else return it raw-capitalized
+        const found = pipelineStageNames.find(
+          (n) => n.trim().toLowerCase() === legacy.toLowerCase(),
+        );
+        return found ?? legacy;
+      }
+
+      return pipelineStageNames[0] ?? "New";
+    },
+    [pipelineStageNames],
+  );
+
+  // API value for PATCH (what backend expects)
+  const getLeadStatusApiValue = React.useCallback(
+    (displayName: string): string => {
+      // Try to find the stage and use its name directly as most backends accept stage names
+      const stage = pipelineStages.find(
+        (s) =>
+          s.stage_name.trim().toLowerCase() ===
+          displayName.trim().toLowerCase(),
+      );
+      if (stage) return stage.stage_name.trim().toLowerCase();
+
+      // Legacy fallback
+      const legacyApiMap: Record<string, string> = {
+        New: "new",
+        Appointment: "appointment",
+        "Follow Up": "follow up",
+        Negotiation: "negotiation",
+        "Proposal Sent": "proposal sent",
+        "Contract Signed": "contract signed",
+        "Converted Lead": "converted",
+        "Lost Lead": "lost",
+      };
+      return legacyApiMap[displayName] ?? displayName.toLowerCase();
+    },
+    [pipelineStages],
+  );
+
+  // Fetch pipeline stages on mount (same logic as AddNewLead)
+  React.useEffect(() => {
+    const loadPipeline = async () => {
+      try {
+        setPipelineLoading(true);
+        const selectedIndustry =
+          localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
+        const selectedPipelineId =
+          localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "";
+
+        let selectedPipeline = null;
+
+        if (selectedPipelineId) {
+          try {
+            selectedPipeline = await pipelineApi.getById(selectedPipelineId);
+          } catch {
+            selectedPipeline = null;
+          }
+        }
+
+        if (!selectedPipeline) {
+          const pipelines = await pipelineApi.list(clinicId);
+          const byIndustry = selectedIndustry
+            ? pipelines.filter(
+                (p: { industry_type: string }) =>
+                  p.industry_type === selectedIndustry,
+              )
+            : pipelines;
+
+          selectedPipeline =
+            pipelines.find(
+              (p: { id: string }) => p.id === selectedPipelineId,
+            ) ??
+            byIndustry.find((p: { is_active: boolean }) => p.is_active) ??
+            byIndustry[0] ??
+            pipelines.find((p: { is_active: boolean }) => p.is_active) ??
+            pipelines[0] ??
+            null;
+        }
+
+        const rawStages: PipelineStage[] = selectedPipeline?.stages ?? [];
+        const activeStages = rawStages
+          .filter((s) => isActiveStageStatus(s.stage_status))
+          .filter((s) => s.stage_name.trim())
+          .sort((a, b) => {
+            const aOrder =
+              typeof a.stage_order === "number" ? a.stage_order : 0;
+            const bOrder =
+              typeof b.stage_order === "number" ? b.stage_order : 0;
+            return aOrder - bOrder;
+          });
+
+        setPipelineStages(activeStages);
+        setPipelineStageNames(activeStages.map((s) => s.stage_name.trim()));
+      } catch {
+        // Keep empty — fallback to whatever was already set
+      } finally {
+        setPipelineLoading(false);
+      }
+    };
+
+    void loadPipeline();
+  }, [clinicId]);
+
   const [activeTab, setActiveTab] = React.useState(TAB_LABELS[0]);
   const [openConvertPopup, setOpenConvertPopup] = React.useState(false);
   const [convertLoading, setConvertLoading] = React.useState(false);
@@ -1577,13 +1708,12 @@ export default function LeadDetailView() {
   const [fullLead, setFullLead] = React.useState<LeadRecord | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false);
   const [selectedLeadStatus, setSelectedLeadStatus] =
-    React.useState<LeadStatusOption>("New");
-  const [draftLeadStatus, setDraftLeadStatus] =
-    React.useState<LeadStatusOption>("New");
+    React.useState<string>("");
+  const [draftLeadStatus, setDraftLeadStatus] = React.useState<string>("");
   const [statusSaving, setStatusSaving] = React.useState(false);
   const [interests, setInterests] = React.useState<
     { id: string; name: string }[]
-    >([]);
+  >([]);
 
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px",
@@ -1682,26 +1812,30 @@ export default function LeadDetailView() {
     [authedUser?.email, clinicName],
   );
 
-    React.useEffect(() => {
-      const clinicId = activeLead?.clinic_id;
-
-      if (!clinicId) return;
-
-      InterestAPI.listActiveByClinic(clinicId)
-        .then((data) => {
-          setInterests(Array.isArray(data) ? data : []);
-        })
-        .catch(() => {
-          setInterests([]);
-        });
-    }, [activeLead?.clinic_id]);
-
   React.useEffect(() => {
-    const current = normalizeLeadStatusForPill(
-      activeLead?.status || activeLead?.lead_status || "New",
-    );
-    setSelectedLeadStatus(current);
-  }, [activeLead?.id, activeLead?.status, activeLead?.lead_status]);
+    const clinicId = activeLead?.clinic_id;
+    if (!clinicId) return;
+    InterestAPI.listActiveByClinic(clinicId)
+      .then((data) => {
+        setInterests(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        setInterests([]);
+      });
+  }, [activeLead?.clinic_id]);
+
+  // Sync selectedLeadStatus from activeLead once pipeline is loaded
+  React.useEffect(() => {
+    if (!activeLead) return;
+    const raw = activeLead?.status || activeLead?.lead_status || "";
+    const normalized = normalizeLeadStatusForPill(raw);
+    setSelectedLeadStatus(normalized);
+  }, [
+    activeLead?.id,
+    activeLead?.status,
+    activeLead?.lead_status,
+    normalizeLeadStatusForPill,
+  ]);
 
   const fetchNotes = React.useCallback(async (leadUuid: string) => {
     try {
@@ -1983,6 +2117,46 @@ export default function LeadDetailView() {
     setActionError(null);
   };
 
+  const handleMarkDone = React.useCallback(async () => {
+    if (!activeLead?.id) throw new Error("Lead ID missing.");
+
+    const resolvedContactNo =
+      activeLead.contact_no ||
+      activeLead.phone ||
+      activeLead.phone_number ||
+      undefined;
+
+    const updated = await LeadAPI.update(activeLead.id, {
+      clinic_id: activeLead.clinic_id ?? 0,
+      department_id: activeLead.department_id ?? 0,
+      full_name: activeLead.full_name || activeLead.name || "",
+      ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
+      source: activeLead.source || "Unknown",
+      treatment_interest: Array.isArray(activeLead.treatment_interest)
+        ? activeLead.treatment_interest.map((t) =>
+            typeof t === "string" ? t : t.id,
+          )
+        : [],
+      book_appointment: activeLead.book_appointment || false,
+      appointment_date: activeLead.appointment_date || null,
+      slot: activeLead.slot || "",
+      is_active: activeLead.is_active !== false,
+      partner_inquiry: activeLead.partner_inquiry || false,
+      action_status: "completed",
+    });
+
+    setFullLead(
+      (prev) =>
+        ({
+          ...(prev ?? activeLead),
+          ...(updated as unknown as LeadRecord),
+          action_status: "completed",
+        }) as LeadRecord,
+    );
+
+    dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+  }, [activeLead, dispatch]);
+
   const handleOpenPopup = () => {
     setConvertError(null);
     setOpenConvertPopup(true);
@@ -2240,17 +2414,12 @@ export default function LeadDetailView() {
     activeLead.next_action_description || "N/A",
   );
 
-  // ── Task status: reads action_status only, returns "To Do"|"In Progress"|"Completed"|""
   const leadTaskStatus = getLeadTaskStatus(activeLead);
 
-  // ── FIX: treatment_interest may be an array or a string from the API
   const treatmentInterest = (() => {
     const raw = activeLead.treatment_interest;
     if (!raw) return [];
-
-    // Collect all IDs from the raw value
     const ids: string[] = [];
-
     if (Array.isArray(raw)) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       raw.forEach((item: any) => {
@@ -2273,12 +2442,8 @@ export default function LeadDetailView() {
           if (cleaned) ids.push(cleaned);
         });
     }
-
-    // UUID pattern for detection
     const UUID_RE =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-    // Expand: some IDs may themselves resolve to multiple names
     const resolved: string[] = [];
     ids.forEach((id) => {
       const found = interests.find((i) => String(i.id).trim() === id);
@@ -2286,16 +2451,13 @@ export default function LeadDetailView() {
         resolved.push(capitalizeWords(id));
         return;
       }
-
       const nameVal = found.name ?? "";
       const parts = nameVal
         .split(",")
         .map((p) => p.trim())
         .filter(Boolean);
       const allUUIDs = parts.every((p) => UUID_RE.test(p));
-
       if (allUUIDs && parts.length > 0) {
-        // The interest's name is a list of sub-IDs — resolve each
         parts.forEach((subId) => {
           const sub = interests.find((i) => String(i.id).trim() === subId);
           resolved.push(capitalizeWords(sub?.name || subId));
@@ -2304,8 +2466,6 @@ export default function LeadDetailView() {
         resolved.push(capitalizeWords(nameVal || id));
       }
     });
-
-    // Deduplicate
     return [...new Set(resolved)];
   })();
 
@@ -2352,10 +2512,8 @@ export default function LeadDetailView() {
     convertedLeadIds.includes(leadUuidRaw) ||
     currentStatus === "converted" ||
     (activeLead?.lead_status || "").toLowerCase() === "converted";
-  const leadStatusPill = LEAD_STATUS_PILL_COLORS[leadStatus] ?? {
-    color: "#6B7280",
-    bg: "#F3F4F6",
-  };
+
+  const leadStatusPill = getStagePillColor(leadStatus);
 
   const openStatusDialog = () => {
     if (!canEditLeads) return;
@@ -2369,7 +2527,7 @@ export default function LeadDetailView() {
 
   const saveLeadStatus = async () => {
     if (!activeLead || statusSaving || !canEditLeads) return;
-    const nextLeadStatus = LEAD_STATUS_API_VALUES[draftLeadStatus];
+    const nextLeadStatus = getLeadStatusApiValue(draftLeadStatus);
     try {
       setStatusSaving(true);
       const updatedLead = await LeadAPI.update(activeLead.id, {
@@ -2441,193 +2599,217 @@ export default function LeadDetailView() {
         elevation={0}
         sx={{
           position: "relative",
-          p: { xs: 2, sm: 3, md: 5 },
+          p: { xs: 2, sm: 3, md: 4 },
           mb: 3,
           borderRadius: "16px",
           backgroundColor: "#FAFAFA",
-          overflow: "hidden",
+          overflow: "visible",
           boxShadow: "none",
         }}
       >
         <Box
-          component="img"
-          src={Lead_Subtract}
-          alt=""
           sx={{
             position: "absolute",
-            top: "6px",
+            top: 0,
             left: 0,
             width: "100%",
             height: "100%",
-            objectFit: "fill",
+            borderRadius: "16px",
+            overflow: "hidden",
             zIndex: 0,
             pointerEvents: "none",
           }}
-        />
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="stretch"
-          sx={{ position: "relative", width: "100%", zIndex: 1 }}
         >
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            alignItems={{ xs: "flex-start", md: "flex-end" }}
-            justifyContent="space-between"
+          <Box
+            component="img"
+            src={Lead_Subtract}
+            alt=""
             sx={{
               width: "100%",
-              pl: { xs: 0, sm: 1 },
-              pr: 0,
-              gap: { xs: 1.25, md: 0 },
+              height: "100%",
+              objectFit: "fill",
+              display: "block",
+            }}
+          />
+        </Box>
+
+        {/* ── Header card content — fixed layout ── */}
+        <Box
+          sx={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 2,
+            width: "100%",
+          }}
+        >
+          {/* Avatar */}
+          <Avatar
+            sx={{
+              bgcolor: "#EEF2FF",
+              color: "#6366F1",
+              width: 40,
+              height: 40,
+              fontSize: "20px",
+              fontWeight: 700,
+              flexShrink: 0,
+              position: "relative",
+              top: -26,
+              zIndex: 2,
             }}
           >
-            <Avatar
-              sx={{
-                bgcolor: "#EEF2FF",
-                color: "#6366F1",
-                width: 45,
-                height: 45,
-                fontSize: "30px",
-                fontWeight: 700,
-                transform: { xs: "none", md: "translateY(-35px)" },
-                ml: { xs: 0, md: -2 },
-                flexShrink: 0,
-              }}
-            >
-              {leadInitials}
-            </Avatar>
+            {leadInitials}
+          </Avatar>
 
+          {/* Fields row */}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: { xs: "flex-start", md: "center" },
+              flexWrap: { xs: "wrap", md: "nowrap" },
+              gap: { xs: 2, md: 0 },
+              flex: 1,
+              width: "100%",
+            }}
+          >
             {/* Lab Name */}
-            <Stack
-              spacing={0.5}
+            <Box
               sx={{
-                flex: 1.3,
-                transform: { xs: "none", md: "translateY(14px)" },
-                minWidth: { xs: "100%", md: 0 },
+                flex: "1 1 0",
+                minWidth: 0,
+                px: { xs: 0, md: 1.5 },
               }}
             >
               <Typography
                 variant="caption"
                 color="text.secondary"
                 fontSize="10px"
+                display="block"
+                mb={0.5}
               >
                 Lab Name
               </Typography>
-              <Typography fontWeight={700} variant="body1" fontSize="12px">
+              <Typography fontWeight={700} fontSize="12px" noWrap>
                 {leadName}
               </Typography>
-            </Stack>
+            </Box>
 
             {/* Lead ID */}
-            <Stack
-              spacing={0.5}
+            <Box
               sx={{
-                flex: 1.3,
-                transform: { xs: "none", md: "translateY(14px)" },
-                minWidth: { xs: "100%", md: 0 },
+                flex: "1 1 0",
+                minWidth: 0,
+                px: { xs: 0, md: 1.5 },
               }}
             >
               <Typography
                 variant="caption"
                 color="text.secondary"
                 fontSize="10px"
+                display="block"
+                mb={0.5}
               >
                 Lead ID
               </Typography>
-              <Typography fontWeight={600} variant="body1" fontSize="12px">
+              <Typography fontWeight={600} fontSize="12px" noWrap>
                 {leadDisplayId}
               </Typography>
-            </Stack>
+            </Box>
 
             {/* Source */}
-            <Stack
-              spacing={0.5}
+            <Box
               sx={{
-                flex: 1.3,
-                transform: { xs: "none", md: "translateY(14px)" },
-                minWidth: { xs: "100%", md: 0 },
+                flex: "1 1 0",
+                minWidth: 0,
+                px: { xs: 0, md: 1.5 },
               }}
             >
               <Typography
                 variant="caption"
                 color="text.secondary"
                 fontSize="10px"
+                display="block"
+                mb={0.5}
               >
                 Source
               </Typography>
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 <Box
                   sx={{
-                    width: 16,
-                    height: 16,
+                    width: 14,
+                    height: 14,
                     bgcolor: "#FFB800",
                     borderRadius: "50%",
+                    flexShrink: 0,
                   }}
                 />
-                <Typography fontWeight={600} variant="body1" fontSize="12px">
+                <Typography fontWeight={600} fontSize="12px" noWrap>
                   {leadSource}
                 </Typography>
               </Stack>
-            </Stack>
+            </Box>
 
             {/* Lead Status */}
-<Stack
-  spacing={0.5}
-  sx={{
-    flex: "1 1 180px",
-    transform: { xs: "none", md: "translateY(14px)" },
-    minWidth: 0,
-  }}
->
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                fontSize="10px"
-              >
-                Lead Status
-              </Typography>
-<Stack
-  direction="row"
-  alignItems="center"
-  spacing={0.5}
-  flexWrap="wrap"
-  useFlexGap
->
-                  <Chip
-                  label={leadStatus}
-                  size="small"
-                  sx={pillChipSx(leadStatusPill.color, leadStatusPill.bg)}
-                />
-                <IconButton
-                  size="small"
-                  onClick={openStatusDialog}
-                  disabled={!canEditLeads}
-                  sx={{ p: 0.35 }}
-                  aria-label="Edit lead status"
-                >
-                  <Box
-                    component="img"
-                    src={Lead_Status_Edit}
-                    alt="Edit Status"
-                    sx={{ width: 14, height: 14 }}
-                  />
-                </IconButton>
-              </Stack>
-            </Stack>
-
-            {/* Lead Quality */}
-            <Stack
-              spacing={0.5}
+            <Box
               sx={{
-                flex: 1.3,
-                transform: { xs: "none", md: "translateY(14px)" },
-                minWidth: { xs: "100%", md: 0 },
+                flex: "1.4 1 0",
+                minWidth: 0,
+                px: { xs: 0, md: 1.5 },
               }}
             >
               <Typography
                 variant="caption"
                 color="text.secondary"
                 fontSize="10px"
+                display="block"
+                mb={0.5}
+              >
+                Lead Status
+              </Typography>
+              {pipelineLoading ? (
+                <CircularProgress size={14} />
+              ) : (
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <Chip
+                    label={leadStatus || "—"}
+                    size="small"
+                    sx={pillChipSx(leadStatusPill.color, leadStatusPill.bg)}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={openStatusDialog}
+                    disabled={!canEditLeads}
+                    sx={{ p: 0.35, flexShrink: 0 }}
+                    aria-label="Edit lead status"
+                  >
+                    <Box
+                      component="img"
+                      src={Lead_Status_Edit}
+                      alt="Edit Status"
+                      sx={{ width: 14, height: 14 }}
+                    />
+                  </IconButton>
+                </Stack>
+              )}
+            </Box>
+
+            {/* Lead Quality */}
+            <Box
+              sx={{
+                flex: "1 1 0",
+                minWidth: 0,
+                px: { xs: 0, md: 1.5 },
+              }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+                display="block"
+                mb={0.5}
               >
                 Lead Quality
               </Typography>
@@ -2642,27 +2824,22 @@ export default function LeadDetailView() {
                       : pillChipSx("#52C41A", "rgba(82,196,26,0.10)")
                 }
               />
-            </Stack>
+            </Box>
 
-            {/* ── Task Status ─────────────────────────────────────────────────
-                Reads action_status from API only.
-                "to_do"       → "To Do"      (blue chip)
-                "in_progress" → "In Progress" (indigo chip)
-                "completed"   → "Completed"  (green chip)
-                null / ""     → "—"          (no chip rendered)
-            ────────────────────────────────────────────────────────────────── */}
-            <Stack
-              spacing={0.5}
+            {/* Task Status */}
+            <Box
               sx={{
-                flex: 1.3,
-                transform: { xs: "none", md: "translateY(14px)" },
-                minWidth: { xs: "100%", md: 0 },
+                flex: "1 1 0",
+                minWidth: 0,
+                px: { xs: 0, md: 1.5 },
               }}
             >
               <Typography
                 variant="caption"
                 color="text.secondary"
                 fontSize="10px"
+                display="block"
+                mb={0.5}
               >
                 Task Status
               </Typography>
@@ -2675,7 +2852,7 @@ export default function LeadDetailView() {
                       ? pillChipSx("#52C41A", "rgba(82,196,26,0.10)")
                       : leadTaskStatus === "In Progress"
                         ? pillChipSx("#2F54EB", "rgba(47,84,235,0.10)")
-                        : pillChipSx("#1890FF", "rgba(24,144,255,0.10)") // "To Do"
+                        : pillChipSx("#1890FF", "rgba(24,144,255,0.10)")
                   }
                 />
               ) : (
@@ -2683,35 +2860,36 @@ export default function LeadDetailView() {
                   —
                 </Typography>
               )}
-            </Stack>
+            </Box>
 
             {/* AI Lead Score — medical app only */}
             {!IS_CONTRACTS_APP && (
-              <Stack
-                spacing={0.5}
+              <Box
                 sx={{
-                  flex: 1.3,
-                  transform: { xs: "none", md: "translateY(14px)" },
-                  minWidth: { xs: "100%", md: 0 },
+                  flex: "1 1 0",
+                  minWidth: 0,
+                  px: { xs: 0, md: 1.5 },
                 }}
               >
                 <Typography
                   variant="caption"
                   color="text.secondary"
                   fontSize="10px"
+                  display="block"
+                  mb={0.5}
                 >
                   AI Lead Score
                 </Typography>
                 <Typography fontWeight={700} color="#EC4899" fontSize="12px">
                   {leadScore}
                 </Typography>
-              </Stack>
+              </Box>
             )}
-          </Stack>
-        </Stack>
+          </Box>
+        </Box>
       </Card>
 
-      {/* Edit Status Dialog */}
+      {/* Edit Status Dialog — now uses dynamic pipeline stages */}
       <Dialog
         open={statusDialogOpen}
         onClose={closeStatusDialog}
@@ -2745,51 +2923,56 @@ export default function LeadDetailView() {
             <Typography fontSize="13px" color="#8B8B8B" fontWeight={500}>
               Status
             </Typography>
-            <Select
-              value={draftLeadStatus}
-              onChange={(event) =>
-                setDraftLeadStatus(event.target.value as LeadStatusOption)
-              }
-              size="small"
-              renderValue={(value) => {
-                const style = LEAD_STATUS_PILL_COLORS[
-                  value as LeadStatusOption
-                ] ?? { color: "#6B7280", bg: "#F3F4F6" };
-                return (
-                  <Chip
-                    label={value}
-                    size="small"
-                    sx={pillChipSx(style.color, style.bg)}
-                  />
-                );
-              }}
-              sx={{
-                minHeight: 50,
-                borderRadius: "12px",
-                bgcolor: "#FFFFFF",
-                "& .MuiSelect-select": {
-                  display: "flex",
-                  alignItems: "center",
-                  py: 1.25,
-                },
-              }}
-            >
-              {LEAD_STATUS_OPTIONS.map((statusOption) => {
-                const style = LEAD_STATUS_PILL_COLORS[statusOption] ?? {
-                  color: "#6B7280",
-                  bg: "#F3F4F6",
-                };
-                return (
-                  <MenuItem key={statusOption} value={statusOption}>
+            {pipelineLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <Select
+                value={draftLeadStatus}
+                onChange={(event) => setDraftLeadStatus(event.target.value)}
+                size="small"
+                renderValue={(value) => {
+                  const style = getStagePillColor(value);
+                  return (
                     <Chip
-                      label={statusOption}
+                      label={value || "Select status"}
                       size="small"
                       sx={pillChipSx(style.color, style.bg)}
                     />
+                  );
+                }}
+                sx={{
+                  minHeight: 50,
+                  borderRadius: "12px",
+                  bgcolor: "#FFFFFF",
+                  "& .MuiSelect-select": {
+                    display: "flex",
+                    alignItems: "center",
+                    py: 1.25,
+                  },
+                }}
+              >
+                {pipelineStageNames.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No stages available
                   </MenuItem>
-                );
-              })}
-            </Select>
+                ) : (
+                  pipelineStageNames.map((stageName) => {
+                    const style = getStagePillColor(stageName);
+                    return (
+                      <MenuItem key={stageName} value={stageName}>
+                        <Chip
+                          label={stageName}
+                          size="small"
+                          sx={pillChipSx(style.color, style.bg)}
+                        />
+                      </MenuItem>
+                    );
+                  })
+                )}
+              </Select>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2.25, pt: 1.5, gap: 1.5 }}>
@@ -2812,7 +2995,7 @@ export default function LeadDetailView() {
           <Button
             onClick={saveLeadStatus}
             variant="contained"
-            disabled={statusSaving}
+            disabled={statusSaving || pipelineLoading}
             sx={{
               textTransform: "none",
               fontWeight: 600,
@@ -3025,6 +3208,8 @@ export default function LeadDetailView() {
           setActionError={setActionError}
           onAddNextAction={handleAddNextAction}
           onCloseActionDialog={closeActionDialog}
+          taskStatus={leadTaskStatus}
+          onMarkDone={handleMarkDone}
           notes={notes}
           notesLoading={notesLoading}
           notesError={notesError}
