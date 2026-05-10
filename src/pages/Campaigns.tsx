@@ -1,15 +1,3 @@
-// CampaignsScreen.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// FIXES APPLIED:
-//   Cause 1 — useSelector now extracts clinic?.id (primitive) instead of the
-//              whole clinic object. The whole object is a new reference on
-//              every Redux render, which caused useEffect to re-fire endlessly.
-//   Cause 2 — CampaignPage.tsx no longer calls CampaignAPI.list() directly.
-//              This file is the ONLY place fetchCampaign() is dispatched.
-//   Cause 3 — Modal onSave callbacks re-fetch only when the server has
-//              created/edited a record that must be pulled back into Redux.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { selectClinic } from "../store/clinicSlice";
@@ -44,31 +32,19 @@ import {
 } from "../constants/campaigns.constants";
 import type { Campaign, CampaignAPIType } from "../types/campaigns.types";
 
-const AddNewCampaign = lazy(
-  () => import("../components/Campaign/AddNewCampaign"),
-);
-const SocialCampaignModal = lazy(
-  () => import("../components/Campaign/SocialCampaignModal"),
-);
-const CampaignDashboard = lazy(
-  () => import("../components/Campaign/CampaignDashboard"),
-);
-const EmailCampaignModal = lazy(
-  () => import("../components/Campaign/EmailCampaignModal"),
-);
-const EditCampaignModal = lazy(
-  () => import("../components/Campaign/EditCampaignModal"),
-);
-const DuplicateCampaignModal = lazy(
-  () => import("../components/Campaign/DuplicateCampaignModal"),
-);
+const AddNewCampaign = lazy(() => import("../components/Campaign/AddNewCampaign"));
+const SocialCampaignModal = lazy(() => import("../components/Campaign/SocialCampaignModal"));
+const CampaignDashboard = lazy(() => import("../components/Campaign/CampaignDashboard"));
+const EmailCampaignModal = lazy(() => import("../components/Campaign/EmailCampaignModal"));
+const EditCampaignModal = lazy(() => import("../components/Campaign/EditCampaignModal"));
+const DuplicateCampaignModal = lazy(() => import("../components/Campaign/DuplicateCampaignModal"));
 
 export default function CampaignsScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const rawCampaigns = useSelector(selectCampaign);
   const campaignLoading = useSelector(selectCampaignLoading);
   const user = useSelector(selectUser);
-  const authUser = user as unknown as Record<string, unknown> | null;
+  const authUser = user as Record<string, unknown> | null;
   const nestedAuthUser =
     authUser?.user && typeof authUser.user === "object"
       ? (authUser.user as Record<string, unknown>)
@@ -87,9 +63,6 @@ export default function CampaignsScreen() {
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, campaignAliases, "edit");
 
-  // FIX (Cause 1): Extract only the id (a stable primitive) from the clinic
-  // selector. The full clinic object is a new reference on every Redux render,
-  // which made the useEffect below fire on every single state update.
   const clinicId = useSelector(
     (state: Parameters<typeof selectClinic>[0]) => selectClinic(state)?.id,
   );
@@ -97,8 +70,6 @@ export default function CampaignsScreen() {
   useEffect(() => {
     if (!canViewCampaigns) return;
     dispatch(fetchCampaign());
-    // clinicId is a primitive — fires once on mount, and again only when the
-    // user switches clinics in the header. Never fires on unrelated renders.
   }, [dispatch, canViewCampaigns, clinicId]);
 
   const campaigns = useMemo<Campaign[]>(() => {
@@ -176,6 +147,8 @@ export default function CampaignsScreen() {
   const [tab, setTab] = useState<Tab>(CAMPAIGN_TABS.SOCIAL);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CampaignStatus | "all">("all");
+  const [platform, setPlatform] = useState<string>("all");
+  const [openPlatform, setOpenPlatform] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [openStatus, setOpenStatus] = useState(false);
   const [showAddCampaign, setShowAddCampaign] = useState(false);
@@ -211,10 +184,14 @@ export default function CampaignsScreen() {
         .toLowerCase()
         .includes(search.toLowerCase());
       const statusOk = status === "all" || c.status === status;
-      return tabOk && searchOk && statusOk;
-    });
-  }, [campaigns, tab, search, status]);
 
+      const platformOk =
+        platform === "all" ||
+        c.platforms?.some((p) => p.toLowerCase() === platform.toLowerCase());
+
+      return tabOk && searchOk && statusOk && platformOk;
+    });
+  }, [campaigns, tab, search, status, platform]);
   const socialCount = campaigns.filter(
     (c) => c.type === CAMPAIGN_TYPE.SOCIAL,
   ).length;
@@ -251,6 +228,10 @@ export default function CampaignsScreen() {
         onStatusChange={setStatus}
         openStatus={openStatus}
         setOpenStatus={setOpenStatus}
+        platform={platform}
+        onPlatformChange={setPlatform}
+        openPlatform={openPlatform}
+        setOpenPlatform={setOpenPlatform}
       />
 
       <div className="filters-row">
@@ -330,7 +311,6 @@ export default function CampaignsScreen() {
             onClose={() => setShowSocialModal(false)}
             onSave={() => {
               setShowSocialModal(false);
-              // Re-fetch: new campaign created server-side, pull into Redux
               dispatch(fetchCampaign());
             }}
           />
@@ -342,7 +322,6 @@ export default function CampaignsScreen() {
             onClose={() => setShowEmailModal(false)}
             onSave={() => {
               setShowEmailModal(false);
-              // Re-fetch: new campaign created server-side, pull into Redux
               dispatch(fetchCampaign());
             }}
           />
@@ -355,7 +334,6 @@ export default function CampaignsScreen() {
             onClose={() => setShowEditModal(false)}
             onSave={() => {
               setShowEditModal(false);
-              // Re-fetch: edited campaign updated server-side, pull into Redux
               dispatch(fetchCampaign());
             }}
           />
@@ -368,7 +346,6 @@ export default function CampaignsScreen() {
             onClose={() => setDuplicatingCampaign(null)}
             onSave={() => {
               setDuplicatingCampaign(null);
-              // Re-fetch: duplicate created server-side, pull into Redux
               dispatch(fetchCampaign());
             }}
           />

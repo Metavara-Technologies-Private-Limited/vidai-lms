@@ -215,3 +215,10 @@
 .primary-btn:active {
   background: black;
 }
+
+.platform-icon-img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  margin-right: 6px;
+}

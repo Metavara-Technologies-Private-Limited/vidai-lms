@@ -42,6 +42,7 @@ const CampaignDashboard = ({
   const [fullCampaign, setFullCampaign] = React.useState<Campaign>(campaign);
   const [loadingInsights, setLoadingInsights] = React.useState(true);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const reduxClinicId = useSelector((state: any) => state.clinic?.id ?? 0);
   const clinicIdRef = React.useRef<number>(
     reduxClinicId || Number(localStorage.getItem("clinic_id") ?? 0),
@@ -50,10 +51,10 @@ const CampaignDashboard = ({
     if (reduxClinicId) clinicIdRef.current = reduxClinicId;
   }, [reduxClinicId]);
 
-  const campaignIdRef   = React.useRef(campaign.id);
+  const campaignIdRef = React.useRef(campaign.id);
   const campaignTypeRef = React.useRef(campaign.type);
   const fbCampaignIdRef = React.useRef(campaign.fb_campaign_id);
-  const platformsRef    = React.useRef<Platform[]>(campaign.platforms ?? []);
+  const platformsRef = React.useRef<Platform[]>(campaign.platforms ?? []);
 
   const [adInsights, setAdInsights] = React.useState({
     impressions: 0,
@@ -75,16 +76,16 @@ const CampaignDashboard = ({
       const data = res.data?.insights || {};
       console.log("AD INSIGHTS RAW:", data);
       setAdInsights({
-        impressions:     data.post_impressions  || 0,
-        clicks:          data.post_clicks       || 0,
-        spend:           data.spend             || "0",
-        reach:           data.reach             || "0",
-        cpc:             parseFloat(data.cpc    || "0").toFixed(2),
-        cpm:             parseFloat(data.cpm    || "0").toFixed(2),
-        conversions:     data.conversions       || 0,
-        total_budget:    data.total_budget      || "0",
-        conversion_rate: data.conversion_rate   || "0%",
-        ctr:             data.ctr               || "0",
+        impressions: data.post_impressions || 0,
+        clicks: data.post_clicks || 0,
+        spend: data.spend || "0",
+        reach: data.reach || "0",
+        cpc: parseFloat(data.cpc || "0").toFixed(2),
+        cpm: parseFloat(data.cpm || "0").toFixed(2),
+        conversions: data.conversions || 0,
+        total_budget: data.total_budget || "0",
+        conversion_rate: data.conversion_rate || "0%",
+        ctr: data.ctr || "0",
       });
     } catch (err) {
       console.error("FB Ad Insights fetch failed", err);
@@ -94,8 +95,14 @@ const CampaignDashboard = ({
   const fetchGoogleAdsInsightsFromDB = React.useCallback(
     async (campaignId: string, cId: number) => {
       try {
-        console.log("[GoogleAds] Reading insights from DB for campaign:", campaignId);
-        const res = await CampaignAPI.getGoogleAdsInsightsFromApi(campaignId, cId);
+        console.log(
+          "[GoogleAds] Reading insights from DB for campaign:",
+          campaignId,
+        );
+        const res = await CampaignAPI.getGoogleAdsInsightsFromApi(
+          campaignId,
+          cId,
+        );
         const data = res.data?.insights || res.data || {};
         console.log("[GoogleAds] DB insights raw:", data);
         const hasRealData =
@@ -105,15 +112,17 @@ const CampaignDashboard = ({
         if (hasRealData) {
           setAdInsights((prev) => ({
             ...prev,
-            impressions:     Number(data.impressions    ?? prev.impressions),
-            clicks:          Number(data.clicks         ?? prev.clicks),
-            spend:           String(data.cost           ?? prev.spend       ?? "0"),
-            reach:           String(data.reach          ?? prev.reach       ?? "0"),
-            cpc:             parseFloat(String(data.avg_cpc ?? prev.cpc    ?? "0")).toFixed(2),
-            conversions:     Number(data.conversions    ?? prev.conversions),
-            total_budget:    String(data.total_budget   ?? prev.total_budget ?? "0"),
-            conversion_rate: String(data.ctr ?? data.conversion_rate ?? prev.conversion_rate ?? "0%"),
-            ctr:             String(data.ctr            ?? prev.ctr          ?? "0"),
+            impressions: Number(data.impressions ?? prev.impressions),
+            clicks: Number(data.clicks ?? prev.clicks),
+            spend: String(data.cost ?? prev.spend ?? "0"),
+            reach: String(data.reach ?? prev.reach ?? "0"),
+            cpc: parseFloat(String(data.avg_cpc ?? prev.cpc ?? "0")).toFixed(2),
+            conversions: Number(data.conversions ?? prev.conversions),
+            total_budget: String(data.total_budget ?? prev.total_budget ?? "0"),
+            conversion_rate: String(
+              data.ctr ?? data.conversion_rate ?? prev.conversion_rate ?? "0%",
+            ),
+            ctr: String(data.ctr ?? prev.ctr ?? "0"),
           }));
           return true;
         }
@@ -133,17 +142,17 @@ const CampaignDashboard = ({
       try {
         setLoadingInsights(true);
 
-        const campaignId   = campaignIdRef.current;
+        const campaignId = campaignIdRef.current;
         const campaignType = campaignTypeRef.current;
-        const fbCamId      = fbCampaignIdRef.current;
-        const platforms    = platformsRef.current;
-        const cId          = clinicIdRef.current;
+        const fbCamId = fbCampaignIdRef.current;
+        const platforms = platformsRef.current;
+        const cId = clinicIdRef.current;
 
         if (campaignType === CAMPAIGN_TYPE.EMAIL) {
           try {
             await CampaignAPI.getMailchimpInsights(campaignId);
-          } catch {
-            // Not sent to Mailchimp yet — that is fine.
+          } catch (err) {
+            console.error(err);
           }
           if (cancelled) return;
         }
@@ -158,21 +167,21 @@ const CampaignDashboard = ({
 
         setFullCampaign((prev) => ({
           ...prev,
-          emails_sent:        d.emails_sent        ?? 0,
-          impressions:        d.impressions         ?? 0,
-          open_rate:          d.open_rate           ?? 0,
-          clicks:             d.clicks              ?? 0,
-          click_rate:         d.click_rate          ?? 0,
-          bounces:            d.bounces             ?? 0,
-          unsubscribes:       d.unsubscribes        ?? 0,
-          lead_generated:     d.lead_generated      ?? 0,
-          conversion_rate:    d.conversion_rate     ?? 0,
-          last_open:          d.last_open           ?? null,
-          last_click:         d.last_click          ?? null,
-          insights_synced_at: d.insights_synced_at  ?? null,
-          fb_campaign_id:     resolvedFbCampaignId,
-          budget_data:        d.budget_data         ?? prev.budget_data ?? {},
-          image_url:          d.image_url           ?? prev.image_url   ?? null, // ✅ FIX: preserve image_url from API response
+          emails_sent: d.emails_sent ?? 0,
+          impressions: d.impressions ?? 0,
+          open_rate: d.open_rate ?? 0,
+          clicks: d.clicks ?? 0,
+          click_rate: d.click_rate ?? 0,
+          bounces: d.bounces ?? 0,
+          unsubscribes: d.unsubscribes ?? 0,
+          lead_generated: d.lead_generated ?? 0,
+          conversion_rate: d.conversion_rate ?? 0,
+          last_open: d.last_open ?? null,
+          last_click: d.last_click ?? null,
+          insights_synced_at: d.insights_synced_at ?? null,
+          fb_campaign_id: resolvedFbCampaignId,
+          budget_data: d.budget_data ?? prev.budget_data ?? {},
+          image_url: d.image_url ?? prev.image_url ?? null,
         }));
 
         if (resolvedFbCampaignId) {
@@ -181,10 +190,14 @@ const CampaignDashboard = ({
         }
 
         if (hasGoogleAds) {
-          console.log("[GoogleAds] No DB data — triggering Zapier insights fetch...");
+          console.log(
+            "[GoogleAds] No DB data — triggering Zapier insights fetch...",
+          );
           try {
             await CampaignAPI.triggerGoogleAdsInsights(campaignId);
-            console.log("[GoogleAds] Zapier trigger sent. Polling DB for results...");
+            console.log(
+              "[GoogleAds] Zapier trigger sent. Polling DB for results...",
+            );
           } catch (err) {
             console.error("[GoogleAds] Trigger failed:", err);
           }
@@ -206,10 +219,11 @@ const CampaignDashboard = ({
           }
 
           if (attempts >= maxAttempts) {
-            console.warn("[GoogleAds] Polling timed out — Zapier may still be processing");
+            console.warn(
+              "[GoogleAds] Polling timed out — Zapier may still be processing",
+            );
           }
         }
-
       } catch (err) {
         console.error("Failed to fetch campaign data:", err);
       } finally {
@@ -223,7 +237,7 @@ const CampaignDashboard = ({
       cancelled = true;
     };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign.id]);
 
   // ─── Budget ───────────────────────────────────────────────────────────────
@@ -241,11 +255,12 @@ const CampaignDashboard = ({
         ? parseFloat(adInsights.total_budget)
         : (fullCampaign.total_spend ?? 0);
 
-  const ctr = adInsights.ctr !== "0"
-    ? parseFloat(adInsights.ctr).toFixed(2)
-    : adInsights.impressions > 0
-      ? ((adInsights.clicks / adInsights.impressions) * 100).toFixed(2)
-      : "0";
+  const ctr =
+    adInsights.ctr !== "0"
+      ? parseFloat(adInsights.ctr).toFixed(2)
+      : adInsights.impressions > 0
+        ? ((adInsights.clicks / adInsights.impressions) * 100).toFixed(2)
+        : "0";
 
   const duration = `${dayjs(fullCampaign.start).format("DD/MM/YYYY")} - ${dayjs(
     fullCampaign.end,
@@ -267,14 +282,46 @@ const CampaignDashboard = ({
 
   // ─── EMAIL CAMPAIGN METRICS ───────────────────────────────────────────────
   const emailMetrics = [
-    { title: "Emails Sent",     value: loadingInsights ? "…" : (fullCampaign.emails_sent   ?? 0), icon: impressionsIcon },
-    { title: "Total Opens",     value: loadingInsights ? "…" : (fullCampaign.impressions    ?? 0), icon: clicksIcon },
-    { title: "Open Rate",       value: loadingInsights ? "…" : formatRate(fullCampaign.open_rate), icon: ctrIcon },
-    { title: "Total Clicks",    value: loadingInsights ? "…" : (fullCampaign.clicks         ?? 0), icon: cpcIcon },
-    { title: "Click Rate",      value: loadingInsights ? "…" : formatRate(fullCampaign.click_rate), icon: conversionRateIcon },
-    { title: "Bounces",         value: loadingInsights ? "…" : (fullCampaign.bounces        ?? 0), icon: spendIcon },
-    { title: "Unsubscribes",    value: loadingInsights ? "…" : (fullCampaign.unsubscribes   ?? 0), icon: cpaIcon },
-    { title: "Leads Generated", value: loadingInsights ? "…" : (fullCampaign.lead_generated || 0), icon: conversionsIcon },
+    {
+      title: "Emails Sent",
+      value: loadingInsights ? "…" : (fullCampaign.emails_sent ?? 0),
+      icon: impressionsIcon,
+    },
+    {
+      title: "Total Opens",
+      value: loadingInsights ? "…" : (fullCampaign.impressions ?? 0),
+      icon: clicksIcon,
+    },
+    {
+      title: "Open Rate",
+      value: loadingInsights ? "…" : formatRate(fullCampaign.open_rate),
+      icon: ctrIcon,
+    },
+    {
+      title: "Total Clicks",
+      value: loadingInsights ? "…" : (fullCampaign.clicks ?? 0),
+      icon: cpcIcon,
+    },
+    {
+      title: "Click Rate",
+      value: loadingInsights ? "…" : formatRate(fullCampaign.click_rate),
+      icon: conversionRateIcon,
+    },
+    {
+      title: "Bounces",
+      value: loadingInsights ? "…" : (fullCampaign.bounces ?? 0),
+      icon: spendIcon,
+    },
+    {
+      title: "Unsubscribes",
+      value: loadingInsights ? "…" : (fullCampaign.unsubscribes ?? 0),
+      icon: cpaIcon,
+    },
+    {
+      title: "Leads Generated",
+      value: loadingInsights ? "…" : fullCampaign.lead_generated || 0,
+      icon: conversionsIcon,
+    },
   ];
 
   // ─── SOCIAL CAMPAIGN METRICS ──────────────────────────────────────────────
@@ -334,9 +381,15 @@ const CampaignDashboard = ({
         <IconButton
           onClick={onBack}
           sx={{
-            width: 24, height: 24, padding: "10px", opacity: 1,
-            color: "#374151", borderRadius: 1, mr: 1,
-            boxShadow: "3px 3px 6px rgba(0,0,0,0.2)", backgroundColor: "#fff",
+            width: 24,
+            height: 24,
+            padding: "10px",
+            opacity: 1,
+            color: "#374151",
+            borderRadius: 1,
+            mr: 1,
+            boxShadow: "3px 3px 6px rgba(0,0,0,0.2)",
+            backgroundColor: "#fff",
           }}
         >
           <TurnLeftIcon sx={{ fontSize: 24, padding: "3px" }} />
@@ -345,11 +398,26 @@ const CampaignDashboard = ({
         <div className="cd-header-card">
           <div className="cd-header-top">
             <div className="cd-header-left">
-              <div className={fullCampaign.type === CAMPAIGN_TYPE.EMAIL ? "cd-mail-icon" : "cd-globe-icon"}>
-                <img src={fullCampaign.type === CAMPAIGN_TYPE.EMAIL ? mailIcon : globeIcon} alt={fullCampaign.type} />
+              <div
+                className={
+                  fullCampaign.type === CAMPAIGN_TYPE.EMAIL
+                    ? "cd-mail-icon"
+                    : "cd-globe-icon"
+                }
+              >
+                <img
+                  src={
+                    fullCampaign.type === CAMPAIGN_TYPE.EMAIL
+                      ? mailIcon
+                      : globeIcon
+                  }
+                  alt={fullCampaign.type}
+                />
               </div>
               <span className="cd-header-title">{fullCampaign.name}</span>
-              <span className={`status ${fullCampaign.status.toLowerCase()}`}>{fullCampaign.status}</span>
+              <span className={`status ${fullCampaign.status.toLowerCase()}`}>
+                {fullCampaign.status}
+              </span>
             </div>
           </div>
 
@@ -358,38 +426,64 @@ const CampaignDashboard = ({
             <Meta label="Schedule Time" value={scheduleTime} />
             <Meta
               label="Campaign Objective"
-              value={fullCampaign.objective ? CAMPAIGN_OBJECTIVES[fullCampaign.objective as keyof typeof CAMPAIGN_OBJECTIVES] : "-"}
+              value={
+                fullCampaign.objective
+                  ? CAMPAIGN_OBJECTIVES[
+                      fullCampaign.objective as keyof typeof CAMPAIGN_OBJECTIVES
+                    ]
+                  : "-"
+              }
             />
             <Meta
               label="Platform"
               value={
                 <div className="cd-platform-icons">
-                  {platforms.map((p) => (<img key={p} src={platformIcons[p]} alt={p} />))}
+                  {platforms.map((p) => (
+                    <img key={p} src={platformIcons[p]} alt={p} />
+                  ))}
                 </div>
               }
             />
-            <Meta label="Campaign Type" value={fullCampaign.type.toUpperCase()} />
-            <Meta label="Leads Generated" value={fullCampaign.lead_generated || 0} />
+            <Meta
+              label="Campaign Type"
+              value={fullCampaign.type.toUpperCase()}
+            />
+            <Meta
+              label="Leads Generated"
+              value={fullCampaign.lead_generated || 0}
+            />
           </div>
         </div>
       </div>
 
       <div className="cd-metrics-row">
-        {metrics.map((m) => (<Metric key={m.title} {...m} />))}
+        {metrics.map((m) => (
+          <Metric key={m.title} {...m} />
+        ))}
       </div>
 
       <div className="cd-tabs-container">
-        {["Content", "Performance", "Platform Breakdown", "AI Insights"].map((tab) => (
-          <button key={tab} className={`cd-tab ${activeTab === tab ? "cd-tab-active" : ""}`} onClick={() => setActiveTab(tab)}>
-            {tab}
-          </button>
-        ))}
+        {["Content", "Performance", "Platform Breakdown", "AI Insights"].map(
+          (tab) => (
+            <button
+              key={tab}
+              className={`cd-tab ${activeTab === tab ? "cd-tab-active" : ""}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}
+            </button>
+          ),
+        )}
       </div>
 
       {platforms.length > 1 && (
         <div className="cd-subtabs-container">
           {platforms.map((p) => (
-            <button key={p} className={`cd-subtab ${activeSubTab === p ? "cd-subtab-active" : ""}`} onClick={() => setActiveSubTab(p)}>
+            <button
+              key={p}
+              className={`cd-subtab ${activeSubTab === p ? "cd-subtab-active" : ""}`}
+              onClick={() => setActiveSubTab(p)}
+            >
               {p.charAt(0).toUpperCase() + p.slice(1)}
             </button>
           ))}
@@ -414,27 +508,53 @@ const Meta = ({ label, value }: { label: string; value: React.ReactNode }) => (
 );
 
 const METRIC_GRADIENTS: Record<string, string> = {
-  "Total Impressions": "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
-  "Total Clicks": "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
-  Conversions: "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
-  "Total Budget": "linear-gradient(180deg, rgba(236,189,86,0.10) 0%, rgba(236,189,86,0.05) 35%, #FFFFFF 100%)",
+  "Total Impressions":
+    "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
+  "Total Clicks":
+    "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
+  Conversions:
+    "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
+  "Total Budget":
+    "linear-gradient(180deg, rgba(236,189,86,0.10) 0%, rgba(236,189,86,0.05) 35%, #FFFFFF 100%)",
   CTR: "linear-gradient(180deg, rgba(71,179,95,0.10) 0%, rgba(71,179,95,0.05) 35%, #FFFFFF 100%)",
-  "Conversion Rate": "linear-gradient(180deg, rgba(242,91,91,0.10) 0%, rgba(242,91,91,0.05) 35%, #FFFFFF 100%)",
+  "Conversion Rate":
+    "linear-gradient(180deg, rgba(242,91,91,0.10) 0%, rgba(242,91,91,0.05) 35%, #FFFFFF 100%)",
   CPC: "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
   CPA: "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
-  "Emails Sent": "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
-  "Total Opens": "linear-gradient(180deg, rgba(71,179,95,0.10) 0%, rgba(71,179,95,0.05) 35%, #FFFFFF 100%)",
-  "Open Rate": "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
-  "Total Clicks (Email)": "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
-  "Click Rate": "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
-  Bounces: "linear-gradient(180deg, rgba(242,91,91,0.10) 0%, rgba(242,91,91,0.05) 35%, #FFFFFF 100%)",
-  Unsubscribes: "linear-gradient(180deg, rgba(236,189,86,0.10) 0%, rgba(236,189,86,0.05) 35%, #FFFFFF 100%)",
-  "Leads Generated": "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
+  "Emails Sent":
+    "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
+  "Total Opens":
+    "linear-gradient(180deg, rgba(71,179,95,0.10) 0%, rgba(71,179,95,0.05) 35%, #FFFFFF 100%)",
+  "Open Rate":
+    "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
+  "Total Clicks (Email)":
+    "linear-gradient(180deg, rgba(83,146,242,0.10) 0%, rgba(83,146,242,0.05) 35%, #FFFFFF 100%)",
+  "Click Rate":
+    "linear-gradient(180deg, rgba(131,93,239,0.10) 0%, rgba(131,93,239,0.05) 35%, #FFFFFF 100%)",
+  Bounces:
+    "linear-gradient(180deg, rgba(242,91,91,0.10) 0%, rgba(242,91,91,0.05) 35%, #FFFFFF 100%)",
+  Unsubscribes:
+    "linear-gradient(180deg, rgba(236,189,86,0.10) 0%, rgba(236,189,86,0.05) 35%, #FFFFFF 100%)",
+  "Leads Generated":
+    "linear-gradient(180deg, rgba(45,107,240,0.10) 0%, rgba(45,107,240,0.05) 35%, #FFFFFF 100%)",
 };
 
-const Metric = ({ title, value, icon }: { title: string; value: string | number; icon: string }) => (
-  <div className="cd-metric-card" style={{ background: METRIC_GRADIENTS[title] }}>
-    <div className="cd-metric-icon"><img src={icon} alt={title} /></div>
+const Metric = ({
+  title,
+  value,
+  icon,
+}: {
+  title: string;
+  value: string | number;
+  icon: string;
+}) => (
+  <div
+    className="cd-metric-card"
+    style={{ background: METRIC_GRADIENTS[title] }}
+  >
+    <div className="cd-metric-icon">
+      <img src={icon} alt={title} />
+    </div>
     <div className="cd-metric-text">
       <span className="cd-metric-label">{title}</span>
       <span className="cd-metric-value">{value}</span>

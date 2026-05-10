@@ -226,6 +226,7 @@ export interface SocialCampaignPayload {
   campaign_content: string;
 
   // ✅ FIX: Changed from 'string' to 'any' to allow JSON objects (LinkedIn/Instagram data)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   platform_data: Partial<Record<Platform, any>>;
 
   image_url: string | null;
