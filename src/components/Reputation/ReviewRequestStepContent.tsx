@@ -27,6 +27,10 @@ import {
   Tooltip,
   Typography,
   Select,
+  FormControl,
+  InputLabel,
+  CircularProgress,
+  Paper,
 } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import UndoIcon from "@mui/icons-material/Undo";
@@ -55,6 +59,7 @@ import InsertPhotoIcon from "@mui/icons-material/InsertPhoto";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
 import AddIcon from "@mui/icons-material/Add";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import AI_Suggest, { type AiSuggestionItem } from "./AI_Suggest";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -78,6 +83,35 @@ import {
 import ReviewRequestTemplateDialog, {
   type TemplateListItem,
 } from "./ReviewRequestTemplateDialog";
+import { useSelector } from "react-redux";
+import axios from "axios";
+
+// ─── WhatsApp template type ───────────────────────────────────────────────────
+type WhatsAppTemplateItem = {
+  id: string;
+  name: string;
+  body: string;
+  is_active: boolean;
+};
+
+// ─── Extract {{1}}, {{2}} placeholders from template body ────────────────────
+const extractPlaceholders = (body: string): number[] => {
+  const matches = body.match(/\{\{(\d+)\}\}/g) || [];
+  const indices = matches.map((m) => parseInt(m.replace(/[{}]/g, ""), 10));
+  return [...new Set(indices)].sort((a, b) => a - b);
+};
+
+// ─── Build preview by substituting variable values ───────────────────────────
+const buildPreview = (body: string, values: Record<number, string>): string => {
+  let result = body;
+  Object.entries(values).forEach(([idx, val]) => {
+    result = result.replace(
+      new RegExp(`\\{\\{${idx}\\}\\}`, "g"),
+      val || `{{${idx}}}`,
+    );
+  });
+  return result;
+};
 
 type ReviewRequestStepContentProps = {
   formData: ReviewRequestFormData;
@@ -94,6 +128,9 @@ type ReviewRequestStepContentProps = {
   onMessageBlur: () => void;
   onFileSelect: (file: File) => void;
   onFileRemove: (fileName: string) => void;
+  // ── NEW optional props for WhatsApp ──────────────────────────────────────
+  onWhatsAppTemplateChange?: (templateId: string, templateName: string) => void;
+  onWhatsAppVariablesChange?: (variables: string[]) => void;
 };
 
 type AttachmentItem = {
@@ -176,6 +213,8 @@ const ReviewRequestStepContent = ({
   onFileSelect,
   onFileRemove,
   attachmentFiles,
+  onWhatsAppTemplateChange,
+  onWhatsAppVariablesChange,
 }: ReviewRequestStepContentProps): JSX.Element => {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
@@ -210,6 +249,83 @@ const ReviewRequestStepContent = ({
   const [aiSuggestField, setAiSuggestField] = useState<"subject" | "body">(
     "subject",
   );
+
+  // ── NEW: WhatsApp state ───────────────────────────────────────────────────
+  const [waTemplates, setWaTemplates] = useState<WhatsAppTemplateItem[]>([]);
+  const [waTemplatesLoading, setWaTemplatesLoading] = useState(false);
+  const [selectedWaTemplate, setSelectedWaTemplate] =
+    useState<WhatsAppTemplateItem | null>(null);
+  const [waVariableValues, setWaVariableValues] = useState<
+    Record<number, string>
+  >({});
+  const [waPlaceholders, setWaPlaceholders] = useState<number[]>([]);
+
+  // Read clinic id from Redux (same pattern used elsewhere in the app)
+  const clinicId = useSelector((state: any) => state.clinic?.id);
+  const token = useSelector(
+    (state: any) =>
+      state.auth?.token || localStorage.getItem("access_token") || "",
+  );
+
+  // Fetch WhatsApp templates when mode switches to whatsapp
+  useEffect(() => {
+    if (formData.mode !== "whatsapp") return;
+    if (waTemplates.length > 0) return; // already loaded
+
+    const fetchTemplates = async () => {
+      setWaTemplatesLoading(true);
+      try {
+        const res = await axios.get("/api/templates/whatsapp/", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "X-Clinic-Id": clinicId,
+          },
+        });
+        // API returns array of TemplateWhatsApp objects
+        const data: WhatsAppTemplateItem[] = (res.data || []).filter(
+          (t: WhatsAppTemplateItem) => t.is_active,
+        );
+        setWaTemplates(data);
+      } catch (err) {
+        console.error("Failed to fetch WhatsApp templates", err);
+      } finally {
+        setWaTemplatesLoading(false);
+      }
+    };
+
+    fetchTemplates();
+  }, [formData.mode, token, clinicId, waTemplates.length]);
+
+  // When a template is selected — extract placeholders, reset variable values
+  const handleWaTemplateSelect = (templateId: string) => {
+    const tmpl = waTemplates.find((t) => t.id === templateId) || null;
+    setSelectedWaTemplate(tmpl);
+    setWaVariableValues({});
+
+    if (tmpl) {
+      const placeholders = extractPlaceholders(tmpl.body);
+      setWaPlaceholders(placeholders);
+      onWhatsAppTemplateChange?.(tmpl.id, tmpl.name);
+      // Set message to template body (raw with placeholders) so parent has it
+      onMessageChange(tmpl.body);
+    } else {
+      setWaPlaceholders([]);
+      onWhatsAppTemplateChange?.("", "");
+      onMessageChange("");
+    }
+  };
+
+  // When a variable value changes — update parent with ordered array
+  const handleWaVariableChange = (idx: number, value: string) => {
+    const updated = { ...waVariableValues, [idx]: value };
+    setWaVariableValues(updated);
+
+    if (selectedWaTemplate) {
+      const placeholders = extractPlaceholders(selectedWaTemplate.body);
+      const orderedValues = placeholders.map((i) => updated[i] || "");
+      onWhatsAppVariablesChange?.(orderedValues);
+    }
+  };
 
   const editor = useEditor({
     extensions: [
@@ -1415,11 +1531,9 @@ const handleClearFormatting = () => {
         }}
         PaperProps={{
           sx: {
-            width: 180, // 🔹 smaller width
-            maxHeight: 120, // 🔹 only ~2 rows visible
-            overflowY: "auto", // 🔹 enable scroll
-
-            // 🔹 thin scrollbar
+            width: 180,
+            maxHeight: 120,
+            overflowY: "auto",
             "&::-webkit-scrollbar": {
               width: 4,
             },
@@ -1435,8 +1549,8 @@ const handleClearFormatting = () => {
             key={color}
             onClick={() => handleTextColor(color)}
             sx={{
-              py: 0.5, // 🔹 reduce height
-              minHeight: 32, // 🔹 compact rows
+              py: 0.5,
+              minHeight: 32,
             }}
           >
             <Box
@@ -1538,6 +1652,120 @@ const handleClearFormatting = () => {
         </DialogActions>
       </Dialog>
     </>
+  );
+
+  // ── NEW: WhatsApp body section ────────────────────────────────────────────
+  const renderWhatsAppBody = () => (
+    <Box>
+      <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+        WhatsApp Template
+      </Typography>
+
+      {/* Template dropdown */}
+      <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+        <InputLabel>Select Template</InputLabel>
+        {waTemplatesLoading ? (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}>
+            <CircularProgress size={16} />
+            <Typography variant="caption" color="textSecondary">
+              Loading templates...
+            </Typography>
+          </Box>
+        ) : (
+          <Select
+            label="Select Template"
+            value={selectedWaTemplate?.id || ""}
+            onChange={(e) => handleWaTemplateSelect(e.target.value)}
+          >
+            <MenuItem value="">
+              <em>— Select a template —</em>
+            </MenuItem>
+            {waTemplates.map((t) => (
+              <MenuItem key={t.id} value={t.id}>
+                {t.name}
+              </MenuItem>
+            ))}
+          </Select>
+        )}
+      </FormControl>
+
+      {/* Variable input fields — auto-detected from {{1}} {{2}} */}
+      {selectedWaTemplate && waPlaceholders.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+            Fill in Variables
+          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+            {waPlaceholders.map((idx) => (
+              <TextField
+                key={idx}
+                size="small"
+                fullWidth
+                label={`Variable ${idx}`}
+                placeholder={`Enter value for {{${idx}}}`}
+                value={waVariableValues[idx] || ""}
+                onChange={(e) => handleWaVariableChange(idx, e.target.value)}
+              />
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      {/* Live message preview */}
+      {selectedWaTemplate && (
+        <Box sx={{ mb: 1 }}>
+          <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+            Message Preview
+          </Typography>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              bgcolor: "#F0FDF4",
+              borderColor: "#BBF7D0",
+              borderRadius: "12px",
+              position: "relative",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
+                mb: 1,
+              }}
+            >
+              <WhatsAppIcon sx={{ color: "#25D366", fontSize: 18 }} />
+              <Typography
+                variant="caption"
+                sx={{ color: "#15803D", fontWeight: 600 }}
+              >
+                WhatsApp Preview
+              </Typography>
+            </Box>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#111827",
+                lineHeight: 1.7,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {buildPreview(selectedWaTemplate.body, waVariableValues)}
+            </Typography>
+          </Paper>
+        </Box>
+      )}
+
+      {/* No templates found */}
+      {!waTemplatesLoading && waTemplates.length === 0 && (
+        <Typography variant="caption" sx={{ color: "#6B7280" }}>
+          No WhatsApp templates found. Add templates via Settings → Templates →
+          WhatsApp.
+        </Typography>
+      )}
+    </Box>
   );
 
   return (
@@ -1681,173 +1909,179 @@ const handleClearFormatting = () => {
           />
         )}
 
-        <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-          Body
-        </Typography>
-        <Box
-          sx={{
-            border: "1px solid #E5E7EB",
-            borderRadius: "12px",
-            overflow: "hidden",
-            mb: 1.5,
-          }}
-        >
-          <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
-            <Button
-              startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-              onClick={() => openAiSuggestions("body")}
-              sx={{ color: "#A855F7", textTransform: "none", fontWeight: 700 }}
-            >
-              AI Suggest
-            </Button>
-          </Box>
-          <Box
-            ref={editorRef}
-            sx={{
-              "& .ProseMirror": {
-                minHeight: formData.mode === "email" ? 180 : 130,
-                fontSize: 14,
-                lineHeight: 1.7,
-                padding: "14px 16px",
-                "& [style*='text-align: left']": {
-  textAlign: "left",
-},
-"& [style*='text-align: center']": {
-  textAlign: "center",
-},
-"& [style*='text-align: right']": {
-  textAlign: "right",
-},
-                outline: "none",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                color: "#111827",
-                "& p": { margin: "0 0 8px 0" },
-                "& h1": { fontSize: "28px", fontWeight: 700, margin: "8px 0" },
-                "& h2": { fontSize: "24px", fontWeight: 600, margin: "8px 0" },
-                "& h3": { fontSize: "20px", fontWeight: 600, margin: "8px 0" },
-                "& h4": { fontSize: "18px", fontWeight: 600, margin: "8px 0" },
-                "& h5": { fontSize: "16px", fontWeight: 600, margin: "8px 0" },
-                "& h6": { fontSize: "14px", fontWeight: 600, margin: "8px 0" },
-
-                "& ul": {
-                  listStyleType: "disc",
-                  paddingLeft: "20px",
-                  margin: "8px 0",
-                },
-                "& ol": {
-                  listStyleType: "decimal",
-                  paddingLeft: "20px",
-                  margin: "8px 0",
-                },
-                "& li": { margin: "4px 0" },
-                "& blockquote": {
-                  borderLeft: "3px solid #D1D5DB",
-                  margin: "8px 0",
-                  paddingLeft: "12px",
-                  color: "#4B5563",
-                },
-                "& a": { color: "#2563EB", textDecoration: "underline" },
-                "& img": {
-                  width: "220px",
-                  maxWidth: "100%",
-                  height: "auto",
-                  borderRadius: "6px",
-                },
-              },
-            }}
-          >
-            <EditorContent
-              editor={editor}
-              onPaste={(e: ClipboardEvent<HTMLDivElement>) => {
-                e.preventDefault();
-                const text = e.clipboardData.getData("text/plain");
-                if (editor) {
-                  editor.chain().focus().insertContent(text).run();
-                }
-              }}
-              onBlur={() => {
-                onMessageBlur();
-              }}
-            />
-          </Box>
-
-          <Box
-            onMouseDown={(e) => e.stopPropagation()}
-            onMouseUp={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {renderEditorToolbar()}
-          </Box>
-        </Box>
-
-        <Typography
-          variant="caption"
-          sx={{
-            display: "block",
-            textAlign: "right",
-            color:
-              messageCharacterCount > REVIEW_REQUEST_BODY_MAX_LENGTH
-                ? "#DC2626"
-                : "#6B7280",
-            mb: 1.5,
-          }}
-        >
-          {messageCharacterCount}/{REVIEW_REQUEST_BODY_MAX_LENGTH}
-        </Typography>
-
-        {(formData.mode === "sms" || formData.mode === "whatsapp") && (
-          <Box sx={{ mt: 2 }}>
+        {/* ── WhatsApp mode: show template picker instead of rich text editor ── */}
+        {formData.mode === "whatsapp" ? (
+          renderWhatsAppBody()
+        ) : (
+          <>
             <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-              Upload Documents
+              Body
             </Typography>
             <Box
               sx={{
                 border: "1px solid #E5E7EB",
-                borderRadius: "8px",
-                p: "8px 12px",
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
+                borderRadius: "12px",
+                overflow: "hidden",
+                mb: 1.5,
               }}
             >
-              <Button
-                variant="contained"
-                component="label"
+              <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
+                <Button
+                  startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => openAiSuggestions("body")}
+                  sx={{ color: "#A855F7", textTransform: "none", fontWeight: 700 }}
+                >
+                  AI Suggest
+                </Button>
+              </Box>
+              <Box
+                ref={editorRef}
                 sx={{
-                  bgcolor: "#9CA3AF",
-                  "&:hover": { bgcolor: "#6B7280" },
-                  textTransform: "none",
-                  fontSize: 12,
-                  boxShadow: "none",
-                  borderRadius: "4px",
+                  "& .ProseMirror": {
+                    minHeight: formData.mode === "email" ? 180 : 130,
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    padding: "14px 16px",
+                    "& [style*='text-align: left']": {
+                      textAlign: "left",
+                    },
+                    "& [style*='text-align: center']": {
+                      textAlign: "center",
+                    },
+                    "& [style*='text-align: right']": {
+                      textAlign: "right",
+                    },
+                    outline: "none",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    color: "#111827",
+                    "& p": { margin: "0 0 8px 0" },
+                    "& h1": { fontSize: "28px", fontWeight: 700, margin: "8px 0" },
+                    "& h2": { fontSize: "24px", fontWeight: 600, margin: "8px 0" },
+                    "& h3": { fontSize: "20px", fontWeight: 600, margin: "8px 0" },
+                    "& h4": { fontSize: "18px", fontWeight: 600, margin: "8px 0" },
+                    "& h5": { fontSize: "16px", fontWeight: 600, margin: "8px 0" },
+                    "& h6": { fontSize: "14px", fontWeight: 600, margin: "8px 0" },
+                    "& ul": {
+                      listStyleType: "disc",
+                      paddingLeft: "20px",
+                      margin: "8px 0",
+                    },
+                    "& ol": {
+                      listStyleType: "decimal",
+                      paddingLeft: "20px",
+                      margin: "8px 0",
+                    },
+                    "& li": { margin: "4px 0" },
+                    "& blockquote": {
+                      borderLeft: "3px solid #D1D5DB",
+                      margin: "8px 0",
+                      paddingLeft: "12px",
+                      color: "#4B5563",
+                    },
+                    "& a": { color: "#2563EB", textDecoration: "underline" },
+                    "& img": {
+                      width: "220px",
+                      maxWidth: "100%",
+                      height: "auto",
+                      borderRadius: "6px",
+                    },
+                  },
                 }}
               >
-                Choose File
-                <input
-                  type="file"
-                  hidden
-                  accept="*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    onFileSelect(file);
-                    e.target.value = "";
+                <EditorContent
+                  editor={editor}
+                  onPaste={(e: ClipboardEvent<HTMLDivElement>) => {
+                    e.preventDefault();
+                    const text = e.clipboardData.getData("text/plain");
+                    if (editor) {
+                      editor.chain().focus().insertContent(text).run();
+                    }
+                  }}
+                  onBlur={() => {
+                    onMessageBlur();
                   }}
                 />
-              </Button>
-              <Typography variant="body2" color="textSecondary">
-                {fileName || "No File Chosen"}
-              </Typography>
+              </Box>
+
+              <Box
+                onMouseDown={(e) => e.stopPropagation()}
+                onMouseUp={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {renderEditorToolbar()}
+              </Box>
             </Box>
+
             <Typography
               variant="caption"
-              color="textSecondary"
-              sx={{ mt: 0.5, display: "block" }}
+              sx={{
+                display: "block",
+                textAlign: "right",
+                color:
+                  messageCharacterCount > REVIEW_REQUEST_BODY_MAX_LENGTH
+                    ? "#DC2626"
+                    : "#6B7280",
+                mb: 1.5,
+              }}
             >
-              Accepted formats: Any | Max size: 25MB
+              {messageCharacterCount}/{REVIEW_REQUEST_BODY_MAX_LENGTH}
             </Typography>
-          </Box>
+
+            {formData.mode === "sms" && (
+              <Box sx={{ mt: 2 }}>
+                <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+                  Upload Documents
+                </Typography>
+                <Box
+                  sx={{
+                    border: "1px solid #E5E7EB",
+                    borderRadius: "8px",
+                    p: "8px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                  }}
+                >
+                  <Button
+                    variant="contained"
+                    component="label"
+                    sx={{
+                      bgcolor: "#9CA3AF",
+                      "&:hover": { bgcolor: "#6B7280" },
+                      textTransform: "none",
+                      fontSize: 12,
+                      boxShadow: "none",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    Choose File
+                    <input
+                      type="file"
+                      hidden
+                      accept="*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        onFileSelect(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </Button>
+                  <Typography variant="body2" color="textSecondary">
+                    {fileName || "No File Chosen"}
+                  </Typography>
+                </Box>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  sx={{ mt: 0.5, display: "block" }}
+                >
+                  Accepted formats: Any | Max size: 25MB
+                </Typography>
+              </Box>
+            )}
+          </>
         )}
       </Box>
 
