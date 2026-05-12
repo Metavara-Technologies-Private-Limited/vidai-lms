@@ -284,14 +284,23 @@ const ReviewRequestStepContent = ({
     const fetchTemplates = async () => {
       setWaTemplatesLoading(true);
       try {
+        // FIX: removed X-Clinic-Id header (causes CORS preflight error), use query param only
+        // clinic_scope.py reads query params first so this is fully supported by the backend
         const res = await axios.get("/api/templates/whatsapp/", {
+          params: { clinic_id: clinicId },
           headers: {
             Authorization: `Bearer ${token}`,
-            "X-Clinic-Id": clinicId,
           },
         });
-        // API returns array of TemplateWhatsApp objects
-        const data: WhatsAppTemplateItem[] = (res.data || []).filter(
+        // API may return array directly OR wrapped in data/results
+        const raw = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data?.data)
+            ? res.data.data
+            : Array.isArray(res.data?.results)
+              ? res.data.results
+              : [];
+        const data: WhatsAppTemplateItem[] = raw.filter(
           (t: WhatsAppTemplateItem) => t.is_active,
         );
         setWaTemplates(data);
