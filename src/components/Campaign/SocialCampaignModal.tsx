@@ -1,4 +1,4 @@
-  import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
   import "../../styles/Campaign/EmailCampaignModal.css";
   import "../../styles/Campaign/SocialCampaignModal.css";
   import { CampaignAPI } from "../../services/campaign.api";
@@ -636,11 +636,15 @@
           setCreatedCampaignId(newCampaignId);
         }
 
-        // ─────────────────────────────────────────────────────────
-        // Google Ads: fire the dedicated endpoint if selected
-        // ─────────────────────────────────────────────────────────
+        // ─────────────────────────────────────────────────────────────────
+        // Google Ads: ONLY fire paid ad endpoint when mode === "paid"
+        // For organic posting, the campaign content is already saved above
+        // via CampaignAPI.createSocial — no money is spent.
+        // ─────────────────────────────────────────────────────────────────
         const shouldSendGoogleAds =
-          accounts.includes("google_ads") && isGoogleAdsConnected;
+          accounts.includes("google_ads") &&
+          isGoogleAdsConnected &&
+          mode === "paid"; // ← KEY FIX: organic skips this entirely
 
         if (shouldSendGoogleAds) {
           try {
@@ -655,7 +659,7 @@
               .map((k) => k.trim())
               .filter(Boolean);
 
-            console.log("[GoogleAds] Sending payload:", {
+            console.log("[GoogleAds] Sending paid ad payload:", {
               internal_campaign_id: String(newCampaignId ?? ""),
               image_url: googleAdsImage,
               keywords: parsedKeywords,
@@ -695,7 +699,7 @@
               campaign_status: googleAdsCampaignStatus,
             });
 
-            console.log("[GoogleAds] Campaign sent to Zapier successfully");
+            console.log("[GoogleAds] Paid campaign sent to Zapier successfully");
           } catch (googleAdsErr) {
             console.error(
               "[GoogleAds] Failed to trigger Google Ads:",
@@ -705,6 +709,17 @@
               "Campaign saved, but Google Ads trigger failed. Check logs.",
             );
           }
+        } else if (
+          accounts.includes("google_ads") &&
+          isGoogleAdsConnected &&
+          mode === "organic"
+        ) {
+          // Organic posting with Google Ads selected:
+          // Campaign content already saved via createSocial above.
+          // No paid ad is triggered — no money spent.
+          console.log(
+            "[GoogleAds] Organic mode — campaign content saved, no paid ad triggered.",
+          );
         } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
           toast.warn(
             "Google Ads was not triggered because this clinic is not connected to Google Ads.",
@@ -1180,8 +1195,8 @@
                 </div>
               </div>
 
-              {/* ✅ Google Ads Keywords — shown when google_ads selected */}
-              {accounts.includes("google_ads") && (
+              {/* ✅ Google Ads Keywords — shown when google_ads selected AND paid mode */}
+              {accounts.includes("google_ads") && mode === "paid" && (
                 <div className="section-card">
                   <h3>Google Ads Keywords</h3>
                   <p className="section-subtitle">
@@ -1249,6 +1264,31 @@
                       alongside the Search campaign.
                     </p>
                   </div>
+                </div>
+              )}
+
+              {/* ✅ Google Ads organic info — shown when google_ads selected AND organic mode */}
+              {accounts.includes("google_ads") && mode === "organic" && (
+                <div
+                  className="section-card"
+                  style={{
+                    border: "1px solid #d1fae5",
+                    backgroundColor: "#f0fdf4",
+                    borderRadius: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <img
+                      src={platformIcons["google_ads"]}
+                      alt="Google Ads"
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <h3 style={{ margin: 0, color: "#15803d" }}>Google Ads — Organic Post</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
+                    Your campaign content will be saved for Google Ads. No paid ad will be triggered — no money will be spent.
+                    Switch to <strong>Paid Advertising</strong> mode to run a real Google Ad.
+                  </p>
                 </div>
               )}
 
