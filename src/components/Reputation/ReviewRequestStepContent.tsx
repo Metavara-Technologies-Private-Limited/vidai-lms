@@ -27,8 +27,6 @@ import {
   Tooltip,
   Typography,
   Select,
-  FormControl,
-  InputLabel,
   CircularProgress,
   Paper,
 } from "@mui/material";
@@ -194,7 +192,6 @@ const ReviewRequestStepContent = ({
   onFileRemove,
   attachmentFiles,
   onWhatsAppTemplateChange,
-  onWhatsAppVariablesChange,
 }: ReviewRequestStepContentProps): JSX.Element => {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
