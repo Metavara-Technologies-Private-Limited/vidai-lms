@@ -94,25 +94,6 @@ type WhatsAppTemplateItem = {
   is_active: boolean;
 };
 
-// ─── Extract {{1}}, {{2}} placeholders from template body ────────────────────
-const extractPlaceholders = (body: string): number[] => {
-  const matches = body.match(/\{\{(\d+)\}\}/g) || [];
-  const indices = matches.map((m) => parseInt(m.replace(/[{}]/g, ""), 10));
-  return [...new Set(indices)].sort((a, b) => a - b);
-};
-
-// ─── Build preview by substituting variable values ───────────────────────────
-const buildPreview = (body: string, values: Record<number, string>): string => {
-  let result = body;
-  Object.entries(values).forEach(([idx, val]) => {
-    result = result.replace(
-      new RegExp(`\\{\\{${idx}\\}\\}`, "g"),
-      val || `{{${idx}}}`,
-    );
-  });
-  return result;
-};
-
 type ReviewRequestStepContentProps = {
   formData: ReviewRequestFormData;
   fileName: string;
@@ -128,7 +109,6 @@ type ReviewRequestStepContentProps = {
   onMessageBlur: () => void;
   onFileSelect: (file: File) => void;
   onFileRemove: (fileName: string) => void;
-  // ── NEW optional props for WhatsApp ──────────────────────────────────────
   onWhatsAppTemplateChange?: (templateId: string, templateName: string) => void;
   onWhatsAppVariablesChange?: (variables: string[]) => void;
 };
@@ -250,58 +230,36 @@ const ReviewRequestStepContent = ({
     "subject",
   );
 
-  // ── NEW: WhatsApp state ───────────────────────────────────────────────────
+  // ── WhatsApp template picker state (for the optional template selector above editor) ──
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplateItem[]>([]);
   const [waTemplatesLoading, setWaTemplatesLoading] = useState(false);
-  const [selectedWaTemplate, setSelectedWaTemplate] =
-    useState<WhatsAppTemplateItem | null>(null);
-  const [waVariableValues, setWaVariableValues] = useState<
-    Record<number, string>
-  >({});
-  const [waPlaceholders, setWaPlaceholders] = useState<number[]>([]);
+  const [showWaTemplatePicker, setShowWaTemplatePicker] = useState(false);
 
-  // Read clinic id from Redux (same pattern used elsewhere in the app)
   const clinicId = useSelector((state: any) => state.clinic?.id);
   const token = useSelector(
     (state: any) =>
       state.auth?.token || localStorage.getItem("access_token") || "",
   );
 
-  // FIX: Reset templates when clinic changes so the next fetch loads the correct clinic's templates
-  useEffect(() => {
-    setWaTemplates([]);
-    setSelectedWaTemplate(null);
-    setWaVariableValues({});
-    setWaPlaceholders([]);
-  }, [clinicId]);
-
-  // Fetch WhatsApp templates when mode switches to whatsapp
+  // Fetch WhatsApp templates when mode is whatsapp and picker opened
   useEffect(() => {
     if (formData.mode !== "whatsapp") return;
-    if (!clinicId) return; // FIX: guard — don't fetch if clinicId not available
-    // FIX: removed "if (waTemplates.length > 0) return" — stale cache guard was preventing refetch after clinic switch
+    if (waTemplates.length > 0) return;
 
     const fetchTemplates = async () => {
       setWaTemplatesLoading(true);
       try {
-        // FIX: removed X-Clinic-Id header (causes CORS preflight error), use query param only
-        // clinic_scope.py reads query params first so this is fully supported by the backend
         const res = await axios.get("/api/templates/whatsapp/", {
-          params: { clinic_id: clinicId },
           headers: {
             Authorization: `Bearer ${token}`,
+            "X-Clinic-Id": clinicId,
           },
         });
-        // API may return array directly OR wrapped in data/results
-        const raw = Array.isArray(res.data)
+        const raw: WhatsAppTemplateItem[] = Array.isArray(res.data)
           ? res.data
-          : Array.isArray(res.data?.data)
-            ? res.data.data
-            : Array.isArray(res.data?.results)
-              ? res.data.results
-              : [];
-        const data: WhatsAppTemplateItem[] = raw.filter(
-          (t: WhatsAppTemplateItem) => t.is_active,
+          : [];
+        const data = raw.filter(
+          (t: WhatsAppTemplateItem) => t.id && t.name && t.is_active !== false,
         );
         setWaTemplates(data);
       } catch (err) {
@@ -312,37 +270,20 @@ const ReviewRequestStepContent = ({
     };
 
     fetchTemplates();
-  }, [formData.mode, token, clinicId]); // FIX: removed waTemplates.length from deps
+  }, [formData.mode, token, clinicId, waTemplates.length]);
 
-  // When a template is selected — extract placeholders, reset variable values
-  const handleWaTemplateSelect = (templateId: string) => {
-    const tmpl = waTemplates.find((t) => t.id === templateId) || null;
-    setSelectedWaTemplate(tmpl);
-    setWaVariableValues({});
+  // When a WhatsApp template is selected from the picker — insert into editor
+  const handleWaTemplateInsert = (templateId: string) => {
+    const tmpl = waTemplates.find((t) => t.id === templateId);
+    if (!tmpl) return;
 
-    if (tmpl) {
-      const placeholders = extractPlaceholders(tmpl.body);
-      setWaPlaceholders(placeholders);
-      onWhatsAppTemplateChange?.(tmpl.id, tmpl.name);
-      // Set message to template body (raw with placeholders) so parent has it
-      onMessageChange(tmpl.body);
-    } else {
-      setWaPlaceholders([]);
-      onWhatsAppTemplateChange?.("", "");
-      onMessageChange("");
+    const body = normalizeTemplateContent(tmpl.body || "");
+    if (body) {
+      insertTextAtCursor(body);
     }
-  };
 
-  // When a variable value changes — update parent with ordered array
-  const handleWaVariableChange = (idx: number, value: string) => {
-    const updated = { ...waVariableValues, [idx]: value };
-    setWaVariableValues(updated);
-
-    if (selectedWaTemplate) {
-      const placeholders = extractPlaceholders(selectedWaTemplate.body);
-      const orderedValues = placeholders.map((i) => updated[i] || "");
-      onWhatsAppVariablesChange?.(orderedValues);
-    }
+    onWhatsAppTemplateChange?.(tmpl.id, tmpl.name);
+    setShowWaTemplatePicker(false);
   };
 
   const editor = useEditor({
@@ -384,6 +325,7 @@ const ReviewRequestStepContent = ({
       : formData.mode === "sms"
         ? "SMS"
         : "WhatsApp";
+
   const messageCharacterCount = getMessageCharacterCount(formData.message);
   const attachments = useMemo<AttachmentItem[]>(
     () =>
@@ -701,6 +643,7 @@ const ReviewRequestStepContent = ({
     }
     applyEditorCommand("hiliteColor", "#fff2a8");
   };
+
   const TEXT_COLORS = [
     "#111827",
     "#DC2626",
@@ -712,6 +655,7 @@ const ReviewRequestStepContent = ({
     "#7C3AED",
     "#DB2777",
   ];
+
   const handleTextColor = (color: string) => {
     if (editor) {
       editor.chain().focus().setColor(color).run();
@@ -723,6 +667,7 @@ const ReviewRequestStepContent = ({
     setColorError("");
     setTextColorAnchor(null);
   };
+
   const handleApplyCustomTextColor = () => {
     const normalized = customTextColor.trim().toUpperCase();
     if (!isValidHexColor(normalized)) {
@@ -739,17 +684,16 @@ const ReviewRequestStepContent = ({
     setTextColorAnchor(null);
   };
 
-const handleAlignLeft = () => {
-  if (!editor) return;
-
-  editor.chain()
-  .focus()
-  .clearNodes()
-  .unsetAllMarks()
-  .unsetTextAlign()
-  .setParagraph()   
-  .run();
-};
+  const handleAlignLeft = () => {
+    if (!editor) return;
+    editor.chain()
+      .focus()
+      .clearNodes()
+      .unsetAllMarks()
+      .unsetTextAlign()
+      .setParagraph()
+      .run();
+  };
 
   const handleAlignCenter = () => {
     if (editor) {
@@ -842,9 +786,14 @@ const handleAlignLeft = () => {
         const match = /margin-left:\s*(\d+)px/.exec(style);
         const curr = match ? parseInt(match[1], 10) : 0;
         const cleaned = style.replace(/margin-left:\s*\d+px;?/g, "").trim();
-        const newStyle = (cleaned ? cleaned + "; " : "") + `margin-left: ${curr + 20}px`;
+        const newStyle =
+          (cleaned ? cleaned + "; " : "") + `margin-left: ${curr + 20}px`;
         const nodeType = editor.isActive("heading") ? "heading" : "paragraph";
-        editor.chain().focus().updateAttributes(nodeType, { style: newStyle }).run();
+        editor
+          .chain()
+          .focus()
+          .updateAttributes(nodeType, { style: newStyle })
+          .run();
       }
       syncEditorToState();
       return;
@@ -864,9 +813,14 @@ const handleAlignLeft = () => {
         const curr = match ? parseInt(match[1], 10) : 0;
         const next = Math.max(0, curr - 20);
         const cleaned = style.replace(/margin-left:\s*\d+px;?/g, "").trim();
-        const newStyle = (cleaned ? cleaned + "; " : "") + `margin-left: ${next}px`;
+        const newStyle =
+          (cleaned ? cleaned + "; " : "") + `margin-left: ${next}px`;
         const nodeType = editor.isActive("heading") ? "heading" : "paragraph";
-        editor.chain().focus().updateAttributes(nodeType, { style: newStyle }).run();
+        editor
+          .chain()
+          .focus()
+          .updateAttributes(nodeType, { style: newStyle })
+          .run();
       }
       syncEditorToState();
       return;
@@ -900,30 +854,26 @@ const handleAlignLeft = () => {
     saveSelection();
   };
 
-const handleClearFormatting = () => {
-  if (!editor) return;
-
-  editor
-    .chain()
-    .focus()
-    .clearNodes()        // remove headings, lists, quotes
-    .unsetAllMarks()     // remove bold, italic, underline
-    .unsetTextAlign()    // remove alignment
-    .run();
-};
+  const handleClearFormatting = () => {
+    if (!editor) return;
+    editor
+      .chain()
+      .focus()
+      .clearNodes()
+      .unsetAllMarks()
+      .unsetTextAlign()
+      .run();
+  };
 
   const handleHeadingChange = (
     value: "Tt" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6",
   ) => {
     if (!editor) return;
-
     setCurrentHeading(value);
-
     if (value === "Tt") {
       editor.chain().focus().setParagraph().run();
       return;
     }
-
     const level = Number(value.replace("H", "")) as 1 | 2 | 3 | 4 | 5 | 6;
     editor.chain().focus().setHeading({ level }).run();
   };
@@ -1111,9 +1061,9 @@ const handleClearFormatting = () => {
   };
 
   const handleRemoveInlineImage = (imageId: string, src: string) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor
+    const editorEl = editorRef.current;
+    if (!editorEl) return;
+    editorEl
       .querySelectorAll(
         `img[data-inline-image-id="${imageId}"], img[src="${src}"]`,
       )
@@ -1147,6 +1097,67 @@ const handleClearFormatting = () => {
     insertTextAtCursor(emoji);
     setShowEmojiPicker(false);
   };
+
+  // ── WhatsApp template picker dialog ──────────────────────────────────────
+  const renderWaTemplatePicker = () => (
+    <Dialog
+      open={showWaTemplatePicker}
+      onClose={() => setShowWaTemplatePicker(false)}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle sx={{ pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+        <WhatsAppIcon sx={{ color: "#25D366", fontSize: 20 }} />
+        Select WhatsApp Template
+      </DialogTitle>
+      <DialogContent>
+        {waTemplatesLoading ? (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 2 }}>
+            <CircularProgress size={18} />
+            <Typography variant="body2" color="textSecondary">
+              Loading templates…
+            </Typography>
+          </Box>
+        ) : waTemplates.length === 0 ? (
+          <Typography variant="body2" color="textSecondary" sx={{ py: 1 }}>
+            No WhatsApp templates found. Add templates via Settings → Templates
+            → WhatsApp.
+          </Typography>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, pt: 0.5 }}>
+            {waTemplates.map((tmpl) => (
+              <Paper
+                key={tmpl.id}
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  cursor: "pointer",
+                  borderRadius: "10px",
+                  "&:hover": { bgcolor: "#F0FDF4", borderColor: "#86EFAC" },
+                  transition: "background 0.15s",
+                }}
+                onClick={() => handleWaTemplateInsert(tmpl.id)}
+              >
+                <Typography fontWeight={600} fontSize={13} sx={{ mb: 0.5 }}>
+                  {tmpl.name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                >
+                  {tmpl.body}
+                </Typography>
+              </Paper>
+            ))}
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={() => setShowWaTemplatePicker(false)}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   const renderEditorToolbar = () => (
     <>
@@ -1272,26 +1283,62 @@ const handleClearFormatting = () => {
 
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
           <Tooltip title="Align Left">
-            <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignLeft}
-              sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'left' }) ? '#E5E7EB' : 'transparent' }}>
+            <IconButton
+              size="small"
+              onMouseDown={keepSelection}
+              onClick={handleAlignLeft}
+              sx={{
+                p: 0.5,
+                bgcolor: editor?.isActive({ textAlign: "left" })
+                  ? "#E5E7EB"
+                  : "transparent",
+              }}
+            >
               <FormatAlignLeftIcon fontSize="inherit" />
             </IconButton>
           </Tooltip>
           <Tooltip title="Align Center">
-            <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignCenter}
-              sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'center' }) ? '#E5E7EB' : 'transparent' }}>
+            <IconButton
+              size="small"
+              onMouseDown={keepSelection}
+              onClick={handleAlignCenter}
+              sx={{
+                p: 0.5,
+                bgcolor: editor?.isActive({ textAlign: "center" })
+                  ? "#E5E7EB"
+                  : "transparent",
+              }}
+            >
               <FormatAlignCenterIcon fontSize="inherit" />
             </IconButton>
           </Tooltip>
           <Tooltip title="Align Right">
-            <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignRight}
-              sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'right' }) ? '#E5E7EB' : 'transparent' }}>
+            <IconButton
+              size="small"
+              onMouseDown={keepSelection}
+              onClick={handleAlignRight}
+              sx={{
+                p: 0.5,
+                bgcolor: editor?.isActive({ textAlign: "right" })
+                  ? "#E5E7EB"
+                  : "transparent",
+              }}
+            >
               <FormatAlignRightIcon fontSize="inherit" />
             </IconButton>
           </Tooltip>
           <Tooltip title="Justify">
-            <IconButton size="small" onMouseDown={keepSelection} onClick={handleAlignJustify}
-              sx={{ p: 0.5, bgcolor: editor?.isActive({ textAlign: 'justify' }) ? '#E5E7EB' : 'transparent' }}>
+            <IconButton
+              size="small"
+              onMouseDown={keepSelection}
+              onClick={handleAlignJustify}
+              sx={{
+                p: 0.5,
+                bgcolor: editor?.isActive({ textAlign: "justify" })
+                  ? "#E5E7EB"
+                  : "transparent",
+              }}
+            >
               <FormatAlignJustifyIcon fontSize="inherit" />
             </IconButton>
           </Tooltip>
@@ -1426,7 +1473,13 @@ const handleClearFormatting = () => {
           <Tooltip title={`Insert ${templateTypeLabel} Template`}>
             <IconButton
               size="small"
-              onClick={() => setOpenTemplateDialog(true)}
+              onClick={() => {
+                if (formData.mode === "whatsapp") {
+                  setShowWaTemplatePicker(true);
+                } else {
+                  setOpenTemplateDialog(true);
+                }
+              }}
             >
               <AddIcon fontSize="inherit" />
             </IconButton>
@@ -1672,120 +1725,6 @@ const handleClearFormatting = () => {
     </>
   );
 
-  // ── NEW: WhatsApp body section ────────────────────────────────────────────
-  const renderWhatsAppBody = () => (
-    <Box>
-      <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-        WhatsApp Template
-      </Typography>
-
-      {/* Template dropdown */}
-      <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-        <InputLabel>Select Template</InputLabel>
-        {waTemplatesLoading ? (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}>
-            <CircularProgress size={16} />
-            <Typography variant="caption" color="textSecondary">
-              Loading templates...
-            </Typography>
-          </Box>
-        ) : (
-          <Select
-            label="Select Template"
-            value={selectedWaTemplate?.id || ""}
-            onChange={(e) => handleWaTemplateSelect(e.target.value)}
-          >
-            <MenuItem value="">
-              <em>— Select a template —</em>
-            </MenuItem>
-            {waTemplates.map((t) => (
-              <MenuItem key={t.id} value={t.id}>
-                {t.name}
-              </MenuItem>
-            ))}
-          </Select>
-        )}
-      </FormControl>
-
-      {/* Variable input fields — auto-detected from {{1}} {{2}} */}
-      {selectedWaTemplate && waPlaceholders.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-            Fill in Variables
-          </Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-            {waPlaceholders.map((idx) => (
-              <TextField
-                key={idx}
-                size="small"
-                fullWidth
-                label={`Variable ${idx}`}
-                placeholder={`Enter value for {{${idx}}}`}
-                value={waVariableValues[idx] || ""}
-                onChange={(e) => handleWaVariableChange(idx, e.target.value)}
-              />
-            ))}
-          </Box>
-        </Box>
-      )}
-
-      {/* Live message preview */}
-      {selectedWaTemplate && (
-        <Box sx={{ mb: 1 }}>
-          <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-            Message Preview
-          </Typography>
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 2,
-              bgcolor: "#F0FDF4",
-              borderColor: "#BBF7D0",
-              borderRadius: "12px",
-              position: "relative",
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 0.75,
-                mb: 1,
-              }}
-            >
-              <WhatsAppIcon sx={{ color: "#25D366", fontSize: 18 }} />
-              <Typography
-                variant="caption"
-                sx={{ color: "#15803D", fontWeight: 600 }}
-              >
-                WhatsApp Preview
-              </Typography>
-            </Box>
-            <Typography
-              variant="body2"
-              sx={{
-                color: "#111827",
-                lineHeight: 1.7,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
-            >
-              {buildPreview(selectedWaTemplate.body, waVariableValues)}
-            </Typography>
-          </Paper>
-        </Box>
-      )}
-
-      {/* No templates found */}
-      {!waTemplatesLoading && waTemplates.length === 0 && (
-        <Typography variant="caption" sx={{ color: "#6B7280" }}>
-          No WhatsApp templates found. Add templates via Settings → Templates →
-          WhatsApp.
-        </Typography>
-      )}
-    </Box>
-  );
-
   return (
     <>
       <Box>
@@ -1927,180 +1866,237 @@ const handleClearFormatting = () => {
           />
         )}
 
-        {/* ── WhatsApp mode: show template picker instead of rich text editor ── */}
-        {formData.mode === "whatsapp" ? (
-          renderWhatsAppBody()
-        ) : (
-          <>
-            <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-              Body
-            </Typography>
+        {/* ── Body section — same for email, sms, and whatsapp ── */}
+        <>
+          <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+            Body
+          </Typography>
+          <Box
+            sx={{
+              border: "1px solid #E5E7EB",
+              borderRadius: "12px",
+              overflow: "hidden",
+              mb: 1.5,
+            }}
+          >
+            {/* Top bar: AI Suggest (all modes) + WhatsApp template hint */}
             <Box
               sx={{
-                border: "1px solid #E5E7EB",
-                borderRadius: "12px",
-                overflow: "hidden",
-                mb: 1.5,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                p: 1,
               }}
             >
-              <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
-                <Button
-                  startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-                  onClick={() => openAiSuggestions("body")}
-                  sx={{ color: "#A855F7", textTransform: "none", fontWeight: 700 }}
-                >
-                  AI Suggest
-                </Button>
-              </Box>
-              <Box
-                ref={editorRef}
-                sx={{
-                  "& .ProseMirror": {
-                    minHeight: formData.mode === "email" ? 180 : 130,
-                    fontSize: 14,
-                    lineHeight: 1.7,
-                    padding: "14px 16px",
-                    "& [style*='text-align: left']": {
-                      textAlign: "left",
-                    },
-                    "& [style*='text-align: center']": {
-                      textAlign: "center",
-                    },
-                    "& [style*='text-align: right']": {
-                      textAlign: "right",
-                    },
-                    outline: "none",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    color: "#111827",
-                    "& p": { margin: "0 0 8px 0" },
-                    "& h1": { fontSize: "28px", fontWeight: 700, margin: "8px 0" },
-                    "& h2": { fontSize: "24px", fontWeight: 600, margin: "8px 0" },
-                    "& h3": { fontSize: "20px", fontWeight: 600, margin: "8px 0" },
-                    "& h4": { fontSize: "18px", fontWeight: 600, margin: "8px 0" },
-                    "& h5": { fontSize: "16px", fontWeight: 600, margin: "8px 0" },
-                    "& h6": { fontSize: "14px", fontWeight: 600, margin: "8px 0" },
-                    "& ul": {
-                      listStyleType: "disc",
-                      paddingLeft: "20px",
-                      margin: "8px 0",
-                    },
-                    "& ol": {
-                      listStyleType: "decimal",
-                      paddingLeft: "20px",
-                      margin: "8px 0",
-                    },
-                    "& li": { margin: "4px 0" },
-                    "& blockquote": {
-                      borderLeft: "3px solid #D1D5DB",
-                      margin: "8px 0",
-                      paddingLeft: "12px",
-                      color: "#4B5563",
-                    },
-                    "& a": { color: "#2563EB", textDecoration: "underline" },
-                    "& img": {
-                      width: "220px",
-                      maxWidth: "100%",
-                      height: "auto",
-                      borderRadius: "6px",
-                    },
-                  },
-                }}
-              >
-                <EditorContent
-                  editor={editor}
-                  onPaste={(e: ClipboardEvent<HTMLDivElement>) => {
-                    e.preventDefault();
-                    const text = e.clipboardData.getData("text/plain");
-                    if (editor) {
-                      editor.chain().focus().insertContent(text).run();
-                    }
-                  }}
-                  onBlur={() => {
-                    onMessageBlur();
-                  }}
-                />
-              </Box>
-
-              <Box
-                onMouseDown={(e) => e.stopPropagation()}
-                onMouseUp={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {renderEditorToolbar()}
-              </Box>
-            </Box>
-
-            <Typography
-              variant="caption"
-              sx={{
-                display: "block",
-                textAlign: "right",
-                color:
-                  messageCharacterCount > REVIEW_REQUEST_BODY_MAX_LENGTH
-                    ? "#DC2626"
-                    : "#6B7280",
-                mb: 1.5,
-              }}
-            >
-              {messageCharacterCount}/{REVIEW_REQUEST_BODY_MAX_LENGTH}
-            </Typography>
-
-            {formData.mode === "sms" && (
-              <Box sx={{ mt: 2 }}>
-                <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
-                  Upload Documents
-                </Typography>
-                <Box
-                  sx={{
-                    border: "1px solid #E5E7EB",
-                    borderRadius: "8px",
-                    p: "8px 12px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                  }}
-                >
+              {formData.mode === "whatsapp" ? (
+                // WhatsApp: show green template button + AI Suggest
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Button
-                    variant="contained"
-                    component="label"
+                    size="small"
+                    startIcon={<WhatsAppIcon sx={{ fontSize: 15 }} />}
+                    onClick={() => setShowWaTemplatePicker(true)}
                     sx={{
-                      bgcolor: "#9CA3AF",
-                      "&:hover": { bgcolor: "#6B7280" },
+                      color: "#15803D",
+                      bgcolor: "#F0FDF4",
+                      border: "1px solid #BBF7D0",
                       textTransform: "none",
+                      fontWeight: 600,
                       fontSize: 12,
-                      boxShadow: "none",
-                      borderRadius: "4px",
+                      borderRadius: "6px",
+                      "&:hover": { bgcolor: "#DCFCE7" },
                     }}
                   >
-                    Choose File
-                    <input
-                      type="file"
-                      hidden
-                      accept="*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        onFileSelect(file);
-                        e.target.value = "";
-                      }}
-                    />
+                    Use Template
                   </Button>
-                  <Typography variant="body2" color="textSecondary">
-                    {fileName || "No File Chosen"}
-                  </Typography>
                 </Box>
-                <Typography
-                  variant="caption"
-                  color="textSecondary"
-                  sx={{ mt: 0.5, display: "block" }}
+              ) : (
+                <Box />
+              )}
+              <Button
+                startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                onClick={() => openAiSuggestions("body")}
+                sx={{
+                  color: "#A855F7",
+                  textTransform: "none",
+                  fontWeight: 700,
+                }}
+              >
+                AI Suggest
+              </Button>
+            </Box>
+
+            <Box
+              ref={editorRef}
+              sx={{
+                "& .ProseMirror": {
+                  minHeight: formData.mode === "email" ? 180 : 130,
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  padding: "14px 16px",
+                  "& [style*='text-align: left']": {
+                    textAlign: "left",
+                  },
+                  "& [style*='text-align: center']": {
+                    textAlign: "center",
+                  },
+                  "& [style*='text-align: right']": {
+                    textAlign: "right",
+                  },
+                  outline: "none",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  color: "#111827",
+                  "& p": { margin: "0 0 8px 0" },
+                  "& h1": {
+                    fontSize: "28px",
+                    fontWeight: 700,
+                    margin: "8px 0",
+                  },
+                  "& h2": {
+                    fontSize: "24px",
+                    fontWeight: 600,
+                    margin: "8px 0",
+                  },
+                  "& h3": {
+                    fontSize: "20px",
+                    fontWeight: 600,
+                    margin: "8px 0",
+                  },
+                  "& h4": {
+                    fontSize: "18px",
+                    fontWeight: 600,
+                    margin: "8px 0",
+                  },
+                  "& h5": {
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    margin: "8px 0",
+                  },
+                  "& h6": {
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    margin: "8px 0",
+                  },
+                  "& ul": {
+                    listStyleType: "disc",
+                    paddingLeft: "20px",
+                    margin: "8px 0",
+                  },
+                  "& ol": {
+                    listStyleType: "decimal",
+                    paddingLeft: "20px",
+                    margin: "8px 0",
+                  },
+                  "& li": { margin: "4px 0" },
+                  "& blockquote": {
+                    borderLeft: "3px solid #D1D5DB",
+                    margin: "8px 0",
+                    paddingLeft: "12px",
+                    color: "#4B5563",
+                  },
+                  "& a": { color: "#2563EB", textDecoration: "underline" },
+                  "& img": {
+                    width: "220px",
+                    maxWidth: "100%",
+                    height: "auto",
+                    borderRadius: "6px",
+                  },
+                },
+              }}
+            >
+              <EditorContent
+                editor={editor}
+                onPaste={(e: ClipboardEvent<HTMLDivElement>) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData("text/plain");
+                  if (editor) {
+                    editor.chain().focus().insertContent(text).run();
+                  }
+                }}
+                onBlur={() => {
+                  onMessageBlur();
+                }}
+              />
+            </Box>
+
+            <Box
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {renderEditorToolbar()}
+            </Box>
+          </Box>
+
+          <Typography
+            variant="caption"
+            sx={{
+              display: "block",
+              textAlign: "right",
+              color:
+                messageCharacterCount > REVIEW_REQUEST_BODY_MAX_LENGTH
+                  ? "#DC2626"
+                  : "#6B7280",
+              mb: 1.5,
+            }}
+          >
+            {messageCharacterCount}/{REVIEW_REQUEST_BODY_MAX_LENGTH}
+          </Typography>
+
+          {formData.mode === "sms" && (
+            <Box sx={{ mt: 2 }}>
+              <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
+                Upload Documents
+              </Typography>
+              <Box
+                sx={{
+                  border: "1px solid #E5E7EB",
+                  borderRadius: "8px",
+                  p: "8px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Button
+                  variant="contained"
+                  component="label"
+                  sx={{
+                    bgcolor: "#9CA3AF",
+                    "&:hover": { bgcolor: "#6B7280" },
+                    textTransform: "none",
+                    fontSize: 12,
+                    boxShadow: "none",
+                    borderRadius: "4px",
+                  }}
                 >
-                  Accepted formats: Any | Max size: 25MB
+                  Choose File
+                  <input
+                    type="file"
+                    hidden
+                    accept="*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      onFileSelect(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </Button>
+                <Typography variant="body2" color="textSecondary">
+                  {fileName || "No File Chosen"}
                 </Typography>
               </Box>
-            )}
-          </>
-        )}
+              <Typography
+                variant="caption"
+                color="textSecondary"
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                Accepted formats: Any | Max size: 25MB
+              </Typography>
+            </Box>
+          )}
+        </>
       </Box>
 
       <AI_Suggest
@@ -2111,12 +2107,16 @@ const handleClearFormatting = () => {
         onApply={handleApplyAiSuggestion}
       />
 
+      {/* Email/SMS template dialog */}
       <ReviewRequestTemplateDialog
         open={openTemplateDialog}
         mode={formData.mode}
         onClose={() => setOpenTemplateDialog(false)}
         onInsert={handleInsertTemplate}
       />
+
+      {/* WhatsApp template picker dialog */}
+      {renderWaTemplatePicker()}
     </>
   );
 };
