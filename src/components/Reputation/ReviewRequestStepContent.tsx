@@ -267,10 +267,19 @@ const ReviewRequestStepContent = ({
       state.auth?.token || localStorage.getItem("access_token") || "",
   );
 
+  // FIX: Reset templates when clinic changes so the next fetch loads the correct clinic's templates
+  useEffect(() => {
+    setWaTemplates([]);
+    setSelectedWaTemplate(null);
+    setWaVariableValues({});
+    setWaPlaceholders([]);
+  }, [clinicId]);
+
   // Fetch WhatsApp templates when mode switches to whatsapp
   useEffect(() => {
     if (formData.mode !== "whatsapp") return;
-    if (waTemplates.length > 0) return; // already loaded
+    if (!clinicId) return; // FIX: guard — don't fetch if clinicId not available
+    // FIX: removed "if (waTemplates.length > 0) return" — stale cache guard was preventing refetch after clinic switch
 
     const fetchTemplates = async () => {
       setWaTemplatesLoading(true);
@@ -294,7 +303,7 @@ const ReviewRequestStepContent = ({
     };
 
     fetchTemplates();
-  }, [formData.mode, token, clinicId, waTemplates.length]);
+  }, [formData.mode, token, clinicId]); // FIX: removed waTemplates.length from deps
 
   // When a template is selected — extract placeholders, reset variable values
   const handleWaTemplateSelect = (templateId: string) => {
