@@ -1681,31 +1681,33 @@ const handleClearFormatting = () => {
 
       {/* Template dropdown */}
       <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-        <InputLabel>Select Template</InputLabel>
-        {waTemplatesLoading ? (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}>
-            <CircularProgress size={16} />
-            <Typography variant="caption" color="textSecondary">
-              Loading templates...
-            </Typography>
-          </Box>
-        ) : (
-          <Select
-            label="Select Template"
-            value={selectedWaTemplate?.id || ""}
-            onChange={(e) => handleWaTemplateSelect(e.target.value)}
-          >
-            <MenuItem value="">
-              <em>— Select a template —</em>
-            </MenuItem>
-            {waTemplates.map((t) => (
-              <MenuItem key={t.id} value={t.id}>
-                {t.name}
-              </MenuItem>
-            ))}
-          </Select>
-        )}
-      </FormControl>
+  {waTemplatesLoading ? (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}>
+      <CircularProgress size={16} />
+      <Typography variant="caption" color="textSecondary">
+        Loading templates...
+      </Typography>
+    </Box>
+  ) : (
+    <>
+      <InputLabel>Select Template</InputLabel>
+      <Select
+        label="Select Template"
+        value={selectedWaTemplate?.id || ""}
+        onChange={(e) => handleWaTemplateSelect(e.target.value)}
+      >
+        <MenuItem value="">
+          <em>— Select a template —</em>
+        </MenuItem>
+        {waTemplates.map((t) => (
+          <MenuItem key={t.id} value={t.id}>
+            {t.name}
+          </MenuItem>
+        ))}
+      </Select>
+    </>
+  )}
+</FormControl>
 
       {/* Variable input fields — auto-detected from {{1}} {{2}} */}
       {selectedWaTemplate && waPlaceholders.length > 0 && (
