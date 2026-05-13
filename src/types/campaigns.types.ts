@@ -7,6 +7,26 @@ import type {
   Platform,
 } from "../constants/campaigns.constants";
 
+// Social Post type (new from backend migration 0070)
+export interface SocialPost {
+  id: string;
+  campaign: string;
+  platform_name: "facebook" | "linkedin";
+  post_id?: string | null;
+  status: "pending" | "posted" | "failed";
+  error_message?: string | null;
+  requested_at: string;
+  synced_at?: string | null;
+  creative_id?: string | null;
+  ads_manager_url?: string | null;
+  uploaded_image?: string | null;
+  image_url?: string | null;
+  image?: string | null; // computed field: prioritizes image_url then uploaded_image
+  document_name?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // UI
 export interface Campaign {
   id: string;
@@ -98,6 +118,9 @@ export interface CampaignAPIType {
     scheduled_at: string;
     is_active: boolean;
   }[];
+
+  // ✅ NEW: Social posts (from migration 0070)
+  social_posts?: SocialPost[];
 
   adv_accounts: unknown | null;
 
