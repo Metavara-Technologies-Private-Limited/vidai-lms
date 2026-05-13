@@ -227,7 +227,7 @@ const ReviewRequestStepContent = ({
     "subject",
   );
 
-  // ── WhatsApp template picker state (for the optional template selector above editor) ──
+  // ── WhatsApp template picker state ──
   const [waTemplates, setWaTemplates] = useState<WhatsAppTemplateItem[]>([]);
   const [waTemplatesLoading, setWaTemplatesLoading] = useState(false);
   const [showWaTemplatePicker, setShowWaTemplatePicker] = useState(false);
@@ -238,20 +238,24 @@ const ReviewRequestStepContent = ({
       state.auth?.token || localStorage.getItem("access_token") || "",
   );
 
-  // Fetch WhatsApp templates when mode is whatsapp and picker opened
+  // ── FIX 1: Use clinic_id as query param (not X-Clinic-Id header)
+  // ── FIX 2: Remove waTemplates.length from deps so it refetches when clinic changes
   useEffect(() => {
     if (formData.mode !== "whatsapp") return;
-    if (waTemplates.length > 0) return;
+    if (!clinicId) return;
 
     const fetchTemplates = async () => {
       setWaTemplatesLoading(true);
+      setWaTemplates([]); // reset on clinic change
       try {
-        const res = await axios.get("/api/templates/whatsapp/", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "X-Clinic-Id": clinicId,
+        const res = await axios.get(
+          `/api/templates/whatsapp/?clinic_id=${clinicId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           },
-        });
+        );
         const raw: WhatsAppTemplateItem[] = Array.isArray(res.data)
           ? res.data
           : [];
@@ -267,7 +271,7 @@ const ReviewRequestStepContent = ({
     };
 
     fetchTemplates();
-  }, [formData.mode, token, clinicId, waTemplates.length]);
+  }, [formData.mode, token, clinicId]); // ← removed waTemplates.length
 
   // When a WhatsApp template is selected from the picker — insert into editor
   const handleWaTemplateInsert = (templateId: string) => {
@@ -1886,7 +1890,6 @@ const ReviewRequestStepContent = ({
               }}
             >
               {formData.mode === "whatsapp" ? (
-                // WhatsApp: show green template button + AI Suggest
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Button
                     size="small"
@@ -1930,60 +1933,22 @@ const ReviewRequestStepContent = ({
                   fontSize: 14,
                   lineHeight: 1.7,
                   padding: "14px 16px",
-                  "& [style*='text-align: left']": {
-                    textAlign: "left",
-                  },
-                  "& [style*='text-align: center']": {
-                    textAlign: "center",
-                  },
-                  "& [style*='text-align: right']": {
-                    textAlign: "right",
-                  },
+                  "& [style*='text-align: left']": { textAlign: "left" },
+                  "& [style*='text-align: center']": { textAlign: "center" },
+                  "& [style*='text-align: right']": { textAlign: "right" },
                   outline: "none",
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
                   color: "#111827",
                   "& p": { margin: "0 0 8px 0" },
-                  "& h1": {
-                    fontSize: "28px",
-                    fontWeight: 700,
-                    margin: "8px 0",
-                  },
-                  "& h2": {
-                    fontSize: "24px",
-                    fontWeight: 600,
-                    margin: "8px 0",
-                  },
-                  "& h3": {
-                    fontSize: "20px",
-                    fontWeight: 600,
-                    margin: "8px 0",
-                  },
-                  "& h4": {
-                    fontSize: "18px",
-                    fontWeight: 600,
-                    margin: "8px 0",
-                  },
-                  "& h5": {
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    margin: "8px 0",
-                  },
-                  "& h6": {
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    margin: "8px 0",
-                  },
-                  "& ul": {
-                    listStyleType: "disc",
-                    paddingLeft: "20px",
-                    margin: "8px 0",
-                  },
-                  "& ol": {
-                    listStyleType: "decimal",
-                    paddingLeft: "20px",
-                    margin: "8px 0",
-                  },
+                  "& h1": { fontSize: "28px", fontWeight: 700, margin: "8px 0" },
+                  "& h2": { fontSize: "24px", fontWeight: 600, margin: "8px 0" },
+                  "& h3": { fontSize: "20px", fontWeight: 600, margin: "8px 0" },
+                  "& h4": { fontSize: "18px", fontWeight: 600, margin: "8px 0" },
+                  "& h5": { fontSize: "16px", fontWeight: 600, margin: "8px 0" },
+                  "& h6": { fontSize: "14px", fontWeight: 600, margin: "8px 0" },
+                  "& ul": { listStyleType: "disc", paddingLeft: "20px", margin: "8px 0" },
+                  "& ol": { listStyleType: "decimal", paddingLeft: "20px", margin: "8px 0" },
                   "& li": { margin: "4px 0" },
                   "& blockquote": {
                     borderLeft: "3px solid #D1D5DB",
@@ -1992,12 +1957,7 @@ const ReviewRequestStepContent = ({
                     color: "#4B5563",
                   },
                   "& a": { color: "#2563EB", textDecoration: "underline" },
-                  "& img": {
-                    width: "220px",
-                    maxWidth: "100%",
-                    height: "auto",
-                    borderRadius: "6px",
-                  },
+                  "& img": { width: "220px", maxWidth: "100%", height: "auto", borderRadius: "6px" },
                 },
               }}
             >
