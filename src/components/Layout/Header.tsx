@@ -76,6 +76,7 @@ const Header = ({
   type DropdownClinic = { id: number; name: string; isDefault: boolean };
 
   const [dbClinics, setDbClinics] = useState<DropdownClinic[]>([]);
+  const [isClinicLoading, setIsClinicLoading] = useState(false);
   const [selectedClinicId, setSelectedClinicId] = useState<number | null>(null);
   const [photoAnchorEl, setPhotoAnchorEl] = useState<HTMLElement | null>(null);
   const [isPhotoUpdating, setIsPhotoUpdating] = useState(false);
@@ -191,19 +192,24 @@ const Header = ({
 
   useEffect(() => {
     const hydrateClinic = async () => {
-      if (!selectedClinicId) return;
-      if (lastFetchedClinicIdRef.current === selectedClinicId) return;
+      setIsClinicLoading(true);
+      try {
+        if (!selectedClinicId) return;
+        if (lastFetchedClinicIdRef.current === selectedClinicId) return;
 
-      lastFetchedClinicIdRef.current = selectedClinicId;
-      // Persist to localStorage FIRST so all service calls pick up the new clinic
-      localStorage.setItem("clinic_id", String(selectedClinicId));
-      await dispatch(fetchClinic(selectedClinicId));
-      // Re-fetch all clinic-scoped data in parallel
-      await Promise.all([
-        dispatch(fetchLeads()),
-        dispatch(fetchCampaign()),
-        dispatch(fetchPipelines(selectedClinicId)),
-      ]);
+        lastFetchedClinicIdRef.current = selectedClinicId;
+        // Persist to localStorage FIRST so all service calls pick up the new clinic
+        localStorage.setItem("clinic_id", String(selectedClinicId));
+        await dispatch(fetchClinic(selectedClinicId));
+        // Re-fetch all clinic-scoped data in parallel
+        await Promise.all([
+          dispatch(fetchLeads()),
+          dispatch(fetchCampaign()),
+          dispatch(fetchPipelines(selectedClinicId)),
+        ]);
+      } finally {
+        setIsClinicLoading(false);
+      }
     };
 
     hydrateClinic();
@@ -503,7 +509,11 @@ const Header = ({
               <Typography
                 component="span"
                 sx={{
-                  fontSize: { xs: 10.5, sm: 11.5, md: isCompactDesktop ? 12 : 13 },
+                  fontSize: {
+                    xs: 10.5,
+                    sm: 11.5,
+                    md: isCompactDesktop ? 12 : 13,
+                  },
                   color: "#6B7280",
                   flexShrink: 0,
                   lineHeight: 1.2,
@@ -514,7 +524,11 @@ const Header = ({
               <Typography
                 component="span"
                 sx={{
-                  fontSize: { xs: 11, sm: 12, md: isCompactDesktop ? 12.5 : 13.5 },
+                  fontSize: {
+                    xs: 11,
+                    sm: 12,
+                    md: isCompactDesktop ? 12.5 : 13.5,
+                  },
                   fontWeight: 700,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
@@ -525,7 +539,19 @@ const Header = ({
               >
                 {displayClinicName}
               </Typography>
-              <ArrowDropDownIcon sx={{ fontSize: { xs: 18, sm: 20 }, flexShrink: 0 }} />
+              <ArrowDropDownIcon
+                sx={{ fontSize: { xs: 18, sm: 20 }, flexShrink: 0 }}
+              />
+              {isClinicLoading && (
+                <CircularProgress
+                  size={14}
+                  thickness={5}
+                  sx={{
+                    color: "#ff6b35",
+                    flexShrink: 0,
+                  }}
+                />
+              )}
             </Box>
 
             <Menu
@@ -569,7 +595,12 @@ const Header = ({
 
           {/* USER */}
           <Box
-            sx={{ display: "flex", alignItems: "center", gap: 0.75, flexShrink: 0 }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+              flexShrink: 0,
+            }}
           >
             <Avatar
               src={getPhotoSrc(user?.photo)}

@@ -69,28 +69,28 @@ const CampaignDashboard = ({
     ctr: "0",
   });
 
-  const fetchAdInsights = React.useCallback(async (fbCampaignId: string) => {
-    try {
-      console.log("Fetching ad insights for FB Campaign ID:", fbCampaignId);
-      const res = await CampaignAPI.getFBAdInsights(fbCampaignId);
-      const data = res.data?.insights || {};
-      console.log("AD INSIGHTS RAW:", data);
-      setAdInsights({
-        impressions: data.post_impressions || 0,
-        clicks: data.post_clicks || 0,
-        spend: data.spend || "0",
-        reach: data.reach || "0",
-        cpc: parseFloat(data.cpc || "0").toFixed(2),
-        cpm: parseFloat(data.cpm || "0").toFixed(2),
-        conversions: data.conversions || 0,
-        total_budget: data.total_budget || "0",
-        conversion_rate: data.conversion_rate || "0%",
-        ctr: data.ctr || "0",
-      });
-    } catch (err) {
-      console.error("FB Ad Insights fetch failed", err);
-    }
-  }, []);
+  // const fetchAdInsights = React.useCallback(async (fbCampaignId: string) => {
+  //   try {
+  //     console.log("Fetching ad insights for FB Campaign ID:", fbCampaignId);
+  //     const res = await CampaignAPI.getFBAdInsights(fbCampaignId);
+  //     const data = res.data?.insights || {};
+  //     console.log("AD INSIGHTS RAW:", data);
+  //     setAdInsights({
+  //       impressions: data.post_impressions || 0,
+  //       clicks: data.post_clicks || 0,
+  //       spend: data.spend || "0",
+  //       reach: data.reach || "0",
+  //       cpc: parseFloat(data.cpc || "0").toFixed(2),
+  //       cpm: parseFloat(data.cpm || "0").toFixed(2),
+  //       conversions: data.conversions || 0,
+  //       total_budget: data.total_budget || "0",
+  //       conversion_rate: data.conversion_rate || "0%",
+  //       ctr: data.ctr || "0",
+  //     });
+  //   } catch (err) {
+  //     console.error("FB Ad Insights fetch failed", err);
+  //   }
+  // }, []);
 
   const fetchGoogleAdsInsightsFromDB = React.useCallback(
     async (campaignId: string, cId: number) => {
@@ -163,6 +163,46 @@ const CampaignDashboard = ({
         if (cancelled) return;
 
         const d = res.data;
+        if (
+          platforms.includes(PLATFORMS.FACEBOOK) ||
+          platforms.includes(PLATFORMS.INSTAGRAM)
+        ) {
+          setAdInsights({
+            impressions: Number(d.fb_impressions || 0),
+            clicks: Number(d.fb_clicks || 0),
+            spend: String(d.fb_spend || "0"),
+            reach: String(d.fb_reach || "0"),
+
+            cpc:
+              Number(d.fb_clicks || 0) > 0
+                ? (Number(d.fb_spend || 0) / Number(d.fb_clicks || 1)).toFixed(
+                    2,
+                  )
+                : "0",
+
+            cpm:
+              Number(d.fb_impressions || 0) > 0
+                ? (
+                    (Number(d.fb_spend || 0) * 1000) /
+                    Number(d.fb_impressions || 1)
+                  ).toFixed(2)
+                : "0",
+
+            conversions: 0,
+
+            total_budget: String(d.fb_spend || "0"),
+
+            conversion_rate: "0%",
+
+            ctr:
+              Number(d.fb_impressions || 0) > 0
+                ? (
+                    (Number(d.fb_clicks || 0) * 100) /
+                    Number(d.fb_impressions || 1)
+                  ).toFixed(2)
+                : "0",
+          });
+        }
         const resolvedFbCampaignId = d.fb_campaign_id ?? fbCamId ?? null;
 
         setFullCampaign((prev) => ({
@@ -184,10 +224,10 @@ const CampaignDashboard = ({
           image_url: d.image_url ?? prev.image_url ?? null,
         }));
 
-        if (resolvedFbCampaignId) {
-          await fetchAdInsights(resolvedFbCampaignId);
-          if (cancelled) return;
-        }
+        // if (resolvedFbCampaignId) {
+        //   await fetchAdInsights(resolvedFbCampaignId);
+        //   if (cancelled) return;
+        // }
 
         if (hasGoogleAds) {
           console.log(

@@ -158,6 +158,7 @@ export interface CampaignAPIType {
   fb_impressions?: number;
   fb_reach?: number;
   fb_clicks?: number;
+  fb_spend?: number;
 
   linkedin_live_status?: string | null;
   linkedin_external_campaign_id?: string | null;

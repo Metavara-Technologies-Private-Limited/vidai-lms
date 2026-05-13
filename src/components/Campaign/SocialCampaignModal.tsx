@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+  import React, { useState, useRef, useEffect } from "react";
   import "../../styles/Campaign/EmailCampaignModal.css";
   import "../../styles/Campaign/SocialCampaignModal.css";
   import { CampaignAPI } from "../../services/campaign.api";
@@ -110,6 +110,9 @@ import React, { useState, useRef, useEffect } from "react";
     const [linkedInBidStrategy, setLinkedInBidStrategy] = useState("MANUAL_BIDDING");
     const [linkedInBidAmount, setLinkedInBidAmount] = useState<number>(0);
 
+    const [metaCountry, setMetaCountry] = useState("");
+    const [metaState, setMetaState] = useState("");
+
     // ─── Dynamic country/state data from API ─────────────────────
     const [countriesData, setCountriesData] = useState<CountryData[]>([]);
     const [countriesLoading, setCountriesLoading] = useState(false);
@@ -145,6 +148,10 @@ import React, { useState, useRef, useEffect } from "react";
     const selectedCountryStates: { name: string; state_code?: string }[] =
       countriesData.find(
         (c) => c.name === linkedInCountry
+      )?.states ?? [];
+    const metaSelectedStates =
+      countriesData.find(
+        (c) => c.iso2 === metaCountry || c.name === metaCountry,
       )?.states ?? [];
 
     useEffect(() => {
@@ -202,7 +209,8 @@ import React, { useState, useRef, useEffect } from "react";
     );
 
     const isLinkedInFullySetup = Boolean(
-      linkedInAccountStatus?.connected && linkedInAccountStatus?.setup_complete,
+      linkedInAccountStatus?.connected
+      // && linkedInAccountStatus?.setup_complete,
     );
     
     const platformConnectionMap: Record<Platform, boolean> = {
@@ -582,7 +590,7 @@ import React, { useState, useRef, useEffect } from "react";
         const selectedAccounts = [...accounts];
 
         // ─── Build platform_data — inject LinkedIn targeting fields ──
-        const cleanedContent: Partial<Record<Platform, string | object>> = {
+        const cleanedContent: Partial<Record<Platform, unknown>> = {
           ...resolvedContent,
         };
 
@@ -596,6 +604,21 @@ import React, { useState, useRef, useEffect } from "react";
             location: getLinkedInLocation(),
             bid_strategy: linkedInBidStrategy,
             bid_amount: linkedInBidAmount,
+          };
+        }
+        if (accounts.includes("facebook")) {
+          cleanedContent["facebook"] = {
+            content: resolvedContent["facebook"],
+            country_code: metaCountry || "IN",
+            state: metaState,
+          };
+        }
+
+        if (accounts.includes("instagram")) {
+          cleanedContent["instagram"] = {
+            content: resolvedContent["instagram"],
+            country_code: metaCountry || "IN",
+            state: metaState,
           };
         }
 
@@ -1249,7 +1272,21 @@ import React, { useState, useRef, useEffect } from "react";
                     )}
                   </div>
 
-
+                  <div className="form-group" style={{ marginTop: 12 }}>
+                    <label>Google Ads Image URL (optional)</label>
+                    <input
+                      value={platformImageUrls["google_ads"]}
+                      onChange={(e) =>
+                        handleImageUrl("google_ads", e.target.value)
+                      }
+                      placeholder="https://your-image-url.com/image.jpg"
+                      style={{ width: "100%" }}
+                    />
+                    <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                      If provided, a Display campaign will also be created
+                      alongside the Search campaign.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1270,11 +1307,69 @@ import React, { useState, useRef, useEffect } from "react";
                       style={{ width: 18, height: 18 }}
                     />
                     <h3 style={{ margin: 0, color: "#15803d" }}>Google Ads — Organic Post</h3>
-                  </div>
-                  <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
+                    </div>
+<p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
                     Your campaign content will be saved for Google Ads. No paid ad will be triggered — no money will be spent.
                     Switch to <strong>Paid Advertising</strong> mode to run a real Google Ad.
                   </p>
+                </div>
+              )}
+
+              {(accounts.includes("facebook") ||
+                accounts.includes("instagram")) && (
+                <div
+                  className="section-card"
+                  style={{
+                    border: "1px solid #1877f2",
+                    borderRadius: 8,
+                  }}
+                >
+                  <h3 style={{ color: "#1877f2" }}>Meta Ad Targeting</h3>
+
+                  <div className="form-row">
+                    <div className="form-group half">
+                      <label>Country</label>
+
+                      <FormControl fullWidth variant="outlined" size="small">
+                        <Select
+                          value={metaCountry}
+                          onChange={(e) => {
+                            setMetaCountry(e.target.value);
+                            setMetaState("");
+                          }}
+                          displayEmpty
+                        >
+                          <MenuItem value="">Select Country</MenuItem>
+
+                          {countriesData.map((c) => (
+                            <MenuItem key={c.name} value={c.iso2 || c.name}>
+                              {c.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </div>
+
+                    <div className="form-group half">
+                      <label>State</label>
+
+                      <FormControl fullWidth variant="outlined" size="small">
+                        <Select
+                          value={metaState}
+                          onChange={(e) => setMetaState(e.target.value)}
+                          displayEmpty
+                        >
+                          <MenuItem value="">All States</MenuItem>
+
+                          {metaSelectedStates.map((s) => (
+                            <MenuItem key={s.name} value={s.name}>
+                              {s.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </div>
+                  </div>
                 </div>
               )}
 

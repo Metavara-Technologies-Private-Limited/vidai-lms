@@ -162,6 +162,16 @@ export default function CampaignsScreen() {
   const [duplicatingCampaign, setDuplicatingCampaign] =
     useState<Campaign | null>(null);
 
+    const handlePlatformChange = (selectedPlatform: string) => {
+      setPlatform(selectedPlatform);
+
+      if (selectedPlatform === PLATFORMS.GMAIL) {
+        setTab(CAMPAIGN_TABS.EMAIL);
+      } else if (selectedPlatform !== "all") {
+        setTab(CAMPAIGN_TABS.SOCIAL);
+      }
+    };
+  
   const handleStatusChange = (id: string, status: CampaignStatus) => {
     dispatch(updateCampaignStatus({ id, status }));
   };
@@ -229,7 +239,7 @@ export default function CampaignsScreen() {
         openStatus={openStatus}
         setOpenStatus={setOpenStatus}
         platform={platform}
-        onPlatformChange={setPlatform}
+        onPlatformChange={handlePlatformChange}
         openPlatform={openPlatform}
         setOpenPlatform={setOpenPlatform}
       />
