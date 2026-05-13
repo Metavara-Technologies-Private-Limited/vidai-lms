@@ -51,12 +51,73 @@ import React, { useState, useRef, useEffect } from "react";
     { id: "google_ads", label: "Google Ads", cpc: 2.0 },
   ];
 
-  const PLATFORM_RULES = {
-    facebook: { minBudget: 2 },
-  };
+  // FIX: minimum budget is strictly greater than $2 — so minimum accepted is $3
+  const PLATFORM_MIN_BUDGET = 2; // must be strictly greater than this
 
   const isPlainUrl = (str: string) =>
     str.trim().startsWith("http") && !str.trim().includes(" ");
+
+  // FIX: Convert any share/preview URL to a direct renderable image URL.
+  // Handles Google Drive, Dropbox, OneDrive, imgur, postimages, and passes
+  // all other direct URLs through unchanged.
+  const resolveImageUrl = (url: string): string => {
+    if (!url) return url;
+    const trimmed = url.trim();
+
+    // ── Google Drive ──────────────────────────────────────────────────────
+    // Pattern 1: https://drive.google.com/file/d/FILE_ID/view?...
+    const driveFileMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/?]+)/);
+    if (driveFileMatch) {
+      return `https://drive.google.com/uc?export=view&id=${driveFileMatch[1]}`;
+    }
+    // Pattern 2: https://drive.google.com/open?id=FILE_ID
+    const driveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([^&]+)/);
+    if (driveOpenMatch) {
+      return `https://drive.google.com/uc?export=view&id=${driveOpenMatch[1]}`;
+    }
+    // Pattern 3: https://docs.google.com/.../d/FILE_ID/...
+    const docsMatch = trimmed.match(/docs\.google\.com\/[^/]+\/d\/([^/?]+)/);
+    if (docsMatch) {
+      return `https://drive.google.com/uc?export=view&id=${docsMatch[1]}`;
+    }
+    // Pattern 4: already a uc?export= link — leave as-is
+    if (trimmed.includes("drive.google.com/uc")) {
+      return trimmed;
+    }
+
+    // ── Dropbox ───────────────────────────────────────────────────────────
+    // Change ?dl=0 → ?raw=1  (or append raw=1 if no dl param)
+    if (trimmed.includes("dropbox.com")) {
+      return trimmed
+        .replace(/[?&]dl=\d/, "")   // strip existing dl param
+        .replace(/[?&]raw=\d/, "")  // strip existing raw param
+        .replace(/\?/, "?raw=1&")   // insert raw=1 as first param
+        .replace(/dropbox\.com\/(.+)$/, (match) =>
+          match.includes("?") ? match : match + "?raw=1"
+        );
+    }
+
+    // ── OneDrive / SharePoint ─────────────────────────────────────────────
+    if (trimmed.match(/1drv\.ms|onedrive\.live\.com|sharepoint\.com/)) {
+      if (trimmed.includes("download=1")) return trimmed;
+      const sep = trimmed.includes("?") ? "&" : "?";
+      return `${trimmed}${sep}download=1`;
+    }
+
+    // ── Imgur ─────────────────────────────────────────────────────────────
+    const imgurGallery = trimmed.match(/^https?:\/\/(?:www\.)?imgur\.com\/(?:a\/|gallery\/)?([A-Za-z0-9]+)(?:\.[a-z]+)?(?:[?#].*)?$/);
+    if (imgurGallery && !trimmed.includes("i.imgur.com")) {
+      return `https://i.imgur.com/${imgurGallery[1]}.jpg`;
+    }
+
+    // ── Postimages / postimg.cc ───────────────────────────────────────────
+    if (trimmed.includes("postimg.cc") || trimmed.includes("postimage.org")) {
+      return trimmed;
+    }
+
+    // ── All other URLs ────────────────────────────────────────────────────
+    return trimmed;
+  };
 
   // ─── LinkedIn account status shape ───────────────────────────────────
   interface LinkedInAccountStatus {
@@ -94,7 +155,6 @@ import React, { useState, useRef, useEffect } from "react";
     // ─── LinkedIn account status ───────────────────────────────────
     const [linkedInAccountStatus, setLinkedInAccountStatus] =
       useState<LinkedInAccountStatus | null>(null);
-    // const [linkedInStatusLoading, setLinkedInStatusLoading] = useState(false);
 
     // ─── Per-campaign LinkedIn live status (after creation) ────────
     const [linkedInLiveStatus, setLinkedInLiveStatus] = useState<string | null>(null);
@@ -207,7 +267,6 @@ import React, { useState, useRef, useEffect } from "react";
 
     const isLinkedInFullySetup = Boolean(
       linkedInAccountStatus?.connected
-      // && linkedInAccountStatus?.setup_complete,
     );
 
     const platformConnectionMap: Record<Platform, boolean> = {
@@ -227,9 +286,31 @@ import React, { useState, useRef, useEffect } from "react";
     /* ================= STEP 1 ================= */
     const [campaignName, setCampaignName] = useState("");
     const [campaignDescription, setCampaignDescription] = useState("");
-    const [objective, setObjective] = useState("");
-    const [audience, setAudience] = useState("");
-    const [startDate, setStartDate] = useState("");
+    const [objective, setObjective] = useState(() => {
+      const keys = Object.keys(CAMPAIGN_OBJECTIVES);
+      const leadGenKey = keys.find(
+        (k) =>
+          k === "lead_generation" ||
+          k === "LEAD_GENERATION" ||
+          (CAMPAIGN_OBJECTIVES as Record<string, string>)[k]
+            ?.toLowerCase()
+            .includes("lead"),
+      );
+      return leadGenKey ?? keys[0] ?? "";
+    });
+    const [audience, setAudience] = useState(() => {
+      const keys = Object.keys(CAMPAIGN_AUDIENCE);
+      const allSubKey = keys.find(
+        (k) =>
+          k === "all_subscribers" ||
+          k === "ALL_SUBSCRIBERS" ||
+          (CAMPAIGN_AUDIENCE as Record<string, string>)[k]
+            ?.toLowerCase()
+            .includes("all"),
+      );
+      return allSubKey ?? keys[0] ?? "";
+    });
+    const [startDate, setStartDate] = useState(dayjs().format("YYYY-MM-DD"));
     const [endDate, setEndDate] = useState("");
 
     const step1Valid =
@@ -279,8 +360,9 @@ import React, { useState, useRef, useEffect } from "react";
     };
 
     const handleImageUrl = (platform: Platform, url: string) => {
-      platformImageUrlsRef.current[platform] = url;
-      setPlatformImageUrls((prev) => ({ ...prev, [platform]: url }));
+      const resolvedUrl = resolveImageUrl(url);
+      platformImageUrlsRef.current[platform] = resolvedUrl;
+      setPlatformImageUrls((prev) => ({ ...prev, [platform]: resolvedUrl }));
     };
 
     /* ---- Refs ---- */
@@ -451,7 +533,7 @@ import React, { useState, useRef, useEffect } from "react";
       setAccounts((prev) =>
         prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
       );
-    };;
+    };
 
     const handleNext = () => {
       setSubmitted(true);
@@ -482,6 +564,20 @@ import React, { useState, useRef, useEffect } from "react";
       return "";
     };
 
+    const getBudgetError = (platform: Platform, amount: number): string | null => {
+      if (
+        platform === "facebook" ||
+        platform === "instagram" ||
+        platform === "linkedin" ||
+        platform === "google_ads"
+      ) {
+        if (amount <= PLATFORM_MIN_BUDGET) {
+          return `${platform.replace("_", " ").toUpperCase()} requires a budget greater than $${PLATFORM_MIN_BUDGET}. Please enter at least $${PLATFORM_MIN_BUDGET + 1}.`;
+        }
+      }
+      return null;
+    };
+
     const handleCreateCampaign = async (
       type: "live" | "draft" | "scheduled",
     ) => {
@@ -493,25 +589,22 @@ import React, { useState, useRef, useEffect } from "react";
         return;
       }
 
+      if (mode === "paid") {
+        for (const platform of accounts) {
+          const err = getBudgetError(platform, budgets[platform]);
+          if (err) {
+            toast.error(err);
+            return;
+          }
+        }
+      }
+
       setLoadingType(type);
       try {
         const selectedPlatforms = PLATFORM_LIST.filter((p) =>
           accounts.includes(p.id),
         );
 
-        if (mode === "paid") {
-          for (const platform of accounts) {
-            if (
-              (platform === "facebook" || platform === "instagram") &&
-              budgets[platform] < PLATFORM_RULES.facebook.minBudget
-            ) {
-              toast.error(
-                `${platform.toUpperCase()} requires minimum $${PLATFORM_RULES.facebook.minBudget} budget (≈ ₹95)`,
-              );
-              return;
-            }
-          }
-        }
         const totalSpend = selectedPlatforms.reduce(
           (sum, p) => sum + budgets[p.id],
           0,
@@ -549,7 +642,7 @@ import React, { useState, useRef, useEffect } from "react";
           const fromState = platformImageUrls[p]?.trim();
           const candidate = fromRef || fromState || "";
           if (candidate) {
-            image_url = candidate;
+            image_url = resolveImageUrl(candidate);
             break;
           }
         }
@@ -558,7 +651,7 @@ import React, { useState, useRef, useEffect } from "react";
           for (const p of accounts) {
             const content = resolvedContent[p]?.trim();
             if (content && isPlainUrl(content)) {
-              image_url = content;
+              image_url = resolveImageUrl(content);
               resolvedContent[p] = "";
               break;
             }
@@ -586,7 +679,6 @@ import React, { useState, useRef, useEffect } from "react";
 
         const selectedAccounts = [...accounts];
 
-        // ─── Build platform_data ──────────────────────────────────
         const cleanedContent: Partial<Record<Platform, unknown>> = {
           ...resolvedContent,
         };
@@ -655,9 +747,6 @@ import React, { useState, useRef, useEffect } from "react";
           setCreatedCampaignId(newCampaignId);
         }
 
-        // ─────────────────────────────────────────────────────────────────
-        // Google Ads: ONLY fire paid ad endpoint when mode === "paid"
-        // ─────────────────────────────────────────────────────────────────
         const shouldSendGoogleAds =
           accounts.includes("google_ads") &&
           isGoogleAdsConnected &&
@@ -731,9 +820,6 @@ import React, { useState, useRef, useEffect } from "react";
           toast.warn("Google Ads was not triggered because this clinic is not connected to Google Ads.");
         }
 
-        // ─────────────────────────────────────────────────────────
-        // LinkedIn
-        // ─────────────────────────────────────────────────────────
         if (accounts.includes("linkedin") && newCampaignId) {
           try {
             await CampaignAPI.createLinkedInCampaign(newCampaignId);
@@ -844,7 +930,6 @@ import React, { useState, useRef, useEffect } from "react";
       }
     };
 
-    // ─── LinkedIn live controls panel ─────────────────────────────
     const renderLinkedInControls = () => {
       if (!accounts.includes("linkedin")) return null;
 
@@ -950,6 +1035,25 @@ import React, { useState, useRef, useEffect } from "react";
           )}
         </div>
       );
+    };
+
+    const scheduleDateMin = startDate ? dayjs(startDate) : dayjs();
+    const scheduleDateMax = endDate ? dayjs(endDate) : undefined;
+
+    const getScheduleMinTime = (): Dayjs | undefined => {
+      if (!scheduleDate) return dayjs();
+      if (scheduleDate === dayjs().format("YYYY-MM-DD")) {
+        return dayjs();
+      }
+      return undefined;
+    };
+
+    // FIX: Accept Date | Dayjs to match MUI's PickerValidDate type — fixes TS2322 build error
+    const isScheduleDateDisabled = (date: Date | Dayjs): boolean => {
+      const d = dayjs(date);
+      if (startDate && d.isBefore(dayjs(startDate), "day")) return true;
+      if (endDate && d.isAfter(dayjs(endDate), "day")) return true;
+      return false;
     };
 
     return (
@@ -1078,9 +1182,17 @@ import React, { useState, useRef, useEffect } from "react";
                       format="DD/MM/YYYY"
                       minDate={dayjs()}
                       value={startDate ? dayjs(startDate) : null}
-                      onChange={(v) =>
-                        setStartDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")
-                      }
+                      onChange={(v) => {
+                        const newStart = v ? (v as Dayjs).format("YYYY-MM-DD") : "";
+                        setStartDate(newStart);
+                        if (endDate && newStart && dayjs(endDate).isBefore(dayjs(newStart), "day")) {
+                          setEndDate("");
+                        }
+                        if (scheduleDate && newStart && dayjs(scheduleDate).isBefore(dayjs(newStart), "day")) {
+                          setScheduleDate("");
+                          setScheduleTime("");
+                        }
+                      }}
                       slots={{ openPickerIcon: CalendarTodayIcon }}
                       slotProps={{
                         textField: { error: submitted && !startDate },
@@ -1097,9 +1209,14 @@ import React, { useState, useRef, useEffect } from "react";
                       format="DD/MM/YYYY"
                       minDate={startDate ? dayjs(startDate) : dayjs()}
                       value={endDate ? dayjs(endDate) : null}
-                      onChange={(v) =>
-                        setEndDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")
-                      }
+                      onChange={(v) => {
+                        const newEnd = v ? (v as Dayjs).format("YYYY-MM-DD") : "";
+                        setEndDate(newEnd);
+                        if (scheduleDate && newEnd && dayjs(scheduleDate).isAfter(dayjs(newEnd), "day")) {
+                          setScheduleDate("");
+                          setScheduleTime("");
+                        }
+                      }}
                       slots={{ openPickerIcon: CalendarTodayIcon }}
                       slotProps={{
                         textField: { error: submitted && !endDate },
@@ -1201,7 +1318,7 @@ import React, { useState, useRef, useEffect } from "react";
                 </div>
               </div>
 
-              {/* ✅ Google Ads Keywords — paid mode only, NO image URL box */}
+              {/* Google Ads Keywords — paid mode only */}
               {accounts.includes("google_ads") && mode === "paid" && (
                 <div className="section-card">
                   <h3>Google Ads Keywords</h3>
@@ -1257,7 +1374,7 @@ import React, { useState, useRef, useEffect } from "react";
                 </div>
               )}
 
-              {/* ✅ Google Ads organic info */}
+              {/* Google Ads organic info */}
               {accounts.includes("google_ads") && mode === "organic" && (
                 <div
                   className="section-card"
@@ -1282,7 +1399,7 @@ import React, { useState, useRef, useEffect } from "react";
                 </div>
               )}
 
-              {/* ✅ Meta Ad Targeting */}
+              {/* Meta Ad Targeting */}
               {(accounts.includes("facebook") ||
                 accounts.includes("instagram")) && (
                 <div
@@ -1335,7 +1452,7 @@ import React, { useState, useRef, useEffect } from "react";
                 </div>
               )}
 
-              {/* ✅ LinkedIn Targeting */}
+              {/* LinkedIn Targeting */}
               {accounts.includes("linkedin") && (
                 <div
                   className="section-card"
@@ -1623,6 +1740,14 @@ import React, { useState, useRef, useEffect } from "react";
                         ? "Establish your schedule and budget for every platform."
                         : "Select a date and time for the campaign."}
                     </p>
+                    {startDate && endDate && (
+                      <p style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                        Schedule must be within campaign duration:{" "}
+                        <strong style={{ color: "#1d4ed8" }}>
+                          {dayjs(startDate).format("DD/MM/YYYY")} – {dayjs(endDate).format("DD/MM/YYYY")}
+                        </strong>
+                      </p>
+                    )}
                   </div>
                   <button className="ai-btn">✨ AI-Optimization Timing</button>
                 </div>
@@ -1633,13 +1758,16 @@ import React, { useState, useRef, useEffect } from "react";
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <DatePicker
                         format="DD/MM/YYYY"
-                        minDate={dayjs()}
+                        minDate={scheduleDateMin}
+                        maxDate={scheduleDateMax}
+                        shouldDisableDate={isScheduleDateDisabled}
                         value={scheduleDate ? dayjs(scheduleDate) : null}
-                        onChange={(v) =>
+                        onChange={(v) => {
                           setScheduleDate(
                             v ? (v as Dayjs).format("YYYY-MM-DD") : "",
-                          )
-                        }
+                          );
+                          setScheduleTime("");
+                        }}
                         slots={{ openPickerIcon: CalendarTodayIcon }}
                       />
                     </LocalizationProvider>
@@ -1647,17 +1775,10 @@ import React, { useState, useRef, useEffect } from "react";
                   <div className="form-group half">
                     <label>Enter Time</label>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
-                      {/*
-                        FIX: value uses today's real date so minTime comparison works.
-                        Previously used hardcoded "2024-01-01" which broke minTime.
-                      */}
                       <TimePicker
                         format="hh:mm A"
-                        minTime={
-                          scheduleDate === dayjs().format("YYYY-MM-DD")
-                            ? dayjs()
-                            : undefined
-                        }
+                        disabled={!scheduleDate}
+                        minTime={getScheduleMinTime()}
                         value={
                           scheduleTime
                             ? dayjs(
@@ -1669,7 +1790,14 @@ import React, { useState, useRef, useEffect } from "react";
                           if (v) setScheduleTime((v as Dayjs).format("HH:mm"));
                         }}
                         ampm
-                        slotProps={{ textField: { fullWidth: true } }}
+                        slotProps={{
+                          textField: {
+                            fullWidth: true,
+                            helperText: !scheduleDate
+                              ? "Select a date first"
+                              : undefined,
+                          },
+                        }}
                       />
                     </LocalizationProvider>
                   </div>
@@ -1680,32 +1808,46 @@ import React, { useState, useRef, useEffect } from "react";
                     <div className="budget-divider" />
                     <div className="budget-section">
                       <h3>Budget Allocation</h3>
+                      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+                        Minimum budget per platform: <strong style={{ color: "#d97706" }}>${PLATFORM_MIN_BUDGET + 1}</strong> (must be greater than ${PLATFORM_MIN_BUDGET})
+                      </p>
                       <div className="budget-row">
                         {PLATFORM_LIST.filter((p) =>
                           accounts.includes(p.id),
-                        ).map((p) => (
-                          <div key={p.id} className="budget-card">
-                            <div className="budget-title">
-                              <img src={platformIcons[p.id]} alt={p.label} />
-                              <span>
-                                {p.label} (Estimate CPC : ${p.cpc})
-                              </span>
+                        ).map((p) => {
+                          const budgetErr = getBudgetError(p.id, budgets[p.id]);
+                          return (
+                            <div key={p.id} className="budget-card">
+                              <div className="budget-title">
+                                <img src={platformIcons[p.id]} alt={p.label} />
+                                <span>
+                                  {p.label} (Estimate CPC : ${p.cpc})
+                                </span>
+                              </div>
+                              <div className="budget-input-wrapper">
+                                <label>Enter Amount ($)</label>
+                                <input
+                                  type="number"
+                                  min={PLATFORM_MIN_BUDGET + 1}
+                                  step="1"
+                                  value={budgets[p.id]}
+                                  onChange={(e) =>
+                                    setBudget(p.id, Number(e.target.value))
+                                  }
+                                  className="budget-input"
+                                  style={{
+                                    borderColor: budgetErr ? "#ef4444" : undefined,
+                                  }}
+                                />
+                                {budgetErr && (
+                                  <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
+                                    {budgetErr}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            <div className="budget-input-wrapper">
-                              <label>Enter Amount ($)</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="10"
-                                value={budgets[p.id]}
-                                onChange={(e) =>
-                                  setBudget(p.id, Number(e.target.value))
-                                }
-                                className="budget-input"
-                              />
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       <div className="total-budget">
                         <div>
