@@ -102,7 +102,12 @@ export default function CampaignHeader({
   const currentPlatformIcon = PLATFORM_ICONS[platform];
   const currentPlatformLabel = PLATFORM_LABELS[platform] ?? platform;
 
-  // const currentPlatformDot = PLATFORM_DOTS[platform] ?? "#6b7280";
+  // ── Build status list: "all" first, then CAMPAIGN_STATUS values,
+  //    but SKIP "schedule" (old duplicate of "scheduled")
+  //    FIX: cast to string before comparing to avoid TS2367 type overlap error
+  const statusItems = (
+    ["all", ...Object.values(CAMPAIGN_STATUS)] as (CampaignStatus | "all")[]
+  ).filter((item) => (item as string) !== "schedule");
 
   return (
     <div className="page-header">
@@ -136,12 +141,7 @@ export default function CampaignHeader({
 
           {openStatus && (
             <div className="header-filter-menu">
-              {(
-                ["all", ...Object.values(CAMPAIGN_STATUS)] as (
-                  | CampaignStatus
-                  | "all"
-                )[]
-              ).map((item) => (
+              {statusItems.map((item) => (
                 <div
                   key={item}
                   className={`header-filter-item ${status === item ? "selected" : ""}`}

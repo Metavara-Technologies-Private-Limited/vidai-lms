@@ -1,4 +1,4 @@
-  import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
   import "../../styles/Campaign/EmailCampaignModal.css";
   import "../../styles/Campaign/SocialCampaignModal.css";
   import { CampaignAPI } from "../../services/campaign.api";
@@ -128,7 +128,6 @@
           const res = await fetch("https://countriesnow.space/api/v0.1/countries/states");
           const json = await res.json();
           if (json && Array.isArray(json.data)) {
-            // Sort alphabetically by name
             const sorted = [...json.data].sort((a: CountryData, b: CountryData) =>
               a.name.localeCompare(b.name)
             );
@@ -136,7 +135,6 @@
           }
         } catch (err) {
           console.error("Failed to fetch countries from API", err);
-          // Leave countriesData empty — UI will gracefully show empty dropdown
         } finally {
           setCountriesLoading(false);
         }
@@ -172,7 +170,6 @@
 
       const fetchStatuses = async () => {
         try {
-          // ── Google Ads connection check ──────────────────────────
           const res = await integrationApi.getSocialAccounts(clinic.id);
           const accs = Array.isArray(res.data) ? res.data : [];
 
@@ -212,7 +209,7 @@
       linkedInAccountStatus?.connected
       // && linkedInAccountStatus?.setup_complete,
     );
-    
+
     const platformConnectionMap: Record<Platform, boolean> = {
       facebook: facebookConnected,
       instagram: facebookConnected,
@@ -589,7 +586,7 @@
 
         const selectedAccounts = [...accounts];
 
-        // ─── Build platform_data — inject LinkedIn targeting fields ──
+        // ─── Build platform_data ──────────────────────────────────
         const cleanedContent: Partial<Record<Platform, unknown>> = {
           ...resolvedContent,
         };
@@ -613,7 +610,6 @@
             state: metaState,
           };
         }
-
         if (accounts.includes("instagram")) {
           cleanedContent["instagram"] = {
             content: resolvedContent["instagram"],
@@ -661,13 +657,11 @@
 
         // ─────────────────────────────────────────────────────────────────
         // Google Ads: ONLY fire paid ad endpoint when mode === "paid"
-        // For organic posting, the campaign content is already saved above
-        // via CampaignAPI.createSocial — no money is spent.
         // ─────────────────────────────────────────────────────────────────
         const shouldSendGoogleAds =
           accounts.includes("google_ads") &&
           isGoogleAdsConnected &&
-          mode === "paid"; // ← KEY FIX: organic skips this entirely
+          mode === "paid";
 
         if (shouldSendGoogleAds) {
           try {
@@ -724,38 +718,25 @@
 
             console.log("[GoogleAds] Paid campaign sent to Zapier successfully");
           } catch (googleAdsErr) {
-            console.error(
-              "[GoogleAds] Failed to trigger Google Ads:",
-              googleAdsErr,
-            );
-            toast.warn(
-              "Campaign saved, but Google Ads trigger failed. Check logs.",
-            );
+            console.error("[GoogleAds] Failed to trigger Google Ads:", googleAdsErr);
+            toast.warn("Campaign saved, but Google Ads trigger failed. Check logs.");
           }
         } else if (
           accounts.includes("google_ads") &&
           isGoogleAdsConnected &&
           mode === "organic"
         ) {
-          // Organic posting with Google Ads selected:
-          // Campaign content already saved via createSocial above.
-          // No paid ad is triggered — no money spent.
-          console.log(
-            "[GoogleAds] Organic mode — campaign content saved, no paid ad triggered.",
-          );
+          console.log("[GoogleAds] Organic mode — campaign content saved, no paid ad triggered.");
         } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
-          toast.warn(
-            "Google Ads was not triggered because this clinic is not connected to Google Ads.",
-          );
+          toast.warn("Google Ads was not triggered because this clinic is not connected to Google Ads.");
         }
 
         // ─────────────────────────────────────────────────────────
-        // LinkedIn: warn if selected but not fully set up
+        // LinkedIn
         // ─────────────────────────────────────────────────────────
         if (accounts.includes("linkedin") && newCampaignId) {
           try {
             await CampaignAPI.createLinkedInCampaign(newCampaignId);
-
             console.log("[LinkedIn] Campaign sent to Zapier");
           } catch (err) {
             console.error("[LinkedIn] Create failed", err);
@@ -1220,7 +1201,7 @@
                 </div>
               </div>
 
-              {/* ✅ Google Ads Keywords — shown when google_ads selected AND paid mode */}
+              {/* ✅ Google Ads Keywords — paid mode only, NO image URL box */}
               {accounts.includes("google_ads") && mode === "paid" && (
                 <div className="section-card">
                   <h3>Google Ads Keywords</h3>
@@ -1273,26 +1254,10 @@
                       </div>
                     )}
                   </div>
-
-                  <div className="form-group" style={{ marginTop: 12 }}>
-                    <label>Google Ads Image URL (optional)</label>
-                    <input
-                      value={platformImageUrls["google_ads"]}
-                      onChange={(e) =>
-                        handleImageUrl("google_ads", e.target.value)
-                      }
-                      placeholder="https://your-image-url.com/image.jpg"
-                      style={{ width: "100%" }}
-                    />
-                    <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                      If provided, a Display campaign will also be created
-                      alongside the Search campaign.
-                    </p>
-                  </div>
                 </div>
               )}
 
-              {/* ✅ Google Ads organic info — shown when google_ads selected AND organic mode */}
+              {/* ✅ Google Ads organic info */}
               {accounts.includes("google_ads") && mode === "organic" && (
                 <div
                   className="section-card"
@@ -1309,14 +1274,15 @@
                       style={{ width: 18, height: 18 }}
                     />
                     <h3 style={{ margin: 0, color: "#15803d" }}>Google Ads — Organic Post</h3>
-                    </div>
-<p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
+                  </div>
+                  <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
                     Your campaign content will be saved for Google Ads. No paid ad will be triggered — no money will be spent.
                     Switch to <strong>Paid Advertising</strong> mode to run a real Google Ad.
                   </p>
                 </div>
               )}
 
+              {/* ✅ Meta Ad Targeting */}
               {(accounts.includes("facebook") ||
                 accounts.includes("instagram")) && (
                 <div
@@ -1327,11 +1293,9 @@
                   }}
                 >
                   <h3 style={{ color: "#1877f2" }}>Meta Ad Targeting</h3>
-
                   <div className="form-row">
                     <div className="form-group half">
                       <label>Country</label>
-
                       <FormControl fullWidth variant="outlined" size="small">
                         <Select
                           value={metaCountry}
@@ -1342,7 +1306,6 @@
                           displayEmpty
                         >
                           <MenuItem value="">Select Country</MenuItem>
-
                           {countriesData.map((c) => (
                             <MenuItem key={c.name} value={c.iso2 || c.name}>
                               {c.name}
@@ -1351,10 +1314,8 @@
                         </Select>
                       </FormControl>
                     </div>
-
                     <div className="form-group half">
                       <label>State</label>
-
                       <FormControl fullWidth variant="outlined" size="small">
                         <Select
                           value={metaState}
@@ -1362,7 +1323,6 @@
                           displayEmpty
                         >
                           <MenuItem value="">All States</MenuItem>
-
                           {metaSelectedStates.map((s) => (
                             <MenuItem key={s.name} value={s.name}>
                               {s.name}
@@ -1375,7 +1335,7 @@
                 </div>
               )}
 
-              {/* ✅ LinkedIn Targeting — shown only when linkedin selected */}
+              {/* ✅ LinkedIn Targeting */}
               {accounts.includes("linkedin") && (
                 <div
                   className="section-card"
@@ -1402,7 +1362,6 @@
                     Configure targeting and bidding for your LinkedIn campaign
                   </p>
 
-                  {/* Location row */}
                   <div className="form-row" style={{ marginTop: 12 }}>
                     <div className="form-group half">
                       <label>Country</label>
@@ -1477,7 +1436,6 @@
                     </div>
                   </div>
 
-                  {/* Custom location override */}
                   <div className="form-group" style={{ marginTop: 8 }}>
                     <label>
                       Custom Location
@@ -1500,7 +1458,6 @@
                       placeholder="e.g. Mumbai, Maharashtra, India"
                       style={{ width: "100%" }}
                     />
-                    {/* Preview */}
                     <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
                       Location that will be sent:{" "}
                       <strong style={{ color: "#1d4ed8" }}>
@@ -1509,7 +1466,6 @@
                     </p>
                   </div>
 
-                  {/* Bid strategy + bid amount row */}
                   <div className="form-row" style={{ marginTop: 8 }}>
                     <div className="form-group half">
                       <label>Bid Strategy</label>
@@ -1570,7 +1526,6 @@
                         >
                           $
                         </span>
-                        {/* step=1, min=0, default=0 — increments by whole numbers */}
                         <input
                           type="number"
                           min={0}
@@ -1692,6 +1647,10 @@
                   <div className="form-group half">
                     <label>Enter Time</label>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      {/*
+                        FIX: value uses today's real date so minTime comparison works.
+                        Previously used hardcoded "2024-01-01" which broke minTime.
+                      */}
                       <TimePicker
                         format="hh:mm A"
                         minTime={
@@ -1701,7 +1660,9 @@
                         }
                         value={
                           scheduleTime
-                            ? dayjs(`2024-01-01 ${scheduleTime}`)
+                            ? dayjs(
+                                `${scheduleDate || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`,
+                              )
                             : null
                         }
                         onChange={(v) => {
@@ -1778,7 +1739,6 @@
             >
               Cancel
             </button>
-            {/* ── BACK button: shown on step 2 and step 3 ── */}
             {step > 1 && (
               <button
                 className="cancel-btn"
