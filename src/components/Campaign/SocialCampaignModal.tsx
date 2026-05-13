@@ -1,335 +1,359 @@
 import React, { useState, useRef, useEffect } from "react";
-  import "../../styles/Campaign/EmailCampaignModal.css";
-  import "../../styles/Campaign/SocialCampaignModal.css";
-  import { CampaignAPI } from "../../services/campaign.api";
-  import { integrationApi } from "../../services/integration.api";
-  import {
-    FormControl,
-    Select,
-    MenuItem,
-    Modal,
-    Typography,
-    IconButton,
-    Chip,
-    // Tooltip,
-  } from "@mui/material";
-  import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-  import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-  import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-  import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-  import { TimePicker } from "@mui/x-date-pickers/TimePicker";
-  import dayjs from "dayjs";
-  import type { Dayjs } from "dayjs";
-  import { toast } from "react-toastify";
-  import { Box } from "@mui/system";
-  import CloseIcon from "@mui/icons-material/Close";
-  import type { SocialCampaignPayload } from "../../types/campaigns.types";
-  import SocialContentBox from "./SocialContentBox";
-  import { useSelector } from "react-redux";
-  import { selectClinic } from "../../store/clinicSlice";
-  import {
-    CAMPAIGN_AUDIENCE,
-    CAMPAIGN_OBJECTIVES,
-    CAMPAIGN_STATUS,
-    platformIcons,
-    type Platform,
-  } from "../../constants/campaigns.constants";
-  import {
-    canTypeCampaignName,
-    getCampaignNameValidationError,
-  } from "./campaignNameValidation";
+import "../../styles/Campaign/EmailCampaignModal.css";
+import "../../styles/Campaign/SocialCampaignModal.css";
+import { CampaignAPI } from "../../services/campaign.api";
+import { integrationApi } from "../../services/integration.api";
+import {
+  FormControl,
+  Select,
+  MenuItem,
+  Modal,
+  Typography,
+  IconButton,
+  Chip,
+  // Tooltip,
+} from "@mui/material";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
+import { toast } from "react-toastify";
+import { Box } from "@mui/system";
+import CloseIcon from "@mui/icons-material/Close";
+import type { SocialCampaignPayload } from "../../types/campaigns.types";
+import SocialContentBox from "./SocialContentBox";
+import { useSelector } from "react-redux";
+import { selectClinic } from "../../store/clinicSlice";
+import {
+  CAMPAIGN_AUDIENCE,
+  CAMPAIGN_OBJECTIVES,
+  CAMPAIGN_STATUS,
+  platformIcons,
+  type Platform,
+} from "../../constants/campaigns.constants";
+import {
+  canTypeCampaignName,
+  getCampaignNameValidationError,
+} from "./campaignNameValidation";
 
-  type Props = {
-    onClose: () => void;
-    onSave: (campaign?: unknown) => void;
-  };
+type Props = {
+  onClose: () => void;
+  onSave: (campaign?: unknown) => void;
+};
 
-  const PLATFORM_LIST: { id: Platform; label: string; cpc: number }[] = [
-    { id: "instagram", label: "Instagram", cpc: 3.5 },
-    { id: "facebook", label: "Facebook", cpc: 2.5 },
-    { id: "linkedin", label: "LinkedIn", cpc: 1.5 },
-    { id: "google_ads", label: "Google Ads", cpc: 2.0 },
-  ];
+const PLATFORM_LIST: { id: Platform; label: string; cpc: number }[] = [
+  { id: "instagram", label: "Instagram", cpc: 3.5 },
+  { id: "facebook", label: "Facebook", cpc: 2.5 },
+  { id: "linkedin", label: "LinkedIn", cpc: 1.5 },
+  { id: "google_ads", label: "Google Ads", cpc: 2.0 },
+];
 
-  // FIX: minimum budget is strictly greater than $2 — so minimum accepted is $3
-  const PLATFORM_MIN_BUDGET = 2; // must be strictly greater than this
+// FIX: minimum budget is strictly greater than $2 — so minimum accepted is $3
+const PLATFORM_MIN_BUDGET = 2; // must be strictly greater than this
 
-  const isPlainUrl = (str: string) =>
-    str.trim().startsWith("http") && !str.trim().includes(" ");
+const isPlainUrl = (str: string) =>
+  str.trim().startsWith("http") && !str.trim().includes(" ");
 
-  // FIX: Convert any share/preview URL to a direct renderable image URL.
-  // Handles Google Drive, Dropbox, OneDrive, imgur, postimages, and passes
-  // all other direct URLs through unchanged.
-  const resolveImageUrl = (url: string): string => {
-    if (!url) return url;
-    const trimmed = url.trim();
+// FIX: Convert any share/preview URL to a direct renderable image URL.
+const resolveImageUrl = (url: string): string => {
+  if (!url) return url;
+  const trimmed = url.trim();
 
-    // ── Google Drive ──────────────────────────────────────────────────────
-    // Pattern 1: https://drive.google.com/file/d/FILE_ID/view?...
-    const driveFileMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/?]+)/);
-    if (driveFileMatch) {
-      return `https://drive.google.com/uc?export=view&id=${driveFileMatch[1]}`;
-    }
-    // Pattern 2: https://drive.google.com/open?id=FILE_ID
-    const driveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([^&]+)/);
-    if (driveOpenMatch) {
-      return `https://drive.google.com/uc?export=view&id=${driveOpenMatch[1]}`;
-    }
-    // Pattern 3: https://docs.google.com/.../d/FILE_ID/...
-    const docsMatch = trimmed.match(/docs\.google\.com\/[^/]+\/d\/([^/?]+)/);
-    if (docsMatch) {
-      return `https://drive.google.com/uc?export=view&id=${docsMatch[1]}`;
-    }
-    // Pattern 4: already a uc?export= link — leave as-is
-    if (trimmed.includes("drive.google.com/uc")) {
-      return trimmed;
-    }
-
-    // ── Dropbox ───────────────────────────────────────────────────────────
-    // Change ?dl=0 → ?raw=1  (or append raw=1 if no dl param)
-    if (trimmed.includes("dropbox.com")) {
-      return trimmed
-        .replace(/[?&]dl=\d/, "")   // strip existing dl param
-        .replace(/[?&]raw=\d/, "")  // strip existing raw param
-        .replace(/\?/, "?raw=1&")   // insert raw=1 as first param
-        .replace(/dropbox\.com\/(.+)$/, (match) =>
-          match.includes("?") ? match : match + "?raw=1"
-        );
-    }
-
-    // ── OneDrive / SharePoint ─────────────────────────────────────────────
-    if (trimmed.match(/1drv\.ms|onedrive\.live\.com|sharepoint\.com/)) {
-      if (trimmed.includes("download=1")) return trimmed;
-      const sep = trimmed.includes("?") ? "&" : "?";
-      return `${trimmed}${sep}download=1`;
-    }
-
-    // ── Imgur ─────────────────────────────────────────────────────────────
-    const imgurGallery = trimmed.match(/^https?:\/\/(?:www\.)?imgur\.com\/(?:a\/|gallery\/)?([A-Za-z0-9]+)(?:\.[a-z]+)?(?:[?#].*)?$/);
-    if (imgurGallery && !trimmed.includes("i.imgur.com")) {
-      return `https://i.imgur.com/${imgurGallery[1]}.jpg`;
-    }
-
-    // ── Postimages / postimg.cc ───────────────────────────────────────────
-    if (trimmed.includes("postimg.cc") || trimmed.includes("postimage.org")) {
-      return trimmed;
-    }
-
-    // ── All other URLs ────────────────────────────────────────────────────
+  // ── Google Drive ──────────────────────────────────────────────────────
+  const driveFileMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/?]+)/);
+  if (driveFileMatch) {
+    return `https://drive.google.com/uc?export=view&id=${driveFileMatch[1]}`;
+  }
+  const driveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([^&]+)/);
+  if (driveOpenMatch) {
+    return `https://drive.google.com/uc?export=view&id=${driveOpenMatch[1]}`;
+  }
+  const docsMatch = trimmed.match(/docs\.google\.com\/[^/]+\/d\/([^/?]+)/);
+  if (docsMatch) {
+    return `https://drive.google.com/uc?export=view&id=${docsMatch[1]}`;
+  }
+  if (trimmed.includes("drive.google.com/uc")) {
     return trimmed;
-  };
-
-  // ─── LinkedIn account status shape ───────────────────────────────────
-  interface LinkedInAccountStatus {
-    connected: boolean;
-    setup_complete: boolean;
-    missing: string[];
-    account_id?: string;
-    org_urn?: string;
-    has_campaign_group?: boolean;
   }
 
-  // ─── Country/State shape from API ────────────────────────────────────
-  interface CountryData {
-    name: string;
-    iso2?: string;
-    iso3?: string;
-    states: { name: string; state_code?: string }[];
+  // ── Dropbox ───────────────────────────────────────────────────────────
+  if (trimmed.includes("dropbox.com")) {
+    return trimmed
+      .replace(/[?&]dl=\d/, "")
+      .replace(/[?&]raw=\d/, "")
+      .replace(/\?/, "?raw=1&")
+      .replace(/dropbox\.com\/(.+)$/, (match) =>
+        match.includes("?") ? match : match + "?raw=1"
+      );
   }
 
-  const LINKEDIN_BID_STRATEGIES = [
-    { value: "MANUAL_BIDDING", label: "Manual Bidding" },
-    { value: "MAXIMUM_DELIVERY", label: "Maximum Delivery (Auto)" },
-    { value: "TARGET_COST", label: "Target Cost" },
-    { value: "ENHANCED_CPC", label: "Enhanced CPC" },
-  ];
+  // ── OneDrive / SharePoint ─────────────────────────────────────────────
+  if (trimmed.match(/1drv\.ms|onedrive\.live\.com|sharepoint\.com/)) {
+    if (trimmed.includes("download=1")) return trimmed;
+    const sep = trimmed.includes("?") ? "&" : "?";
+    return `${trimmed}${sep}download=1`;
+  }
 
-  export default function SocialCampaignModal({ onClose, onSave }: Props) {
-    const clinic = useSelector(selectClinic);
-    const clinicId = clinic?.id || 1;
-    const googleAdsCustomerId = clinic?.google_ads_customer_id;
-    const [googleAdsIntegrationConnected, setGoogleAdsIntegrationConnected] =
-      useState(false);
-    const [facebookConnected, setFacebookConnected] = useState(false);
+  // ── Imgur ─────────────────────────────────────────────────────────────
+  const imgurGallery = trimmed.match(
+    /^https?:\/\/(?:www\.)?imgur\.com\/(?:a\/|gallery\/)?([A-Za-z0-9]+)(?:\.[a-z]+)?(?:[?#].*)?$/
+  );
+  if (imgurGallery && !trimmed.includes("i.imgur.com")) {
+    return `https://i.imgur.com/${imgurGallery[1]}.jpg`;
+  }
 
-    // ─── LinkedIn account status ───────────────────────────────────
-    const [linkedInAccountStatus, setLinkedInAccountStatus] =
-      useState<LinkedInAccountStatus | null>(null);
+  // ── Postimages / postimg.cc ───────────────────────────────────────────
+  if (trimmed.includes("postimg.cc") || trimmed.includes("postimage.org")) {
+    return trimmed;
+  }
 
-    // ─── Per-campaign LinkedIn live status (after creation) ────────
-    const [linkedInLiveStatus, setLinkedInLiveStatus] = useState<string | null>(null);
-    const [linkedInInsightsLoading, setLinkedInInsightsLoading] = useState(false);
-    const [linkedInStatusCheckLoading, setLinkedInStatusCheckLoading] = useState(false);
-    const [linkedInUpdateLoading, setLinkedInUpdateLoading] = useState(false);
-    const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+  // ── All other URLs ────────────────────────────────────────────────────
+  return trimmed;
+};
 
-    // ─── LinkedIn targeting fields ────────────────────────────────
-    const [linkedInCountry, setLinkedInCountry] = useState("");
-    const [linkedInState, setLinkedInState] = useState("");
-    const [linkedInCustomLocation, setLinkedInCustomLocation] = useState("");
-    const [linkedInBidStrategy, setLinkedInBidStrategy] = useState("MANUAL_BIDDING");
-    const [linkedInBidAmount, setLinkedInBidAmount] = useState<number>(0);
+// ─── LinkedIn account status shape ───────────────────────────────────
+interface LinkedInAccountStatus {
+  connected: boolean;
+  setup_complete: boolean;
+  missing: string[];
+  account_id?: string;
+  org_urn?: string;
+  has_campaign_group?: boolean;
+}
 
-    const [metaCountry, setMetaCountry] = useState("");
-    const [metaState, setMetaState] = useState("");
+// ─── Country/State shape from API ────────────────────────────────────
+interface CountryData {
+  name: string;
+  iso2?: string;
+  iso3?: string;
+  states: { name: string; state_code?: string }[];
+}
 
-    // ─── Dynamic country/state data from API ─────────────────────
-    const [countriesData, setCountriesData] = useState<CountryData[]>([]);
-    const [countriesLoading, setCountriesLoading] = useState(false);
+const LINKEDIN_BID_STRATEGIES = [
+  { value: "MANUAL_BIDDING", label: "Manual Bidding" },
+  { value: "MAXIMUM_DELIVERY", label: "Maximum Delivery (Auto)" },
+  { value: "TARGET_COST", label: "Target Cost" },
+  { value: "ENHANCED_CPC", label: "Enhanced CPC" },
+];
 
-    const isPlatformConnected = (platform: Platform) =>
-      platformConnectionMap[platform];
+// ─── Per-platform uploaded image file state ───────────────────────────
+type PlatformImageFiles = Record<Platform, File | null>;
+type PlatformImagePreviews = Record<Platform, string>; // object URLs for preview
 
-    // Fetch countries + states from API on mount
-    useEffect(() => {
-      const fetchCountries = async () => {
-        setCountriesLoading(true);
-        try {
-          const res = await fetch("https://countriesnow.space/api/v0.1/countries/states");
-          const json = await res.json();
-          if (json && Array.isArray(json.data)) {
-            const sorted = [...json.data].sort((a: CountryData, b: CountryData) =>
-              a.name.localeCompare(b.name)
-            );
-            setCountriesData(sorted);
-          }
-        } catch (err) {
-          console.error("Failed to fetch countries from API", err);
-        } finally {
-          setCountriesLoading(false);
+export default function SocialCampaignModal({ onClose, onSave }: Props) {
+  const clinic = useSelector(selectClinic);
+  const clinicId = clinic?.id || 1;
+  const googleAdsCustomerId = clinic?.google_ads_customer_id;
+  const [googleAdsIntegrationConnected, setGoogleAdsIntegrationConnected] =
+    useState(false);
+  const [facebookConnected, setFacebookConnected] = useState(false);
+
+  // ─── LinkedIn account status ───────────────────────────────────
+  const [linkedInAccountStatus, setLinkedInAccountStatus] =
+    useState<LinkedInAccountStatus | null>(null);
+
+  // ─── Per-campaign LinkedIn live status (after creation) ────────
+  const [linkedInLiveStatus, setLinkedInLiveStatus] = useState<string | null>(null);
+  const [linkedInInsightsLoading, setLinkedInInsightsLoading] = useState(false);
+  const [linkedInStatusCheckLoading, setLinkedInStatusCheckLoading] = useState(false);
+  const [linkedInUpdateLoading, setLinkedInUpdateLoading] = useState(false);
+  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+
+  // ─── LinkedIn targeting fields ────────────────────────────────
+  const [linkedInCountry, setLinkedInCountry] = useState("");
+  const [linkedInState, setLinkedInState] = useState("");
+  const [linkedInCustomLocation, setLinkedInCustomLocation] = useState("");
+  const [linkedInBidStrategy, setLinkedInBidStrategy] = useState("MANUAL_BIDDING");
+  const [linkedInBidAmount, setLinkedInBidAmount] = useState<number>(0);
+
+  const [metaCountry, setMetaCountry] = useState("");
+  const [metaState, setMetaState] = useState("");
+
+  // ─── Dynamic country/state data from API ─────────────────────
+  const [countriesData, setCountriesData] = useState<CountryData[]>([]);
+  const [countriesLoading, setCountriesLoading] = useState(false);
+
+  const isPlatformConnected = (platform: Platform) =>
+    platformConnectionMap[platform];
+
+  // Fetch countries + states from API on mount
+  useEffect(() => {
+    const fetchCountries = async () => {
+      setCountriesLoading(true);
+      try {
+        const res = await fetch("https://countriesnow.space/api/v0.1/countries/states");
+        const json = await res.json();
+        if (json && Array.isArray(json.data)) {
+          const sorted = [...json.data].sort((a: CountryData, b: CountryData) =>
+            a.name.localeCompare(b.name)
+          );
+          setCountriesData(sorted);
         }
-      };
-      fetchCountries();
-    }, []);
-
-    // Derive states for selected country
-    const selectedCountryStates: { name: string; state_code?: string }[] =
-      countriesData.find(
-        (c) => c.name === linkedInCountry
-      )?.states ?? [];
-    const metaSelectedStates =
-      countriesData.find(
-        (c) => c.iso2 === metaCountry || c.name === metaCountry,
-      )?.states ?? [];
-
-    useEffect(() => {
-      let isMounted = true;
-
-      if (!clinic?.id) {
-        queueMicrotask(() => {
-          if (isMounted) {
-            setGoogleAdsIntegrationConnected(false);
-            setLinkedInAccountStatus(null);
-            setFacebookConnected(false);
-          }
-        });
-        return () => {
-          isMounted = false;
-        };
+      } catch (err) {
+        console.error("Failed to fetch countries from API", err);
+      } finally {
+        setCountriesLoading(false);
       }
+    };
+    fetchCountries();
+  }, []);
 
-      const fetchStatuses = async () => {
-        try {
-          const res = await integrationApi.getSocialAccounts(clinic.id);
-          const accs = Array.isArray(res.data) ? res.data : [];
+  // Derive states for selected country
+  const selectedCountryStates: { name: string; state_code?: string }[] =
+    countriesData.find((c) => c.name === linkedInCountry)?.states ?? [];
+  const metaSelectedStates =
+    countriesData.find(
+      (c) => c.iso2 === metaCountry || c.name === metaCountry
+    )?.states ?? [];
 
-          if (!isMounted) return;
+  useEffect(() => {
+    let isMounted = true;
 
-          setGoogleAdsIntegrationConnected(
-            accs.some(
-              (acc) =>
-                typeof acc.platform === "string" &&
-                acc.platform.toLowerCase().includes("google"),
-            ),
-          );
-          setFacebookConnected(
-            accs.some((acc) => acc.platform === "facebook" && acc.connected),
-          );
-        } catch (err) {
-          console.error("Failed to fetch Google Ads integration status", err);
-          if (isMounted) {
-            setGoogleAdsIntegrationConnected(false);
-          }
+    if (!clinic?.id) {
+      queueMicrotask(() => {
+        if (isMounted) {
+          setGoogleAdsIntegrationConnected(false);
+          setLinkedInAccountStatus(null);
+          setFacebookConnected(false);
         }
-      };
-
-      fetchStatuses();
-
+      });
       return () => {
         isMounted = false;
       };
-    }, [clinic]);
+    }
 
-    const isGoogleAdsConnected = Boolean(
-      (googleAdsCustomerId && String(googleAdsCustomerId).trim().length) ||
-        googleAdsIntegrationConnected,
+    const fetchStatuses = async () => {
+      try {
+        const res = await integrationApi.getSocialAccounts(clinic.id);
+        const accs = Array.isArray(res.data) ? res.data : [];
+
+        if (!isMounted) return;
+
+        setGoogleAdsIntegrationConnected(
+          accs.some(
+            (acc) =>
+              typeof acc.platform === "string" &&
+              acc.platform.toLowerCase().includes("google")
+          )
+        );
+        setFacebookConnected(
+          accs.some((acc) => acc.platform === "facebook" && acc.connected)
+        );
+      } catch (err) {
+        console.error("Failed to fetch Google Ads integration status", err);
+        if (isMounted) {
+          setGoogleAdsIntegrationConnected(false);
+        }
+      }
+    };
+
+    fetchStatuses();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [clinic]);
+
+  const isGoogleAdsConnected = Boolean(
+    (googleAdsCustomerId && String(googleAdsCustomerId).trim().length) ||
+      googleAdsIntegrationConnected
+  );
+
+  const isLinkedInFullySetup = Boolean(linkedInAccountStatus?.connected);
+
+  const platformConnectionMap: Record<Platform, boolean> = {
+    facebook: facebookConnected,
+    instagram: facebookConnected,
+    linkedin: isLinkedInFullySetup,
+    google_ads: googleAdsIntegrationConnected,
+    gmail: true,
+  };
+
+  const [step, setStep] = useState(1);
+  const [submitted, setSubmitted] = useState(false);
+  const [loadingType, setLoadingType] = useState<
+    "draft" | "scheduled" | "live" | null
+  >(null);
+
+  /* ================= STEP 1 ================= */
+  const [campaignName, setCampaignName] = useState("");
+  const [campaignDescription, setCampaignDescription] = useState("");
+  const [objective, setObjective] = useState(() => {
+    const keys = Object.keys(CAMPAIGN_OBJECTIVES);
+    const leadGenKey = keys.find(
+      (k) =>
+        k === "lead_generation" ||
+        k === "LEAD_GENERATION" ||
+        (CAMPAIGN_OBJECTIVES as Record<string, string>)[k]
+          ?.toLowerCase()
+          .includes("lead")
     );
-
-    const isLinkedInFullySetup = Boolean(
-      linkedInAccountStatus?.connected
+    return leadGenKey ?? keys[0] ?? "";
+  });
+  const [audience, setAudience] = useState(() => {
+    const keys = Object.keys(CAMPAIGN_AUDIENCE);
+    const allSubKey = keys.find(
+      (k) =>
+        k === "all_subscribers" ||
+        k === "ALL_SUBSCRIBERS" ||
+        (CAMPAIGN_AUDIENCE as Record<string, string>)[k]
+          ?.toLowerCase()
+          .includes("all")
     );
+    return allSubKey ?? keys[0] ?? "";
+  });
+  const [startDate, setStartDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const [endDate, setEndDate] = useState("");
 
-    const platformConnectionMap: Record<Platform, boolean> = {
-      facebook: facebookConnected,
-      instagram: facebookConnected,
-      linkedin: isLinkedInFullySetup,
-      google_ads: googleAdsIntegrationConnected,
-      gmail: true,
-    };
+  const step1Valid =
+    campaignName.trim() &&
+    campaignDescription.trim() &&
+    objective &&
+    audience &&
+    startDate &&
+    endDate;
 
-    const [step, setStep] = useState(1);
-    const [submitted, setSubmitted] = useState(false);
-    const [loadingType, setLoadingType] = useState<
-      "draft" | "scheduled" | "live" | null
-    >(null);
+  /* ================= STEP 2 ================= */
+  const [accounts, setAccounts] = useState<Platform[]>([]);
+  const [mode, setMode] = useState<"organic" | "paid" | "">("");
 
-    /* ================= STEP 1 ================= */
-    const [campaignName, setCampaignName] = useState("");
-    const [campaignDescription, setCampaignDescription] = useState("");
-    const [objective, setObjective] = useState(() => {
-      const keys = Object.keys(CAMPAIGN_OBJECTIVES);
-      const leadGenKey = keys.find(
-        (k) =>
-          k === "lead_generation" ||
-          k === "LEAD_GENERATION" ||
-          (CAMPAIGN_OBJECTIVES as Record<string, string>)[k]
-            ?.toLowerCase()
-            .includes("lead"),
-      );
-      return leadGenKey ?? keys[0] ?? "";
+  const [keywordsInput, setKeywordsInput] = useState("");
+
+  const [platformContent, setPlatformContent] = useState<
+    Record<Platform, string>
+  >({
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+    gmail: "",
+    google_ads: "",
+  });
+
+  const [platformImageUrls, setPlatformImageUrls] = useState<
+    Record<Platform, string>
+  >({
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+    gmail: "",
+    google_ads: "",
+  });
+
+  // ─── NEW: Per-platform uploaded image files & previews ────────────────
+  const [platformImageFiles, setPlatformImageFiles] =
+    useState<PlatformImageFiles>({
+      instagram: null,
+      facebook: null,
+      linkedin: null,
+      gmail: null,
+      google_ads: null,
     });
-    const [audience, setAudience] = useState(() => {
-      const keys = Object.keys(CAMPAIGN_AUDIENCE);
-      const allSubKey = keys.find(
-        (k) =>
-          k === "all_subscribers" ||
-          k === "ALL_SUBSCRIBERS" ||
-          (CAMPAIGN_AUDIENCE as Record<string, string>)[k]
-            ?.toLowerCase()
-            .includes("all"),
-      );
-      return allSubKey ?? keys[0] ?? "";
-    });
-    const [startDate, setStartDate] = useState(dayjs().format("YYYY-MM-DD"));
-    const [endDate, setEndDate] = useState("");
 
-    const step1Valid =
-      campaignName.trim() &&
-      campaignDescription.trim() &&
-      objective &&
-      audience &&
-      startDate &&
-      endDate;
-
-    /* ================= STEP 2 ================= */
-    const [accounts, setAccounts] = useState<Platform[]>([]);
-    const [mode, setMode] = useState<"organic" | "paid" | "">("");
-
-    const [keywordsInput, setKeywordsInput] = useState("");
-
-    const [platformContent, setPlatformContent] = useState<
-      Record<Platform, string>
-    >({
+  const [platformImagePreviews, setPlatformImagePreviews] =
+    useState<PlatformImagePreviews>({
       instagram: "",
       facebook: "",
       linkedin: "",
@@ -337,1225 +361,1508 @@ import React, { useState, useRef, useEffect } from "react";
       google_ads: "",
     });
 
-    const [platformImageUrls, setPlatformImageUrls] = useState<
-      Record<Platform, string>
-    >({
-      instagram: "",
-      facebook: "",
-      linkedin: "",
-      gmail: "",
-      google_ads: "",
-    });
+  // Refs for the hidden image-upload inputs (one per platform)
+  const imageUploadRefs: Record<Platform, React.RefObject<HTMLInputElement | null>> = {
+    instagram: useRef<HTMLInputElement>(null),
+    facebook: useRef<HTMLInputElement>(null),
+    linkedin: useRef<HTMLInputElement>(null),
+    gmail: useRef<HTMLInputElement>(null),
+    google_ads: useRef<HTMLInputElement>(null),
+  };
 
-    const platformImageUrlsRef = useRef<Record<Platform, string>>({
-      instagram: "",
-      facebook: "",
-      linkedin: "",
-      gmail: "",
-      google_ads: "",
-    });
+  // Handle image file chosen from disk
+  const handleImageFileUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    platform: Platform
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const handleEditorInput = (platform: Platform, value: string) => {
-      setPlatformContent((prev) => ({ ...prev, [platform]: value }));
-    };
+    // Revoke previous object URL to avoid memory leaks
+    if (platformImagePreviews[platform]) {
+      URL.revokeObjectURL(platformImagePreviews[platform]);
+    }
 
-    const handleImageUrl = (platform: Platform, url: string) => {
-      const resolvedUrl = resolveImageUrl(url);
-      platformImageUrlsRef.current[platform] = resolvedUrl;
-      setPlatformImageUrls((prev) => ({ ...prev, [platform]: resolvedUrl }));
-    };
+    const objectUrl = URL.createObjectURL(file);
+    setPlatformImageFiles((prev) => ({ ...prev, [platform]: file }));
+    setPlatformImagePreviews((prev) => ({ ...prev, [platform]: objectUrl }));
 
-    /* ---- Refs ---- */
-    const instagramRef = useRef<HTMLDivElement>(null);
-    const facebookRef = useRef<HTMLDivElement>(null);
-    const linkedinRef = useRef<HTMLDivElement>(null);
-    const gmailRef = useRef<HTMLDivElement>(null);
-    const googleAdsRef = useRef<HTMLDivElement>(null);
+    // Clear the URL field when a file is uploaded (file takes lower priority
+    // but we still keep any URL the user typed — see priority logic in submit)
+    e.target.value = "";
+  };
 
-    const instagramMediaRef = useRef<HTMLDivElement>(null);
-    const facebookMediaRef = useRef<HTMLDivElement>(null);
-    const linkedinMediaRef = useRef<HTMLDivElement>(null);
-    const gmailMediaRef = useRef<HTMLDivElement>(null);
-    const googleAdsMediaRef = useRef<HTMLDivElement>(null);
+  // Remove uploaded image for a platform
+  const handleRemoveImageFile = (platform: Platform) => {
+    if (platformImagePreviews[platform]) {
+      URL.revokeObjectURL(platformImagePreviews[platform]);
+    }
+    setPlatformImageFiles((prev) => ({ ...prev, [platform]: null }));
+    setPlatformImagePreviews((prev) => ({ ...prev, [platform]: "" }));
+  };
 
-    const instagramFileRef = useRef<HTMLInputElement>(null);
-    const facebookFileRef = useRef<HTMLInputElement>(null);
-    const linkedinFileRef = useRef<HTMLInputElement>(null);
-    const gmailFileRef = useRef<HTMLInputElement>(null);
-    const googleAdsFileRef = useRef<HTMLInputElement>(null);
+  // ─── Upload image file to server and get back a URL ──────────────────
+  // Uses CampaignSocialPost-backed endpoint (or a generic media upload).
+  // Adjust the API call to match whatever endpoint you expose.
+  const uploadImageFile = async (file: File): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("clinic", String(clinicId));
+      // CampaignAPI.uploadCampaignDocument should POST to your backend
+      // and return { url: "https://..." } or similar.
+      const res = await CampaignAPI.uploadCampaignDocument(formData);
+      const url =
+        (res?.data as { url?: string })?.url ??
+        (res?.data as { file_url?: string })?.file_url ??
+        null;
+      return url;
+    } catch (err) {
+      console.error("[ImageUpload] Failed to upload image file", err);
+      return null;
+    }
+  };
 
-    const platformRefs: Record<
-      Platform,
-      React.RefObject<HTMLDivElement | null>
-    > = {
-      instagram: instagramRef,
-      facebook: facebookRef,
-      linkedin: linkedinRef,
-      gmail: gmailRef,
-      google_ads: googleAdsRef,
-    };
+  const platformImageUrlsRef = useRef<Record<Platform, string>>({
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+    gmail: "",
+    google_ads: "",
+  });
 
-    const mediaRefs: Record<Platform, React.RefObject<HTMLDivElement | null>> = {
-      instagram: instagramMediaRef,
-      facebook: facebookMediaRef,
-      linkedin: linkedinMediaRef,
-      gmail: gmailMediaRef,
-      google_ads: googleAdsMediaRef,
-    };
+  const handleEditorInput = (platform: Platform, value: string) => {
+    setPlatformContent((prev) => ({ ...prev, [platform]: value }));
+  };
 
-    const fileInputRefs: Record<
-      Platform,
-      React.RefObject<HTMLInputElement | null>
-    > = {
-      instagram: instagramFileRef,
-      facebook: facebookFileRef,
-      linkedin: linkedinFileRef,
-      gmail: gmailFileRef,
-      google_ads: googleAdsFileRef,
-    };
+  const handleImageUrl = (platform: Platform, url: string) => {
+    const resolvedUrl = resolveImageUrl(url);
+    platformImageUrlsRef.current[platform] = resolvedUrl;
+    setPlatformImageUrls((prev) => ({ ...prev, [platform]: resolvedUrl }));
+  };
 
-    const [inlinePreview, setInlinePreview] = useState<{
-      src: string;
-      type: "image" | "file";
-      name: string;
-    } | null>(null);
+  /* ---- Refs ---- */
+  const instagramRef = useRef<HTMLDivElement>(null);
+  const facebookRef = useRef<HTMLDivElement>(null);
+  const linkedinRef = useRef<HTMLDivElement>(null);
+  const gmailRef = useRef<HTMLDivElement>(null);
+  const googleAdsRef = useRef<HTMLDivElement>(null);
 
-    const step2Valid = accounts.length > 0 && mode;
+  const instagramMediaRef = useRef<HTMLDivElement>(null);
+  const facebookMediaRef = useRef<HTMLDivElement>(null);
+  const linkedinMediaRef = useRef<HTMLDivElement>(null);
+  const gmailMediaRef = useRef<HTMLDivElement>(null);
+  const googleAdsMediaRef = useRef<HTMLDivElement>(null);
 
-    const [scheduleDate, setScheduleDate] = useState("");
-    const [scheduleTime, setScheduleTime] = useState("");
-    const [budgets, setBudgets] = useState<Record<Platform, number>>({
-      instagram: 350,
-      facebook: 250,
-      linkedin: 150,
-      gmail: 0,
-      google_ads: 200,
-    });
+  const instagramFileRef = useRef<HTMLInputElement>(null);
+  const facebookFileRef = useRef<HTMLInputElement>(null);
+  const linkedinFileRef = useRef<HTMLInputElement>(null);
+  const gmailFileRef = useRef<HTMLInputElement>(null);
+  const googleAdsFileRef = useRef<HTMLInputElement>(null);
 
-    const setBudget = (platform: Platform, value: number) =>
-      setBudgets((prev) => ({ ...prev, [platform]: value }));
+  const platformRefs: Record<
+    Platform,
+    React.RefObject<HTMLDivElement | null>
+  > = {
+    instagram: instagramRef,
+    facebook: facebookRef,
+    linkedin: linkedinRef,
+    gmail: gmailRef,
+    google_ads: googleAdsRef,
+  };
 
-    const getEditorRef = (platform: string) => {
-      if (platform === "instagram") return instagramRef;
-      if (platform === "facebook") return facebookRef;
-      if (platform === "google_ads") return googleAdsRef;
-      return linkedinRef;
-    };
+  const mediaRefs: Record<Platform, React.RefObject<HTMLDivElement | null>> = {
+    instagram: instagramMediaRef,
+    facebook: facebookMediaRef,
+    linkedin: linkedinMediaRef,
+    gmail: gmailMediaRef,
+    google_ads: googleAdsMediaRef,
+  };
 
-    const getMediaRef = (platform: string) => {
-      if (platform === "instagram") return instagramMediaRef;
-      if (platform === "facebook") return facebookMediaRef;
-      if (platform === "google_ads") return googleAdsMediaRef;
-      return linkedinMediaRef;
-    };
+  const fileInputRefs: Record<
+    Platform,
+    React.RefObject<HTMLInputElement | null>
+  > = {
+    instagram: instagramFileRef,
+    facebook: facebookFileRef,
+    linkedin: linkedinFileRef,
+    gmail: gmailFileRef,
+    google_ads: googleAdsFileRef,
+  };
 
-    const insertHTML = (platform: string, html: string) => {
-      const ref = getEditorRef(platform);
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) return;
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      const el = document.createElement("span");
-      el.innerHTML = html;
-      const frag = document.createDocumentFragment();
-      let node;
-      while ((node = el.firstChild)) frag.appendChild(node);
-      range.insertNode(frag);
-      ref.current?.focus();
-    };
+  const [inlinePreview, setInlinePreview] = useState<{
+    src: string;
+    type: "image" | "file";
+    name: string;
+  } | null>(null);
 
-    const handleText = () => {
-      document.execCommand("bold");
-    };
+  const step2Valid = accounts.length > 0 && mode;
 
-    const handleLink = (platform: string) => {
-      const url = prompt("Enter URL");
-      if (!url) return;
-      insertHTML(
-        platform,
-        `<a href="${url}" target="_blank" style="color:#2563eb;text-decoration:underline;">${url}</a>`,
+  // ─── FIX: validate campaign content per selected platform ────────────
+  const getPlatformContentErrors = (): string[] => {
+    const errors: string[] = [];
+    for (const platform of accounts) {
+      const fromRef = platformRefs[platform]?.current?.innerText?.trim() || "";
+      const fromState = platformContent[platform]?.trim() || "";
+      const hasContent = fromState || fromRef;
+      if (!hasContent) {
+        errors.push(
+          `${platform.replace("_", " ").toUpperCase()} campaign content is required.`
+        );
+      }
+    }
+    return errors;
+  };
+
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [budgets, setBudgets] = useState<Record<Platform, number>>({
+    instagram: 350,
+    facebook: 250,
+    linkedin: 150,
+    gmail: 0,
+    google_ads: 200,
+  });
+
+  const setBudget = (platform: Platform, value: number) =>
+    setBudgets((prev) => ({ ...prev, [platform]: value }));
+
+  const getEditorRef = (platform: string) => {
+    if (platform === "instagram") return instagramRef;
+    if (platform === "facebook") return facebookRef;
+    if (platform === "google_ads") return googleAdsRef;
+    return linkedinRef;
+  };
+
+  const getMediaRef = (platform: string) => {
+    if (platform === "instagram") return instagramMediaRef;
+    if (platform === "facebook") return facebookMediaRef;
+    if (platform === "google_ads") return googleAdsMediaRef;
+    return linkedinMediaRef;
+  };
+
+  const insertHTML = (platform: string, html: string) => {
+    const ref = getEditorRef(platform);
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const el = document.createElement("span");
+    el.innerHTML = html;
+    const frag = document.createDocumentFragment();
+    let node;
+    while ((node = el.firstChild)) frag.appendChild(node);
+    range.insertNode(frag);
+    ref.current?.focus();
+  };
+
+  const handleText = () => {
+    document.execCommand("bold");
+  };
+
+  const handleLink = (platform: string) => {
+    const url = prompt("Enter URL");
+    if (!url) return;
+    insertHTML(
+      platform,
+      `<a href="${url}" target="_blank" style="color:#2563eb;text-decoration:underline;">${url}</a>`
+    );
+  };
+
+  const handleEmoji = (platform: string) => {
+    const ref = getEditorRef(platform);
+    ref.current?.focus();
+    document.execCommand("insertText", false, "😊");
+  };
+
+  const handleImage = () => {
+    // No-op: images handled via URL input field or file upload in SocialContentBox
+  };
+
+  const handleAttachment = (platform: string) => {
+    if (platform === "instagram") instagramFileRef.current?.click();
+    if (platform === "facebook") facebookFileRef.current?.click();
+    if (platform === "linkedin") linkedinFileRef.current?.click();
+    if (platform === "google_ads") googleAdsFileRef.current?.click();
+  };
+
+  const handleFileInsert = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    platform: string
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const mediaRef = getMediaRef(platform);
+    const objectUrl = URL.createObjectURL(file);
+    const wrapper = document.createElement("div");
+    wrapper.className = "inserted-file-wrapper";
+    const label = document.createElement("span");
+    label.className = "file-label";
+    label.textContent = file.name;
+    label.style.cursor = "pointer";
+    label.onclick = () =>
+      setInlinePreview({ src: objectUrl, type: "file", name: file.name });
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "✕";
+    removeBtn.className = "remove-btn";
+    removeBtn.contentEditable = "false";
+    removeBtn.onclick = () => wrapper.remove();
+    wrapper.appendChild(label);
+    wrapper.appendChild(removeBtn);
+    mediaRef.current?.appendChild(wrapper);
+    e.target.value = "";
+  };
+
+  const toggleAccount = (id: Platform) => {
+    const isConnected = isPlatformConnected(id);
+    if (!accounts.includes(id) && !isConnected) {
+      toast.warn(
+        `${id.replace("_", " ").toUpperCase()} is not connected. Please connect it from Integrations.`,
+        { toastId: `${id}-not-connected` }
       );
-    };
+      return;
+    }
+    setAccounts((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
-    const handleEmoji = (platform: string) => {
-      const ref = getEditorRef(platform);
-      ref.current?.focus();
-      document.execCommand("insertText", false, "😊");
-    };
+  const handleNext = () => {
+    setSubmitted(true);
+    if (step === 1) {
+      const campaignNameError = getCampaignNameValidationError(campaignName);
+      if (campaignNameError) {
+        toast.error(campaignNameError, {
+          toastId: "social-campaign-name-error",
+        });
+        return;
+      }
+    }
 
-    const handleImage = () => {
-      // No-op: images handled via URL input field in SocialContentBox
-    };
+    if (step === 1 && step1Valid) {
+      setStep(2);
+      setSubmitted(false);
+      return;
+    }
 
-    const handleAttachment = (platform: string) => {
-      if (platform === "instagram") instagramFileRef.current?.click();
-      if (platform === "facebook") facebookFileRef.current?.click();
-      if (platform === "linkedin") linkedinFileRef.current?.click();
-      if (platform === "google_ads") googleAdsFileRef.current?.click();
-    };
-
-    const handleFileInsert = (
-      e: React.ChangeEvent<HTMLInputElement>,
-      platform: string,
-    ) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const mediaRef = getMediaRef(platform);
-      const objectUrl = URL.createObjectURL(file);
-      const wrapper = document.createElement("div");
-      wrapper.className = "inserted-file-wrapper";
-      const label = document.createElement("span");
-      label.className = "file-label";
-      label.textContent = file.name;
-      label.style.cursor = "pointer";
-      label.onclick = () =>
-        setInlinePreview({ src: objectUrl, type: "file", name: file.name });
-      const removeBtn = document.createElement("button");
-      removeBtn.textContent = "✕";
-      removeBtn.className = "remove-btn";
-      removeBtn.contentEditable = "false";
-      removeBtn.onclick = () => wrapper.remove();
-      wrapper.appendChild(label);
-      wrapper.appendChild(removeBtn);
-      mediaRef.current?.appendChild(wrapper);
-      e.target.value = "";
-    };
-
-    const toggleAccount = (id: Platform) => {
-      const isConnected = isPlatformConnected(id);
-      if (!accounts.includes(id) && !isConnected) {
-        toast.warn(
-          `${id.replace("_", " ").toUpperCase()} is not connected. Please connect it from Integrations.`,
-          { toastId: `${id}-not-connected` },
+    if (step === 2 && step2Valid) {
+      // ── FIX: validate that every selected platform has content ──
+      const contentErrors = getPlatformContentErrors();
+      if (contentErrors.length > 0) {
+        contentErrors.forEach((msg) =>
+          toast.error(msg, { toastId: `content-error-${msg}` })
         );
         return;
       }
-      setAccounts((prev) =>
-        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-      );
-    };
+      setStep(3);
+      setSubmitted(false);
+    }
+  };
 
-    const handleNext = () => {
-      setSubmitted(true);
-      if (step === 1) {
-        const campaignNameError = getCampaignNameValidationError(campaignName);
-        if (campaignNameError) {
-          toast.error(campaignNameError, {
-            toastId: "social-campaign-name-error",
-          });
+  // ─── Build final LinkedIn location string ─────────────────────
+  const getLinkedInLocation = () => {
+    if (linkedInCustomLocation.trim()) return linkedInCustomLocation.trim();
+    if (linkedInState && linkedInCountry) return `${linkedInState}, ${linkedInCountry}`;
+    if (linkedInCountry) return linkedInCountry;
+    return "";
+  };
+
+  const getBudgetError = (platform: Platform, amount: number): string | null => {
+    if (
+      platform === "facebook" ||
+      platform === "instagram" ||
+      platform === "linkedin" ||
+      platform === "google_ads"
+    ) {
+      if (amount <= PLATFORM_MIN_BUDGET) {
+        return `${platform.replace("_", " ").toUpperCase()} requires a budget greater than $${PLATFORM_MIN_BUDGET}. Please enter at least $${PLATFORM_MIN_BUDGET + 1}.`;
+      }
+    }
+    return null;
+  };
+
+  const handleCreateCampaign = async (
+    type: "live" | "draft" | "scheduled"
+  ) => {
+    setSubmitted(true);
+
+    if (!step1Valid || !step2Valid) return;
+    if (type === "scheduled" && (!scheduleDate || !scheduleTime)) {
+      toast.error("Please select both schedule date and time");
+      return;
+    }
+
+    if (mode === "paid") {
+      for (const platform of accounts) {
+        const err = getBudgetError(platform, budgets[platform]);
+        if (err) {
+          toast.error(err);
           return;
         }
       }
+    }
 
-      if (step === 1 && step1Valid) {
-        setStep(2);
-        setSubmitted(false);
-      } else if (step === 2 && step2Valid) {
-        setStep(3);
-        setSubmitted(false);
+    setLoadingType(type);
+    try {
+      const selectedPlatforms = PLATFORM_LIST.filter((p) =>
+        accounts.includes(p.id)
+      );
+
+      const totalSpend = selectedPlatforms.reduce(
+        (sum, p) => sum + budgets[p.id],
+        0
+      );
+
+      const refsMap: Record<Platform, React.RefObject<HTMLDivElement | null>> = {
+        instagram: instagramRef,
+        facebook: facebookRef,
+        linkedin: linkedinRef,
+        gmail: gmailRef,
+        google_ads: googleAdsRef,
+      };
+
+      const resolvedContent: Record<Platform, string> = {
+        instagram: "",
+        facebook: "",
+        linkedin: "",
+        gmail: "",
+        google_ads: "",
+      };
+
+      for (const platform of accounts) {
+        const fromState = platformContent[platform]?.trim();
+        const fromRef = refsMap[platform]?.current?.innerText?.trim() || "";
+        resolvedContent[platform] = fromState || fromRef;
       }
-    };
 
-    // ─── Build final LinkedIn location string ─────────────────────
-    const getLinkedInLocation = () => {
-      if (linkedInCustomLocation.trim()) return linkedInCustomLocation.trim();
-      if (linkedInState && linkedInCountry) return `${linkedInState}, ${linkedInCountry}`;
-      if (linkedInCountry) return linkedInCountry;
-      return "";
-    };
+      // ─── FIX: Resolve image_url with priority: URL > uploaded file ──────
+      // Priority order:
+      //   1. Explicitly typed / pasted image URL (platformImageUrls / ref)
+      //   2. Uploaded image file (uploaded to server, returns a URL)
+      //   3. Content that looks like a plain URL (legacy fallback)
+      let image_url: string | null = null;
 
-    const getBudgetError = (platform: Platform, amount: number): string | null => {
-      if (
-        platform === "facebook" ||
-        platform === "instagram" ||
-        platform === "linkedin" ||
-        platform === "google_ads"
-      ) {
-        if (amount <= PLATFORM_MIN_BUDGET) {
-          return `${platform.replace("_", " ").toUpperCase()} requires a budget greater than $${PLATFORM_MIN_BUDGET}. Please enter at least $${PLATFORM_MIN_BUDGET + 1}.`;
+      // Step 1 – check typed URL fields
+      for (const p of accounts) {
+        const fromRef = platformImageUrlsRef.current[p]?.trim();
+        const fromState = platformImageUrls[p]?.trim();
+        const candidate = fromRef || fromState || "";
+        if (candidate) {
+          image_url = resolveImageUrl(candidate);
+          break;
         }
       }
-      return null;
-    };
 
-    const handleCreateCampaign = async (
-      type: "live" | "draft" | "scheduled",
-    ) => {
-      setSubmitted(true);
-
-      if (!step1Valid || !step2Valid) return;
-      if (type === "scheduled" && (!scheduleDate || !scheduleTime)) {
-        toast.error("Please select both schedule date and time");
-        return;
-      }
-
-      if (mode === "paid") {
-        for (const platform of accounts) {
-          const err = getBudgetError(platform, budgets[platform]);
-          if (err) {
-            toast.error(err);
-            return;
-          }
-        }
-      }
-
-      setLoadingType(type);
-      try {
-        const selectedPlatforms = PLATFORM_LIST.filter((p) =>
-          accounts.includes(p.id),
-        );
-
-        const totalSpend = selectedPlatforms.reduce(
-          (sum, p) => sum + budgets[p.id],
-          0,
-        );
-
-        const refsMap: Record<
-          Platform,
-          React.RefObject<HTMLDivElement | null>
-        > = {
-          instagram: instagramRef,
-          facebook: facebookRef,
-          linkedin: linkedinRef,
-          gmail: gmailRef,
-          google_ads: googleAdsRef,
-        };
-
-        const resolvedContent: Record<Platform, string> = {
-          instagram: "",
-          facebook: "",
-          linkedin: "",
-          gmail: "",
-          google_ads: "",
-        };
-
-        for (const platform of accounts) {
-          const fromState = platformContent[platform]?.trim();
-          const fromRef = refsMap[platform]?.current?.innerText?.trim() || "";
-          resolvedContent[platform] = fromState || fromRef;
-        }
-
-        let image_url: string | null = null;
-
+      // Step 2 – if no URL, try uploading a file
+      if (!image_url) {
         for (const p of accounts) {
-          const fromRef = platformImageUrlsRef.current[p]?.trim();
-          const fromState = platformImageUrls[p]?.trim();
-          const candidate = fromRef || fromState || "";
-          if (candidate) {
-            image_url = resolveImageUrl(candidate);
-            break;
-          }
-        }
-
-        if (!image_url) {
-          for (const p of accounts) {
-            const content = resolvedContent[p]?.trim();
-            if (content && isPlainUrl(content)) {
-              image_url = resolveImageUrl(content);
-              resolvedContent[p] = "";
+          const file = platformImageFiles[p];
+          if (file) {
+            toast.info("Uploading image…", { toastId: "image-upload-progress", autoClose: false });
+            const uploadedUrl = await uploadImageFile(file);
+            toast.dismiss("image-upload-progress");
+            if (uploadedUrl) {
+              image_url = uploadedUrl;
               break;
+            } else {
+              toast.warn(
+                "Image upload failed — campaign will be created without an image."
+              );
             }
           }
         }
+      }
 
-        const firstSelectedContent =
-          accounts
-            .map((p) => resolvedContent[p])
-            .find((c) => c.trim() !== "" && !isPlainUrl(c)) ?? campaignName;
-
-        const statusValue =
-          type === "live"
-            ? CAMPAIGN_STATUS.LIVE
-            : type === "scheduled"
-              ? CAMPAIGN_STATUS.SCHEDULED
-              : CAMPAIGN_STATUS.DRAFT;
-
-        const isActive = type === "live";
-        const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
-
-        const campaignMode: ("organic_posting" | "paid_advertising")[] = [
-          mode === "paid" ? "paid_advertising" : "organic_posting",
-        ];
-
-        const selectedAccounts = [...accounts];
-
-        const cleanedContent: Partial<Record<Platform, unknown>> = {
-          ...resolvedContent,
-        };
-
-        if (accounts.includes("linkedin")) {
-          const existingLinkedinContent =
-            typeof resolvedContent["linkedin"] === "string"
-              ? resolvedContent["linkedin"]
-              : "";
-          cleanedContent["linkedin"] = {
-            content: existingLinkedinContent,
-            location: getLinkedInLocation(),
-            bid_strategy: linkedInBidStrategy,
-            bid_amount: linkedInBidAmount,
-          };
-        }
-        if (accounts.includes("facebook")) {
-          cleanedContent["facebook"] = {
-            content: resolvedContent["facebook"],
-            country_code: metaCountry || "IN",
-            state: metaState,
-          };
-        }
-        if (accounts.includes("instagram")) {
-          cleanedContent["instagram"] = {
-            content: resolvedContent["instagram"],
-            country_code: metaCountry || "IN",
-            state: metaState,
-          };
-        }
-
-        const payload: SocialCampaignPayload = {
-          clinic: clinicId,
-          campaign_name: campaignName,
-          campaign_description: campaignDescription,
-          campaign_objective: objective,
-          target_audience: audience,
-          start_date: startDate,
-          end_date: endDate,
-          campaign_mode: campaignMode,
-          campaign_content: firstSelectedContent,
-          select_ad_accounts: selectedAccounts,
-          enter_time: scheduleTime || null,
-          platform_data: cleanedContent,
-          budget_data: {
-            ...Object.fromEntries(
-              selectedPlatforms.map((p) => [p.id, budgets[p.id]]),
-            ),
-            total: totalSpend,
-          },
-          image_url,
-          selected_start: scheduleDate || null,
-          selected_end: scheduleDate || null,
-          status: statusValue,
-          is_active: isActive,
-        };
-
-        const createdRes = await CampaignAPI.createSocial(payload);
-
-        const newCampaignId: string | null =
-          (createdRes?.data as { id?: string })?.id ??
-          (createdRes?.data as { campaign_id?: string })?.campaign_id ??
-          null;
-
-        if (newCampaignId) {
-          setCreatedCampaignId(newCampaignId);
-        }
-
-        const shouldSendGoogleAds =
-          accounts.includes("google_ads") &&
-          isGoogleAdsConnected &&
-          mode === "paid";
-
-        if (shouldSendGoogleAds) {
-          try {
-            const googleAdsImage =
-              platformImageUrlsRef.current["google_ads"]?.trim() ||
-              platformImageUrls["google_ads"]?.trim() ||
-              image_url ||
-              null;
-
-            const parsedKeywords = keywordsInput
-              .split(",")
-              .map((k) => k.trim())
-              .filter(Boolean);
-
-            console.log("[GoogleAds] Sending paid ad payload:", {
-              internal_campaign_id: String(newCampaignId ?? ""),
-              image_url: googleAdsImage,
-              keywords: parsedKeywords,
-              campaign_objective: objective,
-              target_audience: audience,
-              start_date: startDate,
-              end_date: endDate,
-              start_time: scheduleTime || "",
-              campaign_status: googleAdsCampaignStatus,
-            });
-
-            await CampaignAPI.createGoogleAds({
-              clinic_id: clinicId,
-              customer_id: String(clinic?.google_ads_customer_id ?? ""),
-              campaign_name: campaignName,
-              budget: budgets["google_ads"],
-              bidding_strategy: "MANUAL_CPC",
-              locations: [],
-              keywords: parsedKeywords,
-              cpc_bid: 20,
-              ad_group_name: `${campaignName} AdGroup`,
-              final_url: clinic?.website ?? "https://example.com",
-              headline_1: campaignName.slice(0, 30),
-              headline_2: "Learn More",
-              headline_3: "Contact Us Today",
-              description: campaignDescription.slice(0, 90),
-              description_2: "Call us now or visit our website.",
-              image_url: googleAdsImage,
-              platform_data: { google_ads: resolvedContent["google_ads"] },
-              campaign_type: "SEARCH",
-              internal_campaign_id: String(newCampaignId ?? ""),
-              campaign_objective: objective,
-              target_audience: audience,
-              start_date: startDate,
-              end_date: endDate,
-              start_time: scheduleTime || "",
-              campaign_status: googleAdsCampaignStatus,
-            });
-
-            console.log("[GoogleAds] Paid campaign sent to Zapier successfully");
-          } catch (googleAdsErr) {
-            console.error("[GoogleAds] Failed to trigger Google Ads:", googleAdsErr);
-            toast.warn("Campaign saved, but Google Ads trigger failed. Check logs.");
-          }
-        } else if (
-          accounts.includes("google_ads") &&
-          isGoogleAdsConnected &&
-          mode === "organic"
-        ) {
-          console.log("[GoogleAds] Organic mode — campaign content saved, no paid ad triggered.");
-        } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
-          toast.warn("Google Ads was not triggered because this clinic is not connected to Google Ads.");
-        }
-
-        if (accounts.includes("linkedin") && newCampaignId) {
-          try {
-            await CampaignAPI.createLinkedInCampaign(newCampaignId);
-            console.log("[LinkedIn] Campaign sent to Zapier");
-          } catch (err) {
-            console.error("[LinkedIn] Create failed", err);
-            toast.warn("Campaign saved but LinkedIn trigger failed");
+      // Step 3 – legacy: content that is a plain URL
+      if (!image_url) {
+        for (const p of accounts) {
+          const content = resolvedContent[p]?.trim();
+          if (content && isPlainUrl(content)) {
+            image_url = resolveImageUrl(content);
+            resolvedContent[p] = "";
+            break;
           }
         }
+      }
 
-        onSave(createdRes?.data ?? payload);
-        toast.success("Campaign created successfully");
-        onClose();
-      } catch {
+      const firstSelectedContent =
+        accounts
+          .map((p) => resolvedContent[p])
+          .find((c) => c.trim() !== "" && !isPlainUrl(c)) ?? campaignName;
+
+      const statusValue =
+        type === "live"
+          ? CAMPAIGN_STATUS.LIVE
+          : type === "scheduled"
+          ? CAMPAIGN_STATUS.SCHEDULED
+          : CAMPAIGN_STATUS.DRAFT;
+
+      const isActive = type === "live";
+      const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
+
+      const campaignMode: ("organic_posting" | "paid_advertising")[] = [
+        mode === "paid" ? "paid_advertising" : "organic_posting",
+      ];
+
+      const selectedAccounts =
+        mode === "paid"
+          ? [...accounts]
+          : accounts.filter((platform) => platform !== "google_ads");
+
+      const cleanedContent: Partial<Record<Platform, unknown>> = {
+        ...resolvedContent,
+      };
+
+      if (accounts.includes("linkedin")) {
+        const existingLinkedinContent =
+          typeof resolvedContent["linkedin"] === "string"
+            ? resolvedContent["linkedin"]
+            : "";
+        cleanedContent["linkedin"] = {
+          content: existingLinkedinContent,
+          location: getLinkedInLocation(),
+          bid_strategy: linkedInBidStrategy,
+          bid_amount: linkedInBidAmount,
+        };
+      }
+      if (accounts.includes("facebook")) {
+        cleanedContent["facebook"] = {
+          content: resolvedContent["facebook"],
+          country_code: metaCountry || "IN",
+          state: metaState,
+        };
+      }
+      if (accounts.includes("instagram")) {
+        cleanedContent["instagram"] = {
+          content: resolvedContent["instagram"],
+          country_code: metaCountry || "IN",
+          state: metaState,
+        };
+      }
+
+      const payload: SocialCampaignPayload = {
+        clinic: clinicId,
+        campaign_name: campaignName,
+        campaign_description: campaignDescription,
+        campaign_objective: objective,
+        target_audience: audience,
+        start_date: startDate,
+        end_date: endDate,
+        campaign_mode: campaignMode,
+        campaign_content: firstSelectedContent,
+        select_ad_accounts: selectedAccounts,
+        enter_time: scheduleTime || null,
+        platform_data: cleanedContent,
+        budget_data: {
+          ...Object.fromEntries(
+            selectedPlatforms.map((p) => [p.id, budgets[p.id]])
+          ),
+          total: totalSpend,
+        },
+        image_url,
+        selected_start: scheduleDate || null,
+        selected_end: scheduleDate || null,
+        status: statusValue,
+        is_active: isActive,
+      };
+
+      const createdRes = await CampaignAPI.createSocial(payload);
+
+      const newCampaignId: string | null =
+        (createdRes?.data as { id?: string })?.id ??
+        (createdRes?.data as { campaign_id?: string })?.campaign_id ??
+        null;
+
+      if (newCampaignId) {
+        setCreatedCampaignId(newCampaignId);
+      }
+
+      const shouldSendGoogleAds =
+        accounts.includes("google_ads") &&
+        isGoogleAdsConnected &&
+        mode === "paid";
+
+      if (shouldSendGoogleAds) {
         try {
-          const listRes = await CampaignAPI.list();
-          const list = Array.isArray(listRes.data) ? listRes.data : [];
-          const found = list
-            .filter(
-              (item) =>
-                String(item?.campaign_name ?? "")
-                  .trim()
-                  .toLowerCase() === campaignName.trim().toLowerCase(),
-            )
-            .sort((a, b) => {
-              const at = new Date(
-                String(a?.modified_at ?? a?.created_at ?? 0),
-              ).getTime();
-              const bt = new Date(
-                String(b?.modified_at ?? b?.created_at ?? 0),
-              ).getTime();
-              return bt - at;
-            })[0];
+          const googleAdsImage =
+            platformImageUrlsRef.current["google_ads"]?.trim() ||
+            platformImageUrls["google_ads"]?.trim() ||
+            image_url ||
+            null;
 
-          if (found) {
-            onSave(found);
-            toast.success("Campaign created successfully");
-            onClose();
-            return;
-          }
-        } catch {
-          // ignore fallback failure
+          const parsedKeywords = keywordsInput
+            .split(",")
+            .map((k) => k.trim())
+            .filter(Boolean);
+
+          console.log("[GoogleAds] Sending paid ad payload:", {
+            internal_campaign_id: String(newCampaignId ?? ""),
+            image_url: googleAdsImage,
+            keywords: parsedKeywords,
+            campaign_objective: objective,
+            target_audience: audience,
+            start_date: startDate,
+            end_date: endDate,
+            start_time: scheduleTime || "",
+            campaign_status: googleAdsCampaignStatus,
+          });
+
+          // ✅ FIX: Use platform's estimated CPC ($2.0 for Google Ads) instead of hardcoded value
+          const googleAdsPlatform = PLATFORM_LIST.find((p) => p.id === "google_ads");
+          const googleAdsCpcBid = googleAdsPlatform?.cpc ?? 2.0;
+
+          await CampaignAPI.createGoogleAds({
+            clinic_id: clinicId,
+            customer_id: String(clinic?.google_ads_customer_id ?? ""),
+            campaign_name: campaignName,
+            budget: budgets["google_ads"],
+            bidding_strategy: "MANUAL_CPC",
+            locations: [],
+            keywords: parsedKeywords,
+            cpc_bid: googleAdsCpcBid,
+            ad_group_name: `${campaignName} AdGroup`,
+            final_url: clinic?.website ?? "https://example.com",
+            headline_1: campaignName.slice(0, 30),
+            headline_2: "Learn More",
+            headline_3: "Contact Us Today",
+            description: campaignDescription.slice(0, 90),
+            description_2: "Call us now or visit our website.",
+            image_url: googleAdsImage,
+            platform_data: { google_ads: resolvedContent["google_ads"] },
+            campaign_type: "SEARCH",
+            internal_campaign_id: String(newCampaignId ?? ""),
+            campaign_objective: objective,
+            target_audience: audience,
+            start_date: startDate,
+            end_date: endDate,
+            start_time: scheduleTime || "",
+            campaign_status: googleAdsCampaignStatus,
+          });
+
+          console.log("[GoogleAds] Paid campaign sent to Zapier successfully");
+        } catch (googleAdsErr) {
+          console.error("[GoogleAds] Failed to trigger Google Ads:", googleAdsErr);
+          toast.warn("Campaign saved, but Google Ads trigger failed. Check logs.");
         }
-
-        toast.error("Failed to create campaign");
-      } finally {
-        setLoadingType(null);
+      } else if (
+        accounts.includes("google_ads") &&
+        isGoogleAdsConnected &&
+        mode === "organic"
+      ) {
+        console.log(
+          "[GoogleAds] Organic mode — campaign content saved, no paid ad triggered."
+        );
+      } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
+        toast.warn(
+          "Google Ads was not triggered because this clinic is not connected to Google Ads."
+        );
       }
-    };
 
-    // ─── LinkedIn post-creation actions ──────────────────────────
-    const handleLinkedInStatusCheck = async () => {
-      if (!createdCampaignId) return;
-      setLinkedInStatusCheckLoading(true);
+      if (accounts.includes("linkedin") && newCampaignId) {
+        try {
+          await CampaignAPI.createLinkedInCampaign(newCampaignId);
+          console.log("[LinkedIn] Campaign sent to Zapier");
+        } catch (err) {
+          console.error("[LinkedIn] Create failed", err);
+          toast.warn("Campaign saved but LinkedIn trigger failed");
+        }
+      }
+
+      onSave(createdRes?.data ?? payload);
+      toast.success("Campaign created successfully");
+      onClose();
+    } catch {
       try {
-        const res = await CampaignAPI.getLinkedInStatus(createdCampaignId);
-        const respStatus =
-          (res?.data as { linkedin_live_status?: string })?.linkedin_live_status ??
-          (res?.data as { status?: string })?.status ??
-          "unknown";
-        setLinkedInLiveStatus(String(respStatus));
-        toast.success(`LinkedIn status: ${respStatus}`);
+        const listRes = await CampaignAPI.list();
+        const list = Array.isArray(listRes.data) ? listRes.data : [];
+        const found = list
+          .filter(
+            (item) =>
+              String(item?.campaign_name ?? "")
+                .trim()
+                .toLowerCase() === campaignName.trim().toLowerCase()
+          )
+          .sort((a, b) => {
+            const at = new Date(
+              String(a?.modified_at ?? a?.created_at ?? 0)
+            ).getTime();
+            const bt = new Date(
+              String(b?.modified_at ?? b?.created_at ?? 0)
+            ).getTime();
+            return bt - at;
+          })[0];
+
+        if (found) {
+          onSave(found);
+          toast.success("Campaign created successfully");
+          onClose();
+          return;
+        }
       } catch {
-        toast.error("Failed to fetch LinkedIn status");
-      } finally {
-        setLinkedInStatusCheckLoading(false);
+        // ignore fallback failure
       }
-    };
 
-    const handleLinkedInInsights = async () => {
-      if (!createdCampaignId) return;
-      setLinkedInInsightsLoading(true);
-      try {
-        await CampaignAPI.triggerLinkedInInsights(createdCampaignId);
-        toast.success("LinkedIn insights requested. Data will sync shortly.");
-      } catch {
-        toast.error("Failed to trigger LinkedIn insights");
-      } finally {
-        setLinkedInInsightsLoading(false);
-      }
-    };
+      toast.error("Failed to create campaign");
+    } finally {
+      setLoadingType(null);
+    }
+  };
 
-    const handleLinkedInPause = async () => {
-      if (!createdCampaignId) return;
-      setLinkedInUpdateLoading(true);
-      try {
-        await CampaignAPI.updateLinkedInStatus(createdCampaignId, "PAUSED");
-        setLinkedInLiveStatus("PAUSED");
-        toast.success("LinkedIn campaign paused.");
-      } catch {
-        toast.error("Failed to pause LinkedIn campaign");
-      } finally {
-        setLinkedInUpdateLoading(false);
-      }
-    };
+  // ─── LinkedIn post-creation actions ──────────────────────────
+  const handleLinkedInStatusCheck = async () => {
+    if (!createdCampaignId) return;
+    setLinkedInStatusCheckLoading(true);
+    try {
+      const res = await CampaignAPI.getLinkedInStatus(createdCampaignId);
+      const respStatus =
+        (res?.data as { linkedin_live_status?: string })?.linkedin_live_status ??
+        (res?.data as { status?: string })?.status ??
+        "unknown";
+      setLinkedInLiveStatus(String(respStatus));
+      toast.success(`LinkedIn status: ${respStatus}`);
+    } catch {
+      toast.error("Failed to fetch LinkedIn status");
+    } finally {
+      setLinkedInStatusCheckLoading(false);
+    }
+  };
 
-    const handleLinkedInResume = async () => {
-      if (!createdCampaignId) return;
-      setLinkedInUpdateLoading(true);
-      try {
-        await CampaignAPI.updateLinkedInStatus(createdCampaignId, "ACTIVE");
-        setLinkedInLiveStatus("ACTIVE");
-        toast.success("LinkedIn campaign resumed.");
-      } catch {
-        toast.error("Failed to resume LinkedIn campaign");
-      } finally {
-        setLinkedInUpdateLoading(false);
-      }
-    };
+  const handleLinkedInInsights = async () => {
+    if (!createdCampaignId) return;
+    setLinkedInInsightsLoading(true);
+    try {
+      await CampaignAPI.triggerLinkedInInsights(createdCampaignId);
+      toast.success("LinkedIn insights requested. Data will sync shortly.");
+    } catch {
+      toast.error("Failed to trigger LinkedIn insights");
+    } finally {
+      setLinkedInInsightsLoading(false);
+    }
+  };
 
-    const renderLinkedInControls = () => {
-      if (!accounts.includes("linkedin")) return null;
+  const handleLinkedInPause = async () => {
+    if (!createdCampaignId) return;
+    setLinkedInUpdateLoading(true);
+    try {
+      await CampaignAPI.updateLinkedInStatus(createdCampaignId, "PAUSED");
+      setLinkedInLiveStatus("PAUSED");
+      toast.success("LinkedIn campaign paused.");
+    } catch {
+      toast.error("Failed to pause LinkedIn campaign");
+    } finally {
+      setLinkedInUpdateLoading(false);
+    }
+  };
 
-      return (
-        <div
-          className="section-card"
-          style={{
-            marginTop: 16,
-            border: "1px solid #0077b5",
-            borderRadius: 8,
-            padding: 16,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <img
-              src={platformIcons["linkedin"]}
-              alt="LinkedIn"
-              style={{ width: 20, height: 20 }}
-            />
-            <h3 style={{ margin: 0, color: "#0077b5" }}>LinkedIn Campaign Controls</h3>
-            {linkedInLiveStatus && (
-              <Chip
-                label={linkedInLiveStatus}
-                size="small"
-                color={
-                  linkedInLiveStatus === "ACTIVE"
-                    ? "success"
-                    : linkedInLiveStatus === "PAUSED"
-                      ? "warning"
-                      : "default"
-                }
-                sx={{ ml: "auto" }}
-              />
-            )}
-          </div>
+  const handleLinkedInResume = async () => {
+    if (!createdCampaignId) return;
+    setLinkedInUpdateLoading(true);
+    try {
+      await CampaignAPI.updateLinkedInStatus(createdCampaignId, "ACTIVE");
+      setLinkedInLiveStatus("ACTIVE");
+      toast.success("LinkedIn campaign resumed.");
+    } catch {
+      toast.error("Failed to resume LinkedIn campaign");
+    } finally {
+      setLinkedInUpdateLoading(false);
+    }
+  };
 
-          {!isLinkedInFullySetup && (
-            <p
-              style={{
-                color: "#d97706",
-                fontSize: 12,
-                marginBottom: 10,
-                backgroundColor: "#fffbeb",
-                padding: "6px 10px",
-                borderRadius: 4,
-                border: "1px solid #fcd34d",
-              }}
-            >
-              ⚠️ LinkedIn account setup is incomplete (missing:{" "}
-              {linkedInAccountStatus?.missing?.join(", ") || "account details"}).
-              Complete setup in Integrations for ads to be triggered.
-            </p>
-          )}
-
-          {isLinkedInFullySetup && !createdCampaignId && (
-            <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
-              Controls will be available after the campaign is created.
-            </p>
-          )}
-
-          {isLinkedInFullySetup && createdCampaignId && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                className="cancel-btn"
-                style={{ fontSize: 12, padding: "4px 12px" }}
-                onClick={handleLinkedInStatusCheck}
-                disabled={linkedInStatusCheckLoading}
-              >
-                {linkedInStatusCheckLoading ? "Checking…" : "🔄 Sync Status"}
-              </button>
-
-              <button
-                className="cancel-btn"
-                style={{ fontSize: 12, padding: "4px 12px" }}
-                onClick={handleLinkedInInsights}
-                disabled={linkedInInsightsLoading}
-              >
-                {linkedInInsightsLoading ? "Requesting…" : "📊 Fetch Insights"}
-              </button>
-
-              {linkedInLiveStatus !== "PAUSED" && (
-                <button
-                  className="cancel-btn"
-                  style={{ fontSize: 12, padding: "4px 12px", color: "#d97706" }}
-                  onClick={handleLinkedInPause}
-                  disabled={linkedInUpdateLoading}
-                >
-                  {linkedInUpdateLoading ? "Updating…" : "⏸ Pause"}
-                </button>
-              )}
-
-              {linkedInLiveStatus === "PAUSED" && (
-                <button
-                  className="next-btn"
-                  style={{ fontSize: 12, padding: "4px 12px" }}
-                  onClick={handleLinkedInResume}
-                  disabled={linkedInUpdateLoading}
-                >
-                  {linkedInUpdateLoading ? "Updating…" : "▶ Resume"}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    const scheduleDateMin = startDate ? dayjs(startDate) : dayjs();
-    const scheduleDateMax = endDate ? dayjs(endDate) : undefined;
-
-    const getScheduleMinTime = (): Dayjs | undefined => {
-      if (!scheduleDate) return dayjs();
-      if (scheduleDate === dayjs().format("YYYY-MM-DD")) {
-        return dayjs();
-      }
-      return undefined;
-    };
-
-    // FIX: Accept Date | Dayjs to match MUI's PickerValidDate type — fixes TS2322 build error
-    const isScheduleDateDisabled = (date: Date | Dayjs): boolean => {
-      const d = dayjs(date);
-      if (startDate && d.isBefore(dayjs(startDate), "day")) return true;
-      if (endDate && d.isAfter(dayjs(endDate), "day")) return true;
-      return false;
-    };
+  const renderLinkedInControls = () => {
+    if (!accounts.includes("linkedin")) return null;
 
     return (
-      <Modal open={true} onClose={onClose}>
-        <Box className="email-campaign-modal">
-          <div className="add-modal-header">
-            <Typography variant="h6">Add Social Media Campaign</Typography>
-            <IconButton onClick={onClose} className="close-btn">
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </div>
-
-          <div className="modal-divider" />
-
-          <div className="stepper">
-            <div
-              className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
-            >
-              <div className="circle">{step > 1 ? "✓" : "1"}</div>
-              <span>Campaign Details</span>
-            </div>
-            <div className="line" />
-            <div
-              className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}
-            >
-              <div className="circle">{step > 2 ? "✓" : "2"}</div>
-              <span>Content & Configuration</span>
-            </div>
-            <div className="line" />
-            <div className={`step ${step === 3 ? "active" : ""}`}>
-              <div className="circle">3</div>
-              <span>Schedule Campaign</span>
-            </div>
-          </div>
-
-          {/* STEP 1 */}
-          {step === 1 && (
-            <div className="step-content">
-              <Typography variant="h6" sx={{ mb: 3 }}>
-                Campaign Details
-              </Typography>
-
-              <div
-                className={`form-group ${submitted && !campaignName ? "error" : ""}`}
-              >
-                <label>Campaign Name *</label>
-                <input
-                  value={campaignName}
-                  onChange={(e) => {
-                    const nextValue = e.target.value;
-                    if (!canTypeCampaignName(nextValue)) {
-                      toast.error("Alphanumeric and underscore are allowed", {
-                        toastId: "social-campaign-name-typing",
-                      });
-                      return;
-                    }
-                    setCampaignName(nextValue);
-                  }}
-                  placeholder="e.g. New Product Launch"
-                />
-              </div>
-
-              <div
-                className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}
-              >
-                <label>Campaign Description *</label>
-                <input
-                  value={campaignDescription}
-                  onChange={(e) => setCampaignDescription(e.target.value)}
-                  placeholder="e.g. Contains records of routine checks..."
-                />
-              </div>
-
-              <div className="form-row">
-                <div
-                  className={`form-group half ${submitted && !objective ? "error" : ""}`}
-                >
-                  <label>Campaign Objective *</label>
-                  <FormControl fullWidth variant="outlined">
-                    <Select
-                      value={objective}
-                      onChange={(e) => setObjective(e.target.value)}
-                      displayEmpty
-                    >
-                      <MenuItem value="">Select Objective</MenuItem>
-                      {Object.entries(CAMPAIGN_OBJECTIVES).map(
-                        ([value, label]) => (
-                          <MenuItem key={value} value={value}>
-                            {label}
-                          </MenuItem>
-                        ),
-                      )}
-                    </Select>
-                  </FormControl>
-                </div>
-                <div
-                  className={`form-group half ${submitted && !audience ? "error" : ""}`}
-                >
-                  <label>Target Audience *</label>
-                  <FormControl fullWidth variant="outlined">
-                    <Select
-                      value={audience}
-                      onChange={(e) => setAudience(e.target.value)}
-                      displayEmpty
-                    >
-                      <MenuItem value="">Select Audience</MenuItem>
-                      {Object.entries(CAMPAIGN_AUDIENCE).map(
-                        ([value, label]) => (
-                          <MenuItem key={value} value={value}>
-                            {label}
-                          </MenuItem>
-                        ),
-                      )}
-                    </Select>
-                  </FormControl>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div
-                  className={`form-group half ${submitted && !startDate ? "error" : ""}`}
-                >
-                  <label>Start Date *</label>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker
-                      format="DD/MM/YYYY"
-                      minDate={dayjs()}
-                      value={startDate ? dayjs(startDate) : null}
-                      onChange={(v) => {
-                        const newStart = v ? (v as Dayjs).format("YYYY-MM-DD") : "";
-                        setStartDate(newStart);
-                        if (endDate && newStart && dayjs(endDate).isBefore(dayjs(newStart), "day")) {
-                          setEndDate("");
-                        }
-                        if (scheduleDate && newStart && dayjs(scheduleDate).isBefore(dayjs(newStart), "day")) {
-                          setScheduleDate("");
-                          setScheduleTime("");
-                        }
-                      }}
-                      slots={{ openPickerIcon: CalendarTodayIcon }}
-                      slotProps={{
-                        textField: { error: submitted && !startDate },
-                      }}
-                    />
-                  </LocalizationProvider>
-                </div>
-                <div
-                  className={`form-group half ${submitted && !endDate ? "error" : ""}`}
-                >
-                  <label>End Date *</label>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker
-                      format="DD/MM/YYYY"
-                      minDate={startDate ? dayjs(startDate) : dayjs()}
-                      value={endDate ? dayjs(endDate) : null}
-                      onChange={(v) => {
-                        const newEnd = v ? (v as Dayjs).format("YYYY-MM-DD") : "";
-                        setEndDate(newEnd);
-                        if (scheduleDate && newEnd && dayjs(scheduleDate).isAfter(dayjs(newEnd), "day")) {
-                          setScheduleDate("");
-                          setScheduleTime("");
-                        }
-                      }}
-                      slots={{ openPickerIcon: CalendarTodayIcon }}
-                      slotProps={{
-                        textField: { error: submitted && !endDate },
-                      }}
-                    />
-                  </LocalizationProvider>
-                </div>
-              </div>
-            </div>
+      <div
+        className="section-card"
+        style={{
+          marginTop: 16,
+          border: "1px solid #0077b5",
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 8,
+          }}
+        >
+          <img
+            src={platformIcons["linkedin"]}
+            alt="LinkedIn"
+            style={{ width: 20, height: 20 }}
+          />
+          <h3 style={{ margin: 0, color: "#0077b5" }}>
+            LinkedIn Campaign Controls
+          </h3>
+          {linkedInLiveStatus && (
+            <Chip
+              label={linkedInLiveStatus}
+              size="small"
+              color={
+                linkedInLiveStatus === "ACTIVE"
+                  ? "success"
+                  : linkedInLiveStatus === "PAUSED"
+                  ? "warning"
+                  : "default"
+              }
+              sx={{ ml: "auto" }}
+            />
           )}
+        </div>
 
-          {/* STEP 2 */}
-          {step === 2 && (
-            <div className="step-content">
-              <Typography variant="h6" sx={{ mb: 3 }}>
-                Content & Configuration
-              </Typography>
+        {!isLinkedInFullySetup && (
+          <p
+            style={{
+              color: "#d97706",
+              fontSize: 12,
+              marginBottom: 10,
+              backgroundColor: "#fffbeb",
+              padding: "6px 10px",
+              borderRadius: 4,
+              border: "1px solid #fcd34d",
+            }}
+          >
+            ⚠️ LinkedIn account setup is incomplete (missing:{" "}
+            {linkedInAccountStatus?.missing?.join(", ") || "account details"}).
+            Complete setup in Integrations for ads to be triggered.
+          </p>
+        )}
 
-              <div
-                className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
+        {isLinkedInFullySetup && !createdCampaignId && (
+          <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+            Controls will be available after the campaign is created.
+          </p>
+        )}
+
+        {isLinkedInFullySetup && createdCampaignId && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              className="cancel-btn"
+              style={{ fontSize: 12, padding: "4px 12px" }}
+              onClick={handleLinkedInStatusCheck}
+              disabled={linkedInStatusCheckLoading}
+            >
+              {linkedInStatusCheckLoading ? "Checking…" : "🔄 Sync Status"}
+            </button>
+
+            <button
+              className="cancel-btn"
+              style={{ fontSize: 12, padding: "4px 12px" }}
+              onClick={handleLinkedInInsights}
+              disabled={linkedInInsightsLoading}
+            >
+              {linkedInInsightsLoading ? "Requesting…" : "📊 Fetch Insights"}
+            </button>
+
+            {linkedInLiveStatus !== "PAUSED" && (
+              <button
+                className="cancel-btn"
+                style={{ fontSize: 12, padding: "4px 12px", color: "#d97706" }}
+                onClick={handleLinkedInPause}
+                disabled={linkedInUpdateLoading}
               >
-                <h3>Select Ad Accounts</h3>
-                <p className="section-subtitle">
-                  Select your social media ad accounts
-                </p>
-                <div className="account-row">
-                  {PLATFORM_LIST.map((acc) => (
-                    <div
-                      key={acc.id}
-                      className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
-                      onClick={() => toggleAccount(acc.id)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <div className="account-left">
-                        <img src={platformIcons[acc.id]} alt={acc.label} />
-                        <span>{acc.label}</span>
-                        {!isPlatformConnected(acc.id) && (
-                          <Chip
-                            label="Not Connected"
-                            size="small"
-                            color="error"
-                            className="connection-chip"
-                          />
-                        )}
-                      </div>
-                      <div
-                        className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+                {linkedInUpdateLoading ? "Updating…" : "⏸ Pause"}
+              </button>
+            )}
 
-              <div
-                className={`section-card ${submitted && !mode ? "error" : ""}`}
+            {linkedInLiveStatus === "PAUSED" && (
+              <button
+                className="next-btn"
+                style={{ fontSize: 12, padding: "4px 12px" }}
+                onClick={handleLinkedInResume}
+                disabled={linkedInUpdateLoading}
               >
-                <h3>Campaign Mode</h3>
-                <p className="section-subtitle">
-                  Choose a campaign mode to optimize your ad strategy
-                </p>
-                <div className="mode-row">
-                  <div
-                    className={`mode-card ${mode === "organic" ? "selected" : ""}`}
-                    onClick={() => setMode("organic")}
-                  >
-                    <div className="mode-left">
-                      <div
-                        className={`radio ${mode === "organic" ? "checked" : ""}`}
-                      />
-                      <div className="mode-text">
-                        <h4>Organic Posting</h4>
-                        <p>
-                          Post to your connected social accounts without ad
-                          spend.
-                        </p>
-                      </div>
-                    </div>
-                    <span className="badge">No Budget Required</span>
-                  </div>
-                  <div
-                    className={`mode-card ${mode === "paid" ? "selected" : ""}`}
-                    onClick={() => setMode("paid")}
-                  >
-                    <div className="mode-left">
-                      <div
-                        className={`radio ${mode === "paid" ? "checked" : ""}`}
-                      />
-                      <div className="mode-text">
-                        <h4>Paid Advertising</h4>
-                        <p>
-                          Boost your reach and engagement with targeted ads.
-                        </p>
-                      </div>
-                    </div>
-                    <span className="badge outlined">
-                      Budget Setup Required
-                    </span>
-                  </div>
-                </div>
-              </div>
+                {linkedInUpdateLoading ? "Updating…" : "▶ Resume"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
-              {/* Google Ads Keywords — paid mode only */}
-              {accounts.includes("google_ads") && mode === "paid" && (
-                <div className="section-card">
-                  <h3>Google Ads Keywords</h3>
-                  <p className="section-subtitle">
-                    Enter keywords for your Google Search campaign
-                    (comma-separated)
-                  </p>
-                  <div className="form-group">
-                    <label>Keywords *</label>
-                    <input
-                      value={keywordsInput}
-                      onChange={(e) => setKeywordsInput(e.target.value)}
-                      placeholder="e.g. IVF, fertility clinic, IVF consultation, egg freezing"
-                      style={{ width: "100%" }}
-                    />
-                    <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                      Separate keywords with commas. These will be added as
-                      broad match keywords to your Google Search campaign.
-                      {!keywordsInput.trim() && (
-                        <span style={{ color: "#d97706" }}>
-                          {" "}
-                          If left empty, fallback keywords will be
-                          auto-generated from the campaign name.
-                        </span>
-                      )}
-                    </p>
-                    {keywordsInput.trim() && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 4,
-                          marginTop: 6,
-                        }}
-                      >
-                        {keywordsInput
-                          .split(",")
-                          .map((k) => k.trim())
-                          .filter(Boolean)
-                          .map((kw, i) => (
-                            <Chip
-                              key={i}
-                              label={kw}
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                              sx={{ fontSize: 11 }}
-                            />
-                          ))}
-                      </div>
+  const scheduleDateMin = startDate ? dayjs(startDate) : dayjs();
+  const scheduleDateMax = endDate ? dayjs(endDate) : undefined;
+
+  const getScheduleMinTime = (): Dayjs | undefined => {
+    if (!scheduleDate) return dayjs();
+    if (scheduleDate === dayjs().format("YYYY-MM-DD")) {
+      return dayjs();
+    }
+    return undefined;
+  };
+
+  // FIX: Accept Date | Dayjs to match MUI's PickerValidDate type — fixes TS2322 build error
+  const isScheduleDateDisabled = (date: Date | Dayjs): boolean => {
+    const d = dayjs(date);
+    if (startDate && d.isBefore(dayjs(startDate), "day")) return true;
+    if (endDate && d.isAfter(dayjs(endDate), "day")) return true;
+    return false;
+  };
+
+  // ─── Render per-platform image upload section ─────────────────────────
+  const renderImageUploadSection = (platform: Platform) => {
+    const hasUrl = !!(
+      platformImageUrlsRef.current[platform]?.trim() ||
+      platformImageUrls[platform]?.trim()
+    );
+    const hasFile = !!platformImageFiles[platform];
+    const previewSrc = hasUrl
+      ? resolveImageUrl(
+          platformImageUrlsRef.current[platform]?.trim() ||
+            platformImageUrls[platform]?.trim()
+        )
+      : platformImagePreviews[platform];
+
+    return (
+      <div
+        style={{
+          marginTop: 12,
+          border: "1px dashed #d1d5db",
+          borderRadius: 8,
+          padding: 12,
+          backgroundColor: "#f9fafb",
+        }}
+      >
+        <p
+          style={{
+            fontSize: 12,
+            color: "#374151",
+            fontWeight: 600,
+            marginBottom: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          🖼️ Campaign Image
+          <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span>
+        </p>
+
+        {/* Priority note */}
+        <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+          You can provide an image URL <strong>or</strong> upload a file. If
+          both are provided, the <strong>URL takes priority</strong>.
+        </p>
+
+        {/* Image URL input — handled by parent SocialContentBox via onImageUrl,
+            but we show the current resolved URL here as a read-only indicator */}
+        {hasUrl && (
+          <div
+            style={{
+              fontSize: 11,
+              color: "#1d4ed8",
+              marginBottom: 8,
+              wordBreak: "break-all",
+              backgroundColor: "#eff6ff",
+              padding: "4px 8px",
+              borderRadius: 4,
+              border: "1px solid #bfdbfe",
+            }}
+          >
+            ✅ URL set:{" "}
+            <a
+              href={previewSrc}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "#1d4ed8" }}
+            >
+              {previewSrc.length > 60
+                ? previewSrc.slice(0, 60) + "…"
+                : previewSrc}
+            </a>
+          </div>
+        )}
+
+        {/* File upload area */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            ref={imageUploadRefs[platform]}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+            hidden
+            onChange={(e) => handleImageFileUpload(e, platform)}
+          />
+          <button
+            type="button"
+            onClick={() => imageUploadRefs[platform].current?.click()}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 14px",
+              fontSize: 12,
+              borderRadius: 6,
+              border: "1px solid #6366f1",
+              backgroundColor: hasFile ? "#eef2ff" : "#fff",
+              color: "#4f46e5",
+              cursor: "pointer",
+              fontWeight: 500,
+              transition: "background 0.15s",
+            }}
+          >
+            📁 {hasFile ? "Change Image File" : "Upload Image File"}
+          </button>
+
+          {hasFile && (
+            <button
+              type="button"
+              onClick={() => handleRemoveImageFile(platform)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "6px 10px",
+                fontSize: 12,
+                borderRadius: 6,
+                border: "1px solid #fca5a5",
+                backgroundColor: "#fff1f2",
+                color: "#dc2626",
+                cursor: "pointer",
+              }}
+            >
+              ✕ Remove
+            </button>
+          )}
+        </div>
+
+        {/* File name indicator */}
+        {hasFile && (
+          <p
+            style={{
+              fontSize: 11,
+              color: "#374151",
+              marginTop: 6,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            📄 <strong>{platformImageFiles[platform]!.name}</strong> (
+            {(platformImageFiles[platform]!.size / 1024).toFixed(1)} KB)
+          </p>
+        )}
+
+        {/* Image preview (URL takes priority over file) */}
+        {(hasUrl || hasFile) && previewSrc && (
+          <div style={{ marginTop: 10 }}>
+            <p
+              style={{
+                fontSize: 11,
+                color: "#6b7280",
+                marginBottom: 4,
+                fontWeight: 600,
+              }}
+            >
+              Preview {hasUrl ? "(from URL)" : "(uploaded file)"}:
+            </p>
+            <img
+              src={previewSrc}
+              alt="Campaign preview"
+              style={{
+                maxWidth: "100%",
+                maxHeight: 160,
+                borderRadius: 6,
+                border: "1px solid #e5e7eb",
+                objectFit: "contain",
+                backgroundColor: "#fff",
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+                // Show a fallback message next to the image
+                const parent = (e.target as HTMLImageElement).parentElement;
+                if (parent && !parent.querySelector(".img-error-msg")) {
+                  const msg = document.createElement("p");
+                  msg.className = "img-error-msg";
+                  msg.style.cssText =
+                    "font-size:11px;color:#dc2626;margin-top:4px;";
+                  msg.textContent =
+                    "⚠️ Image could not be loaded for preview (may still work when saved).";
+                  parent.appendChild(msg);
+                }
+              }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Modal open={true} onClose={onClose}>
+      <Box className="email-campaign-modal">
+        <div className="add-modal-header">
+          <Typography variant="h6">Add Social Media Campaign</Typography>
+          <IconButton onClick={onClose} className="close-btn">
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </div>
+
+        <div className="modal-divider" />
+
+        <div className="stepper">
+          <div
+            className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
+          >
+            <div className="circle">{step > 1 ? "✓" : "1"}</div>
+            <span>Campaign Details</span>
+          </div>
+          <div className="line" />
+          <div
+            className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}
+          >
+            <div className="circle">{step > 2 ? "✓" : "2"}</div>
+            <span>Content & Configuration</span>
+          </div>
+          <div className="line" />
+          <div className={`step ${step === 3 ? "active" : ""}`}>
+            <div className="circle">3</div>
+            <span>Schedule Campaign</span>
+          </div>
+        </div>
+
+        {/* STEP 1 */}
+        {step === 1 && (
+          <div className="step-content">
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Campaign Details
+            </Typography>
+
+            <div
+              className={`form-group ${submitted && !campaignName ? "error" : ""}`}
+            >
+              <label>Campaign Name *</label>
+              <input
+                value={campaignName}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  if (!canTypeCampaignName(nextValue)) {
+                    toast.error("Alphanumeric and underscore are allowed", {
+                      toastId: "social-campaign-name-typing",
+                    });
+                    return;
+                  }
+                  setCampaignName(nextValue);
+                }}
+                placeholder="e.g. New Product Launch"
+              />
+            </div>
+
+            <div
+              className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}
+            >
+              <label>Campaign Description *</label>
+              <input
+                value={campaignDescription}
+                onChange={(e) => setCampaignDescription(e.target.value)}
+                placeholder="e.g. Contains records of routine checks..."
+              />
+            </div>
+
+            <div className="form-row">
+              <div
+                className={`form-group half ${submitted && !objective ? "error" : ""}`}
+              >
+                <label>Campaign Objective *</label>
+                <FormControl fullWidth variant="outlined">
+                  <Select
+                    value={objective}
+                    onChange={(e) => setObjective(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="">Select Objective</MenuItem>
+                    {Object.entries(CAMPAIGN_OBJECTIVES).map(
+                      ([value, label]) => (
+                        <MenuItem key={value} value={value}>
+                          {label}
+                        </MenuItem>
+                      )
                     )}
-                  </div>
-                </div>
-              )}
-
-              {/* Google Ads organic info */}
-              {accounts.includes("google_ads") && mode === "organic" && (
-                <div
-                  className="section-card"
-                  style={{
-                    border: "1px solid #d1fae5",
-                    backgroundColor: "#f0fdf4",
-                    borderRadius: 8,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <img
-                      src={platformIcons["google_ads"]}
-                      alt="Google Ads"
-                      style={{ width: 18, height: 18 }}
-                    />
-                    <h3 style={{ margin: 0, color: "#15803d" }}>Google Ads — Organic Post</h3>
-                  </div>
-                  <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
-                    Your campaign content will be saved for Google Ads. No paid ad will be triggered — no money will be spent.
-                    Switch to <strong>Paid Advertising</strong> mode to run a real Google Ad.
-                  </p>
-                </div>
-              )}
-
-              {/* Meta Ad Targeting */}
-              {(accounts.includes("facebook") ||
-                accounts.includes("instagram")) && (
-                <div
-                  className="section-card"
-                  style={{
-                    border: "1px solid #1877f2",
-                    borderRadius: 8,
-                  }}
-                >
-                  <h3 style={{ color: "#1877f2" }}>Meta Ad Targeting</h3>
-                  <div className="form-row">
-                    <div className="form-group half">
-                      <label>Country</label>
-                      <FormControl fullWidth variant="outlined" size="small">
-                        <Select
-                          value={metaCountry}
-                          onChange={(e) => {
-                            setMetaCountry(e.target.value);
-                            setMetaState("");
-                          }}
-                          displayEmpty
-                        >
-                          <MenuItem value="">Select Country</MenuItem>
-                          {countriesData.map((c) => (
-                            <MenuItem key={c.name} value={c.iso2 || c.name}>
-                              {c.name}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </div>
-                    <div className="form-group half">
-                      <label>State</label>
-                      <FormControl fullWidth variant="outlined" size="small">
-                        <Select
-                          value={metaState}
-                          onChange={(e) => setMetaState(e.target.value)}
-                          displayEmpty
-                        >
-                          <MenuItem value="">All States</MenuItem>
-                          {metaSelectedStates.map((s) => (
-                            <MenuItem key={s.name} value={s.name}>
-                              {s.name}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* LinkedIn Targeting */}
-              {accounts.includes("linkedin") && (
-                <div
-                  className="section-card"
-                  style={{ border: "1px solid #0077b5", borderRadius: 8 }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 4,
-                    }}
+                  </Select>
+                </FormControl>
+              </div>
+              <div
+                className={`form-group half ${submitted && !audience ? "error" : ""}`}
+              >
+                <label>Target Audience *</label>
+                <FormControl fullWidth variant="outlined">
+                  <Select
+                    value={audience}
+                    onChange={(e) => setAudience(e.target.value)}
+                    displayEmpty
                   >
-                    <img
-                      src={platformIcons["linkedin"]}
-                      alt="LinkedIn"
-                      style={{ width: 18, height: 18 }}
-                    />
-                    <h3 style={{ margin: 0, color: "#0077b5" }}>
-                      LinkedIn Ad Targeting
-                    </h3>
-                  </div>
-                  <p className="section-subtitle">
-                    Configure targeting and bidding for your LinkedIn campaign
-                  </p>
+                    <MenuItem value="">Select Audience</MenuItem>
+                    {Object.entries(CAMPAIGN_AUDIENCE).map(
+                      ([value, label]) => (
+                        <MenuItem key={value} value={value}>
+                          {label}
+                        </MenuItem>
+                      )
+                    )}
+                  </Select>
+                </FormControl>
+              </div>
+            </div>
 
-                  <div className="form-row" style={{ marginTop: 12 }}>
-                    <div className="form-group half">
-                      <label>Country</label>
-                      <FormControl fullWidth variant="outlined" size="small">
-                        <Select
-                          value={linkedInCountry}
-                          onChange={(e) => {
-                            setLinkedInCountry(e.target.value);
-                            setLinkedInState("");
-                          }}
-                          displayEmpty
-                          disabled={countriesLoading}
-                        >
-                          <MenuItem value="">
-                            {countriesLoading
-                              ? "Loading countries…"
-                              : "Select Country"}
-                          </MenuItem>
-                          {countriesData.map((c) => (
-                            <MenuItem key={c.name} value={c.name}>
-                              {c.name}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </div>
+            <div className="form-row">
+              <div
+                className={`form-group half ${submitted && !startDate ? "error" : ""}`}
+              >
+                <label>Start Date *</label>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    format="DD/MM/YYYY"
+                    minDate={dayjs()}
+                    value={startDate ? dayjs(startDate) : null}
+                    onChange={(v) => {
+                      const newStart = v
+                        ? (v as Dayjs).format("YYYY-MM-DD")
+                        : "";
+                      setStartDate(newStart);
+                      if (
+                        endDate &&
+                        newStart &&
+                        dayjs(endDate).isBefore(dayjs(newStart), "day")
+                      ) {
+                        setEndDate("");
+                      }
+                      if (
+                        scheduleDate &&
+                        newStart &&
+                        dayjs(scheduleDate).isBefore(dayjs(newStart), "day")
+                      ) {
+                        setScheduleDate("");
+                        setScheduleTime("");
+                      }
+                    }}
+                    slots={{ openPickerIcon: CalendarTodayIcon }}
+                    slotProps={{
+                      textField: { error: submitted && !startDate },
+                    }}
+                  />
+                </LocalizationProvider>
+              </div>
+              <div
+                className={`form-group half ${submitted && !endDate ? "error" : ""}`}
+              >
+                <label>End Date *</label>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    format="DD/MM/YYYY"
+                    minDate={startDate ? dayjs(startDate) : dayjs()}
+                    value={endDate ? dayjs(endDate) : null}
+                    onChange={(v) => {
+                      const newEnd = v
+                        ? (v as Dayjs).format("YYYY-MM-DD")
+                        : "";
+                      setEndDate(newEnd);
+                      if (
+                        scheduleDate &&
+                        newEnd &&
+                        dayjs(scheduleDate).isAfter(dayjs(newEnd), "day")
+                      ) {
+                        setScheduleDate("");
+                        setScheduleTime("");
+                      }
+                    }}
+                    slots={{ openPickerIcon: CalendarTodayIcon }}
+                    slotProps={{
+                      textField: { error: submitted && !endDate },
+                    }}
+                  />
+                </LocalizationProvider>
+              </div>
+            </div>
+          </div>
+        )}
 
-                    <div className="form-group half">
-                      <label>
-                        State / Region
-                        <span
-                          style={{
-                            color: "#9ca3af",
-                            fontWeight: 400,
-                            marginLeft: 4,
-                            fontSize: 11,
-                          }}
-                        >
-                          (optional)
-                        </span>
-                      </label>
-                      {selectedCountryStates.length > 0 ? (
-                        <FormControl fullWidth variant="outlined" size="small">
-                          <Select
-                            value={linkedInState}
-                            onChange={(e) => setLinkedInState(e.target.value)}
-                            displayEmpty
-                          >
-                            <MenuItem value="">All States</MenuItem>
-                            {selectedCountryStates.map((s) => (
-                              <MenuItem key={s.name} value={s.name}>
-                                {s.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      ) : (
-                        <input
-                          value={linkedInState}
-                          onChange={(e) => setLinkedInState(e.target.value)}
-                          placeholder="e.g. London, Bavaria…"
-                          style={{
-                            width: "100%",
-                            height: 40,
-                            padding: "0 12px",
-                            border: "1px solid #d1d5db",
-                            borderRadius: 4,
-                            fontSize: 14,
-                          }}
+        {/* STEP 2 */}
+        {step === 2 && (
+          <div className="step-content">
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Content & Configuration
+            </Typography>
+
+            <div
+              className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
+            >
+              <h3>Select Ad Accounts</h3>
+              <p className="section-subtitle">
+                Select your social media ad accounts
+              </p>
+              <div className="account-row">
+                {PLATFORM_LIST.map((acc) => (
+                  <div
+                    key={acc.id}
+                    className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
+                    onClick={() => toggleAccount(acc.id)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="account-left">
+                      <img src={platformIcons[acc.id]} alt={acc.label} />
+                      <span>{acc.label}</span>
+                      {!isPlatformConnected(acc.id) && (
+                        <Chip
+                          label="Not Connected"
+                          size="small"
+                          color="error"
+                          className="connection-chip"
                         />
                       )}
                     </div>
+                    <div
+                      className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div
+              className={`section-card ${submitted && !mode ? "error" : ""}`}
+            >
+              <h3>Campaign Mode</h3>
+              <p className="section-subtitle">
+                Choose a campaign mode to optimize your ad strategy
+              </p>
+              <div className="mode-row">
+                <div
+                  className={`mode-card ${mode === "organic" ? "selected" : ""}`}
+                  onClick={() => setMode("organic")}
+                >
+                  <div className="mode-left">
+                    <div
+                      className={`radio ${mode === "organic" ? "checked" : ""}`}
+                    />
+                    <div className="mode-text">
+                      <h4>Organic Posting</h4>
+                      <p>
+                        Post to your connected social accounts without ad spend.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="badge">No Budget Required</span>
+                </div>
+                <div
+                  className={`mode-card ${mode === "paid" ? "selected" : ""}`}
+                  onClick={() => setMode("paid")}
+                >
+                  <div className="mode-left">
+                    <div
+                      className={`radio ${mode === "paid" ? "checked" : ""}`}
+                    />
+                    <div className="mode-text">
+                      <h4>Paid Advertising</h4>
+                      <p>Boost your reach and engagement with targeted ads.</p>
+                    </div>
+                  </div>
+                  <span className="badge outlined">Budget Setup Required</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Google Ads Keywords — paid mode only */}
+            {accounts.includes("google_ads") && mode === "paid" && (
+              <div className="section-card">
+                <h3>Google Ads Keywords</h3>
+                <p className="section-subtitle">
+                  Enter keywords for your Google Search campaign
+                  (comma-separated)
+                </p>
+                <div className="form-group">
+                  <label>Keywords *</label>
+                  <input
+                    value={keywordsInput}
+                    onChange={(e) => setKeywordsInput(e.target.value)}
+                    placeholder="e.g. IVF, fertility clinic, IVF consultation, egg freezing"
+                    style={{ width: "100%" }}
+                  />
+                  <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                    Separate keywords with commas. These will be added as broad
+                    match keywords to your Google Search campaign.
+                    {!keywordsInput.trim() && (
+                      <span style={{ color: "#d97706" }}>
+                        {" "}
+                        If left empty, fallback keywords will be auto-generated
+                        from the campaign name.
+                      </span>
+                    )}
+                  </p>
+                  {keywordsInput.trim() && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 4,
+                        marginTop: 6,
+                      }}
+                    >
+                      {keywordsInput
+                        .split(",")
+                        .map((k) => k.trim())
+                        .filter(Boolean)
+                        .map((kw, i) => (
+                          <Chip
+                            key={i}
+                            label={kw}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontSize: 11 }}
+                          />
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Google Ads organic info */}
+            {accounts.includes("google_ads") && mode === "organic" && (
+              <div
+                className="section-card"
+                style={{
+                  border: "1px solid #d1fae5",
+                  backgroundColor: "#f0fdf4",
+                  borderRadius: 8,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 4,
+                  }}
+                >
+                  <img
+                    src={platformIcons["google_ads"]}
+                    alt="Google Ads"
+                    style={{ width: 18, height: 18 }}
+                  />
+                  <h3 style={{ margin: 0, color: "#15803d" }}>
+                    Google Ads — Organic Post
+                  </h3>
+                </div>
+                <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
+                  Your campaign content will be saved for Google Ads. No paid ad
+                  will be triggered — no money will be spent. Switch to{" "}
+                  <strong>Paid Advertising</strong> mode to run a real Google
+                  Ad.
+                </p>
+              </div>
+            )}
+
+            {/* Meta Ad Targeting */}
+            {(accounts.includes("facebook") ||
+              accounts.includes("instagram")) && (
+              <div
+                className="section-card"
+                style={{ border: "1px solid #1877f2", borderRadius: 8 }}
+              >
+                <h3 style={{ color: "#1877f2" }}>Meta Ad Targeting</h3>
+                <div className="form-row">
+                  <div className="form-group half">
+                    <label>Country</label>
+                    <FormControl fullWidth variant="outlined" size="small">
+                      <Select
+                        value={metaCountry}
+                        onChange={(e) => {
+                          setMetaCountry(e.target.value);
+                          setMetaState("");
+                        }}
+                        displayEmpty
+                      >
+                        <MenuItem value="">Select Country</MenuItem>
+                        {countriesData.map((c) => (
+                          <MenuItem key={c.name} value={c.iso2 || c.name}>
+                            {c.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </div>
+                  <div className="form-group half">
+                    <label>State</label>
+                    <FormControl fullWidth variant="outlined" size="small">
+                      <Select
+                        value={metaState}
+                        onChange={(e) => setMetaState(e.target.value)}
+                        displayEmpty
+                      >
+                        <MenuItem value="">All States</MenuItem>
+                        {metaSelectedStates.map((s) => (
+                          <MenuItem key={s.name} value={s.name}>
+                            {s.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* LinkedIn Targeting */}
+            {accounts.includes("linkedin") && (
+              <div
+                className="section-card"
+                style={{ border: "1px solid #0077b5", borderRadius: 8 }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 4,
+                  }}
+                >
+                  <img
+                    src={platformIcons["linkedin"]}
+                    alt="LinkedIn"
+                    style={{ width: 18, height: 18 }}
+                  />
+                  <h3 style={{ margin: 0, color: "#0077b5" }}>
+                    LinkedIn Ad Targeting
+                  </h3>
+                </div>
+                <p className="section-subtitle">
+                  Configure targeting and bidding for your LinkedIn campaign
+                </p>
+
+                <div className="form-row" style={{ marginTop: 12 }}>
+                  <div className="form-group half">
+                    <label>Country</label>
+                    <FormControl fullWidth variant="outlined" size="small">
+                      <Select
+                        value={linkedInCountry}
+                        onChange={(e) => {
+                          setLinkedInCountry(e.target.value);
+                          setLinkedInState("");
+                        }}
+                        displayEmpty
+                        disabled={countriesLoading}
+                      >
+                        <MenuItem value="">
+                          {countriesLoading
+                            ? "Loading countries…"
+                            : "Select Country"}
+                        </MenuItem>
+                        {countriesData.map((c) => (
+                          <MenuItem key={c.name} value={c.name}>
+                            {c.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </div>
 
-                  <div className="form-group" style={{ marginTop: 8 }}>
+                  <div className="form-group half">
                     <label>
-                      Custom Location
+                      State / Region
                       <span
                         style={{
                           color: "#9ca3af",
@@ -1564,394 +1871,503 @@ import React, { useState, useRef, useEffect } from "react";
                           fontSize: 11,
                         }}
                       >
-                        (overrides country/state if filled)
+                        (optional)
                       </span>
                     </label>
-                    <input
-                      value={linkedInCustomLocation}
-                      onChange={(e) =>
-                        setLinkedInCustomLocation(e.target.value)
-                      }
-                      placeholder="e.g. Mumbai, Maharashtra, India"
-                      style={{ width: "100%" }}
-                    />
-                    <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                      Location that will be sent:{" "}
-                      <strong style={{ color: "#1d4ed8" }}>
-                        {getLinkedInLocation() || "—"}
-                      </strong>
-                    </p>
-                  </div>
-
-                  <div className="form-row" style={{ marginTop: 8 }}>
-                    <div className="form-group half">
-                      <label>Bid Strategy</label>
+                    {selectedCountryStates.length > 0 ? (
                       <FormControl fullWidth variant="outlined" size="small">
                         <Select
-                          value={linkedInBidStrategy}
-                          onChange={(e) =>
-                            setLinkedInBidStrategy(e.target.value)
-                          }
+                          value={linkedInState}
+                          onChange={(e) => setLinkedInState(e.target.value)}
+                          displayEmpty
                         >
-                          {LINKEDIN_BID_STRATEGIES.map((s) => (
-                            <MenuItem key={s.value} value={s.value}>
-                              {s.label}
+                          <MenuItem value="">All States</MenuItem>
+                          {selectedCountryStates.map((s) => (
+                            <MenuItem key={s.name} value={s.name}>
+                              {s.name}
                             </MenuItem>
                           ))}
                         </Select>
                       </FormControl>
-                      <p
-                        style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}
-                      >
-                        {linkedInBidStrategy === "MAXIMUM_DELIVERY"
-                          ? "LinkedIn automatically maximises delivery within your budget."
-                          : linkedInBidStrategy === "TARGET_COST"
-                            ? "LinkedIn tries to stay close to your target cost per result."
-                            : linkedInBidStrategy === "ENHANCED_CPC"
-                              ? "LinkedIn adjusts your manual bid to maximise conversions."
-                              : "You set the exact bid per click manually."}
-                      </p>
-                    </div>
-
-                    <div className="form-group half">
-                      <label>
-                        Bid Amount ($)
-                        {linkedInBidStrategy === "MAXIMUM_DELIVERY" && (
-                          <span
-                            style={{
-                              color: "#9ca3af",
-                              fontWeight: 400,
-                              marginLeft: 4,
-                              fontSize: 11,
-                            }}
-                          >
-                            (not used for auto)
-                          </span>
-                        )}
-                      </label>
-                      <div style={{ position: "relative" }}>
-                        <span
-                          style={{
-                            position: "absolute",
-                            left: 10,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            color: "#6b7280",
-                            fontSize: 14,
-                            pointerEvents: "none",
-                          }}
-                        >
-                          $
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          step={1}
-                          value={linkedInBidAmount}
-                          onChange={(e) =>
-                            setLinkedInBidAmount(Number(e.target.value))
-                          }
-                          disabled={linkedInBidStrategy === "MAXIMUM_DELIVERY"}
-                          style={{
-                            width: "100%",
-                            paddingLeft: 24,
-                            height: 40,
-                            border: "1px solid #d1d5db",
-                            borderRadius: 4,
-                            fontSize: 14,
-                            opacity:
-                              linkedInBidStrategy === "MAXIMUM_DELIVERY"
-                                ? 0.5
-                                : 1,
-                          }}
-                        />
-                      </div>
-                      <p
-                        style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}
-                      >
-                        Enter a whole number amount (e.g. 1, 2, 5, 10…)
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {mode && (
-                <div className="section-card">
-                  <h2>Campaign Content</h2>
-                  <p className="section-subtitle">
-                    Create your post content with AI assistance
-                  </p>
-
-                  {PLATFORM_LIST.map((p) => (
-                    <React.Fragment key={p.id}>
+                    ) : (
                       <input
-                        ref={fileInputRefs[p.id]}
-                        type="file"
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
-                        hidden
-                        onChange={(e) => handleFileInsert(e, p.id)}
+                        value={linkedInState}
+                        onChange={(e) => setLinkedInState(e.target.value)}
+                        placeholder="e.g. London, Bavaria…"
+                        style={{
+                          width: "100%",
+                          height: 40,
+                          padding: "0 12px",
+                          border: "1px solid #d1d5db",
+                          borderRadius: 4,
+                          fontSize: 14,
+                        }}
                       />
-                    </React.Fragment>
-                  ))}
-
-                  {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).map(
-                    (p) => (
-                      <SocialContentBox
-                        key={p.id}
-                        ref={platformRefs[p.id]}
-                        mediaRef={mediaRefs[p.id]}
-                        platform={p.id}
-                        icon={platformIcons[p.id]}
-                        label={p.label}
-                        onText={handleText}
-                        onLink={handleLink}
-                        onEmoji={handleEmoji}
-                        onImage={handleImage}
-                        onAttachment={handleAttachment}
-                        onInput={handleEditorInput}
-                        onImageUrl={handleImageUrl}
-                        imageUrl={platformImageUrls[p.id]}
-                      />
-                    ),
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 3 */}
-          {step === 3 && (
-            <div className="step-content">
-              <Typography variant="h6" sx={{ mb: 3 }}>
-                Schedule Campaign
-              </Typography>
-
-              <div className="section-card">
-                <div className="schedule-header">
-                  <div>
-                    <h3>
-                      {mode === "paid"
-                        ? "Schedule & Budget Allocation"
-                        : "Schedule"}
-                    </h3>
-                    <p className="section-subtitle">
-                      {mode === "paid"
-                        ? "Establish your schedule and budget for every platform."
-                        : "Select a date and time for the campaign."}
-                    </p>
-                    {startDate && endDate && (
-                      <p style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                        Schedule must be within campaign duration:{" "}
-                        <strong style={{ color: "#1d4ed8" }}>
-                          {dayjs(startDate).format("DD/MM/YYYY")} – {dayjs(endDate).format("DD/MM/YYYY")}
-                        </strong>
-                      </p>
                     )}
                   </div>
-                  <button className="ai-btn">✨ AI-Optimization Timing</button>
                 </div>
 
-                <div className="schedule-row">
+                <div className="form-group" style={{ marginTop: 8 }}>
+                  <label>
+                    Custom Location
+                    <span
+                      style={{
+                        color: "#9ca3af",
+                        fontWeight: 400,
+                        marginLeft: 4,
+                        fontSize: 11,
+                      }}
+                    >
+                      (overrides country/state if filled)
+                    </span>
+                  </label>
+                  <input
+                    value={linkedInCustomLocation}
+                    onChange={(e) => setLinkedInCustomLocation(e.target.value)}
+                    placeholder="e.g. Mumbai, Maharashtra, India"
+                    style={{ width: "100%" }}
+                  />
+                  <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                    Location that will be sent:{" "}
+                    <strong style={{ color: "#1d4ed8" }}>
+                      {getLinkedInLocation() || "—"}
+                    </strong>
+                  </p>
+                </div>
+
+                <div className="form-row" style={{ marginTop: 8 }}>
                   <div className="form-group half">
-                    <label>Select Date</label>
-                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                      <DatePicker
-                        format="DD/MM/YYYY"
-                        minDate={scheduleDateMin}
-                        maxDate={scheduleDateMax}
-                        shouldDisableDate={isScheduleDateDisabled}
-                        value={scheduleDate ? dayjs(scheduleDate) : null}
-                        onChange={(v) => {
-                          setScheduleDate(
-                            v ? (v as Dayjs).format("YYYY-MM-DD") : "",
-                          );
-                          setScheduleTime("");
-                        }}
-                        slots={{ openPickerIcon: CalendarTodayIcon }}
-                      />
-                    </LocalizationProvider>
+                    <label>Bid Strategy</label>
+                    <FormControl fullWidth variant="outlined" size="small">
+                      <Select
+                        value={linkedInBidStrategy}
+                        onChange={(e) => setLinkedInBidStrategy(e.target.value)}
+                      >
+                        {LINKEDIN_BID_STRATEGIES.map((s) => (
+                          <MenuItem key={s.value} value={s.value}>
+                            {s.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <p
+                      style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}
+                    >
+                      {linkedInBidStrategy === "MAXIMUM_DELIVERY"
+                        ? "LinkedIn automatically maximises delivery within your budget."
+                        : linkedInBidStrategy === "TARGET_COST"
+                        ? "LinkedIn tries to stay close to your target cost per result."
+                        : linkedInBidStrategy === "ENHANCED_CPC"
+                        ? "LinkedIn adjusts your manual bid to maximise conversions."
+                        : "You set the exact bid per click manually."}
+                    </p>
                   </div>
+
                   <div className="form-group half">
-                    <label>Enter Time</label>
-                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                      <TimePicker
-                        format="hh:mm A"
-                        disabled={!scheduleDate}
-                        minTime={getScheduleMinTime()}
-                        value={
-                          scheduleTime
-                            ? dayjs(
-                                `${scheduleDate || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`,
-                              )
-                            : null
+                    <label>
+                      Bid Amount ($)
+                      {linkedInBidStrategy === "MAXIMUM_DELIVERY" && (
+                        <span
+                          style={{
+                            color: "#9ca3af",
+                            fontWeight: 400,
+                            marginLeft: 4,
+                            fontSize: 11,
+                          }}
+                        >
+                          (not used for auto)
+                        </span>
+                      )}
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <span
+                        style={{
+                          position: "absolute",
+                          left: 10,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          color: "#6b7280",
+                          fontSize: 14,
+                          pointerEvents: "none",
+                        }}
+                      >
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={linkedInBidAmount}
+                        onChange={(e) =>
+                          setLinkedInBidAmount(Number(e.target.value))
                         }
-                        onChange={(v) => {
-                          if (v) setScheduleTime((v as Dayjs).format("HH:mm"));
-                        }}
-                        ampm
-                        slotProps={{
-                          textField: {
-                            fullWidth: true,
-                            helperText: !scheduleDate
-                              ? "Select a date first"
-                              : undefined,
-                          },
+                        disabled={linkedInBidStrategy === "MAXIMUM_DELIVERY"}
+                        style={{
+                          width: "100%",
+                          paddingLeft: 24,
+                          height: 40,
+                          border: "1px solid #d1d5db",
+                          borderRadius: 4,
+                          fontSize: 14,
+                          opacity:
+                            linkedInBidStrategy === "MAXIMUM_DELIVERY"
+                              ? 0.5
+                              : 1,
                         }}
                       />
-                    </LocalizationProvider>
+                    </div>
+                    <p
+                      style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}
+                    >
+                      Enter a whole number amount (e.g. 1, 2, 5, 10…)
+                    </p>
                   </div>
                 </div>
+              </div>
+            )}
 
-                {mode === "paid" && (
-                  <>
-                    <div className="budget-divider" />
-                    <div className="budget-section">
-                      <h3>Budget Allocation</h3>
-                      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
-                        Minimum budget per platform: <strong style={{ color: "#d97706" }}>${PLATFORM_MIN_BUDGET + 1}</strong> (must be greater than ${PLATFORM_MIN_BUDGET})
-                      </p>
-                      <div className="budget-row">
-                        {PLATFORM_LIST.filter((p) =>
-                          accounts.includes(p.id),
-                        ).map((p) => {
-                          const budgetErr = getBudgetError(p.id, budgets[p.id]);
-                          return (
-                            <div key={p.id} className="budget-card">
-                              <div className="budget-title">
-                                <img src={platformIcons[p.id]} alt={p.label} />
-                                <span>
-                                  {p.label} (Estimate CPC : ${p.cpc})
-                                </span>
-                              </div>
-                              <div className="budget-input-wrapper">
-                                <label>Enter Amount ($)</label>
-                                <input
-                                  type="number"
-                                  min={PLATFORM_MIN_BUDGET + 1}
-                                  step="1"
-                                  value={budgets[p.id]}
-                                  onChange={(e) =>
-                                    setBudget(p.id, Number(e.target.value))
-                                  }
-                                  className="budget-input"
-                                  style={{
-                                    borderColor: budgetErr ? "#ef4444" : undefined,
-                                  }}
-                                />
-                                {budgetErr && (
-                                  <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
-                                    {budgetErr}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+            {mode && (
+              <div className="section-card">
+                <h2>Campaign Content</h2>
+                <p className="section-subtitle">
+                  Create your post content with AI assistance
+                </p>
+
+                {PLATFORM_LIST.map((p) => (
+                  <React.Fragment key={p.id}>
+                    <input
+                      ref={fileInputRefs[p.id]}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                      hidden
+                      onChange={(e) => handleFileInsert(e, p.id)}
+                    />
+                  </React.Fragment>
+                ))}
+
+                {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).map(
+                  (p) => {
+                    const contentMissing =
+                      submitted &&
+                      !platformContent[p.id]?.trim() &&
+                      !platformRefs[p.id]?.current?.innerText?.trim();
+
+                    return (
+                      <div key={p.id}>
+                        {/* Content error banner */}
+                        {contentMissing && (
+                          <div
+                            style={{
+                              backgroundColor: "#fef2f2",
+                              border: "1px solid #fca5a5",
+                              borderRadius: 6,
+                              padding: "8px 12px",
+                              marginBottom: 6,
+                              fontSize: 12,
+                              color: "#dc2626",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            ⚠️{" "}
+                            {p.label} campaign content is required. Please
+                            add some text before proceeding.
+                          </div>
+                        )}
+
+                        <SocialContentBox
+                          ref={platformRefs[p.id]}
+                          mediaRef={mediaRefs[p.id]}
+                          platform={p.id}
+                          icon={platformIcons[p.id]}
+                          label={p.label}
+                          onText={handleText}
+                          onLink={handleLink}
+                          onEmoji={handleEmoji}
+                          onImage={handleImage}
+                          onAttachment={handleAttachment}
+                          onInput={handleEditorInput}
+                          onImageUrl={handleImageUrl}
+                          imageUrl={platformImageUrls[p.id]}
+                        />
+
+                        {/* Image upload section below each platform content box */}
+                        {renderImageUploadSection(p.id)}
                       </div>
-                      <div className="total-budget">
-                        <div>
-                          <h4>
-                            Total Budget : $
-                            {PLATFORM_LIST.filter((p) =>
-                              accounts.includes(p.id),
-                            ).reduce((sum, p) => sum + budgets[p.id], 0)}
-                          </h4>
-                          <p>
-                            Ad spend is charged directly by each connected
-                            social media platform. We don't handle payments.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </>
+                    );
+                  }
                 )}
               </div>
-
-              {renderLinkedInControls()}
-            </div>
-          )}
-
-          {/* FOOTER */}
-          <div className="modal-actions">
-            <button
-              className="cancel-btn"
-              onClick={onClose}
-              disabled={loadingType !== null}
-            >
-              Cancel
-            </button>
-            {step > 1 && (
-              <button
-                className="cancel-btn"
-                onClick={() => {
-                  setStep(step - 1);
-                  setSubmitted(false);
-                }}
-                disabled={loadingType !== null}
-              >
-                Back
-              </button>
-            )}
-            {step === 3 ? (
-              mode === "paid" ? (
-                <>
-                  <button
-                    className="cancel-btn"
-                    onClick={() => handleCreateCampaign("draft")}
-                    disabled={loadingType !== null}
-                  >
-                    {loadingType === "draft" ? "Saving..." : "Save as Draft"}
-                  </button>
-                  <button
-                    className="next-btn"
-                    onClick={() => handleCreateCampaign("scheduled")}
-                    disabled={loadingType !== null}
-                  >
-                    {loadingType === "scheduled" ? "Scheduling..." : "Schedule"}
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="next-btn"
-                  onClick={() => handleCreateCampaign("live")}
-                  disabled={loadingType !== null}
-                >
-                  {loadingType !== null ? "Creating..." : "Save & Post"}
-                </button>
-              )
-            ) : (
-              <button className="next-btn" onClick={handleNext}>
-                Next
-              </button>
             )}
           </div>
+        )}
 
-          {inlinePreview && (
-            <div
-              className="inline-preview-backdrop"
-              onClick={() => setInlinePreview(null)}
-            >
-              <div
-                className="inline-preview-popup"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  className="preview-close-btn"
-                  onClick={() => setInlinePreview(null)}
-                >
-                  ✕
-                </button>
-                <span className="preview-filename">{inlinePreview.name}</span>
-                {inlinePreview.type === "image" ? (
-                  <img src={inlinePreview.src} alt={inlinePreview.name} />
-                ) : (
-                  <iframe src={inlinePreview.src} title={inlinePreview.name} />
-                )}
+        {/* STEP 3 */}
+        {step === 3 && (
+          <div className="step-content">
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              Schedule Campaign
+            </Typography>
+
+            <div className="section-card">
+              <div className="schedule-header">
+                <div>
+                  <h3>
+                    {mode === "paid"
+                      ? "Schedule & Budget Allocation"
+                      : "Schedule"}
+                  </h3>
+                  <p className="section-subtitle">
+                    {mode === "paid"
+                      ? "Establish your schedule and budget for every platform."
+                      : "Select a date and time for the campaign."}
+                  </p>
+                  {startDate && endDate && (
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "#6b7280",
+                        marginTop: 4,
+                      }}
+                    >
+                      Schedule must be within campaign duration:{" "}
+                      <strong style={{ color: "#1d4ed8" }}>
+                        {dayjs(startDate).format("DD/MM/YYYY")} –{" "}
+                        {dayjs(endDate).format("DD/MM/YYYY")}
+                      </strong>
+                    </p>
+                  )}
+                </div>
+                <button className="ai-btn">✨ AI-Optimization Timing</button>
               </div>
+
+              <div className="schedule-row">
+                <div className="form-group half">
+                  <label>Select Date</label>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      format="DD/MM/YYYY"
+                      minDate={scheduleDateMin}
+                      maxDate={scheduleDateMax}
+                      shouldDisableDate={isScheduleDateDisabled}
+                      value={scheduleDate ? dayjs(scheduleDate) : null}
+                      onChange={(v) => {
+                        setScheduleDate(
+                          v ? (v as Dayjs).format("YYYY-MM-DD") : ""
+                        );
+                        setScheduleTime("");
+                      }}
+                      slots={{ openPickerIcon: CalendarTodayIcon }}
+                    />
+                  </LocalizationProvider>
+                </div>
+                <div className="form-group half">
+                  <label>Enter Time</label>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <TimePicker
+                      format="hh:mm A"
+                      disabled={!scheduleDate}
+                      minTime={getScheduleMinTime()}
+                      value={
+                        scheduleTime
+                          ? dayjs(
+                              `${scheduleDate || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`
+                            )
+                          : null
+                      }
+                      onChange={(v) => {
+                        if (v) setScheduleTime((v as Dayjs).format("HH:mm"));
+                      }}
+                      ampm
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          helperText: !scheduleDate
+                            ? "Select a date first"
+                            : undefined,
+                        },
+                      }}
+                    />
+                  </LocalizationProvider>
+                </div>
+              </div>
+
+              {mode === "paid" && (
+                <>
+                  <div className="budget-divider" />
+                  <div className="budget-section">
+                    <h3>Budget Allocation</h3>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "#6b7280",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Minimum budget per platform:{" "}
+                      <strong style={{ color: "#d97706" }}>
+                        ${PLATFORM_MIN_BUDGET + 1}
+                      </strong>{" "}
+                      (must be greater than ${PLATFORM_MIN_BUDGET})
+                    </p>
+                    <div className="budget-row">
+                      {PLATFORM_LIST.filter((p) =>
+                        accounts.includes(p.id)
+                      ).map((p) => {
+                        const budgetErr = getBudgetError(
+                          p.id,
+                          budgets[p.id]
+                        );
+                        return (
+                          <div key={p.id} className="budget-card">
+                            <div className="budget-title">
+                              <img
+                                src={platformIcons[p.id]}
+                                alt={p.label}
+                              />
+                              <span>
+                                {p.label} (Estimate CPC : ${p.cpc})
+                              </span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label htmlFor={`budget-${p.id}`}>Enter Amount in USD ($)</label>
+                              <input
+                                id={`budget-${p.id}`}
+                                type="number"
+                                min={PLATFORM_MIN_BUDGET + 1}
+                                step="1"
+                                value={budgets[p.id]}
+                                onChange={(e) =>
+                                  setBudget(p.id, Number(e.target.value))
+                                }
+                                className="budget-input"
+                                aria-label={`Budget for ${p.label} in US Dollars. Estimated CPC: $${p.cpc}`}
+                                style={{
+                                  borderColor: budgetErr
+                                    ? "#ef4444"
+                                    : undefined,
+                                }}
+                              />
+                              {budgetErr && (
+                                <p
+                                  style={{
+                                    fontSize: 11,
+                                    color: "#ef4444",
+                                    marginTop: 4,
+                                  }}
+                                >
+                                  {budgetErr}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="total-budget">
+                      <div>
+                        <h4>
+                          Total Budget : $
+                          {PLATFORM_LIST.filter((p) =>
+                            accounts.includes(p.id)
+                          ).reduce((sum, p) => sum + budgets[p.id], 0)}
+                        </h4>
+                        <p>
+                          Ad spend is charged directly by each connected social
+                          media platform. We don't handle payments.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
+
+            {renderLinkedInControls()}
+          </div>
+        )}
+
+        {/* FOOTER */}
+        <div className="modal-actions">
+          <button
+            className="cancel-btn"
+            onClick={onClose}
+            disabled={loadingType !== null}
+          >
+            Cancel
+          </button>
+          {step > 1 && (
+            <button
+              className="cancel-btn"
+              onClick={() => {
+                setStep(step - 1);
+                setSubmitted(false);
+              }}
+              disabled={loadingType !== null}
+            >
+              Back
+            </button>
           )}
-        </Box>
-      </Modal>
-    );
-  }
+          {step === 3 ? (
+            mode === "paid" ? (
+              <>
+                <button
+                  className="cancel-btn"
+                  onClick={() => handleCreateCampaign("draft")}
+                  disabled={loadingType !== null}
+                >
+                  {loadingType === "draft" ? "Saving..." : "Save as Draft"}
+                </button>
+                <button
+                  className="next-btn"
+                  onClick={() => handleCreateCampaign("scheduled")}
+                  disabled={loadingType !== null}
+                >
+                  {loadingType === "scheduled" ? "Scheduling..." : "Schedule"}
+                </button>
+              </>
+            ) : (
+              <button
+                className="next-btn"
+                onClick={() => handleCreateCampaign("live")}
+                disabled={loadingType !== null}
+              >
+                {loadingType !== null ? "Creating..." : "Save & Post"}
+              </button>
+            )
+          ) : (
+            <button className="next-btn" onClick={handleNext}>
+              Next
+            </button>
+          )}
+        </div>
+
+        {inlinePreview && (
+          <div
+            className="inline-preview-backdrop"
+            onClick={() => setInlinePreview(null)}
+          >
+            <div
+              className="inline-preview-popup"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="preview-close-btn"
+                onClick={() => setInlinePreview(null)}
+              >
+                ✕
+              </button>
+              <span className="preview-filename">{inlinePreview.name}</span>
+              {inlinePreview.type === "image" ? (
+                <img src={inlinePreview.src} alt={inlinePreview.name} />
+              ) : (
+                <iframe src={inlinePreview.src} title={inlinePreview.name} />
+              )}
+            </div>
+          </div>
+        )}
+      </Box>
+    </Modal>
+  );
+}

@@ -518,6 +518,8 @@ export default function EditCampaignModal({
 
   const [accounts, setAccounts] = useState<string[]>([]);
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
+  const [initialMode, setInitialMode] = useState<"organic" | "paid" | "">("");
+  const isPaidLocked = initialMode === "paid";
   // FIX: scheduleDate defaults from campaign.scheduledAt
   const [scheduleDate, setScheduleDate] = useState(
     campaign.scheduledAt ? dayjs(campaign.scheduledAt).format("YYYY-MM-DD") : "",
@@ -776,28 +778,31 @@ export default function EditCampaignModal({
 
         // ── Accounts / platforms ───────────────────────────────
         // FIX: try select_ad_accounts first, then social_media array
+        let fetchedAccounts: string[] = [];
         if (Array.isArray(data.select_ad_accounts) && data.select_ad_accounts.length > 0) {
-          setAccounts(data.select_ad_accounts.filter(Boolean) as string[]);
+          fetchedAccounts = data.select_ad_accounts.filter(Boolean) as string[];
         } else if (Array.isArray(data.social_media) && data.social_media.length > 0) {
-          setAccounts(
+          fetchedAccounts =
             (data.social_media as { platform_name: string; is_active?: boolean }[])
               .filter((sm) => sm.is_active !== false)
-              .map((sm) => sm.platform_name),
-          );
+              .map((sm) => sm.platform_name);
         }
 
         // ── Campaign mode ──────────────────────────────────────
         // ✅ FIX errors 1 & 2: cast campaign_mode to unknown first to allow string comparison
         const rawMode = data.campaign_mode as unknown;
+        let resolvedMode: "organic" | "paid" | "" = "";
         if (rawMode === 1 || rawMode === "organic_posting" || rawMode === "organic") {
-          setMode("organic");
+          resolvedMode = "organic";
         } else if (rawMode === 2 || rawMode === "paid_advertising" || rawMode === "paid") {
-          setMode("paid");
+          resolvedMode = "paid";
         } else if (Array.isArray(rawMode)) {
           const modeArr = rawMode as string[];
-          if (modeArr.includes("paid_advertising")) setMode("paid");
-          else if (modeArr.includes("organic_posting")) setMode("organic");
+          if (modeArr.includes("paid_advertising")) resolvedMode = "paid";
+          else if (modeArr.includes("organic_posting")) resolvedMode = "organic";
         }
+        setMode(resolvedMode);
+        setInitialMode(resolvedMode);
 
         // ── Budget data ────────────────────────────────────────
         if (data.budget_data) {
@@ -815,6 +820,15 @@ export default function EditCampaignModal({
         if (data.platform_data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pd = data.platform_data as Record<string, any>;
+
+          if (
+            pd.google_ads &&
+            !fetchedAccounts.includes("google_ads")
+          ) {
+            fetchedAccounts = [...fetchedAccounts, "google_ads"];
+          }
+
+          setAccounts(fetchedAccounts);
 
           // FIX: extract text content for each platform,
           //      handling both plain string and {content: string} object shapes
@@ -946,6 +960,8 @@ export default function EditCampaignModal({
             if (metaData.country_code) setMetaCountry(metaData.country_code);
             if (metaData.state) setMetaState(metaData.state);
           }
+        } else {
+          setAccounts(fetchedAccounts);
         }
       } catch (error) {
         console.error("Failed to fetch campaign:", error);
@@ -1013,6 +1029,11 @@ export default function EditCampaignModal({
   const handleUpdate = async () => {
     setSubmitted(true);
     if (!step3Valid || !fullCampaignData) return;
+
+    if (isPaidLocked && mode !== "paid") {
+      toast.error("Paid campaigns cannot be changed back to organic.");
+      return;
+    }
 
     // FIX: validate budgets with accurate error messages before submitting
     if (mode === "paid") {
@@ -1118,14 +1139,21 @@ export default function EditCampaignModal({
         resolvedImageUrl = resolveImageUrl(String(fullDataAsRecord.image_url));
       }
 
-      const selectedPlatforms = PLATFORM_LIST.filter((p) => accounts.includes(p.id));
-      const totalSpend = selectedPlatforms.reduce((sum, p) => sum + (budgets[p.id] ?? 0), 0);
+      const persistedAccounts =
+        mode === "paid"
+          ? accounts
+          : accounts.filter((platform) => platform !== "google_ads");
+      const selectedPlatforms = PLATFORM_LIST.filter((p) => persistedAccounts.includes(p.id));
+      const totalSpend =
+        mode === "paid"
+          ? selectedPlatforms.reduce((sum, p) => sum + (budgets[p.id] ?? 0), 0)
+          : 0;
 
       const socialPayload =
         campaign.type === "social"
           ? {
               social_media: socialAccountData,
-              select_ad_accounts: accounts,
+              select_ad_accounts: persistedAccounts,
               campaign_content: fullCampaignData.campaign_content || campaignName,
               platform_data: updatedPlatformData,
               image_url: resolvedImageUrl,
@@ -1175,6 +1203,65 @@ export default function EditCampaignModal({
       };
 
       await CampaignAPI.update(campaign.id, payload);
+
+      const shouldCreateGoogleAdsOnPromotion =
+        campaign.type === "social" &&
+        initialMode !== "paid" &&
+        mode === "paid" &&
+        accounts.includes("google_ads") &&
+        !!clinic?.google_ads_customer_id;
+
+      if (shouldCreateGoogleAdsOnPromotion) {
+        try {
+          const googleAdsImage =
+            platformImageUrlsRef.current["google_ads"]?.trim() ||
+            resolvedImageUrl ||
+            null;
+          const parsedKeywords = keywordsInput
+            .split(",")
+            .map((keyword) => keyword.trim())
+            .filter(Boolean);
+          const googleAdsCampaignStatus =
+            String(fullCampaignData.status ?? "").toLowerCase() === "live"
+              ? "live"
+              : "draft";
+
+          // ✅ FIX: Use platform's estimated CPC ($2.0 for Google Ads) instead of hardcoded value
+          const googleAdsPlatform = PLATFORM_LIST.find((p) => p.id === "google_ads");
+          const googleAdsCpcBid = googleAdsPlatform?.cpc ?? 2.0;
+
+          await CampaignAPI.createGoogleAds({
+            clinic_id: clinicId,
+            customer_id: String(clinic?.google_ads_customer_id ?? ""),
+            campaign_name: campaignName,
+            budget: budgets["google_ads"],
+            bidding_strategy: "MANUAL_CPC",
+            locations: [],
+            keywords: parsedKeywords,
+            cpc_bid: googleAdsCpcBid,
+            ad_group_name: `${campaignName} AdGroup`,
+            final_url: clinic?.website ?? "https://example.com",
+            headline_1: campaignName.slice(0, 30),
+            headline_2: "Learn More",
+            headline_3: "Contact Us Today",
+            description: campaignDescription.slice(0, 90),
+            description_2: "Call us now or visit our website.",
+            image_url: googleAdsImage,
+            platform_data: { google_ads: platformContent["google_ads"] },
+            campaign_type: "SEARCH",
+            internal_campaign_id: String(campaign.id),
+            campaign_objective: objective,
+            target_audience: audience,
+            start_date: startDate,
+            end_date: endDate,
+            start_time: scheduleTime || "",
+            campaign_status: googleAdsCampaignStatus,
+          });
+        } catch (googleAdsErr) {
+          console.error("[GoogleAds] Failed to promote edited campaign to paid:", googleAdsErr);
+          toast.warn("Campaign updated, but Google Ads promotion failed.");
+        }
+      }
 
       const updatedCampaign: Campaign = {
         ...campaign,
@@ -1449,7 +1536,15 @@ export default function EditCampaignModal({
                 <h3>Campaign Mode</h3>
                 <p className="section-subtitle">Choose a campaign mode to optimize your ad strategy</p>
                 <div className="mode-row">
-                  <div className={`mode-card ${mode === "organic" ? "selected" : ""}`} onClick={() => setMode("organic")}>
+                  <div
+                    className={`mode-card ${mode === "organic" ? "selected" : ""} ${isPaidLocked ? "disabled" : ""}`}
+                    onClick={() => {
+                      if (isPaidLocked) return;
+                      setMode("organic");
+                    }}
+                    style={isPaidLocked ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+                    title={isPaidLocked ? "Paid campaigns cannot be changed back to organic." : undefined}
+                  >
                     <div className="mode-left">
                       <div className={`radio ${mode === "organic" ? "checked" : ""}`} />
                       <div className="mode-text">
@@ -1470,6 +1565,11 @@ export default function EditCampaignModal({
                     <span className="badge outlined">Budget Setup Required</span>
                   </div>
                 </div>
+                {isPaidLocked && (
+                  <p className="section-subtitle" style={{ color: "#b45309", marginTop: 10 }}>
+                    This campaign is already paid and cannot be changed back to organic.
+                  </p>
+                )}
               </div>
 
               {/* Google Ads Keywords — FIX: NO image URL field (removed to match SocialCampaignModal) */}
@@ -1880,14 +1980,16 @@ export default function EditCampaignModal({
                                 <span>{p.label} (Estimate CPC : ${p.cpc})</span>
                               </div>
                               <div className="budget-input-wrapper">
-                                <label>Enter Amount ($)</label>
+                                <label htmlFor={`budget-${p.id}`}>Enter Amount in USD ($)</label>
                                 <input
+                                  id={`budget-${p.id}`}
                                   type="number"
                                   min={PLATFORM_MIN_BUDGET + 1}
                                   step="1"
                                   value={budgets[p.id] ?? 0}
                                   onChange={(e) => setBudget(p.id, Number(e.target.value))}
                                   className="budget-input"
+                                  aria-label={`Budget for ${p.label} in US Dollars`}
                                   style={{ borderColor: budgetErr ? "#ef4444" : undefined }}
                                 />
                                 {/* FIX: inline error per platform */}

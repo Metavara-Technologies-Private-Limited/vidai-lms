@@ -45,7 +45,7 @@ import WorkIcon from "@mui/icons-material/Work";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { clinicApi } from "../../services/clinic.api";
 import { fetchLeads } from "../../store/leadSlice";
-import { fetchCampaign } from "../../store/campaignSlice";
+import { fetchCampaign, clearCampaigns } from "../../store/campaignSlice";
 import { fetchPipelines } from "../../store/pipelineSlice";
 import { fetchUsers } from "../../store/userSlice";
 import { authApi } from "../../services/auth.api";
@@ -198,6 +198,8 @@ const Header = ({
         if (lastFetchedClinicIdRef.current === selectedClinicId) return;
 
         lastFetchedClinicIdRef.current = selectedClinicId;
+        // ✅ FIX: Clear campaigns BEFORE switching clinic to prevent stale data display
+        dispatch(clearCampaigns());
         // Persist to localStorage FIRST so all service calls pick up the new clinic
         localStorage.setItem("clinic_id", String(selectedClinicId));
         await dispatch(fetchClinic(selectedClinicId));
