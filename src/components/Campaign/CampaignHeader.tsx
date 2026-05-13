@@ -27,7 +27,6 @@ const STATUS_DOTS: Record<string, string> = {
   all:       "#6b7280",
   live:      "#22c55e",
   draft:     "#9ca3af",
-  schedule:  "#2563eb",
   scheduled: "#2563eb",
   paused:    "#f59e0b",
   stopped:   "#6b7280",
@@ -105,13 +104,9 @@ export default function CampaignHeader({
   const currentPlatformIcon = PLATFORM_ICONS[platform];
   const currentPlatformLabel = PLATFORM_LABELS[platform] ?? platform;
 
-  // FIX 1: removed "schedule" (old duplicate) AND also skip "scheduled" duplicate
   // Keep only: all, live, draft, scheduled, paused, stopped, completed, failed
   const statusItems = (
     ["all", ...Object.values(CAMPAIGN_STATUS)] as (CampaignStatus | "all")[]
-  ).filter(
-    (item) =>
-      (item as string) !== "schedule" // remove old "schedule" duplicate
   );
 
   // FIX 2: when Gmail selected → switch to Email tab automatically

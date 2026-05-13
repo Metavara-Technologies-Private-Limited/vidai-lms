@@ -137,10 +137,20 @@ const CampaignDashboard = ({
 
   React.useEffect(() => {
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const fetchAll = async () => {
       try {
         setLoadingInsights(true);
+        
+        // ✅ FIX: Safety timeout to prevent loading spinner from getting stuck
+        // Maximum 10 seconds before forcing loading to false
+        timeoutId = setTimeout(() => {
+          if (!cancelled) {
+            console.warn("[CampaignDashboard] Loading timeout — forcing completion");
+            setLoadingInsights(false);
+          }
+        }, 10000);
 
         const campaignId = campaignIdRef.current;
         const campaignType = campaignTypeRef.current;
@@ -268,6 +278,7 @@ const CampaignDashboard = ({
       } catch (err) {
         console.error("Failed to fetch campaign data:", err);
       } finally {
+        if (timeoutId) clearTimeout(timeoutId);
         if (!cancelled) setLoadingInsights(false);
       }
     };
@@ -276,6 +287,7 @@ const CampaignDashboard = ({
 
     return () => {
       cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
