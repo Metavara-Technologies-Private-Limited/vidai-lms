@@ -52,6 +52,62 @@ interface EditCampaignModalProps {
   onSave: (updated: Campaign) => void;
 }
 
+// FIX: Convert any share/preview URL to a direct renderable image URL.
+// Handles Google Drive, Dropbox, OneDrive, Imgur, and passes direct URLs unchanged.
+const resolveImageUrl = (url: string): string => {
+  if (!url) return url;
+  const trimmed = url.trim();
+
+  // ── Google Drive ──────────────────────────────────────────────────────
+  const driveFileMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/?]+)/);
+  if (driveFileMatch) {
+    return `https://drive.google.com/uc?export=view&id=${driveFileMatch[1]}`;
+  }
+  const driveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([^&]+)/);
+  if (driveOpenMatch) {
+    return `https://drive.google.com/uc?export=view&id=${driveOpenMatch[1]}`;
+  }
+  const docsMatch = trimmed.match(/docs\.google\.com\/[^/]+\/d\/([^/?]+)/);
+  if (docsMatch) {
+    return `https://drive.google.com/uc?export=view&id=${docsMatch[1]}`;
+  }
+  if (trimmed.includes("drive.google.com/uc")) {
+    return trimmed;
+  }
+
+  // ── Dropbox ───────────────────────────────────────────────────────────
+  if (trimmed.includes("dropbox.com")) {
+    return trimmed
+      .replace(/[?&]dl=\d/, "")
+      .replace(/[?&]raw=\d/, "")
+      .replace(/\?/, "?raw=1&")
+      .replace(/dropbox\.com\/(.+)$/, (match) =>
+        match.includes("?") ? match : match + "?raw=1"
+      );
+  }
+
+  // ── OneDrive / SharePoint ─────────────────────────────────────────────
+  if (trimmed.match(/1drv\.ms|onedrive\.live\.com|sharepoint\.com/)) {
+    if (trimmed.includes("download=1")) return trimmed;
+    const sep = trimmed.includes("?") ? "&" : "?";
+    return `${trimmed}${sep}download=1`;
+  }
+
+  // ── Imgur ─────────────────────────────────────────────────────────────
+  const imgurGallery = trimmed.match(
+    /^https?:\/\/(?:www\.)?imgur\.com\/(?:a\/|gallery\/)?([A-Za-z0-9]+)(?:\.[a-z]+)?(?:[?#].*)?$/
+  );
+  if (imgurGallery && !trimmed.includes("i.imgur.com")) {
+    return `https://i.imgur.com/${imgurGallery[1]}.jpg`;
+  }
+
+  // ── All other URLs (S3, Cloudinary, direct .jpg/.png, etc.) ──────────
+  return trimmed;
+};
+
+// FIX: minimum budget strictly greater than $2
+const PLATFORM_MIN_BUDGET = 2;
+
 // ─── LinkedIn countries + states (full world list) ───────────────
 const LINKEDIN_COUNTRIES: {
   value: string;
@@ -416,6 +472,21 @@ const PLATFORM_LIST: { id: Platform; label: string; cpc: number }[] = [
   { id: "google_ads", label: "Google Ads", cpc: 2.0 },
 ];
 
+// FIX: Accurate per-platform budget error (must be strictly > $2)
+const getBudgetError = (platform: Platform, amount: number): string | null => {
+  if (
+    platform === "facebook" ||
+    platform === "instagram" ||
+    platform === "linkedin" ||
+    platform === "google_ads"
+  ) {
+    if (amount <= PLATFORM_MIN_BUDGET) {
+      return `${platform.replace("_", " ").toUpperCase()} requires a budget greater than $${PLATFORM_MIN_BUDGET}. Please enter at least $${PLATFORM_MIN_BUDGET + 1}.`;
+    }
+  }
+  return null;
+};
+
 export default function EditCampaignModal({
   campaign,
   onClose,
@@ -447,6 +518,7 @@ export default function EditCampaignModal({
 
   const [accounts, setAccounts] = useState<string[]>([]);
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
+  // FIX: scheduleDate defaults from campaign.scheduledAt
   const [scheduleDate, setScheduleDate] = useState(
     campaign.scheduledAt ? dayjs(campaign.scheduledAt).format("YYYY-MM-DD") : "",
   );
@@ -457,14 +529,25 @@ export default function EditCampaignModal({
   const [scheduleTime, setScheduleTime] = useState(
     campaign.scheduledAt ? dayjs(campaign.scheduledAt).format("HH:mm") : "",
   );
-  const [instagramBudget, setInstagramBudget] = useState(350);
-  const [facebookBudget, setFacebookBudget] = useState(250);
-  const [linkedinBudget, setLinkedinBudget] = useState(150);
-  const [googleAdsBudget, setGoogleAdsBudget] = useState(200);
+
+  // FIX: budgets stored as a map so all platforms handled uniformly
+  const [budgets, setBudgets] = useState<Record<Platform, number>>({
+    instagram: 350,
+    facebook: 250,
+    linkedin: 150,
+    gmail: 0,
+    google_ads: 200,
+  });
+  const setBudget = (platform: Platform, value: number) =>
+    setBudgets((prev) => ({ ...prev, [platform]: value }));
 
   // ─── Google Ads fields ────────────────────────────────────────
+  // FIX: Google Ads image URL field REMOVED (no longer shown in UI, matching SocialCampaignModal)
   const [keywordsInput, setKeywordsInput] = useState("");
-  const [googleAdsImageUrl, setGoogleAdsImageUrl] = useState("");
+
+  // ─── Meta (Facebook/Instagram) targeting ─────────────────────
+  const [metaCountry, setMetaCountry] = useState("");
+  const [metaState, setMetaState] = useState("");
 
   // ─── LinkedIn targeting fields ────────────────────────────────
   const [linkedInCountry, setLinkedInCountry] = useState("");
@@ -473,7 +556,7 @@ export default function EditCampaignModal({
   const [linkedInBidStrategy, setLinkedInBidStrategy] = useState("MANUAL_BIDDING");
   const [linkedInBidAmount, setLinkedInBidAmount] = useState<number>(0);
 
-  // ─── Platform content refs (for SocialContentBox) ─────────────
+  // ─── Platform content & image URLs ───────────────────────────
   const [platformContent, setPlatformContent] = useState<Record<Platform, string>>({
     instagram: "", facebook: "", linkedin: "", gmail: "", google_ads: "",
   });
@@ -520,9 +603,11 @@ export default function EditCampaignModal({
   const handleEditorInput = (platform: Platform, value: string) =>
     setPlatformContent((prev) => ({ ...prev, [platform]: value }));
 
+  // FIX: resolve Drive/Dropbox/etc URLs on input
   const handleImageUrl = (platform: Platform, url: string) => {
-    platformImageUrlsRef.current[platform] = url;
-    setPlatformImageUrls((prev) => ({ ...prev, [platform]: url }));
+    const resolved = resolveImageUrl(url);
+    platformImageUrlsRef.current[platform] = resolved;
+    setPlatformImageUrls((prev) => ({ ...prev, [platform]: resolved }));
   };
 
   const getEditorRef = (platform: string) => {
@@ -607,11 +692,9 @@ export default function EditCampaignModal({
   const selectedCountryStates =
     LINKEDIN_COUNTRIES.find((c) => c.value === linkedInCountry)?.states ?? [];
 
-  // ─── Helper: parse saved location string back into country/state ──────────
+  // ─── Helper: parse saved location string back into country/state ──
   const parseLocationIntoFields = (location: string) => {
     if (!location) return;
-
-    // Try "State, Country" split
     const commaIdx = location.indexOf(", ");
     if (commaIdx !== -1) {
       const possibleState = location.substring(0, commaIdx).trim();
@@ -625,98 +708,183 @@ export default function EditCampaignModal({
         return;
       }
     }
-
-    // Try plain country match
     const countryOnly = LINKEDIN_COUNTRIES.find((c) => c.value === location.trim());
     if (countryOnly) {
       setLinkedInCountry(location.trim());
       setLinkedInState("");
       return;
     }
-
-    // Fallback: treat as custom location
     setLinkedInCustomLocation(location);
   };
 
+  // FIX: Schedule date picker constraints — same as SocialCampaignModal
+  const scheduleDateMin = startDate ? dayjs(startDate) : dayjs();
+  const scheduleDateMax = endDate ? dayjs(endDate) : undefined;
+
+  // ✅ FIX error 3: shouldDisableDate param typed as Date | Dayjs to match MUI expectation
+  const isScheduleDateDisabled = (date: Date | Dayjs): boolean => {
+    const d = dayjs(date);
+    if (startDate && d.isBefore(dayjs(startDate), "day")) return true;
+    if (endDate && d.isAfter(dayjs(endDate), "day")) return true;
+    return false;
+  };
+
+  const getScheduleMinTime = (): Dayjs | undefined => {
+    if (!scheduleDate) return dayjs();
+    if (scheduleDate === dayjs().format("YYYY-MM-DD")) return dayjs();
+    return undefined;
+  };
+
+  // ─── Fetch full campaign data and pre-fill ALL fields ────────
   useEffect(() => {
     const fetchCampaign = async () => {
       try {
         const response = await CampaignAPI.get(campaign.id);
-        const data = response.data;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = response.data as CampaignAPIType & Record<string, any>;
         setFullCampaignData(data);
+
+        // ── Step 1 fields ──────────────────────────────────────
         setCampaignName(data.campaign_name || "");
         setCampaignDescription(data.campaign_description || "");
         setObjective(data.campaign_objective || "");
         setAudience(data.target_audience || "");
         setStartDate(data.start_date || "");
         setEndDate(data.end_date || "");
+
+        // ── Email fields ───────────────────────────────────────
         if (data.email?.length > 0) {
           setSubject(data.email[0].subject || "");
           setEmailBody(data.email[0].email_body || "");
           if (editorRef.current)
             editorRef.current.innerHTML = data.email[0].email_body || "";
         }
+
+        // ── Schedule fields ────────────────────────────────────
+        // FIX: prefer selected_start/selected_end; fall back to scheduledAt
         if (data.selected_start) {
-          setScheduleRange([dayjs(data.selected_start), dayjs(data.selected_end)]);
-          setScheduleDate(dayjs(data.selected_start).format("YYYY-MM-DD"));
+          const selStart = dayjs(data.selected_start);
+          const selEnd = dayjs(data.selected_end || data.selected_start);
+          setScheduleRange([selStart, selEnd]);
+          setScheduleDate(selStart.format("YYYY-MM-DD"));
+        } else if (campaign.scheduledAt) {
+          const fallback = dayjs(campaign.scheduledAt);
+          setScheduleRange([fallback, fallback]);
+          setScheduleDate(fallback.format("YYYY-MM-DD"));
         }
         if (data.enter_time) setScheduleTime(data.enter_time);
+
+        // ── Accounts / platforms ───────────────────────────────
+        // FIX: try select_ad_accounts first, then social_media array
         if (Array.isArray(data.select_ad_accounts) && data.select_ad_accounts.length > 0) {
-          setAccounts(data.select_ad_accounts.filter(Boolean));
-        } else if (data.social_media?.length > 0) {
+          setAccounts(data.select_ad_accounts.filter(Boolean) as string[]);
+        } else if (Array.isArray(data.social_media) && data.social_media.length > 0) {
           setAccounts(
-            data.social_media
-              .filter((sm: { is_active?: boolean }) => sm.is_active !== false)
-              .map((sm: { platform_name: string }) => sm.platform_name),
+            (data.social_media as { platform_name: string; is_active?: boolean }[])
+              .filter((sm) => sm.is_active !== false)
+              .map((sm) => sm.platform_name),
           );
         }
-        if (data.campaign_mode === 1) setMode("organic");
-        if (data.campaign_mode === 2) setMode("paid");
 
-        // ─── Pre-fill budget data if available ──────────────────
-        if (data.budget_data) {
-          const bd = data.budget_data as Record<string, number>;
-          if (bd.instagram) setInstagramBudget(bd.instagram);
-          if (bd.facebook) setFacebookBudget(bd.facebook);
-          if (bd.linkedin) setLinkedinBudget(bd.linkedin);
-          if (bd.google_ads) setGoogleAdsBudget(bd.google_ads);
+        // ── Campaign mode ──────────────────────────────────────
+        // ✅ FIX errors 1 & 2: cast campaign_mode to unknown first to allow string comparison
+        const rawMode = data.campaign_mode as unknown;
+        if (rawMode === 1 || rawMode === "organic_posting" || rawMode === "organic") {
+          setMode("organic");
+        } else if (rawMode === 2 || rawMode === "paid_advertising" || rawMode === "paid") {
+          setMode("paid");
+        } else if (Array.isArray(rawMode)) {
+          const modeArr = rawMode as string[];
+          if (modeArr.includes("paid_advertising")) setMode("paid");
+          else if (modeArr.includes("organic_posting")) setMode("organic");
         }
 
-        // ─── Pre-fill platform content ────────────────────────
+        // ── Budget data ────────────────────────────────────────
+        if (data.budget_data) {
+          const bd = data.budget_data as Record<string, number>;
+          setBudgets((prev) => ({
+            ...prev,
+            ...(bd.instagram !== undefined ? { instagram: bd.instagram } : {}),
+            ...(bd.facebook !== undefined ? { facebook: bd.facebook } : {}),
+            ...(bd.linkedin !== undefined ? { linkedin: bd.linkedin } : {}),
+            ...(bd.google_ads !== undefined ? { google_ads: bd.google_ads } : {}),
+          }));
+        }
+
+        // ── Platform data (content + targeting) ───────────────
         if (data.platform_data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pd = data.platform_data as Record<string, any>;
 
-          const filledContent: Record<Platform, string> = {
-            instagram: typeof pd.instagram === "string" ? pd.instagram : "",
-            facebook: typeof pd.facebook === "string" ? pd.facebook : "",
-            linkedin:
-              typeof pd.linkedin === "string"
-                ? pd.linkedin
-                : (pd.linkedin as { content?: string } | undefined)?.content ?? "",
-            gmail: typeof pd.gmail === "string" ? pd.gmail : "",
-            google_ads: typeof pd.google_ads === "string" ? pd.google_ads : "",
+          // FIX: extract text content for each platform,
+          //      handling both plain string and {content: string} object shapes
+          const extractContent = (val: unknown): string => {
+            if (typeof val === "string") return val;
+            if (val && typeof val === "object" && "content" in (val as object)) {
+              return String((val as { content: unknown }).content ?? "");
+            }
+            return "";
           };
 
+          const filledContent: Record<Platform, string> = {
+            instagram: extractContent(pd.instagram),
+            facebook: extractContent(pd.facebook),
+            linkedin: extractContent(pd.linkedin),
+            gmail: extractContent(pd.gmail),
+            google_ads: extractContent(pd.google_ads),
+          };
           setPlatformContent(filledContent);
 
-          // ─── Push content into contentEditable refs so editors show text ──
+          // FIX: extract image_url for each platform and resolve Drive/Dropbox URLs
+          const extractImageUrl = (val: unknown): string => {
+            if (val && typeof val === "object" && "image_url" in (val as object)) {
+              const imgUrl = String((val as { image_url: unknown }).image_url ?? "");
+              return imgUrl ? resolveImageUrl(imgUrl) : "";
+            }
+            return "";
+          };
+
+          const filledImageUrls: Record<Platform, string> = {
+            instagram: extractImageUrl(pd.instagram),
+            facebook: extractImageUrl(pd.facebook),
+            linkedin: extractImageUrl(pd.linkedin),
+            gmail: extractImageUrl(pd.gmail),
+            // FIX: Google Ads image URL NOT shown in UI — still resolve internally for submission
+            google_ads: extractImageUrl(pd.google_ads),
+          };
+          // Apply resolved image URLs to both ref and state
+          (Object.keys(filledImageUrls) as Platform[]).forEach((p) => {
+            if (filledImageUrls[p]) {
+              platformImageUrlsRef.current[p] = filledImageUrls[p];
+            }
+          });
+          setPlatformImageUrls(filledImageUrls);
+
+          // FIX: also check top-level image_url field (saved by SocialCampaignModal)
+          if (data.image_url) {
+            const resolvedTopLevel = resolveImageUrl(String(data.image_url));
+            // Apply to all selected platforms that don't already have an image
+            (["instagram", "facebook", "linkedin", "google_ads"] as Platform[]).forEach((p) => {
+              if (!filledImageUrls[p]) {
+                platformImageUrlsRef.current[p] = resolvedTopLevel;
+                setPlatformImageUrls((prev) => ({ ...prev, [p]: resolvedTopLevel }));
+              }
+            });
+          }
+
+          // ── Push text content into contentEditable refs ──────
           setTimeout(() => {
-            if (instagramRef.current && filledContent.instagram) {
+            if (instagramRef.current && filledContent.instagram)
               instagramRef.current.innerText = filledContent.instagram;
-            }
-            if (facebookRef.current && filledContent.facebook) {
+            if (facebookRef.current && filledContent.facebook)
               facebookRef.current.innerText = filledContent.facebook;
-            }
-            if (linkedinRef.current && filledContent.linkedin) {
+            if (linkedinRef.current && filledContent.linkedin)
               linkedinRef.current.innerText = filledContent.linkedin;
-            }
-            if (googleAdsRef.current && filledContent.google_ads) {
+            if (googleAdsRef.current && filledContent.google_ads)
               googleAdsRef.current.innerText = filledContent.google_ads;
-            }
           }, 300);
 
-          // ─── Pre-fill Google Ads fields ────────────────────────────────
+          // ── Google Ads: keywords only (no image URL in UI) ───
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const googleAdsData = pd.google_ads as any;
           if (googleAdsData && typeof googleAdsData === "object") {
@@ -726,13 +894,8 @@ export default function EditCampaignModal({
                 : String(googleAdsData.keywords);
               setKeywordsInput(kws);
             }
-            if (googleAdsData.image_url) {
-              const imgUrl = String(googleAdsData.image_url);
-              setGoogleAdsImageUrl(imgUrl);
-              handleImageUrl("google_ads", imgUrl);
-            }
+            // FIX: image_url still resolved internally (for submission) but NOT shown in UI
           } else if (typeof pd.google_ads === "string" && pd.google_ads.trim().startsWith("{")) {
-            // Stored as JSON string — safely parse with type assertion avoided via variable
             try {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const parsed = JSON.parse(pd.google_ads) as Record<string, any>;
@@ -742,17 +905,12 @@ export default function EditCampaignModal({
                   : String(parsed.keywords);
                 setKeywordsInput(kws);
               }
-              if (parsed.image_url) {
-                const imgUrl = String(parsed.image_url);
-                setGoogleAdsImageUrl(imgUrl);
-                handleImageUrl("google_ads", imgUrl);
-              }
             } catch {
               // not JSON, ignore
             }
           }
 
-          // ─── Pre-fill LinkedIn targeting fields ──────────────────────────
+          // ── LinkedIn targeting ────────────────────────────────
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const linkedinData = pd.linkedin as any;
           if (linkedinData && typeof linkedinData === "object") {
@@ -762,17 +920,10 @@ export default function EditCampaignModal({
               bid_amount?: number;
               content?: string;
             };
-            if (liData.location) {
-              parseLocationIntoFields(liData.location);
-            }
-            if (liData.bid_strategy) {
-              setLinkedInBidStrategy(liData.bid_strategy);
-            }
-            if (liData.bid_amount !== undefined) {
-              setLinkedInBidAmount(Number(liData.bid_amount));
-            }
+            if (liData.location) parseLocationIntoFields(liData.location);
+            if (liData.bid_strategy) setLinkedInBidStrategy(liData.bid_strategy);
+            if (liData.bid_amount !== undefined) setLinkedInBidAmount(Number(liData.bid_amount));
           } else if (typeof pd.linkedin === "string" && pd.linkedin.trim().startsWith("{")) {
-            // Stored as JSON string — use a local variable to avoid TS narrowing to never
             const linkedinStr: string = pd.linkedin;
             try {
               const liParsed = JSON.parse(linkedinStr) as {
@@ -787,30 +938,35 @@ export default function EditCampaignModal({
               // not JSON, ignore
             }
           }
+
+          // ── Meta (Facebook/Instagram) targeting ───────────────
+          // FIX: pre-fill metaCountry/metaState from saved facebook or instagram platform_data
+          const metaData = (pd.facebook || pd.instagram) as { country_code?: string; state?: string } | undefined;
+          if (metaData && typeof metaData === "object") {
+            if (metaData.country_code) setMetaCountry(metaData.country_code);
+            if (metaData.state) setMetaState(metaData.state);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch campaign:", error);
       }
     };
     fetchCampaign();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign.id]);
 
   // ─── Push content into refs when step changes to 2 (editors mount) ──
   useEffect(() => {
     if (step === 2 && campaign.type === "social") {
       setTimeout(() => {
-        if (instagramRef.current && platformContent.instagram && !instagramRef.current.innerText.trim()) {
+        if (instagramRef.current && platformContent.instagram && !instagramRef.current.innerText.trim())
           instagramRef.current.innerText = platformContent.instagram;
-        }
-        if (facebookRef.current && platformContent.facebook && !facebookRef.current.innerText.trim()) {
+        if (facebookRef.current && platformContent.facebook && !facebookRef.current.innerText.trim())
           facebookRef.current.innerText = platformContent.facebook;
-        }
-        if (linkedinRef.current && platformContent.linkedin && !linkedinRef.current.innerText.trim()) {
+        if (linkedinRef.current && platformContent.linkedin && !linkedinRef.current.innerText.trim())
           linkedinRef.current.innerText = platformContent.linkedin;
-        }
-        if (googleAdsRef.current && platformContent.google_ads && !googleAdsRef.current.innerText.trim()) {
+        if (googleAdsRef.current && platformContent.google_ads && !googleAdsRef.current.innerText.trim())
           googleAdsRef.current.innerText = platformContent.google_ads;
-        }
       }, 200);
     }
   }, [step, campaign.type, platformContent]);
@@ -857,6 +1013,18 @@ export default function EditCampaignModal({
   const handleUpdate = async () => {
     setSubmitted(true);
     if (!step3Valid || !fullCampaignData) return;
+
+    // FIX: validate budgets with accurate error messages before submitting
+    if (mode === "paid") {
+      for (const platform of accounts as Platform[]) {
+        const err = getBudgetError(platform, budgets[platform] ?? 0);
+        if (err) {
+          toast.error(err);
+          return;
+        }
+      }
+    }
+
     try {
       const start =
         campaign.type === "email" ? scheduleRange[0]?.format("YYYY-MM-DD") : scheduleDate;
@@ -876,30 +1044,82 @@ export default function EditCampaignModal({
               })
           : [];
 
-      // ─── Build updated platform_data with LinkedIn targeting ──
+      // ─── Build updated platform_data ──────────────────────────
+      // FIX: resolve any image URLs before saving
       const updatedPlatformData: Record<string, unknown> = {
         ...(fullCampaignData.platform_data || {}),
-        ...platformContent,
       };
-      if (accounts.includes("linkedin")) {
-        updatedPlatformData["linkedin"] = {
-          content: platformContent["linkedin"],
-          location: getLinkedInLocation(),
-          bid_strategy: linkedInBidStrategy,
-          bid_amount: linkedInBidAmount,
-        };
+
+      // Write per-platform content + image_url (resolved)
+      for (const p of accounts as Platform[]) {
+        if (p === "linkedin") {
+          updatedPlatformData["linkedin"] = {
+            content: platformContent["linkedin"],
+            location: getLinkedInLocation(),
+            bid_strategy: linkedInBidStrategy,
+            bid_amount: linkedInBidAmount,
+            // FIX: persist resolved image url for linkedin if present
+            ...(platformImageUrlsRef.current["linkedin"]
+              ? { image_url: resolveImageUrl(platformImageUrlsRef.current["linkedin"]) }
+              : {}),
+          };
+        } else if (p === "facebook") {
+          updatedPlatformData["facebook"] = {
+            content: platformContent["facebook"],
+            country_code: metaCountry || "IN",
+            state: metaState,
+            ...(platformImageUrlsRef.current["facebook"]
+              ? { image_url: resolveImageUrl(platformImageUrlsRef.current["facebook"]) }
+              : {}),
+          };
+        } else if (p === "instagram") {
+          updatedPlatformData["instagram"] = {
+            content: platformContent["instagram"],
+            country_code: metaCountry || "IN",
+            state: metaState,
+            ...(platformImageUrlsRef.current["instagram"]
+              ? { image_url: resolveImageUrl(platformImageUrlsRef.current["instagram"]) }
+              : {}),
+          };
+        } else if (p === "google_ads") {
+          // FIX: Google Ads — keywords only; image URL kept internally (no UI field)
+          updatedPlatformData["google_ads"] = {
+            content: platformContent["google_ads"],
+            keywords: keywordsInput
+              .split(",")
+              .map((k) => k.trim())
+              .filter(Boolean),
+            // preserve existing image_url from previously saved data if any
+            ...(platformImageUrlsRef.current["google_ads"]
+              ? { image_url: resolveImageUrl(platformImageUrlsRef.current["google_ads"]) }
+              : {}),
+          };
+        } else {
+          updatedPlatformData[p] = {
+            content: platformContent[p as Platform],
+          };
+        }
       }
-      // ─── Persist Google Ads keywords + image_url into platform_data ──
-      if (accounts.includes("google_ads")) {
-        updatedPlatformData["google_ads"] = {
-          content: platformContent["google_ads"],
-          keywords: keywordsInput
-            .split(",")
-            .map((k) => k.trim())
-            .filter(Boolean),
-          image_url: googleAdsImageUrl || null,
-        };
+
+      // ✅ FIX errors 4 & 5: cast through unknown before Record<string, unknown>
+      const fullDataAsRecord = fullCampaignData as unknown as Record<string, unknown>;
+
+      // FIX: resolve the top-level image_url (pick first non-empty platform image)
+      let resolvedImageUrl: string | null = null;
+      for (const p of accounts as Platform[]) {
+        const candidate = platformImageUrlsRef.current[p]?.trim();
+        if (candidate) {
+          resolvedImageUrl = resolveImageUrl(candidate);
+          break;
+        }
       }
+      // fall back to existing campaign image_url if nothing new
+      if (!resolvedImageUrl && fullDataAsRecord.image_url) {
+        resolvedImageUrl = resolveImageUrl(String(fullDataAsRecord.image_url));
+      }
+
+      const selectedPlatforms = PLATFORM_LIST.filter((p) => accounts.includes(p.id));
+      const totalSpend = selectedPlatforms.reduce((sum, p) => sum + (budgets[p.id] ?? 0), 0);
 
       const socialPayload =
         campaign.type === "social"
@@ -908,16 +1128,12 @@ export default function EditCampaignModal({
               select_ad_accounts: accounts,
               campaign_content: fullCampaignData.campaign_content || campaignName,
               platform_data: updatedPlatformData,
+              image_url: resolvedImageUrl,
               budget_data: {
-                ...(accounts.includes("instagram") ? { instagram: instagramBudget } : {}),
-                ...(accounts.includes("facebook") ? { facebook: facebookBudget } : {}),
-                ...(accounts.includes("linkedin") ? { linkedin: linkedinBudget } : {}),
-                ...(accounts.includes("google_ads") ? { google_ads: googleAdsBudget } : {}),
-                total:
-                  (accounts.includes("instagram") ? instagramBudget : 0) +
-                  (accounts.includes("facebook") ? facebookBudget : 0) +
-                  (accounts.includes("linkedin") ? linkedinBudget : 0) +
-                  (accounts.includes("google_ads") ? googleAdsBudget : 0),
+                ...Object.fromEntries(
+                  selectedPlatforms.map((p) => [p.id, budgets[p.id]])
+                ),
+                total: totalSpend,
               },
             }
           : {};
@@ -975,6 +1191,7 @@ export default function EditCampaignModal({
       onClose();
     } catch (error) {
       console.error("Update error:", error);
+      toast.error("Failed to update campaign");
     }
   };
 
@@ -1070,7 +1287,19 @@ export default function EditCampaignModal({
                     <DatePicker
                       format="DD/MM/YYYY"
                       value={startDate ? dayjs(startDate) : null}
-                      onChange={(v) => setStartDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
+                      onChange={(v) => {
+                        const newStart = v ? (v as Dayjs).format("YYYY-MM-DD") : "";
+                        setStartDate(newStart);
+                        // FIX: clear endDate if it becomes before new startDate
+                        if (endDate && newStart && dayjs(endDate).isBefore(dayjs(newStart), "day")) {
+                          setEndDate("");
+                        }
+                        // FIX: clear scheduleDate if it falls outside new range
+                        if (scheduleDate && newStart && dayjs(scheduleDate).isBefore(dayjs(newStart), "day")) {
+                          setScheduleDate("");
+                          setScheduleTime("");
+                        }
+                      }}
                       slots={{ openPickerIcon: CalendarTodayIcon }}
                       slotProps={{ textField: { fullWidth: true } }}
                     />
@@ -1081,8 +1310,17 @@ export default function EditCampaignModal({
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
                       format="DD/MM/YYYY"
+                      minDate={startDate ? dayjs(startDate) : undefined}
                       value={endDate ? dayjs(endDate) : null}
-                      onChange={(v) => setEndDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
+                      onChange={(v) => {
+                        const newEnd = v ? (v as Dayjs).format("YYYY-MM-DD") : "";
+                        setEndDate(newEnd);
+                        // FIX: clear scheduleDate if it goes beyond new endDate
+                        if (scheduleDate && newEnd && dayjs(scheduleDate).isAfter(dayjs(newEnd), "day")) {
+                          setScheduleDate("");
+                          setScheduleTime("");
+                        }
+                      }}
                       slots={{ openPickerIcon: CalendarTodayIcon }}
                       slotProps={{ textField: { fullWidth: true } }}
                     />
@@ -1234,8 +1472,8 @@ export default function EditCampaignModal({
                 </div>
               </div>
 
-              {/* Google Ads Keywords — shown only when google_ads selected */}
-              {accounts.includes("google_ads") && (
+              {/* Google Ads Keywords — FIX: NO image URL field (removed to match SocialCampaignModal) */}
+              {accounts.includes("google_ads") && mode === "paid" && (
                 <div className="section-card">
                   <h3>Google Ads Keywords</h3>
                   <p className="section-subtitle">Enter keywords for your Google Search campaign (comma-separated)</p>
@@ -1263,17 +1501,58 @@ export default function EditCampaignModal({
                       </div>
                     )}
                   </div>
-                  <div className="form-group" style={{ marginTop: 12 }}>
-                    <label>Google Ads Image URL (optional)</label>
-                    <input
-                      value={googleAdsImageUrl}
-                      onChange={(e) => { setGoogleAdsImageUrl(e.target.value); handleImageUrl("google_ads", e.target.value); }}
-                      placeholder="https://your-image-url.com/image.jpg"
-                      style={{ width: "100%" }}
-                    />
-                    <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                      If provided, a Display campaign will also be created alongside the Search campaign.
-                    </p>
+                </div>
+              )}
+
+              {/* Google Ads organic info */}
+              {accounts.includes("google_ads") && mode === "organic" && (
+                <div className="section-card" style={{ border: "1px solid #d1fae5", backgroundColor: "#f0fdf4", borderRadius: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <img src={googleAdsIcon} alt="Google Ads" style={{ width: 18, height: 18 }} />
+                    <h3 style={{ margin: 0, color: "#15803d" }}>Google Ads — Organic Post</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
+                    Your campaign content will be saved for Google Ads. No paid ad will be triggered — no money will be spent.
+                    Switch to <strong>Paid Advertising</strong> mode to run a real Google Ad.
+                  </p>
+                </div>
+              )}
+
+              {/* FIX: Meta Ad Targeting — pre-filled from saved facebook/instagram platform_data */}
+              {(accounts.includes("facebook") || accounts.includes("instagram")) && (
+                <div className="section-card" style={{ border: "1px solid #1877f2", borderRadius: 8 }}>
+                  <h3 style={{ color: "#1877f2" }}>Meta Ad Targeting</h3>
+                  <div className="form-row">
+                    <div className="form-group half">
+                      <label>Country</label>
+                      <FormControl fullWidth variant="outlined" size="small">
+                        <Select
+                          value={metaCountry}
+                          onChange={(e) => { setMetaCountry(e.target.value); setMetaState(""); }}
+                          displayEmpty
+                        >
+                          <MenuItem value="">Select Country</MenuItem>
+                          {LINKEDIN_COUNTRIES.map((c) => (
+                            <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </div>
+                    <div className="form-group half">
+                      <label>State</label>
+                      <FormControl fullWidth variant="outlined" size="small">
+                        <Select
+                          value={metaState}
+                          onChange={(e) => setMetaState(e.target.value)}
+                          displayEmpty
+                        >
+                          <MenuItem value="">All States</MenuItem>
+                          {(LINKEDIN_COUNTRIES.find((c) => c.value === metaCountry)?.states ?? []).map((s) => (
+                            <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1287,7 +1566,6 @@ export default function EditCampaignModal({
                   </div>
                   <p className="section-subtitle">Configure targeting and bidding for your LinkedIn campaign</p>
 
-                  {/* Country + State row */}
                   <div className="form-row" style={{ marginTop: 12 }}>
                     <div className="form-group half">
                       <label>Country</label>
@@ -1329,7 +1607,6 @@ export default function EditCampaignModal({
                     </div>
                   </div>
 
-                  {/* Custom location override */}
                   <div className="form-group" style={{ marginTop: 8 }}>
                     <label>
                       Custom Location
@@ -1347,7 +1624,6 @@ export default function EditCampaignModal({
                     </p>
                   </div>
 
-                  {/* Bid strategy + bid amount row */}
                   <div className="form-row" style={{ marginTop: 8 }}>
                     <div className="form-group half">
                       <label>Bid Strategy</label>
@@ -1464,7 +1740,7 @@ export default function EditCampaignModal({
                         <DatePicker
                           label="From"
                           value={scheduleRange[0]}
-                          minDate={dayjs()}
+                          minDate={startDate ? dayjs(startDate) : dayjs()}
                           maxDate={scheduleRange[1] ?? (endDate ? dayjs(endDate) : undefined)}
                           onChange={(v) => setScheduleRange([v ? dayjs(v) : null, scheduleRange[1]])}
                           slotProps={{ textField: { fullWidth: true } }}
@@ -1472,7 +1748,7 @@ export default function EditCampaignModal({
                         <DatePicker
                           label="To"
                           value={scheduleRange[1]}
-                          minDate={scheduleRange[0] ?? dayjs()}
+                          minDate={scheduleRange[0] ?? (startDate ? dayjs(startDate) : dayjs())}
                           maxDate={endDate ? dayjs(endDate) : undefined}
                           onChange={(v) => setScheduleRange([scheduleRange[0], v ? dayjs(v) : null])}
                           slotProps={{ textField: { fullWidth: true } }}
@@ -1483,12 +1759,21 @@ export default function EditCampaignModal({
                   <div className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}>
                     <label>Enter Time</label>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      {/* FIX: use real today's date for minTime comparison */}
                       <TimePicker
                         format="hh:mm A"
-                        value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null}
+                        value={
+                          scheduleTime
+                            ? dayjs(`${scheduleRange[0]?.format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`)
+                            : null
+                        }
                         onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }}
                         ampm
-                        minTime={scheduleRange[0] && scheduleRange[0].isSame(dayjs(), "day") ? dayjs() : undefined}
+                        minTime={
+                          scheduleRange[0] && scheduleRange[0].isSame(dayjs(), "day")
+                            ? dayjs()
+                            : undefined
+                        }
                       />
                     </LocalizationProvider>
                   </div>
@@ -1508,6 +1793,15 @@ export default function EditCampaignModal({
                     <p className="section-subtitle">
                       {mode === "paid" ? "Establish your schedule and budget for every platform." : "Select a date and time for the campaign."}
                     </p>
+                    {/* FIX: show allowed schedule range */}
+                    {startDate && endDate && (
+                      <p style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                        Schedule must be within campaign duration:{" "}
+                        <strong style={{ color: "#1d4ed8" }}>
+                          {dayjs(startDate).format("DD/MM/YYYY")} – {dayjs(endDate).format("DD/MM/YYYY")}
+                        </strong>
+                      </p>
+                    )}
                   </div>
                   <button className="ai-btn">✨ AI-Optimization Timing</button>
                 </div>
@@ -1515,10 +1809,17 @@ export default function EditCampaignModal({
                   <div className="form-group half">
                     <label>Select Date</label>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      {/* ✅ FIX error 3: shouldDisableDate now uses Date | Dayjs param */}
                       <DatePicker
                         format="DD/MM/YYYY"
+                        minDate={scheduleDateMin}
+                        maxDate={scheduleDateMax}
+                        shouldDisableDate={isScheduleDateDisabled}
                         value={scheduleDate ? dayjs(scheduleDate) : null}
-                        onChange={(v) => setScheduleDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")}
+                        onChange={(v) => {
+                          setScheduleDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "");
+                          setScheduleTime(""); // reset time on date change
+                        }}
                         slots={{ openPickerIcon: CalendarTodayIcon }}
                       />
                     </LocalizationProvider>
@@ -1526,11 +1827,24 @@ export default function EditCampaignModal({
                   <div className="form-group half">
                     <label>Enter Time</label>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      {/* FIX: disabled until date picked; minTime uses today's real date */}
                       <TimePicker
                         format="hh:mm A"
-                        value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null}
+                        disabled={!scheduleDate}
+                        minTime={getScheduleMinTime()}
+                        value={
+                          scheduleTime
+                            ? dayjs(`${scheduleDate || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`)
+                            : null
+                        }
                         onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }}
                         ampm
+                        slotProps={{
+                          textField: {
+                            fullWidth: true,
+                            helperText: !scheduleDate ? "Select a date first" : undefined,
+                          },
+                        }}
                       />
                     </LocalizationProvider>
                   </div>
@@ -1541,64 +1855,58 @@ export default function EditCampaignModal({
                     <div className="budget-divider" />
                     <div className="budget-section">
                       <h3>Budget Allocation</h3>
+                      {/* FIX: show minimum budget hint */}
+                      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+                        Minimum budget per platform:{" "}
+                        <strong style={{ color: "#d97706" }}>${PLATFORM_MIN_BUDGET + 1}</strong>{" "}
+                        (must be greater than ${PLATFORM_MIN_BUDGET})
+                      </p>
                       <div className="budget-row">
-                        {accounts.includes("instagram") && (
-                          <div className="budget-card">
-                            <div className="budget-title">
-                              <img src={instagramIcon} alt="Instagram" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
-                              <span>Instagram (Estimate CPC : $3.5)</span>
+                        {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).map((p) => {
+                          const budgetErr = getBudgetError(p.id, budgets[p.id] ?? 0);
+                          return (
+                            <div key={p.id} className="budget-card">
+                              <div className="budget-title">
+                                <img
+                                  src={
+                                    p.id === "instagram" ? instagramIcon
+                                    : p.id === "facebook" ? facebookIcon
+                                    : p.id === "linkedin" ? linkedinIcon
+                                    : googleAdsIcon
+                                  }
+                                  alt={p.label}
+                                  style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                                />
+                                <span>{p.label} (Estimate CPC : ${p.cpc})</span>
+                              </div>
+                              <div className="budget-input-wrapper">
+                                <label>Enter Amount ($)</label>
+                                <input
+                                  type="number"
+                                  min={PLATFORM_MIN_BUDGET + 1}
+                                  step="1"
+                                  value={budgets[p.id] ?? 0}
+                                  onChange={(e) => setBudget(p.id, Number(e.target.value))}
+                                  className="budget-input"
+                                  style={{ borderColor: budgetErr ? "#ef4444" : undefined }}
+                                />
+                                {/* FIX: inline error per platform */}
+                                {budgetErr && (
+                                  <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>{budgetErr}</p>
+                                )}
+                              </div>
                             </div>
-                            <div className="budget-input-wrapper">
-                              <label>Enter Amount ($)</label>
-                              <input type="number" min="0" step="10" value={instagramBudget} onChange={(e) => setInstagramBudget(Number(e.target.value))} className="budget-input" />
-                            </div>
-                          </div>
-                        )}
-                        {accounts.includes("facebook") && (
-                          <div className="budget-card">
-                            <div className="budget-title">
-                              <img src={facebookIcon} alt="Facebook" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
-                              <span>Facebook (Estimate CPC : $2.5)</span>
-                            </div>
-                            <div className="budget-input-wrapper">
-                              <label>Enter Amount ($)</label>
-                              <input type="number" min="0" step="10" value={facebookBudget} onChange={(e) => setFacebookBudget(Number(e.target.value))} className="budget-input" />
-                            </div>
-                          </div>
-                        )}
-                        {accounts.includes("linkedin") && (
-                          <div className="budget-card">
-                            <div className="budget-title">
-                              <img src={linkedinIcon} alt="LinkedIn" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
-                              <span>LinkedIn (Estimate CPC : $1.5)</span>
-                            </div>
-                            <div className="budget-input-wrapper">
-                              <label>Enter Amount ($)</label>
-                              <input type="number" min="0" step="10" value={linkedinBudget} onChange={(e) => setLinkedinBudget(Number(e.target.value))} className="budget-input" />
-                            </div>
-                          </div>
-                        )}
-                        {accounts.includes("google_ads") && (
-                          <div className="budget-card">
-                            <div className="budget-title">
-                              <img src={googleAdsIcon} alt="Google Ads" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
-                              <span>Google Ads (Estimate CPC : $2.0)</span>
-                            </div>
-                            <div className="budget-input-wrapper">
-                              <label>Enter Amount ($)</label>
-                              <input type="number" min="0" step="10" value={googleAdsBudget} onChange={(e) => setGoogleAdsBudget(Number(e.target.value))} className="budget-input" />
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })}
                       </div>
                       <div className="total-budget">
                         <div>
                           <h4>
                             Total Budget: $
-                            {(accounts.includes("instagram") ? instagramBudget : 0) +
-                              (accounts.includes("facebook") ? facebookBudget : 0) +
-                              (accounts.includes("linkedin") ? linkedinBudget : 0) +
-                              (accounts.includes("google_ads") ? googleAdsBudget : 0)}
+                            {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).reduce(
+                              (sum, p) => sum + (budgets[p.id] ?? 0),
+                              0
+                            )}
                           </h4>
                           <p>Ad spend is charged directly by each connected social media platform. We don't handle payments.</p>
                         </div>
