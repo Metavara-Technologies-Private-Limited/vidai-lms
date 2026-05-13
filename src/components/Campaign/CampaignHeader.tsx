@@ -37,7 +37,6 @@ const STATUS_LABELS: Record<string, string> = {
   all:       "Filter by Status",
   live:      "Live",
   draft:     "Draft",
-  schedule:  "Schedule",
   scheduled: "Scheduled",
   paused:    "Paused",
   stopped:   "Stopped",
