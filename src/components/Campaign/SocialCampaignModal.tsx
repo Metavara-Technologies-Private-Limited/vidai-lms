@@ -417,8 +417,19 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         (res?.data as { file_url?: string })?.file_url ??
         null;
       return url;
-    } catch (err) {
-      console.error("[ImageUpload] Failed to upload image file", err);
+    } catch (err: unknown) {
+      const errMessage = String(err);
+      if (errMessage.includes("CORS") || errMessage.includes("Network Error")) {
+        console.error(
+          "[ImageUpload] CORS/Network error. Backend may not allow requests from this origin.\n" +
+          "Possible fixes:\n" +
+          "1. Ensure backend has django-cors-headers installed and configured\n" +
+          "2. Add your frontend origin to CORS_ALLOWED_ORIGINS in settings.py\n" +
+          "3. Verify /api/upload/image/ endpoint exists and has CORS headers enabled"
+        );
+      } else {
+        console.error("[ImageUpload] Failed to upload image file", err);
+      }
       return null;
     }
   };
