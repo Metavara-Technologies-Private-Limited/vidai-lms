@@ -73,7 +73,14 @@ export const updateCampaignStatus = createAsyncThunk<
 const campaignSlice = createSlice({
   name: "campaign",
   initialState,
-  reducers: {},
+  reducers: {
+    // ✅ FIX: Clear campaigns when switching clinics to prevent stale data display
+    clearCampaigns: (state) => {
+      state.data = [];
+      state.error = null;
+      // Keep loading state to show loading spinner during clinic switch
+    },
+  },
   extraReducers: (builder) => {
     builder
       // fetch campaigns
@@ -116,6 +123,7 @@ const campaignSlice = createSlice({
 
 export default campaignSlice.reducer;
 
+export const { clearCampaigns } = campaignSlice.actions;
 export const selectCampaign = (state: RootState) => state.campaign.data;
 
 export const selectCampaignLoading = (state: RootState) =>

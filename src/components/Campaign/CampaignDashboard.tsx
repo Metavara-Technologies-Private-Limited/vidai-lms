@@ -243,8 +243,9 @@ const CampaignDashboard = ({
           }
 
           let attempts = 0;
-          const maxAttempts = 5;
-          const pollIntervalMs = 3000;
+          // ✅ FIX: Reduced polling to speed up loading (from 15s to 6s max)
+          const maxAttempts = 3;
+          const pollIntervalMs = 2000;
 
           while (attempts < maxAttempts) {
             await new Promise((r) => setTimeout(r, pollIntervalMs));
@@ -383,7 +384,7 @@ const CampaignDashboard = ({
     },
     {
       title: "Total Budget",
-      value: loadingInsights ? "…" : `₹${totalBudget}`,
+      value: loadingInsights ? "…" : `$${totalBudget}`,
       icon: spendIcon,
     },
     {
@@ -398,7 +399,7 @@ const CampaignDashboard = ({
     },
     {
       title: "CPC",
-      value: loadingInsights ? "…" : `₹${adInsights.cpc}`,
+      value: loadingInsights ? "…" : `$${adInsights.cpc}`,
       icon: cpcIcon,
     },
     {
@@ -406,8 +407,8 @@ const CampaignDashboard = ({
       value: loadingInsights
         ? "…"
         : adInsights.conversions > 0
-          ? `₹${(parseFloat(adInsights.spend) / adInsights.conversions).toFixed(2)}`
-          : `₹${adInsights.spend}`,
+          ? `$${(parseFloat(adInsights.spend) / adInsights.conversions).toFixed(2)}`
+          : `$${adInsights.spend}`,
       icon: cpaIcon,
     },
   ];

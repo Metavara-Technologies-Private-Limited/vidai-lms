@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { selectClinic } from "../store/clinicSlice";
 import { Alert } from "@mui/material";
 import "../styles/Campaign/campaigns.css";
 import searchIcon from "../components/Campaign/Icons/search.png";
@@ -63,14 +62,16 @@ export default function CampaignsScreen() {
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, campaignAliases, "edit");
 
-  const clinicId = useSelector(
-    (state: Parameters<typeof selectClinic>[0]) => selectClinic(state)?.id,
-  );
+  // ✅ FIX: Clinic switching is handled by Header's hydrateClinic which dispatches fetchCampaign()
+  // Campaigns.tsx should NOT dispatch here to avoid double-fetching and slow loads
 
   useEffect(() => {
     if (!canViewCampaigns) return;
-    dispatch(fetchCampaign());
-  }, [dispatch, canViewCampaigns, clinicId]);
+    // Only dispatch if campaign data is empty and loading is false (initial mount with no data).
+    if (rawCampaigns.length === 0 && !campaignLoading) {
+      dispatch(fetchCampaign());
+    }
+  }, [dispatch, canViewCampaigns, campaignLoading]);
 
   const campaigns = useMemo<Campaign[]>(() => {
     return (rawCampaigns || []).map((api: CampaignAPIType) => {

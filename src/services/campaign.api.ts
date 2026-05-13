@@ -224,4 +224,10 @@ export const CampaignAPI = {
         clinic_id: clinicId ?? storedClinicId(),
       },
     }),
+
+  // ✅ FIX: Use existing /upload/image/ endpoint instead of non-existent /campaigns/upload/
+  uploadCampaignDocument: (formData: FormData) =>
+    http.post(`/upload/image/`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
 };
