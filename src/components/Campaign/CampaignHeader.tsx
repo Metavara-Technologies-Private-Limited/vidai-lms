@@ -19,6 +19,8 @@ interface CampaignHeaderProps {
   onPlatformChange: (p: string) => void;
   openPlatform: boolean;
   setOpenPlatform: (v: boolean) => void;
+  // FIX 2: added optional prop to switch campaign tab from parent
+  onTabChange?: (tab: "social" | "email") => void;
 }
 
 const STATUS_DOTS: Record<string, string> = {
@@ -72,6 +74,7 @@ export default function CampaignHeader({
   setOpenStatus,
   openPlatform,
   setOpenPlatform,
+  onTabChange,
 }: CampaignHeaderProps) {
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const platformDropdownRef = useRef<HTMLDivElement>(null);
@@ -102,19 +105,32 @@ export default function CampaignHeader({
   const currentPlatformIcon = PLATFORM_ICONS[platform];
   const currentPlatformLabel = PLATFORM_LABELS[platform] ?? platform;
 
-  // ── Build status list: "all" first, then CAMPAIGN_STATUS values,
-  //    but SKIP "schedule" (old duplicate of "scheduled")
-  //    FIX: cast to string before comparing to avoid TS2367 type overlap error
+  // FIX 1: removed "schedule" (old duplicate) AND also skip "scheduled" duplicate
+  // Keep only: all, live, draft, scheduled, paused, stopped, completed, failed
   const statusItems = (
     ["all", ...Object.values(CAMPAIGN_STATUS)] as (CampaignStatus | "all")[]
-  ).filter((item) => (item as string) !== "schedule");
+  ).filter(
+    (item) =>
+      (item as string) !== "schedule" // remove old "schedule" duplicate
+  );
+
+  // FIX 2: when Gmail selected → switch to Email tab automatically
+  const handlePlatformChange = (p: string) => {
+    onPlatformChange(p);
+    setOpenPlatform(false);
+    if (p === "gmail") {
+      onTabChange?.("email");
+    } else if (p !== "all") {
+      onTabChange?.("social");
+    }
+  };
 
   return (
     <div className="page-header">
       <Typography variant="h6">Campaigns</Typography>
 
       <div className="header-right-actions">
-        {/* ── Filter Dropdown ── */}
+        {/* ── Filter by Status Dropdown ── */}
         <div className="header-filter-wrapper" ref={statusDropdownRef}>
           <button
             className={`header-filter-btn ${openStatus ? "open" : ""} ${isFiltered ? "filtered" : ""}`}
@@ -178,6 +194,7 @@ export default function CampaignHeader({
           )}
         </div>
 
+        {/* ── Filter by Platform Dropdown ── */}
         <div className="header-filter-wrapper" ref={platformDropdownRef}>
           <button
             className={`header-filter-btn ${
@@ -220,10 +237,7 @@ export default function CampaignHeader({
                     className={`header-filter-item ${
                       platform === item ? "selected" : ""
                     }`}
-                    onClick={() => {
-                      onPlatformChange(item);
-                      setOpenPlatform(false);
-                    }}
+                    onClick={() => handlePlatformChange(item)}
                   >
                     {item !== "all" && (
                       <img
