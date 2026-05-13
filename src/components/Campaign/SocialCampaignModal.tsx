@@ -1249,21 +1249,7 @@ import React, { useState, useRef, useEffect } from "react";
                     )}
                   </div>
 
-                  <div className="form-group" style={{ marginTop: 12 }}>
-                    <label>Google Ads Image URL (optional)</label>
-                    <input
-                      value={platformImageUrls["google_ads"]}
-                      onChange={(e) =>
-                        handleImageUrl("google_ads", e.target.value)
-                      }
-                      placeholder="https://your-image-url.com/image.jpg"
-                      style={{ width: "100%" }}
-                    />
-                    <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                      If provided, a Display campaign will also be created
-                      alongside the Search campaign.
-                    </p>
-                  </div>
+
                 </div>
               )}
 
