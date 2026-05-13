@@ -27,8 +27,6 @@ import {
   Tooltip,
   Typography,
   Select,
-  CircularProgress,
-  Paper,
 } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import UndoIcon from "@mui/icons-material/Undo";
@@ -57,7 +55,6 @@ import InsertPhotoIcon from "@mui/icons-material/InsertPhoto";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
 import AddIcon from "@mui/icons-material/Add";
-import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import AI_Suggest, { type AiSuggestionItem } from "./AI_Suggest";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -81,16 +78,6 @@ import {
 import ReviewRequestTemplateDialog, {
   type TemplateListItem,
 } from "./ReviewRequestTemplateDialog";
-import { useSelector } from "react-redux";
-import axios from "axios";
-
-// ─── WhatsApp template type ───────────────────────────────────────────────────
-type WhatsAppTemplateItem = {
-  id: string;
-  name: string;
-  body: string;
-  is_active: boolean;
-};
 
 type ReviewRequestStepContentProps = {
   formData: ReviewRequestFormData;
@@ -227,66 +214,6 @@ const ReviewRequestStepContent = ({
     "subject",
   );
 
-  // ── WhatsApp template picker state ──
-  const [waTemplates, setWaTemplates] = useState<WhatsAppTemplateItem[]>([]);
-  const [waTemplatesLoading, setWaTemplatesLoading] = useState(false);
-  const [showWaTemplatePicker, setShowWaTemplatePicker] = useState(false);
-
-  const clinicId = useSelector((state: any) => state.clinic?.id);
-  const token = useSelector(
-    (state: any) =>
-      state.auth?.token || localStorage.getItem("access_token") || "",
-  );
-
-  // ── FIX 1: Use clinic_id as query param (not X-Clinic-Id header)
-  // ── FIX 2: Remove waTemplates.length from deps so it refetches when clinic changes
-  useEffect(() => {
-    if (formData.mode !== "whatsapp") return;
-    if (!clinicId) return;
-
-    const fetchTemplates = async () => {
-      setWaTemplatesLoading(true);
-      setWaTemplates([]); // reset on clinic change
-      try {
-        const res = await axios.get(
-          `/api/templates/whatsapp/?clinic_id=${clinicId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-        const raw: WhatsAppTemplateItem[] = Array.isArray(res.data)
-          ? res.data
-          : [];
-        const data = raw.filter(
-          (t: WhatsAppTemplateItem) => t.id && t.name && t.is_active !== false,
-        );
-        setWaTemplates(data);
-      } catch (err) {
-        console.error("Failed to fetch WhatsApp templates", err);
-      } finally {
-        setWaTemplatesLoading(false);
-      }
-    };
-
-    fetchTemplates();
-  }, [formData.mode, token, clinicId]); // ← removed waTemplates.length
-
-  // When a WhatsApp template is selected from the picker — insert into editor
-  const handleWaTemplateInsert = (templateId: string) => {
-    const tmpl = waTemplates.find((t) => t.id === templateId);
-    if (!tmpl) return;
-
-    const body = normalizeTemplateContent(tmpl.body || "");
-    if (body) {
-      insertTextAtCursor(body);
-    }
-
-    onWhatsAppTemplateChange?.(tmpl.id, tmpl.name);
-    setShowWaTemplatePicker(false);
-  };
-
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -383,6 +310,13 @@ const ReviewRequestStepContent = ({
 
     if (formData.mode === "email" && !formData.subject.trim()) {
       onSubjectChange((selectedTemplate.subject || "").trim());
+    }
+
+    if (formData.mode === "whatsapp") {
+      onWhatsAppTemplateChange?.(
+        String(selectedTemplate.id),
+        (selectedTemplate.name || selectedTemplate.audience_name || "").trim(),
+      );
     }
   };
 
@@ -1099,67 +1033,6 @@ const ReviewRequestStepContent = ({
     setShowEmojiPicker(false);
   };
 
-  // ── WhatsApp template picker dialog ──────────────────────────────────────
-  const renderWaTemplatePicker = () => (
-    <Dialog
-      open={showWaTemplatePicker}
-      onClose={() => setShowWaTemplatePicker(false)}
-      maxWidth="xs"
-      fullWidth
-    >
-      <DialogTitle sx={{ pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-        <WhatsAppIcon sx={{ color: "#25D366", fontSize: 20 }} />
-        Select WhatsApp Template
-      </DialogTitle>
-      <DialogContent>
-        {waTemplatesLoading ? (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 2 }}>
-            <CircularProgress size={18} />
-            <Typography variant="body2" color="textSecondary">
-              Loading templates…
-            </Typography>
-          </Box>
-        ) : waTemplates.length === 0 ? (
-          <Typography variant="body2" color="textSecondary" sx={{ py: 1 }}>
-            No WhatsApp templates found. Add templates via Settings → Templates
-            → WhatsApp.
-          </Typography>
-        ) : (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, pt: 0.5 }}>
-            {waTemplates.map((tmpl) => (
-              <Paper
-                key={tmpl.id}
-                variant="outlined"
-                sx={{
-                  p: 1.5,
-                  cursor: "pointer",
-                  borderRadius: "10px",
-                  "&:hover": { bgcolor: "#F0FDF4", borderColor: "#86EFAC" },
-                  transition: "background 0.15s",
-                }}
-                onClick={() => handleWaTemplateInsert(tmpl.id)}
-              >
-                <Typography fontWeight={600} fontSize={13} sx={{ mb: 0.5 }}>
-                  {tmpl.name}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="textSecondary"
-                  sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
-                >
-                  {tmpl.body}
-                </Typography>
-              </Paper>
-            ))}
-          </Box>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={() => setShowWaTemplatePicker(false)}>Close</Button>
-      </DialogActions>
-    </Dialog>
-  );
-
   const renderEditorToolbar = () => (
     <>
       <Divider />
@@ -1474,13 +1347,7 @@ const ReviewRequestStepContent = ({
           <Tooltip title={`Insert ${templateTypeLabel} Template`}>
             <IconButton
               size="small"
-              onClick={() => {
-                if (formData.mode === "whatsapp") {
-                  setShowWaTemplatePicker(true);
-                } else {
-                  setOpenTemplateDialog(true);
-                }
-              }}
+              onClick={() => setOpenTemplateDialog(true)}
             >
               <AddIcon fontSize="inherit" />
             </IconButton>
@@ -1880,38 +1747,15 @@ const ReviewRequestStepContent = ({
               mb: 1.5,
             }}
           >
-            {/* Top bar: AI Suggest (all modes) + WhatsApp template hint */}
+            {/* Top bar: AI Suggest */}
             <Box
               sx={{
                 display: "flex",
-                justifyContent: "space-between",
+                justifyContent: "flex-end",
                 alignItems: "center",
                 p: 1,
               }}
             >
-              {formData.mode === "whatsapp" ? (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Button
-                    size="small"
-                    startIcon={<WhatsAppIcon sx={{ fontSize: 15 }} />}
-                    onClick={() => setShowWaTemplatePicker(true)}
-                    sx={{
-                      color: "#15803D",
-                      bgcolor: "#F0FDF4",
-                      border: "1px solid #BBF7D0",
-                      textTransform: "none",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      borderRadius: "6px",
-                      "&:hover": { bgcolor: "#DCFCE7" },
-                    }}
-                  >
-                    Use Template
-                  </Button>
-                </Box>
-              ) : (
-                <Box />
-              )}
               <Button
                 startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
                 onClick={() => openAiSuggestions("body")}
@@ -2064,16 +1908,13 @@ const ReviewRequestStepContent = ({
         onApply={handleApplyAiSuggestion}
       />
 
-      {/* Email/SMS template dialog */}
+      {/* Email/SMS/WhatsApp template dialog */}
       <ReviewRequestTemplateDialog
         open={openTemplateDialog}
         mode={formData.mode}
         onClose={() => setOpenTemplateDialog(false)}
         onInsert={handleInsertTemplate}
       />
-
-      {/* WhatsApp template picker dialog */}
-      {renderWaTemplatePicker()}
     </>
   );
 };
