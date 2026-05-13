@@ -1095,6 +1095,7 @@
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
                       format="DD/MM/YYYY"
+                      minDate={dayjs()}
                       value={startDate ? dayjs(startDate) : null}
                       onChange={(v) =>
                         setStartDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")
@@ -1113,6 +1114,7 @@
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
                       format="DD/MM/YYYY"
+                      minDate={startDate ? dayjs(startDate) : dayjs()}
                       value={endDate ? dayjs(endDate) : null}
                       onChange={(v) =>
                         setEndDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "")
@@ -1676,6 +1678,7 @@
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <DatePicker
                         format="DD/MM/YYYY"
+                        minDate={dayjs()}
                         value={scheduleDate ? dayjs(scheduleDate) : null}
                         onChange={(v) =>
                           setScheduleDate(
@@ -1691,6 +1694,11 @@
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <TimePicker
                         format="hh:mm A"
+                        minTime={
+                          scheduleDate === dayjs().format("YYYY-MM-DD")
+                            ? dayjs()
+                            : undefined
+                        }
                         value={
                           scheduleTime
                             ? dayjs(`2024-01-01 ${scheduleTime}`)
