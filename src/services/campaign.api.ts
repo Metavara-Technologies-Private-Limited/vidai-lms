@@ -5,11 +5,36 @@ import type { SocialCampaignPayload } from "../types/campaigns.types";
 const storedClinicId = (): number =>
   Number(localStorage.getItem("clinic_id") ?? 0);
 
+let campaignListController: AbortController | null = null;
+
 export const CampaignAPI = {
-  list: (clinicId?: number) =>
-    http.get<CampaignAPIType[]>("/campaigns/list/", {
-      params: { clinic_id: clinicId ?? storedClinicId() },
-    }),
+  list: async (clinicId?: number) => {
+    // Cancel previous request
+    campaignListController?.abort();
+
+    // Create new controller
+    campaignListController = new AbortController();
+
+    try {
+      return await http.get<CampaignAPIType[]>("/campaigns/list/", {
+        params: {
+          clinic_id: clinicId ?? storedClinicId(),
+        },
+        signal: campaignListController.signal,
+      });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
+        console.log("Previous campaign request cancelled");
+
+        return {
+          data: [],
+        };
+      }
+
+      throw error;
+    }
+  },
 
   create: (data: unknown) =>
     http.post("/campaigns/", data, {

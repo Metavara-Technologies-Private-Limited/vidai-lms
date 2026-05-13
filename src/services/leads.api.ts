@@ -600,9 +600,31 @@ const isServer500 = (error: unknown): boolean =>
 
 const getLeadId = (lead: Lead): string => String(lead.id);
 
+let leadsListController: AbortController | null = null;
+
 export const LeadAPI = {
-  list: (clinicId: number) =>
-    api.get(`/leads/list/?clinic_id=${clinicId}`).then((res) => res.data),
+  list: async (clinicId: number) => {
+    leadsListController?.abort();
+
+    // Create new controller
+    leadsListController = new AbortController();
+
+    try {
+      const res = await api.get(`/leads/list/?clinic_id=${clinicId}`, {
+        signal: leadsListController.signal,
+      });
+
+      return res.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
+        console.log("Previous leads request cancelled");
+        return [];
+      }
+
+      throw error;
+    }
+  },
 
   create: async (
     data: LeadPayload,
@@ -679,7 +701,10 @@ export const LeadAPI = {
     }
 
     try {
-      const updatedLead = await LeadAPI.uploadDocuments(getLeadId(createdLead), files);
+      const updatedLead = await LeadAPI.uploadDocuments(
+        getLeadId(createdLead),
+        files,
+      );
       console.log("✅ Lead created and documents uploaded:", updatedLead);
       return updatedLead;
     } catch (uploadError) {
