@@ -143,6 +143,78 @@ const LINKEDIN_BID_STRATEGIES = [
 type PlatformImageFiles = Record<Platform, File | null>;
 type PlatformImagePreviews = Record<Platform, string>; // object URLs for preview
 
+// ─── Image resize/compress helper ────────────────────────────────────
+// Resizes and compresses an image File to stay within maxSizeMB and
+// maxDimension px (longest side). Returns a new File with the same name.
+const resizeAndCompressImage = (
+  file: File,
+  maxSizeMB: number = 2,
+  maxDimension: number = 1920
+): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("FileReader error"));
+    reader.onload = (evt) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Image load error"));
+      img.onload = () => {
+        let { width, height } = img;
+
+        // ── Scale down if either dimension exceeds maxDimension ──
+        if (width > maxDimension || height > maxDimension) {
+          if (width >= height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas context unavailable"));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // ── Iteratively lower quality until size is within limit ──
+        const maxBytes = maxSizeMB * 1024 * 1024;
+        let quality = 0.92;
+        const tryExport = () => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error("Canvas toBlob failed"));
+                return;
+              }
+              if (blob.size <= maxBytes || quality <= 0.3) {
+                // Accept — wrap in a File so the rest of the upload flow works
+                const outputFile = new File([blob], file.name, {
+                  type: blob.type,
+                  lastModified: Date.now(),
+                });
+                resolve(outputFile);
+              } else {
+                quality = Math.max(quality - 0.1, 0.3);
+                tryExport();
+              }
+            },
+            "image/jpeg",
+            quality
+          );
+        };
+        tryExport();
+      };
+      img.src = evt.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
@@ -364,21 +436,62 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     google_ads: useRef<HTMLInputElement>(null),
   };
 
-  // Handle image file chosen from disk
-  const handleImageFileUpload = (
+  // ─── Handle image file chosen from disk ──────────────────────────────
+  // CHANGED: added size check (>5 MB hard reject) + auto resize/compress
+  // (>2 MB gets resized to ≤2 MB via canvas before storing in state).
+  // Nothing else in this function changed.
+  const handleImageFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     platform: Platform
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // ── Hard limit: reject files over 20 MB ──────────────────────────
+    const HARD_LIMIT_MB = 20;
+    const COMPRESS_THRESHOLD_MB = 5;
+
+    if (file.size > HARD_LIMIT_MB * 1024 * 1024) {
+      toast.error(
+        `Image too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Please upload an image under ${HARD_LIMIT_MB} MB.`,
+        { toastId: "img-size-error" }
+      );
+      e.target.value = "";
+      return;
+    }
+
+    // ── Auto-compress if file is between 5 MB and 20 MB ──────────────
+    let finalFile: File = file;
+    if (file.size > COMPRESS_THRESHOLD_MB * 1024 * 1024) {
+      try {
+        toast.info("Compressing image…", {
+          toastId: "img-compress-progress",
+          autoClose: false,
+        });
+        finalFile = await resizeAndCompressImage(file, COMPRESS_THRESHOLD_MB, 1920);
+        toast.dismiss("img-compress-progress");
+        toast.success(
+          `Image compressed: ${(file.size / 1024 / 1024).toFixed(1)} MB → ${(finalFile.size / 1024 / 1024).toFixed(1)} MB`,
+          { toastId: "img-compress-done", autoClose: 3000 }
+        );
+      } catch (compressErr) {
+        toast.dismiss("img-compress-progress");
+        console.error("[ImageCompress] Failed to compress image", compressErr);
+        toast.warn(
+          "Could not auto-compress image. Using original file — upload may fail if server rejects large files.",
+          { toastId: "img-compress-warn" }
+        );
+        finalFile = file; // fall back to original
+      }
+    }
+
     // Revoke previous object URL to avoid memory leaks
     if (platformImagePreviews[platform]) {
       URL.revokeObjectURL(platformImagePreviews[platform]);
     }
 
-    const objectUrl = URL.createObjectURL(file);
-    setPlatformImageFiles((prev) => ({ ...prev, [platform]: file }));
+    const objectUrl = URL.createObjectURL(finalFile);
+    setPlatformImageFiles((prev) => ({ ...prev, [platform]: finalFile }));
     setPlatformImagePreviews((prev) => ({ ...prev, [platform]: objectUrl }));
 
     e.target.value = "";
