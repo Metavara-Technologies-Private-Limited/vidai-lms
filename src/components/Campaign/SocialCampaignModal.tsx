@@ -332,17 +332,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     google_ads: "",
   });
 
-  const [platformImageUrls, setPlatformImageUrls] = useState<
-    Record<Platform, string>
-  >({
-    instagram: "",
-    facebook: "",
-    linkedin: "",
-    gmail: "",
-    google_ads: "",
-  });
+  // ─── REMOVED: platformImageUrls state (URL field removed) ────────────
+  // Only file-based upload is kept. platformImageUrlsRef is kept for
+  // legacy plain-URL fallback from content field (Step 3 logic unchanged).
 
-  // ─── NEW: Per-platform uploaded image files & previews ────────────────
+  // ─── Per-platform uploaded image files & previews ────────────────────
   const [platformImageFiles, setPlatformImageFiles] =
     useState<PlatformImageFiles>({
       instagram: null,
@@ -387,8 +381,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     setPlatformImageFiles((prev) => ({ ...prev, [platform]: file }));
     setPlatformImagePreviews((prev) => ({ ...prev, [platform]: objectUrl }));
 
-    // Clear the URL field when a file is uploaded (file takes lower priority
-    // but we still keep any URL the user typed — see priority logic in submit)
     e.target.value = "";
   };
 
@@ -402,15 +394,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   // ─── Upload image file to server and get back a URL ──────────────────
-  // Uses CampaignSocialPost-backed endpoint (or a generic media upload).
-  // Adjust the API call to match whatever endpoint you expose.
   const uploadImageFile = async (file: File): Promise<string | null> => {
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("clinic", String(clinicId));
-      // CampaignAPI.uploadCampaignDocument should POST to your backend
-      // and return { url: "https://..." } or similar.
       const res = await CampaignAPI.uploadCampaignDocument(formData);
       const url =
         (res?.data as { url?: string })?.url ??
@@ -434,6 +422,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     }
   };
 
+  // ─── platformImageUrlsRef kept for legacy plain-URL content fallback ──
   const platformImageUrlsRef = useRef<Record<Platform, string>>({
     instagram: "",
     facebook: "",
@@ -446,10 +435,12 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     setPlatformContent((prev) => ({ ...prev, [platform]: value }));
   };
 
+  // ─── handleImageUrl kept so SocialContentBox prop interface is unchanged ─
+  // Even though the URL input field is removed from the modal UI, SocialContentBox
+  // may still call onImageUrl internally; we keep the handler to avoid runtime errors.
   const handleImageUrl = (platform: Platform, url: string) => {
     const resolvedUrl = resolveImageUrl(url);
     platformImageUrlsRef.current[platform] = resolvedUrl;
-    setPlatformImageUrls((prev) => ({ ...prev, [platform]: resolvedUrl }));
   };
 
   /* ---- Refs ---- */
@@ -587,7 +578,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   const handleImage = () => {
-    // No-op: images handled via URL input field or file upload in SocialContentBox
+    // No-op: images handled via file upload button inside content box
   };
 
   const handleAttachment = (platform: string) => {
@@ -746,45 +737,31 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         resolvedContent[platform] = fromState || fromRef;
       }
 
-      // ─── FIX: Resolve image_url with priority: URL > uploaded file ──────
+      // ─── Resolve image_url: uploaded file only (URL field removed) ───────
       // Priority order:
-      //   1. Explicitly typed / pasted image URL (platformImageUrls / ref)
-      //   2. Uploaded image file (uploaded to server, returns a URL)
-      //   3. Content that looks like a plain URL (legacy fallback)
+      //   1. Uploaded image file (uploaded to server, returns a URL)
+      //   2. Content that looks like a plain URL (legacy fallback)
       let image_url: string | null = null;
 
-      // Step 1 – check typed URL fields
+      // Step 1 – try uploading a file
       for (const p of accounts) {
-        const fromRef = platformImageUrlsRef.current[p]?.trim();
-        const fromState = platformImageUrls[p]?.trim();
-        const candidate = fromRef || fromState || "";
-        if (candidate) {
-          image_url = resolveImageUrl(candidate);
-          break;
-        }
-      }
-
-      // Step 2 – if no URL, try uploading a file
-      if (!image_url) {
-        for (const p of accounts) {
-          const file = platformImageFiles[p];
-          if (file) {
-            toast.info("Uploading image…", { toastId: "image-upload-progress", autoClose: false });
-            const uploadedUrl = await uploadImageFile(file);
-            toast.dismiss("image-upload-progress");
-            if (uploadedUrl) {
-              image_url = uploadedUrl;
-              break;
-            } else {
-              toast.warn(
-                "Image upload failed — campaign will be created without an image."
-              );
-            }
+        const file = platformImageFiles[p];
+        if (file) {
+          toast.info("Uploading image…", { toastId: "image-upload-progress", autoClose: false });
+          const uploadedUrl = await uploadImageFile(file);
+          toast.dismiss("image-upload-progress");
+          if (uploadedUrl) {
+            image_url = uploadedUrl;
+            break;
+          } else {
+            toast.warn(
+              "Image upload failed — campaign will be created without an image."
+            );
           }
         }
       }
 
-      // Step 3 – legacy: content that is a plain URL
+      // Step 2 – legacy: content that is a plain URL
       if (!image_url) {
         for (const p of accounts) {
           const content = resolvedContent[p]?.trim();
@@ -897,7 +874,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         try {
           const googleAdsImage =
             platformImageUrlsRef.current["google_ads"]?.trim() ||
-            platformImageUrls["google_ads"]?.trim() ||
             image_url ||
             null;
 
@@ -1214,89 +1190,32 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     return false;
   };
 
-  // ─── Render per-platform image upload section ─────────────────────────
+  // ─── Render per-platform image upload section (INSIDE content box) ────
+  // CHANGED: removed image URL input field. Only file upload + preview remain.
+  // The upload button and preview are rendered inline below the content editor.
   const renderImageUploadSection = (platform: Platform) => {
-    const hasUrl = !!(
-      platformImageUrlsRef.current[platform]?.trim() ||
-      platformImageUrls[platform]?.trim()
-    );
     const hasFile = !!platformImageFiles[platform];
-    const previewSrc = hasUrl
-      ? resolveImageUrl(
-          platformImageUrlsRef.current[platform]?.trim() ||
-            platformImageUrls[platform]?.trim()
-        )
-      : platformImagePreviews[platform];
+    const previewSrc = platformImagePreviews[platform];
 
     return (
       <div
         style={{
-          marginTop: 12,
-          border: "1px dashed #d1d5db",
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: "#f9fafb",
+          marginTop: 10,
+          borderTop: "1px dashed #e5e7eb",
+          paddingTop: 10,
         }}
       >
-        <p
-          style={{
-            fontSize: 12,
-            color: "#374151",
-            fontWeight: 600,
-            marginBottom: 8,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          🖼️ Campaign Image
-          <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span>
-        </p>
+        {/* Hidden file input */}
+        <input
+          ref={imageUploadRefs[platform]}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+          hidden
+          onChange={(e) => handleImageFileUpload(e, platform)}
+        />
 
-        {/* Priority note */}
-        <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-          You can provide an image URL <strong>or</strong> upload a file. If
-          both are provided, the <strong>URL takes priority</strong>.
-        </p>
-
-        {/* Image URL input — handled by parent SocialContentBox via onImageUrl,
-            but we show the current resolved URL here as a read-only indicator */}
-        {hasUrl && (
-          <div
-            style={{
-              fontSize: 11,
-              color: "#1d4ed8",
-              marginBottom: 8,
-              wordBreak: "break-all",
-              backgroundColor: "#eff6ff",
-              padding: "4px 8px",
-              borderRadius: 4,
-              border: "1px solid #bfdbfe",
-            }}
-          >
-            ✅ URL set:{" "}
-            <a
-              href={previewSrc}
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: "#1d4ed8" }}
-            >
-              {previewSrc.length > 60
-                ? previewSrc.slice(0, 60) + "…"
-                : previewSrc}
-            </a>
-          </div>
-        )}
-
-        {/* File upload area */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input
-            ref={imageUploadRefs[platform]}
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-            hidden
-            onChange={(e) => handleImageFileUpload(e, platform)}
-          />
+        {/* Upload button row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
             onClick={() => imageUploadRefs[platform].current?.click()}
@@ -1315,7 +1234,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
               transition: "background 0.15s",
             }}
           >
-            📁 {hasFile ? "Change Image File" : "Upload Image File"}
+            🖼️ {hasFile ? "Change Ad Image" : "Upload Ad Image"}
           </button>
 
           {hasFile && (
@@ -1338,64 +1257,72 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
               ✕ Remove
             </button>
           )}
+
+          {hasFile && (
+            <span style={{ fontSize: 11, color: "#6b7280" }}>
+              📄 <strong>{platformImageFiles[platform]!.name}</strong>{" "}
+              ({(platformImageFiles[platform]!.size / 1024).toFixed(1)} KB)
+            </span>
+          )}
         </div>
 
-        {/* File name indicator */}
-        {hasFile && (
-          <p
+        {/* ── Inline image preview (Figma-style) ── */}
+        {hasFile && previewSrc && (
+          <div
             style={{
-              fontSize: 11,
-              color: "#374151",
-              marginTop: 6,
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
+              marginTop: 10,
+              position: "relative",
+              display: "inline-block",
+              borderRadius: 8,
+              overflow: "hidden",
+              border: "1px solid #e5e7eb",
+              backgroundColor: "#f9fafb",
+              cursor: "pointer",
             }}
+            onClick={() =>
+              setInlinePreview({
+                src: previewSrc,
+                type: "image",
+                name: platformImageFiles[platform]!.name,
+              })
+            }
+            title="Click to enlarge"
           >
-            📄 <strong>{platformImageFiles[platform]!.name}</strong> (
-            {(platformImageFiles[platform]!.size / 1024).toFixed(1)} KB)
-          </p>
-        )}
-
-        {/* Image preview (URL takes priority over file) */}
-        {(hasUrl || hasFile) && previewSrc && (
-          <div style={{ marginTop: 10 }}>
-            <p
-              style={{
-                fontSize: 11,
-                color: "#6b7280",
-                marginBottom: 4,
-                fontWeight: 600,
-              }}
-            >
-              Preview {hasUrl ? "(from URL)" : "(uploaded file)"}:
-            </p>
             <img
               src={previewSrc}
-              alt="Campaign preview"
+              alt="Ad image preview"
               style={{
-                maxWidth: "100%",
-                maxHeight: 160,
-                borderRadius: 6,
-                border: "1px solid #e5e7eb",
-                objectFit: "contain",
-                backgroundColor: "#fff",
+                display: "block",
+                maxWidth: 220,
+                maxHeight: 140,
+                objectFit: "cover",
+                borderRadius: 8,
               }}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
-                // Show a fallback message next to the image
-                const parent = (e.target as HTMLImageElement).parentElement;
-                if (parent && !parent.querySelector(".img-error-msg")) {
-                  const msg = document.createElement("p");
-                  msg.className = "img-error-msg";
-                  msg.style.cssText =
-                    "font-size:11px;color:#dc2626;margin-top:4px;";
-                  msg.textContent =
-                    "⚠️ Image could not be loaded for preview (may still work when saved).";
-                  parent.appendChild(msg);
-                }
               }}
             />
+            {/* Hover overlay hint */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,0.35)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 0,
+                transition: "opacity 0.18s",
+                borderRadius: 8,
+                fontSize: 13,
+                color: "#fff",
+                fontWeight: 600,
+                pointerEvents: "none",
+              }}
+              className="img-hover-overlay"
+            >
+              🔍 Preview
+            </div>
           </div>
         )}
       </div>
@@ -1405,6 +1332,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   return (
     <Modal open={true} onClose={onClose}>
       <Box className="email-campaign-modal">
+        <style>{`
+          .img-preview-wrapper:hover .img-hover-overlay {
+            opacity: 1 !important;
+          }
+        `}</style>
         <div className="add-modal-header">
           <Typography variant="h6">Add Social Media Campaign</Typography>
           <IconButton onClick={onClose} className="close-btn">
@@ -2100,10 +2032,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                           onAttachment={handleAttachment}
                           onInput={handleEditorInput}
                           onImageUrl={handleImageUrl}
-                          imageUrl={platformImageUrls[p.id]}
+                          imageUrl={""}
                         />
 
-                        {/* Image upload section below each platform content box */}
+                        {/* ── Image upload + preview inside content area ── */}
                         {renderImageUploadSection(p.id)}
                       </div>
                     );
@@ -2354,6 +2286,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           )}
         </div>
 
+        {/* ── Full-size image/file preview modal ── */}
         {inlinePreview && (
           <div
             className="inline-preview-backdrop"
