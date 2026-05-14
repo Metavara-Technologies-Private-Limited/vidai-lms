@@ -251,6 +251,56 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const isPlatformConnected = (platform: Platform) =>
     platformConnectionMap[platform];
 
+  useEffect(() => {
+    if (!countriesData.length) return;
+    if (!navigator.geolocation) return;
+    if (metaCountry) return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+          );
+
+          const data = await res.json();
+
+          const detectedCountry =
+            data?.address?.country_code?.toUpperCase() || "";
+
+          const detectedState = data?.address?.state || "";
+
+          const validCountry = countriesData.find(
+            (c) => c.iso2 === detectedCountry || c.name === detectedCountry,
+          );
+
+          if (validCountry) {
+            setMetaCountry(validCountry.iso2 || validCountry.name);
+          }
+
+          const validState = validCountry?.states?.find(
+            (s) => s.name.toLowerCase() === detectedState.toLowerCase(),
+          );
+
+          if (validState) {
+            setMetaState(validState.name);
+          }
+        } catch (err) {
+          console.error("Location detection failed", err);
+        }
+      },
+      (err) => {
+        console.error("Location permission denied", err);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+      },
+    );
+  }, [countriesData, metaCountry]);
+  
   // Fetch countries + states from API on mount
   useEffect(() => {
     const fetchCountries = async () => {
@@ -609,6 +659,24 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     google_ads: googleAdsFileRef,
   };
 
+  useEffect(() => {
+    const syncContent = (
+      ref: React.RefObject<HTMLDivElement | null>,
+      value: string,
+    ) => {
+      if (!ref.current) return;
+
+      if (ref.current.innerText.trim() !== value.trim()) {
+        ref.current.innerText = value;
+      }
+    };
+
+    syncContent(facebookRef, platformContent.facebook);
+    syncContent(instagramRef, platformContent.instagram);
+    syncContent(linkedinRef, platformContent.linkedin);
+    syncContent(googleAdsRef, platformContent.google_ads);
+  }, [step, platformContent]);
+
   const [inlinePreview, setInlinePreview] = useState<{
     src: string;
     type: "image" | "file";
@@ -957,7 +1025,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         platform_data: cleanedContent,
         budget_data: {
           ...Object.fromEntries(
-            selectedPlatforms.map((p) => [p.id, budgets[p.id]])
+            selectedPlatforms.map((p) => [p.id, budgets[p.id]]),
           ),
           total: totalSpend,
         },
