@@ -57,6 +57,16 @@ const PLATFORM_MIN_BUDGET = 2; // must be strictly greater than this
 const isPlainUrl = (str: string) =>
   str.trim().startsWith("http") && !str.trim().includes(" ");
 
+const getNextFiveMinuteTime = () => {
+  const now = dayjs();
+
+  const remainder = 5 - (now.minute() % 5);
+
+  const rounded = remainder === 5 ? now : now.add(remainder, "minute");
+
+  return rounded.second(0).format("HH:mm");
+};
+
 // FIX: Convert any share/preview URL to a direct renderable image URL.
 const resolveImageUrl = (url: string): string => {
   if (!url) return url;
@@ -701,8 +711,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     return errors;
   };
 
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleDate, setScheduleDate] = useState(
+    dayjs().format("YYYY-MM-DD"),
+  );
+  const [scheduleTime, setScheduleTime] = useState(getNextFiveMinuteTime());
   const [budgets, setBudgets] = useState<Record<Platform, number>>({
     instagram: 350,
     facebook: 250,
@@ -868,6 +880,18 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     return null;
   };
 
+  const getComputedCampaignStatus = () => {
+    if (!scheduleDate || !scheduleTime) {
+      return CAMPAIGN_STATUS.LIVE;
+    }
+
+    const scheduledAt = dayjs(`${scheduleDate} ${scheduleTime}`);
+
+    return scheduledAt.isAfter(dayjs())
+      ? CAMPAIGN_STATUS.SCHEDULED
+      : CAMPAIGN_STATUS.LIVE;
+  };
+
   const handleCreateCampaign = async (
     type: "live" | "draft" | "scheduled"
   ) => {
@@ -964,11 +988,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           .find((c) => c.trim() !== "" && !isPlainUrl(c)) ?? campaignName;
 
       const statusValue =
-        type === "live"
-          ? CAMPAIGN_STATUS.LIVE
-          : type === "scheduled"
-          ? CAMPAIGN_STATUS.SCHEDULED
-          : CAMPAIGN_STATUS.DRAFT;
+        type === "draft"
+          ? CAMPAIGN_STATUS.DRAFT
+          : getComputedCampaignStatus();
 
       const isActive = type === "live";
       const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
@@ -1031,7 +1053,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         },
         image_url,
         selected_start: scheduleDate || null,
-        selected_end: scheduleDate || null,
+        selected_end: endDate || null,
         status: statusValue,
         is_active: isActive,
       };
