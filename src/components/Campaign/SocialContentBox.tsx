@@ -51,9 +51,9 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
   ) => {
 
 
-  const displayImage = imagePreview || imageUrl;
-  const hasFile = !!imageFile || !!displayImage;
-  const previewName = imageFile?.name || imageUrl || "Ad image preview";
+const displayImage = imagePreview || imageUrl;
+    const hasFile = !!imageFile || !!displayImage;
+    const previewName = imageFile?.name || imageUrl || "Ad image preview";
 
     return (
       <div className="social-content-box">
@@ -176,7 +176,12 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
                   borderRadius: 8,
                 }}
                 onError={(e) => {
+                  // Hide the image and collapse the container if load fails
                   (e.target as HTMLImageElement).style.display = "none";
+                  const container = (e.target as HTMLImageElement).parentElement;
+                  if (container) {
+                    container.style.display = "none";
+                  }
                 }}
               />
               {/* Hover overlay */}
