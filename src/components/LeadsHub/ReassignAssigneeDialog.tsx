@@ -37,6 +37,7 @@ import {
 
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
+const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
 
 // ── Typed error helper ──────────────────────────────────────────────────────
 interface ApiError {
@@ -226,7 +227,9 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
       const selectedIndustry =
         localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
       const selectedPipelineId =
-        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "";
+        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ??
+        localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ??
+        "";
 
       try {
         setLoadingPipeline(true);
