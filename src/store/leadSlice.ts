@@ -72,23 +72,17 @@ const filterLeadsForRole = (
     return leads;
   }
 
+  // User-level visibility should follow current assignee so reassignment
+  // immediately transfers ownership between users.
   return leads.filter((lead) => {
-    const creatorIds = collectLeadIds(lead, [
-      "created_by_id",
-      "created_by",
-      "user_id",
-    ]);
-    const generatedByIds = collectLeadIds(lead, [
-      "personal_id",
-      "lead_generated_by_id",
-      "generated_by_id",
-      "referred_by_id",
+    const assigneeIds = collectLeadIds(lead, [
+      "assigned_to_id",
+      "assigned_to",
+      "assignee_id",
+      "owner_id",
     ]);
 
-    return (
-      creatorIds.includes(currentUserId) ||
-      generatedByIds.includes(currentUserId)
-    );
+    return assigneeIds.includes(currentUserId);
   });
 };
 

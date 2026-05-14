@@ -45,6 +45,7 @@ const STORAGE_KEY_TAB = "leads_active_tab";
 const STORAGE_KEY_VIEW = "leads_view_mode";
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
+const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
 
 interface HeaderMatch {
   tableHeader: string;
@@ -425,6 +426,9 @@ const Leads: React.FC = () => {
   const [selectedPipelineId, setSelectedPipelineId] = React.useState<string>(
     localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "",
   );
+  const [defaultPipelineId, setDefaultPipelineId] = React.useState<string>(
+    localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ?? "",
+  );
   const attemptedClinicHydrationRef = React.useRef<Set<number>>(new Set());
   const tabScrollRef = React.useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = React.useState(false);
@@ -654,6 +658,10 @@ const Leads: React.FC = () => {
   }, [selectedPipelineId]);
 
   React.useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, defaultPipelineId);
+  }, [defaultPipelineId]);
+
+  React.useEffect(() => {
     if (!selectedPipelineId) return;
     const existsInIndustry = filteredPipelinesByIndustry.some(
       (pipeline) => pipeline.id === selectedPipelineId,
@@ -662,6 +670,39 @@ const Leads: React.FC = () => {
       setSelectedPipelineId(filteredPipelinesByIndustry[0]?.id ?? "");
     }
   }, [filteredPipelinesByIndustry, selectedPipelineId]);
+
+  React.useEffect(() => {
+    if (selectedPipelineId) return;
+    if (!defaultPipelineId) return;
+
+    const defaultInIndustry = filteredPipelinesByIndustry.find(
+      (pipeline) => pipeline.id === defaultPipelineId,
+    );
+
+    if (defaultInIndustry) {
+      setSelectedPipelineId(defaultPipelineId);
+    }
+  }, [defaultPipelineId, filteredPipelinesByIndustry, selectedPipelineId]);
+
+  React.useEffect(() => {
+    if (!defaultPipelineId) return;
+    const defaultStillExists = availablePipelines.some(
+      (pipeline) => pipeline.id === defaultPipelineId,
+    );
+    if (!defaultStillExists) {
+      setDefaultPipelineId("");
+    }
+  }, [availablePipelines, defaultPipelineId]);
+
+  const handleSetDefaultPipeline = React.useCallback(() => {
+    if (!selectedPipelineId) {
+      toast.info("Select a pipeline first to set it as default.");
+      return;
+    }
+
+    setDefaultPipelineId(selectedPipelineId);
+    toast.success("Default pipeline updated.");
+  }, [selectedPipelineId]);
 
   React.useEffect(() => {
     void import("../components/LeadsHub/LeadsCalendar");
@@ -1310,9 +1351,18 @@ const Leads: React.FC = () => {
             alignItems: { xs: "stretch", sm: "center" },
             position: "relative",
             zIndex: 5,
+            flexWrap: { xs: "nowrap", lg: "nowrap" },
           }}
         >
-          <Box sx={{ width: { xs: "100%", sm: 150, lg: 136 }, position: "relative", zIndex: 5 }}>
+          <Box
+            sx={{
+              width: { xs: "100%", sm: 150, lg: 136 },
+              position: "relative",
+              zIndex: 5,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
             <Box
               component="select"
               aria-label="Select Industry"
@@ -1325,6 +1375,7 @@ const Leads: React.FC = () => {
               style={{
                 width: "100%",
                 height: 34,
+                lineHeight: "34px",
                 borderRadius: 8,
                 border: "1px solid #D0D5DD",
                 padding: "0 10px",
@@ -1341,7 +1392,15 @@ const Leads: React.FC = () => {
             </Box>
           </Box>
 
-          <Box sx={{ width: { xs: "100%", sm: 170, lg: 148 }, position: "relative", zIndex: 5 }}>
+          <Box
+            sx={{
+              width: { xs: "100%", sm: 170, lg: 148 },
+              position: "relative",
+              zIndex: 5,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
             <Box
               component="select"
               aria-label="Select Pipeline"
@@ -1352,6 +1411,7 @@ const Leads: React.FC = () => {
               style={{
                 width: "100%",
                 height: 34,
+                lineHeight: "34px",
                 borderRadius: 8,
                 border: "1px solid #D0D5DD",
                 padding: "0 10px",
@@ -1367,6 +1427,48 @@ const Leads: React.FC = () => {
               ))}
             </Box>
           </Box>
+
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleSetDefaultPipeline}
+            disabled={!selectedPipelineId}
+            sx={{
+              height: 34,
+              minHeight: 34,
+              borderRadius: 1,
+              textTransform: "none",
+              whiteSpace: "nowrap",
+              alignSelf: { xs: "stretch", sm: "center" },
+              px: 1.5,
+              borderColor:
+                selectedPipelineId && selectedPipelineId === defaultPipelineId
+                  ? "#16A34A"
+                  : "#D0D5DD",
+              color:
+                selectedPipelineId && selectedPipelineId === defaultPipelineId
+                  ? "#166534"
+                  : "#344054",
+              bgcolor:
+                selectedPipelineId && selectedPipelineId === defaultPipelineId
+                  ? "#F0FDF4"
+                  : "#fff",
+              "&:hover": {
+                borderColor:
+                  selectedPipelineId && selectedPipelineId === defaultPipelineId
+                    ? "#16A34A"
+                    : "#98A2B3",
+                bgcolor:
+                  selectedPipelineId && selectedPipelineId === defaultPipelineId
+                    ? "#ECFDF3"
+                    : "#F9FAFB",
+              },
+            }}
+          >
+            {selectedPipelineId && selectedPipelineId === defaultPipelineId
+              ? "Default Pipeline"
+              : "Set Default"}
+          </Button>
         </Stack>
       </Stack>
 

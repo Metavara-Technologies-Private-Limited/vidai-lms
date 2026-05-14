@@ -46,6 +46,7 @@ import type { Interest } from "../../types/leads.types";
 
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
+const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
 
 // ====================== Extended Lead type ======================
 export interface LeadResponse extends Omit<Lead, "gender"> {
@@ -355,25 +356,34 @@ export function useEditLead() {
   const rawCampaigns = useSelector(selectCampaign);
   const campaigns = React.useMemo<CampaignOption[]>(
     () =>
-      (rawCampaigns || []).map((api: RawCampaign) => {
+      (rawCampaigns || []).flatMap((api: RawCampaign) => {
         const isEmail = api.campaign_mode === 3;
-        const rawPlatform = api.social_media?.[0]?.platform_name ?? "";
-        const platformTitleCase = rawPlatform
-          ? rawPlatform
-              .split("_")
-              .map(
-                (w: string) =>
-                  w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
-              )
-              .join(" ")
-          : "";
-        return {
+        const base = {
           id: api.id,
           name: capitalizeFirst(api.campaign_name ?? ""),
           source: isEmail ? "Direct" : "Social Media",
-          subSource: isEmail ? "Gmail" : platformTitleCase,
-          isActive: Boolean(api.is_active),
+          isActive: api.is_active !== false,
         };
+
+        if (isEmail) {
+          return [{ ...base, subSource: "Gmail" }];
+        }
+
+        const platforms = (api.social_media || [])
+          .map((p) => p?.platform_name ?? "")
+          .filter((p) => Boolean(p.trim()));
+
+        if (platforms.length === 0) {
+          return [{ ...base, subSource: "" }];
+        }
+
+        return platforms.map((platform) => ({
+          ...base,
+          subSource: platform
+            .split("_")
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(" "),
+        }));
       }),
     [rawCampaigns],
   );
@@ -583,7 +593,10 @@ export function useEditLead() {
   React.useEffect(() => {
     const loadFromPipeline = async () => {
       const selectedIndustry = localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
-      const selectedPipelineId = localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "";
+      const selectedPipelineId =
+        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ??
+        localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ??
+        "";
       try {
         let selectedPipeline: Pipeline | null = null;
         if (selectedPipelineId) {
@@ -1175,9 +1188,14 @@ export function useEditLead() {
   const filteredCampaigns = React.useMemo<CampaignOption[]>(() => {
     if (!source && !subSource) return campaigns;
     const normalizeStr = (s: string) => s.trim().toLowerCase();
+
     return campaigns.filter((c) => {
       const sourceMatch = source ? normalizeStr(c.source) === normalizeStr(source) : true;
-      const subSourceMatch = subSource ? normalizeStr(c.subSource) === normalizeStr(subSource) : true;
+
+      const subSourceMatch = subSource
+        ? normalizeStr(c.subSource) === normalizeStr(subSource)
+        : true;
+
       return sourceMatch && subSourceMatch;
     });
   }, [campaigns, source, subSource]);

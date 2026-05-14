@@ -304,9 +304,11 @@ export function Step1({
       const sourceMatch = form.source
         ? normalizeForCompare(c.source) === normalizeForCompare(form.source)
         : true;
+
       const subSourceMatch = form.subSource
         ? normalizeForCompare(c.subSource) === normalizeForCompare(form.subSource)
         : true;
+
       return sourceMatch && subSourceMatch;
     });
   }, [campaigns, form.source, form.subSource]);
