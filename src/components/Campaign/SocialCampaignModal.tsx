@@ -512,7 +512,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("clinic", String(clinicId));
+      formData.append("clinic_id", String(clinicId));
       const res = await CampaignAPI.uploadCampaignDocument(formData);
       const url =
         (res?.data as { url?: string })?.url ??
