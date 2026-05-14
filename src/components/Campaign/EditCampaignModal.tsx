@@ -915,30 +915,46 @@ export default function EditCampaignModal({
           }, 300);
 
           // ── Google Ads: keywords only (no image URL in UI) ───
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const googleAdsData = pd.google_ads as any;
-          if (googleAdsData && typeof googleAdsData === "object") {
-            if (googleAdsData.keywords) {
-              const kws: string = Array.isArray(googleAdsData.keywords)
-                ? (googleAdsData.keywords as string[]).join(", ")
-                : String(googleAdsData.keywords);
-              setKeywordsInput(kws);
+          const parseKeywords = (value: unknown): string => {
+            if (!value) return "";
+            if (Array.isArray(value)) {
+              return value.map((item) => String(item).trim()).filter(Boolean).join(", ");
             }
-            // FIX: image_url still resolved internally (for submission) but NOT shown in UI
-          } else if (typeof pd.google_ads === "string" && pd.google_ads.trim().startsWith("{")) {
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const parsed = JSON.parse(pd.google_ads) as Record<string, any>;
-              if (parsed.keywords) {
-                const kws: string = Array.isArray(parsed.keywords)
-                  ? (parsed.keywords as string[]).join(", ")
-                  : String(parsed.keywords);
-                setKeywordsInput(kws);
+            if (typeof value === "string") {
+              const trimmed = value.trim();
+              if (!trimmed) return "";
+              if (trimmed.startsWith("{")) {
+                try {
+                  return parseKeywords(JSON.parse(trimmed));
+                } catch {
+                  return "";
+                }
               }
-            } catch {
-              // not JSON, ignore
+              return trimmed;
             }
+            if (typeof value === "object") {
+              const record = value as Record<string, unknown>;
+              return (
+                parseKeywords(record.keywords) ||
+                parseKeywords(record.keyword) ||
+                parseKeywords(record.target_keywords) ||
+                parseKeywords(record.keywords_input)
+              );
+            }
+            return String(value).trim();
+          };
+
+          const googleAdsData = pd.google_ads as unknown;
+          const topLevelKeywords = parseKeywords((data as Record<string, unknown>).keywords);
+          const altTopLevelKeywords = parseKeywords((data as Record<string, unknown>).google_ads_keywords);
+          const nestedKeywords = parseKeywords(googleAdsData);
+          const resolvedKeywords = topLevelKeywords || altTopLevelKeywords || nestedKeywords;
+
+          if (resolvedKeywords) {
+            setKeywordsInput(resolvedKeywords);
           }
+
+          // FIX: image_url still resolved internally (for submission) but NOT shown in UI
 
           // ── LinkedIn targeting ────────────────────────────────
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

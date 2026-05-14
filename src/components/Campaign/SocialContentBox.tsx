@@ -40,6 +40,7 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
       onAttachment,
       onInput,
       onImageUrl: _onImageUrl, // FIX TS6133: kept in interface for prop compatibility, prefixed to suppress unused warning
+      imageUrl = "",
       imageFile = null,
       imagePreview = "",
       onUploadClick,
@@ -50,7 +51,9 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
   ) => {
 
 
-    const hasFile = !!imageFile;
+  const displayImage = imagePreview || imageUrl;
+  const hasFile = !!imageFile || !!displayImage;
+  const previewName = imageFile?.name || imageUrl || "Ad image preview";
 
     return (
       <div className="social-content-box">
@@ -147,7 +150,7 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
           </div>
 
           {/* ── Inline image preview (click to enlarge) ── */}
-          {hasFile && imagePreview && (
+          {hasFile && displayImage && (
             <div
               style={{
                 marginTop: 10,
@@ -159,13 +162,11 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
                 backgroundColor: "#f9fafb",
                 cursor: "pointer",
               }}
-              onClick={() =>
-                onPreviewClick && onPreviewClick(imagePreview, imageFile!.name)
-              }
+              onClick={() => onPreviewClick && onPreviewClick(displayImage, previewName)}
               title="Click to enlarge"
             >
               <img
-                src={imagePreview}
+                src={displayImage}
                 alt="Ad image preview"
                 style={{
                   display: "block",

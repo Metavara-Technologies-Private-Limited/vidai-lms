@@ -25,37 +25,21 @@ import {
 } from "../../constants/campaigns.constants";
 import type { Campaign } from "../../types/campaigns.types";
 import { formatScheduleTime } from "../../utils/campaigns.utils";
-import { useDispatch } from "react-redux";
-import { clearCampaigns, fetchCampaign } from "../../store/campaignSlice";
-import type { AppDispatch } from "../../store";
 
 /* ================= COMPONENT ================= */
 const CampaignDashboard = ({
-  selectedCampaign,
+  campaign,
   onBack,
 }: {
-  selectedCampaign: Campaign;
+  campaign: Campaign;
   onBack: () => void;
 }) => {
-  const [activeTab, setActiveTab] = React.useState<string>("Content");
-  // ✅ FIX: Declare activeSubTab so it can be passed to CampaignTabContent
-  const [activeSubTab, setActiveSubTab] = React.useState<string>("");
-
-  const dispatch = useDispatch<AppDispatch>();
-  const clinicId = useSelector((state: any) => state.clinic?.id ?? 0);
-
-  React.useEffect(() => {
-    if (clinicId) {
-      dispatch(clearCampaigns());
-      dispatch(fetchCampaign());
-    }
-  }, [clinicId, dispatch]);
-
-  const campaignDetails = selectedCampaign;
-
-  const [fullCampaign, setFullCampaign] = React.useState<Campaign>(
-    selectedCampaign,
+  const [activeTab, setActiveTab] = React.useState("Content");
+  const [activeSubTab, setActiveSubTab] = React.useState(
+    campaign.platforms?.[0] || "",
   );
+
+  const [fullCampaign, setFullCampaign] = React.useState<Campaign>(campaign);
   const [loadingInsights, setLoadingInsights] = React.useState(true);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,10 +51,10 @@ const CampaignDashboard = ({
     if (reduxClinicId) clinicIdRef.current = reduxClinicId;
   }, [reduxClinicId]);
 
-  const campaignIdRef = React.useRef(campaignDetails.id);
-  const campaignTypeRef = React.useRef(campaignDetails.type);
-  const fbCampaignIdRef = React.useRef(campaignDetails.fb_campaign_id);
-  const platformsRef = React.useRef<Platform[]>(campaignDetails.platforms ?? []);
+  const campaignIdRef = React.useRef(campaign.id);
+  const campaignTypeRef = React.useRef(campaign.type);
+  const fbCampaignIdRef = React.useRef(campaign.fb_campaign_id);
+  const platformsRef = React.useRef<Platform[]>(campaign.platforms ?? []);
 
   const [adInsights, setAdInsights] = React.useState({
     impressions: 0,
@@ -151,7 +135,6 @@ const CampaignDashboard = ({
     [],
   );
 
-  // ✅ FIX: Moved cancelled/timeoutId inside useEffect so they are properly scoped
   React.useEffect(() => {
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -160,11 +143,9 @@ const CampaignDashboard = ({
       try {
         setLoadingInsights(true);
 
-        // ✅ FIX: Safety timeout to prevent loading spinner from getting stuck
-        // Maximum 10 seconds before forcing loading to false
         timeoutId = setTimeout(() => {
           if (!cancelled) {
-            console.warn("[CampaignDashboard] Loading timeout — forcing completion");
+            console.warn("[CampaignDashboard] Loading timeout - forcing completion");
             setLoadingInsights(false);
           }
         }, 10000);
@@ -250,14 +231,9 @@ const CampaignDashboard = ({
           image_url: d.image_url ?? prev.image_url ?? null,
         }));
 
-        // if (resolvedFbCampaignId) {
-        //   await fetchAdInsights(resolvedFbCampaignId);
-        //   if (cancelled) return;
-        // }
-
         if (hasGoogleAds) {
           console.log(
-            "[GoogleAds] No DB data — triggering Zapier insights fetch...",
+            "[GoogleAds] No DB data - triggering Zapier insights fetch...",
           );
           try {
             await CampaignAPI.triggerGoogleAdsInsights(campaignId);
@@ -269,7 +245,6 @@ const CampaignDashboard = ({
           }
 
           let attempts = 0;
-          // ✅ FIX: Reduced polling to speed up loading (from 15s to 6s max)
           const maxAttempts = 3;
           const pollIntervalMs = 2000;
 
@@ -287,15 +262,13 @@ const CampaignDashboard = ({
 
           if (attempts >= maxAttempts) {
             console.warn(
-              "[GoogleAds] Polling timed out — Zapier may still be processing",
+              "[GoogleAds] Polling timed out - Zapier may still be processing",
             );
           }
         }
       } catch (err) {
-        // ✅ FIX: catch is now correctly paired with the outer try
         console.error("Failed to fetch campaign data:", err);
       } finally {
-        // ✅ FIX: finally is now correctly paired with the outer try
         if (timeoutId) clearTimeout(timeoutId);
         if (!cancelled) setLoadingInsights(false);
       }
@@ -308,8 +281,7 @@ const CampaignDashboard = ({
       if (timeoutId) clearTimeout(timeoutId);
     };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignDetails.id]); // ✅ FIX: was campaign.id (undefined), now campaignDetails.id
+  }, [campaign.id, fetchGoogleAdsInsightsFromDB]);
 
   // ─── Budget ───────────────────────────────────────────────────────────────
   const budgetData: Record<string, number> = fullCampaign.budget_data ?? {};
