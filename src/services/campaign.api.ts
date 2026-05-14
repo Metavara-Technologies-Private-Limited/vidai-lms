@@ -8,7 +8,7 @@ const storedClinicId = (): number =>
 let campaignListController: AbortController | null = null;
 
 export const CampaignAPI = {
-  list: async (clinicId?: number) => {
+  list: async (clinicId?: number, page = 1, pageSize = 20) => {
     // Cancel previous request
     campaignListController?.abort();
 
@@ -19,19 +19,19 @@ export const CampaignAPI = {
       return await http.get<CampaignAPIType[]>("/campaigns/list/", {
         params: {
           clinic_id: clinicId ?? storedClinicId(),
+          page,
+          page_size: pageSize,
         },
         signal: campaignListController.signal,
       });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        (error.name === "CanceledError" || error.message.includes("cancel"))
+      ) {
         console.log("Previous campaign request cancelled");
-
-        return {
-          data: [],
-        };
+        return { data: [] };
       }
-
       throw error;
     }
   },

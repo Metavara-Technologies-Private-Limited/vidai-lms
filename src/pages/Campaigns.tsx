@@ -216,7 +216,7 @@ export default function CampaignsScreen() {
         fallback={<div className="empty-state">Loading campaign...</div>}
       >
         <CampaignDashboard
-          campaign={selectedCampaign}
+          selectedCampaign={selectedCampaign}
           onBack={() => setSelectedCampaign(null)}
         />
       </Suspense>
