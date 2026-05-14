@@ -437,6 +437,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   // ─── Handle image file chosen from disk ──────────────────────────────
+  // FIX TS6133: wired to imageUploadRefs onChange below (was declared but never used).
   // CHANGED: added size check (>5 MB hard reject) + auto resize/compress
   // (>2 MB gets resized to ≤2 MB via canvas before storing in state).
   // Nothing else in this function changed.
@@ -1303,144 +1304,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     return false;
   };
 
-  // ─── Render per-platform image upload section (INSIDE content box) ────
-  // CHANGED: removed image URL input field. Only file upload + preview remain.
-  // The upload button and preview are rendered inline below the content editor.
-  const renderImageUploadSection = (platform: Platform) => {
-    const hasFile = !!platformImageFiles[platform];
-    const previewSrc = platformImagePreviews[platform];
-
-    return (
-      <div
-        style={{
-          marginTop: 10,
-          borderTop: "1px dashed #e5e7eb",
-          paddingTop: 10,
-        }}
-      >
-        {/* Hidden file input */}
-        <input
-          ref={imageUploadRefs[platform]}
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-          hidden
-          onChange={(e) => handleImageFileUpload(e, platform)}
-        />
-
-        {/* Upload button row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => imageUploadRefs[platform].current?.click()}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 14px",
-              fontSize: 12,
-              borderRadius: 6,
-              border: "1px solid #6366f1",
-              backgroundColor: hasFile ? "#eef2ff" : "#fff",
-              color: "#4f46e5",
-              cursor: "pointer",
-              fontWeight: 500,
-              transition: "background 0.15s",
-            }}
-          >
-            🖼️ {hasFile ? "Change Ad Image" : "Upload Ad Image"}
-          </button>
-
-          {hasFile && (
-            <button
-              type="button"
-              onClick={() => handleRemoveImageFile(platform)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                padding: "6px 10px",
-                fontSize: 12,
-                borderRadius: 6,
-                border: "1px solid #fca5a5",
-                backgroundColor: "#fff1f2",
-                color: "#dc2626",
-                cursor: "pointer",
-              }}
-            >
-              ✕ Remove
-            </button>
-          )}
-
-          {hasFile && (
-            <span style={{ fontSize: 11, color: "#6b7280" }}>
-              📄 <strong>{platformImageFiles[platform]!.name}</strong>{" "}
-              ({(platformImageFiles[platform]!.size / 1024).toFixed(1)} KB)
-            </span>
-          )}
-        </div>
-
-        {/* ── Inline image preview (Figma-style) ── */}
-        {hasFile && previewSrc && (
-          <div
-            style={{
-              marginTop: 10,
-              position: "relative",
-              display: "inline-block",
-              borderRadius: 8,
-              overflow: "hidden",
-              border: "1px solid #e5e7eb",
-              backgroundColor: "#f9fafb",
-              cursor: "pointer",
-            }}
-            onClick={() =>
-              setInlinePreview({
-                src: previewSrc,
-                type: "image",
-                name: platformImageFiles[platform]!.name,
-              })
-            }
-            title="Click to enlarge"
-          >
-            <img
-              src={previewSrc}
-              alt="Ad image preview"
-              style={{
-                display: "block",
-                maxWidth: 220,
-                maxHeight: 140,
-                objectFit: "cover",
-                borderRadius: 8,
-              }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-            {/* Hover overlay hint */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: "rgba(0,0,0,0.35)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: 0,
-                transition: "opacity 0.18s",
-                borderRadius: 8,
-                fontSize: 13,
-                color: "#fff",
-                fontWeight: 600,
-                pointerEvents: "none",
-              }}
-              className="img-hover-overlay"
-            >
-              🔍 Preview
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <Modal open={true} onClose={onClose}>
@@ -2089,8 +1952,22 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   Create your post content with AI assistance
                 </p>
 
+                {/* ── Hidden image upload inputs (one per platform) ── */}
+                {/* FIX TS6133: wired handleImageFileUpload here so it is actually used */}
                 {PLATFORM_LIST.map((p) => (
                   <React.Fragment key={p.id}>
+                    <input
+                      ref={imageUploadRefs[p.id]}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => handleImageFileUpload(e, p.id)}
+                    />
+                  </React.Fragment>
+                ))}
+
+                {PLATFORM_LIST.map((p) => (
+                  <React.Fragment key={`file-${p.id}`}>
                     <input
                       ref={fileInputRefs[p.id]}
                       type="file"
@@ -2146,10 +2023,14 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                           onInput={handleEditorInput}
                           onImageUrl={handleImageUrl}
                           imageUrl={""}
+                          imageFile={platformImageFiles[p.id]}
+                          imagePreview={platformImagePreviews[p.id]}
+                          onUploadClick={() => imageUploadRefs[p.id].current?.click()}
+                          onRemoveImage={() => handleRemoveImageFile(p.id)}
+                          onPreviewClick={(src, name) =>
+                            setInlinePreview({ src, type: "image", name })
+                          }
                         />
-
-                        {/* ── Image upload + preview inside content area ── */}
-                        {renderImageUploadSection(p.id)}
                       </div>
                     );
                   }

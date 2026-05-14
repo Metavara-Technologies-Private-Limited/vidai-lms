@@ -1,9 +1,8 @@
-import { forwardRef, useState } from "react";
+import { forwardRef } from "react";
 import TextFieldsIcon from "@mui/icons-material/TextFields";
 import LinkIcon from "@mui/icons-material/Link";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
-import ImageIcon from "@mui/icons-material/Image";
 import type { Platform } from "../../constants/campaigns.constants";
 import "../../styles/Campaign/SocialContentBox.css";
 
@@ -20,6 +19,12 @@ interface Props {
   onInput: (platform: Platform, value: string) => void;
   onImageUrl: (platform: Platform, url: string) => void;
   imageUrl?: string;
+  // ── Upload image props ──
+  imageFile?: File | null;
+  imagePreview?: string;
+  onUploadClick?: () => void;
+  onRemoveImage?: () => void;
+  onPreviewClick?: (src: string, name: string) => void;
 }
 
 const SocialContentBox = forwardRef<HTMLDivElement, Props>(
@@ -34,17 +39,18 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
       onEmoji,
       onAttachment,
       onInput,
-      onImageUrl,
-      imageUrl = "",
+      onImageUrl: _onImageUrl, // FIX TS6133: kept in interface for prop compatibility, prefixed to suppress unused warning
+      imageFile = null,
+      imagePreview = "",
+      onUploadClick,
+      onRemoveImage,
+      onPreviewClick,
     },
     ref
   ) => {
-    const [previewError, setPreviewError] = useState(false);
 
-    const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setPreviewError(false);
-      onImageUrl(platform, e.target.value.trim());
-    };
+
+    const hasFile = !!imageFile;
 
     return (
       <div className="social-content-box">
@@ -77,52 +83,123 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
           }
         />
 
-        {/* Image URL input */}
-        <div className="image-url-section">
-          <label className="image-url-label">
-            <ImageIcon fontSize="small" style={{ marginRight: 4 }} />
-            Image URL
-            <span style={{ marginLeft: 4, color: "#999" }}>(optional)</span>
-          </label>
-          <input
-            type="url"
-            className="image-url-input"
-            placeholder="https://example.com/image.jpg"
-            value={imageUrl}
-            onChange={handleUrlChange}
-          />
-
-          {/* Live preview */}
-          {imageUrl && !previewError && (
-            <div className="image-url-preview">
-              <img
-                src={imageUrl}
-                alt="preview"
-                onLoad={() => setPreviewError(false)}
-                onError={() => setPreviewError(true)}
-                style={{
-                  maxHeight: 100,
-                  maxWidth: "100%",
-                  borderRadius: 6,
-                  marginTop: 6,
-                  objectFit: "cover",
-                  border: "1px solid #e0e0e0",
-                  display: "block",
-                }}
-              />
-            </div>
-          )}
-          {imageUrl && previewError && (
-            <p
+        {/* ── Upload Image Document section (replaces Image URL field) ── */}
+        <div
+          style={{
+            marginTop: 10,
+            borderTop: "1px dashed #e5e7eb",
+            paddingTop: 10,
+            paddingLeft: 12,
+            paddingRight: 12,
+            paddingBottom: 4,
+          }}
+        >
+          {/* Upload button row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={onUploadClick}
               style={{
-                color: "#d32f2f",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 14px",
                 fontSize: 12,
-                marginTop: 4,
-                marginBottom: 0,
+                borderRadius: 6,
+                border: "1px solid #6366f1",
+                backgroundColor: hasFile ? "#eef2ff" : "#fff",
+                color: "#4f46e5",
+                cursor: "pointer",
+                fontWeight: 500,
+                transition: "background 0.15s",
               }}
             >
-              ⚠️ Cannot load preview — make sure the URL is publicly accessible.
-            </p>
+              🖼️ {hasFile ? "Change Image Document" : "Upload Image Document"}
+            </button>
+
+            {hasFile && (
+              <button
+                type="button"
+                onClick={onRemoveImage}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  borderRadius: 6,
+                  border: "1px solid #fca5a5",
+                  backgroundColor: "#fff1f2",
+                  color: "#dc2626",
+                  cursor: "pointer",
+                }}
+              >
+                ✕ Remove
+              </button>
+            )}
+
+            {hasFile && (
+              <span style={{ fontSize: 11, color: "#6b7280" }}>
+                📄 <strong>{imageFile!.name}</strong>{" "}
+                ({(imageFile!.size / 1024).toFixed(1)} KB)
+              </span>
+            )}
+          </div>
+
+          {/* ── Inline image preview (click to enlarge) ── */}
+          {hasFile && imagePreview && (
+            <div
+              style={{
+                marginTop: 10,
+                position: "relative",
+                display: "inline-block",
+                borderRadius: 8,
+                overflow: "hidden",
+                border: "1px solid #e5e7eb",
+                backgroundColor: "#f9fafb",
+                cursor: "pointer",
+              }}
+              onClick={() =>
+                onPreviewClick && onPreviewClick(imagePreview, imageFile!.name)
+              }
+              title="Click to enlarge"
+            >
+              <img
+                src={imagePreview}
+                alt="Ad image preview"
+                style={{
+                  display: "block",
+                  maxWidth: 220,
+                  maxHeight: 140,
+                  objectFit: "cover",
+                  borderRadius: 8,
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+              {/* Hover overlay */}
+              <div
+                className="img-hover-overlay"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: 0,
+                  transition: "opacity 0.18s",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#fff",
+                  fontWeight: 600,
+                  pointerEvents: "none",
+                }}
+              >
+                🔍 Preview
+              </div>
+            </div>
           )}
         </div>
 
