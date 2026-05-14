@@ -513,10 +513,13 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("clinic_id", String(clinicId));
-      const res = await CampaignAPI.uploadCampaignDocument(formData);
+      const uploadResponse = await CampaignAPI.uploadCampaignDocument(formData);
       const url =
-        (res?.data as { url?: string })?.url ??
-        (res?.data as { file_url?: string })?.file_url ??
+        // Preferred backend contract
+        (uploadResponse?.data as { image_url?: string })?.image_url ??
+        // Backward-compatible fallbacks
+        (uploadResponse?.data as { url?: string })?.url ??
+        (uploadResponse?.data as { file_url?: string })?.file_url ??
         null;
       return url;
     } catch (err: unknown) {
@@ -906,10 +909,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         mode === "paid" ? "paid_advertising" : "organic_posting",
       ];
 
-      const selectedAccounts =
-        mode === "paid"
-          ? [...accounts]
-          : accounts.filter((platform) => platform !== "google_ads");
+      const selectedAccounts = [...accounts];
 
       const cleanedContent: Partial<Record<Platform, unknown>> = {
         ...resolvedContent,
@@ -1437,9 +1437,19 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     minDate={dayjs()}
                     value={startDate ? dayjs(startDate) : null}
                     onChange={(v) => {
-                      const newStart = v
-                        ? (v as Dayjs).format("YYYY-MM-DD")
-                        : "";
+                      const parsed = v ? dayjs(v as Dayjs) : null;
+                      if (!parsed || !parsed.isValid()) {
+                        setStartDate("");
+                        return;
+                      }
+
+                      const today = dayjs().startOf("day");
+                      if (parsed.isBefore(today, "day")) {
+                        setStartDate("");
+                        return;
+                      }
+
+                      const newStart = parsed.format("YYYY-MM-DD");
                       setStartDate(newStart);
                       if (
                         endDate &&
@@ -1474,9 +1484,21 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     minDate={startDate ? dayjs(startDate) : dayjs()}
                     value={endDate ? dayjs(endDate) : null}
                     onChange={(v) => {
-                      const newEnd = v
-                        ? (v as Dayjs).format("YYYY-MM-DD")
-                        : "";
+                      const parsed = v ? dayjs(v as Dayjs) : null;
+                      if (!parsed || !parsed.isValid()) {
+                        setEndDate("");
+                        return;
+                      }
+
+                      const minEnd = startDate
+                        ? dayjs(startDate).startOf("day")
+                        : dayjs().startOf("day");
+                      if (parsed.isBefore(minEnd, "day")) {
+                        setEndDate("");
+                        return;
+                      }
+
+                      const newEnd = parsed.format("YYYY-MM-DD");
                       setEndDate(newEnd);
                       if (
                         scheduleDate &&
@@ -2090,9 +2112,30 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                       shouldDisableDate={isScheduleDateDisabled}
                       value={scheduleDate ? dayjs(scheduleDate) : null}
                       onChange={(v) => {
-                        setScheduleDate(
-                          v ? (v as Dayjs).format("YYYY-MM-DD") : ""
-                        );
+                        const parsed = v ? dayjs(v as Dayjs) : null;
+                        if (!parsed || !parsed.isValid()) {
+                          setScheduleDate("");
+                          setScheduleTime("");
+                          return;
+                        }
+
+                        const minSchedule = scheduleDateMin.startOf("day");
+                        if (parsed.isBefore(minSchedule, "day")) {
+                          setScheduleDate("");
+                          setScheduleTime("");
+                          return;
+                        }
+
+                        if (scheduleDateMax) {
+                          const maxSchedule = scheduleDateMax.startOf("day");
+                          if (parsed.isAfter(maxSchedule, "day")) {
+                            setScheduleDate("");
+                            setScheduleTime("");
+                            return;
+                          }
+                        }
+
+                        setScheduleDate(parsed.format("YYYY-MM-DD"));
                         setScheduleTime("");
                       }}
                       slots={{ openPickerIcon: CalendarTodayIcon }}

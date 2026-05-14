@@ -105,6 +105,11 @@ const resolveImageUrl = (url: string): string => {
   return trimmed;
 };
 
+// Keep content clean: if a platform content is only a URL, treat it as image URL,
+// not text content (same behavior as SocialCampaignModal create flow).
+const isPlainUrl = (str: string): boolean =>
+  str.trim().startsWith("http") && !str.trim().includes(" ");
+
 // FIX: minimum budget strictly greater than $2
 const PLATFORM_MIN_BUDGET = 2;
 
@@ -832,12 +837,23 @@ export default function EditCampaignModal({
 
           // FIX: extract text content for each platform,
           //      handling both plain string and {content: string} object shapes
-          const extractContent = (val: unknown): string => {
+          const extractRawContent = (val: unknown): string => {
             if (typeof val === "string") return val;
             if (val && typeof val === "object" && "content" in (val as object)) {
               return String((val as { content: unknown }).content ?? "");
             }
             return "";
+          };
+
+          const extractContent = (val: unknown): string => {
+            const raw = extractRawContent(val);
+            const trimmed = raw.trim();
+            return isPlainUrl(trimmed) ? "" : raw;
+          };
+
+          const extractImageFromContent = (val: unknown): string => {
+            const raw = extractRawContent(val).trim();
+            return isPlainUrl(raw) ? resolveImageUrl(raw) : "";
           };
 
           const filledContent: Record<Platform, string> = {
@@ -859,12 +875,12 @@ export default function EditCampaignModal({
           };
 
           const filledImageUrls: Record<Platform, string> = {
-            instagram: extractImageUrl(pd.instagram),
-            facebook: extractImageUrl(pd.facebook),
-            linkedin: extractImageUrl(pd.linkedin),
-            gmail: extractImageUrl(pd.gmail),
+            instagram: extractImageUrl(pd.instagram) || extractImageFromContent(pd.instagram),
+            facebook: extractImageUrl(pd.facebook) || extractImageFromContent(pd.facebook),
+            linkedin: extractImageUrl(pd.linkedin) || extractImageFromContent(pd.linkedin),
+            gmail: extractImageUrl(pd.gmail) || extractImageFromContent(pd.gmail),
             // FIX: Google Ads image URL NOT shown in UI — still resolve internally for submission
-            google_ads: extractImageUrl(pd.google_ads),
+            google_ads: extractImageUrl(pd.google_ads) || extractImageFromContent(pd.google_ads),
           };
           // Apply resolved image URLs to both ref and state
           (Object.keys(filledImageUrls) as Platform[]).forEach((p) => {
@@ -1700,7 +1716,7 @@ export default function EditCampaignModal({
                         <input
                           value={linkedInState}
                           onChange={(e) => setLinkedInState(e.target.value)}
-                          placeholder="e.g. London, Bavaria…"
+                          placeholder="e.g. Mumbai, Maharashtra, India"
                           style={{ width: "100%", height: 40, padding: "0 12px", border: "1px solid #d1d5db", borderRadius: 4, fontSize: 14 }}
                         />
                       )}
@@ -1895,7 +1911,7 @@ export default function EditCampaignModal({
                     </p>
                     {/* FIX: show allowed schedule range */}
                     {startDate && endDate && (
-                      <p style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
                         Schedule must be within campaign duration:{" "}
                         <strong style={{ color: "#1d4ed8" }}>
                           {dayjs(startDate).format("DD/MM/YYYY")} – {dayjs(endDate).format("DD/MM/YYYY")}
