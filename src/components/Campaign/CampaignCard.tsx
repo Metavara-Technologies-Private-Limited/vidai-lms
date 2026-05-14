@@ -70,6 +70,20 @@ export default function CampaignCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setOpenMenuId]);
 
+  const computedStatus = (() => {
+    if (c.status !== CAMPAIGN_STATUS.SCHEDULED || !c.selected_start) {
+      return c.status;
+    }
+
+    const now = dayjs();
+
+    const scheduledAt = dayjs(c.selected_start.replace("Z", ""));
+
+    return now.isAfter(scheduledAt, "minute")
+      ? CAMPAIGN_STATUS.LIVE
+      : CAMPAIGN_STATUS.SCHEDULED;
+  })();
+
   return (
     <div
       className="campaign-card"
@@ -95,7 +109,9 @@ export default function CampaignCard({
           </div>
           <span className="title-text">{c.name}</span>
         </div>
-        <span className={`status ${c.status.toLowerCase()}`}>{c.status}</span>
+        <span className={`status ${computedStatus.toLowerCase()}`}>
+          {computedStatus}
+        </span>
       </div>
 
       <div className="card-row">
@@ -134,7 +150,7 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-        {c.status === CAMPAIGN_STATUS.SCHEDULED ? (
+        {computedStatus === CAMPAIGN_STATUS.SCHEDULED ? (
           <span>
             <label>SCHEDULED:</label>{" "}
             {formatScheduleTime(c.selected_start, c.enter_time)}
@@ -167,7 +183,7 @@ export default function CampaignCard({
             onClick={async (e) => {
               e.stopPropagation();
               if (!canEditCampaign) return;
-              if (c.status === CAMPAIGN_STATUS.STOPPED) {
+              if (computedStatus === CAMPAIGN_STATUS.STOPPED) {
                 let shouldSetLive = true;
 
                 // ── Enable FB Insta Ads ──
@@ -338,7 +354,7 @@ export default function CampaignCard({
                   />
                   Duplicate
                 </div>
-                {!INACTIVE_STATUSES.has(c.status) && (
+                {!INACTIVE_STATUSES.has(computedStatus) && (
                   <div
                     className={`menu-item stop-item ${!canEditCampaign ? "disabled" : ""}`}
                     onClick={(e) => {
