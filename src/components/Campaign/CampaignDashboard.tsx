@@ -498,7 +498,12 @@ const CampaignDashboard = ({
           </div>
         </div>
       </div>
-
+      {loadingInsights && (
+        <div className="cd-insights-loader">
+          <div className="cd-insights-loader-spinner" />
+          <span>Fetching latest campaign insights...</span>
+        </div>
+      )}
       <div className="cd-metrics-row">
         {metrics.map((m) => (
           <Metric key={m.title} {...m} />
