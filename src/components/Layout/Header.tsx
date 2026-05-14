@@ -176,18 +176,21 @@ const Header = ({
 
     const storedClinicId =
       Number(localStorage.getItem("clinic_id") || 0) || null;
+
     const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
+
     const validStored =
       storedClinicId &&
       allowedClinics.some((clinic) => clinic.id === storedClinicId)
         ? storedClinicId
         : null;
-    const defaultClinicId =
-      allowedClinics.find((clinic) => clinic.isDefault)?.id ||
-      allowedClinics[0]?.id ||
+
+    const profileClinicId =
+      userClinics.find((clinic) => clinic.isDefault)?.id ||
+      userClinics[0]?.id ||
       null;
 
-    setSelectedClinicId(validStored || defaultClinicId);
+    setSelectedClinicId(validStored || profileClinicId);
   }, [clinics, selectedClinicId, userClinics]);
 
   useEffect(() => {
