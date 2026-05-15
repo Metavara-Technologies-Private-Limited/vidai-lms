@@ -504,9 +504,7 @@ const LeadsTable: React.FC<Props> = ({
             pipelines.find(
               (pipeline) => pipeline.id === resolvedSelectedPipelineId,
             ) ??
-            pipelinesByIndustry.find((pipeline) => pipeline.is_active) ??
             pipelinesByIndustry[0] ??
-            pipelines.find((pipeline) => pipeline.is_active) ??
             pipelines[0] ??
             null;
         }

@@ -24,6 +24,7 @@ import { INDUSTRY_LABEL_MAP } from "./salesPipeline.utils";
 type SalesPipelineSidebarProps = {
 	pipelines: Pipeline[];
 	selectedPipelineId: string | null;
+	defaultPipelineId: string;
 	pipelineLoading: boolean;
 	pipelineError: string | null;
 	canEditPipeline: boolean;
@@ -44,6 +45,7 @@ type SalesPipelineSidebarProps = {
 const SalesPipelineSidebar = ({
 	pipelines,
 	selectedPipelineId,
+	defaultPipelineId,
 	pipelineLoading,
 	pipelineError,
 	canEditPipeline,
@@ -178,9 +180,30 @@ const SalesPipelineSidebar = ({
 									<Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary" }}>
 										{pipeline.pipeline_name}
 									</Typography>
+									{defaultPipelineId === pipeline.id ? (
+										<Typography
+											variant="caption"
+											sx={{
+												display: "inline-block",
+												mt: 0.35,
+												px: 0.7,
+												py: 0.1,
+												borderRadius: 999,
+												fontSize: 10,
+												fontWeight: 700,
+												letterSpacing: 0.4,
+												textTransform: "uppercase",
+												color: "#166534",
+												backgroundColor: "#DCFCE7",
+											}}
+										>
+											Default
+										</Typography>
+									) : null}
 									<Typography
 										variant="caption"
 										sx={{
+											display: "block",
 											textTransform: "uppercase",
 											color: "text.secondary",
 											letterSpacing: 0.6,

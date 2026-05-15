@@ -71,7 +71,7 @@ export default function CampaignsScreen() {
     if (rawCampaigns.length === 0 && !campaignLoading) {
       dispatch(fetchCampaign());
     }
-  }, [dispatch, canViewCampaigns, campaignLoading]);
+  }, [dispatch, canViewCampaigns, campaignLoading, rawCampaigns.length]);
 
   const campaigns = useMemo<Campaign[]>(() => {
     return (rawCampaigns || []).map((api: CampaignAPIType) => {

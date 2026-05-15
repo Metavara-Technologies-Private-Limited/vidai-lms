@@ -36,6 +36,55 @@ export const CampaignAPI = {
     }
   },
 
+  listAll: async (clinicId?: number, pageSize = 100) => {
+    const all: CampaignAPIType[] = [];
+    const seen = new Set<string>();
+    let page = 1;
+    let hasNext = true;
+
+    while (hasNext) {
+      const res = await CampaignAPI.list(clinicId, page, pageSize);
+      const payload = res.data as unknown;
+
+      const arrayPayload = Array.isArray(payload)
+        ? payload
+        : payload && typeof payload === "object" && Array.isArray((payload as { results?: unknown[] }).results)
+          ? ((payload as { results: unknown[] }).results as CampaignAPIType[])
+          : payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown[] }).data)
+            ? ((payload as { data: unknown[] }).data as CampaignAPIType[])
+            : [];
+
+      arrayPayload.forEach((item) => {
+        const id = String(item?.id ?? "");
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        all.push(item);
+      });
+
+      if (Array.isArray(payload)) {
+        hasNext = arrayPayload.length >= pageSize;
+      } else if (payload && typeof payload === "object") {
+        const obj = payload as { next?: unknown; count?: unknown };
+        if (typeof obj.next === "string") {
+          hasNext = obj.next.length > 0;
+        } else if (typeof obj.count === "number") {
+          hasNext = all.length < obj.count;
+        } else {
+          hasNext = arrayPayload.length >= pageSize;
+        }
+      } else {
+        hasNext = false;
+      }
+
+      page += 1;
+      if (page > 100) {
+        hasNext = false;
+      }
+    }
+
+    return all;
+  },
+
   create: (data: unknown) =>
     http.post("/campaigns/", data, {
       params: { clinic_id: storedClinicId() },
