@@ -460,18 +460,6 @@ const Leads: React.FC = () => {
     el.scrollBy({ left: dir === "left" ? -120 : 120, behavior: "smooth" });
   }, []);
 
-  const industryOptions = React.useMemo(
-    () =>
-      Array.from(
-        new Set(
-          availablePipelines
-            .map((pipeline) => pipeline.industry_type)
-            .filter(Boolean),
-        ),
-      ),
-    [availablePipelines],
-  );
-
   const applyFilters = React.useCallback(
     (leadsToFilter: Array<Lead & { status?: string }>) => {
       return leadsToFilter.filter((lead) => {
@@ -1382,46 +1370,6 @@ const Leads: React.FC = () => {
             flexWrap: { xs: "nowrap", lg: "nowrap" },
           }}
         >
-          {viewMode !== "board" ? (
-            <Box
-              sx={{
-                width: { xs: "100%", sm: 150, lg: 136 },
-                position: "relative",
-                zIndex: 5,
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <Box
-                component="select"
-                aria-label="Select Industry"
-                value={selectedIndustry}
-                onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
-                  const nextIndustry = event.target.value;
-                  setSelectedIndustry(nextIndustry);
-                  setSelectedPipelineId("");
-                }}
-                style={{
-                  width: "100%",
-                  height: 34,
-                  lineHeight: "34px",
-                  borderRadius: 8,
-                  border: "1px solid #D0D5DD",
-                  padding: "0 10px",
-                  fontSize: 13,
-                  backgroundColor: "#fff",
-                }}
-              >
-                <option value="">All Industries</option>
-                {industryOptions.map((industry) => (
-                  <option key={industry} value={industry}>
-                    {industry.toUpperCase()}
-                  </option>
-                ))}
-              </Box>
-            </Box>
-          ) : null}
-
           <Box
             sx={{
               minHeight: 34,

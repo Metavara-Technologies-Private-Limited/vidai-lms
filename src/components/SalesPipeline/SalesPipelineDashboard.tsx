@@ -771,22 +771,9 @@ const SalesPipelineDashboard = () => {
 					actionMenuPipelineId={actionMenuPipelineId}
 					chipBackgrounds={chipBackgrounds}
 					onOpenCreatePipeline={handleOpenCreatePipeline}
-					onSelectPipeline={(pipelineId) => {
-						if (pipelineId !== defaultPipelineId) {
-							setDefaultPipelineId(pipelineId);
-							localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, pipelineId);
-							window.dispatchEvent(
-								new CustomEvent(DEFAULT_PIPELINE_EVENT, {
-									detail: { pipelineId },
-								}),
-							);
-							const selected = pipelines.find((pipeline) => pipeline.id === pipelineId);
-							toast.success(
-								`${selected?.pipeline_name ?? "Pipeline"} set as default pipeline.`,
-							);
-						}
-						dispatch(fetchPipelineDetail(pipelineId));
-					}}
+					       onSelectPipeline={(pipelineId) => {
+						       dispatch(fetchPipelineDetail(pipelineId));
+					       }}
 					onOpenActionMenu={handleOpenActionMenu}
 					onCloseActionMenu={handleCloseActionMenu}
 					onEditPipeline={handleEditPipeline}
