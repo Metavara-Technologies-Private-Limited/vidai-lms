@@ -322,9 +322,8 @@ export const pipelineApi = {
   async update(
     pipelineId: string,
     payload: UpdatePipelinePayload,
-    clinicId?: number,
   ): Promise<Pipeline> {
-    const params = { clinic_id: clinicId ?? storedClinicId() };
+    const params = { clinic_id: storedClinicId() };
     const attempts: Array<{ method: "put" | "patch"; url: string }> = [
       { method: "put", url: `/pipelines/${pipelineId}/` },
       { method: "patch", url: `/pipelines/${pipelineId}/` },
@@ -361,17 +360,6 @@ export const pipelineApi = {
     }
 
     throw lastError;
-  },
-
-  async setActivePipelineForClinic(
-    clinicId: number,
-    activePipelineId: string,
-  ): Promise<void> {
-    const pipelines = await this.list(clinicId);
-    const nextActive = pipelines.find((pipeline) => pipeline.id === activePipelineId) ?? null;
-    if (!nextActive) return;
-
-    await this.update(activePipelineId, { is_active: true }, clinicId);
   },
 
   async duplicate(pipelineId: string): Promise<Pipeline> {

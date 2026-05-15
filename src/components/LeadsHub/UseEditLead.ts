@@ -613,7 +613,9 @@ export function useEditLead() {
             : pipelines;
           selectedPipeline =
             pipelines.find((p) => p.id === selectedPipelineId) ??
+            byIndustry.find((p) => p.is_active) ??
             byIndustry[0] ??
+            pipelines.find((p) => p.is_active) ??
             pipelines[0] ??
             null;
         }

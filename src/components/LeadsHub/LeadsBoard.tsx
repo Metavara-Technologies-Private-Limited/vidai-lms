@@ -1848,7 +1848,6 @@ const LeadsBoard: React.FC<Props> = ({
       return;
     }
 
-    await dispatch(fetchLeads());
     handleCloseBook();
     toast.success("Appointment booked successfully!", {
       position: "top-right",
