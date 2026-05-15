@@ -18,7 +18,6 @@ import { formatScheduleTime } from "../../utils/campaigns.utils";
 import { CampaignAPI } from "../../services/campaign.api";
 
 const INACTIVE_STATUSES = new Set<CampaignStatus>([
-  CAMPAIGN_STATUS.STOPPED,
   CAMPAIGN_STATUS.COMPLETED,
   CAMPAIGN_STATUS.FAILED,
 ]);
@@ -70,18 +69,67 @@ export default function CampaignCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setOpenMenuId]);
 
+  /**
+   * Status rules:
+   *
+   * STOPPED from DB:
+   * - end date passed   -> STOPPED
+   * - else              -> PAUSED
+   *
+   * SCHEDULED from DB:
+   * - before start      -> SCHEDULED
+   * - between start/end -> LIVE
+   * - after end         -> COMPLETED
+   */
   const computedStatus = (() => {
-    if (c.status !== CAMPAIGN_STATUS.SCHEDULED || !c.selected_start) {
+    const now = dayjs();
+
+    const start = c.selected_start
+      ? dayjs(c.selected_start.replace("Z", ""))
+      : null;
+
+    const end = c.end ? dayjs(c.end.replace("Z", "")) : null;
+
+    // 🚨 Terminal states remain untouched
+    if (
+      c.status === CAMPAIGN_STATUS.FAILED ||
+      c.status === CAMPAIGN_STATUS.COMPLETED
+    ) {
       return c.status;
     }
 
-    const now = dayjs();
+    // 🚨 STOPPED from DB
+    // If campaign duration ended → keep STOPPED
+    // Else treat as PAUSED
+    if (c.status === CAMPAIGN_STATUS.STOPPED) {
+      if (end && now.isAfter(end)) {
+        return CAMPAIGN_STATUS.STOPPED;
+      }
 
-    const scheduledAt = dayjs(c.selected_start.replace("Z", ""));
+      return CAMPAIGN_STATUS.PAUSED;
+    }
 
-    return now.isAfter(scheduledAt, "minute")
-      ? CAMPAIGN_STATUS.LIVE
-      : CAMPAIGN_STATUS.SCHEDULED;
+    // 🚨 Only scheduled campaigns auto-transition
+    if (c.status === CAMPAIGN_STATUS.SCHEDULED) {
+      if (!start) {
+        return CAMPAIGN_STATUS.SCHEDULED;
+      }
+
+      // Before start
+      if (now.isBefore(start)) {
+        return CAMPAIGN_STATUS.SCHEDULED;
+      }
+
+      // After end
+      if (end && now.isAfter(end)) {
+        return CAMPAIGN_STATUS.COMPLETED;
+      }
+
+      // Between start/end
+      return CAMPAIGN_STATUS.LIVE;
+    }
+
+    return c.status;
   })();
 
   return (
@@ -183,7 +231,7 @@ export default function CampaignCard({
             onClick={async (e) => {
               e.stopPropagation();
               if (!canEditCampaign) return;
-              if (computedStatus === CAMPAIGN_STATUS.STOPPED) {
+              if (computedStatus === CAMPAIGN_STATUS.PAUSED) {
                 let shouldSetLive = true;
 
                 // ── Enable FB Insta Ads ──
@@ -273,7 +321,9 @@ export default function CampaignCard({
             }}
           >
             <img
-              src={c.status === CAMPAIGN_STATUS.STOPPED ? playIcon : pauseIcon}
+              src={
+                computedStatus === CAMPAIGN_STATUS.PAUSED ? playIcon : pauseIcon
+              }
               alt="Toggle"
               width={20}
               height={20}
@@ -459,7 +509,7 @@ export default function CampaignCard({
             }
 
             if (shouldStop) {
-              onStatusChange(c.id, CAMPAIGN_STATUS.STOPPED);
+              onStatusChange(c.id, CAMPAIGN_STATUS.PAUSED);
 
               toast.success("Campaign stopped successfully.");
             }
