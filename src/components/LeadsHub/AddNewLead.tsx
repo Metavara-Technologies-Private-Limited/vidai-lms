@@ -171,19 +171,6 @@ const showInputToast = (toastId: string, message: string) => {
 const sanitizeEmailInput = (value: string): string =>
   value.toLowerCase().replace(/[^a-z0-9@._%+-]/g, "");
 
-const normalizeSocialSubSource = (platformName: string): string => {
-  const normalized = platformName.trim().toLowerCase().replace(/[_-]+/g, " ");
-  if (!normalized) return "";
-  if (normalized.includes("instagram")) return "Instagram";
-  if (normalized.includes("facebook")) return "Facebook";
-  if (normalized.includes("linkedin")) return "LinkedIn";
-  if (normalized.includes("google")) return "Google Ads";
-  return normalized
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
-
 // ── Derive action type labels from a single stage's enabled rules ─────────────
 const deriveActionTypeOptions = (stage: PipelineStage): string[] => {
   const labels = stage.rules
@@ -311,7 +298,10 @@ export default function AddNewLead() {
 
         return platforms.map((platform) => ({
           ...base,
-          subSource: normalizeSocialSubSource(platform),
+          subSource: platform
+            .split("_")
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(" "),
         }));
       }),
     [rawCampaigns],
@@ -457,7 +447,9 @@ export default function AddNewLead() {
 
           selectedPipeline =
             pipelines.find((p) => p.id === selectedPipelineId) ??
+            byIndustry.find((p) => p.is_active) ??
             byIndustry[0] ??
+            pipelines.find((p) => p.is_active) ??
             pipelines[0] ??
             null;
         }

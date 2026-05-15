@@ -2281,8 +2281,6 @@ export default function LeadDetailView() {
           appointment_date: result.appointment_date,
           slot: result.slot,
           remark: result.remark,
-          assigned_to_id: result.assigned_to_id,
-          assigned_to_name: result.assigned_to_name || base.assigned_to_name,
           personal_id: result.personal_id,
           personal_name: result.personnelName || base.personal_name,
           department_id: result.department_id ?? base.department_id,

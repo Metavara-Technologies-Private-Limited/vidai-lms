@@ -65,8 +65,6 @@ export interface AppointmentResult {
   appointment_date: string; // "YYYY-MM-DD"
   slot: string;
   remark: string;
-  assigned_to_id: number | null;
-  assigned_to_name: string;
   personal_id: number | null;
   department_id: number | null;
   personnelName: string;
@@ -448,7 +446,6 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         remark: remark.trim(),
         is_active: lead.is_active !== false,
         partner_inquiry: lead.partner_inquiry || false,
-        assigned_to_id: personnelId,
         personal_id: personnelId,
       });
 
@@ -465,8 +462,6 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
         appointment_date: appointmentDateStr,
         slot,
         remark: remark.trim(),
-        assigned_to_id: personnelId,
-        assigned_to_name: selectedEmp ? assigneeLabel(selectedEmp) : "",
         personal_id: personnelId,
         department_id: deptId,
         personnelName: selectedEmp ? assigneeLabel(selectedEmp) : "",
