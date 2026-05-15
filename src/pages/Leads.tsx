@@ -426,9 +426,6 @@ const Leads: React.FC = () => {
   const [selectedPipelineId, setSelectedPipelineId] = React.useState<string>(
     localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "",
   );
-  const [defaultPipelineId, setDefaultPipelineId] = React.useState<string>(
-    localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ?? "",
-  );
   const attemptedClinicHydrationRef = React.useRef<Set<number>>(new Set());
   const tabScrollRef = React.useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = React.useState(false);
@@ -460,25 +457,24 @@ const Leads: React.FC = () => {
     el.scrollBy({ left: dir === "left" ? -120 : 120, behavior: "smooth" });
   }, []);
 
-  const industryOptions = React.useMemo(
-    () =>
-      Array.from(
-        new Set(
-          availablePipelines
-            .map((pipeline) => pipeline.industry_type)
-            .filter(Boolean),
-        ),
-      ),
+  const activePipeline = React.useMemo(
+    () => {
+      const persistedPipelineId =
+        localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ??
+        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ??
+        "";
+
+      return (
+        availablePipelines.find((pipeline) => pipeline.id === persistedPipelineId) ??
+        availablePipelines.find((pipeline) => pipeline.is_active) ??
+        availablePipelines[0] ??
+        null
+      );
+    },
     [availablePipelines],
   );
 
-  const filteredPipelinesByIndustry = React.useMemo(
-    () =>
-      availablePipelines.filter((pipeline) =>
-        selectedIndustry ? pipeline.industry_type === selectedIndustry : true,
-      ),
-    [availablePipelines, selectedIndustry],
-  );
+  const resolvedPipelineId = activePipeline?.id ?? selectedPipelineId;
 
   const applyFilters = React.useCallback(
     (leadsToFilter: Array<Lead & { status?: string }>) => {
@@ -658,51 +654,36 @@ const Leads: React.FC = () => {
   }, [selectedPipelineId]);
 
   React.useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, defaultPipelineId);
-  }, [defaultPipelineId]);
+    const persistedSelectedPipelineId =
+      localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ??
+      localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ??
+      "";
 
-  React.useEffect(() => {
-    if (!selectedPipelineId) return;
-    const existsInIndustry = filteredPipelinesByIndustry.some(
-      (pipeline) => pipeline.id === selectedPipelineId,
-    );
-    if (!existsInIndustry) {
-      setSelectedPipelineId(filteredPipelinesByIndustry[0]?.id ?? "");
-    }
-  }, [filteredPipelinesByIndustry, selectedPipelineId]);
+    const persistedPipeline = persistedSelectedPipelineId
+      ? availablePipelines.find(
+          (pipeline) => pipeline.id === persistedSelectedPipelineId,
+        ) ?? null
+      : null;
 
-  React.useEffect(() => {
-    if (selectedPipelineId) return;
-    if (!defaultPipelineId) return;
+    const resolvedPipeline = persistedPipeline ?? activePipeline;
 
-    const defaultInIndustry = filteredPipelinesByIndustry.find(
-      (pipeline) => pipeline.id === defaultPipelineId,
-    );
-
-    if (defaultInIndustry) {
-      setSelectedPipelineId(defaultPipelineId);
-    }
-  }, [defaultPipelineId, filteredPipelinesByIndustry, selectedPipelineId]);
-
-  React.useEffect(() => {
-    if (!defaultPipelineId) return;
-    const defaultStillExists = availablePipelines.some(
-      (pipeline) => pipeline.id === defaultPipelineId,
-    );
-    if (!defaultStillExists) {
-      setDefaultPipelineId("");
-    }
-  }, [availablePipelines, defaultPipelineId]);
-
-  const handleSetDefaultPipeline = React.useCallback(() => {
-    if (!selectedPipelineId) {
-      toast.info("Select a pipeline first to set it as default.");
+    if (!resolvedPipeline) {
+      if (selectedPipelineId) {
+        setSelectedPipelineId("");
+      }
+      if (selectedIndustry) {
+        setSelectedIndustry("");
+      }
       return;
     }
 
-    setDefaultPipelineId(selectedPipelineId);
-    toast.success("Default pipeline updated.");
-  }, [selectedPipelineId]);
+    if (selectedPipelineId !== resolvedPipeline.id) {
+      setSelectedPipelineId(resolvedPipeline.id);
+    }
+    if (selectedIndustry !== resolvedPipeline.industry_type) {
+      setSelectedIndustry(resolvedPipeline.industry_type);
+    }
+  }, [activePipeline, availablePipelines, selectedIndustry, selectedPipelineId]);
 
   React.useEffect(() => {
     void import("../components/LeadsHub/LeadsCalendar");
@@ -1339,7 +1320,7 @@ const Leads: React.FC = () => {
           </Box>
         </Box>
 
-        {/* PIPELINE SELECTORS */}
+        {/* PIPELINE STATUS */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1}
@@ -1356,119 +1337,21 @@ const Leads: React.FC = () => {
         >
           <Box
             sx={{
-              width: { xs: "100%", sm: 150, lg: 136 },
-              position: "relative",
-              zIndex: 5,
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <Box
-              component="select"
-              aria-label="Select Industry"
-              value={selectedIndustry}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
-                const nextIndustry = event.target.value;
-                setSelectedIndustry(nextIndustry);
-                setSelectedPipelineId("");
-              }}
-              style={{
-                width: "100%",
-                height: 34,
-                lineHeight: "34px",
-                borderRadius: 8,
-                border: "1px solid #D0D5DD",
-                padding: "0 10px",
-                fontSize: 13,
-                backgroundColor: "#fff",
-              }}
-            >
-              <option value="">All Industries</option>
-              {industryOptions.map((industry) => (
-                <option key={industry} value={industry}>
-                  {industry.toUpperCase()}
-                </option>
-              ))}
-            </Box>
-          </Box>
-
-          <Box
-            sx={{
-              width: { xs: "100%", sm: 170, lg: 148 },
-              position: "relative",
-              zIndex: 5,
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <Box
-              component="select"
-              aria-label="Select Pipeline"
-              value={selectedPipelineId}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                setSelectedPipelineId(event.target.value)
-              }
-              style={{
-                width: "100%",
-                height: 34,
-                lineHeight: "34px",
-                borderRadius: 8,
-                border: "1px solid #D0D5DD",
-                padding: "0 10px",
-                fontSize: 13,
-                backgroundColor: "#fff",
-              }}
-            >
-              <option value="">All Pipelines</option>
-              {filteredPipelinesByIndustry.map((pipeline) => (
-                <option key={pipeline.id} value={pipeline.id}>
-                  {pipeline.pipeline_name}
-                </option>
-              ))}
-            </Box>
-          </Box>
-
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleSetDefaultPipeline}
-            disabled={!selectedPipelineId}
-            sx={{
-              height: 34,
+              width: { xs: "100%", sm: "auto" },
               minHeight: 34,
+              px: 1.25,
+              display: "flex",
+              alignItems: "center",
+              border: "1px solid #D0D5DD",
               borderRadius: 1,
-              textTransform: "none",
-              whiteSpace: "nowrap",
-              alignSelf: { xs: "stretch", sm: "center" },
-              px: 1.5,
-              borderColor:
-                selectedPipelineId && selectedPipelineId === defaultPipelineId
-                  ? "#16A34A"
-                  : "#D0D5DD",
-              color:
-                selectedPipelineId && selectedPipelineId === defaultPipelineId
-                  ? "#166534"
-                  : "#344054",
-              bgcolor:
-                selectedPipelineId && selectedPipelineId === defaultPipelineId
-                  ? "#F0FDF4"
-                  : "#fff",
-              "&:hover": {
-                borderColor:
-                  selectedPipelineId && selectedPipelineId === defaultPipelineId
-                    ? "#16A34A"
-                    : "#98A2B3",
-                bgcolor:
-                  selectedPipelineId && selectedPipelineId === defaultPipelineId
-                    ? "#ECFDF3"
-                    : "#F9FAFB",
-              },
+              backgroundColor: "#fff",
+              color: "#344054",
+              fontSize: 13,
+              fontWeight: 600,
             }}
           >
-            {selectedPipelineId && selectedPipelineId === defaultPipelineId
-              ? "Default Pipeline"
-              : "Set Default"}
-          </Button>
+            Default Pipeline: {activePipeline?.pipeline_name ?? "Not configured"}
+          </Box>
         </Stack>
       </Stack>
 
@@ -1527,7 +1410,7 @@ const Leads: React.FC = () => {
                 importedLeads={tab === 0 ? importedLeads : []}
                 canEditLeads={canEditLeads}
                 selectedIndustry={selectedIndustry}
-                selectedPipelineId={selectedPipelineId}
+                selectedPipelineId={resolvedPipelineId}
               />
             ) : (
               <LeadsBoard
@@ -1535,7 +1418,7 @@ const Leads: React.FC = () => {
                 filters={activeFilters}
                 canEditLeads={canEditLeads}
                 selectedIndustry={selectedIndustry}
-                selectedPipelineId={selectedPipelineId}
+                selectedPipelineId={resolvedPipelineId}
               />
             ))}
         </React.Suspense>

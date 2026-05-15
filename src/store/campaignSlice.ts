@@ -30,8 +30,7 @@ export const fetchCampaign = createAsyncThunk<
     // switches in the header are immediately reflected
     const clinicId = getState().clinic.data?.id;
     if (!clinicId) return rejectWithValue("Clinic not selected");
-    const res = await CampaignAPI.list(clinicId);
-    return res.data;
+    return await CampaignAPI.listAll(clinicId);
   } catch (error) {
     return rejectWithValue(
       error instanceof Error ? error.message : "Failed to fetch campaigns",

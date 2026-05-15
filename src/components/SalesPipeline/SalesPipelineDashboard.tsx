@@ -51,6 +51,10 @@ import {
 	STAGE_TYPE_SEQUENCE,
 } from "./salesPipeline.utils";
 
+const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
+const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
+const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
+
 const SalesPipelineDashboard = () => {
 	const MAX_STAGE_NAME_LENGTH = 50;
 	const theme = useTheme();
@@ -74,6 +78,9 @@ const SalesPipelineDashboard = () => {
 	const pipelineLoading = useSelector(selectPipelineLoading);
 	const pipelineError = useSelector(selectPipelineError);
 	const selectedPipelineId = selectedPipeline?.id ?? null;
+	const [defaultPipelineId, setDefaultPipelineId] = useState<string>(
+		localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ?? "",
+	);
 
 	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 	const [editPipelineData, setEditPipelineData] = useState<{ id: string; pipelineName: string; industry: string } | null>(null);
@@ -109,8 +116,18 @@ const SalesPipelineDashboard = () => {
 	useEffect(() => {
 		if (!canViewPipeline) return;
 		if (pipelineLoading || selectedPipeline || pipelines.length === 0) return;
-		dispatch(fetchPipelineDetail(pipelines[0].id));
-	}, [canViewPipeline, dispatch, pipelineLoading, pipelines, selectedPipeline]);
+		const preferredPipeline =
+			pipelines.find((pipeline) => pipeline.id === defaultPipelineId) ??
+			pipelines.find((pipeline) => pipeline.is_active) ??
+			pipelines[0];
+		dispatch(fetchPipelineDetail(preferredPipeline.id));
+	}, [canViewPipeline, defaultPipelineId, dispatch, pipelineLoading, pipelines, selectedPipeline]);
+
+	useEffect(() => {
+		if (defaultPipelineId) {
+			localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, defaultPipelineId);
+		}
+	}, [defaultPipelineId]);
 
 	useEffect(() => {
 		if (!actionMenuAnchor) return;
@@ -183,8 +200,7 @@ const SalesPipelineDashboard = () => {
 				await pipelineApi.update(editPipelineData.id, {
 					pipeline_name: trimmedPipelineName,
 					industry_type: industry as PipelineIndustryType,
-					is_active: true,
-				});
+				}, clinic.id);
 				await refreshPipelines();
 				if (selectedPipelineId === editPipelineData.id) {
 					await dispatch(fetchPipelineDetail(editPipelineData.id));
@@ -247,6 +263,36 @@ const SalesPipelineDashboard = () => {
 	const refreshPipelines = async () => {
 		if (!clinic?.id) return;
 		await dispatch(fetchPipelines(clinic.id));
+	};
+
+	const handleSelectPipeline = async (pipelineId: string) => {
+		if (!canViewPipeline) return;
+		if (!clinic?.id) {
+			await dispatch(fetchPipelineDetail(pipelineId));
+			return;
+		}
+
+		const targetPipeline = pipelines.find((pipeline) => pipeline.id === pipelineId) ?? null;
+
+		try {
+			setActionInProgress(true);
+			await dispatch(fetchPipelineDetail(pipelineId));
+			await refreshPipelines();
+			await dispatch(fetchPipelineDetail(pipelineId));
+			toast.success("Default pipeline updated.");
+
+			const industryToPersist = targetPipeline?.industry_type ?? "";
+			if (industryToPersist) {
+				localStorage.setItem(STORAGE_KEY_SELECTED_INDUSTRY, industryToPersist);
+			}
+			localStorage.setItem(STORAGE_KEY_SELECTED_PIPELINE, pipelineId);
+			localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, pipelineId);
+			setDefaultPipelineId(pipelineId);
+		} catch {
+			toast.error("Failed to set default pipeline.");
+		} finally {
+			setActionInProgress(false);
+		}
 	};
 
 	const getActionPipeline = () => {
@@ -720,6 +766,7 @@ const SalesPipelineDashboard = () => {
 				<SalesPipelineSidebar
 					pipelines={pipelines}
 					selectedPipelineId={selectedPipelineId}
+					defaultPipelineId={defaultPipelineId}
 					pipelineLoading={pipelineLoading}
 					pipelineError={pipelineError}
 					canEditPipeline={canEditPipeline}
@@ -728,9 +775,7 @@ const SalesPipelineDashboard = () => {
 					actionMenuPipelineId={actionMenuPipelineId}
 					chipBackgrounds={chipBackgrounds}
 					onOpenCreatePipeline={handleOpenCreatePipeline}
-					onSelectPipeline={(pipelineId) => {
-						dispatch(fetchPipelineDetail(pipelineId));
-					}}
+					onSelectPipeline={handleSelectPipeline}
 					onOpenActionMenu={handleOpenActionMenu}
 					onCloseActionMenu={handleCloseActionMenu}
 					onEditPipeline={handleEditPipeline}
