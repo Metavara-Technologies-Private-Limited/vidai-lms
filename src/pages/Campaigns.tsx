@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Alert } from "@mui/material";
 import "../styles/Campaign/campaigns.css";
@@ -65,13 +65,13 @@ export default function CampaignsScreen() {
   // ✅ FIX: Clinic switching is handled by Header's hydrateClinic which dispatches fetchCampaign()
   // Campaigns.tsx should NOT dispatch here to avoid double-fetching and slow loads
 
-  useEffect(() => {
-    if (!canViewCampaigns) return;
-    // Only dispatch if campaign data is empty and loading is false (initial mount with no data).
-    if (rawCampaigns.length === 0 && !campaignLoading) {
-      dispatch(fetchCampaign());
-    }
-  }, [dispatch, canViewCampaigns, campaignLoading]);
+  // useEffect(() => {
+  //   if (!canViewCampaigns) return;
+  //   // Only dispatch if campaign data is empty and loading is false (initial mount with no data).
+  //   if (rawCampaigns.length === 0 && !campaignLoading) {
+  //     dispatch(fetchCampaign());
+  //   }
+  // }, [dispatch, canViewCampaigns, campaignLoading]);
 
   const campaigns = useMemo<Campaign[]>(() => {
     return (rawCampaigns || []).map((api: CampaignAPIType) => {
