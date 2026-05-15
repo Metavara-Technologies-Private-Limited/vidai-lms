@@ -131,17 +131,24 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
     () => (Array.isArray(leads) ? (leads as Lead[]) : []),
     [leads],
   );
+  // Get default pipeline id from localStorage
+  const defaultPipelineId = typeof window !== "undefined" ? localStorage.getItem("leads_default_pipeline_id") : null;
+  const defaultPipeline = useMemo(() => {
+    if (!defaultPipelineId) return null;
+    return pipelines.find((p) => String(p.id) === String(defaultPipelineId)) || null;
+  }, [pipelines, defaultPipelineId]);
   const pipelineStages = useMemo(
     () => {
+      if (!defaultPipeline) return [];
       // sort ASCENDING by stage_order to match the pipeline stages view
-      const stages = getActivePipelineStages(pipelines);
+      const stages = getActivePipelineStages([defaultPipeline]);
       return [...stages].sort((a, b) => {
         const aOrder = typeof a.stage_order === 'number' ? a.stage_order : 0;
         const bOrder = typeof b.stage_order === 'number' ? b.stage_order : 0;
         return aOrder - bOrder;
       });
     },
-    [pipelines],
+    [defaultPipeline],
   );
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));

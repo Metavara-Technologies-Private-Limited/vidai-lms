@@ -733,26 +733,30 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const handleSaveUserPermissions = async () => {
-    if (!canManageUserRights || !focusedUser) return;
+    if (!canManageUserRights || selectedRoleIdx === null) return;
+    const role = roles[selectedRoleIdx];
+    const selectedIds = Array.from(selectedUserIdsByRole[role.name] ?? []);
+    if (selectedIds.length === 0) return;
     const permissions = rightsToUserPermissions(draftRights, draftPerms);
     setSaving(true);
     try {
-      await usersApi.saveIndividualPermissions(focusedUser.id, permissions);
-
-      const authUserId = Number((authUser?.id ?? authUser?.user_id) ?? 0);
-      if (authUserId > 0 && focusedUser.id === authUserId && authUser) {
-        const myPermPayload = await authApi.getMyPermissions().catch(() => null);
-        if (myPermPayload && typeof myPermPayload === "object") {
-          const merged = {
-            ...(authUser as Record<string, unknown>),
-            permissions:
-              (myPermPayload as { permissions?: unknown }).permissions ??
-              (authUser as Record<string, unknown>).permissions,
-          };
-          dispatch(setUser(merged as never));
+      for (const userId of selectedIds) {
+        await usersApi.saveIndividualPermissions(userId, permissions);
+        // If updating self, refresh permissions
+        const authUserId = Number((authUser?.id ?? authUser?.user_id) ?? 0);
+        if (authUserId > 0 && userId === authUserId && authUser) {
+          const myPermPayload = await authApi.getMyPermissions().catch(() => null);
+          if (myPermPayload && typeof myPermPayload === "object") {
+            const merged = {
+              ...(authUser as Record<string, unknown>),
+              permissions:
+                (myPermPayload as { permissions?: unknown }).permissions ??
+                (authUser as Record<string, unknown>).permissions,
+            };
+            dispatch(setUser(merged as never));
+          }
         }
       }
-
       setUserHasIndividualPerms(permissions.length > 0);
       setMode("user-summary");
       onSave();
@@ -767,12 +771,17 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   };
 
   const handleResetUserPermissions = async () => {
-    if (!canManageUserRights || !focusedUser) return;
+    if (!canManageUserRights || selectedRoleIdx === null) return;
+    const role = roles[selectedRoleIdx];
+    const selectedIds = Array.from(selectedUserIdsByRole[role.name] ?? []);
+    if (selectedIds.length === 0) return;
     setSaving(true);
     try {
-      await usersApi.clearIndividualPermissions(focusedUser.id);
-      // Reload from role
-      const roleForUser = roles.find((r) => r.name.toLowerCase() === (focusedUser.role || "").toLowerCase());
+      for (const userId of selectedIds) {
+        await usersApi.clearIndividualPermissions(userId);
+      }
+      // Reload from role (for UI draft state)
+      const roleForUser = roles.find((r) => r.name.toLowerCase() === role.name.toLowerCase());
       setDraftRights(roleForUser?.rights ?? emptyRights());
       setDraftPerms(roleForUser?.permissions ?? {});
       setUserHasIndividualPerms(false);
@@ -947,7 +956,14 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                         {roleUsers.map((user) => (
                           <Box
                             key={user.id}
-                            onClick={() => openUserPermissions(user)}
+                            onClick={() => {
+                              // Single-select: set only this user as selected and focused
+                              setSelectedUserIdsByRole((prev) => ({
+                                ...prev,
+                                [role.name]: new Set([user.id]),
+                              }));
+                              void openUserPermissions(user);
+                            }}
                             sx={{
                               px: 1,
                               py: 0.6,
@@ -962,15 +978,25 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                           >
                             <Checkbox
                               size="small"
-                              checked={selectedIds.has(user.id)}
-                              onChange={() => toggleUserSelection(role.name, user.id)}
-                              onClick={(e) => e.stopPropagation()}
+                              checked={focusedUser?.id === user.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedUserIdsByRole((prev) => ({
+                                  ...prev,
+                                  [role.name]: new Set([user.id]),
+                                }));
+                                void openUserPermissions(user);
+                              }}
                               sx={{ p: 0 }}
                             />
-                            <Typography sx={{ fontSize: 12, color: "#2F2F2F", flex: 1 }}>
+                            <Typography
+                              sx={{ fontSize: 12, color: "#2F2F2F", flex: 1 }}
+                            >
                               {user.username || user.email || `User ${user.id}`}
                             </Typography>
-                            <PersonOutlineIcon sx={{ fontSize: 16, color: "#E17E61" }} />
+                            <PersonOutlineIcon
+                              sx={{ fontSize: 16, color: "#E17E61" }}
+                            />
                           </Box>
                         ))}
                       </Box>
