@@ -14,7 +14,10 @@ import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import type { Campaign } from "../../types/campaigns.types";
 import { CAMPAIGN_STATUS, platformIcons, PLATFORMS, type CampaignStatus } from "../../constants/campaigns.constants";
-import { formatScheduleTime } from "../../utils/campaigns.utils";
+import {
+  formatScheduleTime,
+  getComputedCampaignStatus,
+} from "../../utils/campaigns.utils";
 import { CampaignAPI } from "../../services/campaign.api";
 
 const INACTIVE_STATUSES = new Set<CampaignStatus>([
@@ -69,68 +72,7 @@ export default function CampaignCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setOpenMenuId]);
 
-  /**
-   * Status rules:
-   *
-   * STOPPED from DB:
-   * - end date passed   -> STOPPED
-   * - else              -> PAUSED
-   *
-   * SCHEDULED from DB:
-   * - before start      -> SCHEDULED
-   * - between start/end -> LIVE
-   * - after end         -> COMPLETED
-   */
-  const computedStatus = (() => {
-    const now = dayjs();
-
-    const start = c.selected_start
-      ? dayjs(c.selected_start.replace("Z", ""))
-      : null;
-
-    const end = c.end ? dayjs(c.end.replace("Z", "")) : null;
-
-    // 🚨 Terminal states remain untouched
-    if (
-      c.status === CAMPAIGN_STATUS.FAILED ||
-      c.status === CAMPAIGN_STATUS.COMPLETED
-    ) {
-      return c.status;
-    }
-
-    // 🚨 STOPPED from DB
-    // If campaign duration ended → keep STOPPED
-    // Else treat as PAUSED
-    if (c.status === CAMPAIGN_STATUS.STOPPED) {
-      if (end && now.isAfter(end)) {
-        return CAMPAIGN_STATUS.STOPPED;
-      }
-
-      return CAMPAIGN_STATUS.PAUSED;
-    }
-
-    // 🚨 Only scheduled campaigns auto-transition
-    if (c.status === CAMPAIGN_STATUS.SCHEDULED) {
-      if (!start) {
-        return CAMPAIGN_STATUS.SCHEDULED;
-      }
-
-      // Before start
-      if (now.isBefore(start)) {
-        return CAMPAIGN_STATUS.SCHEDULED;
-      }
-
-      // After end
-      if (end && now.isAfter(end)) {
-        return CAMPAIGN_STATUS.COMPLETED;
-      }
-
-      // Between start/end
-      return CAMPAIGN_STATUS.LIVE;
-    }
-
-    return c.status;
-  })();
+  const computedStatus = getComputedCampaignStatus(c);
 
   return (
     <div
