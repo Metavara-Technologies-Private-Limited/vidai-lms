@@ -5,6 +5,7 @@ import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import PublishedWithChangesOutlinedIcon from "@mui/icons-material/PublishedWithChangesOutlined";
 import {
 	Box,
 	Button,
@@ -24,6 +25,7 @@ import { INDUSTRY_LABEL_MAP } from "./salesPipeline.utils";
 type SalesPipelineSidebarProps = {
 	pipelines: Pipeline[];
 	selectedPipelineId: string | null;
+	defaultPipelineId: string | null;
 	pipelineLoading: boolean;
 	pipelineError: string | null;
 	canEditPipeline: boolean;
@@ -37,6 +39,7 @@ type SalesPipelineSidebarProps = {
 	onCloseActionMenu: () => void;
 	onEditPipeline: () => void;
 	onDuplicatePipeline: () => void;
+	onSetDefaultPipeline: () => void;
 	onArchivePipeline: () => void;
 	onDeletePipeline: () => void;
 };
@@ -44,6 +47,7 @@ type SalesPipelineSidebarProps = {
 const SalesPipelineSidebar = ({
 	pipelines,
 	selectedPipelineId,
+	defaultPipelineId,
 	pipelineLoading,
 	pipelineError,
 	canEditPipeline,
@@ -57,6 +61,7 @@ const SalesPipelineSidebar = ({
 	onCloseActionMenu,
 	onEditPipeline,
 	onDuplicatePipeline,
+	onSetDefaultPipeline,
 	onArchivePipeline,
 	onDeletePipeline,
 }: SalesPipelineSidebarProps) => {
@@ -136,6 +141,7 @@ const SalesPipelineSidebar = ({
 
 				{pipelines.map((pipeline) => {
 					const isSelected = selectedPipelineId === pipeline.id;
+					const isDefault = defaultPipelineId === pipeline.id;
 					const visibleStages = isSelected ? pipeline.stages : pipeline.stages.slice(0, 3);
 
 					return (
@@ -175,12 +181,32 @@ const SalesPipelineSidebar = ({
 								}}
 							>
 								<Box>
-									<Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary" }}>
-										{pipeline.pipeline_name}
-									</Typography>
+									<Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+										<Typography variant="body2" sx={{ fontWeight: 700, color: "text.primary" }}>
+											{pipeline.pipeline_name}
+										</Typography>
+										{isDefault ? (
+											<Box
+												sx={{
+													display: "inline-flex",
+													px: 0.9,
+													py: 0.2,
+													borderRadius: 999,
+													fontSize: 11,
+													fontWeight: 700,
+													color: "#166534",
+													backgroundColor: "#ECFDF3",
+													border: "1px solid #86EFAC",
+												}}
+											>
+												Default
+											</Box>
+										) : null}
+									</Box>
 									<Typography
 										variant="caption"
 										sx={{
+											mt: 0.55,
 											textTransform: "uppercase",
 											color: "text.secondary",
 											letterSpacing: 0.6,
@@ -256,8 +282,7 @@ const SalesPipelineSidebar = ({
 				PaperProps={{
 					sx: {
 						mt: 0.9,
-						width: 130,
-						height: 174.94541931152344,
+						width: 150,
 						borderRadius: "12px",
 						border: "1px solid #ECECEC",
 						boxShadow: "0 16px 34px rgba(25, 35, 58, 0.14)",
@@ -299,6 +324,23 @@ const SalesPipelineSidebar = ({
 						<ContentCopyOutlinedIcon sx={{ fontSize: 20 }} />
 					</ListItemIcon>
 					Duplicate
+				</MenuItem>
+				<MenuItem
+					onClick={onSetDefaultPipeline}
+					disabled={actionInProgress}
+					sx={{
+						minHeight: 42,
+						px: 0.8,
+						borderRadius: 1.5,
+						fontSize: 12.5,
+						fontWeight: 600,
+						color: "#16A34A",
+					}}
+				>
+					<ListItemIcon sx={{ minWidth: 28, color: "#16A34A" }}>
+						<PublishedWithChangesOutlinedIcon sx={{ fontSize: 20 }} />
+					</ListItemIcon>
+					Set as Default
 				</MenuItem>
 				<MenuItem
 					onClick={onArchivePipeline}

@@ -51,6 +51,9 @@ import {
 	STAGE_TYPE_SEQUENCE,
 } from "./salesPipeline.utils";
 
+const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
+const DEFAULT_PIPELINE_EVENT = "leads-default-pipeline-updated";
+
 const SalesPipelineDashboard = () => {
 	const MAX_STAGE_NAME_LENGTH = 50;
 	const theme = useTheme();
@@ -90,6 +93,9 @@ const SalesPipelineDashboard = () => {
 	const [actionInProgress, setActionInProgress] = useState(false);
 	const [stageColorOverrides, setStageColorOverrides] = useState<Record<string, string>>({});
 	const [zoomPercent, setZoomPercent] = useState(100);
+	const [defaultPipelineId, setDefaultPipelineId] = useState<string>(
+		localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ?? "",
+	);
 
 	const chipBackgrounds = [
 		alpha(theme.palette.primary.main, 0.14),
@@ -109,8 +115,28 @@ const SalesPipelineDashboard = () => {
 	useEffect(() => {
 		if (!canViewPipeline) return;
 		if (pipelineLoading || selectedPipeline || pipelines.length === 0) return;
-		dispatch(fetchPipelineDetail(pipelines[0].id));
-	}, [canViewPipeline, dispatch, pipelineLoading, pipelines, selectedPipeline]);
+		const initialPipelineId =
+			pipelines.find((pipeline) => pipeline.id === defaultPipelineId)?.id ??
+			pipelines[0].id;
+		dispatch(fetchPipelineDetail(initialPipelineId));
+	}, [canViewPipeline, defaultPipelineId, dispatch, pipelineLoading, pipelines, selectedPipeline]);
+
+	useEffect(() => {
+		if (pipelines.length === 0) return;
+		const hasValidDefault = pipelines.some(
+			(pipeline) => String(pipeline.id) === String(defaultPipelineId),
+		);
+		if (hasValidDefault) return;
+		if (defaultPipelineId) return;
+		const fallbackPipelineId = pipelines[0].id;
+		setDefaultPipelineId(fallbackPipelineId);
+		localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, fallbackPipelineId);
+		window.dispatchEvent(
+			new CustomEvent(DEFAULT_PIPELINE_EVENT, {
+				detail: { pipelineId: fallbackPipelineId },
+			}),
+		);
+	}, [defaultPipelineId, pipelines]);
 
 	useEffect(() => {
 		if (!actionMenuAnchor) return;
@@ -297,6 +323,22 @@ const SalesPipelineDashboard = () => {
 		if (!pipeline) return;
 		setConfirmAction("archive");
 		setConfirmPipelineId(pipeline.id);
+		handleCloseActionMenu();
+	};
+
+	const handleSetDefaultPipeline = () => {
+		if (!canEditPipeline) return;
+		const pipeline = getActionPipeline();
+		if (!pipeline) return;
+
+		setDefaultPipelineId(pipeline.id);
+		localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, pipeline.id);
+		window.dispatchEvent(
+			new CustomEvent(DEFAULT_PIPELINE_EVENT, {
+				detail: { pipelineId: pipeline.id },
+			}),
+		);
+		toast.success(`${pipeline.pipeline_name} set as default pipeline.`);
 		handleCloseActionMenu();
 	};
 
@@ -720,6 +762,7 @@ const SalesPipelineDashboard = () => {
 				<SalesPipelineSidebar
 					pipelines={pipelines}
 					selectedPipelineId={selectedPipelineId}
+					defaultPipelineId={defaultPipelineId}
 					pipelineLoading={pipelineLoading}
 					pipelineError={pipelineError}
 					canEditPipeline={canEditPipeline}
@@ -729,12 +772,26 @@ const SalesPipelineDashboard = () => {
 					chipBackgrounds={chipBackgrounds}
 					onOpenCreatePipeline={handleOpenCreatePipeline}
 					onSelectPipeline={(pipelineId) => {
+						if (pipelineId !== defaultPipelineId) {
+							setDefaultPipelineId(pipelineId);
+							localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, pipelineId);
+							window.dispatchEvent(
+								new CustomEvent(DEFAULT_PIPELINE_EVENT, {
+									detail: { pipelineId },
+								}),
+							);
+							const selected = pipelines.find((pipeline) => pipeline.id === pipelineId);
+							toast.success(
+								`${selected?.pipeline_name ?? "Pipeline"} set as default pipeline.`,
+							);
+						}
 						dispatch(fetchPipelineDetail(pipelineId));
 					}}
 					onOpenActionMenu={handleOpenActionMenu}
 					onCloseActionMenu={handleCloseActionMenu}
 					onEditPipeline={handleEditPipeline}
 					onDuplicatePipeline={handleDuplicatePipeline}
+					onSetDefaultPipeline={handleSetDefaultPipeline}
 					onArchivePipeline={handleArchivePipeline}
 					onDeletePipeline={handleDeletePipeline}
 				/>
