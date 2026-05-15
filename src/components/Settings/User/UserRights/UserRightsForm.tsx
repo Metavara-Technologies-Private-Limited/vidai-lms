@@ -804,22 +804,6 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     setExpandedRoleName((prev) => (prev === roleName ? null : roleName));
   };
 
-  const toggleUserSelection = (roleName: RoleName, userId: number) => {
-    if (!canManageUserRights) return;
-    setSelectedUserIdsByRole((prev) => {
-      const nextSet = new Set(prev[roleName]);
-      if (nextSet.has(userId)) {
-        nextSet.delete(userId);
-      } else {
-        nextSet.add(userId);
-      }
-      return {
-        ...prev,
-        [roleName]: nextSet,
-      };
-    });
-  };
-
   const toggleAllUsersSelection = (roleName: RoleName, checked: boolean) => {
     if (!canManageUserRights) return;
     setSelectedUserIdsByRole((prev) => {
