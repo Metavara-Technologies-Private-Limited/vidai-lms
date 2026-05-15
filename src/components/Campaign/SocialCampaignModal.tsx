@@ -57,6 +57,16 @@ const PLATFORM_MIN_BUDGET = 2; // must be strictly greater than this
 const isPlainUrl = (str: string) =>
   str.trim().startsWith("http") && !str.trim().includes(" ");
 
+const getNextFiveMinuteTime = () => {
+  const now = dayjs();
+
+  const remainder = 5 - (now.minute() % 5);
+
+  const rounded = remainder === 5 ? now : now.add(remainder, "minute");
+
+  return rounded.second(0).format("HH:mm");
+};
+
 // FIX: Convert any share/preview URL to a direct renderable image URL.
 const resolveImageUrl = (url: string): string => {
   if (!url) return url;
@@ -251,6 +261,56 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const isPlatformConnected = (platform: Platform) =>
     platformConnectionMap[platform];
 
+  useEffect(() => {
+    if (!countriesData.length) return;
+    if (!navigator.geolocation) return;
+    if (metaCountry) return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+          );
+
+          const data = await res.json();
+
+          const detectedCountry =
+            data?.address?.country_code?.toUpperCase() || "";
+
+          const detectedState = data?.address?.state || "";
+
+          const validCountry = countriesData.find(
+            (c) => c.iso2 === detectedCountry || c.name === detectedCountry,
+          );
+
+          if (validCountry) {
+            setMetaCountry(validCountry.iso2 || validCountry.name);
+          }
+
+          const validState = validCountry?.states?.find(
+            (s) => s.name.toLowerCase() === detectedState.toLowerCase(),
+          );
+
+          if (validState) {
+            setMetaState(validState.name);
+          }
+        } catch (err) {
+          console.error("Location detection failed", err);
+        }
+      },
+      (err) => {
+        console.error("Location permission denied", err);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+      },
+    );
+  }, [countriesData, metaCountry]);
+  
   // Fetch countries + states from API on mount
   useEffect(() => {
     const fetchCountries = async () => {
@@ -609,6 +669,24 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     google_ads: googleAdsFileRef,
   };
 
+  useEffect(() => {
+    const syncContent = (
+      ref: React.RefObject<HTMLDivElement | null>,
+      value: string,
+    ) => {
+      if (!ref.current) return;
+
+      if (ref.current.innerText.trim() !== value.trim()) {
+        ref.current.innerText = value;
+      }
+    };
+
+    syncContent(facebookRef, platformContent.facebook);
+    syncContent(instagramRef, platformContent.instagram);
+    syncContent(linkedinRef, platformContent.linkedin);
+    syncContent(googleAdsRef, platformContent.google_ads);
+  }, [step, platformContent]);
+
   const [inlinePreview, setInlinePreview] = useState<{
     src: string;
     type: "image" | "file";
@@ -633,8 +711,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     return errors;
   };
 
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleDate, setScheduleDate] = useState(
+    dayjs().format("YYYY-MM-DD"),
+  );
+  const [scheduleTime, setScheduleTime] = useState(getNextFiveMinuteTime());
   const [budgets, setBudgets] = useState<Record<Platform, number>>({
     instagram: 350,
     facebook: 250,
@@ -800,6 +880,18 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     return null;
   };
 
+  const getComputedCampaignStatus = () => {
+    if (!scheduleDate || !scheduleTime) {
+      return CAMPAIGN_STATUS.LIVE;
+    }
+
+    const scheduledAt = dayjs(`${scheduleDate} ${scheduleTime}`);
+
+    return scheduledAt.isAfter(dayjs())
+      ? CAMPAIGN_STATUS.SCHEDULED
+      : CAMPAIGN_STATUS.LIVE;
+  };
+
   const handleCreateCampaign = async (
     type: "live" | "draft" | "scheduled"
   ) => {
@@ -896,11 +988,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           .find((c) => c.trim() !== "" && !isPlainUrl(c)) ?? campaignName;
 
       const statusValue =
-        type === "live"
-          ? CAMPAIGN_STATUS.LIVE
-          : type === "scheduled"
-          ? CAMPAIGN_STATUS.SCHEDULED
-          : CAMPAIGN_STATUS.DRAFT;
+        type === "draft"
+          ? CAMPAIGN_STATUS.DRAFT
+          : getComputedCampaignStatus();
 
       const isActive = type === "live";
       const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
@@ -957,13 +1047,13 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         platform_data: cleanedContent,
         budget_data: {
           ...Object.fromEntries(
-            selectedPlatforms.map((p) => [p.id, budgets[p.id]])
+            selectedPlatforms.map((p) => [p.id, budgets[p.id]]),
           ),
           total: totalSpend,
         },
         image_url,
         selected_start: scheduleDate || null,
-        selected_end: scheduleDate || null,
+        selected_end: endDate || null,
         status: statusValue,
         is_active: isActive,
       };

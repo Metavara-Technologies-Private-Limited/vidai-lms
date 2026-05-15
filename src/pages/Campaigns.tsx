@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Alert } from "@mui/material";
 import "../styles/Campaign/campaigns.css";
@@ -30,6 +30,7 @@ import {
   type Tab,
 } from "../constants/campaigns.constants";
 import type { Campaign, CampaignAPIType } from "../types/campaigns.types";
+import { getComputedCampaignStatus } from "../utils/campaigns.utils";
 
 const AddNewCampaign = lazy(() => import("../components/Campaign/AddNewCampaign"));
 const SocialCampaignModal = lazy(() => import("../components/Campaign/SocialCampaignModal"));
@@ -194,7 +195,9 @@ export default function CampaignsScreen() {
       const searchOk = (c.name ?? "")
         .toLowerCase()
         .includes(search.toLowerCase());
-      const statusOk = status === "all" || c.status === status;
+        const computedStatus = getComputedCampaignStatus(c);
+
+        const statusOk = status === "all" || computedStatus === status;
 
       const platformOk =
         platform === "all" ||

@@ -50,8 +50,7 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
     ref
   ) => {
 
-
-const displayImage = imagePreview || imageUrl;
+    const displayImage = imagePreview || imageUrl;
     const hasFile = !!imageFile || !!displayImage;
     const previewName = imageFile?.name || imageUrl || "Ad image preview";
 
@@ -141,10 +140,11 @@ const displayImage = imagePreview || imageUrl;
               </button>
             )}
 
-            {hasFile && (
+            {/* FIX: only show file info when imageFile is actually set (not null) */}
+            {imageFile && (
               <span style={{ fontSize: 11, color: "#6b7280" }}>
-                📄 <strong>{imageFile!.name}</strong>{" "}
-                ({(imageFile!.size / 1024).toFixed(1)} KB)
+                📄 <strong>{imageFile.name}</strong>{" "}
+                ({(imageFile.size / 1024).toFixed(1)} KB)
               </span>
             )}
           </div>

@@ -14,11 +14,13 @@ import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import type { Campaign } from "../../types/campaigns.types";
 import { CAMPAIGN_STATUS, platformIcons, PLATFORMS, type CampaignStatus } from "../../constants/campaigns.constants";
-import { formatScheduleTime } from "../../utils/campaigns.utils";
+import {
+  formatScheduleTime,
+  getComputedCampaignStatus,
+} from "../../utils/campaigns.utils";
 import { CampaignAPI } from "../../services/campaign.api";
 
 const INACTIVE_STATUSES = new Set<CampaignStatus>([
-  CAMPAIGN_STATUS.STOPPED,
   CAMPAIGN_STATUS.COMPLETED,
   CAMPAIGN_STATUS.FAILED,
 ]);
@@ -70,6 +72,8 @@ export default function CampaignCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setOpenMenuId]);
 
+  const computedStatus = getComputedCampaignStatus(c);
+
   return (
     <div
       className="campaign-card"
@@ -95,7 +99,9 @@ export default function CampaignCard({
           </div>
           <span className="title-text">{c.name}</span>
         </div>
-        <span className={`status ${c.status.toLowerCase()}`}>{c.status}</span>
+        <span className={`status ${computedStatus.toLowerCase()}`}>
+          {computedStatus}
+        </span>
       </div>
 
       <div className="card-row">
@@ -134,7 +140,7 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-        {c.status === CAMPAIGN_STATUS.SCHEDULED ? (
+        {computedStatus === CAMPAIGN_STATUS.SCHEDULED ? (
           <span>
             <label>SCHEDULED:</label>{" "}
             {formatScheduleTime(c.selected_start, c.enter_time)}
@@ -167,7 +173,7 @@ export default function CampaignCard({
             onClick={async (e) => {
               e.stopPropagation();
               if (!canEditCampaign) return;
-              if (c.status === CAMPAIGN_STATUS.STOPPED) {
+              if (computedStatus === CAMPAIGN_STATUS.PAUSED) {
                 let shouldSetLive = true;
 
                 // ── Enable FB Insta Ads ──
@@ -257,7 +263,9 @@ export default function CampaignCard({
             }}
           >
             <img
-              src={c.status === CAMPAIGN_STATUS.STOPPED ? playIcon : pauseIcon}
+              src={
+                computedStatus === CAMPAIGN_STATUS.PAUSED ? playIcon : pauseIcon
+              }
               alt="Toggle"
               width={20}
               height={20}
@@ -338,7 +346,7 @@ export default function CampaignCard({
                   />
                   Duplicate
                 </div>
-                {!INACTIVE_STATUSES.has(c.status) && (
+                {!INACTIVE_STATUSES.has(computedStatus) && (
                   <div
                     className={`menu-item stop-item ${!canEditCampaign ? "disabled" : ""}`}
                     onClick={(e) => {
@@ -443,7 +451,7 @@ export default function CampaignCard({
             }
 
             if (shouldStop) {
-              onStatusChange(c.id, CAMPAIGN_STATUS.STOPPED);
+              onStatusChange(c.id, CAMPAIGN_STATUS.PAUSED);
 
               toast.success("Campaign stopped successfully.");
             }
