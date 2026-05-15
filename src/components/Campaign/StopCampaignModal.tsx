@@ -12,7 +12,9 @@ interface Props {
   platforms: Platform[];
   campaignId?: string;
   onClose: () => void;
-  onStop: () => void;
+  onStop: (selectedPlatforms: Platform[]) => void;
+  title?: string;
+  confirmText?: string;
 }
 
 export default function StopCampaignModal({
@@ -21,6 +23,8 @@ export default function StopCampaignModal({
   campaignId,
   onClose,
   onStop,
+  title = "Stop Campaign",
+  confirmText = "Stop",
 }: Props) {
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -54,24 +58,40 @@ export default function StopCampaignModal({
       }
     }
 
-    onStop();
+    onStop(selectedPlatforms);
     toast.warn("Campaign stopped successfully");
     onClose();
   };
 
   return (
-    <div className="stop-overlay" onClick={onClose}>
+    <div
+      className="stop-overlay"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
       <div className="stop-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="stop-close" onClick={onClose}>
+        <button
+          className="stop-close"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+        >
           ✕
         </button>
 
         {/* ===== STEP 1 : SELECT PLATFORM ===== */}
         {!showConfirm && (
           <>
-            <h2 className="stop-title">Stop Campaign ({campaignName})</h2>
+            <h2 className="stop-title">
+              {title} ({campaignName})
+            </h2>
 
-            <p className="stop-subtitle">Select platform to stop campaign</p>
+            <p className="stop-subtitle">
+              Select platform to {confirmText.toLowerCase()} campaign
+            </p>
 
             <div className="platform-list">
               {platforms.map((platform) => (
@@ -97,7 +117,13 @@ export default function StopCampaignModal({
             </div>
 
             <div className="stop-actions">
-              <button className="cancel-btn" onClick={onClose}>
+              <button
+                className="cancel-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+              >
                 Cancel
               </button>
 
@@ -106,7 +132,7 @@ export default function StopCampaignModal({
                 disabled={selectedPlatforms.length === 0}
                 onClick={() => setShowConfirm(true)}
               >
-                Stop
+                {confirmText}
               </button>
             </div>
           </>
@@ -131,10 +157,7 @@ export default function StopCampaignModal({
                 No
               </button>
 
-              <button
-                className="stop-btn"
-                onClick={handleStop}
-              >
+              <button className="stop-btn" onClick={handleStop}>
                 Yes
               </button>
             </div>

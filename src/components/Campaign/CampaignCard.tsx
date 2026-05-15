@@ -13,7 +13,12 @@ import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import type { Campaign } from "../../types/campaigns.types";
-import { CAMPAIGN_STATUS, platformIcons, PLATFORMS, type CampaignStatus } from "../../constants/campaigns.constants";
+import {
+  CAMPAIGN_STATUS,
+  platformIcons,
+  PLATFORMS,
+  type CampaignStatus,
+} from "../../constants/campaigns.constants";
 import {
   formatScheduleTime,
   getComputedCampaignStatus,
@@ -54,6 +59,7 @@ export default function CampaignCard({
   const isMenuOpen = openMenuId === c.id;
   const menuRef = useRef<HTMLDivElement>(null);
   const [showStopModal, setShowStopModal] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
 
   const platforms = c.platforms ?? [];
 
@@ -164,113 +170,38 @@ export default function CampaignCard({
           </button>
 
           {/* ── Pause / Play button ── */}
-          <button
-            className="action-btn pause-btn"
-            disabled={!canEditCampaign}
-            title={
-              !canEditCampaign ? "No permission to edit campaigns" : undefined
-            }
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (!canEditCampaign) return;
-              if (computedStatus === CAMPAIGN_STATUS.PAUSED) {
-                let shouldSetLive = true;
-
-                // ── Enable FB Insta Ads ──
-                if (
-                  platforms.includes("facebook") ||
-                  platforms.includes("instagram")
-                ) {
-                  try {
-                    await CampaignAPI.updateFacebookStatus(c.id, "enable");
-
-                    toast.success(
-                      "Facebook/Instagram campaign enabled successfully.",
-                    );
-                  } catch (err) {
-                    shouldSetLive = false;
-
-                    console.error("[Facebook] Failed to enable campaign:", err);
-
-                    toast.warn(
-                      "Facebook enable failed; campaign remains stopped locally.",
-                    );
-                  }
-                }
-
-                // ── Enable Google Ads ──
-                if (platforms.includes("google_ads")) {
-                  try {
-                    const res = await CampaignAPI.updateGoogleAdsStatus(
-                      c.id,
-                      "enable",
-                    );
-
-                    // ✅ FIX: skipped means campaign not found in Google Ads yet
-                    // (e.g. Zapier callback hasn't fired or campaign was just created).
-                    // Treat as a soft warning — still allow local status to go live.
-                    if (res.data?.skipped) {
-                      toast.warn(
-                        "Google Ads campaign not found yet — it may still be creating. Campaign set to Live locally.",
-                      );
-                      // do NOT set shouldSetLive = false; let local status update proceed
-                    } else if (!res.data?.success) {
-                      // Hard failure — actual API error
-                      shouldSetLive = false;
-                      toast.warn(
-                        res.data?.error ||
-                          "Google Ads enable failed; campaign remains stopped locally.",
-                      );
-                    } else {
-                      toast.success(
-                        "Google Ads campaign enabled successfully.",
-                      );
-                    }
-                  } catch (err) {
-                    // ✅ FIX: network/server errors are hard failures
-                    shouldSetLive = false;
-                    console.error(
-                      "[GoogleAds] Failed to enable campaign:",
-                      err,
-                    );
-                    toast.warn(
-                      "Google Ads enable failed; campaign remains stopped locally.",
-                    );
-                  }
-                }
-
-                // ── Enable LinkedIn ──
-                if (platforms.includes("linkedin")) {
-                  try {
-                    await CampaignAPI.updateLinkedInStatus(c.id, "ACTIVE");
-                    toast.success("LinkedIn campaign enabled successfully.");
-                  } catch (err) {
-                    shouldSetLive = false;
-                    console.error("[LinkedIn] Failed to enable campaign:", err);
-                    toast.warn(
-                      "LinkedIn enable failed; campaign remains stopped locally.",
-                    );
-                  }
-                }
-
-                if (shouldSetLive) {
-                  onStatusChange(c.id, CAMPAIGN_STATUS.LIVE);
-                  toast.success("Campaign is Live now");
-                }
-              } else {
-                setShowStopModal(true);
+          {(computedStatus === CAMPAIGN_STATUS.LIVE ||
+            computedStatus === CAMPAIGN_STATUS.PAUSED) && (
+            <button
+              className="action-btn pause-btn"
+              disabled={!canEditCampaign}
+              title={
+                !canEditCampaign ? "No permission to edit campaigns" : undefined
               }
-            }}
-          >
-            <img
-              src={
-                computedStatus === CAMPAIGN_STATUS.PAUSED ? playIcon : pauseIcon
-              }
-              alt="Toggle"
-              width={20}
-              height={20}
-            />
-          </button>
+              onClick={(e) => {
+                e.stopPropagation();
+
+                if (!canEditCampaign) return;
+
+                if (computedStatus === CAMPAIGN_STATUS.PAUSED) {
+                  setShowResumeModal(true);
+                } else {
+                  setShowStopModal(true);
+                }
+              }}
+            >
+              <img
+                src={
+                  computedStatus === CAMPAIGN_STATUS.PAUSED
+                    ? playIcon
+                    : pauseIcon
+                }
+                alt="Toggle"
+                width={20}
+                height={20}
+              />
+            </button>
+          )}
 
           <div className="more-container" ref={menuRef}>
             <button
@@ -382,37 +313,57 @@ export default function CampaignCard({
 
       {showStopModal && (
         <StopCampaignModal
+        title = "Stop Campaign"
+        confirmText = "Stop"
           campaignName={c.name}
           platforms={platforms}
           campaignId={c.id}
           onClose={() => setShowStopModal(false)}
-          onStop={async () => {
+          onStop={async (selectedPlatforms?: string[]) => {
+            const chosenPlatforms = selectedPlatforms ?? platforms;
             let shouldStop = true;
 
             // ── Stop FB/Insta ──
-            if (
-              platforms.includes("facebook") ||
-              platforms.includes("instagram")
-            ) {
+            // ── Stop Facebook ──
+            if (chosenPlatforms.includes("facebook")) {
               try {
-                await CampaignAPI.updateFacebookStatus(c.id, "disable");
-
-                toast.success(
-                  "Facebook/Instagram campaign stopped successfully.",
+                await CampaignAPI.updateFacebookStatus(
+                  c.id,
+                  "disable",
+                  "facebook",
                 );
+
+                toast.success("Facebook campaign stopped successfully.");
               } catch (err) {
                 shouldStop = false;
 
                 console.error("[Facebook] Failed to stop campaign:", err);
 
-                toast.warn(
-                  "Facebook stop failed; campaign remains live locally.",
+                toast.warn("Facebook stop failed.");
+              }
+            }
+
+            // ── Stop Instagram ──
+            if (chosenPlatforms.includes("instagram")) {
+              try {
+                await CampaignAPI.updateFacebookStatus(
+                  c.id,
+                  "disable",
+                  "instagram",
                 );
+
+                toast.success("Instagram campaign stopped successfully.");
+              } catch (err) {
+                shouldStop = false;
+
+                console.error("[Instagram] Failed to stop campaign:", err);
+
+                toast.warn("Instagram stop failed.");
               }
             }
 
             // ── Stop Google Ads ──
-            if (platforms.includes("google_ads")) {
+            if (chosenPlatforms.includes("google_ads")) {
               try {
                 const res = await CampaignAPI.updateGoogleAdsStatus(
                   c.id,
@@ -436,7 +387,7 @@ export default function CampaignCard({
             }
 
             // ── Stop LinkedIn ──
-            if (platforms.includes("linkedin")) {
+            if (chosenPlatforms.includes("linkedin")) {
               try {
                 await CampaignAPI.updateLinkedInStatus(c.id, "PAUSED");
 
@@ -457,6 +408,117 @@ export default function CampaignCard({
             }
 
             setShowStopModal(false);
+          }}
+        />
+      )}
+      {showResumeModal && (
+        <StopCampaignModal
+          title="Resume Campaign"
+          confirmText="Resume"
+          campaignName={c.name}
+          platforms={platforms}
+          campaignId={c.id}
+          onClose={() => setShowResumeModal(false)}
+          onStop={async (selectedPlatforms?: string[]) => {
+            let shouldSetLive = true;
+
+            const chosenPlatforms = selectedPlatforms ?? platforms;
+
+            // ── Enable FB/Insta ──
+            // ── Enable Facebook ──
+if (chosenPlatforms.includes("facebook")) {
+  try {
+    await CampaignAPI.updateFacebookStatus(
+      c.id,
+      "enable",
+      "facebook",
+    );
+
+    toast.success(
+      "Facebook campaign enabled successfully.",
+    );
+  } catch (err) {
+    shouldSetLive = false;
+
+    console.error(
+      "[Facebook] Failed to enable campaign:",
+      err,
+    );
+
+    toast.warn("Facebook enable failed.");
+  }
+}
+
+// ── Enable Instagram ──
+if (chosenPlatforms.includes("instagram")) {
+  try {
+    await CampaignAPI.updateFacebookStatus(
+      c.id,
+      "enable",
+      "instagram",
+    );
+
+    toast.success(
+      "Instagram campaign enabled successfully.",
+    );
+  } catch (err) {
+    shouldSetLive = false;
+
+    console.error(
+      "[Instagram] Failed to enable campaign:",
+      err,
+    );
+
+    toast.warn("Instagram enable failed.");
+  }
+}
+
+            // ── Enable Google Ads ──
+            if (chosenPlatforms.includes("google_ads")) {
+              try {
+                const res = await CampaignAPI.updateGoogleAdsStatus(
+                  c.id,
+                  "enable",
+                );
+
+                if (!res.data?.success && !res.data?.skipped) {
+                  shouldSetLive = false;
+
+                  toast.warn(res.data?.error || "Google Ads enable failed.");
+                } else {
+                  toast.success("Google Ads enabled successfully.");
+                }
+              } catch (err) {
+                shouldSetLive = false;
+
+                console.error("[GoogleAds] Failed to enable campaign:", err);
+
+                toast.warn("Google Ads enable failed.");
+              }
+            }
+
+            // ── Enable LinkedIn ──
+            if (chosenPlatforms.includes("linkedin")) {
+              try {
+                await CampaignAPI.updateLinkedInStatus(c.id, "ACTIVE");
+
+                toast.success("LinkedIn campaign enabled successfully.");
+              } catch (err) {
+                shouldSetLive = false;
+
+                console.error("[LinkedIn] Failed to enable campaign:", err);
+
+                toast.warn("LinkedIn enable failed.");
+              }
+            }
+
+            if (shouldSetLive) {
+              onStatusChange(c.id, CAMPAIGN_STATUS.LIVE);
+
+              toast.success("Campaign is Live now");
+            }
+
+            setShowResumeModal(false);
           }}
         />
       )}

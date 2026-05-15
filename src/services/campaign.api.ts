@@ -191,8 +191,15 @@ export const CampaignAPI = {
   getFBAdInsights: (fbCampaignId: string) =>
     http.get(`/fb/campaigns/${fbCampaignId}/insights/?date_preset=maximum`),
 
-  updateFacebookStatus: (campaignId: string, action: "enable" | "disable") =>
-    http.post(`/fb/campaigns/${campaignId}/status/`, { action }),
+  updateFacebookStatus: (
+    campaignId: string,
+    action: "enable" | "disable",
+    platform: "facebook" | "instagram",
+  ) =>
+    http.post(`/fb/campaigns/${campaignId}/status/`, {
+      action,
+      platform,
+    }),
 
   getFacebookDebug: (campaignId: string) =>
     http.get(`/campaigns/${campaignId}/facebook-debug/`, {
