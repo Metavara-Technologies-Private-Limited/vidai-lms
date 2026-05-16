@@ -639,6 +639,11 @@ const Leads: React.FC = () => {
         localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ?? "";
       if (!storedDefaultPipelineId) return;
 
+      const existsInCurrentClinic = availablePipelines.some(
+        (pipeline) => String(pipeline.id) === String(storedDefaultPipelineId),
+      );
+      if (!existsInCurrentClinic) return;
+
       if (storedDefaultPipelineId !== defaultPipelineId) {
         setDefaultPipelineId(storedDefaultPipelineId);
       }
@@ -658,36 +663,33 @@ const Leads: React.FC = () => {
       window.removeEventListener("pageshow", syncDefaultFromStorage);
       document.removeEventListener("visibilitychange", syncDefaultFromStorage);
     };
-  }, [defaultPipelineId, selectedPipelineId]);
+  }, [availablePipelines, defaultPipelineId, selectedPipelineId]);
 
   React.useEffect(() => {
     if (availablePipelines.length === 0) return;
 
-    const defaultPipeline = availablePipelines.find(
+    const backendDefaultPipeline =
+      availablePipelines.find((pipeline) => pipeline.is_default) ??
+      availablePipelines.find((pipeline) => pipeline.is_active) ??
+      null;
+    const storageMatchedPipeline = availablePipelines.find(
       (pipeline) => String(pipeline.id) === String(defaultPipelineId),
     );
+    const resolvedDefaultPipeline =
+      backendDefaultPipeline ?? storageMatchedPipeline ?? availablePipelines[0];
 
-    if (defaultPipeline) {
-      setSelectedPipelineId(defaultPipeline.id);
-      if (selectedIndustry !== defaultPipeline.industry_type) {
-        setSelectedIndustry(defaultPipeline.industry_type);
-      }
-      return;
+    if (resolvedDefaultPipeline.id !== defaultPipelineId) {
+      setDefaultPipelineId(resolvedDefaultPipeline.id);
+    }
+    if (resolvedDefaultPipeline.id !== selectedPipelineId) {
+      setSelectedPipelineId(resolvedDefaultPipeline.id);
+    }
+    if (selectedIndustry !== resolvedDefaultPipeline.industry_type) {
+      setSelectedIndustry(resolvedDefaultPipeline.industry_type);
     }
 
-    // Keep existing default unchanged if it is set but not currently resolvable.
-    // This avoids accidentally overwriting with the first pipeline during transient API states.
-    if (defaultPipelineId) {
-      setSelectedPipelineId(defaultPipelineId);
-      return;
-    }
-
-    const fallbackPipeline = availablePipelines[0];
-    setDefaultPipelineId(fallbackPipeline.id);
-    setSelectedPipelineId(fallbackPipeline.id);
-    setSelectedIndustry(fallbackPipeline.industry_type);
-    localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, fallbackPipeline.id);
-  }, [availablePipelines, defaultPipelineId, selectedIndustry]);
+    localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, resolvedDefaultPipeline.id);
+  }, [availablePipelines, defaultPipelineId, selectedIndustry, selectedPipelineId]);
 
   React.useEffect(() => {
     const handleDefaultPipelineUpdate = (event: Event) => {
@@ -708,6 +710,11 @@ const Leads: React.FC = () => {
     const handleStorageUpdate = (event: StorageEvent) => {
       if (event.key !== STORAGE_KEY_DEFAULT_PIPELINE) return;
       const nextDefaultPipelineId = event.newValue ?? "";
+      if (!nextDefaultPipelineId) return;
+      const existsInCurrentClinic = availablePipelines.some(
+        (pipeline) => String(pipeline.id) === String(nextDefaultPipelineId),
+      );
+      if (!existsInCurrentClinic) return;
       setDefaultPipelineId(nextDefaultPipelineId);
       setSelectedPipelineId(nextDefaultPipelineId);
     };

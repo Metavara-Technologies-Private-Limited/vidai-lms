@@ -66,6 +66,12 @@ const SalesPipelineSidebar = ({
 	onDeletePipeline,
 }: SalesPipelineSidebarProps) => {
 	const theme = useTheme();
+	const sortedPipelines = [...pipelines].sort((left, right) => {
+		const leftIsDefault = left.id === defaultPipelineId;
+		const rightIsDefault = right.id === defaultPipelineId;
+		if (leftIsDefault === rightIsDefault) return 0;
+		return leftIsDefault ? -1 : 1;
+	});
 
 	return (
 		<Paper
@@ -139,7 +145,7 @@ const SalesPipelineSidebar = ({
 					</Box>
 				) : null}
 
-				{pipelines.map((pipeline) => {
+				{sortedPipelines.map((pipeline) => {
 					const isSelected = selectedPipelineId === pipeline.id;
 					const isDefault = defaultPipelineId === pipeline.id;
 					const visibleStages = isSelected ? pipeline.stages : pipeline.stages.slice(0, 3);

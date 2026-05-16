@@ -77,6 +77,7 @@ export interface Pipeline {
   pipeline_name: string;
   industry_type: PipelineIndustryType;
   is_active: boolean;
+  is_default: boolean;
   stages: PipelineStage[];
 }
 
@@ -85,12 +86,14 @@ export interface CreatePipelinePayload {
   pipeline_name: string;
   industry_type: PipelineIndustryType;
   is_active?: boolean;
+  is_default?: boolean;
 }
 
 export interface UpdatePipelinePayload {
   pipeline_name?: string;
   industry_type?: PipelineIndustryType;
   is_active?: boolean;
+  is_default?: boolean;
 }
 
 export interface CreatePipelineStagePayload {
@@ -142,6 +145,7 @@ type PipelineApiResponse = Partial<Pipeline> & {
   pipeline_name?: string;
   industry_type?: PipelineIndustryType;
   is_active?: boolean;
+  is_default?: boolean;
   clinic_id?: number;
   clinic?: number;
   stages?: PipelineStageApiResponse[];
@@ -279,6 +283,8 @@ const normalizePipeline = (pipeline: PipelineApiResponse): Pipeline => {
     pipeline_name: pipeline.pipeline_name ?? "Untitled Pipeline",
     industry_type: pipeline.industry_type ?? "other",
     is_active: pipeline.is_active ?? true,
+    // Prefer explicit backend default flag; fall back to is_active for compatibility.
+    is_default: pipeline.is_default ?? pipeline.is_active ?? false,
     // Sort by stage_order ascending — backend Meta.ordering = ["stage_order"]
     // but we sort here too in case the response arrives unsorted.
     stages: stages.sort((a, b) => a.stage_order - b.stage_order),
@@ -381,6 +387,17 @@ export const pipelineApi = {
       }
       throw error;
     }
+  },
+
+  async setDefault(pipelineId: string): Promise<Pipeline> {
+    const response = await http.post(
+      `/pipelines/${pipelineId}/set-default/`,
+      undefined,
+      {
+        params: { clinic_id: storedClinicId() },
+      },
+    );
+    return normalizePipeline(unwrapItemData(response.data));
   },
 
   async archive(pipelineId: string): Promise<Pipeline> {
