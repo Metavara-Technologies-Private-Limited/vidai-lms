@@ -53,7 +53,8 @@ const CampaignDashboard = ({
 
   const campaignIdRef = React.useRef(campaign.id);
   const campaignTypeRef = React.useRef(campaign.type);
-  const fbCampaignIdRef = React.useRef(campaign.fb_campaign_id);
+  // const fbCampaignIdRef = React.useRef(campaign.fb_campaign_id);
+  // const instagramCampaignIdRef = React.useRef(campaign.instagram_campaign_id);
   const platformsRef = React.useRef<Platform[]>(campaign.platforms ?? []);
 
   const [adInsights, setAdInsights] = React.useState({
@@ -67,30 +68,28 @@ const CampaignDashboard = ({
     total_budget: "0",
     conversion_rate: "0%",
     ctr: "0",
+    currency: "USD",
   });
+  const [platformInsights, setPlatformInsights] = React.useState<
+    Record<string, typeof adInsights>
+  >({});
 
-  // const fetchAdInsights = React.useCallback(async (fbCampaignId: string) => {
-  //   try {
-  //     console.log("Fetching ad insights for FB Campaign ID:", fbCampaignId);
-  //     const res = await CampaignAPI.getFBAdInsights(fbCampaignId);
-  //     const data = res.data?.insights || {};
-  //     console.log("AD INSIGHTS RAW:", data);
-  //     setAdInsights({
-  //       impressions: data.post_impressions || 0,
-  //       clicks: data.post_clicks || 0,
-  //       spend: data.spend || "0",
-  //       reach: data.reach || "0",
-  //       cpc: parseFloat(data.cpc || "0").toFixed(2),
-  //       cpm: parseFloat(data.cpm || "0").toFixed(2),
-  //       conversions: data.conversions || 0,
-  //       total_budget: data.total_budget || "0",
-  //       conversion_rate: data.conversion_rate || "0%",
-  //       ctr: data.ctr || "0",
-  //     });
-  //   } catch (err) {
-  //     console.error("FB Ad Insights fetch failed", err);
-  //   }
-  // }, []);
+  const fetchMetaInsights = React.useCallback(
+    async (campaignId: string, platform: "facebook" | "instagram") => {
+      try {
+        console.log(`Fetching ${platform} insights for:`, campaignId);
+
+        const res = await CampaignAPI.getFBAdInsights(campaignId, platform);
+
+        return res.data?.insights || {};
+      } catch (err) {
+        console.error(`${platform} insights fetch failed`, err);
+
+        return {};
+      }
+    },
+    [],
+  );
 
   const fetchGoogleAdsInsightsFromDB = React.useCallback(
     async (campaignId: string, cId: number) => {
@@ -152,7 +151,8 @@ const CampaignDashboard = ({
 
         const campaignId = campaignIdRef.current;
         const campaignType = campaignTypeRef.current;
-        const fbCamId = fbCampaignIdRef.current;
+        // const fbCamId = fbCampaignIdRef.current;
+        // const instagramCamId = instagramCampaignIdRef.current;
         const platforms = platformsRef.current;
         const cId = clinicIdRef.current;
 
@@ -171,43 +171,153 @@ const CampaignDashboard = ({
         if (cancelled) return;
 
         const d = res.data;
+        const fbCamId = d.fb_campaign_id;
+
+        const instagramCamId = d.instagram_campaign_id;
+
+        console.log("FB Campaign ID:", fbCamId);
+
+        console.log("Instagram Campaign ID:", instagramCamId);
         if (
           platforms.includes(PLATFORMS.FACEBOOK) ||
           platforms.includes(PLATFORMS.INSTAGRAM)
         ) {
-          setAdInsights({
-            impressions: Number(d.fb_impressions || 0),
-            clicks: Number(d.fb_clicks || 0),
-            spend: String(d.fb_spend || "0"),
-            reach: String(d.fb_reach || "0"),
+          const fbInsights =
+            fbCamId && platforms.includes(PLATFORMS.FACEBOOK)
+              ? await fetchMetaInsights(fbCamId, "facebook")
+              : {};
 
-            cpc:
-              Number(d.fb_clicks || 0) > 0
-                ? (Number(d.fb_spend || 0) / Number(d.fb_clicks || 1)).toFixed(2)
-                : "0",
+          const instagramInsights =
+            instagramCamId && platforms.includes(PLATFORMS.INSTAGRAM)
+              ? await fetchMetaInsights(instagramCamId, "instagram")
+              : {};
 
-            cpm:
-              Number(d.fb_impressions || 0) > 0
-                ? (
-                    (Number(d.fb_spend || 0) * 1000) /
-                    Number(d.fb_impressions || 1)
-                  ).toFixed(2)
-                : "0",
+              console.log("Facebook Insights:", fbInsights);
 
-            conversions: 0,
+          console.log("Instagram Insights:", instagramInsights);
+          setPlatformInsights((prev) => ({
+            ...prev,
 
-            total_budget: String(d.fb_spend || "0"),
+            facebook: {
+              impressions: Number(fbInsights.post_impressions || 0),
 
-            conversion_rate: "0%",
+              clicks: Number(fbInsights.post_clicks || 0),
 
-            ctr:
-              Number(d.fb_impressions || 0) > 0
-                ? (
-                    (Number(d.fb_clicks || 0) * 100) /
-                    Number(d.fb_impressions || 1)
-                  ).toFixed(2)
-                : "0",
-          });
+              spend: String(fbInsights.spend || "0"),
+
+              reach: String(fbInsights.reach || "0"),
+
+              cpc:
+                Number(fbInsights.post_clicks || 0) > 0
+                  ? (
+                      Number(fbInsights.spend || 0) /
+                      Number(fbInsights.post_clicks || 0)
+                    ).toFixed(2)
+                  : "0",
+
+              cpm:
+                Number(fbInsights.post_impressions || 0) > 0
+                  ? (
+                      (Number(fbInsights.spend || 0) * 1000) /
+                      Number(fbInsights.post_impressions || 0)
+                    ).toFixed(2)
+                  : "0",
+
+              ctr:
+                Number(fbInsights.post_impressions || 0) > 0
+                  ? (
+                      (Number(fbInsights.post_clicks || 0) * 100) /
+                      Number(fbInsights.post_impressions || 0)
+                    ).toFixed(2)
+                  : "0",
+
+              conversions: 0,
+              total_budget: String(fbInsights.spend || "0"),
+
+              conversion_rate: "0%",
+              currency: fbInsights.currency || "USD",
+            },
+
+            instagram: {
+              impressions: Number(instagramInsights.post_impressions || 0),
+
+              clicks: Number(instagramInsights.post_clicks || 0),
+
+              spend: String(instagramInsights.spend || "0"),
+
+              reach: String(instagramInsights.reach || "0"),
+
+              cpc:
+                Number(instagramInsights.post_clicks || 0) > 0
+                  ? (
+                      Number(instagramInsights.spend || 0) /
+                      Number(instagramInsights.post_clicks || 0)
+                    ).toFixed(2)
+                  : "0",
+
+              cpm:
+                Number(instagramInsights.post_impressions || 0) > 0
+                  ? (
+                      (Number(instagramInsights.spend || 0) * 1000) /
+                      Number(instagramInsights.post_impressions || 0)
+                    ).toFixed(2)
+                  : "0",
+
+              ctr:
+                Number(instagramInsights.post_clicks || 0) > 0
+                  ? (
+                      (Number(instagramInsights.post_clicks || 0) * 100) /
+                      Number(instagramInsights.post_impressions || 0)
+                    ).toFixed(2)
+                  : "0",
+
+              conversions: 0,
+              total_budget: String(instagramInsights.spend || "0"),
+
+              conversion_rate: "0%",
+              currency: instagramInsights.currency || "USD",
+            },
+          }));
+
+              const impressions =
+                Number(fbInsights.post_impressions || 0) +
+                Number(instagramInsights.post_impressions || 0);
+
+              const clicks =
+                Number(fbInsights.post_clicks || 0) +
+                Number(instagramInsights.post_clicks || 0);
+
+              const spend =
+                Number(fbInsights.spend || 0) +
+                Number(instagramInsights.spend || 0);
+
+              const reach =
+                Number(fbInsights.reach || 0) +
+                Number(instagramInsights.reach || 0);
+
+              setAdInsights((prev) => ({
+                ...prev,
+                impressions,
+                clicks,
+                spend: String(spend),
+                reach: String(reach),
+
+                cpc: clicks > 0 ? (spend / clicks).toFixed(2) : "0",
+
+                cpm:
+                  impressions > 0
+                    ? ((spend * 1000) / impressions).toFixed(2)
+                    : "0",
+
+                ctr:
+                  impressions > 0
+                    ? ((clicks * 100) / impressions).toFixed(2)
+                    : "0",
+
+                total_budget: String(spend),
+                currency:
+                  fbInsights.currency || instagramInsights.currency || "USD",
+              }));
         }
 
         const resolvedFbCampaignId = d.fb_campaign_id ?? fbCamId ?? null;
@@ -281,7 +391,7 @@ const CampaignDashboard = ({
       if (timeoutId) clearTimeout(timeoutId);
     };
 
-  }, [campaign.id, fetchGoogleAdsInsightsFromDB]);
+  }, [campaign.id, fetchGoogleAdsInsightsFromDB, fetchMetaInsights]);
 
   // ─── Budget ───────────────────────────────────────────────────────────────
   const budgetData: Record<string, number> = fullCampaign.budget_data ?? {};
@@ -367,6 +477,8 @@ const CampaignDashboard = ({
     },
   ];
 
+  const currencySymbol = adInsights.currency === "INR" ? "₹" : "$";
+
   // ─── SOCIAL CAMPAIGN METRICS ──────────────────────────────────────────────
   const socialMetrics = [
     {
@@ -386,7 +498,7 @@ const CampaignDashboard = ({
     },
     {
       title: "Total Budget",
-      value: loadingInsights ? "…" : `$${totalBudget}`,
+      value: loadingInsights ? "…" : `${currencySymbol}${totalBudget}`,
       icon: spendIcon,
     },
     {
@@ -401,7 +513,7 @@ const CampaignDashboard = ({
     },
     {
       title: "CPC",
-      value: loadingInsights ? "…" : `$${adInsights.cpc}`,
+      value: loadingInsights ? "…" : `${currencySymbol}${adInsights.cpc}`,
       icon: cpcIcon,
     },
     {
@@ -409,8 +521,10 @@ const CampaignDashboard = ({
       value: loadingInsights
         ? "…"
         : adInsights.conversions > 0
-          ? `$${(parseFloat(adInsights.spend) / adInsights.conversions).toFixed(2)}`
-          : `$${adInsights.spend}`,
+          ? `${currencySymbol}${(
+              parseFloat(adInsights.spend) / adInsights.conversions
+            ).toFixed(2)}`
+          : "-",
       icon: cpaIcon,
     },
   ];
@@ -524,7 +638,7 @@ const CampaignDashboard = ({
         )}
       </div>
 
-      {platforms.length > 1 && (
+      {activeTab === "Content" && platforms.length > 1 && (
         <div className="cd-subtabs-container">
           {platforms.map((p) => (
             <button
@@ -543,6 +657,7 @@ const CampaignDashboard = ({
         activeTab={activeTab}
         activeSubTab={activeSubTab}
         adInsights={adInsights}
+        platformInsights={platformInsights}
       />
     </div>
   );

@@ -188,8 +188,13 @@ export const CampaignAPI = {
       params: { clinic_id: storedClinicId() },
     }),
 
-  getFBAdInsights: (fbCampaignId: string) =>
-    http.get(`/fb/campaigns/${fbCampaignId}/insights/?date_preset=maximum`),
+  getFBAdInsights: (campaignId: string, platform: "facebook" | "instagram") =>
+    http.get(`/fb/campaigns/${campaignId}/insights/`, {
+      params: {
+        date_preset: "maximum",
+        platform,
+      },
+    }),
 
   updateFacebookStatus: (
     campaignId: string,

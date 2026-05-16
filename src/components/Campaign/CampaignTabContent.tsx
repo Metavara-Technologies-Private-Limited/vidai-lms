@@ -32,6 +32,7 @@ interface AdInsights {
   total_budget: string;
   conversion_rate: string;
   ctr: string;
+  currency?: string;
 }
 
 interface Props {
@@ -39,6 +40,7 @@ interface Props {
   activeTab: string;
   activeSubTab: string;
   adInsights?: AdInsights; // ✅ NEW: real insights from parent
+  platformInsights?: Record<string, AdInsights>;
 }
 
 const PIE_COLORS: Record<string, string> = {
@@ -54,6 +56,7 @@ const CampaignTabContent: React.FC<Props> = ({
   activeTab,
   activeSubTab,
   adInsights, // ✅ NEW
+  platformInsights,
 }) => {
   const [selectedPlatform, setSelectedPlatform] = React.useState<
     "facebook" | "instagram" | "google_ads" | "linkedin"
@@ -70,8 +73,8 @@ const CampaignTabContent: React.FC<Props> = ({
   const rawPlatformValue = platformData_raw[activePlatformKey];
   const platformText: string =
     (typeof rawPlatformValue === "object" && rawPlatformValue !== null
-      ? rawPlatformValue.content ?? ""
-      : rawPlatformValue ?? "") ||
+      ? (rawPlatformValue.content ?? "")
+      : (rawPlatformValue ?? "")) ||
     (campaign as any).campaign_content ||
     "";
 
@@ -86,15 +89,16 @@ const CampaignTabContent: React.FC<Props> = ({
 
     // 2. Scan platformText for image-like URL
     const urlsInPlatformText = platformText.match(URL_REGEX) || [];
-    const imageFromPlatformText = urlsInPlatformText.find((url) =>
-      /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
-      url.includes("unsplash.com") ||
-      url.includes("images.") ||
-      url.includes("imgur.com") ||
-      url.includes("cloudinary.com") ||
-      url.includes("googleapis.com") ||
-      url.includes("amazonaws.com") ||
-      url.includes("cdn.")
+    const imageFromPlatformText = urlsInPlatformText.find(
+      (url) =>
+        /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
+        url.includes("unsplash.com") ||
+        url.includes("images.") ||
+        url.includes("imgur.com") ||
+        url.includes("cloudinary.com") ||
+        url.includes("googleapis.com") ||
+        url.includes("amazonaws.com") ||
+        url.includes("cdn."),
     );
     if (imageFromPlatformText) return imageFromPlatformText;
 
@@ -106,8 +110,8 @@ const CampaignTabContent: React.FC<Props> = ({
       const val = platformData_raw[key];
       const text =
         typeof val === "object" && val !== null
-          ? val.content ?? ""
-          : val ?? "";
+          ? (val.content ?? "")
+          : (val ?? "");
       const urls = String(text).match(URL_REGEX) || [];
       // ✅ FIX: use ?? "" to avoid undefined
       if (urls.length > 0) return urls[0] ?? "";
@@ -127,6 +131,11 @@ const CampaignTabContent: React.FC<Props> = ({
   const lines = cleanedText.split("\n").filter((l) => l.trim());
   const hashtagLine = lines.find((l) => l.trim().startsWith("#")) || "";
   const bodyLines = lines.filter((l) => l.trim() && !l.trim().startsWith("#"));
+  const currencySymbol =
+    (platformInsights?.[selectedPlatform]?.currency ?? adInsights?.currency) ===
+    "INR"
+      ? "₹"
+      : "$";
 
   /* ================= CONTENT ================= */
   if (activeTab === "Content") {
@@ -190,25 +199,32 @@ const CampaignTabContent: React.FC<Props> = ({
     const platforms: string[] = (campaign as any).platforms ?? [];
     const isEmail = campaign.type === "email";
 
-    const impressions = adInsights?.impressions ?? 0;
-    const clicks      = adInsights?.clicks ?? 0;
-    const ctr         = adInsights?.ctr ?? "0";
-    const cpc         = adInsights?.cpc ?? "0";
-    const spend       = adInsights?.spend ?? "0";
-    const conversions = adInsights?.conversions ?? 0;
+    const selectedInsights = platformInsights?.[selectedPlatform] ?? adInsights;
+
+    const impressions = selectedInsights?.impressions ?? 0;
+
+    const clicks = selectedInsights?.clicks ?? 0;
+
+    const ctr = selectedInsights?.ctr ?? "0";
+
+    const cpc = selectedInsights?.cpc ?? "0";
+
+    const spend = selectedInsights?.spend ?? "0";
+
+    const conversions = selectedInsights?.conversions ?? 0;
 
     const hasRealData = impressions > 0 || clicks > 0 || parseFloat(spend) > 0;
 
     const chartData = hasRealData
       ? [
           { metric: "Impressions", value: impressions },
-          { metric: "Clicks",      value: clicks },
+          { metric: "Clicks", value: clicks },
           { metric: "Conversions", value: conversions },
         ]
       : [];
 
     const availablePlatforms = platforms.filter((p) =>
-      ["facebook", "instagram", "google_ads", "linkedin"].includes(p)
+      ["facebook", "instagram", "google_ads", "linkedin"].includes(p),
     );
 
     return (
@@ -226,7 +242,11 @@ const CampaignTabContent: React.FC<Props> = ({
                   : "—"}
             </div>
             <div className="cd-perf-sub">
-              {isEmail ? "Total Opens" : hasRealData ? "Total Impressions" : "No data yet"}
+              {isEmail
+                ? "Total Opens"
+                : hasRealData
+                  ? "Total Impressions"
+                  : "No data yet"}
             </div>
           </div>
 
@@ -239,7 +259,9 @@ const CampaignTabContent: React.FC<Props> = ({
                     checked={selectedPlatform === p}
                     onChange={() => setSelectedPlatform(p as any)}
                   />
-                  {p === "google_ads" ? "Google Ads" : p.charAt(0).toUpperCase() + p.slice(1)}
+                  {p === "google_ads"
+                    ? "Google Ads"
+                    : p.charAt(0).toUpperCase() + p.slice(1)}
                 </label>
               ))}
             </div>
@@ -247,29 +269,70 @@ const CampaignTabContent: React.FC<Props> = ({
         </div>
 
         {!isEmail && hasRealData && (
-          <div style={{
-            display: "flex",
-            gap: "16px",
-            marginBottom: "20px",
-            flexWrap: "wrap",
-          }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "16px",
+              marginBottom: "20px",
+              flexWrap: "wrap",
+            }}
+          >
             {[
-              { label: "Impressions", value: impressions.toLocaleString(),      color: "#5B6EF5" },
-              { label: "Clicks",      value: clicks.toLocaleString(),            color: "#47B35F" },
-              { label: "CTR",         value: `${parseFloat(ctr).toFixed(2)}%`,  color: "#ECB856" },
-              { label: "Avg CPC",     value: `₹${parseFloat(cpc).toFixed(2)}`,  color: "#F25B5B" },
-              { label: "Cost",        value: `₹${parseFloat(spend).toFixed(2)}`, color: "#835DEF" },
-              { label: "Conversions", value: String(conversions),                color: "#2D6BF0" },
+              {
+                label: "Impressions",
+                value: impressions.toLocaleString(),
+                color: "#5B6EF5",
+              },
+              {
+                label: "Clicks",
+                value: clicks.toLocaleString(),
+                color: "#47B35F",
+              },
+              {
+                label: "CTR",
+                value: `${parseFloat(ctr).toFixed(2)}%`,
+                color: "#ECB856",
+              },
+              {
+                label: "Avg CPC",
+                value: `${currencySymbol}${parseFloat(cpc).toFixed(2)}`,
+                color: "#F25B5B",
+              },
+              {
+                label: "Cost",
+                value: `${currencySymbol}${parseFloat(spend).toFixed(2)}`,
+                color: "#835DEF",
+              },
+              {
+                label: "Conversions",
+                value: String(conversions),
+                color: "#2D6BF0",
+              },
             ].map((m) => (
-              <div key={m.label} style={{
-                flex: "1 1 130px",
-                background: "#f9f9fb",
-                borderRadius: "12px",
-                padding: "14px 16px",
-                borderLeft: `4px solid ${m.color}`,
-              }}>
-                <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px" }}>{m.label}</div>
-                <div style={{ fontSize: "18px", fontWeight: 700, color: "#222" }}>{m.value}</div>
+              <div
+                key={m.label}
+                style={{
+                  flex: "1 1 130px",
+                  background: "#f9f9fb",
+                  borderRadius: "12px",
+                  padding: "14px 16px",
+                  borderLeft: `4px solid ${m.color}`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "#888",
+                    marginBottom: "4px",
+                  }}
+                >
+                  {m.label}
+                </div>
+                <div
+                  style={{ fontSize: "18px", fontWeight: 700, color: "#222" }}
+                >
+                  {m.value}
+                </div>
               </div>
             ))}
           </div>
@@ -279,15 +342,27 @@ const CampaignTabContent: React.FC<Props> = ({
           <ResponsiveContainer width="100%" height={210} minWidth={0}>
             <LineChart
               data={[
-                { date: "Opens",        value: (campaign as any).impressions ?? 0 },
-                { date: "Clicks",       value: (campaign as any).clicks ?? 0 },
-                { date: "Bounces",      value: (campaign as any).bounces ?? 0 },
-                { date: "Unsubscribes", value: (campaign as any).unsubscribes ?? 0 },
+                { date: "Opens", value: (campaign as any).impressions ?? 0 },
+                { date: "Clicks", value: (campaign as any).clicks ?? 0 },
+                { date: "Bounces", value: (campaign as any).bounces ?? 0 },
+                {
+                  date: "Unsubscribes",
+                  value: (campaign as any).unsubscribes ?? 0,
+                },
               ]}
               margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#F1F1F1" />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} stroke="#9E9E9E" />
+              <CartesianGrid
+                strokeDasharray="4 4"
+                vertical={false}
+                stroke="#F1F1F1"
+              />
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                stroke="#9E9E9E"
+              />
               <YAxis axisLine={false} tickLine={false} stroke="#9E9E9E" />
               <Tooltip content={<CustomTooltip />} />
               <Line
@@ -296,7 +371,12 @@ const CampaignTabContent: React.FC<Props> = ({
                 stroke="#5B6EF5"
                 strokeWidth={2.5}
                 dot={{ r: 4, fill: "#5B6EF5" }}
-                activeDot={{ r: 6, stroke: "#ffffff", strokeWidth: 3, fill: "#5B6EF5" }}
+                activeDot={{
+                  r: 6,
+                  stroke: "#ffffff",
+                  strokeWidth: 3,
+                  fill: "#5B6EF5",
+                }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -308,11 +388,26 @@ const CampaignTabContent: React.FC<Props> = ({
             >
               <defs>
                 <filter id="lineShadow" height="200%">
-                  <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#5B6EF5" floodOpacity="0.15" />
+                  <feDropShadow
+                    dx="0"
+                    dy="4"
+                    stdDeviation="8"
+                    floodColor="#5B6EF5"
+                    floodOpacity="0.15"
+                  />
                 </filter>
               </defs>
-              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#F1F1F1" />
-              <XAxis dataKey="metric" axisLine={false} tickLine={false} stroke="#9E9E9E" />
+              <CartesianGrid
+                strokeDasharray="4 4"
+                vertical={false}
+                stroke="#F1F1F1"
+              />
+              <XAxis
+                dataKey="metric"
+                axisLine={false}
+                tickLine={false}
+                stroke="#9E9E9E"
+              />
               <YAxis axisLine={false} tickLine={false} stroke="#9E9E9E" />
               <Tooltip content={<CustomTooltip />} />
               <Line
@@ -322,22 +417,30 @@ const CampaignTabContent: React.FC<Props> = ({
                 strokeWidth={2.5}
                 dot={{ r: 5, fill: "#5B6EF5" }}
                 filter="url(#lineShadow)"
-                activeDot={{ r: 6, stroke: "#ffffff", strokeWidth: 3, fill: "#5B6EF5" }}
+                activeDot={{
+                  r: 6,
+                  stroke: "#ffffff",
+                  strokeWidth: 3,
+                  fill: "#5B6EF5",
+                }}
               />
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{
-            height: 210,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#aaa",
-            fontSize: "14px",
-            background: "#fafafa",
-            borderRadius: "12px",
-          }}>
-            No performance data yet — insights will appear after Zapier fetches them.
+          <div
+            style={{
+              height: 210,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#aaa",
+              fontSize: "14px",
+              background: "#fafafa",
+              borderRadius: "12px",
+            }}
+          >
+            No performance data yet — insights will appear after Zapier fetches
+            them.
           </div>
         )}
       </div>
@@ -399,55 +502,87 @@ const CampaignTabContent: React.FC<Props> = ({
                   outerRadius={130}
                   activeShape={(props: any) => {
                     const {
-                      cx, cy, midAngle, innerRadius, outerRadius,
-                      startAngle, endAngle, fill, payload,
+                      cx,
+                      cy,
+                      midAngle,
+                      innerRadius,
+                      outerRadius,
+                      startAngle,
+                      endAngle,
+                      fill,
+                      payload,
                     } = props;
 
                     const RADIAN = Math.PI / 180;
-                    const midRadius = innerRadius + (outerRadius - innerRadius) / 2;
+                    const midRadius =
+                      innerRadius + (outerRadius - innerRadius) / 2;
                     const x = cx + midRadius * Math.cos(-midAngle * RADIAN);
                     const y = cy + midRadius * Math.sin(-midAngle * RADIAN);
 
                     return (
                       <>
                         <Sector
-                          cx={cx} cy={cy}
+                          cx={cx}
+                          cy={cy}
                           innerRadius={innerRadius}
                           outerRadius={outerRadius + 6}
                           startAngle={startAngle}
                           endAngle={endAngle}
                           fill={fill}
                         />
-                        <foreignObject x={x - 40} y={y - 35} width="90" height="70">
-                          <div style={{
-                            position: "relative",
-                            background: "#ffffff",
-                            borderRadius: "14px",
-                            padding: "8px 12px",
-                            textAlign: "center",
-                            boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "center",
-                            alignItems: "center",
-                          }}>
-                            <div style={{ fontSize: "14px", fontWeight: 600, color: "#222" }}>
+                        <foreignObject
+                          x={x - 40}
+                          y={y - 35}
+                          width="90"
+                          height="70"
+                        >
+                          <div
+                            style={{
+                              position: "relative",
+                              background: "#ffffff",
+                              borderRadius: "14px",
+                              padding: "8px 12px",
+                              textAlign: "center",
+                              boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "center",
+                              alignItems: "center",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                fontWeight: 600,
+                                color: "#222",
+                              }}
+                            >
                               {payload.value} %
                             </div>
-                            <div style={{ fontSize: "12px", color: "#8A8A8A", marginTop: "2px" }}>
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#8A8A8A",
+                                marginTop: "2px",
+                              }}
+                            >
                               {payload.name}
                             </div>
-                            <div style={{
-                              position: "absolute",
-                              bottom: "-4px",
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                              width: 0, height: 0,
-                              borderLeft: "6px solid transparent",
-                              borderRight: "6px solid transparent",
-                              borderTop: "6px solid #ffffff",
-                              filter: "drop-shadow(0 3px 3px rgba(0,0,0,0.06))",
-                            }} />
+                            <div
+                              style={{
+                                position: "absolute",
+                                bottom: "-4px",
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                width: 0,
+                                height: 0,
+                                borderLeft: "6px solid transparent",
+                                borderRight: "6px solid transparent",
+                                borderTop: "6px solid #ffffff",
+                                filter:
+                                  "drop-shadow(0 3px 3px rgba(0,0,0,0.06))",
+                              }}
+                            />
                           </div>
                         </foreignObject>
                       </>
@@ -468,7 +603,10 @@ const CampaignTabContent: React.FC<Props> = ({
                     style={{ background: p.color }}
                   />
                   <img
-                    src={platformIconMap[p.name.toLowerCase().replace(" ", "_")] ?? instagramIcon}
+                    src={
+                      platformIconMap[p.name.toLowerCase().replace(" ", "_")] ??
+                      instagramIcon
+                    }
                     alt={p.name}
                   />
                   {p.name}
@@ -481,8 +619,12 @@ const CampaignTabContent: React.FC<Props> = ({
               <PlatformCard
                 key={p}
                 icon={platformIconMap[p] ?? instagramIcon}
-                title={p === "google_ads" ? "Google Ads" : p.charAt(0).toUpperCase() + p.slice(1)}
-                spend={`$${budgetRaw[p] ?? 0}`}
+                title={
+                  p === "google_ads"
+                    ? "Google Ads"
+                    : p.charAt(0).toUpperCase() + p.slice(1)
+                }
+                spend={`${currencySymbol}${budgetRaw[p] ?? 0}`}
                 conversion={String(leadCount)}
               />
             ))}
@@ -496,12 +638,17 @@ const CampaignTabContent: React.FC<Props> = ({
   if (activeTab === "AI Insights") {
     const isEmail = campaign.type === "email";
     const platforms: string[] = (campaign as any).platforms ?? [];
-    const budgetRaw: Record<string, number> = (campaign as any).budget_data ?? {};
+    const budgetRaw: Record<string, number> =
+      (campaign as any).budget_data ?? {};
     const totalBudget = platforms.reduce((s, p) => s + (budgetRaw[p] ?? 0), 0);
     const leadCount = (campaign as any).lead_generated ?? 0;
     const topPlatform =
-      [...platforms].sort((a, b) => (budgetRaw[b] ?? 0) - (budgetRaw[a] ?? 0))[0] ?? "facebook";
-    const cpa = leadCount > 0 ? (totalBudget / leadCount).toFixed(2) : null;
+      [...platforms].sort(
+        (a, b) => (budgetRaw[b] ?? 0) - (budgetRaw[a] ?? 0),
+      )[0] ?? "facebook";
+    const actualSpend = parseFloat(adInsights?.spend ?? "0");
+
+    const cpa = leadCount > 0 ? (actualSpend / leadCount).toFixed(2) : null;
 
     return (
       <div className="cd-ai-wrapper">
@@ -515,7 +662,7 @@ const CampaignTabContent: React.FC<Props> = ({
             <p>
               {isEmail
                 ? `Your email campaign achieved ${(campaign as any).impressions ?? 0} opens and ${(campaign as any).clicks ?? 0} clicks with a ${(campaign as any).conversion_rate ?? 0}% conversion rate.`
-                : `${topPlatform === "google_ads" ? "Google Ads" : topPlatform.charAt(0).toUpperCase() + topPlatform.slice(1)} has the highest budget allocation at $${budgetRaw[topPlatform] ?? 0}. Monitor leads closely from this platform.`}
+                : `${topPlatform === "google_ads" ? "Google Ads" : topPlatform.charAt(0).toUpperCase() + topPlatform.slice(1)} has the highest budget allocation at ${currencySymbol}${budgetRaw[topPlatform] ?? 0}. Monitor leads closely from this platform.`}
             </p>
           </div>
 
@@ -541,8 +688,8 @@ const CampaignTabContent: React.FC<Props> = ({
             <div className="cd-ai-heading">Budget Efficiency</div>
             <p>
               {cpa
-                ? `Current Cost Per Acquisition is $${cpa} based on ${leadCount} lead${leadCount !== 1 ? "s" : ""} from a $${totalBudget} budget.`
-                : `Total budget is $${totalBudget}. No conversions tracked yet — ensure your landing page captures leads correctly.`}
+                ? `Current Cost Per Acquisition is ${currencySymbol}${cpa} based on ${leadCount} lead${leadCount !== 1 ? "s" : ""} from a ${currencySymbol}${totalBudget} budget.`
+                : `Total budget is ${currencySymbol}${totalBudget}. No conversions tracked yet — ensure your landing page captures leads correctly.`}
             </p>
           </div>
         </div>

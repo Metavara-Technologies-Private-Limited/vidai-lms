@@ -45,7 +45,7 @@ export const getComputedCampaignStatus = (c: Campaign) => {
 
   // STOPPED from DB
   if (c.status === CAMPAIGN_STATUS.STOPPED) {
-    if (end && now.isAfter(end)) {
+    if (end && now.isAfter(end.endOf("day"))) {
       return CAMPAIGN_STATUS.STOPPED;
     }
 
@@ -62,7 +62,7 @@ export const getComputedCampaignStatus = (c: Campaign) => {
       return CAMPAIGN_STATUS.SCHEDULED;
     }
 
-    if (end && now.isAfter(end)) {
+    if (end && now.isAfter(end.endOf("day"))) {
       return CAMPAIGN_STATUS.COMPLETED;
     }
 

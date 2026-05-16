@@ -141,12 +141,13 @@ export default function StopCampaignModal({
         {/* ===== STEP 2 : CONFIRMATION ===== */}
         {showConfirm && (
           <>
-            <div className="confirm-icon">⏸</div>
+            <div className="confirm-icon">{confirmText === 'Resume' ? '▶' : '⏸'}</div>
 
-            <h2 className="confirm-title">Stop Campaign</h2>
+            <h2 className="confirm-title">{title}</h2>
 
             <p className="confirm-text">
-              Do you really want to stop the <b>{campaignName}</b> campaign?
+              Do you really want to {confirmText.toLowerCase()} the{" "}
+              <b>{campaignName}</b> campaign?
             </p>
 
             <div className="stop-actions">

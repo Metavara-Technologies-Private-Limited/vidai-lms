@@ -64,6 +64,7 @@ export interface Campaign {
 
   // ✅ Facebook Ad Campaign ID
   fb_campaign_id?: string | null;
+  instagram_campaign_id?: string | null;
 
   // Mailchimp insights
   impressions?: number;
@@ -158,6 +159,7 @@ export interface CampaignAPIType {
 
   // ✅ Facebook Ad Campaign ID
   fb_campaign_id?: string | null;
+  instagram_campaign_id?: string | null;
 
   clinic: number;
 
