@@ -1466,10 +1466,11 @@ const LeadsBoard: React.FC<Props> = ({
   React.useEffect(() => {
     const fetchPipelineStages = async () => {
       const clinicIdFromStore = Number(clinic?.id ?? 0);
+      const clinicIdFromStorage = Number(localStorage.getItem("clinic_id") ?? 0);
       const clinicIdFromLeads = Number(
         (reduxLeads[0] as unknown as RawLead | undefined)?.clinic_id ?? 0,
       );
-      const clinicId = clinicIdFromStore || clinicIdFromLeads;
+      const clinicId = clinicIdFromStore || clinicIdFromStorage || clinicIdFromLeads;
 
       if (!clinicId) {
         setPipelineColumns([]);
@@ -1499,8 +1500,10 @@ const LeadsBoard: React.FC<Props> = ({
 
           activePipeline =
             pipelines.find((pipeline) => pipeline.id === selectedPipelineId) ??
+            pipelinesByIndustry.find((pipeline) => pipeline.is_default) ??
             pipelinesByIndustry.find((pipeline) => pipeline.is_active) ??
             pipelinesByIndustry[0] ??
+            pipelines.find((pipeline) => pipeline.is_default) ??
             pipelines.find((pipeline) => pipeline.is_active) ??
             pipelines[0] ??
             null;
@@ -1517,10 +1520,6 @@ const LeadsBoard: React.FC<Props> = ({
 
         const dynamicColumns = activePipeline.stages
           .slice()
-          .filter(
-            (stage) =>
-              (stage.stage_status ?? "").toLowerCase().trim() !== "inactive",
-          )
           .sort((left, right) => left.stage_order - right.stage_order)
           .map((stage, index) => {
             const uiActions = getStageUiActions(stage);

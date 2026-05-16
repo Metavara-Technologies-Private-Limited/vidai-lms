@@ -131,12 +131,25 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
     () => (Array.isArray(leads) ? (leads as Lead[]) : []),
     [leads],
   );
-  // Get default pipeline id from localStorage
-  const defaultPipelineId = typeof window !== "undefined" ? localStorage.getItem("leads_default_pipeline_id") : null;
   const defaultPipeline = useMemo(() => {
-    if (!defaultPipelineId) return null;
-    return pipelines.find((p) => String(p.id) === String(defaultPipelineId)) || null;
-  }, [pipelines, defaultPipelineId]);
+    const backendDefault =
+      pipelines.find((pipeline) => pipeline.is_default) ??
+      pipelines.find((pipeline) => pipeline.is_active) ??
+      null;
+    if (backendDefault) return backendDefault;
+
+    const storedDefaultPipelineId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("leads_default_pipeline_id")
+        : null;
+    if (!storedDefaultPipelineId) return null;
+
+    return (
+      pipelines.find(
+        (pipeline) => String(pipeline.id) === String(storedDefaultPipelineId),
+      ) ?? null
+    );
+  }, [pipelines]);
   const pipelineStages = useMemo(
     () => {
       if (!defaultPipeline) return [];

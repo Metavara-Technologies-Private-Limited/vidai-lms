@@ -115,28 +115,45 @@ const SalesPipelineDashboard = () => {
 	useEffect(() => {
 		if (!canViewPipeline) return;
 		if (pipelineLoading || selectedPipeline || pipelines.length === 0) return;
+		const backendDefaultPipelineId =
+			pipelines.find((pipeline) => pipeline.is_default)?.id ??
+			pipelines.find((pipeline) => pipeline.is_active)?.id ??
+			"";
+		const storedDefaultPipelineId =
+			pipelines.find((pipeline) => pipeline.id === defaultPipelineId)?.id;
 		const initialPipelineId =
-			pipelines.find((pipeline) => pipeline.id === defaultPipelineId)?.id ??
-			pipelines[0].id;
+			storedDefaultPipelineId || backendDefaultPipelineId || pipelines[0].id;
 		dispatch(fetchPipelineDetail(initialPipelineId));
 	}, [canViewPipeline, defaultPipelineId, dispatch, pipelineLoading, pipelines, selectedPipeline]);
 
 	useEffect(() => {
 		if (pipelines.length === 0) return;
-		const hasValidDefault = pipelines.some(
-			(pipeline) => String(pipeline.id) === String(defaultPipelineId),
+		const backendDefaultPipelineId =
+			pipelines.find((pipeline) => pipeline.is_default)?.id ??
+			pipelines.find((pipeline) => pipeline.is_active)?.id ??
+			"";
+		const resolvedDefaultPipelineId =
+			backendDefaultPipelineId ||
+			pipelines.find((pipeline) => String(pipeline.id) === String(defaultPipelineId))?.id ||
+			pipelines[0].id;
+		const hasValidSelectedPipeline = pipelines.some(
+			(pipeline) => String(pipeline.id) === String(selectedPipelineId),
 		);
-		if (hasValidDefault) return;
-		if (defaultPipelineId) return;
-		const fallbackPipelineId = pipelines[0].id;
-		setDefaultPipelineId(fallbackPipelineId);
-		localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, fallbackPipelineId);
-		window.dispatchEvent(
-			new CustomEvent(DEFAULT_PIPELINE_EVENT, {
-				detail: { pipelineId: fallbackPipelineId },
-			}),
-		);
-	}, [defaultPipelineId, pipelines]);
+
+		if (resolvedDefaultPipelineId !== defaultPipelineId) {
+			setDefaultPipelineId(resolvedDefaultPipelineId);
+			localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, resolvedDefaultPipelineId);
+			window.dispatchEvent(
+				new CustomEvent(DEFAULT_PIPELINE_EVENT, {
+					detail: { pipelineId: resolvedDefaultPipelineId },
+				}),
+			);
+		}
+
+		if (!hasValidSelectedPipeline && resolvedDefaultPipelineId !== selectedPipelineId) {
+			dispatch(fetchPipelineDetail(resolvedDefaultPipelineId));
+		}
+	}, [defaultPipelineId, dispatch, pipelines, selectedPipelineId]);
 
 	useEffect(() => {
 		if (!actionMenuAnchor) return;
@@ -326,20 +343,29 @@ const SalesPipelineDashboard = () => {
 		handleCloseActionMenu();
 	};
 
-	const handleSetDefaultPipeline = () => {
+	const handleSetDefaultPipeline = async () => {
 		if (!canEditPipeline) return;
 		const pipeline = getActionPipeline();
 		if (!pipeline) return;
 
-		setDefaultPipelineId(pipeline.id);
-		localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, pipeline.id);
-		window.dispatchEvent(
-			new CustomEvent(DEFAULT_PIPELINE_EVENT, {
-				detail: { pipelineId: pipeline.id },
-			}),
-		);
-		toast.success(`${pipeline.pipeline_name} set as default pipeline.`);
-		handleCloseActionMenu();
+		try {
+			setActionInProgress(true);
+			await pipelineApi.setDefault(pipeline.id);
+			await refreshPipelines();
+			setDefaultPipelineId(pipeline.id);
+			localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, pipeline.id);
+			window.dispatchEvent(
+				new CustomEvent(DEFAULT_PIPELINE_EVENT, {
+					detail: { pipelineId: pipeline.id },
+				}),
+			);
+			toast.success(`${pipeline.pipeline_name} set as default pipeline.`);
+		} catch {
+			toast.error("Failed to set default pipeline.");
+		} finally {
+			setActionInProgress(false);
+			handleCloseActionMenu();
+		}
 	};
 
 	const handleDeletePipeline = () => {
