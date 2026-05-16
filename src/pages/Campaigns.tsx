@@ -174,9 +174,19 @@ export default function CampaignsScreen() {
       }
     };
   
-  const handleStatusChange = (id: string, status: CampaignStatus) => {
-    dispatch(updateCampaignStatus({ id, status }));
-  };
+    const handleStatusChange = (
+      id: string,
+      status: CampaignStatus,
+      platformData?: Campaign["platform_data"],
+    ) => {
+      dispatch(
+        updateCampaignStatus({
+          id,
+          status,
+          platform_data: platformData,
+        }),
+      );
+    };
 
   const handleEdit = (campaign: Campaign) => {
     if (!canEditCampaigns) return;

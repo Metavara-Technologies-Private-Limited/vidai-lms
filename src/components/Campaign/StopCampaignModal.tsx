@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import "../../styles/Campaign/StopCampaignModal.css";
 import { toast } from "react-toastify";
 import {
@@ -15,6 +15,7 @@ interface Props {
   onStop: (selectedPlatforms: Platform[]) => void;
   title?: string;
   confirmText?: string;
+  platformStatuses?: Record<string, { status?: string }>;
 }
 
 export default function StopCampaignModal({
@@ -25,10 +26,23 @@ export default function StopCampaignModal({
   onStop,
   title = "Stop Campaign",
   confirmText = "Stop",
+  platformStatuses,
 }: Props) {
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
+  const filteredPlatforms = useMemo(() => {
+    return platforms.filter((platform) => {
+      const status = platformStatuses?.[platform]?.status || "active";
 
+      if (confirmText === "Resume") {
+        return status === "paused";
+      }
+
+      return status === "active";
+    });
+  }, [platforms, platformStatuses, confirmText]);
+  const [selectedPlatforms, setSelectedPlatforms] =
+    useState<Platform[]>(filteredPlatforms);
+  
   const togglePlatform = (platform: Platform) => {
     setSelectedPlatforms((prev) =>
       prev.includes(platform)
@@ -59,7 +73,7 @@ export default function StopCampaignModal({
     }
 
     onStop(selectedPlatforms);
-    toast.warn("Campaign stopped successfully");
+
     onClose();
   };
 
@@ -94,7 +108,7 @@ export default function StopCampaignModal({
             </p>
 
             <div className="platform-list">
-              {platforms.map((platform) => (
+              {filteredPlatforms.map((platform) => (
                 <div
                   key={platform}
                   className="platform-item"
@@ -141,7 +155,9 @@ export default function StopCampaignModal({
         {/* ===== STEP 2 : CONFIRMATION ===== */}
         {showConfirm && (
           <>
-            <div className="confirm-icon">{confirmText === 'Resume' ? '▶' : '⏸'}</div>
+            <div className="confirm-icon">
+              {confirmText === "Resume" ? "▶" : "⏸"}
+            </div>
 
             <h2 className="confirm-title">{title}</h2>
 

@@ -53,7 +53,16 @@ export interface Campaign {
 
   budget_data: Record<string, number>;
 
-  platform_data?: Record<string, { is_active?: boolean }>;
+  platform_data?: Record<
+    string,
+    {
+      is_active?: boolean;
+      status?: "active" | "paused";
+      content?: string;
+      state?: string;
+      country_code?: string;
+    }
+  >;
 
   campaign_content: string;
 
@@ -138,7 +147,16 @@ export interface CampaignAPIType {
 
   enter_time: string;
 
-  platform_data?: Record<string, { is_active?: boolean }>;
+  platform_data?: Record<
+    string,
+    {
+      is_active?: boolean;
+      status?: "active" | "paused";
+      content?: string;
+      state?: string;
+      country_code?: string;
+    }
+  >;
   budget_data: Record<string, number>;
 
   status: CampaignStatus;

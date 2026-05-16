@@ -22,6 +22,7 @@ export const CAMPAIGN_STATUS = {
   STOPPED: "Stopped",
   COMPLETED: "Completed",
   FAILED: "Failed",
+  PARTIALLY_ACTIVE: "Partially Active",
 } as const;
 
 export type CampaignStatus =
@@ -35,6 +36,7 @@ export const STATUS_MAP: Record<string, CampaignStatus> = {
   stopped: CAMPAIGN_STATUS.STOPPED,
   completed: CAMPAIGN_STATUS.COMPLETED,
   failed: CAMPAIGN_STATUS.FAILED,
+  partial: CAMPAIGN_STATUS.PARTIALLY_ACTIVE,
 };
 
 export const STATUS_TO_API: Record<CampaignStatus, string> = {
@@ -45,6 +47,7 @@ export const STATUS_TO_API: Record<CampaignStatus, string> = {
   [CAMPAIGN_STATUS.STOPPED]: "stopped",
   [CAMPAIGN_STATUS.COMPLETED]: "completed",
   [CAMPAIGN_STATUS.FAILED]: "failed",
+  [CAMPAIGN_STATUS.PARTIALLY_ACTIVE]: "partial",
 };
 
 export const CAMPAIGN_TYPE = {

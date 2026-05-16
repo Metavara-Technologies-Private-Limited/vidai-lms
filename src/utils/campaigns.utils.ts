@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { CAMPAIGN_STATUS } from "../constants/campaigns.constants";
+import { CAMPAIGN_STATUS, type CampaignStatus } from "../constants/campaigns.constants";
 import type { Campaign } from "../types/campaigns.types";
 
 export const formatScheduleTime = (
@@ -35,7 +35,7 @@ export const getComputedCampaignStatus = (c: Campaign) => {
 
   const end = c.end ? dayjs(c.end.replace("Z", "")) : null;
 
-  // Terminal states remain untouched
+  // Terminal states
   if (
     c.status === CAMPAIGN_STATUS.FAILED ||
     c.status === CAMPAIGN_STATUS.COMPLETED
@@ -43,31 +43,50 @@ export const getComputedCampaignStatus = (c: Campaign) => {
     return c.status;
   }
 
-  // STOPPED from DB
-  if (c.status === CAMPAIGN_STATUS.STOPPED) {
-    if (end && now.isAfter(end.endOf("day"))) {
+  // Scheduled
+  if (start && now.isBefore(start)) {
+    return CAMPAIGN_STATUS.SCHEDULED;
+  }
+
+  // Platform statuses
+  const platformStatuses = Object.entries(c.platform_data || {})
+    .filter(([, value]) => value && typeof value === "object")
+    .map(([, value]) => value.status || "active");
+
+  const activeCount = platformStatuses.filter((s) => s === "active").length;
+
+  const pausedCount = platformStatuses.filter((s) => s === "paused").length;
+
+  const allPaused =
+    platformStatuses.length > 0 && pausedCount === platformStatuses.length;
+
+  const hasEnded = end && now.isAfter(end.endOf("day"));
+
+  if (hasEnded) {
+    if (allPaused) {
       return CAMPAIGN_STATUS.STOPPED;
     }
 
+    return CAMPAIGN_STATUS.COMPLETED;
+  }
+
+  if (activeCount > 0 && pausedCount > 0) {
+    return CAMPAIGN_STATUS.PARTIALLY_ACTIVE;
+  }
+
+  if (allPaused) {
     return CAMPAIGN_STATUS.PAUSED;
   }
 
-  // SCHEDULED lifecycle
-  if (c.status === CAMPAIGN_STATUS.SCHEDULED) {
-    if (!start) {
-      return CAMPAIGN_STATUS.SCHEDULED;
-    }
+  return CAMPAIGN_STATUS.LIVE;
+};
 
-    if (now.isBefore(start)) {
-      return CAMPAIGN_STATUS.SCHEDULED;
-    }
+export const getPersistedCampaignStatus = (campaign: Campaign): CampaignStatus => {
+  const computed = getComputedCampaignStatus(campaign);
 
-    if (end && now.isAfter(end.endOf("day"))) {
-      return CAMPAIGN_STATUS.COMPLETED;
-    }
-
+  if (computed === CAMPAIGN_STATUS.PARTIALLY_ACTIVE) {
     return CAMPAIGN_STATUS.LIVE;
   }
 
-  return c.status;
+  return computed;
 };
