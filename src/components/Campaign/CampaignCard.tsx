@@ -172,7 +172,11 @@ export default function CampaignCard({
           <label>Platform:</label>
           <div className="platform-icons">
             {platforms.map((p) => {
-              const status = c.platform_data?.[p]?.status || "active";
+              const isInactiveCampaign = INACTIVE_STATUSES.has(computedStatus);
+
+              const status = isInactiveCampaign
+                ? "inactive"
+                : c.platform_data?.[p]?.status || "active";
 
               return (
                 <div
