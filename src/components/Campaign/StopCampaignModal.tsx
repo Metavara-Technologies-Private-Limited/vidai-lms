@@ -52,16 +52,6 @@ export default function StopCampaignModal({
   };
 
   const handleStop = async () => {
-    // ── Pause Google Ads if selected ──
-    if (selectedPlatforms.includes("google_ads") && campaignId) {
-      try {
-        await CampaignAPI.updateGoogleAdsStatus(campaignId, "pause");
-      } catch (err) {
-        console.error("[GoogleAds] Failed to pause campaign:", err);
-        toast.warn("Campaign stopped locally, but Google Ads pause failed.");
-      }
-    }
-
     // ── Pause LinkedIn if selected ──
     if (selectedPlatforms.includes("linkedin") && campaignId) {
       try {
