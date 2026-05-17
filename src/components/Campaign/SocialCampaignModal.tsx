@@ -228,7 +228,7 @@ const resizeAndCompressImage = (
 export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
-  const googleAdsCustomerId = clinic?.google_ads_customer_id;
+  // const googleAdsCustomerId = clinic?.google_ads_customer_id;
   const [googleAdsIntegrationConnected, setGoogleAdsIntegrationConnected] =
     useState(false);
   const [facebookConnected, setFacebookConnected] = useState(false);
@@ -389,10 +389,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     };
   }, [clinic]);
 
-  const isGoogleAdsConnected = Boolean(
-    (googleAdsCustomerId && String(googleAdsCustomerId).trim().length) ||
-      googleAdsIntegrationConnected
-  );
+  // const isGoogleAdsConnected = Boolean(
+  //   (googleAdsCustomerId && String(googleAdsCustomerId).trim().length) ||
+  //     googleAdsIntegrationConnected
+  // );
 
   const isLinkedInFullySetup = Boolean(linkedInAccountStatus?.connected);
 
@@ -992,8 +992,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           ? CAMPAIGN_STATUS.DRAFT
           : getComputedCampaignStatus();
 
-      const isActive = type === "live";
-      const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
+          const isActive =
+            statusValue === CAMPAIGN_STATUS.LIVE ||
+            statusValue === CAMPAIGN_STATUS.SCHEDULED;
+      // const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
 
       const campaignMode: ("organic_posting" | "paid_advertising")[] = [
         mode === "paid" ? "paid_advertising" : "organic_posting",
@@ -1031,6 +1033,32 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           state: metaState,
         };
       }
+      if (accounts.includes("google_ads")) {
+        cleanedContent["google_ads"] = {
+          content: resolvedContent["google_ads"],
+
+          keywords: keywordsInput
+            .split(",")
+            .map((k) => k.trim())
+            .filter(Boolean),
+
+          headline_1: campaignName.slice(0, 30),
+
+          headline_2: "Learn More",
+
+          headline_3: "Contact Us Today",
+
+          description: campaignDescription.slice(0, 90),
+
+          description_2: "Call us now or visit our website.",
+
+          campaign_type: "SEARCH",
+
+          bidding_strategy: "MANUAL_CPC",
+
+          cpc_bid: 2,
+        };
+      }
 
       const payload: SocialCampaignPayload = {
         clinic: clinicId,
@@ -1051,7 +1079,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           ),
           total: totalSpend,
         },
-        image_url,
+        image_url:
+          "https://lms-vidaisolutions.metavaratechnologies.com/media/campaign_images/58e5f195dcfe46fd96f69239a3f01eca.jpg",
         selected_start: scheduleDate || null,
         selected_end: endDate || null,
         status: statusValue,
@@ -1069,85 +1098,87 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         setCreatedCampaignId(newCampaignId);
       }
 
-      const shouldSendGoogleAds =
-        accounts.includes("google_ads") &&
-        isGoogleAdsConnected &&
-        mode === "paid";
+      // const shouldSendGoogleAds =
+      //   accounts.includes("google_ads") &&
+      //   isGoogleAdsConnected &&
+      //   mode === "paid";
 
-      if (shouldSendGoogleAds) {
-        try {
-          const googleAdsImage =
-            platformImageUrlsRef.current["google_ads"]?.trim() ||
-            image_url ||
-            null;
+      // if (shouldSendGoogleAds) {
+      //   try {
+      //     const googleAdsImage =
+      //       platformImageUrlsRef.current["google_ads"]?.trim() ||
+      //       image_url ||
+      //       "https://lms-vidaisolutions.metavaratechnologies.com/media/campaign_images/58e5f195dcfe46fd96f69239a3f01eca.jpg";
 
-          const parsedKeywords = keywordsInput
-            .split(",")
-            .map((k) => k.trim())
-            .filter(Boolean);
+      //     const parsedKeywords = keywordsInput
+      //       .split(",")
+      //       .map((k) => k.trim())
+      //       .filter(Boolean);
 
-          console.log("[GoogleAds] Sending paid ad payload:", {
-            internal_campaign_id: String(newCampaignId ?? ""),
-            image_url: googleAdsImage,
-            keywords: parsedKeywords,
-            campaign_objective: objective,
-            target_audience: audience,
-            start_date: startDate,
-            end_date: endDate,
-            start_time: scheduleTime || "",
-            campaign_status: googleAdsCampaignStatus,
-          });
+      //     console.log("[GoogleAds] Sending paid ad payload:", {
+      //       internal_campaign_id: String(newCampaignId ?? ""),
+      //       image_url: googleAdsImage,
+      //       keywords: parsedKeywords,
+      //       campaign_objective: objective,
+      //       target_audience: audience,
+      //       start_date: startDate,
+      //       end_date: endDate,
+      //       start_time: scheduleTime || "",
+      //       campaign_status: statusValue,
+      //       schedule_datetime: scheduleDateTime,
+      //     });
 
-          // ✅ FIX: Use platform's estimated CPC ($2.0 for Google Ads) instead of hardcoded value
-          const googleAdsPlatform = PLATFORM_LIST.find((p) => p.id === "google_ads");
-          const googleAdsCpcBid = googleAdsPlatform?.cpc ?? 2.0;
+      //     // ✅ FIX: Use platform's estimated CPC ($2.0 for Google Ads) instead of hardcoded value
+      //     const googleAdsPlatform = PLATFORM_LIST.find((p) => p.id === "google_ads");
+      //     const googleAdsCpcBid = googleAdsPlatform?.cpc ?? 2.0;
 
-          await CampaignAPI.createGoogleAds({
-            clinic_id: clinicId,
-            customer_id: String(clinic?.google_ads_customer_id ?? ""),
-            campaign_name: campaignName,
-            budget: budgets["google_ads"],
-            bidding_strategy: "MANUAL_CPC",
-            locations: [],
-            keywords: parsedKeywords,
-            cpc_bid: googleAdsCpcBid,
-            ad_group_name: `${campaignName} AdGroup`,
-            final_url: clinic?.website ?? "https://example.com",
-            headline_1: campaignName.slice(0, 30),
-            headline_2: "Learn More",
-            headline_3: "Contact Us Today",
-            description: campaignDescription.slice(0, 90),
-            description_2: "Call us now or visit our website.",
-            image_url: googleAdsImage,
-            platform_data: { google_ads: resolvedContent["google_ads"] },
-            campaign_type: "SEARCH",
-            internal_campaign_id: String(newCampaignId ?? ""),
-            campaign_objective: objective,
-            target_audience: audience,
-            start_date: startDate,
-            end_date: endDate,
-            start_time: scheduleTime || "",
-            campaign_status: googleAdsCampaignStatus,
-          });
+      //     await CampaignAPI.createGoogleAds({
+      //       clinic_id: clinicId,
+      //       customer_id: String(clinic?.google_ads_customer_id ?? ""),
+      //       campaign_name: campaignName,
+      //       budget: budgets["google_ads"],
+      //       bidding_strategy: "MANUAL_CPC",
+      //       locations: [],
+      //       keywords: parsedKeywords,
+      //       cpc_bid: googleAdsCpcBid,
+      //       ad_group_name: `${campaignName} AdGroup`,
+      //       final_url: clinic?.website ?? "https://example.com",
+      //       headline_1: campaignName.slice(0, 30),
+      //       headline_2: "Learn More",
+      //       headline_3: "Contact Us Today",
+      //       description: campaignDescription.slice(0, 90),
+      //       description_2: "Call us now or visit our website.",
+      //       image_url: googleAdsImage,
+      //       platform_data: { google_ads: resolvedContent["google_ads"] },
+      //       campaign_type: "SEARCH",
+      //       internal_campaign_id: String(newCampaignId ?? ""),
+      //       campaign_objective: objective,
+      //       target_audience: audience,
+      //       start_date: startDate,
+      //       end_date: endDate,
+      //       start_time: scheduleTime || "",
+      //       campaign_status: statusValue,
+      //       schedule_datetime: scheduleDateTime,
+      //     });
 
-          console.log("[GoogleAds] Paid campaign sent to Zapier successfully");
-        } catch (googleAdsErr) {
-          console.error("[GoogleAds] Failed to trigger Google Ads:", googleAdsErr);
-          toast.warn("Campaign saved, but Google Ads trigger failed. Check logs.");
-        }
-      } else if (
-        accounts.includes("google_ads") &&
-        isGoogleAdsConnected &&
-        mode === "organic"
-      ) {
-        console.log(
-          "[GoogleAds] Organic mode — campaign content saved, no paid ad triggered."
-        );
-      } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
-        toast.warn(
-          "Google Ads was not triggered because this clinic is not connected to Google Ads."
-        );
-      }
+      //     console.log("[GoogleAds] Paid campaign sent to Zapier successfully");
+      //   } catch (googleAdsErr) {
+      //     console.error("[GoogleAds] Failed to trigger Google Ads:", googleAdsErr);
+      //     toast.warn("Campaign saved, but Google Ads trigger failed. Check logs.");
+      //   }
+      // } else if (
+      //   accounts.includes("google_ads") &&
+      //   isGoogleAdsConnected &&
+      //   mode === "organic"
+      // ) {
+      //   console.log(
+      //     "[GoogleAds] Organic mode — campaign content saved, no paid ad triggered."
+      //   );
+      // } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
+      //   toast.warn(
+      //     "Google Ads was not triggered because this clinic is not connected to Google Ads."
+      //   );
+      // }
 
       if (accounts.includes("linkedin") && newCampaignId) {
         try {

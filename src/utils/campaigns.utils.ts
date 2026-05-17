@@ -33,7 +33,7 @@ export const getComputedCampaignStatus = (c: Campaign) => {
     ? dayjs(c.selected_start.replace("Z", ""))
     : null;
 
-  const end = c.end ? dayjs(c.end.replace("Z", "")) : null;
+    const end = c.end ? dayjs(c.end) : null;
 
   // Terminal states
   if (
@@ -51,7 +51,8 @@ export const getComputedCampaignStatus = (c: Campaign) => {
   // Platform statuses
   const platformStatuses = Object.entries(c.platform_data || {})
     .filter(([, value]) => value && typeof value === "object")
-    .map(([, value]) => value.status || "active");
+    .map(([, value]) => String(value.status || "").toLowerCase())
+    .filter(Boolean);
 
   const activeCount = platformStatuses.filter((s) => s === "active").length;
 

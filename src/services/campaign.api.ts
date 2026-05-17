@@ -81,6 +81,7 @@ export const CampaignAPI = {
     start_time?: string;
     // ✅ FIX: campaign status — "live" → ENABLED in Google Ads, else → PAUSED
     campaign_status?: string;
+    schedule_datetime?: string | null;
   }) =>
     http.post("/google-ads/create/", data, {
       params: { clinic_id: data.clinic_id },
