@@ -82,6 +82,11 @@ export interface UserClinic {
   is_default: boolean;
 }
 
+interface Role {
+  id: number;
+  name: string;
+}
+
 export interface AuthUser {
   // Core identity
   id?: number;
@@ -89,7 +94,7 @@ export interface AuthUser {
   username: string;
   email: string;
   // Role / designation
-  role?: string;
+  role?: Role;
   designation?: string;
   designation_label?: string;
   // Names

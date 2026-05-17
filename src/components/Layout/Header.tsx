@@ -177,21 +177,37 @@ const Header = ({
     const storedClinicId =
       Number(localStorage.getItem("clinic_id") || 0) || null;
 
-    const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
+      const isSuperAdmin =
+        user?.role?.name === "Super Admin" ||
+        user?.designation === "Super Admin" ||
+        user?.designation_label === "Super Admin";
 
-    const validStored =
-      storedClinicId &&
-      allowedClinics.some((clinic) => clinic.id === storedClinicId)
-        ? storedClinicId
-        : null;
+      const profileClinicId =
+        userClinics.find((clinic) => clinic.isDefault)?.id ||
+        userClinics[0]?.id ||
+        clinics[0]?.id ||
+        null;
 
-    const profileClinicId =
-      userClinics.find((clinic) => clinic.isDefault)?.id ||
-      userClinics[0]?.id ||
-      null;
+      let nextClinicId: number | null = profileClinicId;
 
-    setSelectedClinicId(validStored || profileClinicId);
-  }, [clinics, selectedClinicId, userClinics]);
+      if (isSuperAdmin) {
+        // Superadmin can access any clinic
+        nextClinicId = storedClinicId || profileClinicId;
+      } else {
+        // Normal users only allowed their clinics
+        const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
+
+        const validStored =
+          storedClinicId &&
+          allowedClinics.some((clinic) => clinic.id === storedClinicId)
+            ? storedClinicId
+            : null;
+
+        nextClinicId = validStored || profileClinicId;
+      }
+
+      setSelectedClinicId(nextClinicId);
+  }, [clinics, selectedClinicId, user?.designation, user?.designation_label, user?.role?.name, userClinics]);
 
   useEffect(() => {
     const hydrateClinic = async () => {
