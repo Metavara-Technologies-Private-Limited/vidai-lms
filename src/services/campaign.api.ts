@@ -222,10 +222,10 @@ export const CampaignAPI = {
       params: { clinic_id: storedClinicId() },
     }),
 
-  triggerGoogleAdsInsights: (campaignId: string) =>
-    http.post(`/campaign/insights/trigger/`, {
-      campaign_id: campaignId,
-    }),
+  // triggerGoogleAdsInsights: (campaignId: string) =>
+  //   http.post(`/campaign/insights/trigger/`, {
+  //     campaign_id: campaignId,
+  //   }),
 
   getGoogleAdsInsights: (campaignId: string) =>
     http.get(`/google-ads/insights/`, {
@@ -235,13 +235,13 @@ export const CampaignAPI = {
   // ✅ FIX (clinic_id): accepts explicit clinicId so Google Ads insights are
   //    filtered by the correct clinic on the BE. Previously clinic_id was
   //    always storedClinicId() which could be stale or 0 on first render.
-  getGoogleAdsInsightsFromApi: (campaignId: string, clinicId?: number) =>
-    http.get(`/google-ads/insights/`, {
-      params: {
-        campaign_id: campaignId,
-        clinic_id: clinicId ?? storedClinicId(),
-      },
-    }),
+  // getGoogleAdsInsightsFromApi: (campaignId: string, clinicId?: number) =>
+  //   http.get(`/google-ads/insights/`, {
+  //     params: {
+  //       campaign_id: campaignId,
+  //       clinic_id: clinicId ?? storedClinicId(),
+  //     },
+  //   }),
 
   // ✅ FIX: Use existing /upload/image/ endpoint instead of non-existent /campaigns/upload/
   uploadCampaignDocument: (formData: FormData) =>

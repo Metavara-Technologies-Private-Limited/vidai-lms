@@ -25,6 +25,7 @@ import {
 } from "../../constants/campaigns.constants";
 import type { Campaign } from "../../types/campaigns.types";
 import { formatScheduleTime } from "../../utils/campaigns.utils";
+import { toast } from "react-toastify";
 
 /* ================= COMPONENT ================= */
 const CampaignDashboard = ({
@@ -91,17 +92,11 @@ const CampaignDashboard = ({
     [],
   );
 
-  const fetchGoogleAdsInsightsFromDB = React.useCallback(
-    async (campaignId: string, cId: number) => {
+  const fetchGoogleAdsInsights = React.useCallback(
+    async (campaignId: string) => {
       try {
-        console.log(
-          "[GoogleAds] Reading insights from DB for campaign:",
-          campaignId,
-        );
-        const res = await CampaignAPI.getGoogleAdsInsightsFromApi(
-          campaignId,
-          cId,
-        );
+        console.log("[GoogleAds] Fetching insights for campaign:", campaignId);
+        const res = await CampaignAPI.getGoogleAdsInsights(campaignId);
         const data = res.data?.insights || res.data || {};
         console.log("[GoogleAds] DB insights raw:", data);
         const hasRealData =
@@ -126,8 +121,15 @@ const CampaignDashboard = ({
           return true;
         }
         return false;
-      } catch (err) {
-        console.error("[GoogleAds] DB insights fetch failed", err);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (err: any) {
+        console.error("[GoogleAds] insights fetch failed", err);
+
+        const errorMessage =
+          err?.response?.data?.error || "Failed to fetch Google Ads insights";
+
+        toast.warn(errorMessage);
+
         return false;
       }
     },
@@ -144,7 +146,9 @@ const CampaignDashboard = ({
 
         timeoutId = setTimeout(() => {
           if (!cancelled) {
-            console.warn("[CampaignDashboard] Loading timeout - forcing completion");
+            console.warn(
+              "[CampaignDashboard] Loading timeout - forcing completion",
+            );
             setLoadingInsights(false);
           }
         }, 10000);
@@ -192,7 +196,7 @@ const CampaignDashboard = ({
               ? await fetchMetaInsights(instagramCamId, "instagram")
               : {};
 
-              console.log("Facebook Insights:", fbInsights);
+          console.log("Facebook Insights:", fbInsights);
 
           console.log("Instagram Insights:", instagramInsights);
           setPlatformInsights((prev) => ({
@@ -279,45 +283,41 @@ const CampaignDashboard = ({
             },
           }));
 
-              const impressions =
-                Number(fbInsights.post_impressions || 0) +
-                Number(instagramInsights.post_impressions || 0);
+          const impressions =
+            Number(fbInsights.post_impressions || 0) +
+            Number(instagramInsights.post_impressions || 0);
 
-              const clicks =
-                Number(fbInsights.post_clicks || 0) +
-                Number(instagramInsights.post_clicks || 0);
+          const clicks =
+            Number(fbInsights.post_clicks || 0) +
+            Number(instagramInsights.post_clicks || 0);
 
-              const spend =
-                Number(fbInsights.spend || 0) +
-                Number(instagramInsights.spend || 0);
+          const spend =
+            Number(fbInsights.spend || 0) +
+            Number(instagramInsights.spend || 0);
 
-              const reach =
-                Number(fbInsights.reach || 0) +
-                Number(instagramInsights.reach || 0);
+          const reach =
+            Number(fbInsights.reach || 0) +
+            Number(instagramInsights.reach || 0);
 
-              setAdInsights((prev) => ({
-                ...prev,
-                impressions,
-                clicks,
-                spend: String(spend),
-                reach: String(reach),
+          setAdInsights((prev) => ({
+            ...prev,
+            impressions,
+            clicks,
+            spend: String(spend),
+            reach: String(reach),
 
-                cpc: clicks > 0 ? (spend / clicks).toFixed(2) : "0",
+            cpc: clicks > 0 ? (spend / clicks).toFixed(2) : "0",
 
-                cpm:
-                  impressions > 0
-                    ? ((spend * 1000) / impressions).toFixed(2)
-                    : "0",
+            cpm:
+              impressions > 0 ? ((spend * 1000) / impressions).toFixed(2) : "0",
 
-                ctr:
-                  impressions > 0
-                    ? ((clicks * 100) / impressions).toFixed(2)
-                    : "0",
+            ctr:
+              impressions > 0 ? ((clicks * 100) / impressions).toFixed(2) : "0",
 
-                total_budget: String(spend),
-                currency:
-                  fbInsights.currency || instagramInsights.currency || "USD",
-              }));
+            total_budget: String(spend),
+            currency:
+              fbInsights.currency || instagramInsights.currency || "USD",
+          }));
         }
 
         const resolvedFbCampaignId = d.fb_campaign_id ?? fbCamId ?? null;
@@ -341,40 +341,45 @@ const CampaignDashboard = ({
           image_url: d.image_url ?? prev.image_url ?? null,
         }));
 
+        // if (hasGoogleAds) {
+        // console.log(
+        //   "[GoogleAds] No DB data - triggering Zapier insights fetch...",
+        // );
+        // try {
+        //   await CampaignAPI.triggerGoogleAdsInsights(campaignId);
+        //   console.log(
+        //     "[GoogleAds] Zapier trigger sent. Polling DB for results...",
+        //   );
+        // } catch (err) {
+        //   console.error("[GoogleAds] Trigger failed:", err);
+        // }
+
+        // let attempts = 0;
+        // const maxAttempts = 3;
+        // const pollIntervalMs = 2000;
+
+        // while (attempts < maxAttempts) {
+        //   await new Promise((r) => setTimeout(r, pollIntervalMs));
+        //   attempts++;
+        //   if (cancelled) return;
+        //   console.log(`[GoogleAds] Poll attempt ${attempts}/${maxAttempts}`);
+        //   const gotData = await fetchGoogleAdsInsightsFromDB(campaignId, cId);
+        //   if (gotData) {
+        //     console.log("[GoogleAds] Got real data on attempt", attempts);
+        //     break;
+        //   }
+        // }
+
+        // if (attempts >= maxAttempts) {
+        //   console.warn(
+        //     "[GoogleAds] Polling timed out - Zapier may still be processing",
+        //   );
+        // }
+        // }
         if (hasGoogleAds) {
-          console.log(
-            "[GoogleAds] No DB data - triggering Zapier insights fetch...",
-          );
-          try {
-            await CampaignAPI.triggerGoogleAdsInsights(campaignId);
-            console.log(
-              "[GoogleAds] Zapier trigger sent. Polling DB for results...",
-            );
-          } catch (err) {
-            console.error("[GoogleAds] Trigger failed:", err);
-          }
+          console.log("[GoogleAds] Fetching live insights directly");
 
-          let attempts = 0;
-          const maxAttempts = 3;
-          const pollIntervalMs = 2000;
-
-          while (attempts < maxAttempts) {
-            await new Promise((r) => setTimeout(r, pollIntervalMs));
-            attempts++;
-            if (cancelled) return;
-            console.log(`[GoogleAds] Poll attempt ${attempts}/${maxAttempts}`);
-            const gotData = await fetchGoogleAdsInsightsFromDB(campaignId, cId);
-            if (gotData) {
-              console.log("[GoogleAds] Got real data on attempt", attempts);
-              break;
-            }
-          }
-
-          if (attempts >= maxAttempts) {
-            console.warn(
-              "[GoogleAds] Polling timed out - Zapier may still be processing",
-            );
-          }
+          await fetchGoogleAdsInsights(campaignId);
         }
       } catch (err) {
         console.error("Failed to fetch campaign data:", err);
@@ -390,8 +395,7 @@ const CampaignDashboard = ({
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-
-  }, [campaign.id, fetchGoogleAdsInsightsFromDB, fetchMetaInsights]);
+  }, [campaign.id, fetchGoogleAdsInsights, fetchMetaInsights]);
 
   // ─── Budget ───────────────────────────────────────────────────────────────
   const budgetData: Record<string, number> = fullCampaign.budget_data ?? {};

@@ -1093,8 +1093,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 total: totalSpend,
               }
             : {},
-        image_url:
-          "https://lms-vidaisolutions.metavaratechnologies.com/media/campaign_images/58e5f195dcfe46fd96f69239a3f01eca.jpg",
+        image_url,
+          // "https://lms-vidaisolutions.metavaratechnologies.com/media/campaign_images/58e5f195dcfe46fd96f69239a3f01eca.jpg",
         selected_start: scheduleDate || null,
         selected_end: endDate || null,
         status: statusValue,
