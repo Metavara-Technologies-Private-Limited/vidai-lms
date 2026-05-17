@@ -1020,18 +1020,29 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         };
       }
       if (accounts.includes("facebook")) {
-        cleanedContent["facebook"] = {
-          content: resolvedContent["facebook"],
-          country_code: metaCountry || "IN",
-          state: metaState,
-        };
+        cleanedContent["facebook"] =
+          mode === "paid"
+            ? {
+                content: resolvedContent["facebook"],
+                country_code: metaCountry || "IN",
+                state: metaState,
+              }
+            : {
+                content: resolvedContent["facebook"],
+              };
       }
+
       if (accounts.includes("instagram")) {
-        cleanedContent["instagram"] = {
-          content: resolvedContent["instagram"],
-          country_code: metaCountry || "IN",
-          state: metaState,
-        };
+        cleanedContent["instagram"] =
+          mode === "paid"
+            ? {
+                content: resolvedContent["instagram"],
+                country_code: metaCountry || "IN",
+                state: metaState,
+              }
+            : {
+                content: resolvedContent["instagram"],
+              };
       }
       if (accounts.includes("google_ads")) {
         cleanedContent["google_ads"] = {
@@ -1073,12 +1084,15 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         select_ad_accounts: selectedAccounts,
         enter_time: scheduleTime || null,
         platform_data: cleanedContent,
-        budget_data: {
-          ...Object.fromEntries(
-            selectedPlatforms.map((p) => [p.id, budgets[p.id]]),
-          ),
-          total: totalSpend,
-        },
+        budget_data:
+          mode === "paid"
+            ? {
+                ...Object.fromEntries(
+                  selectedPlatforms.map((p) => [p.id, budgets[p.id]]),
+                ),
+                total: totalSpend,
+              }
+            : {},
         image_url:
           "https://lms-vidaisolutions.metavaratechnologies.com/media/campaign_images/58e5f195dcfe46fd96f69239a3f01eca.jpg",
         selected_start: scheduleDate || null,
@@ -1087,7 +1101,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         is_active: isActive,
       };
 
-      const createdRes = await CampaignAPI.createSocial(payload);
+      const createdRes =
+        mode === "organic"
+          ? await CampaignAPI.createSocialOrganic(payload)
+          : await CampaignAPI.createSocial(payload);
 
       const newCampaignId: string | null =
         (createdRes?.data as { id?: string })?.id ??
@@ -1519,7 +1536,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                         <MenuItem key={value} value={value}>
                           {label}
                         </MenuItem>
-                      )
+                      ),
                     )}
                   </Select>
                 </FormControl>
@@ -1535,13 +1552,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     displayEmpty
                   >
                     <MenuItem value="">Select Audience</MenuItem>
-                    {Object.entries(CAMPAIGN_AUDIENCE).map(
-                      ([value, label]) => (
-                        <MenuItem key={value} value={value}>
-                          {label}
-                        </MenuItem>
-                      )
-                    )}
+                    {Object.entries(CAMPAIGN_AUDIENCE).map(([value, label]) => (
+                      <MenuItem key={value} value={value}>
+                        {label}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </div>
@@ -1819,54 +1834,55 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             )}
 
             {/* Meta Ad Targeting */}
-            {(accounts.includes("facebook") ||
-              accounts.includes("instagram")) && (
-              <div
-                className="section-card"
-                style={{ border: "1px solid #1877f2", borderRadius: 8 }}
-              >
-                <h3 style={{ color: "#1877f2" }}>Meta Ad Targeting</h3>
-                <div className="form-row">
-                  <div className="form-group half">
-                    <label>Country</label>
-                    <FormControl fullWidth variant="outlined" size="small">
-                      <Select
-                        value={metaCountry}
-                        onChange={(e) => {
-                          setMetaCountry(e.target.value);
-                          setMetaState("");
-                        }}
-                        displayEmpty
-                      >
-                        <MenuItem value="">Select Country</MenuItem>
-                        {countriesData.map((c) => (
-                          <MenuItem key={c.name} value={c.iso2 || c.name}>
-                            {c.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </div>
-                  <div className="form-group half">
-                    <label>State</label>
-                    <FormControl fullWidth variant="outlined" size="small">
-                      <Select
-                        value={metaState}
-                        onChange={(e) => setMetaState(e.target.value)}
-                        displayEmpty
-                      >
-                        <MenuItem value="">All States</MenuItem>
-                        {metaSelectedStates.map((s) => (
-                          <MenuItem key={s.name} value={s.name}>
-                            {s.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+            {mode === "paid" &&
+              (accounts.includes("facebook") ||
+                accounts.includes("instagram")) && (
+                <div
+                  className="section-card"
+                  style={{ border: "1px solid #1877f2", borderRadius: 8 }}
+                >
+                  <h3 style={{ color: "#1877f2" }}>Meta Ad Targeting</h3>
+                  <div className="form-row">
+                    <div className="form-group half">
+                      <label>Country</label>
+                      <FormControl fullWidth variant="outlined" size="small">
+                        <Select
+                          value={metaCountry}
+                          onChange={(e) => {
+                            setMetaCountry(e.target.value);
+                            setMetaState("");
+                          }}
+                          displayEmpty
+                        >
+                          <MenuItem value="">Select Country</MenuItem>
+                          {countriesData.map((c) => (
+                            <MenuItem key={c.name} value={c.iso2 || c.name}>
+                              {c.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </div>
+                    <div className="form-group half">
+                      <label>State</label>
+                      <FormControl fullWidth variant="outlined" size="small">
+                        <Select
+                          value={metaState}
+                          onChange={(e) => setMetaState(e.target.value)}
+                          displayEmpty
+                        >
+                          <MenuItem value="">All States</MenuItem>
+                          {metaSelectedStates.map((s) => (
+                            <MenuItem key={s.name} value={s.name}>
+                              {s.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* LinkedIn Targeting */}
             {accounts.includes("linkedin") && (
@@ -2012,16 +2028,14 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                         ))}
                       </Select>
                     </FormControl>
-                    <p
-                      style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}
-                    >
+                    <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
                       {linkedInBidStrategy === "MAXIMUM_DELIVERY"
                         ? "LinkedIn automatically maximises delivery within your budget."
                         : linkedInBidStrategy === "TARGET_COST"
-                        ? "LinkedIn tries to stay close to your target cost per result."
-                        : linkedInBidStrategy === "ENHANCED_CPC"
-                        ? "LinkedIn adjusts your manual bid to maximise conversions."
-                        : "You set the exact bid per click manually."}
+                          ? "LinkedIn tries to stay close to your target cost per result."
+                          : linkedInBidStrategy === "ENHANCED_CPC"
+                            ? "LinkedIn adjusts your manual bid to maximise conversions."
+                            : "You set the exact bid per click manually."}
                     </p>
                   </div>
 
@@ -2078,9 +2092,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                         }}
                       />
                     </div>
-                    <p
-                      style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}
-                    >
+                    <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
                       Enter a whole number amount (e.g. 1, 2, 5, 10…)
                     </p>
                   </div>
@@ -2146,8 +2158,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                               gap: 6,
                             }}
                           >
-                            ⚠️{" "}
-                            {p.label} campaign content is required. Please
+                            ⚠️ {p.label} campaign content is required. Please
                             add some text before proceeding.
                           </div>
                         )}
@@ -2168,7 +2179,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                           imageUrl={""}
                           imageFile={platformImageFiles[p.id]}
                           imagePreview={platformImagePreviews[p.id]}
-                          onUploadClick={() => imageUploadRefs[p.id].current?.click()}
+                          onUploadClick={() =>
+                            imageUploadRefs[p.id].current?.click()
+                          }
                           onRemoveImage={() => handleRemoveImageFile(p.id)}
                           onPreviewClick={(src, name) =>
                             setInlinePreview({ src, type: "image", name })
@@ -2176,7 +2189,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                         />
                       </div>
                     );
-                  }
+                  },
                 )}
               </div>
             )}
@@ -2273,7 +2286,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                       value={
                         scheduleTime
                           ? dayjs(
-                              `${scheduleDate || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`
+                              `${scheduleDate || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`,
                             )
                           : null
                       }
@@ -2313,65 +2326,61 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                       (must be greater than ${PLATFORM_MIN_BUDGET})
                     </p>
                     <div className="budget-row">
-                      {PLATFORM_LIST.filter((p) =>
-                        accounts.includes(p.id)
-                      ).map((p) => {
-                        const budgetErr = getBudgetError(
-                          p.id,
-                          budgets[p.id]
-                        );
-                        return (
-                          <div key={p.id} className="budget-card">
-                            <div className="budget-title">
-                              <img
-                                src={platformIcons[p.id]}
-                                alt={p.label}
-                              />
-                              <span>
-                                {p.label} (Estimate CPC : ${p.cpc})
-                              </span>
-                            </div>
-                            <div className="budget-input-wrapper">
-                              <label htmlFor={`budget-${p.id}`}>Enter Amount in USD ($)</label>
-                              <input
-                                id={`budget-${p.id}`}
-                                type="number"
-                                min={PLATFORM_MIN_BUDGET + 1}
-                                step="1"
-                                value={budgets[p.id]}
-                                onChange={(e) =>
-                                  setBudget(p.id, Number(e.target.value))
-                                }
-                                className="budget-input"
-                                aria-label={`Budget for ${p.label} in US Dollars. Estimated CPC: $${p.cpc}`}
-                                style={{
-                                  borderColor: budgetErr
-                                    ? "#ef4444"
-                                    : undefined,
-                                }}
-                              />
-                              {budgetErr && (
-                                <p
+                      {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).map(
+                        (p) => {
+                          const budgetErr = getBudgetError(p.id, budgets[p.id]);
+                          return (
+                            <div key={p.id} className="budget-card">
+                              <div className="budget-title">
+                                <img src={platformIcons[p.id]} alt={p.label} />
+                                <span>
+                                  {p.label} (Estimate CPC : ${p.cpc})
+                                </span>
+                              </div>
+                              <div className="budget-input-wrapper">
+                                <label htmlFor={`budget-${p.id}`}>
+                                  Enter Amount in USD ($)
+                                </label>
+                                <input
+                                  id={`budget-${p.id}`}
+                                  type="number"
+                                  min={PLATFORM_MIN_BUDGET + 1}
+                                  step="1"
+                                  value={budgets[p.id]}
+                                  onChange={(e) =>
+                                    setBudget(p.id, Number(e.target.value))
+                                  }
+                                  className="budget-input"
+                                  aria-label={`Budget for ${p.label} in US Dollars. Estimated CPC: $${p.cpc}`}
                                   style={{
-                                    fontSize: 11,
-                                    color: "#ef4444",
-                                    marginTop: 4,
+                                    borderColor: budgetErr
+                                      ? "#ef4444"
+                                      : undefined,
                                   }}
-                                >
-                                  {budgetErr}
-                                </p>
-                              )}
+                                />
+                                {budgetErr && (
+                                  <p
+                                    style={{
+                                      fontSize: 11,
+                                      color: "#ef4444",
+                                      marginTop: 4,
+                                    }}
+                                  >
+                                    {budgetErr}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        },
+                      )}
                     </div>
                     <div className="total-budget">
                       <div>
                         <h4>
                           Total Budget : $
                           {PLATFORM_LIST.filter((p) =>
-                            accounts.includes(p.id)
+                            accounts.includes(p.id),
                           ).reduce((sum, p) => sum + budgets[p.id], 0)}
                         </h4>
                         <p>
