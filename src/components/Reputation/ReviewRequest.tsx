@@ -807,6 +807,7 @@ onDescriptionBlur={() => {
               setFormData((prev) => ({
                 ...prev,
                 mode: value,
+                ...(prev.mode !== value ? { message: "" } : {}),
                 ...(value === "email" && !prev.from_email && defaultClinicEmail
                   ? { from_email: defaultClinicEmail }
                   : {}),
