@@ -127,7 +127,9 @@ const CampaignTabContent: React.FC<Props> = ({
 
   const imageUrl: string = extractImageUrl();
 
-  const cleanedText = platformText.replace(URL_REGEX, "").trim();
+  const cleanedText = imageUrl
+    ? platformText.replace(imageUrl, "").trim()
+    : platformText.trim();
   const lines = cleanedText.split("\n").filter((l) => l.trim());
   const hashtagLine = lines.find((l) => l.trim().startsWith("#")) || "";
   const bodyLines = lines.filter((l) => l.trim() && !l.trim().startsWith("#"));
