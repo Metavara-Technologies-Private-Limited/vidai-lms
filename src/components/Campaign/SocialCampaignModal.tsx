@@ -946,41 +946,54 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         resolvedContent[platform] = fromState || fromRef;
       }
 
-      // ─── Resolve image_url: uploaded file only (URL field removed) ───────
-      // Priority order:
-      //   1. Uploaded image file (uploaded to server, returns a URL)
-      //   2. Content that looks like a plain URL (legacy fallback)
-      let image_url: string | null = null;
+      // ─── CHANGED: Upload image per-platform and track each URL separately ───
+      // This allows each platform's platform_data entry to carry its own image_url.
+      // We still compute a single top-level image_url for backward compatibility.
+      //
+      // Priority order per platform:
+      //   1. Uploaded image file for that specific platform (uploaded to server)
+      //   2. Content that looks like a plain URL (legacy fallback, shared across platforms)
 
-      // Step 1 – try uploading a file
+      // Step 1 – try uploading a file for each platform that has one
+      const platformUploadedImageUrls: Partial<Record<Platform, string>> = {};
+
       for (const p of accounts) {
         const file = platformImageFiles[p];
         if (file) {
-          toast.info("Uploading image…", { toastId: "image-upload-progress", autoClose: false });
+          toast.info(`Uploading image for ${p.replace("_", " ")}…`, {
+            toastId: `image-upload-progress-${p}`,
+            autoClose: false,
+          });
           const uploadedUrl = await uploadImageFile(file);
-          toast.dismiss("image-upload-progress");
+          toast.dismiss(`image-upload-progress-${p}`);
           if (uploadedUrl) {
-            image_url = uploadedUrl;
-            break;
+            platformUploadedImageUrls[p] = uploadedUrl;
           } else {
             toast.warn(
-              "Image upload failed — campaign will be created without an image."
+              `Image upload failed for ${p.replace("_", " ")} — campaign will be created without an image for this platform.`
             );
           }
         }
       }
 
-      // Step 2 – legacy: content that is a plain URL
-      if (!image_url) {
-        for (const p of accounts) {
-          const content = resolvedContent[p]?.trim();
-          if (content && isPlainUrl(content)) {
-            image_url = resolveImageUrl(content);
-            resolvedContent[p] = "";
-            break;
-          }
+      // Step 2 – legacy: content that is a plain URL (shared fallback)
+      let legacyFallbackImageUrl: string | null = null;
+      for (const p of accounts) {
+        const content = resolvedContent[p]?.trim();
+        if (content && isPlainUrl(content)) {
+          legacyFallbackImageUrl = resolveImageUrl(content);
+          resolvedContent[p] = "";
+          break;
         }
       }
+
+      // Determine the top-level image_url (backward compat):
+      // Use the first successfully uploaded URL, else the legacy fallback.
+      const firstUploadedUrl =
+        accounts
+          .map((p) => platformUploadedImageUrls[p])
+          .find((u) => !!u) ?? null;
+      const image_url: string | null = firstUploadedUrl ?? legacyFallbackImageUrl;
 
       const firstSelectedContent =
         accounts
@@ -992,9 +1005,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           ? CAMPAIGN_STATUS.DRAFT
           : getComputedCampaignStatus();
 
-          const isActive =
-            statusValue === CAMPAIGN_STATUS.LIVE ||
-            statusValue === CAMPAIGN_STATUS.SCHEDULED;
+      const isActive =
+        statusValue === CAMPAIGN_STATUS.LIVE ||
+        statusValue === CAMPAIGN_STATUS.SCHEDULED;
       // const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
 
       const campaignMode: ("organic_posting" | "paid_advertising")[] = [
@@ -1007,6 +1020,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         ...resolvedContent,
       };
 
+      // ─── CHANGED: embed image_url inside each platform's platform_data ───
+      // Each platform gets its own image_url: first from its own uploaded file,
+      // then from the shared legacy fallback, then from the top-level image_url.
+      // This is the key change — image is now stored per-platform inside platform_data.
+
       if (accounts.includes("linkedin")) {
         const existingLinkedinContent =
           typeof resolvedContent["linkedin"] === "string"
@@ -1017,8 +1035,15 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           location: getLinkedInLocation(),
           bid_strategy: linkedInBidStrategy,
           bid_amount: linkedInBidAmount,
+          // CHANGED: store image_url inside linkedin platform_data
+          image_url:
+            platformUploadedImageUrls["linkedin"] ??
+            legacyFallbackImageUrl ??
+            image_url ??
+            null,
         };
       }
+
       if (accounts.includes("facebook")) {
         cleanedContent["facebook"] =
           mode === "paid"
@@ -1026,9 +1051,21 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 content: resolvedContent["facebook"],
                 country_code: metaCountry || "IN",
                 state: metaState,
+                // CHANGED: store image_url inside facebook platform_data
+                image_url:
+                  platformUploadedImageUrls["facebook"] ??
+                  legacyFallbackImageUrl ??
+                  image_url ??
+                  null,
               }
             : {
                 content: resolvedContent["facebook"],
+                // CHANGED: store image_url inside facebook platform_data
+                image_url:
+                  platformUploadedImageUrls["facebook"] ??
+                  legacyFallbackImageUrl ??
+                  image_url ??
+                  null,
               };
       }
 
@@ -1039,36 +1076,72 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 content: resolvedContent["instagram"],
                 country_code: metaCountry || "IN",
                 state: metaState,
+                // CHANGED: store image_url inside instagram platform_data
+                image_url:
+                  platformUploadedImageUrls["instagram"] ??
+                  legacyFallbackImageUrl ??
+                  image_url ??
+                  null,
               }
             : {
                 content: resolvedContent["instagram"],
+                // CHANGED: store image_url inside instagram platform_data
+                image_url:
+                  platformUploadedImageUrls["instagram"] ??
+                  legacyFallbackImageUrl ??
+                  image_url ??
+                  null,
               };
       }
+
       if (accounts.includes("google_ads")) {
         cleanedContent["google_ads"] = {
           content: resolvedContent["google_ads"],
-
           keywords: keywordsInput
             .split(",")
             .map((k) => k.trim())
             .filter(Boolean),
-
           headline_1: campaignName.slice(0, 30),
-
           headline_2: "Learn More",
-
           headline_3: "Contact Us Today",
-
           description: campaignDescription.slice(0, 90),
-
           description_2: "Call us now or visit our website.",
-
           campaign_type: "SEARCH",
-
           bidding_strategy: "MANUAL_CPC",
-
           cpc_bid: 2,
+          // CHANGED: store image_url inside google_ads platform_data
+          image_url:
+            platformUploadedImageUrls["google_ads"] ??
+            legacyFallbackImageUrl ??
+            image_url ??
+            null,
         };
+      }
+
+      // ─── CHANGED: also embed image_url for any remaining selected platforms
+      // that were not handled by the specific blocks above (e.g. gmail).
+      for (const p of accounts) {
+        if (
+          !["linkedin", "facebook", "instagram", "google_ads"].includes(p) &&
+          cleanedContent[p] !== undefined
+        ) {
+          const platformImgUrl =
+            platformUploadedImageUrls[p] ??
+            legacyFallbackImageUrl ??
+            image_url ??
+            null;
+          if (platformImgUrl) {
+            if (typeof cleanedContent[p] === "object" && cleanedContent[p] !== null) {
+              (cleanedContent[p] as Record<string, unknown>)["image_url"] = platformImgUrl;
+            } else {
+              // If it was a plain string, convert to object form
+              cleanedContent[p] = {
+                content: cleanedContent[p],
+                image_url: platformImgUrl,
+              };
+            }
+          }
+        }
       }
 
       const payload: SocialCampaignPayload = {
@@ -1093,8 +1166,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 total: totalSpend,
               }
             : {},
+        // CHANGED: top-level image_url kept for backward compatibility with
+        // existing backend columns / API consumers that read it directly.
         image_url,
-          // "https://lms-vidaisolutions.metavaratechnologies.com/media/campaign_images/58e5f195dcfe46fd96f69239a3f01eca.jpg",
         selected_start: scheduleDate || null,
         selected_end: endDate || null,
         status: statusValue,

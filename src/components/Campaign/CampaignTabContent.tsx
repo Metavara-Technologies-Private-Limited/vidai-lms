@@ -80,14 +80,43 @@ const CampaignTabContent: React.FC<Props> = ({
 
   const URL_REGEX = /https?:\/\/\S+/gi;
 
-  // ✅ FIX: extract image URL from multiple sources
-  // because user may type image URL inside content box instead of image URL field
+  // ✅ CHANGED: extractImageUrl now checks platform_data[activePlatformKey].image_url
+  // as the FIRST priority source, before falling back to the top-level campaign.image_url
+  // and then to URL scanning. This means images saved per-platform inside platform_data
+  // (as set by the updated SocialCampaignModal) are shown correctly per platform tab.
   const extractImageUrl = (): string => {
-    // 1. Direct image_url field on campaign
+    // ── 0. Per-platform image_url inside platform_data (HIGHEST priority) ──
+    // This is the new primary storage location. When a user uploads an image
+    // for a specific platform, it is stored as platform_data[platform].image_url.
+    if (
+      activePlatformKey &&
+      typeof rawPlatformValue === "object" &&
+      rawPlatformValue !== null &&
+      rawPlatformValue.image_url
+    ) {
+      return String(rawPlatformValue.image_url);
+    }
+
+    // ── 1. Scan all platform_data entries for any image_url field ──────────
+    // Fallback: if no active platform key, or active platform has no image_url,
+    // check all other platforms' platform_data.image_url fields.
+    for (const key of Object.keys(platformData_raw)) {
+      const val = platformData_raw[key];
+      if (
+        typeof val === "object" &&
+        val !== null &&
+        val.image_url
+      ) {
+        return String(val.image_url);
+      }
+    }
+
+    // ── 2. Top-level image_url on campaign (backward compatibility) ─────────
+    // Kept so existing campaigns saved before this change still display images.
     const direct = (campaign as any).image_url || "";
     if (direct) return direct;
 
-    // 2. Scan platformText for image-like URL
+    // ── 3. Scan platformText for image-like URL ─────────────────────────────
     const urlsInPlatformText = platformText.match(URL_REGEX) || [];
     const imageFromPlatformText = urlsInPlatformText.find(
       (url) =>
@@ -102,10 +131,11 @@ const CampaignTabContent: React.FC<Props> = ({
     );
     if (imageFromPlatformText) return imageFromPlatformText;
 
-    // 3. First URL found in platformText — ✅ FIX: use ?? "" to avoid undefined
+    // ── 4. First URL found in platformText ─────────────────────────────────
+    // ✅ FIX: use ?? "" to avoid undefined
     if (urlsInPlatformText.length > 0) return urlsInPlatformText[0] ?? "";
 
-    // 4. Scan all platform_data values for any URL
+    // ── 5. Scan all platform_data values for any URL (text-based scan) ─────
     for (const key of Object.keys(platformData_raw)) {
       const val = platformData_raw[key];
       const text =
@@ -117,7 +147,7 @@ const CampaignTabContent: React.FC<Props> = ({
       if (urls.length > 0) return urls[0] ?? "";
     }
 
-    // 5. Scan campaign_content for any URL
+    // ── 6. Scan campaign_content for any URL ────────────────────────────────
     const campaignContent = (campaign as any).campaign_content || "";
     const urlsInContent = campaignContent.match(URL_REGEX) || [];
     if (urlsInContent.length > 0) return urlsInContent[0] ?? "";
