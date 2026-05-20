@@ -43,6 +43,7 @@ import {
   selectLeadsError,
   // clearError,
 } from "../../store/leadSlice";
+import { selectUsers } from "../../store/userSlice";
 import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
@@ -429,9 +430,20 @@ const LeadsTable: React.FC<Props> = ({
   const dispatch = useDispatch();
 
   const leads = useSelector(selectLeads) as RawLead[] | null;
+  const users = useSelector(selectUsers);
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
   const clinic = useSelector(selectClinic);
+
+  const assigneeNameById = React.useMemo(() => {
+    const map = new Map<number, string>();
+    for (const user of users) {
+      const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+      const displayName = fullName || user.username || `User ${user.id}`;
+      map.set(user.id, user.role ? `${displayName} (${user.role})` : displayName);
+    }
+    return map;
+  }, [users]);
 
   const [localLeads, setLocalLeads] = React.useState<ProcessedLead[]>([]);
   const [page, setPage] = React.useState(1);
@@ -567,8 +579,29 @@ const LeadsTable: React.FC<Props> = ({
       (a, b) => getLeadTimestamp(b) - getLeadTimestamp(a),
     );
 
-    setLocalLeads(sortedMergedLeads.map(processLead));
-  }, [leads, importedLeads]);
+    const withResolvedAssignee = sortedMergedLeads.map((lead) => {
+      if (lead.assigned_to_name && String(lead.assigned_to_name).trim()) {
+        return lead;
+      }
+
+      const assignedIdRaw = (lead as RawLead & { assigned_to?: unknown }).assigned_to;
+      const assignedId = Number(
+        lead.assigned_to_id ??
+          (typeof assignedIdRaw === "number" || typeof assignedIdRaw === "string"
+            ? assignedIdRaw
+            : NaN),
+      );
+
+      if (!Number.isFinite(assignedId) || assignedId <= 0) {
+        return lead;
+      }
+
+      const resolvedName = assigneeNameById.get(assignedId) ?? `User ${assignedId}`;
+      return { ...lead, assigned_to_name: resolvedName };
+    });
+
+    setLocalLeads(withResolvedAssignee.map(processLead));
+  }, [leads, importedLeads, assigneeNameById]);
 
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) =>

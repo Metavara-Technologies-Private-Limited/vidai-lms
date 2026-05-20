@@ -207,7 +207,11 @@ const collectPermissionState = (user: UserLike): PermissionState => {
   return { labels, hasPermissionContainer, hasPermissionPayload };
 };
 
-const hasMenuPermission = (user: UserLike, key: string): boolean | null => {
+const hasMenuPermission = (
+  user: UserLike,
+  key: string,
+  role: KnownRole,
+): boolean | null => {
   const { labels, hasPermissionContainer, hasPermissionPayload } =
     collectPermissionState(user);
   if (!hasPermissionContainer) return null;
@@ -233,13 +237,17 @@ const hasMenuPermission = (user: UserLike, key: string): boolean | null => {
   }
 
   if (key === "settings") {
-    const settingsRelated = [
+    const settingsRelatedForUser = [
       "settings",
       "integration",
       "tickets",
       "templates",
-      "user",
     ];
+    const settingsRelatedForAdmin = [...settingsRelatedForUser, "user"];
+
+    const settingsRelated =
+      role === "user" ? settingsRelatedForUser : settingsRelatedForAdmin;
+
     return settingsRelated.some((label) => labels.has(label));
   }
 
@@ -388,7 +396,7 @@ export const canAccessMenuKey = (
   // Explicit super admin should never be blocked by label mismatches.
   if (role === "super_admin") return true;
 
-  const permissionResult = hasMenuPermission(user, key);
+  const permissionResult = hasMenuPermission(user, key, role);
   if (permissionResult !== null) return permissionResult;
 
   if (role === "unknown") {
@@ -413,14 +421,19 @@ export const canAccessSubMenuKey = (
   // Explicit super admin should always see all settings subtabs.
   if (role === "super_admin") return true;
 
+  // Settings > User is role-gated: only admin/super_admin can access it.
+  // This must override permission payloads that may include view rights.
+  if (parentKey === "settings" && subKey === "users") {
+    return role === "admin";
+  }
+
   const permissionResult = hasSubMenuPermission(user, subKey);
   if (permissionResult !== null) return permissionResult;
 
   if (role === "unknown") return false;
 
   if (role === "admin") {
-    // Admin should not see User tab under Settings
-    return !(parentKey === "settings" && subKey === "users");
+    return true;
   }
 
   // user role: only tickets and templates under settings
