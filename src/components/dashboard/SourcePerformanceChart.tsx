@@ -233,7 +233,7 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
     });
   }, [clinicId, leads, socialMediaRevenueFromCampaigns, sourceBaseRows, timeRange]);
 
-  // Campaign-based data: Revenue (total budget) and Cost per Lead (budget / leads)
+  // Campaign-based data: Revenue (total budget) and Cost per Lead (budget / actual linked leads)
   const campaignData = useMemo(() => {
     const active = (Array.isArray(campaigns) ? campaigns : []).filter(
       (c) =>
@@ -246,6 +246,9 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
         ),
     );
 
+    // Normalised leads array for linking
+    const allLeads = Array.isArray(leads) ? leads : [];
+
     const liveCampaigns = active.map((c) => {
       const budgetTotal =
         (c.total_spend ?? 0) > 0
@@ -257,7 +260,40 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
               )
             : 0;
 
-      const leadsCount = c.lead_generated || 0;
+      // ── FIX: count leads actually linked to this campaign ──────────────────
+      // Match by campaign_id (numeric equality) OR by campaign_name (case-insensitive)
+      const campaignId = String(c.id);
+      const normalizedCampaignName = String(c.campaign_name ?? "")
+        .trim()
+        .toLowerCase();
+
+      const linkedLeadsCount = allLeads.filter((lead) => {
+        // campaign_id field on lead (may be string or number)
+        const leadCampaignId = String(
+          (lead as any).campaign_id ?? "",
+        ).trim();
+
+        // campaign_name field on lead (some backends send name instead of id)
+        const leadCampaignName = String(
+          (lead as any).campaign_name ?? "",
+        )
+          .trim()
+          .toLowerCase();
+
+        return (
+          (leadCampaignId !== "" && leadCampaignId === campaignId) ||
+          (leadCampaignName !== "" &&
+            normalizedCampaignName !== "" &&
+            leadCampaignName === normalizedCampaignName)
+        );
+      }).length;
+
+      // Use actual linked leads count; fall back to campaign's own lead_generated
+      // field only when no leads are found in the store (e.g. store not yet loaded)
+      const leadsCount =
+        linkedLeadsCount > 0
+          ? linkedLeadsCount
+          : (c.lead_generated ?? 0);
 
       const cost = leadsCount > 0 ? budgetTotal / leadsCount : 0;
 
@@ -318,7 +354,7 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
           ]
         : []),
     ];
-  }, [campaigns, clinicId, timeRange]);
+  }, [campaigns, clinicId, leads, timeRange]);
 
   const data =
     metric === "cost"
