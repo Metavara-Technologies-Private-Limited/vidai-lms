@@ -547,12 +547,17 @@ export default function AddNewLead() {
         };
 
         if (!trimmedSearch) {
+          if (normalizedUsers.length > 0) {
+            setAssigneeOptions(normalizedUsers);
+            return;
+          }
+
           const apiUsers = await fetchFromApi();
-          setAssigneeOptions(apiUsers.length > 0 ? apiUsers : normalizedUsers);
+          setAssigneeOptions(apiUsers);
           return;
         }
 
-        if (isInternal && normalizedUsers.length > 0) {
+        if (normalizedUsers.length > 0) {
           const filtered = normalizedUsers.filter((u) =>
             `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
               .toLowerCase()
@@ -614,14 +619,17 @@ export default function AddNewLead() {
         };
 
         if (!trimmedSearch) {
+          if (normalizedUsers.length > 0) {
+            setLeadGeneratedByOptions(normalizedUsers);
+            return;
+          }
+
           const apiUsers = await fetchFromApi();
-          setLeadGeneratedByOptions(
-            apiUsers.length > 0 ? apiUsers : normalizedUsers,
-          );
+          setLeadGeneratedByOptions(apiUsers);
           return;
         }
 
-        if (isInternal && normalizedUsers.length > 0) {
+        if (normalizedUsers.length > 0) {
           const filtered = normalizedUsers.filter((u) =>
             `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
               .toLowerCase()
@@ -672,7 +680,7 @@ export default function AddNewLead() {
       try {
         setAppointmentPersonnelLoading(true);
         const normalized = Array.isArray(users) ? normalizeUsersList(users) : [];
-        if (isInternal && normalized.length > 0) {
+        if (normalized.length > 0) {
           const filtered = normalized.filter((u) =>
             `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
               .toLowerCase()

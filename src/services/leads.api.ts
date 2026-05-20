@@ -342,6 +342,14 @@ api.interceptors.response.use(
       (error?.config as { __skipErrorLog?: boolean } | undefined)
         ?.__skipErrorLog,
     );
+    const isCanceled =
+      error?.code === "ERR_CANCELED" ||
+      error?.name === "CanceledError" ||
+      String(error?.message ?? "").toLowerCase() === "canceled";
+
+    if (isCanceled) {
+      return Promise.reject(error);
+    }
 
     const normalizeError = (value: unknown): string => {
       if (value == null) return "Unknown error";
@@ -595,6 +603,35 @@ const buildMinimalLeadCreatePayload = (data: LeadPayload): LeadPayload => ({
   is_active: data.is_active,
 });
 
+const buildFallbackEnrichPayload = (
+  data: LeadPayload,
+): Partial<LeadPayload> => {
+  const next: Partial<LeadPayload> = {
+    clinic_id: data.clinic_id,
+    department_id: data.department_id,
+    assigned_to_id: data.assigned_to_id ?? null,
+    assigned_to_name: data.assigned_to_name ?? null,
+    personal_id: data.personal_id ?? null,
+    personal_name: data.personal_name ?? null,
+    lead_status: data.lead_status,
+    next_action_type: data.next_action_type,
+    next_action_status: data.next_action_status,
+    next_action_description: data.next_action_description,
+    action_status: data.action_status,
+    remark: data.remark,
+  };
+
+  if (data.book_appointment) {
+    next.book_appointment = true;
+    next.appointment_date = data.appointment_date;
+    next.slot = data.slot;
+  }
+
+  return removeBlankUpdateFields(next as Record<string, unknown>) as Partial<
+    LeadPayload
+  >;
+};
+
 const isServer500 = (error: unknown): boolean =>
   axios.isAxiosError(error) && error.response?.status === 500;
 
@@ -671,14 +708,35 @@ export const LeadAPI = {
       );
 
       const createdLead = retryResponse.data;
+      const fallbackClinicId =
+        createdLead.clinic_id ?? sanitized.clinic_id ?? data.clinic_id;
+      const enrichPayload = buildFallbackEnrichPayload({
+        ...sanitized,
+        clinic_id: fallbackClinicId,
+        department_id: createdLead.department_id ?? sanitized.department_id,
+      });
+
+      if (Object.keys(enrichPayload).length === 0) {
+        return createdLead;
+      }
 
       try {
-        const enrichedLead = await LeadAPI.update(getLeadId(createdLead), {
-          ...sanitized,
-          clinic_id: createdLead.clinic_id ?? sanitized.clinic_id,
-          department_id: createdLead.department_id ?? sanitized.department_id,
-        });
-        return enrichedLead;
+        const requestConfig: AxiosRequestConfig = {
+          headers: {
+            "X-Clinic-Id": String(fallbackClinicId),
+          },
+        };
+        (
+          requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }
+        ).__skipErrorLog = true;
+
+        const enrichedResponse = await api.put<Lead>(
+          `/leads/${getLeadId(createdLead)}/update/?clinic_id=${fallbackClinicId}`,
+          enrichPayload,
+          requestConfig,
+        );
+
+        return enrichedResponse.data;
       } catch (enrichError) {
         console.warn(
           "[LeadAPI.create] Minimal create succeeded, but enrich update failed.",

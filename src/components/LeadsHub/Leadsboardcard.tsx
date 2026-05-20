@@ -12,6 +12,7 @@ import {
   IconButton,
   Button,
   Divider,
+  Tooltip,
 } from "@mui/material";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
@@ -225,70 +226,102 @@ export const CardContent: React.FC<CardContentProps> = ({
             sx={{ mb: showBookButton ? 2 : 0 }}
           >
             {showCall && (
-              <IconButton
-                size="small"
-                disabled={!canUsePhone}
-                sx={{
-                  ...iconBtnSx,
-                  ...(!canUsePhone
-                    ? {
-                        opacity: 0.45,
-                        color: "#94A3B8",
-                        "&:hover": { bgcolor: "transparent", color: "#94A3B8" },
-                      }
-                    : {}),
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenCall(lead);
-                }}
+              <Tooltip
+                title={
+                  canUsePhone ? `Call ${phoneCandidate}` : "No phone number"
+                }
+                arrow
               >
-                <PhoneIcon sx={{ fontSize: 16 }} />
-              </IconButton>
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={!canUsePhone}
+                    sx={{
+                      ...iconBtnSx,
+                      ...(!canUsePhone
+                        ? {
+                            opacity: 0.45,
+                            color: "#94A3B8",
+                            "&:hover": {
+                              bgcolor: "transparent",
+                              color: "#94A3B8",
+                            },
+                          }
+                        : {}),
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenCall(lead);
+                    }}
+                  >
+                    <PhoneIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
             )}
             {showSms && (
-              <IconButton
-                size="small"
-                disabled={!canUsePhone}
-                sx={{
-                  ...iconBtnSx,
-                  ...(!canUsePhone
-                    ? {
-                        opacity: 0.45,
-                        color: "#94A3B8",
-                        "&:hover": { bgcolor: "transparent", color: "#94A3B8" },
-                      }
-                    : {}),
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenSms(lead);
-                }}
+              <Tooltip
+                title={canUsePhone ? `SMS ${phoneCandidate}` : "No phone number"}
+                arrow
               >
-                <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
-              </IconButton>
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={!canUsePhone}
+                    sx={{
+                      ...iconBtnSx,
+                      ...(!canUsePhone
+                        ? {
+                            opacity: 0.45,
+                            color: "#94A3B8",
+                            "&:hover": {
+                              bgcolor: "transparent",
+                              color: "#94A3B8",
+                            },
+                          }
+                        : {}),
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenSms(lead);
+                    }}
+                  >
+                    <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
             )}
             {showEmail && (
-              <IconButton
-                size="small"
-                disabled={!canUseEmail}
-                sx={{
-                  ...iconBtnSx,
-                  ...(!canUseEmail
-                    ? {
-                        opacity: 0.45,
-                        color: "#94A3B8",
-                        "&:hover": { bgcolor: "transparent", color: "#94A3B8" },
-                      }
-                    : {}),
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenMail(lead);
-                }}
+              <Tooltip
+                title={canUseEmail ? `Email ${emailCandidate}` : "No email address"}
+                arrow
               >
-                <MailOutlineIcon sx={{ fontSize: 16 }} />
-              </IconButton>
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={!canUseEmail}
+                    sx={{
+                      ...iconBtnSx,
+                      ...(!canUseEmail
+                        ? {
+                            opacity: 0.45,
+                            color: "#94A3B8",
+                            "&:hover": {
+                              bgcolor: "transparent",
+                              color: "#94A3B8",
+                            },
+                          }
+                        : {}),
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenMail(lead);
+                    }}
+                  >
+                    <MailOutlineIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
             )}
           </Stack>
         </>

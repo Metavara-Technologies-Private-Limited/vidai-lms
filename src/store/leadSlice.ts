@@ -72,8 +72,9 @@ const filterLeadsForRole = (
     return leads;
   }
 
-  // User-level visibility should follow current assignee so reassignment
-  // immediately transfers ownership between users.
+  // User-level visibility includes assignee ownership and creator/generator
+  // ownership so users can still see leads they created/generated even when
+  // assigned to another teammate.
   return leads.filter((lead) => {
     const assigneeIds = collectLeadIds(lead, [
       "assigned_to_id",
@@ -81,8 +82,19 @@ const filterLeadsForRole = (
       "assignee_id",
       "owner_id",
     ]);
+    const creatorIds = collectLeadIds(lead, [
+      "created_by_id",
+      "created_by",
+      "lead_generated_by_id",
+      "generated_by_id",
+      "generator_id",
+      "personal_id",
+    ]);
 
-    return assigneeIds.includes(currentUserId);
+    return (
+      assigneeIds.includes(currentUserId) ||
+      creatorIds.includes(currentUserId)
+    );
   });
 };
 
