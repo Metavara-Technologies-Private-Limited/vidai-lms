@@ -225,6 +225,42 @@ const resizeAndCompressImage = (
   });
 };
 
+// ─── FIX: Insert HTML into a specific editor element (not via window.getSelection) ──
+// This prevents content from bleeding into the wrong platform's editor.
+const insertHTMLIntoEditor = (editorEl: HTMLDivElement, html: string) => {
+  editorEl.focus();
+
+  // Try using the Selection API scoped to this editor
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    // Only use the selection if it's actually inside this editor
+    if (editorEl.contains(range.commonAncestorContainer)) {
+      range.deleteContents();
+      const el = document.createElement("span");
+      el.innerHTML = html;
+      const frag = document.createDocumentFragment();
+      let node;
+      while ((node = el.firstChild)) frag.appendChild(node);
+      range.insertNode(frag);
+      // Move cursor after inserted content
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+  }
+
+  // Fallback: append to end of editor
+  editorEl.focus();
+  const el = document.createElement("span");
+  el.innerHTML = html;
+  const frag = document.createDocumentFragment();
+  let node;
+  while ((node = el.firstChild)) frag.appendChild(node);
+  editorEl.appendChild(frag);
+};
+
 export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
@@ -497,10 +533,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   };
 
   // ─── Handle image file chosen from disk ──────────────────────────────
-  // FIX TS6133: wired to imageUploadRefs onChange below (was declared but never used).
-  // CHANGED: added size check (>5 MB hard reject) + auto resize/compress
-  // (>2 MB gets resized to ≤2 MB via canvas before storing in state).
-  // Nothing else in this function changed.
   const handleImageFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     platform: Platform
@@ -608,13 +640,14 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     google_ads: "",
   });
 
+  // ─── FIX: onInput now reads innerHTML to preserve <a> link tags ──────
+  // Previously used innerText which stripped all HTML including anchor tags.
+  // Now we store the raw HTML so links survive save → view round-trip.
   const handleEditorInput = (platform: Platform, value: string) => {
     setPlatformContent((prev) => ({ ...prev, [platform]: value }));
   };
 
   // ─── handleImageUrl kept so SocialContentBox prop interface is unchanged ─
-  // Even though the URL input field is removed from the modal UI, SocialContentBox
-  // may still call onImageUrl internally; we keep the handler to avoid runtime errors.
   const handleImageUrl = (platform: Platform, url: string) => {
     const resolvedUrl = resolveImageUrl(url);
     platformImageUrlsRef.current[platform] = resolvedUrl;
@@ -675,9 +708,9 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       value: string,
     ) => {
       if (!ref.current) return;
-
-      if (ref.current.innerText.trim() !== value.trim()) {
-        ref.current.innerText = value;
+      // FIX: sync innerHTML (not innerText) so links are preserved on step switch
+      if (ref.current.innerHTML.trim() !== value.trim()) {
+        ref.current.innerHTML = value;
       }
     };
 
@@ -740,37 +773,42 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     return linkedinMediaRef;
   };
 
+  // ─── FIX: insertHTML now targets the specific platform's editor ref ───
+  // Previously used window.getSelection() globally which caused content to
+  // bleed into whichever editor happened to be focused — often the wrong one.
+  // Now we explicitly pass the platform so we always insert into the right editor.
   const insertHTML = (platform: string, html: string) => {
     const ref = getEditorRef(platform);
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    range.deleteContents();
-    const el = document.createElement("span");
-    el.innerHTML = html;
-    const frag = document.createDocumentFragment();
-    let node;
-    while ((node = el.firstChild)) frag.appendChild(node);
-    range.insertNode(frag);
-    ref.current?.focus();
+    if (!ref.current) return;
+    insertHTMLIntoEditor(ref.current, html);
   };
 
   const handleText = () => {
     document.execCommand("bold");
   };
 
+  // ─── FIX: handleLink now inserts into the correct platform's editor ───
   const handleLink = (platform: string) => {
     const url = prompt("Enter URL");
     if (!url) return;
+    const trimmedUrl = url.trim();
     insertHTML(
       platform,
-      `<a href="${url}" target="_blank" style="color:#2563eb;text-decoration:underline;">${url}</a>`
+      `<a href="${trimmedUrl}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">${trimmedUrl}</a>`
     );
+    // Update state with new HTML content
+    const ref = getEditorRef(platform);
+    if (ref.current) {
+      const newHtml = ref.current.innerHTML;
+      setPlatformContent((prev) => ({ ...prev, [platform]: newHtml }));
+    }
   };
 
+  // ─── FIX: handleEmoji now inserts into the correct platform's editor ──
   const handleEmoji = (platform: string) => {
     const ref = getEditorRef(platform);
-    ref.current?.focus();
+    if (!ref.current) return;
+    ref.current.focus();
     document.execCommand("insertText", false, "😊");
   };
 
@@ -942,19 +980,12 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
       for (const platform of accounts) {
         const fromState = platformContent[platform]?.trim();
-        const fromRef = refsMap[platform]?.current?.innerText?.trim() || "";
+        // FIX: read innerHTML to preserve links in the saved content
+        const fromRef = refsMap[platform]?.current?.innerHTML?.trim() || "";
         resolvedContent[platform] = fromState || fromRef;
       }
 
       // ─── CHANGED: Upload image per-platform and track each URL separately ───
-      // This allows each platform's platform_data entry to carry its own image_url.
-      // We still compute a single top-level image_url for backward compatibility.
-      //
-      // Priority order per platform:
-      //   1. Uploaded image file for that specific platform (uploaded to server)
-      //   2. Content that looks like a plain URL (legacy fallback, shared across platforms)
-
-      // Step 1 – try uploading a file for each platform that has one
       const platformUploadedImageUrls: Partial<Record<Platform, string>> = {};
 
       for (const p of accounts) {
@@ -988,7 +1019,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       }
 
       // Determine the top-level image_url (backward compat):
-      // Use the first successfully uploaded URL, else the legacy fallback.
       const firstUploadedUrl =
         accounts
           .map((p) => platformUploadedImageUrls[p])
@@ -1008,7 +1038,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       const isActive =
         statusValue === CAMPAIGN_STATUS.LIVE ||
         statusValue === CAMPAIGN_STATUS.SCHEDULED;
-      // const googleAdsCampaignStatus = type === "live" ? "live" : "draft";
 
       const campaignMode: ("organic_posting" | "paid_advertising")[] = [
         mode === "paid" ? "paid_advertising" : "organic_posting",
@@ -1020,11 +1049,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         ...resolvedContent,
       };
 
-      // ─── CHANGED: embed image_url inside each platform's platform_data ───
-      // Each platform gets its own image_url: first from its own uploaded file,
-      // then from the shared legacy fallback, then from the top-level image_url.
-      // This is the key change — image is now stored per-platform inside platform_data.
-
       if (accounts.includes("linkedin")) {
         const existingLinkedinContent =
           typeof resolvedContent["linkedin"] === "string"
@@ -1035,7 +1059,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           location: getLinkedInLocation(),
           bid_strategy: linkedInBidStrategy,
           bid_amount: linkedInBidAmount,
-          // CHANGED: store image_url inside linkedin platform_data
           image_url:
             platformUploadedImageUrls["linkedin"] ??
             legacyFallbackImageUrl ??
@@ -1051,7 +1074,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 content: resolvedContent["facebook"],
                 country_code: metaCountry || "IN",
                 state: metaState,
-                // CHANGED: store image_url inside facebook platform_data
                 image_url:
                   platformUploadedImageUrls["facebook"] ??
                   legacyFallbackImageUrl ??
@@ -1060,7 +1082,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
               }
             : {
                 content: resolvedContent["facebook"],
-                // CHANGED: store image_url inside facebook platform_data
                 image_url:
                   platformUploadedImageUrls["facebook"] ??
                   legacyFallbackImageUrl ??
@@ -1076,7 +1097,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 content: resolvedContent["instagram"],
                 country_code: metaCountry || "IN",
                 state: metaState,
-                // CHANGED: store image_url inside instagram platform_data
                 image_url:
                   platformUploadedImageUrls["instagram"] ??
                   legacyFallbackImageUrl ??
@@ -1085,7 +1105,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
               }
             : {
                 content: resolvedContent["instagram"],
-                // CHANGED: store image_url inside instagram platform_data
                 image_url:
                   platformUploadedImageUrls["instagram"] ??
                   legacyFallbackImageUrl ??
@@ -1109,7 +1128,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           campaign_type: "SEARCH",
           bidding_strategy: "MANUAL_CPC",
           cpc_bid: 2,
-          // CHANGED: store image_url inside google_ads platform_data
           image_url:
             platformUploadedImageUrls["google_ads"] ??
             legacyFallbackImageUrl ??
@@ -1118,8 +1136,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         };
       }
 
-      // ─── CHANGED: also embed image_url for any remaining selected platforms
-      // that were not handled by the specific blocks above (e.g. gmail).
       for (const p of accounts) {
         if (
           !["linkedin", "facebook", "instagram", "google_ads"].includes(p) &&
@@ -1134,7 +1150,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             if (typeof cleanedContent[p] === "object" && cleanedContent[p] !== null) {
               (cleanedContent[p] as Record<string, unknown>)["image_url"] = platformImgUrl;
             } else {
-              // If it was a plain string, convert to object form
               cleanedContent[p] = {
                 content: cleanedContent[p],
                 image_url: platformImgUrl,
@@ -1166,8 +1181,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 total: totalSpend,
               }
             : {},
-        // CHANGED: top-level image_url kept for backward compatibility with
-        // existing backend columns / API consumers that read it directly.
         image_url,
         selected_start: scheduleDate || null,
         selected_end: endDate || null,
@@ -1188,88 +1201,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       if (newCampaignId) {
         setCreatedCampaignId(newCampaignId);
       }
-
-      // const shouldSendGoogleAds =
-      //   accounts.includes("google_ads") &&
-      //   isGoogleAdsConnected &&
-      //   mode === "paid";
-
-      // if (shouldSendGoogleAds) {
-      //   try {
-      //     const googleAdsImage =
-      //       platformImageUrlsRef.current["google_ads"]?.trim() ||
-      //       image_url ||
-      //       "https://lms-vidaisolutions.metavaratechnologies.com/media/campaign_images/58e5f195dcfe46fd96f69239a3f01eca.jpg";
-
-      //     const parsedKeywords = keywordsInput
-      //       .split(",")
-      //       .map((k) => k.trim())
-      //       .filter(Boolean);
-
-      //     console.log("[GoogleAds] Sending paid ad payload:", {
-      //       internal_campaign_id: String(newCampaignId ?? ""),
-      //       image_url: googleAdsImage,
-      //       keywords: parsedKeywords,
-      //       campaign_objective: objective,
-      //       target_audience: audience,
-      //       start_date: startDate,
-      //       end_date: endDate,
-      //       start_time: scheduleTime || "",
-      //       campaign_status: statusValue,
-      //       schedule_datetime: scheduleDateTime,
-      //     });
-
-      //     // ✅ FIX: Use platform's estimated CPC ($2.0 for Google Ads) instead of hardcoded value
-      //     const googleAdsPlatform = PLATFORM_LIST.find((p) => p.id === "google_ads");
-      //     const googleAdsCpcBid = googleAdsPlatform?.cpc ?? 2.0;
-
-      //     await CampaignAPI.createGoogleAds({
-      //       clinic_id: clinicId,
-      //       customer_id: String(clinic?.google_ads_customer_id ?? ""),
-      //       campaign_name: campaignName,
-      //       budget: budgets["google_ads"],
-      //       bidding_strategy: "MANUAL_CPC",
-      //       locations: [],
-      //       keywords: parsedKeywords,
-      //       cpc_bid: googleAdsCpcBid,
-      //       ad_group_name: `${campaignName} AdGroup`,
-      //       final_url: clinic?.website ?? "https://example.com",
-      //       headline_1: campaignName.slice(0, 30),
-      //       headline_2: "Learn More",
-      //       headline_3: "Contact Us Today",
-      //       description: campaignDescription.slice(0, 90),
-      //       description_2: "Call us now or visit our website.",
-      //       image_url: googleAdsImage,
-      //       platform_data: { google_ads: resolvedContent["google_ads"] },
-      //       campaign_type: "SEARCH",
-      //       internal_campaign_id: String(newCampaignId ?? ""),
-      //       campaign_objective: objective,
-      //       target_audience: audience,
-      //       start_date: startDate,
-      //       end_date: endDate,
-      //       start_time: scheduleTime || "",
-      //       campaign_status: statusValue,
-      //       schedule_datetime: scheduleDateTime,
-      //     });
-
-      //     console.log("[GoogleAds] Paid campaign sent to Zapier successfully");
-      //   } catch (googleAdsErr) {
-      //     console.error("[GoogleAds] Failed to trigger Google Ads:", googleAdsErr);
-      //     toast.warn("Campaign saved, but Google Ads trigger failed. Check logs.");
-      //   }
-      // } else if (
-      //   accounts.includes("google_ads") &&
-      //   isGoogleAdsConnected &&
-      //   mode === "organic"
-      // ) {
-      //   console.log(
-      //     "[GoogleAds] Organic mode — campaign content saved, no paid ad triggered."
-      //   );
-      // } else if (accounts.includes("google_ads") && !isGoogleAdsConnected) {
-      //   toast.warn(
-      //     "Google Ads was not triggered because this clinic is not connected to Google Ads."
-      //   );
-      // }
 
       if (accounts.includes("linkedin") && newCampaignId) {
         try {
@@ -2182,7 +2113,6 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 </p>
 
                 {/* ── Hidden image upload inputs (one per platform) ── */}
-                {/* FIX TS6133: wired handleImageFileUpload here so it is actually used */}
                 {PLATFORM_LIST.map((p) => (
                   <React.Fragment key={p.id}>
                     <input

@@ -51,6 +51,39 @@ const PIE_COLORS: Record<string, string> = {
   google_ads: "#4285F4",
 };
 
+// ─── FIX: CSS injected once to make links in content clickable & highlighted ──
+// This targets <a> tags inside the campaign content rendering area.
+// We use a style tag approach since we can't modify the CSS file from here.
+const LINK_STYLES = `
+  .cd-content-text a,
+  .cd-content-html-body a {
+    color: #2563eb !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+    word-break: break-all;
+  }
+  .cd-content-text a:hover,
+  .cd-content-html-body a:hover {
+    color: #1d4ed8 !important;
+    text-decoration: underline !important;
+  }
+  .cd-content-html-body {
+    line-height: 1.6;
+  }
+`;
+
+// ─── FIX: Detect if content is HTML (has tags) or plain text ─────────────────
+const isHtmlContent = (str: string): boolean => /<[a-z][\s\S]*>/i.test(str);
+
+// ─── FIX: Auto-linkify plain text URLs for view display ──────────────────────
+// When content is plain text (not HTML), convert bare URLs to clickable links.
+const linkifyPlainText = (text: string): string => {
+  return text.replace(
+    /(https?:\/\/[^\s<>"']+)/gi,
+    '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;cursor:pointer;word-break:break-all;">$1</a>'
+  );
+};
+
 const CampaignTabContent: React.FC<Props> = ({
   campaign,
   activeTab,
@@ -86,8 +119,6 @@ const CampaignTabContent: React.FC<Props> = ({
   // (as set by the updated SocialCampaignModal) are shown correctly per platform tab.
   const extractImageUrl = (): string => {
     // ── 0. Per-platform image_url inside platform_data (HIGHEST priority) ──
-    // This is the new primary storage location. When a user uploads an image
-    // for a specific platform, it is stored as platform_data[platform].image_url.
     if (
       activePlatformKey &&
       typeof rawPlatformValue === "object" &&
@@ -98,8 +129,6 @@ const CampaignTabContent: React.FC<Props> = ({
     }
 
     // ── 1. Scan all platform_data entries for any image_url field ──────────
-    // Fallback: if no active platform key, or active platform has no image_url,
-    // check all other platforms' platform_data.image_url fields.
     for (const key of Object.keys(platformData_raw)) {
       const val = platformData_raw[key];
       if (
@@ -112,28 +141,32 @@ const CampaignTabContent: React.FC<Props> = ({
     }
 
     // ── 2. Top-level image_url on campaign (backward compatibility) ─────────
-    // Kept so existing campaigns saved before this change still display images.
     const direct = (campaign as any).image_url || "";
     if (direct) return direct;
 
     // ── 3. Scan platformText for image-like URL ─────────────────────────────
-    const urlsInPlatformText = platformText.match(URL_REGEX) || [];
-    const imageFromPlatformText = urlsInPlatformText.find(
-      (url) =>
-        /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
-        url.includes("unsplash.com") ||
-        url.includes("images.") ||
-        url.includes("imgur.com") ||
-        url.includes("cloudinary.com") ||
-        url.includes("googleapis.com") ||
-        url.includes("amazonaws.com") ||
-        url.includes("cdn."),
-    );
-    if (imageFromPlatformText) return imageFromPlatformText;
+    // Only scan if platformText is plain text (not HTML with links)
+    if (!isHtmlContent(platformText)) {
+      const urlsInPlatformText = platformText.match(URL_REGEX) || [];
+      const imageFromPlatformText = urlsInPlatformText.find(
+        (url) =>
+          /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
+          url.includes("unsplash.com") ||
+          url.includes("images.") ||
+          url.includes("imgur.com") ||
+          url.includes("cloudinary.com") ||
+          url.includes("googleapis.com") ||
+          url.includes("amazonaws.com") ||
+          url.includes("cdn."),
+      );
+      if (imageFromPlatformText) return imageFromPlatformText;
+    }
 
-    // ── 4. First URL found in platformText ─────────────────────────────────
-    // ✅ FIX: use ?? "" to avoid undefined
-    if (urlsInPlatformText.length > 0) return urlsInPlatformText[0] ?? "";
+    // ── 4. First URL found in platformText (plain text only) ───────────────
+    if (!isHtmlContent(platformText)) {
+      const urlsInPlatformText = platformText.match(URL_REGEX) || [];
+      if (urlsInPlatformText.length > 0) return urlsInPlatformText[0] ?? "";
+    }
 
     // ── 5. Scan all platform_data values for any URL (text-based scan) ─────
     for (const key of Object.keys(platformData_raw)) {
@@ -142,27 +175,38 @@ const CampaignTabContent: React.FC<Props> = ({
         typeof val === "object" && val !== null
           ? (val.content ?? "")
           : (val ?? "");
-      const urls = String(text).match(URL_REGEX) || [];
-      // ✅ FIX: use ?? "" to avoid undefined
-      if (urls.length > 0) return urls[0] ?? "";
+      const textStr = String(text);
+      if (!isHtmlContent(textStr)) {
+        const urls = textStr.match(URL_REGEX) || [];
+        if (urls.length > 0) return urls[0] ?? "";
+      }
     }
 
     // ── 6. Scan campaign_content for any URL ────────────────────────────────
     const campaignContent = (campaign as any).campaign_content || "";
-    const urlsInContent = campaignContent.match(URL_REGEX) || [];
-    if (urlsInContent.length > 0) return urlsInContent[0] ?? "";
+    if (!isHtmlContent(campaignContent)) {
+      const urlsInContent = campaignContent.match(URL_REGEX) || [];
+      if (urlsInContent.length > 0) return urlsInContent[0] ?? "";
+    }
 
     return "";
   };
 
   const imageUrl: string = extractImageUrl();
 
-  const cleanedText = imageUrl
+  // ─── FIX: cleanedText & line splitting only for plain text content ────────
+  // For HTML content, we render it directly with dangerouslySetInnerHTML.
+  // For plain text, we split into lines as before.
+  const isHtml = isHtmlContent(platformText);
+
+  const cleanedText = !isHtml && imageUrl
     ? platformText.replace(imageUrl, "").trim()
     : platformText.trim();
-  const lines = cleanedText.split("\n").filter((l) => l.trim());
-  const hashtagLine = lines.find((l) => l.trim().startsWith("#")) || "";
-  const bodyLines = lines.filter((l) => l.trim() && !l.trim().startsWith("#"));
+
+  const lines = isHtml ? [] : cleanedText.split("\n").filter((l) => l.trim());
+  const hashtagLine = isHtml ? "" : (lines.find((l) => l.trim().startsWith("#")) || "");
+  const bodyLines = isHtml ? [] : lines.filter((l) => l.trim() && !l.trim().startsWith("#"));
+
   const currencySymbol =
     (platformInsights?.[selectedPlatform]?.currency ?? adInsights?.currency) ===
     "INR"
@@ -172,10 +216,16 @@ const CampaignTabContent: React.FC<Props> = ({
   /* ================= CONTENT ================= */
   if (activeTab === "Content") {
     const hasImage = Boolean(imageUrl);
-    const hasText = bodyLines.length > 0 || platformText;
+    // FIX: for HTML content, hasText checks the raw HTML string length
+    const hasText = isHtml
+      ? platformText.trim().length > 0
+      : (bodyLines.length > 0 || platformText.trim().length > 0);
 
     return (
       <div className="cd-content-card">
+        {/* Inject link styles once */}
+        <style>{LINK_STYLES}</style>
+
         <div
           className="cd-content-text"
           style={{ flex: hasImage ? "1 1 55%" : "1 1 100%" }}
@@ -183,16 +233,23 @@ const CampaignTabContent: React.FC<Props> = ({
           <h3 className="cd-content-title">{campaign.name}</h3>
 
           {hasText ? (
-            platformText.trim().startsWith("<") ? (
+            isHtml ? (
+              // ─── FIX: HTML content (has <a> tags, <b>, etc.) ─────────────
+              // Rendered with dangerouslySetInnerHTML so links are clickable.
+              // Links are styled blue + underline via the injected LINK_STYLES.
               <div
+                className="cd-content-html-body"
                 dangerouslySetInnerHTML={{ __html: platformText }}
-                style={{ lineHeight: 1.6 }}
               />
             ) : (
+              // ─── Plain text content ───────────────────────────────────────
+              // Run linkifyPlainText so any bare URLs become clickable links.
               bodyLines.map((line, i) => (
-                <p key={i} style={{ marginBottom: "10px", lineHeight: 1.6 }}>
-                  {line}
-                </p>
+                <p
+                  key={i}
+                  style={{ marginBottom: "10px", lineHeight: 1.6 }}
+                  dangerouslySetInnerHTML={{ __html: linkifyPlainText(line) }}
+                />
               ))
             )
           ) : (
