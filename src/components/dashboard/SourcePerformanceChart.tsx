@@ -118,8 +118,9 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
         (c.total_spend ?? 0) > 0
           ? (c.total_spend ?? 0)
           : c.budget_data
-            ? Object.values(c.budget_data).reduce(
-                (s: number, v) => s + (Number(v) || 0),
+            ? Object.entries(c.budget_data).reduce(
+                (s: number, [key, v]) =>
+                  key === "total" ? s : s + (Number(v) || 0),
                 0,
               )
             : 0;
@@ -250,12 +251,17 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
     const allLeads = Array.isArray(leads) ? leads : [];
 
     const liveCampaigns = active.map((c) => {
+      // ── budget: prefer total_spend; otherwise sum per-platform keys from
+      //    budget_data, explicitly EXCLUDING the 'total' key to avoid
+      //    double-counting (budget_data = { instagram: 350, facebook: 250,
+      //    google: 200, total: 800 } → summing all gives 1600, not 800).
       const budgetTotal =
         (c.total_spend ?? 0) > 0
           ? (c.total_spend ?? 0)
           : c.budget_data
-            ? Object.values(c.budget_data).reduce(
-                (sum: number, v) => sum + (Number(v) || 0),
+            ? Object.entries(c.budget_data).reduce(
+                (sum: number, [key, v]) =>
+                  key === "total" ? sum : sum + (Number(v) || 0),
                 0,
               )
             : 0;
