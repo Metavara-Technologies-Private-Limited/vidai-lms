@@ -27,6 +27,9 @@ export const formatScheduleTime = (
  * - after end         -> COMPLETED
  */
 export const getComputedCampaignStatus = (c: Campaign) => {
+  if (c.status === CAMPAIGN_STATUS.DRAFT) {
+    return CAMPAIGN_STATUS.DRAFT;
+  }
   const now = dayjs();
 
   const start = c.selected_start

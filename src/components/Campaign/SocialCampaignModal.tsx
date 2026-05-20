@@ -11,6 +11,7 @@ import {
   Typography,
   IconButton,
   Chip,
+  CircularProgress,
   // Tooltip,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -2438,7 +2439,14 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   onClick={() => handleCreateCampaign("scheduled")}
                   disabled={loadingType !== null}
                 >
-                  {loadingType === "scheduled" ? "Scheduling..." : "Schedule"}
+                  {loadingType === "scheduled" ? (
+                    <>
+                      <CircularProgress size={16} color="inherit" />
+                      <span style={{ marginLeft: 8 }}>Scheduling...</span>
+                    </>
+                  ) : (
+                    "Schedule Campaign"
+                  )}
                 </button>
               </>
             ) : (

@@ -248,4 +248,10 @@ export const CampaignAPI = {
     http.post(`/upload/image/`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+
+  updateFacebookCampaign: (campaignId: string, data: unknown) =>
+    http.put(`/fb/campaigns/${campaignId}/update/`, data),
+
+  updateInstagramCampaign: (campaignId: string, data: unknown) =>
+    http.put(`/instagram/campaigns/${campaignId}/update/`, data),
 };

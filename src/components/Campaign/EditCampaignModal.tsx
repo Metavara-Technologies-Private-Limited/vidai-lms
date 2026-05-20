@@ -10,6 +10,7 @@ import {
   Select,
   MenuItem,
   Chip,
+  CircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -31,9 +32,9 @@ import SocialContentBox from "./SocialContentBox";
 import type { Campaign, CampaignAPIType } from "../../types/campaigns.types";
 import {
   CAMPAIGN_AUDIENCE,
-  CAMPAIGN_MODE,
+  // CAMPAIGN_MODE,
   CAMPAIGN_OBJECTIVES,
-  SENDER_EMAIL,
+  // SENDER_EMAIL,
   platformIcons,
   type Platform,
 } from "../../constants/campaigns.constants";
@@ -515,10 +516,11 @@ export default function EditCampaignModal({
 
   const [subject, setSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  // const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateAttachments, setTemplateAttachments] = useState<TemplateDocument[]>([]);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -1078,24 +1080,25 @@ export default function EditCampaignModal({
       }
     }
 
+    setIsUpdating(true);
     try {
       const start =
         campaign.type === "email" ? scheduleRange[0]?.format("YYYY-MM-DD") : scheduleDate;
-      const end =
-        campaign.type === "email" ? scheduleRange[1]?.format("YYYY-MM-DD") : scheduleDate;
-      const scheduledDateTime = dayjs(`${start} ${scheduleTime}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DDTHH:mm:ss");
+      // const end =
+      //   campaign.type === "email" ? scheduleRange[1]?.format("YYYY-MM-DD") : scheduleDate;
+      // const scheduledDateTime = dayjs(`${start} ${scheduleTime}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DDTHH:mm:ss");
 
-      const socialAccountData =
-        campaign.type === "social"
-          ? accounts
-              .filter((platform) => platform !== "google_ads")
-              .map((platform) => {
-                const existing = fullCampaignData.social_media?.find(
-                  (sm: { id: number; platform_name: string }) => sm.platform_name === platform,
-                );
-                return { id: existing?.id, platform_name: platform, is_active: true };
-              })
-          : [];
+      // const socialAccountData =
+      //   campaign.type === "social"
+      //     ? accounts
+      //         .filter((platform) => platform !== "google_ads")
+      //         .map((platform) => {
+      //           const existing = fullCampaignData.social_media?.find(
+      //             (sm: { id: number; platform_name: string }) => sm.platform_name === platform,
+      //           );
+      //           return { id: existing?.id, platform_name: platform, is_active: true };
+      //         })
+      //     : [];
 
       // ─── Build updated platform_data ──────────────────────────
       // FIX: resolve any image URLs before saving
@@ -1119,19 +1122,31 @@ export default function EditCampaignModal({
         } else if (p === "facebook") {
           updatedPlatformData["facebook"] = {
             content: platformContent["facebook"],
-            country_code: metaCountry || "IN",
-            state: metaState,
+            targeting: {
+              countries: [metaCountry || "IN"],
+              state: metaState,
+            },
             ...(platformImageUrlsRef.current["facebook"]
-              ? { image_url: resolveImageUrl(platformImageUrlsRef.current["facebook"]) }
+              ? {
+                  image_url: resolveImageUrl(
+                    platformImageUrlsRef.current["facebook"],
+                  ),
+                }
               : {}),
           };
         } else if (p === "instagram") {
           updatedPlatformData["instagram"] = {
             content: platformContent["instagram"],
-            country_code: metaCountry || "IN",
-            state: metaState,
+            targeting: {
+              countries: [metaCountry || "IN"],
+              state: metaState,
+            },
             ...(platformImageUrlsRef.current["instagram"]
-              ? { image_url: resolveImageUrl(platformImageUrlsRef.current["instagram"]) }
+              ? {
+                  image_url: resolveImageUrl(
+                    platformImageUrlsRef.current["instagram"],
+                  ),
+                }
               : {}),
           };
         } else if (p === "google_ads") {
@@ -1171,70 +1186,105 @@ export default function EditCampaignModal({
         resolvedImageUrl = resolveImageUrl(String(fullDataAsRecord.image_url));
       }
 
-      const persistedAccounts =
-        mode === "paid"
-          ? accounts
-          : accounts.filter((platform) => platform !== "google_ads");
-      const selectedPlatforms = PLATFORM_LIST.filter((p) => persistedAccounts.includes(p.id));
-      const totalSpend =
-        mode === "paid"
-          ? selectedPlatforms.reduce((sum, p) => sum + (budgets[p.id] ?? 0), 0)
-          : 0;
+      // const persistedAccounts =
+      //   mode === "paid"
+      //     ? accounts
+      //     : accounts.filter((platform) => platform !== "google_ads");
+      // const selectedPlatforms = PLATFORM_LIST.filter((p) => persistedAccounts.includes(p.id));
+      // const totalSpend =
+      //   mode === "paid"
+      //     ? selectedPlatforms.reduce((sum, p) => sum + (budgets[p.id] ?? 0), 0)
+      //     : 0;
 
-      const socialPayload =
-        campaign.type === "social"
-          ? {
-              social_media: socialAccountData,
-              select_ad_accounts: persistedAccounts,
-              campaign_content: fullCampaignData.campaign_content || campaignName,
-              platform_data: updatedPlatformData,
-              image_url: resolvedImageUrl,
-              budget_data: {
-                ...Object.fromEntries(
-                  selectedPlatforms.map((p) => [p.id, budgets[p.id]])
-                ),
-                total: totalSpend,
-              },
-            }
-          : {};
+      // const socialPayload =
+      //   campaign.type === "social"
+      //     ? {
+      //         social_media: socialAccountData,
+      //         select_ad_accounts: persistedAccounts,
+      //         campaign_content: fullCampaignData.campaign_content || campaignName,
+      //         platform_data: updatedPlatformData,
+      //         image_url: resolvedImageUrl,
+      //         budget_data: {
+      //           ...Object.fromEntries(
+      //             selectedPlatforms.map((p) => [p.id, budgets[p.id]])
+      //           ),
+      //           total: totalSpend,
+      //         },
+      //       }
+      //     : {};
 
-      const payload = {
-        clinic: clinicId,
+      // const payload = {
+      //   clinic: clinicId,
+      //   campaign_name: campaignName,
+      //   campaign_description: campaignDescription,
+      //   campaign_objective: objective,
+      //   target_audience: audience,
+      //   start_date: startDate,
+      //   end_date: endDate,
+      //   campaign_mode:
+      //     campaign.type === "email"
+      //       ? CAMPAIGN_MODE.EMAIL
+      //       : mode === "paid"
+      //         ? CAMPAIGN_MODE.PAID
+      //         : CAMPAIGN_MODE.ORGANIC,
+      //   selected_start: start ?? null,
+      //   selected_end: end ?? null,
+      //   enter_time: scheduleTime,
+      //   email:
+      //     campaign.type === "email"
+      //       ? [
+      //           {
+      //             id: fullCampaignData.email?.[0]?.id,
+      //             audience_name: audience,
+      //             subject,
+      //             email_body: emailBody,
+      //             template_name: "EMAIL",
+      //             template_id: selectedTemplateId,
+      //             sender_email: SENDER_EMAIL,
+      //             scheduled_at: scheduledDateTime,
+      //             is_active: true,
+      //           },
+      //         ]
+      //       : [],
+      //   ...socialPayload,
+      // };
+
+      const facebookPayload = {
         campaign_name: campaignName,
-        campaign_description: campaignDescription,
         campaign_objective: objective,
-        target_audience: audience,
-        start_date: startDate,
-        end_date: endDate,
-        campaign_mode:
-          campaign.type === "email"
-            ? CAMPAIGN_MODE.EMAIL
-            : mode === "paid"
-              ? CAMPAIGN_MODE.PAID
-              : CAMPAIGN_MODE.ORGANIC,
-        selected_start: start ?? null,
-        selected_end: end ?? null,
-        enter_time: scheduleTime,
-        email:
-          campaign.type === "email"
-            ? [
-                {
-                  id: fullCampaignData.email?.[0]?.id,
-                  audience_name: audience,
-                  subject,
-                  email_body: emailBody,
-                  template_name: "EMAIL",
-                  template_id: selectedTemplateId,
-                  sender_email: SENDER_EMAIL,
-                  scheduled_at: scheduledDateTime,
-                  is_active: true,
-                },
-              ]
-            : [],
-        ...socialPayload,
+        campaign_content: platformContent.facebook,
+        image_url: resolvedImageUrl,
+        budget_data: {
+          facebook: budgets.facebook,
+        },
+        platform_data: {
+          facebook: updatedPlatformData.facebook,
+        },
       };
 
-      await CampaignAPI.update(campaign.id, payload);
+      const instagramPayload = {
+        campaign_name: campaignName,
+        campaign_objective: objective,
+        campaign_content: platformContent.instagram,
+        image_url: resolvedImageUrl,
+        budget_data: {
+          instagram: budgets.instagram,
+        },
+        platform_data: {
+          instagram: updatedPlatformData.instagram,
+        },
+      };
+
+      if (accounts.includes("facebook")) {
+        await CampaignAPI.updateFacebookCampaign(campaign.id, facebookPayload);
+      }
+
+      if (accounts.includes("instagram")) {
+        await CampaignAPI.updateInstagramCampaign(
+          campaign.id,
+          instagramPayload,
+        );
+      }
 
       const shouldCreateGoogleAdsOnPromotion =
         campaign.type === "social" &&
@@ -1307,8 +1357,10 @@ export default function EditCampaignModal({
       };
 
       onSave(updatedCampaign);
+      setIsUpdating(false);
       onClose();
     } catch (error) {
+      setIsUpdating(false);
       console.error("Update error:", error);
       toast.error("Failed to update campaign");
     }
@@ -1323,43 +1375,64 @@ export default function EditCampaignModal({
         <Box className="email-campaign-modal">
           <div className="add-modal-header">
             <Typography variant="h6">
-              Edit {campaign.type === "email" ? "Email" : "Social Media"} Campaign
+              Edit {campaign.type === "email" ? "Email" : "Social Media"}{" "}
+              Campaign
             </Typography>
-            <IconButton onClick={onClose} className="modal-close">
+            <IconButton
+              onClick={onClose}
+              className="modal-close"
+              disabled={isUpdating}
+            >
               <CloseIcon fontSize="small" />
             </IconButton>
           </div>
           <div className="modal-divider" />
 
           <div className="stepper">
-            <div className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}>
+            <div
+              className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
+            >
               <div className="circle">{step > 1 ? "✓" : "1"}</div>
               <span>Campaign Details</span>
             </div>
             <div className="line" />
-            <div className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}>
+            <div
+              className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}
+            >
               <div className="circle">{step > 2 ? "✓" : "2"}</div>
-              <span>{campaign.type === "email" ? "Email Setup" : "Content & Configuration"}</span>
+              <span>
+                {campaign.type === "email"
+                  ? "Email Setup"
+                  : "Content & Configuration"}
+              </span>
             </div>
             <div className="line" />
             <div className={`step ${step === 3 ? "active" : ""}`}>
               <div className="circle">3</div>
-              <span>Schedule {campaign.type === "email" ? "Email" : "Campaign"}</span>
+              <span>
+                Schedule {campaign.type === "email" ? "Email" : "Campaign"}
+              </span>
             </div>
           </div>
 
           {/* ═══════════════ STEP 1 ═══════════════ */}
           {step === 1 && (
             <div className="step-content">
-              <Typography variant="h6" sx={{ mb: 3 }}>Campaign Details</Typography>
-              <div className={`form-group ${submitted && !campaignName ? "error" : ""}`}>
+              <Typography variant="h6" sx={{ mb: 3 }}>
+                Campaign Details
+              </Typography>
+              <div
+                className={`form-group ${submitted && !campaignName ? "error" : ""}`}
+              >
                 <label>Campaign Name *</label>
                 <input
                   value={campaignName}
                   onChange={(e) => {
                     const nextValue = e.target.value;
                     if (!canTypeCampaignName(nextValue)) {
-                      toast.error("Alphanumeric and underscore are allowed", { toastId: "edit-campaign-name-typing" });
+                      toast.error("Alphanumeric and underscore are allowed", {
+                        toastId: "edit-campaign-name-typing",
+                      });
                       return;
                     }
                     setCampaignName(nextValue);
@@ -1367,7 +1440,9 @@ export default function EditCampaignModal({
                   placeholder="e.g. New Product Launch"
                 />
               </div>
-              <div className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}>
+              <div
+                className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}
+              >
                 <label>Campaign Description *</label>
                 <input
                   value={campaignDescription}
@@ -1376,45 +1451,77 @@ export default function EditCampaignModal({
                 />
               </div>
               <div className="form-row">
-                <div className={`form-group half ${submitted && !objective ? "error" : ""}`}>
+                <div
+                  className={`form-group half ${submitted && !objective ? "error" : ""}`}
+                >
                   <label>Campaign Objective *</label>
                   <FormControl fullWidth>
-                    <Select value={objective} onChange={(e) => setObjective(e.target.value)} displayEmpty>
+                    <Select
+                      value={objective}
+                      onChange={(e) => setObjective(e.target.value)}
+                      displayEmpty
+                    >
                       <MenuItem value="">Select Objective</MenuItem>
-                      {Object.entries(CAMPAIGN_OBJECTIVES).map(([value, label]) => (
-                        <MenuItem key={value} value={value}>{label}</MenuItem>
-                      ))}
+                      {Object.entries(CAMPAIGN_OBJECTIVES).map(
+                        ([value, label]) => (
+                          <MenuItem key={value} value={value}>
+                            {label}
+                          </MenuItem>
+                        ),
+                      )}
                     </Select>
                   </FormControl>
                 </div>
-                <div className={`form-group half ${submitted && !audience ? "error" : ""}`}>
+                <div
+                  className={`form-group half ${submitted && !audience ? "error" : ""}`}
+                >
                   <label>Target Audience *</label>
                   <FormControl fullWidth>
-                    <Select value={audience} onChange={(e) => setAudience(e.target.value)} displayEmpty>
+                    <Select
+                      value={audience}
+                      onChange={(e) => setAudience(e.target.value)}
+                      displayEmpty
+                    >
                       <MenuItem value="">Select Audience</MenuItem>
-                      {Object.entries(CAMPAIGN_AUDIENCE).map(([value, label]) => (
-                        <MenuItem key={value} value={value}>{label}</MenuItem>
-                      ))}
+                      {Object.entries(CAMPAIGN_AUDIENCE).map(
+                        ([value, label]) => (
+                          <MenuItem key={value} value={value}>
+                            {label}
+                          </MenuItem>
+                        ),
+                      )}
                     </Select>
                   </FormControl>
                 </div>
               </div>
               <div className="form-row">
-                <div className={`form-group half ${submitted && !startDate ? "error" : ""}`}>
+                <div
+                  className={`form-group half ${submitted && !startDate ? "error" : ""}`}
+                >
                   <label>Start Date *</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
                       format="DD/MM/YYYY"
                       value={startDate ? dayjs(startDate) : null}
                       onChange={(v) => {
-                        const newStart = v ? (v as Dayjs).format("YYYY-MM-DD") : "";
+                        const newStart = v
+                          ? (v as Dayjs).format("YYYY-MM-DD")
+                          : "";
                         setStartDate(newStart);
                         // FIX: clear endDate if it becomes before new startDate
-                        if (endDate && newStart && dayjs(endDate).isBefore(dayjs(newStart), "day")) {
+                        if (
+                          endDate &&
+                          newStart &&
+                          dayjs(endDate).isBefore(dayjs(newStart), "day")
+                        ) {
                           setEndDate("");
                         }
                         // FIX: clear scheduleDate if it falls outside new range
-                        if (scheduleDate && newStart && dayjs(scheduleDate).isBefore(dayjs(newStart), "day")) {
+                        if (
+                          scheduleDate &&
+                          newStart &&
+                          dayjs(scheduleDate).isBefore(dayjs(newStart), "day")
+                        ) {
                           setScheduleDate("");
                           setScheduleTime("");
                         }
@@ -1424,7 +1531,9 @@ export default function EditCampaignModal({
                     />
                   </LocalizationProvider>
                 </div>
-                <div className={`form-group half ${submitted && !endDate ? "error" : ""}`}>
+                <div
+                  className={`form-group half ${submitted && !endDate ? "error" : ""}`}
+                >
                   <label>End Date *</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
@@ -1432,10 +1541,16 @@ export default function EditCampaignModal({
                       minDate={startDate ? dayjs(startDate) : undefined}
                       value={endDate ? dayjs(endDate) : null}
                       onChange={(v) => {
-                        const newEnd = v ? (v as Dayjs).format("YYYY-MM-DD") : "";
+                        const newEnd = v
+                          ? (v as Dayjs).format("YYYY-MM-DD")
+                          : "";
                         setEndDate(newEnd);
                         // FIX: clear scheduleDate if it goes beyond new endDate
-                        if (scheduleDate && newEnd && dayjs(scheduleDate).isAfter(dayjs(newEnd), "day")) {
+                        if (
+                          scheduleDate &&
+                          newEnd &&
+                          dayjs(scheduleDate).isAfter(dayjs(newEnd), "day")
+                        ) {
                           setScheduleDate("");
                           setScheduleTime("");
                         }
@@ -1453,61 +1568,111 @@ export default function EditCampaignModal({
           {step === 2 && campaign.type === "email" && (
             <div className="step-content">
               <h2>Email Setup</h2>
-              <div className={`section-card ${submitted && !audience ? "error" : ""}`}>
+              <div
+                className={`section-card ${submitted && !audience ? "error" : ""}`}
+              >
                 <h3>Select Audience</h3>
-                <p className="section-subtitle">Choose which audience list to send this email to</p>
-                <div className={`form-group ${submitted && !audience ? "error" : ""}`}>
+                <p className="section-subtitle">
+                  Choose which audience list to send this email to
+                </p>
+                <div
+                  className={`form-group ${submitted && !audience ? "error" : ""}`}
+                >
                   <label>Audience List *</label>
                   <FormControl fullWidth>
-                    <Select value={audience} onChange={(e) => setAudience(e.target.value)} displayEmpty>
+                    <Select
+                      value={audience}
+                      onChange={(e) => setAudience(e.target.value)}
+                      displayEmpty
+                    >
                       <MenuItem value="">Select Audience List</MenuItem>
-                      {Object.entries(CAMPAIGN_AUDIENCE).map(([value, label]) => (
-                        <MenuItem key={value} value={value}>{label}</MenuItem>
-                      ))}
+                      {Object.entries(CAMPAIGN_AUDIENCE).map(
+                        ([value, label]) => (
+                          <MenuItem key={value} value={value}>
+                            {label}
+                          </MenuItem>
+                        ),
+                      )}
                     </Select>
                   </FormControl>
                 </div>
               </div>
-              <div className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}>
+              <div
+                className={`section-card ${submitted && (!subject || !emailBody) ? "error" : ""}`}
+              >
                 <div className="email-content-header">
                   <div>
                     <h3>Email Content</h3>
-                    <p className="section-subtitle">Design your email with AI assistance</p>
+                    <p className="section-subtitle">
+                      Design your email with AI assistance
+                    </p>
                   </div>
                   <div className="email-actions">
-                    <button className="outline-btn" onClick={() => setPreviewOpen(!previewOpen)}>
+                    <button
+                      className="outline-btn"
+                      onClick={() => setPreviewOpen(!previewOpen)}
+                    >
                       <img src={viewIcon} alt="View" width={20} height={20} />
                       Preview Email
                     </button>
-                    <button className="light-btn" onClick={() => { setTemplateAttachments([]); setTemplateOpen(true); }}>
+                    <button
+                      className="light-btn"
+                      onClick={() => {
+                        setTemplateAttachments([]);
+                        setTemplateOpen(true);
+                      }}
+                    >
                       + Email Template
                     </button>
                   </div>
                 </div>
                 <div className="email-body-row">
                   <div className="email-left">
-                    <div className={`form-group ${submitted && !subject ? "error" : ""}`}>
+                    <div
+                      className={`form-group ${submitted && !subject ? "error" : ""}`}
+                    >
                       <label>Subject Line *</label>
-                      <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="New Product Launch" />
+                      <input
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        placeholder="New Product Launch"
+                      />
                       <span className="ai-suggest">✨ AI Suggest</span>
                     </div>
-                    <div className={`form-group ${submitted && !emailBody ? "error" : ""}`}>
+                    <div
+                      className={`form-group ${submitted && !emailBody ? "error" : ""}`}
+                    >
                       <label>Email *</label>
                       <div
                         ref={editorRef}
                         className="email-editor"
                         contentEditable
-                        onInput={(e: React.FormEvent<HTMLDivElement>) => setEmailBody(e.currentTarget.innerHTML)}
+                        onInput={(e: React.FormEvent<HTMLDivElement>) =>
+                          setEmailBody(e.currentTarget.innerHTML)
+                        }
                       />
                       {templateAttachments.length > 0 && (
                         <div className="template-attachments">
                           <label>Attachments</label>
                           {templateAttachments.map((doc) => {
-                            const url = doc.file || doc.file_url || doc.url || "";
-                            const name = doc.name || doc.filename || (url ? url.split("/").pop() : "Attachment");
+                            const url =
+                              doc.file || doc.file_url || doc.url || "";
+                            const name =
+                              doc.name ||
+                              doc.filename ||
+                              (url ? url.split("/").pop() : "Attachment");
                             return (
-                              <div key={doc.id ? String(doc.id) : url} className="attachment-item">
-                                <a href={url} target="_blank" rel="noopener noreferrer">📎 {name}</a>
+                              <div
+                                key={doc.id ? String(doc.id) : url}
+                                className="attachment-item"
+                              >
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  📎 {name}
+                                </a>
                               </div>
                             );
                           })}
@@ -1523,11 +1688,18 @@ export default function EditCampaignModal({
                         <button onClick={() => setPreviewOpen(false)}>✕</button>
                       </div>
                       <div className="preview-body">
-                        <p>To: <span className="chip">{audienceLabel}</span></p>
+                        <p>
+                          To: <span className="chip">{audienceLabel}</span>
+                        </p>
                         <div className="preview-divider"></div>
-                        <p className="preview-subject"><span className="label">Subject:</span> {subject}</p>
+                        <p className="preview-subject">
+                          <span className="label">Subject:</span> {subject}
+                        </p>
                         <div className="preview-divider"></div>
-                        <div className="preview-email-content" dangerouslySetInnerHTML={{ __html: emailBody }} />
+                        <div
+                          className="preview-email-content"
+                          dangerouslySetInnerHTML={{ __html: emailBody }}
+                        />
                       </div>
                     </div>
                   )}
@@ -1539,12 +1711,18 @@ export default function EditCampaignModal({
           {/* ═══════════════ STEP 2 — SOCIAL ═══════════════ */}
           {step === 2 && campaign.type === "social" && (
             <div className="step-content">
-              <Typography variant="h6" sx={{ mb: 3 }}>Content & Configuration</Typography>
+              <Typography variant="h6" sx={{ mb: 3 }}>
+                Content & Configuration
+              </Typography>
 
               {/* Platform selection */}
-              <div className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}>
+              <div
+                className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
+              >
                 <h3>Select Ad Accounts</h3>
-                <p className="section-subtitle">Select your social media ad accounts</p>
+                <p className="section-subtitle">
+                  Select your social media ad accounts
+                </p>
                 <div className="account-row">
                   {PLATFORM_LIST.map((acc) => (
                     <div
@@ -1557,16 +1735,22 @@ export default function EditCampaignModal({
                         <img src={platformIcons[acc.id]} alt={acc.label} />
                         <span>{acc.label}</span>
                       </div>
-                      <div className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`} />
+                      <div
+                        className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
+                      />
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* Campaign mode */}
-              <div className={`section-card ${submitted && !mode ? "error" : ""}`}>
+              <div
+                className={`section-card ${submitted && !mode ? "error" : ""}`}
+              >
                 <h3>Campaign Mode</h3>
-                <p className="section-subtitle">Choose a campaign mode to optimize your ad strategy</p>
+                <p className="section-subtitle">
+                  Choose a campaign mode to optimize your ad strategy
+                </p>
                 <div className="mode-row">
                   <div
                     className={`mode-card ${mode === "organic" ? "selected" : ""} ${isPaidLocked ? "disabled" : ""}`}
@@ -1574,32 +1758,58 @@ export default function EditCampaignModal({
                       if (isPaidLocked) return;
                       setMode("organic");
                     }}
-                    style={isPaidLocked ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
-                    title={isPaidLocked ? "Paid campaigns cannot be changed back to organic." : undefined}
+                    style={
+                      isPaidLocked
+                        ? { opacity: 0.6, cursor: "not-allowed" }
+                        : undefined
+                    }
+                    title={
+                      isPaidLocked
+                        ? "Paid campaigns cannot be changed back to organic."
+                        : undefined
+                    }
                   >
                     <div className="mode-left">
-                      <div className={`radio ${mode === "organic" ? "checked" : ""}`} />
+                      <div
+                        className={`radio ${mode === "organic" ? "checked" : ""}`}
+                      />
                       <div className="mode-text">
                         <h4>Organic Posting</h4>
-                        <p>Post to your connected social accounts without ad spend.</p>
+                        <p>
+                          Post to your connected social accounts without ad
+                          spend.
+                        </p>
                       </div>
                     </div>
                     <span className="badge">No Budget Required</span>
                   </div>
-                  <div className={`mode-card ${mode === "paid" ? "selected" : ""}`} onClick={() => setMode("paid")}>
+                  <div
+                    className={`mode-card ${mode === "paid" ? "selected" : ""}`}
+                    onClick={() => setMode("paid")}
+                  >
                     <div className="mode-left">
-                      <div className={`radio ${mode === "paid" ? "checked" : ""}`} />
+                      <div
+                        className={`radio ${mode === "paid" ? "checked" : ""}`}
+                      />
                       <div className="mode-text">
                         <h4>Paid Advertising</h4>
-                        <p>Boost your reach and engagement with targeted ads.</p>
+                        <p>
+                          Boost your reach and engagement with targeted ads.
+                        </p>
                       </div>
                     </div>
-                    <span className="badge outlined">Budget Setup Required</span>
+                    <span className="badge outlined">
+                      Budget Setup Required
+                    </span>
                   </div>
                 </div>
                 {isPaidLocked && (
-                  <p className="section-subtitle" style={{ color: "#b45309", marginTop: 10 }}>
-                    This campaign is already paid and cannot be changed back to organic.
+                  <p
+                    className="section-subtitle"
+                    style={{ color: "#b45309", marginTop: 10 }}
+                  >
+                    This campaign is already paid and cannot be changed back to
+                    organic.
                   </p>
                 )}
               </div>
@@ -1608,7 +1818,10 @@ export default function EditCampaignModal({
               {accounts.includes("google_ads") && mode === "paid" && (
                 <div className="section-card">
                   <h3>Google Ads Keywords</h3>
-                  <p className="section-subtitle">Enter keywords for your Google Search campaign (comma-separated)</p>
+                  <p className="section-subtitle">
+                    Enter keywords for your Google Search campaign
+                    (comma-separated)
+                  </p>
                   <div className="form-group">
                     <label>Keywords *</label>
                     <input
@@ -1621,15 +1834,34 @@ export default function EditCampaignModal({
                       Separate keywords with commas.{" "}
                       {!keywordsInput.trim() && (
                         <span style={{ color: "#d97706" }}>
-                          If left empty, fallback keywords will be auto-generated from the campaign name.
+                          If left empty, fallback keywords will be
+                          auto-generated from the campaign name.
                         </span>
                       )}
                     </p>
                     {keywordsInput.trim() && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                        {keywordsInput.split(",").map((k) => k.trim()).filter(Boolean).map((kw, i) => (
-                          <Chip key={i} label={kw} size="small" color="primary" variant="outlined" sx={{ fontSize: 11 }} />
-                        ))}
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 4,
+                          marginTop: 6,
+                        }}
+                      >
+                        {keywordsInput
+                          .split(",")
+                          .map((k) => k.trim())
+                          .filter(Boolean)
+                          .map((kw, i) => (
+                            <Chip
+                              key={i}
+                              label={kw}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                              sx={{ fontSize: 11 }}
+                            />
+                          ))}
                       </div>
                     )}
                   </div>
@@ -1638,21 +1870,47 @@ export default function EditCampaignModal({
 
               {/* Google Ads organic info */}
               {accounts.includes("google_ads") && mode === "organic" && (
-                <div className="section-card" style={{ border: "1px solid #d1fae5", backgroundColor: "#f0fdf4", borderRadius: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <img src={googleAdsIcon} alt="Google Ads" style={{ width: 18, height: 18 }} />
-                    <h3 style={{ margin: 0, color: "#15803d" }}>Google Ads — Organic Post</h3>
+                <div
+                  className="section-card"
+                  style={{
+                    border: "1px solid #d1fae5",
+                    backgroundColor: "#f0fdf4",
+                    borderRadius: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <img
+                      src={googleAdsIcon}
+                      alt="Google Ads"
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <h3 style={{ margin: 0, color: "#15803d" }}>
+                      Google Ads — Organic Post
+                    </h3>
                   </div>
                   <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
-                    Your campaign content will be saved for Google Ads. No paid ad will be triggered — no money will be spent.
-                    Switch to <strong>Paid Advertising</strong> mode to run a real Google Ad.
+                    Your campaign content will be saved for Google Ads. No paid
+                    ad will be triggered — no money will be spent. Switch to{" "}
+                    <strong>Paid Advertising</strong> mode to run a real Google
+                    Ad.
                   </p>
                 </div>
               )}
 
               {/* FIX: Meta Ad Targeting — pre-filled from saved facebook/instagram platform_data */}
-              {(accounts.includes("facebook") || accounts.includes("instagram")) && (
-                <div className="section-card" style={{ border: "1px solid #1877f2", borderRadius: 8 }}>
+              {(accounts.includes("facebook") ||
+                accounts.includes("instagram")) && (
+                <div
+                  className="section-card"
+                  style={{ border: "1px solid #1877f2", borderRadius: 8 }}
+                >
                   <h3 style={{ color: "#1877f2" }}>Meta Ad Targeting</h3>
                   <div className="form-row">
                     <div className="form-group half">
@@ -1660,12 +1918,17 @@ export default function EditCampaignModal({
                       <FormControl fullWidth variant="outlined" size="small">
                         <Select
                           value={metaCountry}
-                          onChange={(e) => { setMetaCountry(e.target.value); setMetaState(""); }}
+                          onChange={(e) => {
+                            setMetaCountry(e.target.value);
+                            setMetaState("");
+                          }}
                           displayEmpty
                         >
                           <MenuItem value="">Select Country</MenuItem>
                           {LINKEDIN_COUNTRIES.map((c) => (
-                            <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
+                            <MenuItem key={c.value} value={c.value}>
+                              {c.label}
+                            </MenuItem>
                           ))}
                         </Select>
                       </FormControl>
@@ -1679,8 +1942,14 @@ export default function EditCampaignModal({
                           displayEmpty
                         >
                           <MenuItem value="">All States</MenuItem>
-                          {(LINKEDIN_COUNTRIES.find((c) => c.value === metaCountry)?.states ?? []).map((s) => (
-                            <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+                          {(
+                            LINKEDIN_COUNTRIES.find(
+                              (c) => c.value === metaCountry,
+                            )?.states ?? []
+                          ).map((s) => (
+                            <MenuItem key={s.value} value={s.value}>
+                              {s.label}
+                            </MenuItem>
                           ))}
                         </Select>
                       </FormControl>
@@ -1691,12 +1960,30 @@ export default function EditCampaignModal({
 
               {/* LinkedIn Ad Targeting — shown only when linkedin selected */}
               {accounts.includes("linkedin") && (
-                <div className="section-card" style={{ border: "1px solid #0077b5", borderRadius: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <img src={linkedinIcon} alt="LinkedIn" style={{ width: 18, height: 18 }} />
-                    <h3 style={{ margin: 0, color: "#0077b5" }}>LinkedIn Ad Targeting</h3>
+                <div
+                  className="section-card"
+                  style={{ border: "1px solid #0077b5", borderRadius: 8 }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <img
+                      src={linkedinIcon}
+                      alt="LinkedIn"
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <h3 style={{ margin: 0, color: "#0077b5" }}>
+                      LinkedIn Ad Targeting
+                    </h3>
                   </div>
-                  <p className="section-subtitle">Configure targeting and bidding for your LinkedIn campaign</p>
+                  <p className="section-subtitle">
+                    Configure targeting and bidding for your LinkedIn campaign
+                  </p>
 
                   <div className="form-row" style={{ marginTop: 12 }}>
                     <div className="form-group half">
@@ -1704,12 +1991,17 @@ export default function EditCampaignModal({
                       <FormControl fullWidth variant="outlined" size="small">
                         <Select
                           value={linkedInCountry}
-                          onChange={(e) => { setLinkedInCountry(e.target.value); setLinkedInState(""); }}
+                          onChange={(e) => {
+                            setLinkedInCountry(e.target.value);
+                            setLinkedInState("");
+                          }}
                           displayEmpty
                         >
                           <MenuItem value="">Select Country</MenuItem>
                           {LINKEDIN_COUNTRIES.map((c) => (
-                            <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
+                            <MenuItem key={c.value} value={c.value}>
+                              {c.label}
+                            </MenuItem>
                           ))}
                         </Select>
                       </FormControl>
@@ -1717,14 +2009,29 @@ export default function EditCampaignModal({
                     <div className="form-group half">
                       <label>
                         State / Region
-                        <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: 4, fontSize: 11 }}>(optional)</span>
+                        <span
+                          style={{
+                            color: "#9ca3af",
+                            fontWeight: 400,
+                            marginLeft: 4,
+                            fontSize: 11,
+                          }}
+                        >
+                          (optional)
+                        </span>
                       </label>
                       {selectedCountryStates.length > 0 ? (
                         <FormControl fullWidth variant="outlined" size="small">
-                          <Select value={linkedInState} onChange={(e) => setLinkedInState(e.target.value)} displayEmpty>
+                          <Select
+                            value={linkedInState}
+                            onChange={(e) => setLinkedInState(e.target.value)}
+                            displayEmpty
+                          >
                             <MenuItem value="">All States</MenuItem>
                             {selectedCountryStates.map((s) => (
-                              <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+                              <MenuItem key={s.value} value={s.value}>
+                                {s.label}
+                              </MenuItem>
                             ))}
                           </Select>
                         </FormControl>
@@ -1733,7 +2040,14 @@ export default function EditCampaignModal({
                           value={linkedInState}
                           onChange={(e) => setLinkedInState(e.target.value)}
                           placeholder="e.g. Mumbai, Maharashtra, India"
-                          style={{ width: "100%", height: 40, padding: "0 12px", border: "1px solid #d1d5db", borderRadius: 4, fontSize: 14 }}
+                          style={{
+                            width: "100%",
+                            height: 40,
+                            padding: "0 12px",
+                            border: "1px solid #d1d5db",
+                            borderRadius: 4,
+                            fontSize: 14,
+                          }}
                         />
                       )}
                     </div>
@@ -1742,17 +2056,30 @@ export default function EditCampaignModal({
                   <div className="form-group" style={{ marginTop: 8 }}>
                     <label>
                       Custom Location
-                      <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: 4, fontSize: 11 }}>(overrides country/state if filled)</span>
+                      <span
+                        style={{
+                          color: "#9ca3af",
+                          fontWeight: 400,
+                          marginLeft: 4,
+                          fontSize: 11,
+                        }}
+                      >
+                        (overrides country/state if filled)
+                      </span>
                     </label>
                     <input
                       value={linkedInCustomLocation}
-                      onChange={(e) => setLinkedInCustomLocation(e.target.value)}
+                      onChange={(e) =>
+                        setLinkedInCustomLocation(e.target.value)
+                      }
                       placeholder="e.g. Mumbai, Maharashtra, India"
                       style={{ width: "100%" }}
                     />
                     <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
                       Location that will be sent:{" "}
-                      <strong style={{ color: "#1d4ed8" }}>{getLinkedInLocation() || "—"}</strong>
+                      <strong style={{ color: "#1d4ed8" }}>
+                        {getLinkedInLocation() || "—"}
+                      </strong>
                     </p>
                   </div>
 
@@ -1760,13 +2087,22 @@ export default function EditCampaignModal({
                     <div className="form-group half">
                       <label>Bid Strategy</label>
                       <FormControl fullWidth variant="outlined" size="small">
-                        <Select value={linkedInBidStrategy} onChange={(e) => setLinkedInBidStrategy(e.target.value)}>
+                        <Select
+                          value={linkedInBidStrategy}
+                          onChange={(e) =>
+                            setLinkedInBidStrategy(e.target.value)
+                          }
+                        >
                           {LINKEDIN_BID_STRATEGIES.map((s) => (
-                            <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+                            <MenuItem key={s.value} value={s.value}>
+                              {s.label}
+                            </MenuItem>
                           ))}
                         </Select>
                       </FormControl>
-                      <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                      <p
+                        style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}
+                      >
                         {linkedInBidStrategy === "MAXIMUM_DELIVERY"
                           ? "LinkedIn automatically maximises delivery within your budget."
                           : linkedInBidStrategy === "TARGET_COST"
@@ -1780,30 +2116,110 @@ export default function EditCampaignModal({
                       <label>
                         Bid Amount ($)
                         {linkedInBidStrategy === "MAXIMUM_DELIVERY" && (
-                          <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: 4, fontSize: 11 }}>(not used for auto)</span>
+                          <span
+                            style={{
+                              color: "#9ca3af",
+                              fontWeight: 400,
+                              marginLeft: 4,
+                              fontSize: 11,
+                            }}
+                          >
+                            (not used for auto)
+                          </span>
                         )}
                       </label>
-                      <div style={{ display: "flex", alignItems: "center", gap: 0, border: "1px solid #d1d5db", borderRadius: 4, overflow: "hidden", opacity: linkedInBidStrategy === "MAXIMUM_DELIVERY" ? 0.5 : 1 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0,
+                          border: "1px solid #d1d5db",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                          opacity:
+                            linkedInBidStrategy === "MAXIMUM_DELIVERY"
+                              ? 0.5
+                              : 1,
+                        }}
+                      >
                         <button
                           type="button"
-                          disabled={linkedInBidStrategy === "MAXIMUM_DELIVERY" || linkedInBidAmount <= 0}
-                          onClick={() => setLinkedInBidAmount((prev) => Math.max(0, prev - 1))}
-                          style={{ width: 36, height: 40, border: "none", borderRight: "1px solid #d1d5db", background: "#f9fafb", cursor: "pointer", fontSize: 18, color: "#374151", display: "flex", alignItems: "center", justifyContent: "center", opacity: linkedInBidAmount <= 0 ? 0.4 : 1 }}
-                        >−</button>
-                        <div style={{ display: "flex", alignItems: "center", flex: 1, justifyContent: "center", gap: 2 }}>
-                          <span style={{ color: "#6b7280", fontSize: 14 }}>$</span>
-                          <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", minWidth: 24, textAlign: "center" }}>
+                          disabled={
+                            linkedInBidStrategy === "MAXIMUM_DELIVERY" ||
+                            linkedInBidAmount <= 0
+                          }
+                          onClick={() =>
+                            setLinkedInBidAmount((prev) =>
+                              Math.max(0, prev - 1),
+                            )
+                          }
+                          style={{
+                            width: 36,
+                            height: 40,
+                            border: "none",
+                            borderRight: "1px solid #d1d5db",
+                            background: "#f9fafb",
+                            cursor: "pointer",
+                            fontSize: 18,
+                            color: "#374151",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            opacity: linkedInBidAmount <= 0 ? 0.4 : 1,
+                          }}
+                        >
+                          −
+                        </button>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            flex: 1,
+                            justifyContent: "center",
+                            gap: 2,
+                          }}
+                        >
+                          <span style={{ color: "#6b7280", fontSize: 14 }}>
+                            $
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 600,
+                              color: "#111827",
+                              minWidth: 24,
+                              textAlign: "center",
+                            }}
+                          >
                             {linkedInBidAmount}
                           </span>
                         </div>
                         <button
                           type="button"
                           disabled={linkedInBidStrategy === "MAXIMUM_DELIVERY"}
-                          onClick={() => setLinkedInBidAmount((prev) => prev + 1)}
-                          style={{ width: 36, height: 40, border: "none", borderLeft: "1px solid #d1d5db", background: "#f9fafb", cursor: "pointer", fontSize: 18, color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}
-                        >+</button>
+                          onClick={() =>
+                            setLinkedInBidAmount((prev) => prev + 1)
+                          }
+                          style={{
+                            width: 36,
+                            height: 40,
+                            border: "none",
+                            borderLeft: "1px solid #d1d5db",
+                            background: "#f9fafb",
+                            cursor: "pointer",
+                            fontSize: 18,
+                            color: "#374151",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          +
+                        </button>
                       </div>
-                      <p style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                      <p
+                        style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}
+                      >
                         Enter a whole number amount (e.g. 1, 2, 5, 10…)
                       </p>
                     </div>
@@ -1815,7 +2231,9 @@ export default function EditCampaignModal({
               {mode && (
                 <div className="section-card">
                   <h2>Campaign Content</h2>
-                  <p className="section-subtitle">Create your post content with AI assistance</p>
+                  <p className="section-subtitle">
+                    Create your post content with AI assistance
+                  </p>
 
                   {PLATFORM_LIST.map((p) => (
                     <React.Fragment key={p.id}>
@@ -1829,24 +2247,26 @@ export default function EditCampaignModal({
                     </React.Fragment>
                   ))}
 
-                  {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).map((p) => (
-                    <SocialContentBox
-                      key={p.id}
-                      ref={platformRefs[p.id]}
-                      mediaRef={mediaRefs[p.id]}
-                      platform={p.id}
-                      icon={platformIcons[p.id]}
-                      label={p.label}
-                      onText={handleText}
-                      onLink={handleLink}
-                      onEmoji={handleEmoji}
-                      onImage={handleImage}
-                      onAttachment={handleAttachment}
-                      onInput={handleEditorInput}
-                      onImageUrl={handleImageUrl}
-                      imageUrl={platformImageUrls[p.id]}
-                    />
-                  ))}
+                  {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).map(
+                    (p) => (
+                      <SocialContentBox
+                        key={p.id}
+                        ref={platformRefs[p.id]}
+                        mediaRef={mediaRefs[p.id]}
+                        platform={p.id}
+                        icon={platformIcons[p.id]}
+                        label={p.label}
+                        onText={handleText}
+                        onLink={handleLink}
+                        onEmoji={handleEmoji}
+                        onImage={handleImage}
+                        onAttachment={handleAttachment}
+                        onInput={handleEditorInput}
+                        onImageUrl={handleImageUrl}
+                        imageUrl={platformImageUrls[p.id]}
+                      />
+                    ),
+                  )}
                 </div>
               )}
             </div>
@@ -1862,10 +2282,14 @@ export default function EditCampaignModal({
                     <h3>Schedule</h3>
                     <p>Select date and time to send the email</p>
                   </div>
-                  <button className="ai-opt-btn">✨ AI-Optimization Timing</button>
+                  <button className="ai-opt-btn">
+                    ✨ AI-Optimization Timing
+                  </button>
                 </div>
                 <div className="schedule-row">
-                  <div className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}>
+                  <div
+                    className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}
+                  >
                     <label>Select Date</label>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <div style={{ display: "flex", gap: "12px" }}>
@@ -1873,22 +2297,40 @@ export default function EditCampaignModal({
                           label="From"
                           value={scheduleRange[0]}
                           minDate={startDate ? dayjs(startDate) : dayjs()}
-                          maxDate={scheduleRange[1] ?? (endDate ? dayjs(endDate) : undefined)}
-                          onChange={(v) => setScheduleRange([v ? dayjs(v) : null, scheduleRange[1]])}
+                          maxDate={
+                            scheduleRange[1] ??
+                            (endDate ? dayjs(endDate) : undefined)
+                          }
+                          onChange={(v) =>
+                            setScheduleRange([
+                              v ? dayjs(v) : null,
+                              scheduleRange[1],
+                            ])
+                          }
                           slotProps={{ textField: { fullWidth: true } }}
                         />
                         <DatePicker
                           label="To"
                           value={scheduleRange[1]}
-                          minDate={scheduleRange[0] ?? (startDate ? dayjs(startDate) : dayjs())}
+                          minDate={
+                            scheduleRange[0] ??
+                            (startDate ? dayjs(startDate) : dayjs())
+                          }
                           maxDate={endDate ? dayjs(endDate) : undefined}
-                          onChange={(v) => setScheduleRange([scheduleRange[0], v ? dayjs(v) : null])}
+                          onChange={(v) =>
+                            setScheduleRange([
+                              scheduleRange[0],
+                              v ? dayjs(v) : null,
+                            ])
+                          }
                           slotProps={{ textField: { fullWidth: true } }}
                         />
                       </div>
                     </LocalizationProvider>
                   </div>
-                  <div className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}>
+                  <div
+                    className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}
+                  >
                     <label>Enter Time</label>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       {/* FIX: use real today's date for minTime comparison */}
@@ -1896,13 +2338,18 @@ export default function EditCampaignModal({
                         format="hh:mm A"
                         value={
                           scheduleTime
-                            ? dayjs(`${scheduleRange[0]?.format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`)
+                            ? dayjs(
+                                `${scheduleRange[0]?.format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`,
+                              )
                             : null
                         }
-                        onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }}
+                        onChange={(v) => {
+                          if (v) setScheduleTime((v as Dayjs).format("HH:mm"));
+                        }}
                         ampm
                         minTime={
-                          scheduleRange[0] && scheduleRange[0].isSame(dayjs(), "day")
+                          scheduleRange[0] &&
+                          scheduleRange[0].isSame(dayjs(), "day")
                             ? dayjs()
                             : undefined
                         }
@@ -1917,20 +2364,35 @@ export default function EditCampaignModal({
           {/* ═══════════════ STEP 3 — SOCIAL ═══════════════ */}
           {step === 3 && campaign.type === "social" && (
             <div className="step-content">
-              <Typography variant="h6" sx={{ mb: 3 }}>Schedule Campaign</Typography>
+              <Typography variant="h6" sx={{ mb: 3 }}>
+                Schedule Campaign
+              </Typography>
               <div className="section-card">
                 <div className="schedule-header">
                   <div>
-                    <h3>{mode === "paid" ? "Schedule & Budget Allocation" : "Schedule"}</h3>
+                    <h3>
+                      {mode === "paid"
+                        ? "Schedule & Budget Allocation"
+                        : "Schedule"}
+                    </h3>
                     <p className="section-subtitle">
-                      {mode === "paid" ? "Establish your schedule and budget for every platform." : "Select a date and time for the campaign."}
+                      {mode === "paid"
+                        ? "Establish your schedule and budget for every platform."
+                        : "Select a date and time for the campaign."}
                     </p>
                     {/* FIX: show allowed schedule range */}
                     {startDate && endDate && (
-                      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#6b7280",
+                          marginBottom: 8,
+                        }}
+                      >
                         Schedule must be within campaign duration:{" "}
                         <strong style={{ color: "#1d4ed8" }}>
-                          {dayjs(startDate).format("DD/MM/YYYY")} – {dayjs(endDate).format("DD/MM/YYYY")}
+                          {dayjs(startDate).format("DD/MM/YYYY")} –{" "}
+                          {dayjs(endDate).format("DD/MM/YYYY")}
                         </strong>
                       </p>
                     )}
@@ -1949,7 +2411,9 @@ export default function EditCampaignModal({
                         shouldDisableDate={isScheduleDateDisabled}
                         value={scheduleDate ? dayjs(scheduleDate) : null}
                         onChange={(v) => {
-                          setScheduleDate(v ? (v as Dayjs).format("YYYY-MM-DD") : "");
+                          setScheduleDate(
+                            v ? (v as Dayjs).format("YYYY-MM-DD") : "",
+                          );
                           setScheduleTime(""); // reset time on date change
                         }}
                         slots={{ openPickerIcon: CalendarTodayIcon }}
@@ -1966,15 +2430,21 @@ export default function EditCampaignModal({
                         minTime={getScheduleMinTime()}
                         value={
                           scheduleTime
-                            ? dayjs(`${scheduleDate || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`)
+                            ? dayjs(
+                                `${scheduleDate || dayjs().format("YYYY-MM-DD")} ${scheduleTime}`,
+                              )
                             : null
                         }
-                        onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }}
+                        onChange={(v) => {
+                          if (v) setScheduleTime((v as Dayjs).format("HH:mm"));
+                        }}
                         ampm
                         slotProps={{
                           textField: {
                             fullWidth: true,
-                            helperText: !scheduleDate ? "Select a date first" : undefined,
+                            helperText: !scheduleDate
+                              ? "Select a date first"
+                              : undefined,
                           },
                         }}
                       />
@@ -1988,45 +2458,83 @@ export default function EditCampaignModal({
                     <div className="budget-section">
                       <h3>Budget Allocation</h3>
                       {/* FIX: show minimum budget hint */}
-                      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#6b7280",
+                          marginBottom: 8,
+                        }}
+                      >
                         Minimum budget per platform:{" "}
-                        <strong style={{ color: "#d97706" }}>${PLATFORM_MIN_BUDGET + 1}</strong>{" "}
+                        <strong style={{ color: "#d97706" }}>
+                          ${PLATFORM_MIN_BUDGET + 1}
+                        </strong>{" "}
                         (must be greater than ${PLATFORM_MIN_BUDGET})
                       </p>
                       <div className="budget-row">
-                        {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).map((p) => {
-                          const budgetErr = getBudgetError(p.id, budgets[p.id] ?? 0);
+                        {PLATFORM_LIST.filter((p) =>
+                          accounts.includes(p.id),
+                        ).map((p) => {
+                          const budgetErr = getBudgetError(
+                            p.id,
+                            budgets[p.id] ?? 0,
+                          );
                           return (
                             <div key={p.id} className="budget-card">
                               <div className="budget-title">
                                 <img
                                   src={
-                                    p.id === "instagram" ? instagramIcon
-                                    : p.id === "facebook" ? facebookIcon
-                                    : p.id === "linkedin" ? linkedinIcon
-                                    : googleAdsIcon
+                                    p.id === "instagram"
+                                      ? instagramIcon
+                                      : p.id === "facebook"
+                                        ? facebookIcon
+                                        : p.id === "linkedin"
+                                          ? linkedinIcon
+                                          : googleAdsIcon
                                   }
                                   alt={p.label}
-                                  style={{ width: "22px", height: "22px", objectFit: "contain" }}
+                                  style={{
+                                    width: "22px",
+                                    height: "22px",
+                                    objectFit: "contain",
+                                  }}
                                 />
-                                <span>{p.label} (Estimate CPC : ${p.cpc})</span>
+                                <span>
+                                  {p.label} (Estimate CPC : ${p.cpc})
+                                </span>
                               </div>
                               <div className="budget-input-wrapper">
-                                <label htmlFor={`budget-${p.id}`}>Enter Amount in USD ($)</label>
+                                <label htmlFor={`budget-${p.id}`}>
+                                  Enter Amount in USD ($)
+                                </label>
                                 <input
                                   id={`budget-${p.id}`}
                                   type="number"
                                   min={PLATFORM_MIN_BUDGET + 1}
                                   step="1"
                                   value={budgets[p.id] ?? 0}
-                                  onChange={(e) => setBudget(p.id, Number(e.target.value))}
+                                  onChange={(e) =>
+                                    setBudget(p.id, Number(e.target.value))
+                                  }
                                   className="budget-input"
                                   aria-label={`Budget for ${p.label} in US Dollars`}
-                                  style={{ borderColor: budgetErr ? "#ef4444" : undefined }}
+                                  style={{
+                                    borderColor: budgetErr
+                                      ? "#ef4444"
+                                      : undefined,
+                                  }}
                                 />
                                 {/* FIX: inline error per platform */}
                                 {budgetErr && (
-                                  <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>{budgetErr}</p>
+                                  <p
+                                    style={{
+                                      fontSize: 11,
+                                      color: "#ef4444",
+                                      marginTop: 4,
+                                    }}
+                                  >
+                                    {budgetErr}
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -2037,12 +2545,14 @@ export default function EditCampaignModal({
                         <div>
                           <h4>
                             Total Budget: $
-                            {PLATFORM_LIST.filter((p) => accounts.includes(p.id)).reduce(
-                              (sum, p) => sum + (budgets[p.id] ?? 0),
-                              0
-                            )}
+                            {PLATFORM_LIST.filter((p) =>
+                              accounts.includes(p.id),
+                            ).reduce((sum, p) => sum + (budgets[p.id] ?? 0), 0)}
                           </h4>
-                          <p>Ad spend is charged directly by each connected social media platform. We don't handle payments.</p>
+                          <p>
+                            Ad spend is charged directly by each connected
+                            social media platform. We don't handle payments.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -2053,16 +2563,39 @@ export default function EditCampaignModal({
           )}
 
           <div className="modal-actions">
-            <button className="cancel-btn" onClick={onClose}>Cancel</button>
+            <button className="cancel-btn" onClick={onClose}>
+              Cancel
+            </button>
             {step > 1 && (
-              <button className="cancel-btn" onClick={() => { setStep(step - 1); setSubmitted(false); }}>
+              <button
+                className="cancel-btn"
+                onClick={() => {
+                  setStep(step - 1);
+                  setSubmitted(false);
+                }}
+              >
                 Back
               </button>
             )}
             {step === 3 ? (
-              <button className="next-btn" onClick={handleUpdate}>Update Campaign</button>
+              <button onClick={handleUpdate} disabled={isUpdating}>
+                {isUpdating ? (
+                  <>
+                    <CircularProgress size={16} color="inherit" />
+                    &nbsp; Updating...
+                  </>
+                ) : (
+                  "Update Campaign"
+                )}
+              </button>
             ) : (
-              <button className="next-btn" onClick={handleNext}>Next</button>
+              <button
+                className="next-btn"
+                onClick={handleNext}
+                disabled={isUpdating}
+              >
+                Next
+              </button>
             )}
           </div>
         </Box>
@@ -2074,16 +2607,27 @@ export default function EditCampaignModal({
         onSelect={(template: { subject: string; body: string; id: string }) => {
           setSubject(template.subject);
           setEmailBody(template.body);
-          setSelectedTemplateId(template.id);
+          // setSelectedTemplateId(template.id);
           if (editorRef.current) editorRef.current.innerHTML = template.body;
           if (template.id) fetchTemplateDocuments(template.id);
         }}
       />
 
       {inlinePreview && (
-        <div className="inline-preview-backdrop" onClick={() => setInlinePreview(null)}>
-          <div className="inline-preview-popup" onClick={(e) => e.stopPropagation()}>
-            <button className="preview-close-btn" onClick={() => setInlinePreview(null)}>✕</button>
+        <div
+          className="inline-preview-backdrop"
+          onClick={() => setInlinePreview(null)}
+        >
+          <div
+            className="inline-preview-popup"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="preview-close-btn"
+              onClick={() => setInlinePreview(null)}
+            >
+              ✕
+            </button>
             <span className="preview-filename">{inlinePreview.name}</span>
             {inlinePreview.type === "image" ? (
               <img src={inlinePreview.src} alt={inlinePreview.name} />
