@@ -38,11 +38,18 @@ export const hasUsablePhone = (phone: string | null | undefined): boolean => {
 
 // ====================== Lead field formatters ======================
 export const deriveQuality = (lead: RawLead): "Hot" | "Warm" | "Cold" => {
-  const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
-  const hasNextAction = Boolean(lead.next_action_description?.trim());
-  const nextActionPending = lead.next_action_status === "pending";
-  if (hasAssignee && hasNextAction && nextActionPending) return "Hot";
-  if (hasAssignee || hasNextAction) return "Warm";
+  const createdAt = lead.created_at ?? null;
+
+  if (!createdAt) return "Cold";
+
+  const createdDate = new Date(createdAt);
+  if (isNaN(createdDate.getTime())) return "Cold";
+
+  const diffDays =
+    (Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+
+  if (diffDays < 7)  return "Hot";
+  if (diffDays < 30) return "Warm";
   return "Cold";
 };
 
