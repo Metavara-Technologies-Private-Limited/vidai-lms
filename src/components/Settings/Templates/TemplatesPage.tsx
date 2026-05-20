@@ -23,6 +23,68 @@ import {
 } from "../../../utils/roleAccess";
 import UseCaseService, { type UseCase } from "../../../services/usecase.api"; // ✅ ADDED
 
+const DEFAULT_TEMPLATE_USE_CASE_NAMES = [
+  "Follow-Up",
+  "Reminder",
+  "Re-engagement",
+  "Feedback",
+  "No-Show",
+  "Appointment",
+];
+
+const normalizeUseCaseName = (value: string): string =>
+  value.trim().toLowerCase().replace(/\s+/g, " ");
+
+const sortUseCases = (items: UseCase[]): UseCase[] => {
+  const priority = new Map(
+    DEFAULT_TEMPLATE_USE_CASE_NAMES.map((name, index) => [
+      normalizeUseCaseName(name),
+      index,
+    ]),
+  );
+
+  return [...items].sort((left, right) => {
+    const leftKey = normalizeUseCaseName(left.name);
+    const rightKey = normalizeUseCaseName(right.name);
+
+    const leftRank = priority.get(leftKey) ?? 99;
+    const rightRank = priority.get(rightKey) ?? 99;
+
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+};
+
+const VIRTUAL_USE_CASE_PREFIX = "virtual:";
+
+const withDefaultUseCases = (items: UseCase[]): UseCase[] => {
+  const byName = new Map<string, UseCase>();
+
+  for (const item of items) {
+    const key = normalizeUseCaseName(item.name);
+    if (!key || byName.has(key)) continue;
+    byName.set(key, item);
+  }
+
+  for (const defaultName of DEFAULT_TEMPLATE_USE_CASE_NAMES) {
+    const key = normalizeUseCaseName(defaultName);
+    if (byName.has(key)) continue;
+
+    byName.set(key, {
+      id: `${VIRTUAL_USE_CASE_PREFIX}${defaultName}`,
+      name: defaultName,
+      clinic: "",
+      is_active: true,
+      created_at: "",
+    });
+  }
+
+  return sortUseCases(Array.from(byName.values()));
+};
+
 const TemplateHeader = lazy(() =>
   import("./TemplateHeader").then((module) => ({
     default: module.TemplateHeader,
@@ -105,7 +167,20 @@ const TemplatesPage: React.FC = () => {
     null,
   );
 
+  const resolvedUseCases = React.useMemo(
+    () => withDefaultUseCases(useCases),
+    [useCases],
+  );
+
   const useCaseOptions = React.useMemo(() => {
+    if (resolvedUseCases.length > 0) {
+      return Array.from(
+        new Set(
+          resolvedUseCases.map((useCase) => useCase.name.trim()).filter(Boolean),
+        ),
+      );
+    }
+
     const allTemplates = [
       ...templates.mail,
       ...templates.sms,
@@ -123,7 +198,7 @@ const TemplatesPage: React.FC = () => {
           .filter(Boolean),
       ),
     );
-  }, [templates]);
+  }, [templates, resolvedUseCases]);
 
   const getApiType = (tab: string): APITemplateType => {
     if (tab === "Email") return "mail";
@@ -161,8 +236,32 @@ const TemplatesPage: React.FC = () => {
   const loadUseCases = useCallback(async () => {
     if (!clinic?.id) return;
     try {
-      const data = await UseCaseService.getUseCases(clinic.id);
-      setUseCases(Array.isArray(data) ? data : []);
+      const clinicId = clinic.id;
+      const data = await UseCaseService.getUseCases(clinicId);
+      const safeData = Array.isArray(data) ? data : [];
+
+      const existingNames = new Set(
+        safeData.map((useCase) => normalizeUseCaseName(useCase.name)),
+      );
+
+      const missingDefaultNames = DEFAULT_TEMPLATE_USE_CASE_NAMES.filter(
+        (name) => !existingNames.has(normalizeUseCaseName(name)),
+      );
+
+      if (missingDefaultNames.length > 0) {
+        await Promise.allSettled(
+          missingDefaultNames.map((name) =>
+            UseCaseService.createUseCase(clinicId, name),
+          ),
+        );
+
+        const refreshed = await UseCaseService.getUseCases(clinicId);
+        const safeRefreshed = Array.isArray(refreshed) ? refreshed : safeData;
+        setUseCases(sortUseCases(safeRefreshed));
+        return;
+      }
+
+      setUseCases(sortUseCases(safeData));
     } catch (error) {
       console.error("Failed to fetch use cases:", error);
     }
@@ -325,7 +424,7 @@ const TemplatesPage: React.FC = () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onAction={handleAction as any}
                 canEditTemplate={canEditTemplates}
-                useCases={useCases}
+                useCases={resolvedUseCases}
               />
             )}
             {activeTab === "SMS" && (
@@ -333,7 +432,7 @@ const TemplatesPage: React.FC = () => {
                 data={getFilteredData()}
                 onAction={handleAction}
                 canEditTemplate={canEditTemplates}
-                useCases={useCases}
+                useCases={resolvedUseCases}
               />
             )}
             {activeTab === "WhatsApp" && (
@@ -341,7 +440,7 @@ const TemplatesPage: React.FC = () => {
                 data={getFilteredData()}
                 onAction={handleAction}
                 canEditTemplate={canEditTemplates}
-                useCases={useCases}
+                useCases={resolvedUseCases}
               />
             )}
           </Suspense>
@@ -359,7 +458,7 @@ const TemplatesPage: React.FC = () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             initialData={(activeTemplate as any) || undefined}
             mode={viewMode}
-            useCases={useCases} // ✅ ADDED
+            useCases={resolvedUseCases} // ✅ ADDED
             onUseCaseCreated={loadUseCases} // ✅ ADDED
           />
         </Suspense>

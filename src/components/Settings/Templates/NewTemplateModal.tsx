@@ -18,7 +18,10 @@ import { NewSMSTemplateForm } from "./NewSMSTemplateForm";
 import { NewWhatsAppTemplateForm } from "./NewWhatsAppTemplateForm";
 import TemplateService, { type APITemplateType } from "../../../services/templates.api";
 import type { EmailTemplate, SMSTemplate, WhatsAppTemplate } from '../../../types/templates.types';
+import UseCaseService from "../../../services/usecase.api";
 import type { UseCase } from "../../../services/usecase.api"; // ✅ ADDED
+
+const VIRTUAL_USE_CASE_PREFIX = "virtual:";
 
 interface ModalProps {
   open: boolean;
@@ -133,15 +136,69 @@ export const NewTemplateModal: React.FC<ModalProps> = ({
     setLoading(true);
 
     try {
+      let payloadToSave = formData;
+
+      const resolveClinicId = (): number => {
+        const fromPayload =
+          formData instanceof FormData
+            ? Number(formData.get("clinic") ?? 0)
+            : Number(formData?.clinic ?? 0);
+        if (Number.isFinite(fromPayload) && fromPayload > 0) {
+          return fromPayload;
+        }
+
+        const fromStorage = Number(localStorage.getItem("clinic_id") ?? 0);
+        if (Number.isFinite(fromStorage) && fromStorage > 0) {
+          return fromStorage;
+        }
+
+        return 1;
+      };
+
+      const incomingUseCase =
+        formData instanceof FormData
+          ? String(formData.get("use_case") ?? "")
+          : String(formData?.use_case ?? "");
+
+      if (incomingUseCase.startsWith(VIRTUAL_USE_CASE_PREFIX)) {
+        const useCaseName = incomingUseCase
+          .slice(VIRTUAL_USE_CASE_PREFIX.length)
+          .trim();
+
+        if (!useCaseName) {
+          toast.error("Invalid use case selected.");
+          return;
+        }
+
+        const createdUseCase = await UseCaseService.createUseCase(
+          resolveClinicId(),
+          useCaseName,
+        );
+
+        if (formData instanceof FormData) {
+          formData.set("use_case", String(createdUseCase.id));
+          payloadToSave = formData;
+        } else {
+          payloadToSave = {
+            ...formData,
+            use_case: String(createdUseCase.id),
+          };
+        }
+
+        if (onUseCaseCreated) {
+          await onUseCaseCreated();
+        }
+      }
+
       // Map UI type to API type
       const apiType: APITemplateType = view === "email" ? "mail" : (view as APITemplateType);
 
       // Step 1: Save the template — response contains the id
       let response;
       if (mode === "edit" && resolvedInitialData?.id) {
-        response = await TemplateService.updateTemplate(apiType, resolvedInitialData.id, formData);
+        response = await TemplateService.updateTemplate(apiType, resolvedInitialData.id, payloadToSave);
       } else {
-        response = await TemplateService.createTemplate(apiType, formData);
+        response = await TemplateService.createTemplate(apiType, payloadToSave);
       }
 
       console.log("✅ Template saved:", response);
