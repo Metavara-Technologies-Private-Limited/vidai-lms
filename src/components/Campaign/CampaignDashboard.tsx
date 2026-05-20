@@ -24,7 +24,7 @@ import {
   type Platform,
 } from "../../constants/campaigns.constants";
 import type { Campaign } from "../../types/campaigns.types";
-import { formatScheduleTime } from "../../utils/campaigns.utils";
+import { formatScheduleTime, getComputedCampaignStatus } from "../../utils/campaigns.utils";
 import { toast } from "react-toastify";
 
 /* ================= COMPONENT ================= */
@@ -576,12 +576,11 @@ const CampaignDashboard = ({
                 />
               </div>
               <span className="cd-header-title">{fullCampaign.name}</span>
-              <span className={`status ${fullCampaign.status.toLowerCase()}`}>
-                {fullCampaign.status}
+              <span className={`status ${getComputedCampaignStatus(fullCampaign).toLowerCase()}`}>
+                {getComputedCampaignStatus(fullCampaign)}
               </span>
             </div>
           </div>
-
           <div className="cd-header-meta">
             <Meta label="Campaign Duration" value={duration} />
             <Meta label="Schedule Time" value={scheduleTime} />
