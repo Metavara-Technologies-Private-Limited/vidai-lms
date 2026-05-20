@@ -267,6 +267,9 @@ const normalizeRoleKey = (value: string): string =>
 const shouldShowPermissionRow = (label: string): boolean =>
   !EXCLUDED_ROW_LABELS.has(normalizePermissionLabel(label));
 
+const hasAnyEnabledPermission = (perm: PermissionFlags): boolean =>
+  perm.add || perm.edit || perm.view || perm.print;
+
 const roleMatches = (roleName: string, userRole: string): boolean => {
   const roleKey = normalizeRoleKey(roleName);
   const userRoleKey = normalizeRoleKey(userRole);
@@ -526,17 +529,18 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   const summaryRows = useMemo(() => {
     if (!activeRole) return [] as { label: string; perm: PermissionFlags }[];
 
-    // Always show the complete module list in summary view.
-    // Includes top-level modules (Dashboard, Campaign, Leads Hub, etc.) plus sub-modules.
-    // Selected permissions render green ticks; unselected stay as empty boxes.
-    const allModuleLabels = Array.from(new Set([...categories, ...subCategories]))
-      .filter(shouldShowPermissionRow);
+    return Object.entries(activeRole.permissions)
+      .filter(([label, perm]) => shouldShowPermissionRow(label) && hasAnyEnabledPermission(perm))
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([label, perm]) => ({ label, perm }));
+  }, [activeRole]);
 
-    return allModuleLabels.map((label) => ({
-      label,
-      perm: activeRole.permissions[label] ?? emptyPerm(),
-    }));
-  }, [activeRole, categories, subCategories]);
+  const userSummaryRows = useMemo(() => {
+    return Object.entries(draftPerms)
+      .filter(([label, perm]) => shouldShowPermissionRow(label) && hasAnyEnabledPermission(perm))
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([label, perm]) => ({ label, perm }));
+  }, [draftPerms]);
 
   const editRows = useMemo(() => {
     const labels = Array.from(
@@ -559,6 +563,18 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
   const openUserPermissions = (user: UserRecord) => {
     if (!canViewUserRights) return;
+
+    const roleIndex = roles.findIndex((role) =>
+      roleMatches(role.name, String(user.role || "")),
+    );
+
+    if (roleIndex >= 0) {
+      setSelectedRoleIdx(roleIndex);
+      setRoles((prev) =>
+        prev.map((entry, idx) => ({ ...entry, checked: idx === roleIndex })),
+      );
+    }
+
     setFocusedUser(user);
     setLoadingUserPerms(true);
     setMode("user-summary");
@@ -573,13 +589,17 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
           setDraftPerms(permissions);
         } else {
           // Fall back to the role's permissions
-          const roleForUser = roles.find((r) => r.name.toLowerCase() === (user.role || "").toLowerCase());
+          const roleForUser = roles.find((r) =>
+            roleMatches(r.name, String(user.role || "")),
+          );
           setDraftRights(roleForUser?.rights ?? emptyRights());
           setDraftPerms(roleForUser?.permissions ?? {});
         }
       })
       .catch(() => {
-        const roleForUser = roles.find((r) => r.name.toLowerCase() === (user.role || "").toLowerCase());
+        const roleForUser = roles.find((r) =>
+          roleMatches(r.name, String(user.role || "")),
+        );
         setDraftRights(roleForUser?.rights ?? emptyRights());
         setDraftPerms(roleForUser?.permissions ?? {});
         setUserHasIndividualPerms(false);
@@ -1058,6 +1078,14 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                     <Tick checked={row.perm.print} />
                   </Box>
                 ))}
+
+                {summaryRows.length === 0 ? (
+                  <Box sx={{ px: 1.2, py: 2 }}>
+                    <Typography sx={{ fontSize: 13, color: "#8A8A8A" }}>
+                      No enabled permissions found.
+                    </Typography>
+                  </Box>
+                ) : null}
               </Box>
             </Box>
           </Box>
@@ -1250,18 +1278,23 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                       <Typography key={h} sx={{ fontSize: 13, textAlign: "center" }}>{h}</Typography>
                     ))}
                   </Box>
-                  {summaryRows.map((row) => {
-                    const perm = draftPerms[row.label] ?? emptyPerm();
-                    return (
-                      <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(4, minmax(72px, 1fr))", alignItems: "center", px: 1.2, py: 1 }}>
-                        <Box sx={{ borderLeft: "6px solid #3A7BD5", bgcolor: "#EDF2F8", borderRadius: "4px", px: 1.3, py: 0.8, fontSize: 13 }}>{row.label}</Box>
-                        <Tick checked={perm.add} />
-                        <Tick checked={perm.edit} />
-                        <Tick checked={perm.view} />
-                        <Tick checked={perm.print} />
-                      </Box>
-                    );
-                  })}
+                  {userSummaryRows.map((row) => (
+                    <Box key={row.label} sx={{ display: "grid", gridTemplateColumns: "minmax(220px, 260px) repeat(4, minmax(72px, 1fr))", alignItems: "center", px: 1.2, py: 1 }}>
+                      <Box sx={{ borderLeft: "6px solid #3A7BD5", bgcolor: "#EDF2F8", borderRadius: "4px", px: 1.3, py: 0.8, fontSize: 13 }}>{row.label}</Box>
+                      <Tick checked={row.perm.add} />
+                      <Tick checked={row.perm.edit} />
+                      <Tick checked={row.perm.view} />
+                      <Tick checked={row.perm.print} />
+                    </Box>
+                  ))}
+
+                  {userSummaryRows.length === 0 ? (
+                    <Box sx={{ px: 1.2, py: 2 }}>
+                      <Typography sx={{ fontSize: 13, color: "#8A8A8A" }}>
+                        No enabled permissions found.
+                      </Typography>
+                    </Box>
+                  ) : null}
                 </Box>
               </Box>
             ) : (
