@@ -38,6 +38,7 @@ let profileRestoreTokenInFlight: string | null = null;
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
 const VidaiLogin = lazy(() => import("./pages/VidaiLogin"));
+const AutoLogin = lazy(() => import("./pages/AutoLogin"));
 
 const Spinner = () => (
   <Box
@@ -345,6 +346,10 @@ export default function AppRoutes() {
       <Route
         path="/settings/integration/review/*"
         element={<LoadedComponent Comp={ReviewFormPage} />}
+      />
+      <Route
+        path="/auto-login"
+        element={<LoadedComponent Comp={AutoLogin} />}
       />
 
       <Route

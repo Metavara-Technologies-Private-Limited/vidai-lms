@@ -49,14 +49,14 @@ export const authApi = {
     mode: LoginType,
   ): Promise<NormalizedLoginResponse> => {
     const url = mode === "EXT" ? "/proxy/login/" : "/auth/login/";
-  
+
     const res = await http.post<LoginResponse>(url, data);
     const response = res.data;
-  
+
     if (!response.success || !response.data?.access_token) {
       throw new Error(response.message || "Login failed");
     }
-  
+
     return {
       token: response.data.access_token,
       refresh: response.data.refresh_token,
@@ -108,5 +108,29 @@ export const authApi = {
       },
     });
     return res.data;
+  },
+  autoLogin: async (token: string): Promise<NormalizedLoginResponse> => {
+    const res = await http.get(
+      `/auto-login/?token=${encodeURIComponent(token)}`,
+    );
+
+    const response = res.data;
+
+    if (!response.success || !response.data?.access_token) {
+      throw new Error(response.message || "Auto login failed");
+    }
+
+    return {
+      token: response.data.access_token,
+      refresh: response.data.refresh_token,
+
+      user: {
+        ...response.data.user,
+      },
+
+      role: response.data.role,
+
+      permissions: response.data.permissions,
+    };
   },
 };
