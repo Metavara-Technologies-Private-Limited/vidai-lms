@@ -100,6 +100,8 @@ export type Lead = {
   contact_designation?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
+  quality?: "Hot" | "Warm" | "Cold";
+  last_interaction_at?: string;
 };
 
 export type LeadPayload = {
@@ -656,7 +658,7 @@ export const LeadAPI = {
     } catch (error: any) {
       if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
         console.log("Previous leads request cancelled");
-        return [];
+        return new Promise(() => {});
       }
 
       throw error;
@@ -969,15 +971,24 @@ export type EmailTemplatePayload = {
 // ====================== Email Template API ======================
 export const EmailTemplateAPI = {
   list: async (): Promise<EmailTemplate[]> => {
-    const response = await api.get<EmailTemplate[]>("/templates/mail/");
+    const clinicId = localStorage.getItem("clinic_id");
+
+    const response = await api.get<EmailTemplate[]>("/templates/mail/", {
+      params: {
+        clinic_id: clinicId,
+      },
+    });
+
     const data = response.data;
+
     if (Array.isArray(data)) return data;
+
     if (data && typeof data === "object" && "results" in (data as object)) {
       return (data as { results: EmailTemplate[] }).results ?? [];
     }
+
     return [];
   },
-
   create: async (payload: EmailTemplatePayload): Promise<EmailTemplate> => {
     const response = await api.post<EmailTemplate>(
       "/templates/mail/create/",

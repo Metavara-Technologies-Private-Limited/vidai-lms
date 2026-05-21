@@ -141,6 +141,8 @@ export interface RawLead {
   partner_inquiry?: boolean;
   clinic_id?: number | null;
   campaign_id?: string | null;
+  quality?: "Hot" | "Warm" | "Cold";
+  last_interaction_at?: string;
 }
 
 // ====================== Appointment State ======================
@@ -348,7 +350,7 @@ export const mapRawToLeadItem = (lead: RawLead): LeadItem => {
     campaign: lead.campaign ?? "",
     status: lead.status ?? lead.lead_status ?? "New",
     lead_status: lead.status ?? lead.lead_status ?? "New",
-    quality: deriveQuality(lead),
+    quality: lead.quality || "Cold",
     assigned: lead.assigned_to_name ?? "Unassigned",
     assigned_to_name: lead.assigned_to_name ?? "",
     assigned_to_id: lead.assigned_to_id ?? null,

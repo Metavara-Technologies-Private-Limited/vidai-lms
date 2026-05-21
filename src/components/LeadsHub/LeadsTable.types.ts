@@ -27,6 +27,8 @@ export interface RawLead {
   initials?: string;
   department_id?: number;
   clinic_id?: number | string;
+  quality?: "Hot" | "Warm" | "Cold";
+  last_interaction_at?: string;
 }
 
 export type Quality = "Hot" | "Warm" | "Cold";

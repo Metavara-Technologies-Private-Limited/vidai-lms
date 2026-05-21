@@ -180,32 +180,30 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
       const entry = map.get(source)!;
       entry.total += 1;
 
+      const quality = (
+        (lead as { quality?: string }).quality ||
+        lead.quality ||
+        "Cold"
+      )
+        .toString()
+        .toLowerCase()
+        .trim();
+
       const rawStatus = (lead.lead_status || "")
         .toString()
         .toLowerCase()
         .trim();
-      if (rawStatus === "new" || rawStatus === "appointment") {
-        entry.hot += 1;
-      } else if (
-        rawStatus === "follow-ups" ||
-        rawStatus === "follow_ups" ||
-        rawStatus === "follow up" ||
-        rawStatus === "contacted"
-      ) {
-        entry.warm += 1;
-      } else if (rawStatus === "converted") {
+
+      if (rawStatus === "converted" || rawStatus === "cycle conversion") {
         entry.converted += 1;
+      }
+
+      if (quality === "hot") {
         entry.hot += 1;
-      } else if (
-        rawStatus === "cycle conversion" ||
-        rawStatus === "cycle_conversion"
-      ) {
-        entry.converted += 1;
+      } else if (quality === "warm") {
         entry.warm += 1;
-      } else if (rawStatus === "lost") {
-        entry.cold += 1;
       } else {
-        entry.warm += 1;
+        entry.cold += 1;
       }
     }
 

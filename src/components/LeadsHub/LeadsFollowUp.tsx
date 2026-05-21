@@ -68,6 +68,8 @@ interface RawFollowUpLead {
   last_activity?: string;
   initials?: string;
   department_id?: number;
+  quality?: "Hot" | "Warm" | "Cold";
+  last_interaction_at?: string;
 }
 
 interface MappedFollowUpLead extends RawFollowUpLead {
@@ -89,14 +91,14 @@ const rowsPerPage = 10;
 
 // ====================== Helpers ======================
 
-const deriveQuality = (lead: RawFollowUpLead): "Hot" | "Warm" | "Cold" => {
-  const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
-  const hasNextAction = Boolean(lead.next_action_description?.trim());
-  const nextActionPending = lead.next_action_status === "pending";
-  if (hasAssignee && hasNextAction && nextActionPending) return "Hot";
-  if (hasAssignee || hasNextAction) return "Warm";
-  return "Cold";
-};
+// const deriveQuality = (lead: RawFollowUpLead): "Hot" | "Warm" | "Cold" => {
+//   const hasAssignee = Boolean(lead.assigned_to_id || lead.assigned_to_name);
+//   const hasNextAction = Boolean(lead.next_action_description?.trim());
+//   const nextActionPending = lead.next_action_status === "pending";
+//   if (hasAssignee && hasNextAction && nextActionPending) return "Hot";
+//   if (hasAssignee || hasNextAction) return "Warm";
+//   return "Cold";
+// };
 
 const toastOptions = {
   position: "top-right" as const,
@@ -142,7 +144,7 @@ const LeadsFollowUp: React.FC<Props> = ({
           assigned_to_id: lead.assigned_to_id,
           status: lead.lead_status || lead.status || "New",
           lead_status: lead.lead_status || lead.status || "New",
-          quality: deriveQuality(lead),
+          quality: lead.quality || "Cold",
           location: lead.location || lead.city || lead.state || "N/A",
           source: lead.source || "N/A",
           task: lead.next_action_type || lead.task_type || "N/A",

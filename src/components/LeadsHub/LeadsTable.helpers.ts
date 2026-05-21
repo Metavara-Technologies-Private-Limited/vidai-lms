@@ -169,7 +169,10 @@ export const processLead = (lead: RawLead): ProcessedLead => {
       stageStatus || lead.status || lead.lead_status || "New",
     ),
     lead_status: stageStatus || lead.lead_status || lead.status || "New",
-    quality: (lead as unknown as { quality?: Quality}).quality || deriveQuality(lead),
+    quality:
+      (lead as unknown as { quality?: Quality }).quality ||
+      lead.quality ||
+      "Cold",
     score: lead.score ?? 0,
     taskType,
     taskStatus,
