@@ -147,11 +147,25 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
 
     const sourceAliases: Record<string, string> = {
       website: "Website",
+
       chatbot: "Chatbot",
+
       socialmedia: "Social Media",
       social: "Social Media",
+      facebook: "Social Media",
+      instagram: "Social Media",
+      google: "Social Media",
+      googleads: "Social Media",
+
       referral: "Referral",
+      corporatethr: "Referral",
+      diagnosticlabs: "Referral",
+
+      email: "Email",
+      gmail: "Email",
+
       callcenter: "Call Center",
+
       walkins: "Walk-Ins",
       walkin: "Walk-Ins",
     };
@@ -168,8 +182,17 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
     >();
 
     for (const lead of filtered) {
-      const rawSource = (lead.source || "").trim();
-      const source = sourceAliases[normalizeSourceKey(rawSource)] ?? rawSource;
+      const effectiveSource = lead.sub_source?.trim() || lead.source || "";
+
+      const rawSource = effectiveSource.toLowerCase().includes("walk")
+        ? "Walk-Ins"
+        : effectiveSource.trim();
+
+      const normalizedKey = normalizeSourceKey(rawSource);
+
+      const source =
+        sourceAliases[normalizedKey] ??
+        (sourceBaseRows.includes(rawSource) ? rawSource : "Others");
       if (!source) {
         continue;
       }
@@ -207,7 +230,9 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
       }
     }
 
-    return sourceBaseRows.map((rowName) => {
+    const allRows = Array.from(new Set([...sourceBaseRows, ...map.keys()]));
+
+    return allRows.map((rowName) => {
       const counts = map.get(rowName);
 
       const total = counts?.total ?? 0;
