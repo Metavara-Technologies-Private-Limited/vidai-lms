@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosError, type AxiosInstance } from "axios";
 import { store, type AppDispatch } from "../store";
-import { setExternalToken } from "../store/authSlice";
+import { setAuth, setExternalToken } from "../store/authSlice";
 
 // Base axios instance used everywhere in the app.
 // Keep all network + auth related setup here.
@@ -113,6 +113,18 @@ const refreshAccessToken = async (): Promise<string | null> => {
     }
 
     setAccessToken(nextToken);
+    const state = store.getState();
+
+    if (state.auth.user) {
+      store.dispatch(
+        setAuth({
+          user: state.auth.user,
+          token: nextToken,
+          refresh: refreshToken,
+          loginType: state.auth.loginType,
+        }),
+      );
+    }
     return nextToken;
   } catch {
     clearAuthTokens();
@@ -191,7 +203,7 @@ http.interceptors.response.use(
 
     if (
       !originalRequest ||
-      status !== 401 ||
+      (status !== 401 && status !== 403) ||
       originalRequest._retry ||
       isAuthRoute
       // isExternalApi
@@ -225,7 +237,17 @@ if (url.includes("/users-search/")) {
 
     const newToken = await refreshPromise;
     if (!newToken) {
-      return Promise.reject(error);
+      clearAuthTokens();
+
+      store.dispatch({
+        type: "auth/clearAuth",
+      });
+
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
+
+      return new Promise(() => {});
     }
 
     if (typeof originalRequest.headers?.set === "function") {
