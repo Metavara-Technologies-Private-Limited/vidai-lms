@@ -770,212 +770,216 @@ const SalesPipelineDashboard = () => {
 	};
 
 	return (
-		<Box sx={{ p: 0.5, overflow: "hidden" }}>
-			{!canViewPipeline ? (
-				<Typography sx={{ color: "#B45309", mb: 1.5 }}>
-					You do not have permission to view sales pipeline.
-				</Typography>
-			) : null}
-			<Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-				Sales Pipeline Configuration
-			</Typography>
-			<Typography variant="body2" color="text.secondary" sx={{ mb: 2.25 }}>
-				Configure how leads flow, convert, and generate metrics across your
-				business
-			</Typography>
+    <Box sx={{ p: 0.5, overflow: "hidden" }}>
+      {!canViewPipeline ? (
+        <Typography sx={{ color: "#B45309", mb: 1.5 }}>
+          You do not have permission to view sales pipeline.
+        </Typography>
+      ) : null}
+      <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+        Sales Pipeline Configuration
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2.25 }}>
+        Configure how leads flow, convert, and generate metrics across your
+        business
+      </Typography>
 
-			<Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ alignItems: "flex-start" }}>
-				<SalesPipelineSidebar
-					pipelines={pipelines}
-					selectedPipelineId={selectedPipelineId}
-					defaultPipelineId={defaultPipelineId}
-					pipelineLoading={pipelineLoading}
-					pipelineError={pipelineError}
-					canEditPipeline={canEditPipeline}
-					actionInProgress={actionInProgress}
-					actionMenuAnchor={actionMenuAnchor}
-					actionMenuPipelineId={actionMenuPipelineId}
-					chipBackgrounds={chipBackgrounds}
-					onOpenCreatePipeline={handleOpenCreatePipeline}
-					       onSelectPipeline={(pipelineId) => {
-						       dispatch(fetchPipelineDetail(pipelineId));
-					       }}
-					onOpenActionMenu={handleOpenActionMenu}
-					onCloseActionMenu={handleCloseActionMenu}
-					onEditPipeline={handleEditPipeline}
-					onDuplicatePipeline={handleDuplicatePipeline}
-					onSetDefaultPipeline={handleSetDefaultPipeline}
-					onArchivePipeline={handleArchivePipeline}
-					onDeletePipeline={handleDeletePipeline}
-				/>
+      <Stack
+        direction={{ xs: "column", lg: "row" }}
+        spacing={1.5}
+        sx={{ alignItems: "flex-start" }}
+      >
+        <SalesPipelineSidebar
+          pipelines={pipelines}
+          selectedPipelineId={selectedPipelineId}
+          defaultPipelineId={defaultPipelineId}
+          pipelineLoading={pipelineLoading}
+          pipelineError={pipelineError}
+          canEditPipeline={canEditPipeline}
+          actionInProgress={actionInProgress}
+          actionMenuAnchor={actionMenuAnchor}
+          actionMenuPipelineId={actionMenuPipelineId}
+          chipBackgrounds={chipBackgrounds}
+          onOpenCreatePipeline={handleOpenCreatePipeline}
+          onSelectPipeline={(pipelineId) => {
+            dispatch(fetchPipelineDetail(pipelineId));
+          }}
+          onOpenActionMenu={handleOpenActionMenu}
+          onCloseActionMenu={handleCloseActionMenu}
+          onEditPipeline={handleEditPipeline}
+          onDuplicatePipeline={handleDuplicatePipeline}
+          onSetDefaultPipeline={handleSetDefaultPipeline}
+          onArchivePipeline={handleArchivePipeline}
+          onDeletePipeline={handleDeletePipeline}
+        />
 
-				<Paper
-					elevation={0}
-					sx={{
-						position: "relative",
-						flex: 1,
-						height: "74vh",
-						borderRadius: 2,
-						border: `1px solid ${theme.palette.grey[200]}`,
-						backgroundColor: theme.palette.background.paper,
-						backgroundImage: `radial-gradient(${alpha(
-							theme.palette.grey[400],
-							0.28,
-						)} 0.8px, transparent 0.8px)`,
-						backgroundSize: "16px 16px",
-						overflow: "hidden",
-					}}
-				>
-					<Box
-						sx={{
-							height: "100%",
-							display: "flex",
-							alignItems: "stretch",
-							justifyContent: "flex-start",
-							textAlign: "center",
-							px: { xs: 1, sm: 2 },
-							overflowX: "auto",
-							overflowY: "hidden",
-						}}
-					>
-						{selectedPipeline ? (
-							<SalesPipeLineData
-								stages={selectedPipeline.stages.map((stage) => ({
-									id: stage.id,
-									stageName: stage.stage_name,
-									stageColor:
-										stageColorOverrides[stage.id] ??
-										stageColorOverrides[stage.stage_name.toLowerCase()] ??
-										stage.stage_color,
-									stageType: stage.stage_type,
-									stageStatus: stage.stage_status,
-									entryRule: stage.entry_rule,
-									rules: stage.rules,
-									fields: stage.fields,
-								}))}
-								canEditPipeline={canEditPipeline}
-								onAddStage={handleOpenAddStage}
-								onEditStage={handleEditStage}
-								onDuplicateStage={handleDuplicateStage}
-								onArchiveStage={handleArchiveStageRequest}
-								onDeleteStage={handleDeleteStageRequest}
-								onReorderStages={handleReorderStages}
-								zoomPercent={zoomPercent}
-							/>
-						) : pipelineLoading ? (
-							<CircularProgress size={28} />
-						) : (
-							<Box>
-								<Typography variant="h6" sx={{ fontWeight: 700, mb: 0.65 }}>
-									No Pipeline Data Found
-								</Typography>
-								<Typography variant="body2" color="text.secondary">
-									Create a new pipeline or Select a pipeline to see the stages
-									from left sidebar.
-								</Typography>
-								<Button
-									startIcon={<AddIcon fontSize="small" />}
-									className="mobile-add-button"
-									variant="outlined"
-									onClick={handleOpenCreatePipeline}
-									disabled={!canEditPipeline}
-									sx={{
-										mt: 1.5,
-										borderRadius: 2,
-										fontWeight: 700,
-									}}
-								>
-									<span className="mobile-add-button-label">
-										Create New Pipeline
-									</span>
-								</Button>
-							</Box>
-						)}
-					</Box>
+        <Paper
+          elevation={0}
+          sx={{
+            position: "relative",
+            flex: 1,
+            height: "74vh",
+            borderRadius: 2,
+            border: `1px solid ${theme.palette.grey[200]}`,
+            backgroundColor: theme.palette.background.paper,
+            backgroundImage: `radial-gradient(${alpha(
+              theme.palette.grey[400],
+              0.28,
+            )} 0.8px, transparent 0.8px)`,
+            backgroundSize: "16px 16px",
+            overflow: "hidden",
+          }}
+        >
+          <Box
+            sx={{
+              height: "100%",
+              display: "flex",
+              alignItems: selectedPipeline ? "stretch" : "center",
+              justifyContent: selectedPipeline ? "flex-start" : "center",
+              textAlign: "center",
+              px: { xs: 1, sm: 2 },
+              overflowX: selectedPipeline ? "auto" : "hidden",
+              overflowY: "hidden",
+            }}
+          >
+            {selectedPipeline ? (
+              <SalesPipeLineData
+                stages={selectedPipeline.stages.map((stage) => ({
+                  id: stage.id,
+                  stageName: stage.stage_name,
+                  stageColor:
+                    stageColorOverrides[stage.id] ??
+                    stageColorOverrides[stage.stage_name.toLowerCase()] ??
+                    stage.stage_color,
+                  stageType: stage.stage_type,
+                  stageStatus: stage.stage_status,
+                  entryRule: stage.entry_rule,
+                  rules: stage.rules,
+                  fields: stage.fields,
+                }))}
+                canEditPipeline={canEditPipeline}
+                onAddStage={handleOpenAddStage}
+                onEditStage={handleEditStage}
+                onDuplicateStage={handleDuplicateStage}
+                onArchiveStage={handleArchiveStageRequest}
+                onDeleteStage={handleDeleteStageRequest}
+                onReorderStages={handleReorderStages}
+                zoomPercent={zoomPercent}
+              />
+            ) : pipelineLoading ? (
+              <CircularProgress size={28} />
+            ) : (
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.65 }}>
+                  No Pipeline Data Found
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Create a new pipeline or Select a pipeline to see the stages
+                  from left sidebar.
+                </Typography>
+                <Button
+                  startIcon={<AddIcon fontSize="small" />}
+                  className="mobile-add-button"
+                  variant="outlined"
+                  onClick={handleOpenCreatePipeline}
+                  disabled={!canEditPipeline}
+                  sx={{
+                    mt: 1.5,
+                    borderRadius: 2,
+                    fontWeight: 700,
+                  }}
+                >
+                  <span className="mobile-add-button-label">
+                    Create New Pipeline
+                  </span>
+                </Button>
+              </Box>
+            )}
+          </Box>
 
-					<Box
-						sx={{
-							position: "absolute",
-							left: 14,
-							bottom: 14,
-							display: "flex",
-							alignItems: "center",
-							gap: 0.5,
-						}}
-					>
-						<IconButton
-							size="small"
-							onClick={handleZoomOut}
-							sx={{
-								width: 26,
-								height: 26,
-								border: `1px solid ${theme.palette.grey[300]}`,
-								backgroundColor: theme.palette.background.paper,
-							}}
-						>
-							<RemoveIcon fontSize="small" />
-						</IconButton>
-						<Box
-							sx={{
-								px: 1,
-								py: 0.3,
-								fontSize: 12,
-								fontWeight: 600,
-								borderRadius: 1,
-								border: `1px solid ${theme.palette.grey[300]}`,
-								backgroundColor: theme.palette.background.paper,
-							}}
-						>
-							{zoomPercent}%
-						</Box>
-						<IconButton
-							size="small"
-							onClick={handleZoomIn}
-							sx={{
-								width: 26,
-								height: 26,
-								border: `1px solid ${theme.palette.grey[300]}`,
-								backgroundColor: theme.palette.background.paper,
-							}}
-						>
-							<AddIcon fontSize="small" />
-						</IconButton>
-					</Box>
-				</Paper>
-			</Stack>
+          <Box
+            sx={{
+              position: "absolute",
+              left: 14,
+              bottom: 14,
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
+            <IconButton
+              size="small"
+              onClick={handleZoomOut}
+              sx={{
+                width: 26,
+                height: 26,
+                border: `1px solid ${theme.palette.grey[300]}`,
+                backgroundColor: theme.palette.background.paper,
+              }}
+            >
+              <RemoveIcon fontSize="small" />
+            </IconButton>
+            <Box
+              sx={{
+                px: 1,
+                py: 0.3,
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 1,
+                border: `1px solid ${theme.palette.grey[300]}`,
+                backgroundColor: theme.palette.background.paper,
+              }}
+            >
+              {zoomPercent}%
+            </Box>
+            <IconButton
+              size="small"
+              onClick={handleZoomIn}
+              sx={{
+                width: 26,
+                height: 26,
+                border: `1px solid ${theme.palette.grey[300]}`,
+                backgroundColor: theme.palette.background.paper,
+              }}
+            >
+              <AddIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </Paper>
+      </Stack>
 
-			<CreateNewPipeline
-				key={editPipelineData?.id ?? "create"}
-				open={isCreateModalOpen}
-				onClose={() => {
-					setIsCreateModalOpen(false);
-					setEditPipelineData(null);
-				}}
-				onSave={handleCreatePipelineSave}
-				mode={editPipelineData ? "edit" : "create"}
-				initialPipelineName={editPipelineData?.pipelineName}
-				initialIndustry={editPipelineData?.industry}
-			/>
+      <CreateNewPipeline
+        key={editPipelineData?.id ?? "create"}
+        open={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setEditPipelineData(null);
+        }}
+        onSave={handleCreatePipelineSave}
+        mode={editPipelineData ? "edit" : "create"}
+        initialPipelineName={editPipelineData?.pipelineName}
+        initialIndustry={editPipelineData?.industry}
+      />
 
-			<SalesPipelineActionConfirmDialog
-				open={confirmAction !== null}
-				action={confirmAction}
-				entityLabel="Pipeline"
-				actionInProgress={actionInProgress}
-				onClose={handleCloseConfirmAction}
-				onConfirm={handleConfirmPipelineAction}
-			/>
+      <SalesPipelineActionConfirmDialog
+        open={confirmAction !== null}
+        action={confirmAction}
+        entityLabel="Pipeline"
+        actionInProgress={actionInProgress}
+        onClose={handleCloseConfirmAction}
+        onConfirm={handleConfirmPipelineAction}
+      />
 
-			<SalesPipelineActionConfirmDialog
-				open={stageConfirmAction !== null}
-				action={stageConfirmAction}
-				entityLabel="Stage"
-				actionInProgress={actionInProgress}
-				onClose={handleCloseStageConfirmAction}
-				onConfirm={handleConfirmStageAction}
-			/>
-		</Box>
-	);
+      <SalesPipelineActionConfirmDialog
+        open={stageConfirmAction !== null}
+        action={stageConfirmAction}
+        entityLabel="Stage"
+        actionInProgress={actionInProgress}
+        onClose={handleCloseStageConfirmAction}
+        onConfirm={handleConfirmStageAction}
+      />
+    </Box>
+  );
 };
 
 export default SalesPipelineDashboard;
