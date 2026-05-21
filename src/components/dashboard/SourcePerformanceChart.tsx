@@ -395,6 +395,13 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
     revenue: { key: "revenue", label: "Campaign Budget (in $)" },
     cost: { key: "cost", label: "Cost per Lead (in $)" },
   }[metric];
+  const hasChartData = data.some((item) => {
+    if (metric === "volume") {
+      return item.hot > 0 || item.warm > 0 || item.cold > 0;
+    }
+
+    return Number(item[config.key as keyof typeof item]) > 0;
+  });
 
   return (
     <Box sx={chartStyles.container}>
@@ -471,7 +478,38 @@ const SourcePerformanceChart = ({ timeRange }: SourcePerformanceChartProps) => {
       )}
 
       {/* CHART */}
-      <Box sx={chartStyles.chartWrapper}>
+      <Box
+        sx={{
+          ...chartStyles.chartWrapper,
+          position: "relative",
+        }}
+      >
+        {!hasChartData && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#9E9E9E",
+                fontWeight: 500,
+                backgroundColor: "rgba(255,255,255,0.9)",
+                px: 2,
+                py: 1,
+                borderRadius: 1,
+              }}
+            >
+              No data available
+            </Typography>
+          </Box>
+        )}
         <SafeResponsiveContainer minHeight={260}>
           <BarChart
             key={metric}

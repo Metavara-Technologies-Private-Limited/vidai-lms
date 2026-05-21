@@ -137,6 +137,9 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
   }, [clinicId, timeRange]);
 
   const data: PlatformRow[] = useMemo(() => rawData, [rawData]);
+  const hasChartData = data.some(
+    (item) => item.high > 0 || item.low > 0 || item.no > 0,
+  );
 
   return (
     <Box sx={chartStyles.container}>
@@ -199,7 +202,12 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
       </Stack>
 
       {/* CHART */}
-      <Box sx={chartStyles.chartWrapper}>
+      <Box
+        sx={{
+          ...chartStyles.chartWrapper,
+          position: "relative",
+        }}
+      >
         <SafeResponsiveContainer minHeight={260}>
           <BarChart
             data={data}
@@ -240,6 +248,32 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
             />
           </BarChart>
         </SafeResponsiveContainer>
+        {!hasChartData && !loading && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#9E9E9E",
+                fontWeight: 500,
+                backgroundColor: "rgba(255,255,255,0.9)",
+                px: 2,
+                py: 1,
+                borderRadius: 1,
+              }}
+            >
+              No data available
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Data source note */}

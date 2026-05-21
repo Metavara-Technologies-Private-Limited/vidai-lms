@@ -122,41 +122,55 @@ const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
           No. of Appointments
         </Box>
         <SafeResponsiveContainer minHeight={260}>
-          <BarChart 
-            data={data} 
-            margin={{ top: 22, right: 30, left: 10, bottom: 16 }} 
+          <BarChart
+            data={data}
+            margin={{ top: 22, right: 30, left: 10, bottom: 16 }}
             barSize={30}
           >
-            <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e9edf3" />
-            <XAxis 
-              dataKey="status" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fontSize: 12, fill: "#5f687a" }}
-              label={{ value: "Campaigns", position: "insideBottom", offset: -2, fill: "#b2b9c7", fontSize: 12 }}
+            <CartesianGrid
+              strokeDasharray="4 4"
+              vertical={false}
+              stroke="#e9edf3"
             />
-            <YAxis 
-              axisLine={false} 
-              tickLine={false} 
+            <XAxis
+              dataKey="status"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 12, fill: "#5f687a" }}
+              label={{
+                value: "Appointment Status",
+                position: "insideBottom",
+                offset: -2,
+                fill: "#b2b9c7",
+                fontSize: 12,
+              }}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
               domain={[0, 50]}
               ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]}
               tick={{ fontSize: 11, fill: "#5f687a" }}
             />
-            <Tooltip 
-              content={<CustomTooltip />} 
-              cursor={{ fill: "transparent" }} 
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ fill: "transparent" }}
             />
-            <Bar 
-              dataKey="value" 
+            <Bar
+              dataKey="value"
               radius={[6, 6, 0, 0]}
               onMouseEnter={(_, index) => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
             >
               {data.map((_entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={index === 2 || hoveredIndex === index ? "#7d859d" : (_entry.color || "#daddf0")} 
-                  style={{ transition: 'fill 0.3s ease' }}
+                <Cell
+                  key={`cell-${index}`}
+                  fill={
+                    index === 2 || hoveredIndex === index
+                      ? "#7d859d"
+                      : _entry.color || "#daddf0"
+                  }
+                  style={{ transition: "fill 0.3s ease" }}
                 />
               ))}
             </Bar>

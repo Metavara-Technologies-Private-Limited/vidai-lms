@@ -82,7 +82,7 @@ const Header = ({
   const [isPhotoUpdating, setIsPhotoUpdating] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [photoVersion, setPhotoVersion] = useState(() => Date.now());
-  const lastFetchedClinicIdRef = useRef<number | null>(null);
+  // const lastFetchedClinicIdRef = useRef<number | null>(null);
   const latestUserRef = useRef(user);
 
   const userClinics = useMemo<DropdownClinic[]>(() => {
@@ -177,63 +177,84 @@ const Header = ({
     const storedClinicId =
       Number(localStorage.getItem("clinic_id") || 0) || null;
 
-      const isSuperAdmin =
-        user?.role?.name === "Super Admin" ||
-        user?.designation === "Super Admin" ||
-        user?.designation_label === "Super Admin";
+    const isSuperAdmin =
+      user?.role?.name === "Super Admin" ||
+      user?.designation === "Super Admin" ||
+      user?.designation_label === "Super Admin";
 
-      const profileClinicId =
-        userClinics.find((clinic) => clinic.isDefault)?.id ||
-        userClinics[0]?.id ||
-        clinics[0]?.id ||
-        null;
+    const profileClinicId =
+      userClinics.find((clinic) => clinic.isDefault)?.id ||
+      userClinics[0]?.id ||
+      clinics[0]?.id ||
+      null;
 
-      let nextClinicId: number | null = profileClinicId;
+    let nextClinicId: number | null = profileClinicId;
 
-      if (isSuperAdmin) {
-        // Superadmin can access any clinic
-        nextClinicId = storedClinicId || profileClinicId;
-      } else {
-        // Normal users only allowed their clinics
-        const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
+    if (isSuperAdmin) {
+      // Superadmin can access any clinic
+      nextClinicId = storedClinicId || profileClinicId;
+    } else {
+      // Normal users only allowed their clinics
+      const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
 
-        const validStored =
-          storedClinicId &&
-          allowedClinics.some((clinic) => clinic.id === storedClinicId)
-            ? storedClinicId
-            : null;
+      const validStored =
+        storedClinicId &&
+        allowedClinics.some((clinic) => clinic.id === storedClinicId)
+          ? storedClinicId
+          : null;
 
-        nextClinicId = validStored || profileClinicId;
-      }
+      nextClinicId = validStored || profileClinicId;
+    }
 
-      setSelectedClinicId(nextClinicId);
-  }, [clinics, selectedClinicId, user?.designation, user?.designation_label, user?.role?.name, userClinics]);
+    setSelectedClinicId(nextClinicId);
+  }, [
+    clinics,
+    selectedClinicId,
+    user?.designation,
+    user?.designation_label,
+    user?.role?.name,
+    userClinics,
+  ]);
 
   useEffect(() => {
-    const hydrateClinic = async () => {
-      setIsClinicLoading(true);
-      try {
-        if (!selectedClinicId) return;
-        if (lastFetchedClinicIdRef.current === selectedClinicId) return;
+    let isMounted = true;
 
-        lastFetchedClinicIdRef.current = selectedClinicId;
-        // ✅ FIX: Clear campaigns BEFORE switching clinic to prevent stale data display
+    const hydrateClinic = async () => {
+      try {
+        if (!selectedClinicId) {
+          setIsClinicLoading(false);
+          return;
+        }
+
+        if (isMounted) {
+          setIsClinicLoading(true);
+        }
+        // if (lastFetchedClinicIdRef.current === selectedClinicId) return;
+
         dispatch(clearCampaigns());
-        // Persist to localStorage FIRST so all service calls pick up the new clinic
+
         localStorage.setItem("clinic_id", String(selectedClinicId));
+
         await dispatch(fetchClinic(selectedClinicId));
-        // Re-fetch all clinic-scoped data in parallel
+
         await Promise.all([
           dispatch(fetchLeads()),
           dispatch(fetchCampaign()),
           dispatch(fetchPipelines(selectedClinicId)),
         ]);
+
+        // lastFetchedClinicIdRef.current = selectedClinicId;
       } finally {
-        setIsClinicLoading(false);
+        if (isMounted) {
+          setIsClinicLoading(false);
+        }
       }
     };
 
     hydrateClinic();
+    return () => {
+      isMounted = false;
+    };
   }, [dispatch, selectedClinicId]);
 
   useEffect(() => {
