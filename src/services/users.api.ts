@@ -73,6 +73,7 @@ export type UserCreateUpdatePayload = {
   role?: number;
   photo?: File | string | null;
   remove_photo?: boolean;
+  clinic_id?: number;
 };
 
 type UserCreateFallbackPayload = UserCreateUpdatePayload & {

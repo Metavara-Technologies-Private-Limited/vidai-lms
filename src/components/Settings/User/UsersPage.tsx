@@ -343,7 +343,7 @@ const UsersPage: React.FC = () => {
         photo: nextPhoto,
       };
     });
-  }, [authUser, editingUser?.id]);
+  }, [authUser, editingUser, editingUser?.id]);
 
   const mapUserToFormData = (user: User): UserFormData => {
     const record = user as any;
@@ -424,6 +424,7 @@ const UsersPage: React.FC = () => {
       : {}),
     ...(data.profilePhotoFile ? { photo: data.profilePhotoFile } : {}),
     ...(data.removeProfilePhoto ? { remove_photo: true } : {}),
+    clinic_id: Number(localStorage.getItem("clinic_id")) || undefined,
   });
 
   // const resolvedRoleOptions =
