@@ -658,7 +658,7 @@ export const LeadAPI = {
     } catch (error: any) {
       if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
         console.log("Previous leads request cancelled");
-        return new Promise(() => {});
+        return [];
       }
 
       throw error;

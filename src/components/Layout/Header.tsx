@@ -177,10 +177,10 @@ const Header = ({
     const storedClinicId =
       Number(localStorage.getItem("clinic_id") || 0) || null;
 
-    const isSuperAdmin =
-      user?.role?.name === "Super Admin" ||
-      user?.designation === "Super Admin" ||
-      user?.designation_label === "Super Admin";
+    // const isSuperAdmin =
+    //   user?.role?.name === "Super Admin" ||
+    //   user?.designation === "Super Admin" ||
+    //   user?.designation_label === "Super Admin";
 
     const profileClinicId =
       userClinics.find((clinic) => clinic.isDefault)?.id ||
@@ -190,21 +190,23 @@ const Header = ({
 
     let nextClinicId: number | null = profileClinicId;
 
-    if (isSuperAdmin) {
-      // Superadmin can access any clinic
-      nextClinicId = storedClinicId || profileClinicId;
-    } else {
-      // Normal users only allowed their clinics
-      const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
+    // if (isSuperAdmin) {
+    //   // Superadmin can access any clinic
+    //   nextClinicId = storedClinicId || profileClinicId;
+    // } else {
+    //   // Normal users only allowed their clinics
+    //   const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
 
-      const validStored =
-        storedClinicId &&
-        allowedClinics.some((clinic) => clinic.id === storedClinicId)
-          ? storedClinicId
-          : null;
+    //   const validStored =
+    //     storedClinicId &&
+    //     allowedClinics.some((clinic) => clinic.id === storedClinicId)
+    //       ? storedClinicId
+    //       : null;
 
-      nextClinicId = validStored || profileClinicId;
-    }
+    //   nextClinicId = validStored || profileClinicId;
+    // }
+    
+    nextClinicId = storedClinicId || profileClinicId;
 
     setSelectedClinicId(nextClinicId);
   }, [
@@ -237,7 +239,7 @@ const Header = ({
 
         await dispatch(fetchClinic(selectedClinicId));
 
-        await Promise.all([
+        await Promise.allSettled([
           dispatch(fetchLeads()),
           dispatch(fetchCampaign()),
           dispatch(fetchPipelines(selectedClinicId)),
@@ -245,9 +247,7 @@ const Header = ({
 
         // lastFetchedClinicIdRef.current = selectedClinicId;
       } finally {
-        if (isMounted) {
-          setIsClinicLoading(false);
-        }
+        setIsClinicLoading(false);
       }
     };
 
