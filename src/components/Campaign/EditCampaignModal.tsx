@@ -1084,21 +1084,6 @@ export default function EditCampaignModal({
     try {
       const start =
         campaign.type === "email" ? scheduleRange[0]?.format("YYYY-MM-DD") : scheduleDate;
-      // const end =
-      //   campaign.type === "email" ? scheduleRange[1]?.format("YYYY-MM-DD") : scheduleDate;
-      // const scheduledDateTime = dayjs(`${start} ${scheduleTime}`, "YYYY-MM-DD HH:mm").format("YYYY-MM-DDTHH:mm:ss");
-
-      // const socialAccountData =
-      //   campaign.type === "social"
-      //     ? accounts
-      //         .filter((platform) => platform !== "google_ads")
-      //         .map((platform) => {
-      //           const existing = fullCampaignData.social_media?.find(
-      //             (sm: { id: number; platform_name: string }) => sm.platform_name === platform,
-      //           );
-      //           return { id: existing?.id, platform_name: platform, is_active: true };
-      //         })
-      //     : [];
 
       // ─── Build updated platform_data ──────────────────────────
       // FIX: resolve any image URLs before saving
@@ -1186,69 +1171,6 @@ export default function EditCampaignModal({
         resolvedImageUrl = resolveImageUrl(String(fullDataAsRecord.image_url));
       }
 
-      // const persistedAccounts =
-      //   mode === "paid"
-      //     ? accounts
-      //     : accounts.filter((platform) => platform !== "google_ads");
-      // const selectedPlatforms = PLATFORM_LIST.filter((p) => persistedAccounts.includes(p.id));
-      // const totalSpend =
-      //   mode === "paid"
-      //     ? selectedPlatforms.reduce((sum, p) => sum + (budgets[p.id] ?? 0), 0)
-      //     : 0;
-
-      // const socialPayload =
-      //   campaign.type === "social"
-      //     ? {
-      //         social_media: socialAccountData,
-      //         select_ad_accounts: persistedAccounts,
-      //         campaign_content: fullCampaignData.campaign_content || campaignName,
-      //         platform_data: updatedPlatformData,
-      //         image_url: resolvedImageUrl,
-      //         budget_data: {
-      //           ...Object.fromEntries(
-      //             selectedPlatforms.map((p) => [p.id, budgets[p.id]])
-      //           ),
-      //           total: totalSpend,
-      //         },
-      //       }
-      //     : {};
-
-      // const payload = {
-      //   clinic: clinicId,
-      //   campaign_name: campaignName,
-      //   campaign_description: campaignDescription,
-      //   campaign_objective: objective,
-      //   target_audience: audience,
-      //   start_date: startDate,
-      //   end_date: endDate,
-      //   campaign_mode:
-      //     campaign.type === "email"
-      //       ? CAMPAIGN_MODE.EMAIL
-      //       : mode === "paid"
-      //         ? CAMPAIGN_MODE.PAID
-      //         : CAMPAIGN_MODE.ORGANIC,
-      //   selected_start: start ?? null,
-      //   selected_end: end ?? null,
-      //   enter_time: scheduleTime,
-      //   email:
-      //     campaign.type === "email"
-      //       ? [
-      //           {
-      //             id: fullCampaignData.email?.[0]?.id,
-      //             audience_name: audience,
-      //             subject,
-      //             email_body: emailBody,
-      //             template_name: "EMAIL",
-      //             template_id: selectedTemplateId,
-      //             sender_email: SENDER_EMAIL,
-      //             scheduled_at: scheduledDateTime,
-      //             is_active: true,
-      //           },
-      //         ]
-      //       : [],
-      //   ...socialPayload,
-      // };
-
       const facebookPayload = {
         campaign_name: campaignName,
         campaign_objective: objective,
@@ -1284,6 +1206,40 @@ export default function EditCampaignModal({
           campaign.id,
           instagramPayload,
         );
+      }
+
+      // ─── Google Ads Update ─────────────────────────────────────────────
+      // Calls PUT /api/google-ads/campaigns/<campaign_id>/update/
+      // Only fires when google_ads is a selected platform AND we are in
+      // paid mode AND the campaign already has Google Ads IDs stored
+      // (i.e. it was previously created in Google Ads, not just organic).
+      // For the "promote organic → paid" case we still fall through to the
+      // shouldCreateGoogleAdsOnPromotion block below.
+      if (
+        accounts.includes("google_ads") &&
+        mode === "paid" &&
+        !( // skip if this is a fresh promotion (no Google Ads campaign exists yet)
+          initialMode !== "paid" &&
+          mode === "paid" &&
+          !!clinic?.google_ads_customer_id
+        )
+      ) {
+        try {
+          const googleAdsUpdatePayload = {
+            name: campaignName,
+            status: String(fullCampaignData.status ?? "draft").toLowerCase(),
+            budget: budgets["google_ads"],
+            budget_data: { google_ads: budgets["google_ads"] },
+            bidding_strategy: "MANUAL_CPC",
+            campaign_objective: objective,
+            campaign_content: platformContent["google_ads"],
+            platform_data: { google_ads: updatedPlatformData["google_ads"] },
+          };
+          await CampaignAPI.updateGoogleAdsCampaign(campaign.id, googleAdsUpdatePayload);
+        } catch (googleUpdateErr) {
+          console.error("[GoogleAdsUpdate] Failed to update Google Ads campaign:", googleUpdateErr);
+          toast.warn("Campaign saved, but Google Ads update failed. It will be retried on the next save.");
+        }
       }
 
       const shouldCreateGoogleAdsOnPromotion =

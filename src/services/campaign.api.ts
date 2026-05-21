@@ -92,6 +92,22 @@ export const CampaignAPI = {
       params: { clinic_id: data.clinic_id },
     }),
 
+  updateGoogleAdsCampaign: (
+    campaignId: string,
+    data: {
+      name?: string;
+      status?: string;
+      budget?: number;
+      budget_data?: Record<string, number>;
+      bidding_strategy?: string;
+      campaign_objective?: string;
+      content?: string;
+      campaign_content?: string;
+      platform_data?: Record<string, unknown>;
+    },
+  ) =>
+    http.put(`/google-ads/campaigns/${campaignId}/update/`, data),
+
   updateGoogleAdsStatus: (campaignId: string, action: "pause" | "enable") =>
     http.post("/google-ads/status/", {
       campaign_id: campaignId,
