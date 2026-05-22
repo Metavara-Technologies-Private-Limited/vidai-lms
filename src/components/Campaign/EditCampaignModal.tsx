@@ -1210,35 +1210,66 @@ export default function EditCampaignModal({
 
       // ─── Google Ads Update ─────────────────────────────────────────────
       // Calls PUT /api/google-ads/campaigns/<campaign_id>/update/
-      // Only fires when google_ads is a selected platform AND we are in
-      // paid mode AND the campaign already has Google Ads IDs stored
-      // (i.e. it was previously created in Google Ads, not just organic).
-      // For the "promote organic → paid" case we still fall through to the
-      // shouldCreateGoogleAdsOnPromotion block below.
+      //
+      // Fire when ALL of these are true:
+      //   1. google_ads is a selected platform
+      //   2. we are in paid mode
+      //   3. the campaign already HAS Google Ads IDs in platform_data
+      //      (search_campaign or display_campaign resource_name must exist)
+      //      — if they don't exist this is a first-time creation, handled
+      //      by shouldCreateGoogleAdsOnPromotion below instead.
+      //
+      // The backend GoogleAdsCampaignUpdateAPIView.put() reads:
+      //   name, status, budget / budget_data, bidding_strategy,
+      //   campaign_objective, content / campaign_content, platform_data
+      // and calls Google Ads campaigns:mutate for each resource_name found
+      // in platform_data.google_ads.search_campaign / display_campaign.
+      const existingGoogleData =
+        (fullCampaignData?.platform_data as Record<string, unknown> | undefined)
+          ?.google_ads as Record<string, unknown> | undefined;
+      const hasGoogleAdsResourceName = !!(
+        (existingGoogleData?.search_campaign as Record<string, unknown> | undefined)
+          ?.resource_name ||
+        (existingGoogleData?.display_campaign as Record<string, unknown> | undefined)
+          ?.resource_name ||
+        existingGoogleData?.campaign_resource_name
+      );
+
       if (
         accounts.includes("google_ads") &&
         mode === "paid" &&
-        !( // skip if this is a fresh promotion (no Google Ads campaign exists yet)
-          initialMode !== "paid" &&
-          mode === "paid" &&
-          !!clinic?.google_ads_customer_id
-        )
+        hasGoogleAdsResourceName
       ) {
         try {
+          // Map our internal status string → what the BE expects
+          // BE code: "paused"/"draft" → PAUSED, anything else → ENABLED
+          const currentStatus = String(fullCampaignData.status ?? "draft").toLowerCase();
+
           const googleAdsUpdatePayload = {
+            // ── Campaign-level fields the BE reads ──────────────
             name: campaignName,
-            status: String(fullCampaignData.status ?? "draft").toLowerCase(),
+            status: currentStatus,                     // "draft"|"paused"|"live"|"active"
+            // ── Budget — BE checks both keys ────────────────────
             budget: budgets["google_ads"],
-            budget_data: { google_ads: budgets["google_ads"] },
+            budget_data: { google: budgets["google_ads"] }, // BE key is "google" not "google_ads"
+            // ── Strategy & objective ────────────────────────────
             bidding_strategy: "MANUAL_CPC",
             campaign_objective: objective,
+            // ── Ad content ──────────────────────────────────────
+            content: platformContent["google_ads"],
             campaign_content: platformContent["google_ads"],
+            // ── Full platform_data so BE can read resource names ─
             platform_data: { google_ads: updatedPlatformData["google_ads"] },
           };
+
+          console.log("[GoogleAdsUpdate] Sending update payload:", googleAdsUpdatePayload);
           await CampaignAPI.updateGoogleAdsCampaign(campaign.id, googleAdsUpdatePayload);
+          console.log("[GoogleAdsUpdate] Success — changes pushed to Google Ads");
         } catch (googleUpdateErr) {
           console.error("[GoogleAdsUpdate] Failed to update Google Ads campaign:", googleUpdateErr);
-          toast.warn("Campaign saved, but Google Ads update failed. It will be retried on the next save.");
+          toast.warn(
+            "Campaign saved, but Google Ads update failed — check the console for details.",
+          );
         }
       }
 
