@@ -95,14 +95,22 @@ export const CampaignAPI = {
   updateGoogleAdsCampaign: (
     campaignId: string,
     data: {
+      // ── Campaign identity ──────────────────────────────────────
       name?: string;
+      // ── Status: "draft"|"paused"|"live"|"active"
+      //    BE maps "draft"|"paused" → PAUSED, anything else → ENABLED
       status?: string;
+      // ── Budget — BE checks both keys; use whichever your view reads
       budget?: number;
-      budget_data?: Record<string, number>;
+      budget_data?: Record<string, number>; // { google: <amount> }
+      // ── Bidding
       bidding_strategy?: string;
+      // ── Objective
       campaign_objective?: string;
+      // ── Ad content — BE reads both keys
       content?: string;
       campaign_content?: string;
+      // ── Full platform_data so BE can resolve resource_names
       platform_data?: Record<string, unknown>;
     },
   ) =>
