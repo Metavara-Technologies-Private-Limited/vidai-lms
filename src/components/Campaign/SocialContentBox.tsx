@@ -135,6 +135,7 @@ const SocialContentBox = forwardRef<HTMLDivElement, Props>(
       onEmoji,
       onAttachment,
       onInput,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       onImageUrl: _onImageUrl, // FIX TS6133: kept in interface for prop compatibility, prefixed to suppress unused warning
       imageUrl = "",
       imageFile = null,

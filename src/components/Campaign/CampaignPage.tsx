@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // ─────────────────────────────────────────────────────────────────────────────
 // CAUSE 2 FIX: Removed the useEffect that called CampaignAPI.list() directly.
