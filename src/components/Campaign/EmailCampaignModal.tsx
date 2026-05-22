@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "../../styles/Campaign/EmailCampaignModal.css";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -13,6 +13,7 @@ import {
   Modal,
   Typography,
   IconButton,
+  CircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
@@ -56,6 +57,7 @@ export default function EmailCampaignModal({
 }: EmailCampaignModalProps) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
+  const [modalLoading, setModalLoading] = useState(true);
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [templateAttachments, setTemplateAttachments] = useState<
@@ -64,9 +66,37 @@ export default function EmailCampaignModal({
   /* ================= STEP 1 – DETAILS ================= */
   const [campaignName, setCampaignName] = useState("");
   const [campaignDescription, setCampaignDescription] = useState("");
-  const [objective, setObjective] = useState("");
-  const [audience, setAudience] = useState("");
-  const [startDate, setStartDate] = useState("");
+  const [objective, setObjective] = useState(() => {
+    const keys = Object.keys(CAMPAIGN_OBJECTIVES);
+
+    const leadGenKey = keys.find(
+      (k) =>
+        k === "lead_generation" ||
+        k === "LEAD_GENERATION" ||
+        (CAMPAIGN_OBJECTIVES as Record<string, string>)[k]
+          ?.toLowerCase()
+          .includes("lead"),
+    );
+
+    return leadGenKey ?? keys[0] ?? "";
+  });
+
+  const [audience, setAudience] = useState(() => {
+    const keys = Object.keys(CAMPAIGN_AUDIENCE);
+
+    const allSubKey = keys.find(
+      (k) =>
+        k === "all_subscribers" ||
+        k === "ALL_SUBSCRIBERS" ||
+        (CAMPAIGN_AUDIENCE as Record<string, string>)[k]
+          ?.toLowerCase()
+          .includes("all"),
+    );
+
+    return allSubKey ?? keys[0] ?? "";
+  });
+
+  const [startDate, setStartDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [endDate, setEndDate] = useState("");
   const editorRef = useRef<HTMLDivElement | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
@@ -96,6 +126,14 @@ export default function EmailCampaignModal({
   const [scheduleTime, setScheduleTime] = useState("");
 
   const step3Valid = scheduleRange[0] && scheduleRange[1] && scheduleTime;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setModalLoading(false);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   /* ================= NAVIGATION ================= */
   const handleNext = () => {
@@ -217,6 +255,23 @@ export default function EmailCampaignModal({
         ? "Active Users"
         : "";
 
+  if (modalLoading) {
+    return (
+      <Modal open={true} onClose={onClose}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100vh",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </Modal>
+    );
+  }
+
   return (
     <>
       <Modal open={true} onClose={onClose}>
@@ -273,10 +328,9 @@ export default function EmailCampaignModal({
                   onChange={(e) => {
                     const nextValue = e.target.value;
                     if (!canTypeCampaignName(nextValue)) {
-                      toast.error(
-                        "Alphanumeric and underscore are allowed",
-                        { toastId: "email-campaign-name-typing" },
-                      );
+                      toast.error("Alphanumeric and underscore are allowed", {
+                        toastId: "email-campaign-name-typing",
+                      });
                       return;
                     }
                     setCampaignName(nextValue);

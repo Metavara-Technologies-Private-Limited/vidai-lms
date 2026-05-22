@@ -286,12 +286,12 @@ select:invalid {
   font-family: 'Montserrat', sans-serif !important;
 }
 
-.campaign-modal .MuiPickersDay-root.Mui-selected {
+.MuiPickersDay-root.Mui-selected {
   background-color: #F26A3E !important;
   color: #ffffff !important;
 }
 
-.campaign-modal .MuiPickersDay-root.Mui-selected:hover {
+.MuiPickersDay-root.Mui-selected:hover {
   background-color: #F26A3E !important;
 }
 

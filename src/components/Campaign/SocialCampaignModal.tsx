@@ -97,7 +97,7 @@ const resolveImageUrl = (url: string): string => {
       .replace(/[?&]raw=\d/, "")
       .replace(/\?/, "?raw=1&")
       .replace(/dropbox\.com\/(.+)$/, (match) =>
-        match.includes("?") ? match : match + "?raw=1"
+        match.includes("?") ? match : match + "?raw=1",
       );
   }
 
@@ -110,7 +110,7 @@ const resolveImageUrl = (url: string): string => {
 
   // ── Imgur ─────────────────────────────────────────────────────────────
   const imgurGallery = trimmed.match(
-    /^https?:\/\/(?:www\.)?imgur\.com\/(?:a\/|gallery\/)?([A-Za-z0-9]+)(?:\.[a-z]+)?(?:[?#].*)?$/
+    /^https?:\/\/(?:www\.)?imgur\.com\/(?:a\/|gallery\/)?([A-Za-z0-9]+)(?:\.[a-z]+)?(?:[?#].*)?$/,
   );
   if (imgurGallery && !trimmed.includes("i.imgur.com")) {
     return `https://i.imgur.com/${imgurGallery[1]}.jpg`;
@@ -160,7 +160,7 @@ type PlatformImagePreviews = Record<Platform, string>; // object URLs for previe
 const resizeAndCompressImage = (
   file: File,
   maxSizeMB: number = 2,
-  maxDimension: number = 1920
+  maxDimension: number = 1920,
 ): Promise<File> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -215,7 +215,7 @@ const resizeAndCompressImage = (
               }
             },
             "image/jpeg",
-            quality
+            quality,
           );
         };
         tryExport();
@@ -265,6 +265,7 @@ const insertHTMLIntoEditor = (editorEl: HTMLDivElement, html: string) => {
 export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
+  const [modalLoading, setModalLoading] = useState(true);
   // const googleAdsCustomerId = clinic?.google_ads_customer_id;
   const [googleAdsIntegrationConnected, setGoogleAdsIntegrationConnected] =
     useState(false);
@@ -275,17 +276,23 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     useState<LinkedInAccountStatus | null>(null);
 
   // ─── Per-campaign LinkedIn live status (after creation) ────────
-  const [linkedInLiveStatus, setLinkedInLiveStatus] = useState<string | null>(null);
+  const [linkedInLiveStatus, setLinkedInLiveStatus] = useState<string | null>(
+    null,
+  );
   const [linkedInInsightsLoading, setLinkedInInsightsLoading] = useState(false);
-  const [linkedInStatusCheckLoading, setLinkedInStatusCheckLoading] = useState(false);
+  const [linkedInStatusCheckLoading, setLinkedInStatusCheckLoading] =
+    useState(false);
   const [linkedInUpdateLoading, setLinkedInUpdateLoading] = useState(false);
-  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(
+    null,
+  );
 
   // ─── LinkedIn targeting fields ────────────────────────────────
   const [linkedInCountry, setLinkedInCountry] = useState("");
   const [linkedInState, setLinkedInState] = useState("");
   const [linkedInCustomLocation, setLinkedInCustomLocation] = useState("");
-  const [linkedInBidStrategy, setLinkedInBidStrategy] = useState("MANUAL_BIDDING");
+  const [linkedInBidStrategy, setLinkedInBidStrategy] =
+    useState("MANUAL_BIDDING");
   const [linkedInBidAmount, setLinkedInBidAmount] = useState<number>(0);
 
   const [metaCountry, setMetaCountry] = useState("");
@@ -297,6 +304,14 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
   const isPlatformConnected = (platform: Platform) =>
     platformConnectionMap[platform];
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setModalLoading(false);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!countriesData.length) return;
@@ -347,17 +362,19 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       },
     );
   }, [countriesData, metaCountry]);
-  
+
   // Fetch countries + states from API on mount
   useEffect(() => {
     const fetchCountries = async () => {
       setCountriesLoading(true);
       try {
-        const res = await fetch("https://countriesnow.space/api/v0.1/countries/states");
+        const res = await fetch(
+          "https://countriesnow.space/api/v0.1/countries/states",
+        );
         const json = await res.json();
         if (json && Array.isArray(json.data)) {
           const sorted = [...json.data].sort((a: CountryData, b: CountryData) =>
-            a.name.localeCompare(b.name)
+            a.name.localeCompare(b.name),
           );
           setCountriesData(sorted);
         }
@@ -374,9 +391,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   const selectedCountryStates: { name: string; state_code?: string }[] =
     countriesData.find((c) => c.name === linkedInCountry)?.states ?? [];
   const metaSelectedStates =
-    countriesData.find(
-      (c) => c.iso2 === metaCountry || c.name === metaCountry
-    )?.states ?? [];
+    countriesData.find((c) => c.iso2 === metaCountry || c.name === metaCountry)
+      ?.states ?? [];
 
   useEffect(() => {
     let isMounted = true;
@@ -405,11 +421,11 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           accs.some(
             (acc) =>
               typeof acc.platform === "string" &&
-              acc.platform.toLowerCase().includes("google")
-          )
+              acc.platform.toLowerCase().includes("google"),
+          ),
         );
         setFacebookConnected(
-          accs.some((acc) => acc.platform === "facebook" && acc.connected)
+          accs.some((acc) => acc.platform === "facebook" && acc.connected),
         );
       } catch (err) {
         console.error("Failed to fetch Google Ads integration status", err);
@@ -458,7 +474,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         k === "LEAD_GENERATION" ||
         (CAMPAIGN_OBJECTIVES as Record<string, string>)[k]
           ?.toLowerCase()
-          .includes("lead")
+          .includes("lead"),
     );
     return leadGenKey ?? keys[0] ?? "";
   });
@@ -470,7 +486,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         k === "ALL_SUBSCRIBERS" ||
         (CAMPAIGN_AUDIENCE as Record<string, string>)[k]
           ?.toLowerCase()
-          .includes("all")
+          .includes("all"),
     );
     return allSubKey ?? keys[0] ?? "";
   });
@@ -525,7 +541,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     });
 
   // Refs for the hidden image-upload inputs (one per platform)
-  const imageUploadRefs: Record<Platform, React.RefObject<HTMLInputElement | null>> = {
+  const imageUploadRefs: Record<
+    Platform,
+    React.RefObject<HTMLInputElement | null>
+  > = {
     instagram: useRef<HTMLInputElement>(null),
     facebook: useRef<HTMLInputElement>(null),
     linkedin: useRef<HTMLInputElement>(null),
@@ -536,7 +555,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   // ─── Handle image file chosen from disk ──────────────────────────────
   const handleImageFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    platform: Platform
+    platform: Platform,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -548,7 +567,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     if (file.size > HARD_LIMIT_MB * 1024 * 1024) {
       toast.error(
         `Image too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Please upload an image under ${HARD_LIMIT_MB} MB.`,
-        { toastId: "img-size-error" }
+        { toastId: "img-size-error" },
       );
       e.target.value = "";
       return;
@@ -562,18 +581,22 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           toastId: "img-compress-progress",
           autoClose: false,
         });
-        finalFile = await resizeAndCompressImage(file, COMPRESS_THRESHOLD_MB, 1920);
+        finalFile = await resizeAndCompressImage(
+          file,
+          COMPRESS_THRESHOLD_MB,
+          1920,
+        );
         toast.dismiss("img-compress-progress");
         toast.success(
           `Image compressed: ${(file.size / 1024 / 1024).toFixed(1)} MB → ${(finalFile.size / 1024 / 1024).toFixed(1)} MB`,
-          { toastId: "img-compress-done", autoClose: 3000 }
+          { toastId: "img-compress-done", autoClose: 3000 },
         );
       } catch (compressErr) {
         toast.dismiss("img-compress-progress");
         console.error("[ImageCompress] Failed to compress image", compressErr);
         toast.warn(
           "Could not auto-compress image. Using original file — upload may fail if server rejects large files.",
-          { toastId: "img-compress-warn" }
+          { toastId: "img-compress-warn" },
         );
         finalFile = file; // fall back to original
       }
@@ -620,10 +643,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       if (errMessage.includes("CORS") || errMessage.includes("Network Error")) {
         console.error(
           "[ImageUpload] CORS/Network error. Backend may not allow requests from this origin.\n" +
-          "Possible fixes:\n" +
-          "1. Ensure backend has django-cors-headers installed and configured\n" +
-          "2. Add your frontend origin to CORS_ALLOWED_ORIGINS in settings.py\n" +
-          "3. Verify /api/upload/image/ endpoint exists and has CORS headers enabled"
+            "Possible fixes:\n" +
+            "1. Ensure backend has django-cors-headers installed and configured\n" +
+            "2. Add your frontend origin to CORS_ALLOWED_ORIGINS in settings.py\n" +
+            "3. Verify /api/upload/image/ endpoint exists and has CORS headers enabled",
         );
       } else {
         console.error("[ImageUpload] Failed to upload image file", err);
@@ -738,7 +761,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       const hasContent = fromState || fromRef;
       if (!hasContent) {
         errors.push(
-          `${platform.replace("_", " ").toUpperCase()} campaign content is required.`
+          `${platform.replace("_", " ").toUpperCase()} campaign content is required.`,
         );
       }
     }
@@ -795,7 +818,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     const trimmedUrl = url.trim();
     insertHTML(
       platform,
-      `<a href="${trimmedUrl}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">${trimmedUrl}</a>`
+      `<a href="${trimmedUrl}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">${trimmedUrl}</a>`,
     );
     // Update state with new HTML content
     const ref = getEditorRef(platform);
@@ -826,7 +849,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
   const handleFileInsert = (
     e: React.ChangeEvent<HTMLInputElement>,
-    platform: string
+    platform: string,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -856,12 +879,12 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     if (!accounts.includes(id) && !isConnected) {
       toast.warn(
         `${id.replace("_", " ").toUpperCase()} is not connected. Please connect it from Integrations.`,
-        { toastId: `${id}-not-connected` }
+        { toastId: `${id}-not-connected` },
       );
       return;
     }
     setAccounts((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -888,7 +911,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       const contentErrors = getPlatformContentErrors();
       if (contentErrors.length > 0) {
         contentErrors.forEach((msg) =>
-          toast.error(msg, { toastId: `content-error-${msg}` })
+          toast.error(msg, { toastId: `content-error-${msg}` }),
         );
         return;
       }
@@ -900,12 +923,16 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
   // ─── Build final LinkedIn location string ─────────────────────
   const getLinkedInLocation = () => {
     if (linkedInCustomLocation.trim()) return linkedInCustomLocation.trim();
-    if (linkedInState && linkedInCountry) return `${linkedInState}, ${linkedInCountry}`;
+    if (linkedInState && linkedInCountry)
+      return `${linkedInState}, ${linkedInCountry}`;
     if (linkedInCountry) return linkedInCountry;
     return "";
   };
 
-  const getBudgetError = (platform: Platform, amount: number): string | null => {
+  const getBudgetError = (
+    platform: Platform,
+    amount: number,
+  ): string | null => {
     if (
       platform === "facebook" ||
       platform === "instagram" ||
@@ -931,9 +958,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       : CAMPAIGN_STATUS.LIVE;
   };
 
-  const handleCreateCampaign = async (
-    type: "live" | "draft" | "scheduled"
-  ) => {
+  const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
     setSubmitted(true);
 
     if (!step1Valid || !step2Valid) return;
@@ -955,15 +980,18 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     setLoadingType(type);
     try {
       const selectedPlatforms = PLATFORM_LIST.filter((p) =>
-        accounts.includes(p.id)
+        accounts.includes(p.id),
       );
 
       const totalSpend = selectedPlatforms.reduce(
         (sum, p) => sum + budgets[p.id],
-        0
+        0,
       );
 
-      const refsMap: Record<Platform, React.RefObject<HTMLDivElement | null>> = {
+      const refsMap: Record<
+        Platform,
+        React.RefObject<HTMLDivElement | null>
+      > = {
         instagram: instagramRef,
         facebook: facebookRef,
         linkedin: linkedinRef,
@@ -1002,7 +1030,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             platformUploadedImageUrls[p] = uploadedUrl;
           } else {
             toast.warn(
-              `Image upload failed for ${p.replace("_", " ")} — campaign will be created without an image for this platform.`
+              `Image upload failed for ${p.replace("_", " ")} — campaign will be created without an image for this platform.`,
             );
           }
         }
@@ -1021,10 +1049,10 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
 
       // Determine the top-level image_url (backward compat):
       const firstUploadedUrl =
-        accounts
-          .map((p) => platformUploadedImageUrls[p])
-          .find((u) => !!u) ?? null;
-      const image_url: string | null = firstUploadedUrl ?? legacyFallbackImageUrl;
+        accounts.map((p) => platformUploadedImageUrls[p]).find((u) => !!u) ??
+        null;
+      const image_url: string | null =
+        firstUploadedUrl ?? legacyFallbackImageUrl;
 
       const firstSelectedContent =
         accounts
@@ -1032,9 +1060,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
           .find((c) => c.trim() !== "" && !isPlainUrl(c)) ?? campaignName;
 
       const statusValue =
-        type === "draft"
-          ? CAMPAIGN_STATUS.DRAFT
-          : getComputedCampaignStatus();
+        type === "draft" ? CAMPAIGN_STATUS.DRAFT : getComputedCampaignStatus();
 
       const isActive =
         statusValue === CAMPAIGN_STATUS.LIVE ||
@@ -1148,8 +1174,12 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             image_url ??
             null;
           if (platformImgUrl) {
-            if (typeof cleanedContent[p] === "object" && cleanedContent[p] !== null) {
-              (cleanedContent[p] as Record<string, unknown>)["image_url"] = platformImgUrl;
+            if (
+              typeof cleanedContent[p] === "object" &&
+              cleanedContent[p] !== null
+            ) {
+              (cleanedContent[p] as Record<string, unknown>)["image_url"] =
+                platformImgUrl;
             } else {
               cleanedContent[p] = {
                 content: cleanedContent[p],
@@ -1225,14 +1255,14 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
             (item) =>
               String(item?.campaign_name ?? "")
                 .trim()
-                .toLowerCase() === campaignName.trim().toLowerCase()
+                .toLowerCase() === campaignName.trim().toLowerCase(),
           )
           .sort((a, b) => {
             const at = new Date(
-              String(a?.modified_at ?? a?.created_at ?? 0)
+              String(a?.modified_at ?? a?.created_at ?? 0),
             ).getTime();
             const bt = new Date(
-              String(b?.modified_at ?? b?.created_at ?? 0)
+              String(b?.modified_at ?? b?.created_at ?? 0),
             ).getTime();
             return bt - at;
           })[0];
@@ -1260,7 +1290,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     try {
       const res = await CampaignAPI.getLinkedInStatus(createdCampaignId);
       const respStatus =
-        (res?.data as { linkedin_live_status?: string })?.linkedin_live_status ??
+        (res?.data as { linkedin_live_status?: string })
+          ?.linkedin_live_status ??
         (res?.data as { status?: string })?.status ??
         "unknown";
       setLinkedInLiveStatus(String(respStatus));
@@ -1350,8 +1381,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                 linkedInLiveStatus === "ACTIVE"
                   ? "success"
                   : linkedInLiveStatus === "PAUSED"
-                  ? "warning"
-                  : "default"
+                    ? "warning"
+                    : "default"
               }
               sx={{ ml: "auto" }}
             />
@@ -1448,6 +1479,22 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
     return false;
   };
 
+  if (modalLoading) {
+    return (
+      <Modal open={true} onClose={onClose}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100vh",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </Modal>
+    );
+  }
 
   return (
     <Modal open={true} onClose={onClose}>
@@ -1624,7 +1671,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   <DatePicker
                     format="DD/MM/YYYY"
                     minDate={startDate ? dayjs(startDate) : dayjs()}
-                    value={endDate ? dayjs(endDate) : null}
+                    value={endDate ? dayjs(endDate) : undefined}
                     onChange={(v) => {
                       const parsed = v ? dayjs(v as Dayjs) : null;
                       if (!parsed || !parsed.isValid()) {
