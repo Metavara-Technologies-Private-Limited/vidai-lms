@@ -182,8 +182,8 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
   const [visibleMonth, setVisibleMonth] = React.useState<Dayjs>(
     dayjs().startOf("month"),
   );
-  const [viewMode, setViewMode] = React.useState<CalendarViewMode>("day");
-  const [todayOnlyMode, setTodayOnlyMode] = React.useState(true);
+  const [viewMode, setViewMode] = React.useState<CalendarViewMode>("month");
+  const [todayOnlyMode, setTodayOnlyMode] = React.useState(false);
 
   // Set initial selected date once appointments are ready.
   React.useEffect(() => {

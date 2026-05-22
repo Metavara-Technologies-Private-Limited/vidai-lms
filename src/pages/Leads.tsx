@@ -1176,60 +1176,68 @@ const Leads: React.FC = () => {
           </Box>
 
           {/* View Mode Toggle */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              border: "1px solid #E5E7EB",
-              borderRadius: "10px",
-              overflow: "hidden",
-              bgcolor: "#F9FAFB",
-            }}
-          >
-            <IconButton
-              onClick={() => setViewMode("table")}
-              title="Table view"
+          {/* View Mode Toggle — only show for All Leads tab */}
+          {tab === 0 && (
+            <Box
               sx={{
-                borderRadius: 0,
-                width: 38,
-                height: 38,
-                bgcolor: viewMode === "table" ? "#E5E7EB" : "transparent",
-                "&:hover": {
-                  bgcolor: viewMode === "table" ? "#D1D5DB" : "#F3F4F6",
-                },
-                transition: "background-color 0.15s ease",
+                display: "flex",
+                alignItems: "center",
+                border: "1px solid #E5E7EB",
+                borderRadius: "10px",
+                overflow: "hidden",
+                bgcolor: "#F9FAFB",
               }}
             >
-              <img
-                src={Leads_Tableview_icon}
-                style={{ width: 18, height: 18 }}
-                alt="Table view"
+              <IconButton
+                onClick={() => setViewMode("table")}
+                title="Table view"
+                sx={{
+                  borderRadius: 0,
+                  width: 38,
+                  height: 38,
+                  bgcolor: viewMode === "table" ? "#E5E7EB" : "transparent",
+                  "&:hover": {
+                    bgcolor: viewMode === "table" ? "#D1D5DB" : "#F3F4F6",
+                  },
+                  transition: "background-color 0.15s ease",
+                }}
+              >
+                <img
+                  src={Leads_Tableview_icon}
+                  style={{ width: 18, height: 18 }}
+                  alt="Table view"
+                />
+              </IconButton>
+              <Box
+                sx={{
+                  width: "1px",
+                  height: 20,
+                  bgcolor: "#E5E7EB",
+                  flexShrink: 0,
+                }}
               />
-            </IconButton>
-
-            <Box sx={{ width: "1px", height: 20, bgcolor: "#E5E7EB", flexShrink: 0 }} />
-
-            <IconButton
-              onClick={() => setViewMode("board")}
-              title="Board view"
-              sx={{
-                borderRadius: 0,
-                width: 38,
-                height: 38,
-                bgcolor: viewMode === "board" ? "#E5E7EB" : "transparent",
-                "&:hover": {
-                  bgcolor: viewMode === "board" ? "#D1D5DB" : "#F3F4F6",
-                },
-                transition: "background-color 0.15s ease",
-              }}
-            >
-              <img
-                src={Leads_Gridview}
-                style={{ width: 22, height: 22 }}
-                alt="Board view"
-              />
-            </IconButton>
-          </Box>
+              <IconButton
+                onClick={() => setViewMode("board")}
+                title="Board view"
+                sx={{
+                  borderRadius: 0,
+                  width: 38,
+                  height: 38,
+                  bgcolor: viewMode === "board" ? "#E5E7EB" : "transparent",
+                  "&:hover": {
+                    bgcolor: viewMode === "board" ? "#D1D5DB" : "#F3F4F6",
+                  },
+                  transition: "background-color 0.15s ease",
+                }}
+              >
+                <img
+                  src={Leads_Gridview}
+                  style={{ width: 22, height: 22 }}
+                  alt="Board view"
+                />
+              </IconButton>
+            </Box>
+          )}
 
           {/* Filter Button */}
           <Box sx={{ position: "relative", flexShrink: 0 }}>
@@ -1256,7 +1264,10 @@ const Leads: React.FC = () => {
           <Button
             className="add-lead-btn"
             onClick={() => {
-              localStorage.setItem(STORAGE_KEY_SELECTED_INDUSTRY, selectedIndustry);
+              localStorage.setItem(
+                STORAGE_KEY_SELECTED_INDUSTRY,
+                selectedIndustry,
+              );
               navigate("/leads/add");
             }}
             disabled={!canAddLeads}
@@ -1325,7 +1336,10 @@ const Leads: React.FC = () => {
               scrollbarColor: "#D1D5DB transparent",
               "&::-webkit-scrollbar": { height: { xs: "3px", lg: "0px" } },
               "&::-webkit-scrollbar-track": { background: "transparent" },
-              "&::-webkit-scrollbar-thumb": { background: "#D1D5DB", borderRadius: "4px" },
+              "&::-webkit-scrollbar-thumb": {
+                background: "#D1D5DB",
+                borderRadius: "4px",
+              },
             }}
           >
             {tabs.map((t, i) => (
@@ -1333,7 +1347,12 @@ const Leads: React.FC = () => {
                 key={i}
                 className={`pill-tab ${tab === i ? "active" : ""}`}
                 onClick={() => setTab(i)}
-                sx={{ flexShrink: 0, height: 34, display: "flex", alignItems: "center" }}
+                sx={{
+                  flexShrink: 0,
+                  height: 34,
+                  display: "flex",
+                  alignItems: "center",
+                }}
               >
                 {t.label}
                 {t.count !== null && (
@@ -1394,8 +1413,9 @@ const Leads: React.FC = () => {
           >
             {selectedPipelineId
               ? `Default Pipeline: ${
-                  availablePipelines.find((pipeline) => pipeline.id === selectedPipelineId)
-                    ?.pipeline_name ?? "-"
+                  availablePipelines.find(
+                    (pipeline) => pipeline.id === selectedPipelineId,
+                  )?.pipeline_name ?? "-"
                 }`
               : "Default Pipeline: -"}
           </Box>
@@ -1429,32 +1449,13 @@ const Leads: React.FC = () => {
             </Box>
           }
         >
-          {tab === 1 && (
-            <LeadsFollowUp
-              search={search}
-              filters={activeFilters}
-              canEditLeads={canEditLeads}
-            />
-          )}
-          {tab === 3 && <LeadsConversation />}
-          {tab === 4 && <Activity />}
-          {tab === 5 && (
-            <LeadsCalendar
-              leads={leads}
-              search={search}
-              filters={activeFilters}
-            />
-          )}
-          {tab !== 1 &&
-            tab !== 3 &&
-            tab !== 4 &&
-            tab !== 5 &&
+          {tab === 0 &&
             (viewMode === "table" ? (
               <LeadsTable
                 search={search}
-                tab={tab === 2 ? "archived" : "active"}
+                tab="active"
                 filters={activeFilters}
-                importedLeads={tab === 0 ? importedLeads : []}
+                importedLeads={importedLeads}
                 canEditLeads={canEditLeads}
                 selectedIndustry={selectedIndustry}
                 selectedPipelineId={selectedPipelineId}
@@ -1468,6 +1469,33 @@ const Leads: React.FC = () => {
                 selectedPipelineId={selectedPipelineId}
               />
             ))}
+          {tab === 1 && (
+            <LeadsFollowUp
+              search={search}
+              filters={activeFilters}
+              canEditLeads={canEditLeads}
+            />
+          )}
+          {tab === 2 && (
+            <LeadsTable
+              search={search}
+              tab="archived"
+              filters={activeFilters}
+              importedLeads={[]}
+              canEditLeads={canEditLeads}
+              selectedIndustry={selectedIndustry}
+              selectedPipelineId={selectedPipelineId}
+            />
+          )}
+          {tab === 3 && <LeadsConversation />}
+          {tab === 4 && <Activity />}
+          {tab === 5 && (
+            <LeadsCalendar
+              leads={leads}
+              search={search}
+              filters={activeFilters}
+            />
+          )}
         </React.Suspense>
       )}
 
