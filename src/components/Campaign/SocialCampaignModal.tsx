@@ -427,6 +427,16 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
         setFacebookConnected(
           accs.some((acc) => acc.platform === "facebook" && acc.connected),
         );
+
+        const linkedInAcc = accs.find((acc) => acc.platform === "linkedin");
+
+        setLinkedInAccountStatus({
+          connected: !!linkedInAcc?.connected,
+          setup_complete: !!linkedInAcc?.connected,
+          missing: [],
+          account_id: linkedInAcc?.account_id,
+          org_urn: linkedInAcc?.instagram_user_id,
+        });
       } catch (err) {
         console.error("Failed to fetch Google Ads integration status", err);
         if (isMounted) {
