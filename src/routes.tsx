@@ -31,6 +31,7 @@ import { fetchLeads } from "./store/leadSlice";
 import { fetchUsers } from "./store/userSlice";
 import { selectLoginType } from "./store/authSlice";
 import { toSafePhotoUrl } from "./utils/mediaUrl";
+import { readDisplayNameOverrideForAutoMode } from "./utils/autoLogin";
 // import type { Clinic } from "./types/clinic.types";
 
 let profileRestoreTokenInFlight: string | null = null;
@@ -177,6 +178,18 @@ export default function AppRoutes() {
             ? normalizeClinics(profileRecord)
             : [];
 
+          // Respect custom display name set during auto-login from URL params
+          const displayNameOverride = readDisplayNameOverrideForAutoMode();
+          const overrideParts = displayNameOverride
+            ? displayNameOverride.trim().split(/\s+/)
+            : [];
+          const overrideFirst = displayNameOverride
+            ? (overrideParts.slice(0, -1).join(" ") || displayNameOverride)
+            : null;
+          const overrideLast = displayNameOverride && overrideParts.length > 1
+            ? overrideParts[overrideParts.length - 1]
+            : null;
+
           dispatch(
             setUser({
               ...(currentUser ?? {
@@ -203,11 +216,9 @@ export default function AppRoutes() {
                 currentUser?.email ||
                 "",
               first_name:
-                String(profileRecord?.first_name ?? "").trim() ||
-                currentUser?.first_name,
+                overrideFirst ?? (String(profileRecord?.first_name ?? "").trim() || currentUser?.first_name),
               last_name:
-                String(profileRecord?.last_name ?? "").trim() ||
-                currentUser?.last_name,
+                overrideLast ?? (String(profileRecord?.last_name ?? "").trim() || currentUser?.last_name),
               designation_label:
                 currentUser?.designation_label ||
                 currentUser?.designation ||

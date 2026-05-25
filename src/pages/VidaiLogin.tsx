@@ -1,8 +1,9 @@
-import { useState, type SyntheticEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, type SyntheticEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Lock, User } from "lucide-react";
 import logo from "../assets/icons/Vidai-logo.svg";
 import loginLogo from "../assets/icons/Login_Logo_Vidai.webp";
+import referaStdLogo from "../assets/icons/refera_std.png";
 import styles from "../styles/VidaiLogin.module.css";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../store";
@@ -16,6 +17,14 @@ import {
   type LanguageCode,
 } from "../utils/languages";
 import {
+  clearDisplayNameOverride,
+  decodeBase64,
+  readLoginThemeMode,
+  setDisplayNameOverride,
+  setLoginThemeMode,
+  splitDisplayName,
+} from "../utils/autoLogin";
+import {
   Checkbox,
   CircularProgress,
   FormControl,
@@ -27,7 +36,6 @@ import {
 } from "@mui/material";
 import { toast } from "react-toastify";
 import { toSafePhotoUrl } from "../utils/mediaUrl";
-
 
 
 function resolveInitialLanguage(): LanguageCode {
@@ -118,8 +126,15 @@ const buildAuthUserFromLogin = (
 export default function VidaiLogin() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
+  const [searchParams] = useSearchParams();
+  const hasAutoLoginParams = Boolean(
+    searchParams.get("u") && searchParams.get("p"),
+  );
+  const persistedThemeMode = readLoginThemeMode();
+  const isAutoLoginTheme = hasAutoLoginParams || persistedThemeMode === "auto";
+  const isStandardVisit = !isAutoLoginTheme;
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(hasAutoLoginParams);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -129,6 +144,68 @@ export default function VidaiLogin() {
   const [error, setError] = useState("");
   const [isExternalLogin, setIsExternalLogin] = useState<boolean>(false);
   const t = TRANSLATIONS[language];
+
+  // Auto-login from URL params: ?u=<base64>&p=<base64>&name=<base64>
+  useEffect(() => {
+    const encodedUser = searchParams.get("u");
+    const encodedPass = searchParams.get("p");
+    if (!encodedUser || !encodedPass) return;
+
+    setLoginThemeMode("auto");
+
+    const doAutoLogin = async () => {
+      try {
+        setLoading(true);
+        const decodedUser = decodeBase64(encodedUser);
+        const decodedPass = decodeBase64(encodedPass);
+        if (!decodedUser || !decodedPass) {
+          throw new Error("Invalid auto-login parameters");
+        }
+        const rawName = searchParams.get("name");
+        const displayName = decodeBase64(rawName)?.trim() ?? "";
+
+        const loginRes = await authApi.login(
+          { username: decodedUser.trim(), password: decodedPass.trim() },
+          "INT",
+        );
+
+        const authUser = buildAuthUserFromLogin(
+          loginRes.token,
+          decodedUser,
+          loginRes.role,
+          loginRes.permissions,
+          loginRes.user as Record<string, unknown>,
+        );
+
+        // Override display name if passed in URL
+        if (displayName) {
+          const { first, last } = splitDisplayName(displayName);
+          authUser.first_name = first;
+          authUser.last_name = last;
+          setDisplayNameOverride(displayName);
+        } else {
+          clearDisplayNameOverride();
+        }
+
+        dispatch(
+          setAuth({
+            token: loginRes.token,
+            refresh: loginRes.refresh,
+            user: authUser,
+            loginType: "INT",
+          }),
+        );
+
+        navigate("/dashboard", { replace: true });
+      } catch {
+        setLoading(false);
+        // Fall through to show the normal login form on failure
+      }
+    };
+
+    void doAutoLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (event: SyntheticEvent) => {
     // Sanitize
@@ -146,6 +223,9 @@ export default function VidaiLogin() {
 
     try {
       setLoading(true);
+      // Manual login should always switch the login page back to standalone (green) mode.
+      setLoginThemeMode("normal");
+      clearDisplayNameOverride();
       const mode = isExternalLogin ? "EXT" : "INT";
       const loginRes = await authApi.login(
         { username: username.trim(), password: password.trim() },
@@ -223,10 +303,22 @@ export default function VidaiLogin() {
     setError("");
   };
 
+  if (hasAutoLoginParams && loading) {
+    return (
+      <div className={styles.loginPage} style={{ display: "grid", placeItems: "center" }}>
+        <CircularProgress size={36} />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.loginPage}>
       <section className={styles.heroPanel}>
-        <img className={styles.heroImage} src={loginLogo} alt="" />
+        <img
+          className={styles.heroImage}
+          src={isStandardVisit ? referaStdLogo : loginLogo}
+          alt=""
+        />
         <p className={styles.heroTagline}>
           {t.heroPrefix}
           {t.heroAccent ? (
