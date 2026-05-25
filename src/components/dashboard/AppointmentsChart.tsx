@@ -60,11 +60,20 @@ const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
       if (lead.book_appointment === true && lead.appointment_date) {
         const appointmentDate = new Date(lead.appointment_date);
 
-        if (appointmentDate < now) {
-          // Date has passed → completed
+        // Compare date only — end of appointment day
+        // so today's appointment stays "booked" until the full day is over
+        const endOfAppointmentDay = new Date(
+          appointmentDate.getFullYear(),
+          appointmentDate.getMonth(),
+          appointmentDate.getDate(),
+          23, 59, 59, 999,
+        );
+
+        if (endOfAppointmentDay < now) {
+          // Full day has passed → completed
           completed += 1;
         } else {
-          // Date is upcoming → booked
+          // Today or future → booked
           appointmentsBooked += 1;
         }
       }
