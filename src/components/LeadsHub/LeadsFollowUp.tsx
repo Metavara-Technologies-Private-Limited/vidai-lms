@@ -164,7 +164,7 @@ const LeadsFollowUp: React.FC<Props> = ({
 
   // ====================== Filter ======================
   const filteredLeads = React.useMemo<MappedFollowUpLead[]>(() => {
-    const followUpStatuses = ["new", "lost", "cycle conversion", "follow up", "follow-up", "followup", "follow ups", "follow-ups"];
+    const followUpStatuses = ["follow up", "follow-up", "followup", "follow ups", "follow-ups", "Follow Up", "Follow-Up", "Followup", "Follow Ups", "Follow-Ups"];
     return leads.filter((lead: MappedFollowUpLead) => {
       const leadStatus = (lead.lead_status || lead.status || "").toLowerCase().trim();
       const matchesStatus = followUpStatuses.includes(leadStatus);
