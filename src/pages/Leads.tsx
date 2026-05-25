@@ -741,7 +741,7 @@ const Leads: React.FC = () => {
 
   React.useEffect(() => {
     if (leads && leads.length > 0) {
-      const followUpStatuses = ["new", "lost", "cycle conversion", "follow up", "follow-up", "followup", "follow ups", "follow-ups"];
+      const followUpStatuses = ["follow up", "follow-up", "followup", "follow ups", "follow-ups","Follow Up", "Follow-Up", "Followup", "Follow Ups", "Follow-Ups"];
       const filteredLeads = applyFilters(leads);
       const allCount = filteredLeads.filter(
         (l) => l.is_active !== false,
