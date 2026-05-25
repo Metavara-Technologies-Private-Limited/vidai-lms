@@ -9,13 +9,11 @@ import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import type { TimeRange } from "./TimeRangeSelector";
 import { isWithinTimeRange } from "./timeRange.utils";
 import { selectLeads, selectLeadsLoading } from "../../store/leadSlice";
-//import type{TooltipProps} from "recharts";
 import type { CustomTooltipProps, AppointmentChartData } from "../../types/dashboard.types";
 
 interface AppointmentsChartProps {
   timeRange: TimeRange;
 }
-
 
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length) return null;
@@ -50,47 +48,44 @@ const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
     let appointmentsBooked = 0;
     let completed = 0;
 
-    const filteredLeads = leads.filter((lead) =>
-      lead.is_active !== false && isWithinTimeRange(lead.modified_at || lead.created_at, timeRange),
+    const filteredLeads = leads.filter(
+      (lead) =>
+        lead.is_active !== false &&
+        isWithinTimeRange(lead.modified_at || lead.created_at, timeRange),
     );
 
     filteredLeads.forEach((lead: Lead) => {
-      const leadData = lead as Lead & Record<string, unknown>;
-      const rawStatus = (
-        leadData.next_action_status ||
-        leadData.task_status ||
-        leadData.taskStatus ||
-        ""
-      ).toString().trim().toLowerCase();
-
-      if (
-        rawStatus === "todo" ||
-        rawStatus === "to do" ||
-        rawStatus === "to-do" ||
-        rawStatus === "to_do" ||
-        rawStatus === "pending"
-      ) {
+      // ── Booked: lead was created with book_appointment=true and a date ──
+      if (lead.book_appointment === true && lead.appointment_date) {
         appointmentsBooked += 1;
       }
+
+      // ── Completed: based on next_action_status ────────────────────────
+      const rawStatus = (lead.next_action_status ?? "")
+        .toString()
+        .trim()
+        .toLowerCase();
 
       if (rawStatus === "done" || rawStatus === "completed") {
         completed += 1;
       }
     });
 
-    const noShows = mockData.overview.appointmentsPerformance.find(
-      (item) => item.status === "No-shows"
-    )?.value ?? 0;
+    const noShows =
+      mockData.overview.appointmentsPerformance.find(
+        (item) => item.status === "No-shows",
+      )?.value ?? 0;
 
-    const cancelled = mockData.overview.appointmentsPerformance.find(
-      (item) => item.status === "Cancelled"
-    )?.value ?? 0;
+    const cancelled =
+      mockData.overview.appointmentsPerformance.find(
+        (item) => item.status === "Cancelled",
+      )?.value ?? 0;
 
     return [
       { status: "Appointments Booked", value: appointmentsBooked, color: "#daddf0" },
-      { status: "Completed", value: completed, color: "#daddf0" },
-      { status: "No-shows", value: noShows, color: "#7d859d" },
-      { status: "Cancelled", value: cancelled, color: "#daddf0" },
+      { status: "Completed",           value: completed,           color: "#daddf0" },
+      { status: "No-shows",            value: noShows,             color: "#7d859d" },
+      { status: "Cancelled",           value: cancelled,           color: "#daddf0" },
     ];
   }, [leads, timeRange]);
 
@@ -127,11 +122,7 @@ const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
             margin={{ top: 22, right: 30, left: 10, bottom: 16 }}
             barSize={30}
           >
-            <CartesianGrid
-              strokeDasharray="4 4"
-              vertical={false}
-              stroke="#e9edf3"
-            />
+            <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e9edf3" />
             <XAxis
               dataKey="status"
               axisLine={false}
