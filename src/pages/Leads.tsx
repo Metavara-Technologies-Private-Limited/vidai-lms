@@ -741,14 +741,22 @@ const Leads: React.FC = () => {
 
   React.useEffect(() => {
     if (leads && leads.length > 0) {
-      const followUpStatuses = ["follow up", "follow-up", "followup", "follow ups", "follow-ups","Follow Up", "Follow-Up", "Followup", "Follow Ups", "Follow-Ups"];
+      // const followUpStatuses = ["new", "lost", "cycle conversion", "follow up", "follow-up", "followup", "follow ups", "follow-ups"];
       const filteredLeads = applyFilters(leads);
       const allCount = filteredLeads.filter(
         (l) => l.is_active !== false,
       ).length;
       const followUpCount = filteredLeads.filter((l) => {
-        const status = (l.lead_status || l.status || "").toLowerCase().trim();
-        return l.is_active !== false && followUpStatuses.includes(status);
+        const stageName = (l.stage_name || "").toLowerCase().trim();
+
+        console.log("📊 FollowUp Count Debug:", {
+          id: l.id,
+          stage_name: l.stage_name,
+          lead_status: l.lead_status,
+          matches: stageName.includes("follow"),
+        });
+
+        return l.is_active !== false && stageName.includes("follow");
       }).length;
       const archivedCount = filteredLeads.filter(
         (l) => l.is_active === false,

@@ -57,6 +57,7 @@ interface RawFollowUpLead {
   lead_status?: string;
   status?: string;
   is_active?: boolean;
+  stage_name?: string;
   created_at?: string;
   location?: string;
   city?: string;
@@ -88,6 +89,22 @@ interface Props {
 }
 
 const rowsPerPage = 10;
+
+const BACKEND_TO_DISPLAY: Record<string, string> = {
+  new: "New",
+  appointment: "Appointment",
+  "follow up": "Follow Up",
+  "folow ups": "Follow Up",
+  "folow up": "Follow Up",
+  follow_up: "Follow Up",
+  negotiation: "Negotiation",
+  "proposal sent": "Proposal Sent",
+  "contract signed": "Contract Signed",
+  converted: "Converted Lead",
+  "converted lead": "Converted Lead",
+  lost: "Lost Lead",
+  "lost lead": "Lost Lead",
+};
 
 // ====================== Helpers ======================
 
@@ -135,28 +152,47 @@ const LeadsFollowUp: React.FC<Props> = ({
   React.useEffect(() => {
     if (reduxLeads && reduxLeads.length > 0) {
       const mappedLeads: MappedFollowUpLead[] = reduxLeads.map(
-        (lead: RawFollowUpLead): MappedFollowUpLead => ({
-          ...lead,
-          name: lead.full_name || lead.name || "",
-          full_name: lead.full_name || lead.name || "",
-          assigned: lead.assigned_to_name || "Unassigned",
-          assigned_to_name: lead.assigned_to_name,
-          assigned_to_id: lead.assigned_to_id,
-          status: lead.lead_status || lead.status || "New",
-          lead_status: lead.lead_status || lead.status || "New",
-          quality: lead.quality || "Cold",
-          location: lead.location || lead.city || lead.state || "N/A",
-          source: lead.source || "N/A",
-          task: lead.next_action_type || lead.task_type || "N/A",
-          taskType: lead.next_action_type || lead.task_type || "",
-          taskStatus: lead.next_action_status || lead.task_status || "Pending",
-          activity: lead.last_activity || lead.activity || "View Activity",
-          score: lead.score || lead.ai_score || 0,
-          initials:
-            lead.initials ||
-            (lead.full_name || lead.name || "?").charAt(0).toUpperCase(),
-          displayId: formatLeadId(lead.id),
-        }),
+        (lead: RawFollowUpLead): MappedFollowUpLead => {
+          const rawStatus = (
+            lead.stage_name ||
+            lead.lead_status ||
+            lead.status ||
+            "new"
+          )
+            .toLowerCase()
+            .trim();
+    
+          const displayStatus =
+            BACKEND_TO_DISPLAY[rawStatus] ||
+            lead.stage_name ||
+            lead.lead_status ||
+            lead.status ||
+            "New";
+          
+          return ({
+            ...lead,
+            name: lead.full_name || lead.name || "",
+            full_name: lead.full_name || lead.name || "",
+            assigned: lead.assigned_to_name || "Unassigned",
+            assigned_to_name: lead.assigned_to_name,
+            assigned_to_id: lead.assigned_to_id,
+            status: displayStatus,
+            lead_status: rawStatus,
+            quality: lead.quality || "Cold",
+            location: lead.location || lead.city || lead.state || "N/A",
+            source: lead.source || "N/A",
+            task: lead.next_action_type || lead.task_type || "N/A",
+            taskType: lead.next_action_type || lead.task_type || "",
+            taskStatus: lead.next_action_status || lead.task_status || "Pending",
+            activity: lead.last_activity || lead.activity || "View Activity",
+            score: lead.score || lead.ai_score || 0,
+            initials:
+              lead.initials ||
+              (lead.full_name || lead.name || "?").charAt(0).toUpperCase(),
+            displayId: formatLeadId(lead.id),
+          })
+        
+    },
       );
       setLeads(mappedLeads);
     }
@@ -164,10 +200,12 @@ const LeadsFollowUp: React.FC<Props> = ({
 
   // ====================== Filter ======================
   const filteredLeads = React.useMemo<MappedFollowUpLead[]>(() => {
-    const followUpStatuses = ["follow up", "follow-up", "followup", "follow ups", "follow-ups", "Follow Up", "Follow-Up", "Followup", "Follow Ups", "Follow-Ups"];
+    // const followUpStatuses = ["new", "lost", "cycle conversion", "follow up", "follow-up", "followup", "follow ups", "follow-ups"];
     return leads.filter((lead: MappedFollowUpLead) => {
-      const leadStatus = (lead.lead_status || lead.status || "").toLowerCase().trim();
-      const matchesStatus = followUpStatuses.includes(leadStatus);
+      console.log("cc:", lead.status);
+      const leadStatus = (lead.status || "").toLowerCase().trim();
+
+      const matchesStatus = leadStatus.includes("follow");
       const isActive = lead.is_active !== false;
       const searchStr = `${lead.full_name || lead.name || ""} ${lead.displayId || lead.id || ""}`.toLowerCase();
       const matchesSearch = searchStr.includes(search.toLowerCase());

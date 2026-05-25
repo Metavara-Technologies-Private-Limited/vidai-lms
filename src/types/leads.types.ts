@@ -35,6 +35,7 @@ export type Lead = {
   contactPhone?: string;
   contactEmail?: string;
   leadGeneratedBy?: string;
+  stage_name?: string;
 };
 
 /* ================= ACTIVITY ================= */
