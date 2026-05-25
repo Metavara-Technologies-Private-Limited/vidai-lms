@@ -84,22 +84,19 @@ const LeadsCalendar: React.FC<Props> = ({ leads, search, filters }) => {
     if (fromDate) fromDate.setHours(0, 0, 0, 0);
     if (toDate) toDate.setHours(23, 59, 59, 999);
 
-    // Same normalisation logic as LeadPipelineFunnel — appointment is identified
-    // purely by lead_status, matching "appointment" or "appointments" variants.
-    const isAppointmentLead = (lead: Lead) => {
-      const raw = (
-        (lead.lead_status as string | undefined) ||
-        (lead as { status?: string }).status ||
-        ""
-      )
-        .toLowerCase()
-        .trim()
-        .replace(/[_\s]+/g, "-");
-      return (
-        (raw === "appointment" || raw === "appointments") &&
-        Boolean(lead.appointment_date)
-      );
+    // ── FIXED ────────────────────────────────────────────────────────────────
+    // Previously this only showed leads whose lead_status was "appointment".
+    // That excluded any lead created with appointment details but a different
+    // status (e.g. "New", "Follow Up", etc.).
+    // Now: show any ACTIVE lead that has a valid appointment_date set,
+    // regardless of what lead_status is. The book_appointment flag is also
+    // checked as a secondary signal when present.
+    const isAppointmentLead = (lead: Lead): boolean => {
+      if (!lead.appointment_date) return false;
+      const parsed = dayjs(lead.appointment_date);
+      return parsed.isValid();
     };
+    // ── END FIX ──────────────────────────────────────────────────────────────
 
     const result: AppointmentLead[] = [];
 
