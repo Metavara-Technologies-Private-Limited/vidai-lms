@@ -48,6 +48,8 @@ const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
     let appointmentsBooked = 0;
     let completed = 0;
 
+    const now = new Date();
+
     const filteredLeads = leads.filter(
       (lead) =>
         lead.is_active !== false &&
@@ -55,19 +57,16 @@ const AppointmentsChart = ({ timeRange }: AppointmentsChartProps) => {
     );
 
     filteredLeads.forEach((lead: Lead) => {
-      // ── Booked: lead was created with book_appointment=true and a date ──
       if (lead.book_appointment === true && lead.appointment_date) {
-        appointmentsBooked += 1;
-      }
+        const appointmentDate = new Date(lead.appointment_date);
 
-      // ── Completed: based on next_action_status ────────────────────────
-      const rawStatus = (lead.next_action_status ?? "")
-        .toString()
-        .trim()
-        .toLowerCase();
-
-      if (rawStatus === "done" || rawStatus === "completed") {
-        completed += 1;
+        if (appointmentDate < now) {
+          // Date has passed → completed
+          completed += 1;
+        } else {
+          // Date is upcoming → booked
+          appointmentsBooked += 1;
+        }
       }
     });
 
