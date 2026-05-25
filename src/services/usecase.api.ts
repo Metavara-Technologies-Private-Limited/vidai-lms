@@ -15,7 +15,9 @@ const UseCaseService = {
    */
   getUseCases: async (clinicId: string | number): Promise<UseCase[]> => {
     const response = await http.get(`/usecases/`, {
-      headers: { "X-Clinic-Id": String(clinicId) },
+      params: {
+        clinic_id: clinicId,
+      },
     });
     return response.data;
   },
@@ -29,9 +31,8 @@ const UseCaseService = {
     name: string
   ): Promise<UseCase> => {
     const response = await http.post(
-      `/usecases/create/`,
+      `/usecases/create/?clinic_id=${clinicId}`,
       { name },
-      { headers: { "X-Clinic-Id": String(clinicId) } }
     );
     return response.data;
   },
@@ -46,9 +47,8 @@ const UseCaseService = {
     name: string
   ): Promise<UseCase> => {
     const response = await http.put(
-      `/usecases/${id}/update/`,
+      `/usecases/${id}/update/?clinic_id=${clinicId}`,
       { name },
-      { headers: { "X-Clinic-Id": String(clinicId) } }
     );
     return response.data;
   },
