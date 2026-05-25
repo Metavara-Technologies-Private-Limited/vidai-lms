@@ -277,7 +277,7 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
       </Box>
 
       {/* Data source note */}
-      <Typography
+      {/* <Typography
         variant="caption"
         sx={{
           display: "block",
@@ -288,7 +288,7 @@ const CommunicationChart = ({ timeRange }: CommunicationChartProps) => {
       >
         Email: Zapier · SMS &amp; Calls: Twilio · WhatsApp &amp; Chatbot: coming
         soon
-      </Typography>
+      </Typography> */}
     </Box>
   );
 };
