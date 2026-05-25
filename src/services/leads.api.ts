@@ -677,11 +677,6 @@ export const LeadAPI = {
       const response = await api.post<Lead>(
         `/leads/?clinic_id=${data.clinic_id}`,
         body,
-        {
-          headers: {
-            "X-Clinic-Id": String(data.clinic_id),
-          },
-        },
       );
       console.log("✅ Lead created:", response.data);
       return response.data;
@@ -702,11 +697,6 @@ export const LeadAPI = {
       const retryResponse = await api.post<Lead>(
         `/leads/?clinic_id=${data.clinic_id}`,
         minimalBody,
-        {
-          headers: {
-            "X-Clinic-Id": String(data.clinic_id),
-          },
-        },
       );
 
       const createdLead = retryResponse.data;
@@ -723,11 +713,7 @@ export const LeadAPI = {
       }
 
       try {
-        const requestConfig: AxiosRequestConfig = {
-          headers: {
-            "X-Clinic-Id": String(fallbackClinicId),
-          },
-        };
+        const requestConfig: AxiosRequestConfig = {};
         (
           requestConfig as AxiosRequestConfig & { __skipErrorLog?: boolean }
         ).__skipErrorLog = true;
@@ -789,11 +775,6 @@ export const LeadAPI = {
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       sanitizedData,
-      {
-        headers: {
-          "X-Clinic-Id": String(clinicId),
-        },
-      },
     );
     return response.data;
   },
@@ -814,11 +795,6 @@ export const LeadAPI = {
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
-      {
-        headers: {
-          "X-Clinic-Id": String(clinicId),
-        },
-      },
     );
     console.log("✅ Lead + documents updated:", response.data);
     return response.data;
@@ -849,11 +825,6 @@ export const LeadAPI = {
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${storedClinicId()}`,
       formData,
-      {
-        headers: {
-          "X-Clinic-Id": String(storedClinicId()),
-        },
-      },
     );
     return response.data;
   },
@@ -894,11 +865,6 @@ export const LeadAPI = {
     const response = await api.put<Lead>(
       `/leads/${leadId}/update/?clinic_id=${clinicId}`,
       formData,
-      {
-        headers: {
-          "X-Clinic-Id": String(clinicId),
-        },
-      },
     );
     return response.data;
   },
@@ -1137,8 +1103,8 @@ export const DepartmentAPI = {
 export const InterestAPI = {
   listActiveByClinic: async (clinicId: number) => {
     const res = await api.get("/interests/", {
-      headers: {
-        "X-Clinic-Id": clinicId,
+      params: {
+        clinic_id: clinicId,
       },
     });
 
