@@ -19,11 +19,13 @@ export interface ReferralSource {
   external_clinic_id: number | null;
   external_clinic_name: string | null;
   referral_count: number;
+  is_active?: boolean;  // ← add
 }
 
 export interface ReferralDepartment {
   id: number;
   name: string;
+  is_active?: boolean;  // ← add
 }
 
 export interface ReferralSourcesParams {
