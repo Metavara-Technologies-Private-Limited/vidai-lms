@@ -215,21 +215,19 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
     dispatch(loadDashboardCounts(clinicId));
 
-    // Same pattern as ReferralsManager SourceDepartmentPage:
-    // 1. Fetch departments for this clinic.
-    // 2. For each department with a real id, fetch sources in parallel.
-    // 3. If no valid department ids (static fallback with id=0), fetch all
-    //    sources without a department filter — same fallback fetchReferralSources({})
-    //    that fetchReferralDepartments itself uses internally.
     fetchReferralDepartments(clinicId)
       .then((depts) => {
-        const validDepts = depts.filter((d) => d.id > 0);
-        if (validDepts.length === 0) {
+        // ── FIXED: only include active departments ────────────────────────
+        const activeDepts = depts.filter(
+          (d) => d.id > 0 && d.is_active !== false,
+        );
+
+        if (activeDepts.length === 0) {
           // Static fallback: fetch all sources (no department filter)
           return fetchReferralSources({});
         }
         return Promise.all(
-          validDepts.map((d) =>
+          activeDepts.map((d) =>
             fetchReferralSources({ referral_department_id: d.id }),
           ),
         ).then((results) => {
@@ -247,7 +245,12 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
           return flat;
         });
       })
-      .then(setReferralSources)
+      .then((sources) => {
+        // ── FIXED: only keep active referral sources ──────────────────────
+        // is_active may be a boolean or absent (treat absent as active).
+        const activeSources = sources.filter((s) => s.is_active !== false);
+        setReferralSources(activeSources);
+      })
       .catch(() => setReferralSources([]));
   }, [clinicId, dispatch]);
 
@@ -261,8 +264,12 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
           isWithinTimeRange(lead.modified_at || lead.created_at, timeRange),
       );
 
+      // ── FIXED: only count active campaigns ───────────────────────────────
       const clinicCampaigns = (campaigns || []).filter(
-        (campaign) => Boolean(clinicId) && Number(campaign.clinic) === clinicId,
+        (campaign) =>
+          Boolean(clinicId) &&
+          Number(campaign.clinic) === clinicId &&
+          campaign.is_active !== false,
       );
 
       if (referralSources.length === 0) {
@@ -295,6 +302,7 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
       // Build all members from the API — same data as Referral Manager.
       // referral_count is the authoritative assigned-leads count from the backend.
+      // referralSources is already filtered to active-only before this memo runs.
       referralSources.forEach((source) => {
         const sourceName = (source.name || "").trim();
         if (!sourceName) return;
@@ -346,7 +354,6 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
         const deptName = (lead.referral_department_name || "").toLowerCase().trim();
         if (deptName === "doctors") {
-          // Match doctor by assigned_to_name (same as how Doctors component identifies them)
           const name = (lead.assigned_to_name || "").trim();
           key = name ? doctorNameToKey.get(name.toLowerCase()) : undefined;
         } else if (lead.referral_source_id != null) {
@@ -489,7 +496,6 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
       const memberPerformance: Record<string, PerformanceChartPoint[]> = {};
       membersWithStats.forEach((member) => {
-        // Resolve the memberMap key for this member (needed for lead matching)
         const memberKey = Array.from(sourceIdToKey.values()).find(
           (k) => k.endsWith(`::${member.name}`),
         ) ?? doctorNameToKey.get(member.name.toLowerCase());
@@ -998,7 +1004,6 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
           </Card>
 
           {/* 3 & 4. Performance Content Grid */}
-          {/* Note: In MUI v6/Grid2, container prop is optional but used for spacing */}
           <Grid container spacing={3}>
             {/* Left Column: Top Performers */}
             <Grid size={{ xs: 12, md: 8 }}>
