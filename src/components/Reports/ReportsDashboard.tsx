@@ -223,7 +223,7 @@ const ReportsDashboard = () => {
     }
   }, [navigate, tab]);
 
-  // ── Fetch on clinic change ──────────────────────────────────────────────
+  // ── Fetch campaigns first, then enrich with leads in background ──────────
   useEffect(() => {
     let isMounted = true;
 
@@ -232,25 +232,33 @@ const ReportsDashboard = () => {
 
       try {
         setReportsLoading(true);
-        const [campaignResponse, leadsResponse] = await Promise.all([
-          CampaignAPI.list(clinic.id),
-          LeadAPI.list(clinic.id),
-        ]);
 
+        // Step 1: Fetch campaigns first and render immediately
+        const campaignResponse = await CampaignAPI.list(clinic.id);
         if (!isMounted) return;
 
-        const campaigns = Array.isArray(campaignResponse.data) ? campaignResponse.data : [];
-        const leads = Array.isArray(leadsResponse) ? leadsResponse : [];
+        const campaigns = Array.isArray(campaignResponse.data)
+          ? campaignResponse.data
+          : [];
 
-        setReportsData(buildReportDataByTab(campaigns, leads));
+        setReportsData(buildReportDataByTab(campaigns, []));
         setHasFetched(true);
+        setReportsLoading(false);
+
+        // Step 2: Fetch leads in background and enrich conversions
+        const leadsResponse = await LeadAPI.list(clinic.id);
+        if (!isMounted) return;
+
+        const leads = Array.isArray(leadsResponse) ? leadsResponse : [];
+        if (leads.length > 0) {
+          setReportsData(buildReportDataByTab(campaigns, leads));
+        }
       } catch (error) {
         console.error("Failed to fetch reports data:", error);
         if (!isMounted) return;
         setReportsData(createInitialReportsData());
         setHasFetched(true);
-      } finally {
-        if (isMounted) setReportsLoading(false);
+        setReportsLoading(false);
       }
     };
 
@@ -261,7 +269,7 @@ const ReportsDashboard = () => {
     };
   }, [clinic?.id]);
 
-  // ── Refetch when switching to a tab with no rows ────────────────────────
+  // ── Refetch when switching to a tab with no rows ──────────────────────────
   useEffect(() => {
     if (!hasFetched || !clinic?.id) return;
     if (activeTab === "call") return;
@@ -274,20 +282,28 @@ const ReportsDashboard = () => {
     const refetch = async () => {
       try {
         setReportsLoading(true);
-        const [campaignResponse, leadsResponse] = await Promise.all([
-          CampaignAPI.list(clinic.id),
-          LeadAPI.list(clinic.id),
-        ]);
 
+        // Step 1: Campaigns first
+        const campaignResponse = await CampaignAPI.list(clinic.id);
         if (!isMounted) return;
 
-        const campaigns = Array.isArray(campaignResponse.data) ? campaignResponse.data : [];
-        const leads = Array.isArray(leadsResponse) ? leadsResponse : [];
+        const campaigns = Array.isArray(campaignResponse.data)
+          ? campaignResponse.data
+          : [];
 
-        setReportsData(buildReportDataByTab(campaigns, leads));
+        setReportsData(buildReportDataByTab(campaigns, []));
+        setReportsLoading(false);
+
+        // Step 2: Leads in background
+        const leadsResponse = await LeadAPI.list(clinic.id);
+        if (!isMounted) return;
+
+        const leads = Array.isArray(leadsResponse) ? leadsResponse : [];
+        if (leads.length > 0) {
+          setReportsData(buildReportDataByTab(campaigns, leads));
+        }
       } catch (error) {
         console.error("Failed to refetch reports data:", error);
-      } finally {
         if (isMounted) setReportsLoading(false);
       }
     };
@@ -304,7 +320,7 @@ const ReportsDashboard = () => {
     if (nextTab) navigate(`/reports/${nextTab.key}`);
   };
 
-  // ── Full page loader on first load ─────────────────────────────────────
+  // ── Full page loader on first load ────────────────────────────────────────
   if (reportsLoading && !hasFetched) {
     return (
       <Box sx={{ p: 0.5 }}>
@@ -408,7 +424,7 @@ const ReportsDashboard = () => {
           />
         </Box>
 
-        {/* ── Inline tab refresh loader ── */}
+        {/* ── Inline refresh loader ── */}
         {reportsLoading && hasFetched && activeTab !== "call" && (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 3, mb: 1, px: 1 }}>
             <CircularProgress size={18} sx={{ color: "#F87171" }} />
