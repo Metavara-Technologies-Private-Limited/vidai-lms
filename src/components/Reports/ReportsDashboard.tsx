@@ -233,7 +233,7 @@ const ReportsDashboard = () => {
       try {
         setReportsLoading(true);
 
-        // Step 1: Fetch campaigns first and render immediately
+        // Step 1: campaigns first — renders immediately
         const campaignResponse = await CampaignAPI.list(clinic.id);
         if (!isMounted) return;
 
@@ -245,7 +245,7 @@ const ReportsDashboard = () => {
         setHasFetched(true);
         setReportsLoading(false);
 
-        // Step 2: Fetch leads in background and enrich conversions
+        // Step 2: leads in background — enriches conversions
         const leadsResponse = await LeadAPI.list(clinic.id);
         if (!isMounted) return;
 
@@ -283,7 +283,6 @@ const ReportsDashboard = () => {
       try {
         setReportsLoading(true);
 
-        // Step 1: Campaigns first
         const campaignResponse = await CampaignAPI.list(clinic.id);
         if (!isMounted) return;
 
@@ -294,7 +293,6 @@ const ReportsDashboard = () => {
         setReportsData(buildReportDataByTab(campaigns, []));
         setReportsLoading(false);
 
-        // Step 2: Leads in background
         const leadsResponse = await LeadAPI.list(clinic.id);
         if (!isMounted) return;
 
@@ -320,30 +318,6 @@ const ReportsDashboard = () => {
     if (nextTab) navigate(`/reports/${nextTab.key}`);
   };
 
-  // ── Full page loader on first load ────────────────────────────────────────
-  if (reportsLoading && !hasFetched) {
-    return (
-      <Box sx={{ p: 0.5 }}>
-        <Typography variant="h6" pb={2}>Reports</Typography>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: 400,
-            gap: 2,
-          }}
-        >
-          <CircularProgress size={40} sx={{ color: "#F87171" }} />
-          <Typography variant="body2" color="text.secondary">
-            Loading reports...
-          </Typography>
-        </Box>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ p: 0.5 }}>
       <Typography variant="h6" pb={2}>
@@ -360,6 +334,7 @@ const ReportsDashboard = () => {
             gap: 2,
           }}
         >
+          {/* ── Tabs always visible ── */}
           <Tabs
             value={activeTabIndex === -1 ? 0 : activeTabIndex}
             onChange={handleTabChange}
@@ -424,59 +399,70 @@ const ReportsDashboard = () => {
           />
         </Box>
 
-        {/* ── Inline refresh loader ── */}
-        {reportsLoading && hasFetched && activeTab !== "call" && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 3, mb: 1, px: 1 }}>
-            <CircularProgress size={18} sx={{ color: "#F87171" }} />
+        {/* ── Content area — loader or report ── */}
+        {reportsLoading && activeTab !== "call" ? (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 350,
+              gap: 2,
+            }}
+          >
+            <CircularProgress size={36} sx={{ color: "#F87171" }} />
             <Typography variant="body2" color="text.secondary">
-              Refreshing reports...
+              {hasFetched ? "Refreshing reports..." : "Loading reports..."}
             </Typography>
           </Box>
+        ) : (
+          <>
+            {activeTab === "facebook" && (
+              <FacebookReport
+                key={activeTab}
+                data={reportsData.facebook ?? createEmptyReportData()}
+                searchQuery={searchQuery}
+              />
+            )}
+            {activeTab === "gmail" && (
+              <GmailReports
+                key={activeTab}
+                data={reportsData.gmail ?? createEmptyReportData()}
+                searchQuery={searchQuery}
+              />
+            )}
+            {activeTab === "instagram" && (
+              <InstagramReports
+                key={activeTab}
+                data={reportsData.instagram ?? createEmptyReportData()}
+                searchQuery={searchQuery}
+              />
+            )}
+            {activeTab === "google-ads" && (
+              <GoogleAdsReports
+                key={activeTab}
+                data={reportsData["google-ads"] ?? createEmptyReportData()}
+                searchQuery={searchQuery}
+              />
+            )}
+            {activeTab === "linkedin" && (
+              <LinkedinReports
+                key={activeTab}
+                data={reportsData.linkedin ?? createEmptyReportData()}
+                searchQuery={searchQuery}
+              />
+            )}
+            {activeTab === "email" && (
+              <EmailReports
+                key={activeTab}
+                data={reportsData.email ?? createEmptyReportData()}
+                searchQuery={searchQuery}
+              />
+            )}
+            {activeTab === "call" && <CallReports searchQuery={searchQuery} />}
+          </>
         )}
-
-        {activeTab === "facebook" && (
-          <FacebookReport
-            key={activeTab}
-            data={reportsData.facebook ?? createEmptyReportData()}
-            searchQuery={searchQuery}
-          />
-        )}
-        {activeTab === "gmail" && (
-          <GmailReports
-            key={activeTab}
-            data={reportsData.gmail ?? createEmptyReportData()}
-            searchQuery={searchQuery}
-          />
-        )}
-        {activeTab === "instagram" && (
-          <InstagramReports
-            key={activeTab}
-            data={reportsData.instagram ?? createEmptyReportData()}
-            searchQuery={searchQuery}
-          />
-        )}
-        {activeTab === "google-ads" && (
-          <GoogleAdsReports
-            key={activeTab}
-            data={reportsData["google-ads"] ?? createEmptyReportData()}
-            searchQuery={searchQuery}
-          />
-        )}
-        {activeTab === "linkedin" && (
-          <LinkedinReports
-            key={activeTab}
-            data={reportsData.linkedin ?? createEmptyReportData()}
-            searchQuery={searchQuery}
-          />
-        )}
-        {activeTab === "email" && (
-          <EmailReports
-            key={activeTab}
-            data={reportsData.email ?? createEmptyReportData()}
-            searchQuery={searchQuery}
-          />
-        )}
-        {activeTab === "call" && <CallReports searchQuery={searchQuery} />}
       </Box>
     </Box>
   );
