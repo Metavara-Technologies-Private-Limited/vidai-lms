@@ -1,6 +1,7 @@
 import SearchIcon from "@mui/icons-material/Search";
 import {
   Box,
+  CircularProgress,
   InputAdornment,
   Tab,
   Tabs,
@@ -21,11 +22,7 @@ import { CAMPAIGN_MODE, PLATFORMS } from "../../constants/campaigns.constants";
 import { CampaignAPI } from "../../services/campaign.api";
 import { LeadAPI, type Lead } from "../../services/leads.api";
 import type { CampaignAPIType } from "../../types/campaigns.types";
-import type {
-  ReportChannelData,
-  ReportTabKey,
-  ReportTableRow,
-} from "../../types/reports.types";
+import type { ReportChannelData, ReportTabKey, ReportTableRow } from "../../types/reports.types";
 import { selectClinic } from "../../store/clinicSlice";
 import { useSelector } from "react-redux";
 
@@ -54,10 +51,7 @@ const createEmptyReportData = (): ReportChannelData => ({
   rows: [],
 });
 
-const createInitialReportsData = (): Record<
-  CampaignReportTab,
-  ReportChannelData
-> => {
+const createInitialReportsData = (): Record<CampaignReportTab, ReportChannelData> => {
   return CAMPAIGN_REPORT_TABS.reduce(
     (acc, tabKey) => {
       acc[tabKey] = createEmptyReportData();
@@ -73,7 +67,6 @@ const toNumber = (value: unknown): number => {
 };
 
 const formatCurrency = (value: number): string => `$${value.toFixed(2)}`;
-
 const formatPercent = (value: number): string => `${value.toFixed(1)}%`;
 
 const isEmailCampaign = (campaign: CampaignAPIType): boolean => {
@@ -102,25 +95,18 @@ const resolveSpend = (campaign: CampaignAPIType): number => {
 };
 
 const toLeadCampaignId = (lead: Lead): string => {
-  const raw = (lead as Lead & { campaign_id?: string | number | null })
-    .campaign_id;
+  const raw = (lead as Lead & { campaign_id?: string | number | null }).campaign_id;
   if (raw === null || raw === undefined) return "";
   return String(raw);
 };
 
 const toLeadCampaignName = (lead: Lead): string => {
   const raw = (lead as Lead & { campaign_name?: string | null }).campaign_name;
-  return String(raw ?? "")
-    .trim()
-    .toLowerCase();
+  return String(raw ?? "").trim().toLowerCase();
 };
 
-const campaignMatchesTab = (
-  campaign: CampaignAPIType,
-  tabKey: CampaignReportTab,
-): boolean => {
-  if (tabKey === "gmail" || tabKey === "email")
-    return isEmailCampaign(campaign);
+const campaignMatchesTab = (campaign: CampaignAPIType, tabKey: CampaignReportTab): boolean => {
+  if (tabKey === "gmail" || tabKey === "email") return isEmailCampaign(campaign);
   if (tabKey === "facebook") return hasPlatform(campaign, PLATFORMS.FACEBOOK);
   if (tabKey === "instagram") return hasPlatform(campaign, PLATFORMS.INSTAGRAM);
   if (tabKey === "linkedin") return hasPlatform(campaign, PLATFORMS.LINKEDIN);
@@ -128,10 +114,7 @@ const campaignMatchesTab = (
   return false;
 };
 
-const mapCampaignToRow = (
-  campaign: CampaignAPIType,
-  leads: Lead[],
-): ReportTableRow => {
+const mapCampaignToRow = (campaign: CampaignAPIType, leads: Lead[]): ReportTableRow => {
   const campaignId = String(campaign.id);
   const campaignName = String(campaign.campaign_name ?? "Untitled Campaign");
   const normalizedCampaignName = campaignName.trim().toLowerCase();
@@ -145,8 +128,7 @@ const mapCampaignToRow = (
     );
   });
 
-  const totalImpressions =
-    toNumber(campaign.impressions) || toNumber(campaign.fb_impressions);
+  const totalImpressions = toNumber(campaign.impressions) || toNumber(campaign.fb_impressions);
   const totalClicks = toNumber(campaign.clicks) || toNumber(campaign.fb_clicks);
   const conversions = linkedLeads.length || toNumber(campaign.lead_generated);
   const spend = resolveSpend(campaign);
@@ -155,8 +137,7 @@ const mapCampaignToRow = (
   const conversionRate =
     toNumber(campaign.conversion_rate) ||
     (totalClicks > 0 ? (conversions / totalClicks) * 100 : 0);
-  const cpc =
-    toNumber(campaign.cpc) || (totalClicks > 0 ? spend / totalClicks : 0);
+  const cpc = toNumber(campaign.cpc) || (totalClicks > 0 ? spend / totalClicks : 0);
   const cpa = conversions > 0 ? spend / conversions : 0;
 
   return {
@@ -194,56 +175,21 @@ const buildReportDataByTab = (
         { impressions: 0, clicks: 0, conversions: 0, spend: 0 },
       );
 
-      const totalCtr =
-        totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
-      const totalConversionRate =
-        totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
+      const totalCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+      const totalConversionRate = totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
       const totalCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
-      const totalCpa =
-        totals.conversions > 0 ? totals.spend / totals.conversions : 0;
+      const totalCpa = totals.conversions > 0 ? totals.spend / totals.conversions : 0;
 
       acc[tabKey] = {
         cards: [
-          {
-            id: "impressions",
-            label: "Total Impressions",
-            value: totals.impressions.toLocaleString(),
-          },
-          {
-            id: "clicks",
-            label: "Total Clicks",
-            value: totals.clicks.toLocaleString(),
-          },
-          {
-            id: "conversions",
-            label: "Conversions",
-            value: totals.conversions.toLocaleString(),
-          },
-          {
-            id: "spent",
-            label: "Total Spend",
-            value: formatCurrency(totals.spend),
-          },
-          {
-            id: "ctr",
-            label: "CTR (Click-Through Rate)",
-            value: formatPercent(totalCtr),
-          },
-          {
-            id: "convRate",
-            label: "Conversion Rate",
-            value: formatPercent(totalConversionRate),
-          },
-          {
-            id: "cpc",
-            label: "CPC (Cost per Click)",
-            value: formatCurrency(totalCpc),
-          },
-          {
-            id: "cpa",
-            label: "CPA (Cost per Lead)",
-            value: formatCurrency(totalCpa),
-          },
+          { id: "impressions", label: "Total Impressions", value: totals.impressions.toLocaleString() },
+          { id: "clicks", label: "Total Clicks", value: totals.clicks.toLocaleString() },
+          { id: "conversions", label: "Conversions", value: totals.conversions.toLocaleString() },
+          { id: "spent", label: "Total Spend", value: formatCurrency(totals.spend) },
+          { id: "ctr", label: "CTR (Click-Through Rate)", value: formatPercent(totalCtr) },
+          { id: "convRate", label: "Conversion Rate", value: formatPercent(totalConversionRate) },
+          { id: "cpc", label: "CPC (Cost per Click)", value: formatCurrency(totalCpc) },
+          { id: "cpa", label: "CPA (Cost per Lead)", value: formatCurrency(totalCpa) },
         ],
         rows,
       };
@@ -259,10 +205,9 @@ const ReportsDashboard = () => {
   const clinic = useSelector(selectClinic);
   const { tab } = useParams<{ tab?: string }>();
   const [searchQuery, setSearchQuery] = useState("");
-  const [reportsData, setReportsData] = useState<
-    Record<CampaignReportTab, ReportChannelData>
-  >(createInitialReportsData);
+  const [reportsData, setReportsData] = useState<Record<CampaignReportTab, ReportChannelData>>(createInitialReportsData);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
   const activeTab = useMemo<ReportTabKey>(() => {
     return REPORTS_TABS.find((item) => item.key === tab)?.key || "facebook";
@@ -278,31 +223,34 @@ const ReportsDashboard = () => {
     }
   }, [navigate, tab]);
 
+  // ── Fetch on clinic change ──────────────────────────────────────────────
   useEffect(() => {
     let isMounted = true;
 
     const fetchData = async () => {
+      if (!clinic?.id) return;
+
       try {
         setReportsLoading(true);
         const [campaignResponse, leadsResponse] = await Promise.all([
-          CampaignAPI.list(clinic?.id),
-          clinic?.id ? LeadAPI.list(clinic.id) : Promise.resolve([]),
+          CampaignAPI.list(clinic.id),
+          LeadAPI.list(clinic.id),
         ]);
 
         if (!isMounted) return;
-        const campaigns = Array.isArray(campaignResponse.data)
-          ? campaignResponse.data
-          : [];
+
+        const campaigns = Array.isArray(campaignResponse.data) ? campaignResponse.data : [];
         const leads = Array.isArray(leadsResponse) ? leadsResponse : [];
+
         setReportsData(buildReportDataByTab(campaigns, leads));
+        setHasFetched(true);
       } catch (error) {
         console.error("Failed to fetch reports data:", error);
         if (!isMounted) return;
         setReportsData(createInitialReportsData());
+        setHasFetched(true);
       } finally {
-        if (isMounted) {
-          setReportsLoading(false);
-        }
+        if (isMounted) setReportsLoading(false);
       }
     };
 
@@ -313,12 +261,72 @@ const ReportsDashboard = () => {
     };
   }, [clinic?.id]);
 
+  // ── Refetch when switching to a tab with no rows ────────────────────────
+  useEffect(() => {
+    if (!hasFetched || !clinic?.id) return;
+    if (activeTab === "call") return;
+
+    const currentTabData = reportsData[activeTab as CampaignReportTab];
+    if (!currentTabData || currentTabData.rows.length > 0) return;
+
+    let isMounted = true;
+
+    const refetch = async () => {
+      try {
+        setReportsLoading(true);
+        const [campaignResponse, leadsResponse] = await Promise.all([
+          CampaignAPI.list(clinic.id),
+          LeadAPI.list(clinic.id),
+        ]);
+
+        if (!isMounted) return;
+
+        const campaigns = Array.isArray(campaignResponse.data) ? campaignResponse.data : [];
+        const leads = Array.isArray(leadsResponse) ? leadsResponse : [];
+
+        setReportsData(buildReportDataByTab(campaigns, leads));
+      } catch (error) {
+        console.error("Failed to refetch reports data:", error);
+      } finally {
+        if (isMounted) setReportsLoading(false);
+      }
+    };
+
+    void refetch();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     const nextTab = REPORTS_TABS[newValue];
-    if (nextTab) {
-      navigate(`/reports/${nextTab.key}`);
-    }
+    if (nextTab) navigate(`/reports/${nextTab.key}`);
   };
+
+  // ── Full page loader on first load ─────────────────────────────────────
+  if (reportsLoading && !hasFetched) {
+    return (
+      <Box sx={{ p: 0.5 }}>
+        <Typography variant="h6" pb={2}>Reports</Typography>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 400,
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={40} sx={{ color: "#F87171" }} />
+          <Typography variant="body2" color="text.secondary">
+            Loading reports...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 0.5 }}>
@@ -326,14 +334,7 @@ const ReportsDashboard = () => {
         Reports
       </Typography>
 
-      <Box
-        sx={{
-          backgroundColor: "background.paper",
-          borderRadius: 3,
-          p: 0,
-          border: "none",
-        }}
-      >
+      <Box sx={{ backgroundColor: "background.paper", borderRadius: 3, p: 0, border: "none" }}>
         <Box
           sx={{
             display: "flex",
@@ -351,9 +352,7 @@ const ReportsDashboard = () => {
             TabIndicatorProps={{ style: { display: "none" } }}
             sx={{
               minHeight: 36,
-              "& .MuiTabs-flexContainer": {
-                gap: "12px",
-              },
+              "& .MuiTabs-flexContainer": { gap: "12px" },
             }}
           >
             {REPORTS_TABS.map((item, index) => {
@@ -374,9 +373,7 @@ const ReportsDashboard = () => {
                     color: isActive ? "#F87171" : "#6B7280",
                     backgroundColor: isActive ? "#FFF7F5" : "#F9FAFB",
                     minHeight: "36px",
-                    "&.Mui-selected": {
-                      color: "#F87171",
-                    },
+                    "&.Mui-selected": { color: "#F87171" },
                   }}
                 />
               );
@@ -388,19 +385,19 @@ const ReportsDashboard = () => {
             placeholder="Search by Report name"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-                sx={{
-                  flex: { xs: "1 1 180px", sm: "0 1 auto" },
-                  width: { xs: "auto", sm: 240 },
-                  minWidth: { xs: 0, sm: 220 },
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: "10px",
-                    backgroundColor: "#fff",
-                  },
-    "& input::placeholder": {   
-      fontSize: "14px",
-      opacity: 0.5,
-    },
-                }}
+            sx={{
+              flex: { xs: "1 1 180px", sm: "0 1 auto" },
+              width: { xs: "auto", sm: 240 },
+              minWidth: { xs: 0, sm: 220 },
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+                backgroundColor: "#fff",
+              },
+              "& input::placeholder": {
+                fontSize: "14px",
+                opacity: 0.5,
+              },
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -411,10 +408,14 @@ const ReportsDashboard = () => {
           />
         </Box>
 
-        {reportsLoading && activeTab !== "call" && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Loading reports...
-          </Typography>
+        {/* ── Inline tab refresh loader ── */}
+        {reportsLoading && hasFetched && activeTab !== "call" && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 3, mb: 1, px: 1 }}>
+            <CircularProgress size={18} sx={{ color: "#F87171" }} />
+            <Typography variant="body2" color="text.secondary">
+              Refreshing reports...
+            </Typography>
+          </Box>
         )}
 
         {activeTab === "facebook" && (
