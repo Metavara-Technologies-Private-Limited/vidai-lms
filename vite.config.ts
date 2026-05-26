@@ -2,8 +2,57 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import fs from "fs";
+import type { Plugin } from "vite";
 
-const backendTarget = "http://localhost:8000";
+/**
+ * Copies index.html into every known SPA route directory so that
+ * S3/CloudFront can serve the file for direct-navigation URLs.
+ */
+function spaFallbackPlugin(): Plugin {
+  const routes = [
+    "login",
+    "dashboard",
+    "leads",
+    "leads/add",
+    "pipeline",
+    "campaigns",
+    "referrals",
+    "referrals/doctors",
+    "reports",
+    "reputation",
+    "settings",
+    "documents",
+    "risk",
+    "compliance",
+    "profile",
+  ];
+
+  return {
+    name: "spa-fallback-copies",
+    apply: "build",
+    closeBundle() {
+      const outDir = path.resolve(__dirname, "dist");
+      const indexHtml = path.join(outDir, "index.html");
+      if (!fs.existsSync(indexHtml)) return;
+
+      const content = fs.readFileSync(indexHtml);
+      for (const route of routes) {
+        const dir = path.join(outDir, route);
+        fs.mkdirSync(dir, { recursive: true });
+        const target = path.join(dir, "index.html");
+        if (!fs.existsSync(target)) {
+          fs.writeFileSync(target, content);
+        }
+      }
+    },
+  };
+}
+
+// const backendTarget = "http://localhost:8000";
+
+// const backendTarget = "http://192.168.10.156:8010";
+const backendTarget = "https://lms-vidaisolutions.metavaratechnologies.com";
 
 const getPackageNameFromId = (id: string): string | null => {
   const marker = "node_modules/";
@@ -51,7 +100,7 @@ const apiProxy = {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), spaFallbackPlugin()],
   build: {
     rollupOptions: {
       output: {
@@ -128,6 +177,7 @@ export default defineConfig({
     ],
   },
   server: {
+    host: true,
     port: 5173,
     strictPort: true,
     warmup: {
