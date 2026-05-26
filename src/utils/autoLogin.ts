@@ -54,6 +54,86 @@ export const decodeBase64 = (value: string | null): string | null => {
   }
 };
 
+// --- Secure auto-login token (single obfuscated param `t`) ---
+
+const TOKEN_KEY = "vL9$xQ2m";
+
+function xorCipher(input: string, key: string): string {
+  let result = "";
+  for (let i = 0; i < input.length; i++) {
+    result += String.fromCharCode(
+      input.charCodeAt(i) ^ key.charCodeAt(i % key.length),
+    );
+  }
+  return result;
+}
+
+function toBase64Url(str: string): string {
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromBase64Url(str: string): string {
+  let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  return atob(b64);
+}
+
+/** Encode credentials into a single opaque token for URL use. */
+export const encodeAutoLoginToken = (
+  username: string,
+  password: string,
+  displayName?: string,
+): string => {
+  const payload = [username, password, displayName ?? ""].join("\x01");
+  return toBase64Url(xorCipher(payload, TOKEN_KEY));
+};
+
+/** Decode the opaque token back into credentials. Returns null on failure. */
+export const decodeAutoLoginToken = (
+  token: string,
+): { username: string; password: string; displayName: string } | null => {
+  try {
+    const raw = fromBase64Url(token);
+    const decrypted = xorCipher(raw, TOKEN_KEY);
+    const parts = decrypted.split("\x01");
+    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+    return {
+      username: parts[0],
+      password: parts[1],
+      displayName: parts[2] ?? "",
+    };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Parse auto-login credentials from URL search params.
+ * Supports: ?t=<token> (new) or ?u=&p=&name= (legacy).
+ * Returns null if no valid auto-login params found.
+ */
+export const parseAutoLoginParams = (
+  searchParams: URLSearchParams,
+): { username: string; password: string; displayName: string } | null => {
+  // New format: single token
+  const token = searchParams.get("t");
+  if (token) {
+    return decodeAutoLoginToken(token);
+  }
+  // Legacy format: base64 params
+  const encodedUser = searchParams.get("u");
+  const encodedPass = searchParams.get("p");
+  if (encodedUser && encodedPass) {
+    const username = decodeBase64(encodedUser);
+    const password = decodeBase64(encodedPass);
+    if (!username || !password) return null;
+    const rawName = searchParams.get("name");
+    const displayName = decodeBase64(rawName)?.trim() ?? "";
+    return { username, password, displayName };
+  }
+  return null;
+};
+
 export const splitDisplayName = (
   displayName: string,
 ): { first: string; last: string } => {

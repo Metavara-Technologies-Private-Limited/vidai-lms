@@ -18,7 +18,7 @@ import {
 } from "../utils/languages";
 import {
   clearDisplayNameOverride,
-  decodeBase64,
+  parseAutoLoginParams,
   readLoginThemeMode,
   setDisplayNameOverride,
   setLoginThemeMode,
@@ -128,7 +128,7 @@ export default function VidaiLogin() {
   const dispatch = useDispatch<AppDispatch>();
   const [searchParams] = useSearchParams();
   const hasAutoLoginParams = Boolean(
-    searchParams.get("u") && searchParams.get("p"),
+    searchParams.get("t") || (searchParams.get("u") && searchParams.get("p")),
   );
   const persistedThemeMode = readLoginThemeMode();
   const isAutoLoginTheme = hasAutoLoginParams || persistedThemeMode === "auto";
@@ -145,24 +145,21 @@ export default function VidaiLogin() {
   const [isExternalLogin, setIsExternalLogin] = useState<boolean>(false);
   const t = TRANSLATIONS[language];
 
-  // Auto-login from URL params: ?u=<base64>&p=<base64>&name=<base64>
+  // Auto-login from URL params: ?t=<token> or legacy ?u=&p=&name=
   useEffect(() => {
-    const encodedUser = searchParams.get("u");
-    const encodedPass = searchParams.get("p");
-    if (!encodedUser || !encodedPass) return;
+    const credentials = parseAutoLoginParams(searchParams);
+    if (!credentials) {
+      if (hasAutoLoginParams) setLoading(false);
+      return;
+    }
+
+    const { username: decodedUser, password: decodedPass, displayName } = credentials;
 
     setLoginThemeMode("auto");
 
     const doAutoLogin = async () => {
       try {
         setLoading(true);
-        const decodedUser = decodeBase64(encodedUser);
-        const decodedPass = decodeBase64(encodedPass);
-        if (!decodedUser || !decodedPass) {
-          throw new Error("Invalid auto-login parameters");
-        }
-        const rawName = searchParams.get("name");
-        const displayName = decodeBase64(rawName)?.trim() ?? "";
 
         const loginRes = await authApi.login(
           { username: decodedUser.trim(), password: decodedPass.trim() },
@@ -197,9 +194,12 @@ export default function VidaiLogin() {
         );
 
         navigate("/dashboard", { replace: true });
-      } catch {
+      } catch (err: unknown) {
         setLoading(false);
-        // Fall through to show the normal login form on failure
+        const msg =
+          err instanceof Error ? err.message : "Auto-login failed";
+        setError(msg);
+        toast.error(msg);
       }
     };
 
