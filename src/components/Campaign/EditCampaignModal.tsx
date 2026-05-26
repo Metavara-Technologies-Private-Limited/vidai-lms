@@ -906,15 +906,15 @@ export default function EditCampaignModal({
 
           // ── Push text content into contentEditable refs ──────
           setTimeout(() => {
-            if (instagramRef.current && filledContent.instagram)
-              instagramRef.current.innerText = filledContent.instagram;
-            if (facebookRef.current && filledContent.facebook)
-              facebookRef.current.innerText = filledContent.facebook;
-            if (linkedinRef.current && filledContent.linkedin)
-              linkedinRef.current.innerText = filledContent.linkedin;
-            if (googleAdsRef.current && filledContent.google_ads)
-              googleAdsRef.current.innerText = filledContent.google_ads;
-          }, 300);
+  if (instagramRef.current && filledContent.instagram)
+    instagramRef.current.innerHTML = filledContent.instagram;
+  if (facebookRef.current && filledContent.facebook)
+    facebookRef.current.innerHTML = filledContent.facebook;
+  if (linkedinRef.current && filledContent.linkedin)
+    linkedinRef.current.innerHTML = filledContent.linkedin;
+  if (googleAdsRef.current && filledContent.google_ads)
+    googleAdsRef.current.innerHTML = filledContent.google_ads;
+}, 300);
 
           // ── Google Ads: keywords only (no image URL in UI) ───
           const parseKeywords = (value: unknown): string => {
@@ -1006,20 +1006,20 @@ export default function EditCampaignModal({
   }, [campaign.id]);
 
   // ─── Push content into refs when step changes to 2 (editors mount) ──
-  useEffect(() => {
-    if (step === 2 && campaign.type === "social") {
-      setTimeout(() => {
-        if (instagramRef.current && platformContent.instagram && !instagramRef.current.innerText.trim())
-          instagramRef.current.innerText = platformContent.instagram;
-        if (facebookRef.current && platformContent.facebook && !facebookRef.current.innerText.trim())
-          facebookRef.current.innerText = platformContent.facebook;
-        if (linkedinRef.current && platformContent.linkedin && !linkedinRef.current.innerText.trim())
-          linkedinRef.current.innerText = platformContent.linkedin;
-        if (googleAdsRef.current && platformContent.google_ads && !googleAdsRef.current.innerText.trim())
-          googleAdsRef.current.innerText = platformContent.google_ads;
-      }, 200);
-    }
-  }, [step, campaign.type, platformContent]);
+ useEffect(() => {
+  if (step === 2 && campaign.type === "social") {
+    setTimeout(() => {
+      if (instagramRef.current && platformContent.instagram && !instagramRef.current.innerHTML.trim())
+        instagramRef.current.innerHTML = platformContent.instagram;
+      if (facebookRef.current && platformContent.facebook && !facebookRef.current.innerHTML.trim())
+        facebookRef.current.innerHTML = platformContent.facebook;
+      if (linkedinRef.current && platformContent.linkedin && !linkedinRef.current.innerHTML.trim())
+        linkedinRef.current.innerHTML = platformContent.linkedin;
+      if (googleAdsRef.current && platformContent.google_ads && !googleAdsRef.current.innerHTML.trim())
+        googleAdsRef.current.innerHTML = platformContent.google_ads;
+    }, 200);
+  }
+}, [step, campaign.type, platformContent]);
 
   useEffect(() => {
     if (editorRef.current && emailBody && editorRef.current.innerHTML !== emailBody) {
