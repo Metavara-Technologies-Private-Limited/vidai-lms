@@ -46,14 +46,6 @@ const ALL_LEADS_MENU: MenuItem[] = [
     page: lazy(() => import("../pages/Settings")),
     subMenu: [
       {
-        key: "integration",
-        label: "Integration",
-        path: "/settings/integration",
-        page: lazy(
-          () => import("../components/Settings/Integration/Integration.tsx"),
-        ),
-      },
-      {
         key: "tickets",
         label: "Tickets",
         path: "/settings/tickets",
