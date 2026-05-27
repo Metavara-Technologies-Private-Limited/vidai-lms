@@ -143,8 +143,7 @@ const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =
     `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
-  const secondary = option.role || option.designation;
-  return secondary ? `${primary} (${secondary})` : primary;
+  return primary;
 };
 
 const personnelLabel = (option: AssigneeOption): string =>
