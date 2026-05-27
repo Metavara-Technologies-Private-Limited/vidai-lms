@@ -670,9 +670,6 @@ export function Step1({
                     <Typography variant="body2" fontWeight={600}>
                       {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() || option.username || `User ${option.id}`}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {[option.role || option.designation, option.email].filter(Boolean).join(" · ")}
-                    </Typography>
                   </Box>
                 </li>
               )}
