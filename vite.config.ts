@@ -52,7 +52,7 @@ function spaFallbackPlugin(): Plugin {
 // const backendTarget = "http://localhost:8000";
 
 // const backendTarget = "http://192.168.10.156:8010";
-const backendTarget = "https://lms-vidaisolutions.metavaratechnologies.com";
+const backendTarget = "https://lms-usw-api.vidaisolutions.com";
 
 const getPackageNameFromId = (id: string): string | null => {
   const marker = "node_modules/";
