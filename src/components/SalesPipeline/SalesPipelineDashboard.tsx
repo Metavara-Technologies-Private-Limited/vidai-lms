@@ -77,6 +77,7 @@ const SalesPipelineDashboard = () => {
 	const pipelineLoading = useSelector(selectPipelineLoading);
 	const pipelineError = useSelector(selectPipelineError);
 	const selectedPipelineId = selectedPipeline?.id ?? null;
+	const canCreatePipeline = canEditPipeline && pipelines.length === 0;
 
 	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 	const [editPipelineData, setEditPipelineData] = useState<{ id: string; pipelineName: string; industry: string } | null>(null);
@@ -263,7 +264,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleOpenCreatePipeline = () => {
-		if (!canEditPipeline) return;
+		if (!canCreatePipeline) return;
 		if (document.activeElement instanceof HTMLElement) {
 			document.activeElement.blur();
 		}
@@ -882,7 +883,7 @@ const SalesPipelineDashboard = () => {
                   className="mobile-add-button"
                   variant="outlined"
                   onClick={handleOpenCreatePipeline}
-                  disabled={!canEditPipeline}
+					disabled={!canCreatePipeline}
                   sx={{
                     mt: 1.5,
                     borderRadius: 2,

@@ -66,6 +66,7 @@ const SalesPipelineSidebar = ({
 	onDeletePipeline,
 }: SalesPipelineSidebarProps) => {
 	const theme = useTheme();
+	const canCreatePipeline = canEditPipeline && pipelines.length === 0;
 	const sortedPipelines = [...pipelines].sort((left, right) => {
 		const leftIsDefault = left.id === defaultPipelineId;
 		const rightIsDefault = right.id === defaultPipelineId;
@@ -111,7 +112,7 @@ const SalesPipelineSidebar = ({
 				className="mobile-add-button"
 				variant="outlined"
 				onClick={onOpenCreatePipeline}
-				disabled={!canEditPipeline}
+				disabled={!canCreatePipeline}
 				sx={{
 					justifyContent: "center",
 					color: "text.primary",

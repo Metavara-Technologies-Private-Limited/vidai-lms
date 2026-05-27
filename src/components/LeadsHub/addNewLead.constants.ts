@@ -23,7 +23,7 @@ export const TASK_STATUS_OPTIONS = [
 export type TaskStatusValue = "to_do" | "in_progress" | "completed";
 
 // ====================== Source Options ======================
-export const SOURCE_OPTIONS = ["Direct", "Referral", "Social Media", "Other"] as const;
+export const SOURCE_OPTIONS = ["Direct", "Other"] as const;
 
 // "Referral" sub-sources are fetched dynamically from the backend referral departments API
 export const SUB_SOURCE_OPTIONS: Record<string, string[]> = {

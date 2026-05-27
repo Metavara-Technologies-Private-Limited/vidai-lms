@@ -2,7 +2,6 @@ import { Box, Button } from "@mui/material";
 import { overviewTabsStyles } from "../../styles/dashboard/OverviewTabs.styles";
 
 export type OverviewTab =
-  | "source"
   | "communication"
   | "conversion"
   | "pipeline"
@@ -15,7 +14,6 @@ interface Props {
 }
 
 const tabs: { label: string; value: OverviewTab }[] = [
-  { label: "Source Performance", value: "source" },
   { label: "Communication", value: "communication" },
   { label: "Conversion Trend", value: "conversion" },
   { label: "Lead Pipeline Funnel", value: "pipeline" },

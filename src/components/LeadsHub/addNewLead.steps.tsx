@@ -62,8 +62,7 @@ const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =
     `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
-  const secondary = option.role || option.designation;
-  return secondary ? `${primary} (${secondary})` : primary;
+  return primary;
 };
 
 // ── Capitalize first letter of each word ─────────────────────────────────────
@@ -620,11 +619,6 @@ export function Step1({
                   <Typography variant="body2" fontWeight={600}>
                     {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() || option.username}
                   </Typography>
-                  {(option.role || option.designation) && (
-                    <Typography variant="caption" color="text.secondary">
-                      {option.role || option.designation}
-                    </Typography>
-                  )}
                 </Box>
               </li>
             )}
@@ -1340,11 +1334,6 @@ export function Step3({
                         {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() ||
                           option.username}
                       </Typography>
-                      {(option.role || option.designation) && (
-                        <Typography variant="caption" color="text.secondary">
-                          {option.role || option.designation}
-                        </Typography>
-                      )}
                     </Box>
                   </li>
                 )}
