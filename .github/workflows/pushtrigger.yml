@@ -3,7 +3,7 @@ name: LMS-Clinic Frontend Push Trigger
 on:
   push:
     branches:
-      - devops-build
+      - dev-us
 
 jobs:
   build-and-deploy:
@@ -30,7 +30,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build --no-cache \
-          --build-arg VITE_API_BASE_URL=https://lms-vidaisolutions.metavaratechnologies.com/api \
+          --build-arg VITE_API_BASE_URL=http://72.62.227.137:8006/api \
           -f devops/Dockerfile \
           -t ${{ secrets.DOCKER_USERNAME }}/clinic-frontend:latest .
 
@@ -42,6 +42,7 @@ jobs:
       # ================= DEPLOY TO VPS =================
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
+
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
@@ -49,16 +50,16 @@ jobs:
 
           script: |
 
-            echo "Pull latest clinic frontend image"
+            echo "Pull latest frontend image"
             docker pull ${{ secrets.DOCKER_USERNAME }}/clinic-frontend:latest
 
-            echo "Stop old clinic frontend container"
+            echo "Stop old frontend container"
             docker stop clinic-frontend || true
 
-            echo "Remove old clinic frontend container"
+            echo "Remove old frontend container"
             docker rm clinic-frontend || true
 
-            echo "Start new clinic frontend container"
+            echo "Start clinic frontend container"
 
             docker run -d \
               --restart always \
@@ -66,7 +67,6 @@ jobs:
               -p 3004:80 \
               ${{ secrets.DOCKER_USERNAME }}/clinic-frontend:latest
 
-            echo "Clinic frontend deployed successfully"
+            echo "Frontend deployment completed"
 
-            echo "Running containers:"
             docker ps
