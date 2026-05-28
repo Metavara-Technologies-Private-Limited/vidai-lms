@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { selectClinic } from "../store/clinicSlice";
 import { Alert } from "@mui/material";
 import "../styles/Campaign/campaigns.css";
 import searchIcon from "../components/Campaign/Icons/search.png";
@@ -31,32 +30,21 @@ import {
   type Tab,
 } from "../constants/campaigns.constants";
 import type { Campaign, CampaignAPIType } from "../types/campaigns.types";
+import { getComputedCampaignStatus } from "../utils/campaigns.utils";
 
-const AddNewCampaign = lazy(
-  () => import("../components/Campaign/AddNewCampaign"),
-);
-const SocialCampaignModal = lazy(
-  () => import("../components/Campaign/SocialCampaignModal"),
-);
-const CampaignDashboard = lazy(
-  () => import("../components/Campaign/CampaignDashboard"),
-);
-const EmailCampaignModal = lazy(
-  () => import("../components/Campaign/EmailCampaignModal"),
-);
-const EditCampaignModal = lazy(
-  () => import("../components/Campaign/EditCampaignModal"),
-);
-const DuplicateCampaignModal = lazy(
-  () => import("../components/Campaign/DuplicateCampaignModal"),
-);
+const AddNewCampaign = lazy(() => import("../components/Campaign/AddNewCampaign"));
+const SocialCampaignModal = lazy(() => import("../components/Campaign/SocialCampaignModal"));
+const CampaignDashboard = lazy(() => import("../components/Campaign/CampaignDashboard"));
+const EmailCampaignModal = lazy(() => import("../components/Campaign/EmailCampaignModal"));
+const EditCampaignModal = lazy(() => import("../components/Campaign/EditCampaignModal"));
+const DuplicateCampaignModal = lazy(() => import("../components/Campaign/DuplicateCampaignModal"));
 
 export default function CampaignsScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const rawCampaigns = useSelector(selectCampaign);
   const campaignLoading = useSelector(selectCampaignLoading);
   const user = useSelector(selectUser);
-  const authUser = user as unknown as Record<string, unknown> | null;
+  const authUser = user as Record<string, unknown> | null;
   const nestedAuthUser =
     authUser?.user && typeof authUser.user === "object"
       ? (authUser.user as Record<string, unknown>)
@@ -75,12 +63,16 @@ export default function CampaignsScreen() {
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, campaignAliases, "edit");
 
-  const _campaignClinic = useSelector(selectClinic);
+  // ✅ FIX: Clinic switching is handled by Header's hydrateClinic which dispatches fetchCampaign()
+  // Campaigns.tsx should NOT dispatch here to avoid double-fetching and slow loads
 
-  useEffect(() => {
-    if (!canViewCampaigns) return;
-    dispatch(fetchCampaign());
-  }, [dispatch, canViewCampaigns, _campaignClinic?.id]);
+  // useEffect(() => {
+  //   if (!canViewCampaigns) return;
+  //   // Only dispatch if campaign data is empty and loading is false (initial mount with no data).
+  //   if (rawCampaigns.length === 0 && !campaignLoading) {
+  //     dispatch(fetchCampaign());
+  //   }
+  // }, [dispatch, canViewCampaigns, campaignLoading]);
 
   const campaigns = useMemo<Campaign[]>(() => {
     return (rawCampaigns || []).map((api: CampaignAPIType) => {
@@ -105,6 +97,11 @@ export default function CampaignsScreen() {
             .filter((s) => s.is_active !== false)
             .map((s) => s.platform_name ?? "")
             .filter(Boolean) as Platform[];
+        } else if (
+          Array.isArray(api.select_ad_accounts) &&
+          api.select_ad_accounts.length > 0
+        ) {
+          platforms = api.select_ad_accounts.filter(Boolean) as Platform[];
         }
       }
 
@@ -128,7 +125,6 @@ export default function CampaignsScreen() {
         platform_data: api.platform_data ?? {},
         campaign_content:
           api.campaign_content || api.email?.[0]?.email_body || "",
-
         total_spend: api.total_spend ?? 0,
         cpc: api.cpc ?? 0,
         // Mailchimp metrics
@@ -150,9 +146,11 @@ export default function CampaignsScreen() {
   }, [rawCampaigns]);
 
   // UI States
-  const [tab, setTab] = useState<Tab>(CAMPAIGN_TABS.ALL);
+  const [tab, setTab] = useState<Tab>(CAMPAIGN_TABS.SOCIAL);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CampaignStatus | "all">("all");
+  const [platform, setPlatform] = useState<string>("all");
+  const [openPlatform, setOpenPlatform] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [openStatus, setOpenStatus] = useState(false);
   const [showAddCampaign, setShowAddCampaign] = useState(false);
@@ -166,9 +164,29 @@ export default function CampaignsScreen() {
   const [duplicatingCampaign, setDuplicatingCampaign] =
     useState<Campaign | null>(null);
 
-  const handleStatusChange = (id: string, status: CampaignStatus) => {
-    dispatch(updateCampaignStatus({ id, status }));
-  };
+    const handlePlatformChange = (selectedPlatform: string) => {
+      setPlatform(selectedPlatform);
+
+      if (selectedPlatform === PLATFORMS.GMAIL) {
+        setTab(CAMPAIGN_TABS.EMAIL);
+      } else if (selectedPlatform !== "all") {
+        setTab(CAMPAIGN_TABS.SOCIAL);
+      }
+    };
+  
+    const handleStatusChange = (
+      id: string,
+      status: CampaignStatus,
+      platformData?: Campaign["platform_data"],
+    ) => {
+      dispatch(
+        updateCampaignStatus({
+          id,
+          status,
+          platform_data: platformData,
+        }),
+      );
+    };
 
   const handleEdit = (campaign: Campaign) => {
     if (!canEditCampaigns) return;
@@ -187,16 +205,20 @@ export default function CampaignsScreen() {
       const searchOk = (c.name ?? "")
         .toLowerCase()
         .includes(search.toLowerCase());
-      const statusOk = status === "all" || c.status === status;
-      return tabOk && searchOk && statusOk;
-    });
-  }, [campaigns, tab, search, status]);
+        const computedStatus = getComputedCampaignStatus(c);
 
-  const allCount = campaigns.length;
+        const statusOk = status === "all" || computedStatus === status;
+
+      const platformOk =
+        platform === "all" ||
+        c.platforms?.some((p) => p.toLowerCase() === platform.toLowerCase());
+
+      return tabOk && searchOk && statusOk && platformOk;
+    });
+  }, [campaigns, tab, search, status, platform]);
   const socialCount = campaigns.filter(
     (c) => c.type === CAMPAIGN_TYPE.SOCIAL,
   ).length;
-
   const emailCount = campaigns.filter(
     (c) => c.type === CAMPAIGN_TYPE.EMAIL,
   ).length;
@@ -221,20 +243,24 @@ export default function CampaignsScreen() {
           You do not have permission to view campaigns.
         </Alert>
       )}
+
+      {/* ── Header: title + filter dropdown + add button ── */}
       <CampaignHeader
         onAddNew={() => setShowAddCampaign(true)}
         canAddCampaign={canAddCampaigns}
+        status={status}
+        onStatusChange={setStatus}
+        openStatus={openStatus}
+        setOpenStatus={setOpenStatus}
+        platform={platform}
+        onPlatformChange={handlePlatformChange}
+        openPlatform={openPlatform}
+        setOpenPlatform={setOpenPlatform}
       />
-      <div className="filters-row">
-        {/* Header Filter */}
-        <div className="tabs">
-          <button
-            className={`tab-btn ${tab === CAMPAIGN_TABS.ALL ? "active" : ""}`}
-            onClick={() => setTab(CAMPAIGN_TABS.ALL)}
-          >
-            All Campaigns ({allCount})
-          </button>
 
+      <div className="filters-row">
+        {/* Tabs — only Social and Email, All Campaigns removed */}
+        <div className="tabs">
           <button
             className={`tab-btn ${
               tab === CAMPAIGN_TABS.SOCIAL ? "active" : ""
@@ -252,7 +278,7 @@ export default function CampaignsScreen() {
           </button>
         </div>
 
-        {/* Header Search */}
+        {/* Search bar stays here */}
         <div className="right-filters">
           <div className="search-input">
             <img src={searchIcon} alt="Search" className="search-icon" />
@@ -261,40 +287,6 @@ export default function CampaignsScreen() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-          </div>
-
-          {/* Header Status Filter */}
-          <div className="status-dropdown">
-            <div
-              className={`status-btn ${openStatus ? "active" : ""}`}
-              onClick={() => setOpenStatus((prev) => !prev)}
-            >
-              {status === "all" ? "All Status" : status}
-            </div>
-
-            {openStatus && (
-              <div className="status-menu">
-                {(
-                  ["all", ...Object.values(CAMPAIGN_STATUS)] as (
-                    | CampaignStatus
-                    | "all"
-                  )[]
-                ).map((item) => (
-                  <div
-                    key={item}
-                    className={`status-item ${
-                      status === item ? "selected" : ""
-                    }`}
-                    onClick={() => {
-                      setStatus(item);
-                      setOpenStatus(false);
-                    }}
-                  >
-                    {item === "all" ? "All Status" : item}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>

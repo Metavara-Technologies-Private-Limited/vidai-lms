@@ -40,12 +40,20 @@ export const fetchCampaign = createAsyncThunk<
 });
 
 export const updateCampaignStatus = createAsyncThunk<
-  { id: string; status: CampaignStatus },
-  { id: string; status: CampaignStatus },
+  {
+    id: string;
+    status: CampaignStatus;
+    platform_data?: CampaignAPIType["platform_data"];
+  },
+  {
+    id: string;
+    status: CampaignStatus;
+    platform_data?: CampaignAPIType["platform_data"];
+  },
   { state: RootState; rejectValue: string }
 >(
   "campaign/updateCampaignStatus",
-  async ({ id, status }, { getState, rejectWithValue }) => {
+  async ({ id, status, platform_data }, { getState, rejectWithValue }) => {
     try {
       const apiStatus = STATUS_TO_API[status];
 
@@ -57,6 +65,7 @@ export const updateCampaignStatus = createAsyncThunk<
       await CampaignAPI.updateStatus(id, apiStatus, {
         ...fullCampaign,
         status: apiStatus as CampaignStatus,
+        platform_data: platform_data ?? fullCampaign.platform_data,
       });
 
       return { id, status };
@@ -73,7 +82,14 @@ export const updateCampaignStatus = createAsyncThunk<
 const campaignSlice = createSlice({
   name: "campaign",
   initialState,
-  reducers: {},
+  reducers: {
+    // ✅ FIX: Clear campaigns when switching clinics to prevent stale data display
+    clearCampaigns: (state) => {
+      state.data = [];
+      state.error = null;
+      // Keep loading state to show loading spinner during clinic switch
+    },
+  },
   extraReducers: (builder) => {
     builder
       // fetch campaigns
@@ -96,7 +112,14 @@ const campaignSlice = createSlice({
 
         if (campaign) {
           campaign.status = status;
-          campaign.is_active = status === CAMPAIGN_STATUS.LIVE;
+
+          if (action.meta.arg.platform_data) {
+            campaign.platform_data = action.meta.arg.platform_data;
+          }
+
+          campaign.is_active =
+            status !== CAMPAIGN_STATUS.PAUSED &&
+            status !== CAMPAIGN_STATUS.STOPPED;
         }
       })
       .addCase(updateCampaignStatus.fulfilled, (state, action) => {
@@ -105,7 +128,14 @@ const campaignSlice = createSlice({
 
         if (campaign) {
           campaign.status = status;
-          campaign.is_active = status === CAMPAIGN_STATUS.LIVE;
+
+          if (action.meta.arg.platform_data) {
+            campaign.platform_data = action.meta.arg.platform_data;
+          }
+
+          campaign.is_active =
+            status !== CAMPAIGN_STATUS.PAUSED &&
+            status !== CAMPAIGN_STATUS.STOPPED;
         }
       })
       .addCase(updateCampaignStatus.rejected, (_state, action) => {
@@ -116,6 +146,7 @@ const campaignSlice = createSlice({
 
 export default campaignSlice.reducer;
 
+export const { clearCampaigns } = campaignSlice.actions;
 export const selectCampaign = (state: RootState) => state.campaign.data;
 
 export const selectCampaignLoading = (state: RootState) =>

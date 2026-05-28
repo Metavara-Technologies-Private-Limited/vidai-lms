@@ -2,6 +2,7 @@
 // EditLead.tsx  –  Pure JSX / render layer
 // All state & logic lives in useEditLead.ts
 // ============================================================
+import * as React from "react";
 import {
   Box,
   Button,
@@ -41,10 +42,19 @@ import {
   STEPS,
   TOTAL_STEPS,
   inputStyle,
+  readOnlyStyle,
   labelStyle,
   sectionLabelStyle,
+  TASK_STATUS_OPTIONS,
 } from "./UseEditLead";
 import { sanitizeNameInput } from "../../utils/nameValidation";
+import { capitalizeFirst } from "../../utils/nameValidation";
+import {
+  sanitizePhoneInput,
+  sanitizeEmailFieldInput,
+  sanitizeLocationInput,
+  sanitizeAddressInput,
+} from "../../utils/leadFieldValidation";
 
 const INPUT_TOAST_OPTIONS = { position: "top-right" as const, autoClose: 1400 };
 
@@ -54,15 +64,20 @@ const showInputToast = (toastId: string, message: string) => {
   }
 };
 
+// ── Capitalize first letter of each word (for action type labels) ─────────────
+const capitalizeWords = (str: string): string =>
+  str
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
 const SLOT_MENU_PROPS = {
   anchorOrigin: { vertical: "bottom" as const, horizontal: "left" as const },
   transformOrigin: { vertical: "top" as const, horizontal: "left" as const },
   PaperProps: {
     sx: {
-      width: "max-content",
-      maxWidth: "none",
       "& .MuiMenu-list": {
-        maxHeight: "144px",
+        maxHeight: "200px",
         overflowY: "auto",
         scrollbarWidth: "thin",
         "&::-webkit-scrollbar": { width: "4px" },
@@ -71,15 +86,98 @@ const SLOT_MENU_PROPS = {
           borderRadius: "4px",
         },
       },
-      "& .MuiMenuItem-root": { justifyContent: "flex-start" },
+      "& .MuiMenuItem-root": {
+        justifyContent: "flex-start",
+        fontSize: "0.875rem",
+        whiteSpace: "nowrap",
+      },
     },
   },
 };
 
-const sanitizeEmailInput = (value: string): string =>
-  value.toLowerCase().replace(/[^a-z0-9@._%+-]/g, "");
+// ── ALL BCP-47 language codes to iterate over ────────────────────────────────
+const ALL_LANGUAGE_CODES: string[] = [
+  "ab","aa","af","ak","sq","am","ar","an","hy","as","av","ae","ay","az",
+  "bm","ba","eu","be","bn","bh","bi","bs","br","bg","my","ca","ch","ce",
+  "ny","zh","cv","kw","co","cr","hr","cs","da","dv","nl","dz","en","eo",
+  "et","ee","fo","fj","fi","fr","ff","gl","ka","de","el","gn","gu","ht",
+  "ha","he","hz","hi","ho","hu","ia","id","ie","ga","ig","ik","io","is",
+  "it","iu","ja","jv","kl","kn","kr","ks","kk","km","ki","rw","ky","kv",
+  "kg","ko","ku","kj","la","lb","lg","li","ln","lo","lt","lu","lv","gv",
+  "mk","mg","ms","ml","mt","mi","mr","mh","mn","na","nv","nd","ne","ng",
+  "nb","nn","no","ii","nr","oc","oj","cu","om","or","os","pa","pi","fa",
+  "pl","ps","pt","qu","rm","rn","ro","ru","sa","sc","sd","se","sm","sg",
+  "sr","gd","sn","si","sk","sl","so","st","es","su","sw","ss","sv","ta",
+  "te","tg","th","ti","bo","tk","tl","tn","to","tr","ts","tt","tw","ty",
+  "ug","uk","ur","uz","ve","vi","vo","wa","cy","wo","fy","xh","yi","yo",
+  "za","zu",
+  "fil","haw","hmn","ilo","jw","ceb","war","min","bug","ban","ace","mad",
+  "mak","gor","sas","nds","pms","scn","lmo","vec","fur","lij","nap","szl",
+  "csb","hsb","dsb","rue",
+  "zh-Hans","zh-Hant","pt-BR","pt-PT","es-419",
+  "sr-Latn","sr-Cyrl","uz-Latn","uz-Cyrl","az-Latn","az-Cyrl",
+  "bs-Latn","bs-Cyrl",
+];
+
+function getLanguagesFromBrowser(): string[] {
+  try {
+    const displayNames = new Intl.DisplayNames(["en"], { type: "language" });
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const code of ALL_LANGUAGE_CODES) {
+      try {
+        const name = displayNames.of(code);
+        if (name && name !== code && !seen.has(name)) {
+          seen.add(name);
+          result.push(name);
+        }
+      } catch {
+        // skip invalid codes
+      }
+    }
+
+    return result.sort((a, b) => a.localeCompare(b));
+  } catch {
+    return [
+      "Afrikaans","Albanian","Amharic","Arabic","Armenian","Azerbaijani",
+      "Basque","Belarusian","Bengali","Bosnian","Bulgarian","Burmese",
+      "Catalan","Chinese","Croatian","Czech","Danish","Dutch","English",
+      "Esperanto","Estonian","Finnish","French","Galician","Georgian",
+      "German","Greek","Gujarati","Haitian Creole","Hausa","Hebrew",
+      "Hindi","Hungarian","Icelandic","Igbo","Indonesian","Irish",
+      "Italian","Japanese","Javanese","Kannada","Kazakh","Khmer","Korean",
+      "Kurdish","Kyrgyz","Lao","Latin","Latvian","Lithuanian","Macedonian",
+      "Malagasy","Malay","Malayalam","Maltese","Maori","Marathi","Mongolian",
+      "Nepali","Norwegian","Odia","Pashto","Persian","Polish","Portuguese",
+      "Punjabi","Romanian","Russian","Sanskrit","Serbian","Sinhala","Slovak",
+      "Slovenian","Somali","Spanish","Sundanese","Swahili","Swedish","Tagalog",
+      "Tajik","Tamil","Telugu","Thai","Tibetan","Turkish","Turkmen","Ukrainian",
+      "Urdu","Uzbek","Vietnamese","Welsh","Xhosa","Yoruba","Zulu",
+    ].sort();
+  }
+}
+
+// ── Hook: all languages from browser Intl API — no network, no API key ───────
+function useAllLanguages() {
+  const [languages, setLanguages] = React.useState<string[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const id = setTimeout(() => {
+      setLanguages(getLanguagesFromBrowser());
+      setLoading(false);
+    }, 0);
+    return () => clearTimeout(id);
+  }, []);
+
+  return { languages, loading };
+}
 
 export default function EditLead() {
+  // ── Language hook (replaces hardcoded 3-item list) ────────────────────────
+  const { languages: allLanguages, loading: languagesLoading } = useAllLanguages();
+
   const {
     navigate,
     currentStep,
@@ -89,7 +187,8 @@ export default function EditLead() {
     setError,
     saving,
     canEditLeads,
-    campaigns,
+  
+    filteredCampaigns,
     departments,
     loadingDepartments,
     loadingEmployees,
@@ -105,7 +204,6 @@ export default function EditLead() {
     handleNextStatusChange,
     handleSourceChange,
     handleSubSourceChange,
-    handleReferralDepartmentChange,
     referralDepartments,
     loadingReferralDepts,
     referralDepartment,
@@ -136,6 +234,9 @@ export default function EditLead() {
     nextDesc,
     setNextDesc,
     handleNextTypeChange,
+    // ── Task Status ── NEW
+    taskStatus,
+    setTaskStatus,
     // ── Medical-only fields ──
     gender,
     setGender,
@@ -162,12 +263,6 @@ export default function EditLead() {
     setContactPersonPhone,
     contactPersonEmail,
     setContactPersonEmail,
-    leadGeneratedBy,
-    setLeadGeneratedBy,
-    setLeadGeneratedById,
-    setLeadGeneratedBySearch,
-    leadGeneratedByOptions,
-    leadGeneratedByLoading,
     // ── Step 2 ──
     treatmentInterest,
     setTreatmentInterest,
@@ -202,6 +297,7 @@ export default function EditLead() {
     IS_MEDICAL_APP,
     IS_CONTRACTS_APP,
     ACTIVE_FLOW_COPY,
+    interests,
   } = useEditLead();
 
   // ====================== Loading / Error states ======================
@@ -246,32 +342,82 @@ export default function EditLead() {
 
   const leadLabel = leadData.id ? formatLeadId(leadData.id.toString()) : "";
 
-  // ── Input sanitisers (same as AddNewLead) ──────────────────────────────────
+  // ── Campaign disabled when source is Referral OR Direct + non-Gmail ────────
+  const isCampaignDisabled =
+    source === "Referral" ||
+    (source === "Direct" && subSource !== "Gmail");
+
+  // ── Sub-source options — referral dept names when source is "Referral" ─────
+  const subSourceOptions: string[] =
+    source === "Referral"
+      ? referralDepartments.map((d) => d.name)
+      : (SUB_SOURCE_OPTIONS[source] ?? []);
+
+  // ── Input sanitizers ───────────────────────────────────────────────────────
   const handleFullNameChange = (value: string) => {
     const sanitized = sanitizeNameInput(value);
     if (sanitized !== value)
-      showInputToast("edit-lead-name-invalid", "enter only alphanumeric");
-    setFullName(sanitized);
+      showInputToast(
+        "edit-lead-name-invalid",
+        "Only letters, numbers and spaces allowed",
+      );
+    setFullName(capitalizeFirst(sanitized));
+  };
+
+  const handlePartnerNameChange = (value: string) => {
+    const sanitized = sanitizeNameInput(value);
+    if (sanitized !== value)
+      showInputToast(
+        "edit-lead-name-invalid",
+        "Only letters, numbers and spaces allowed",
+      );
+    setPartnerName(capitalizeFirst(sanitized));
+  };
+
+  const handleContactPersonNameChange = (value: string) => {
+    const sanitized = sanitizeNameInput(value);
+    if (sanitized !== value)
+      showInputToast(
+        "edit-lead-name-invalid",
+        "Only letters, numbers and spaces allowed",
+      );
+    setContactPersonName(capitalizeFirst(sanitized));
   };
 
   const handleContactChange = (value: string) => {
-    const rawDigits = value.replace(/\D/g, "");
-    const digitsOnly = rawDigits.slice(0, 15);
-    if (/\D/.test(value))
-      showInputToast("edit-lead-contact-invalid", "only digits are allowed");
-    if (rawDigits.length > 15)
-      showInputToast("edit-lead-contact-length", "only 15 digits allowed");
-    setContactNo(digitsOnly);
+    const { value: sanitized, error } = sanitizePhoneInput(value);
+    if (error) showInputToast("edit-lead-contact-invalid", error);
+    setContactNo(sanitized);
   };
 
   const handleEmailChange = (value: string) => {
-    const sanitized = sanitizeEmailInput(value);
-    if (sanitized !== value.toLowerCase())
-      showInputToast(
-        "edit-lead-email-invalid",
-        "enter valid email characters only",
-      );
+    const { value: sanitized, error } = sanitizeEmailFieldInput(value);
+    if (error) showInputToast("edit-lead-email-invalid", error);
     setEmail(sanitized);
+  };
+
+  const handleLocationChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeLocationInput(value);
+    if (error) showInputToast("edit-lead-location-invalid", error);
+    setLocation(sanitized);
+  };
+
+  const handleAddressChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeAddressInput(value);
+    if (error) showInputToast("edit-lead-address-invalid", error);
+    setAddress(sanitized);
+  };
+
+  const handleContactPersonPhoneChange = (value: string) => {
+    const { value: sanitized, error } = sanitizePhoneInput(value);
+    if (error) showInputToast("edit-lead-contact-person-phone-invalid", error);
+    setContactPersonPhone(sanitized);
+  };
+
+  const handleContactPersonEmailChange = (value: string) => {
+    const { value: sanitized, error } = sanitizeEmailFieldInput(value);
+    if (error) showInputToast("edit-lead-contact-person-email-invalid", error);
+    setContactPersonEmail(sanitized);
   };
 
   const assigneeOptionLabel = (option: {
@@ -285,12 +431,8 @@ export default function EditLead() {
     const fullNameStr =
       `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
     const primary = fullNameStr || option.username || `User ${option.id}`;
-    const secondary = option.role || option.designation;
-    return secondary ? `${primary} (${secondary})` : primary;
+    return primary;
   };
-
-  // Sub-source options based on selected source
-  const subSourceOptions: string[] = SUB_SOURCE_OPTIONS[source] ?? [];
 
   return (
     <Box>
@@ -339,7 +481,7 @@ export default function EditLead() {
           </Typography>
         </Box>
 
-        {/* ── Stepper (matches AddNewLead style exactly) ── */}
+        {/* ── Stepper ── */}
         <Box sx={{ bgcolor: "white", px: 1, pt: 1, pb: 3 }}>
           <Box
             sx={{
@@ -426,17 +568,19 @@ export default function EditLead() {
               {/* ── SECTION: Lead Information ── */}
               <Typography sx={sectionLabelStyle}>LEAD INFORMATION</Typography>
 
-              {/* Row: Full Name · Contact · Email · Location (4-col, matches AddNewLead) */}
+              {/* Row 1: Full Name · Contact · Email · Location  (+ Address for CONTRACTS) */}
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gridTemplateColumns: IS_CONTRACTS_APP
+                    ? "repeat(5, 1fr)"
+                    : "repeat(4, 1fr)",
                   gap: 2,
-                  mb: 2,
+                  mb: 3,
                 }}
               >
                 <Box>
-                  <Typography sx={labelStyle}>Full Name *</Typography>
+                  <Typography sx={labelStyle}>Lab Name *</Typography>
                   <TextField
                     fullWidth
                     size="small"
@@ -471,20 +615,32 @@ export default function EditLead() {
                     fullWidth
                     size="small"
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    onChange={(e) => handleLocationChange(e.target.value)}
                     sx={inputStyle}
                   />
                 </Box>
+                {IS_CONTRACTS_APP && (
+                  <Box>
+                    <Typography sx={labelStyle}>Address</Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={address}
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      sx={inputStyle}
+                    />
+                  </Box>
+                )}
               </Box>
 
-              {/* MEDICAL — Gender · Age · Marital Status · Address (4-col) */}
+              {/* MEDICAL — Row 2: Gender · Age · Marital Status · Address */}
               {IS_MEDICAL_APP && (
                 <Box
                   sx={{
                     display: "grid",
                     gridTemplateColumns: "repeat(4, 1fr)",
                     gap: 2,
-                    mb: 2,
+                    mb: 3,
                   }}
                 >
                   <Box>
@@ -535,45 +691,49 @@ export default function EditLead() {
                       fullWidth
                       size="small"
                       value={address}
-                      onChange={(e) => setAddress(e.target.value)}
+                      onChange={(e) => handleAddressChange(e.target.value)}
                       sx={inputStyle}
                     />
                   </Box>
                 </Box>
               )}
 
-              {/* MEDICAL — Language Preference (single field, 25% width) */}
-              {IS_MEDICAL_APP && (
-                <Box sx={{ mb: 3 }}>
+              {/* ── Language Preference — dynamic via Intl.DisplayNames ── */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
+                <Box>
                   <Typography sx={labelStyle}>Language Preference</Typography>
                   <TextField
                     select
+                    fullWidth
                     size="small"
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    sx={{ ...inputStyle, maxWidth: "25%" }}
+                    disabled={languagesLoading}
+                    sx={inputStyle}
+                    InputProps={{
+                      endAdornment: languagesLoading ? (
+                        <CircularProgress size={16} sx={{ mr: 3 }} />
+                      ) : null,
+                    }}
                   >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    <MenuItem value="English">English</MenuItem>
-                    <MenuItem value="Hindi">Hindi</MenuItem>
-                    <MenuItem value="Kannada">Kannada</MenuItem>
+                    <MenuItem value="">
+                      {languagesLoading ? "Loading languages…" : "-- Select --"}
+                    </MenuItem>
+                    {allLanguages.map((lang) => (
+                      <MenuItem key={lang} value={lang}>
+                        {lang}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 </Box>
-              )}
-
-              {/* CONTRACTS — Address (full width row) */}
-              {IS_CONTRACTS_APP && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography sx={labelStyle}>Address</Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    sx={inputStyle}
-                  />
-                </Box>
-              )}
+              </Box>
 
               {/* MEDICAL — Partner Information */}
               {IS_MEDICAL_APP && (
@@ -581,7 +741,7 @@ export default function EditLead() {
                   <Typography sx={sectionLabelStyle}>
                     PARTNER INFORMATION
                   </Typography>
-                  <Box sx={{ mb: 1.5 }}>
+                  <Box sx={{ mb: 2 }}>
                     <Typography sx={{ ...labelStyle, mb: 0.5 }}>
                       Is This Inquiry For A Couple?
                     </Typography>
@@ -608,7 +768,7 @@ export default function EditLead() {
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(3, 1fr)",
+                        gridTemplateColumns: "repeat(4, 1fr)",
                         gap: 2,
                         mb: 3,
                       }}
@@ -619,7 +779,9 @@ export default function EditLead() {
                           fullWidth
                           size="small"
                           value={partnerName}
-                          onChange={(e) => setPartnerName(e.target.value)}
+                          onChange={(e) =>
+                            handlePartnerNameChange(e.target.value)
+                          }
                           sx={inputStyle}
                         />
                       </Box>
@@ -654,7 +816,7 @@ export default function EditLead() {
                 </>
               )}
 
-              {/* CONTRACTS — Contact Person Information (4-col) */}
+              {/* CONTRACTS — Contact Person Information */}
               {IS_CONTRACTS_APP && (
                 <>
                   <Typography sx={sectionLabelStyle}>
@@ -674,7 +836,9 @@ export default function EditLead() {
                         fullWidth
                         size="small"
                         value={contactPersonName}
-                        onChange={(e) => setContactPersonName(e.target.value)}
+                        onChange={(e) =>
+                          handleContactPersonNameChange(e.target.value)
+                        }
                         sx={inputStyle}
                       />
                     </Box>
@@ -695,7 +859,7 @@ export default function EditLead() {
                         size="small"
                         value={contactPersonPhone}
                         onChange={(e) =>
-                          setContactPersonPhone(e.target.value)
+                          handleContactPersonPhoneChange(e.target.value)
                         }
                         sx={inputStyle}
                       />
@@ -707,7 +871,7 @@ export default function EditLead() {
                         size="small"
                         value={contactPersonEmail}
                         onChange={(e) =>
-                          setContactPersonEmail(e.target.value)
+                          handleContactPersonEmailChange(e.target.value)
                         }
                         sx={inputStyle}
                       />
@@ -716,18 +880,22 @@ export default function EditLead() {
                 </>
               )}
 
-              {/* ── SECTION: Source & Campaign (3-col, matches AddNewLead) ── */}
+              {/* ── SECTION: Source & Campaign ── */}
               <Typography sx={sectionLabelStyle}>
                 SOURCE & CAMPAIGN DETAILS
               </Typography>
+
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gridTemplateColumns: isCampaignDisabled
+                    ? "repeat(2, 1fr)"
+                    : "repeat(3, 1fr)",
                   gap: 2,
                   mb: 3,
                 }}
               >
+                {/* ── Source ── */}
                 <Box>
                   <Typography sx={labelStyle}>Source</Typography>
                   <TextField
@@ -737,7 +905,6 @@ export default function EditLead() {
                     value={source}
                     onChange={(e) => handleSourceChange(e.target.value)}
                     sx={inputStyle}
-                    disabled={Boolean(campaign)}
                   >
                     <MenuItem value="">-- Select Source --</MenuItem>
                     {SOURCE_OPTIONS.map((s) => (
@@ -747,63 +914,116 @@ export default function EditLead() {
                     ))}
                   </TextField>
                 </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Sub-Source</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={subSource}
-                    onChange={(e) => handleSubSourceChange(e.target.value)}
-                    sx={inputStyle}
-                    disabled={!source || Boolean(campaign)}
-                  >
-                    <MenuItem value="">-- Select Sub-Source --</MenuItem>
-                    {subSourceOptions.map((s) => (
-                      <MenuItem key={s} value={s}>
-                        {s}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-                <Box>
-                  <Typography sx={labelStyle}>Campaign Name</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={campaign}
-                    onChange={handleCampaignChange}
-                    sx={inputStyle}
-                  >
-                    <MenuItem value="">-- Select Campaign --</MenuItem>
-                    {campaigns.map((c) => (
-                      <MenuItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
+
+                {/* ── Sub-Source ── */}
+                {source !== "Other" && (
+                  <Box>
+                    <Typography sx={labelStyle}>Sub-Source</Typography>
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      value={subSource}
+                      onChange={(e) => handleSubSourceChange(e.target.value)}
+                      disabled={
+                        !source ||
+                        (source === "Referral" && loadingReferralDepts)
+                      }
+                      sx={inputStyle}
+                      InputProps={{
+                        endAdornment:
+                          source === "Referral" && loadingReferralDepts ? (
+                            <CircularProgress size={16} sx={{ mr: 3 }} />
+                          ) : null,
+                      }}
+                    >
+                      <MenuItem value="">-- Select Sub-Source --</MenuItem>
+                      {source === "Referral" && loadingReferralDepts ? (
+                        <MenuItem value="" disabled>
+                          Loading departments...
+                        </MenuItem>
+                      ) : source === "Referral" &&
+                        subSourceOptions.length === 0 ? (
+                        <MenuItem value="" disabled>
+                          No departments available
+                        </MenuItem>
+                      ) : (
+                        subSourceOptions.map((s) => (
+                          <MenuItem key={s} value={s}>
+                            {s}
+                          </MenuItem>
+                        ))
+                      )}
+                      {!source && (
+                        <MenuItem value="" disabled>
+                          Select source first
+                        </MenuItem>
+                      )}
+                    </TextField>
+                  </Box>
+                )}
+
+                {/* ── Campaign Name ── */}
+                {source !== "Other" && !isCampaignDisabled && (
+                  <Box>
+                    <Typography sx={labelStyle}>
+                      Campaign Name
+                      {subSource && (
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: "0.65rem",
+                            color: "#94A3B8",
+                            ml: 1,
+                            fontWeight: 500,
+                          }}
+                        >
+                          linked with {subSource}
+                        </Typography>
+                      )}
+                    </Typography>
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      value={campaign}
+                      onChange={handleCampaignChange}
+                      disabled={!source && !subSource}
+                      sx={inputStyle}
+                    >
+                      <MenuItem value="">-- None --</MenuItem>
+                      {filteredCampaigns.length === 0 ? (
+                        <MenuItem value="" disabled>
+                          {source || subSource
+                            ? "No campaigns match the selected source / sub-source"
+                            : "No campaigns available"}
+                        </MenuItem>
+                      ) : (
+                        filteredCampaigns.map((c) => (
+                          <MenuItem key={c.id} value={String(c.id)}>
+                            {c.name}
+                          </MenuItem>
+                        ))
+                      )}
+                    </TextField>
+                  </Box>
+                )}
               </Box>
 
               {/* ── SECTION: Assignee & Next Action ── */}
-              {/* Mirrors AddNewLead layout:
-                  Row A — Assigned To · (Lead Generated By if CONTRACTS) · Referral Dept
-                  Row B — Lead Status · Next Action Type · Next Action Status · Next Action Desc
-                  Each row is its own grid so columns stay balanced regardless of app type. */}
               <Typography sx={sectionLabelStyle}>
                 ASSIGNEE & NEXT ACTION DETAILS
               </Typography>
 
-              {/* Row A: Assigned To + optional Lead Generated By + Referral Dept */}
+              {/* Row 1: Assigned To · Referral Dept (NON-CONTRACTS) · Lead Status · Next Action Status */}
               <Box
                 sx={{
                   display: "grid",
                   gridTemplateColumns: IS_CONTRACTS_APP
                     ? "repeat(3, 1fr)"
-                    : "repeat(2, 1fr)",
+                    : "repeat(4, 1fr)",
                   gap: 2,
-                  mb: 2,
+                  mb: 3,
                 }}
               >
                 {/* Assigned To */}
@@ -815,9 +1035,13 @@ export default function EditLead() {
                     clearOnBlur={false}
                     filterOptions={(options) => options}
                     value={
-                      assigneeOptions.find(
-                        (o) => String(o.id) === assignee,
-                      ) || null
+                      assigneeOptions.find((o) => String(o.id) === assignee) ||
+                      (assignee
+                        ? {
+                            id: Number(assignee),
+                            username: assigneeName,
+                          }
+                        : null)
                     }
                     inputValue={assigneeName}
                     onInputChange={(_, value, reason) => {
@@ -828,9 +1052,7 @@ export default function EditLead() {
                     }}
                     onChange={(_, value) => {
                       setAssignee(value ? String(value.id) : "");
-                      setAssigneeName(
-                        value ? assigneeOptionLabel(value) : "",
-                      );
+                      setAssigneeName(value ? assigneeOptionLabel(value) : "");
                     }}
                     getOptionLabel={assigneeOptionLabel}
                     isOptionEqualToValue={(o, v) => o.id === v.id}
@@ -863,103 +1085,24 @@ export default function EditLead() {
                   />
                 </Box>
 
-                {/* CONTRACTS-only: Lead Generated By */}
-                {IS_CONTRACTS_APP && (
+                {/* NON-CONTRACTS: Referral Department read-only */}
+                {!IS_CONTRACTS_APP && (
                   <Box>
-                    <Typography sx={labelStyle}>Lead Generated By</Typography>
-                    <Autocomplete
-                      options={leadGeneratedByOptions}
-                      loading={leadGeneratedByLoading}
-                      clearOnBlur={false}
-                      filterOptions={(options) => options}
+                    <Typography sx={labelStyle}>Referral Department</Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
                       value={
-                        leadGeneratedByOptions.find(
-                          (o) => assigneeOptionLabel(o) === leadGeneratedBy,
-                        ) || null
+                        referralDepartments.find(
+                          (d) => String(d.id) === referralDepartment,
+                        )?.name ?? referralDepartment
                       }
-                      inputValue={leadGeneratedBy}
-                      onInputChange={(_, value, reason) => {
-                        if (reason === "reset") return;
-                        setLeadGeneratedBySearch(value);
-                        setLeadGeneratedBy(value);
-                        setLeadGeneratedById("");
-                      }}
-                      onChange={(_, value) => {
-                        setLeadGeneratedBy(
-                          value ? assigneeOptionLabel(value) : "",
-                        );
-                        setLeadGeneratedById(
-                          value ? String(value.id) : "",
-                        );
-                      }}
-                      getOptionLabel={assigneeOptionLabel}
-                      isOptionEqualToValue={(o, v) => o.id === v.id}
-                      noOptionsText="Type to search user"
-                      renderOption={(props, option) => (
-                        <li {...props} key={option.id}>
-                          {assigneeOptionLabel(option)}
-                        </li>
-                      )}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          fullWidth
-                          size="small"
-                          placeholder="Search user"
-                          sx={inputStyle}
-                          InputProps={{
-                            ...params.InputProps,
-                            endAdornment: (
-                              <>
-                                {leadGeneratedByLoading ? (
-                                  <CircularProgress
-                                    size={14}
-                                    sx={{ mr: 1 }}
-                                  />
-                                ) : null}
-                                {params.InputProps.endAdornment}
-                              </>
-                            ),
-                          }}
-                        />
-                      )}
+                      InputProps={{ readOnly: true }}
+                      sx={readOnlyStyle}
                     />
                   </Box>
                 )}
 
-                {/* Referral Department */}
-                <Box>
-                  <Typography sx={labelStyle}>Referral Department</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={referralDepartment}
-                    onChange={(e) =>
-                      handleReferralDepartmentChange(e.target.value)
-                    }
-                    sx={inputStyle}
-                    disabled={loadingReferralDepts}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    {referralDepartments.map((d) => (
-                      <MenuItem key={d.id} value={String(d.id)}>
-                        {d.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-              </Box>
-
-              {/* Row B: Lead Status · Next Action Type · Next Action Status · Next Action Desc (4-col) */}
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 2,
-                  mb: 2,
-                }}
-              >
                 {/* Lead Status */}
                 <Box>
                   <Typography sx={labelStyle}>Lead Status</Typography>
@@ -980,26 +1123,6 @@ export default function EditLead() {
                   </TextField>
                 </Box>
 
-                {/* Next Action Type */}
-                <Box>
-                  <Typography sx={labelStyle}>Next Action Type</Typography>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    value={nextType}
-                    onChange={handleNextTypeChange}
-                    sx={inputStyle}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    {nextActionTypeOptions.map((t) => (
-                      <MenuItem key={t} value={t}>
-                        {t}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-
                 {/* Next Action Status */}
                 <Box>
                   <Typography sx={labelStyle}>Next Action Status</Typography>
@@ -1008,9 +1131,7 @@ export default function EditLead() {
                     fullWidth
                     size="small"
                     value={nextStatus}
-                    onChange={(e) =>
-                      handleNextStatusChange(e.target.value)
-                    }
+                    onChange={(e) => handleNextStatusChange(e.target.value)}
                     sx={inputStyle}
                   >
                     <MenuItem value="">-- Select --</MenuItem>
@@ -1021,8 +1142,65 @@ export default function EditLead() {
                     ))}
                   </TextField>
                 </Box>
+              </Box>
 
-                {/* Next Action Description */}
+              {/* Row 2: Next Action Type · Task Status · Next Action Description */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
+                <Box>
+                  <Typography sx={labelStyle}>Next Action Type</Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={nextType}
+                    onChange={handleNextTypeChange}
+                    sx={inputStyle}
+                    disabled={nextActionTypeOptions.length === 0}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {nextActionTypeOptions.length === 0 ? (
+                      <MenuItem value="" disabled>
+                        {leadStatus
+                          ? "No actions configured for this stage"
+                          : "Select a lead status first"}
+                      </MenuItem>
+                    ) : (
+                      nextActionTypeOptions.map((t) => (
+                        <MenuItem key={t} value={t}>
+                          {capitalizeWords(t)}
+                        </MenuItem>
+                      ))
+                    )}
+                  </TextField>
+                </Box>
+
+                {/* ── Task Status ── NEW */}
+                <Box>
+                  <Typography sx={labelStyle}>Task Status</Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={taskStatus}
+                    onChange={(e) => setTaskStatus(e.target.value)}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {TASK_STATUS_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+
                 <Box>
                   <Typography sx={labelStyle}>
                     Next Action Description
@@ -1045,31 +1223,58 @@ export default function EditLead() {
               <Typography sx={sectionLabelStyle}>
                 {ACTIVE_FLOW_COPY.medicalSection.toUpperCase()}
               </Typography>
-              <Box sx={{ mb: 2 }}>
-                <Typography sx={labelStyle}>
-                  {ACTIVE_FLOW_COPY.treatmentLabel} *
-                </Typography>
-                <TextField
-                  select
-                  size="small"
-                  value={treatmentInterest}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setTreatmentInterest(v);
-                    if (v && !treatments.includes(v))
-                      setTreatments((prev) => [...prev, v]);
-                  }}
-                  sx={{ ...inputStyle, maxWidth: "50%" }}
-                >
-                  <MenuItem value="" disabled>
-                    Select
-                  </MenuItem>
-                  {ACTIVE_FLOW_COPY.treatmentOptions.map((opt) => (
-                    <MenuItem key={opt} value={opt}>
-                      {opt}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: 2,
+                  mb: 2,
+                }}
+              >
+                <Box>
+                  <Typography sx={labelStyle}>
+                    {ACTIVE_FLOW_COPY.treatmentLabel} *
+                  </Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={treatmentInterest}
+                    onChange={(e) => {
+                      const selectedId = String(e.target.value);
+
+                      const selectedInterest = interests.find(
+                        (interest) => String(interest.id) === selectedId,
+                      );
+
+                      if (!selectedInterest) return;
+
+                      if (!treatments.includes(selectedId)) {
+                        setTreatments((prev) => [...prev, selectedId]);
+                      }
+
+                      setTreatmentInterest((prev) => {
+                        const names = prev
+                          ? prev.split(",").map((x) => x.trim())
+                          : [];
+
+                        if (names.includes(selectedInterest.name)) {
+                          return prev;
+                        }
+
+                        return [...names, selectedInterest.name].join(", ");
+                      });
+                    }}
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="" disabled>
+                      Select
                     </MenuItem>
-                  ))}
-                </TextField>
+                    {interests.map((opt) => (
+                      <MenuItem value={opt.id}>{opt.name}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
               </Box>
               {treatments.length > 0 && (
                 <Stack
@@ -1077,26 +1282,47 @@ export default function EditLead() {
                   spacing={1}
                   sx={{ mb: 3, flexWrap: "wrap" }}
                 >
-                  {treatments.map((t) => (
-                    <Chip
-                      key={t}
-                      label={t}
-                      size="small"
-                      onDelete={() =>
-                        setTreatments((prev) => prev.filter((x) => x !== t))
-                      }
-                      sx={{
-                        bgcolor: "#FEE2E2",
-                        color: "#B91C1C",
-                        fontWeight: 600,
-                        border: "1px solid #FCA5A5",
-                        "& .MuiChip-deleteIcon": {
+                  {treatmentInterest
+                    .split(",")
+                    .filter(Boolean)
+                    .map((t) => (
+                      <Chip
+                        key={t}
+                        label={t}
+                        size="small"
+                        onDelete={() => {
+                          const interestToRemove = interests.find(
+                            (interest) => interest.name === t,
+                          );
+
+                          if (!interestToRemove) return;
+
+                          setTreatments((prev) =>
+                            prev.filter(
+                              (id) => id !== String(interestToRemove.id),
+                            ),
+                          );
+
+                          setTreatmentInterest((prev) =>
+                            prev
+                              .split(",")
+                              .map((x) => x.trim())
+                              .filter((name) => name !== t)
+                              .join(", "),
+                          );
+                        }}
+                        sx={{
+                          bgcolor: "#FEE2E2",
                           color: "#B91C1C",
-                          "&:hover": { color: "#991B1B" },
-                        },
-                      }}
-                    />
-                  ))}
+                          fontWeight: 600,
+                          border: "1px solid #FCA5A5",
+                          "& .MuiChip-deleteIcon": {
+                            color: "#B91C1C",
+                            "&:hover": { color: "#991B1B" },
+                          },
+                        }}
+                      />
+                    ))}
                 </Stack>
               )}
 
@@ -1369,11 +1595,10 @@ export default function EditLead() {
                     sx={{
                       display: "grid",
                       gridTemplateColumns: IS_MEDICAL_APP
-                        ? "repeat(2, 1fr)"
-                        : "repeat(1, 1fr)",
+                        ? "repeat(4, 1fr)"
+                        : "repeat(3, 1fr)",
                       gap: 2,
-                      mb: 2,
-                      maxWidth: IS_CONTRACTS_APP ? "50%" : "100%",
+                      mb: 3,
                     }}
                   >
                     {IS_MEDICAL_APP && (
@@ -1401,10 +1626,7 @@ export default function EditLead() {
                             <em>-- Select Department --</em>
                           </MenuItem>
                           {departments.map((dept) => (
-                            <MenuItem
-                              key={dept.id}
-                              value={dept.id.toString()}
-                            >
+                            <MenuItem key={dept.id} value={dept.id.toString()}>
                               {dept.name}
                             </MenuItem>
                           ))}
@@ -1438,8 +1660,7 @@ export default function EditLead() {
                         getOptionLabel={personnelOptionLabel}
                         isOptionEqualToValue={(o, v) => o.id === v.id}
                         disabled={
-                          loadingEmployees ||
-                          (IS_MEDICAL_APP && !department)
+                          loadingEmployees || (IS_MEDICAL_APP && !department)
                         }
                         noOptionsText={
                           IS_MEDICAL_APP && !department
@@ -1477,21 +1698,13 @@ export default function EditLead() {
                         )}
                       />
                     </Box>
-                  </Box>
-
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(2, 1fr)",
-                      gap: 2,
-                      mb: 2,
-                    }}
-                  >
                     <Box>
                       <Typography sx={labelStyle}>Date *</Typography>
                       <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DatePicker
                           value={selectedDate}
+                          format="DD/MM/YYYY"
+                          disablePast
                           onChange={(val) => handleDateChange(val)}
                           slotProps={{
                             textField: {
@@ -1513,7 +1726,7 @@ export default function EditLead() {
                         onChange={(e) => setSlot(e.target.value)}
                         sx={inputStyle}
                         SelectProps={{
-                          autoWidth: true,
+                          native: false,
                           MenuProps: SLOT_MENU_PROPS,
                         }}
                       >
@@ -1529,7 +1742,7 @@ export default function EditLead() {
                     </Box>
                   </Box>
 
-                  <Box>
+                  <Box sx={{ mb: 3 }}>
                     <Typography sx={labelStyle}>Remark</Typography>
                     <TextField
                       fullWidth
@@ -1548,7 +1761,7 @@ export default function EditLead() {
           )}
         </Box>
 
-        {/* ── Footer (matches AddNewLead style) ── */}
+        {/* ── Footer ── */}
         <Box
           sx={{
             bgcolor: "white",
@@ -1616,7 +1829,6 @@ export default function EditLead() {
                 minWidth: "100px",
                 "&:hover": { bgcolor: "#1E293B" },
               }}
-              title={!canEditLeads ? "No permission to edit leads" : undefined}
             >
               {saving ? (
                 <CircularProgress size={18} sx={{ color: "#fff" }} />

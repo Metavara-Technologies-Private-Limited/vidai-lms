@@ -64,6 +64,10 @@ export interface Template {
   name: string;
   subject?: string;
   useCase?: string;
+  use_case?: {
+    id: string;
+    name: string;
+  };
   lastUpdatedAt?: string;
   createdBy?: string;
   type: TemplateType;

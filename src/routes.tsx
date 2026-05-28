@@ -39,6 +39,7 @@ let profileRestoreTokenInFlight: string | null = null;
 const MainLayout = lazy(() => import("./components/Layout/MainLayout"));
 const ReviewFormPage = lazy(() => import("./components/Reputation/ReviewForm"));
 const VidaiLogin = lazy(() => import("./pages/VidaiLogin"));
+const AutoLogin = lazy(() => import("./pages/AutoLogin"));
 
 const Spinner = () => (
   <Box
@@ -162,6 +163,9 @@ export default function AppRoutes() {
       try {
         if (loginType !== "EXT") {
           const profile = await authApi.getProfile();
+          const permissionPayload = await authApi
+            .getMyPermissions()
+            .catch(() => null);
           const profileRecord =
             profile && typeof profile === "object"
               ? (profile as Record<string, unknown>)
@@ -230,6 +234,15 @@ export default function AppRoutes() {
                 profileRoleName ||
                 undefined,
               role: currentUser?.role || profileRoleName || undefined,
+              permissions:
+                (permissionPayload &&
+                typeof permissionPayload === "object" &&
+                "permissions" in permissionPayload
+                  ? (permissionPayload as { permissions?: { modules: [] } })
+                      .permissions
+                  : null) ??
+                currentUser?.permissions ??
+                { modules: [] },
               clinics:
                 currentUser?.clinics && currentUser.clinics.length > 0
                   ? currentUser.clinics
@@ -259,6 +272,7 @@ export default function AppRoutes() {
             ...(user as AuthUser | null),
             ...(profile as unknown as AuthUser),
             clinics: normalizedClinics,
+            permissions: (user as AuthUser)?.permissions,
             profile_loaded: true,
           } as AuthUser),
         );
@@ -273,14 +287,12 @@ export default function AppRoutes() {
           }
 
           if (
+            loginType !== "EXT" &&
             defaultClinic?.clinic__name &&
             typeof profile.email === "string"
           ) {
-            await syncClinic(defaultClinic, profile.email);
+            await syncClinic(defaultClinic, profile.email, loginType);
           }
-        } else {
-          // EXT users or INT users with no clinics
-          await dispatch(fetchClinic(1));
         }
 
         await dispatch(fetchLeads());
@@ -345,6 +357,10 @@ export default function AppRoutes() {
       <Route
         path="/settings/integration/review/*"
         element={<LoadedComponent Comp={ReviewFormPage} />}
+      />
+      <Route
+        path="/auto-login"
+        element={<LoadedComponent Comp={AutoLogin} />}
       />
 
       <Route

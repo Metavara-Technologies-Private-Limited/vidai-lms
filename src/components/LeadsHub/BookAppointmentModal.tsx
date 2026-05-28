@@ -40,6 +40,8 @@ import type { Department } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import type { LeadRecord } from "./LeadDetailTypes";
 import { IS_MEDICAL_APP } from "../../config/appType";
+import { useSelector } from "react-redux";
+import { selectUsers } from "../../store/userSlice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -92,6 +94,12 @@ const SLOT_OPTIONS = [
   "05:00 PM - 05:30 PM",
 ];
 
+const toastOptions = {
+  position: "top-right" as const,
+  autoClose: 3000,
+  theme: "colored" as const,
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,19 +151,35 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const normalizeUsersList = (users: any[]): AssigneeOption[] => {
+  return users.map((u) => ({
+    id: u.id,
+    first_name: u.first_name ?? u.firstName,
+    last_name: u.last_name ?? u.lastName,
+    username: u.username,
+    role: u.role?.name || u.role,
+    designation: undefined,
+    email: u.email,
+  }));
+};
+
 const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
   const root = asRecord(raw);
+  const data = asRecord(root?.data);
+
   const list: unknown[] = Array.isArray(raw)
     ? raw
-    : Array.isArray(root?.objects)
-      ? (root?.objects as unknown[])
+    : Array.isArray(data?.objects) // ✅ FIXED
+      ? (data.objects as unknown[])
       : Array.isArray(root?.results)
-        ? (root?.results as unknown[])
+        ? (root.results as unknown[])
         : Array.isArray(root?.data)
-          ? (root?.data as unknown[])
+          ? (root.data as unknown[])
           : [];
 
   const assignees: AssigneeOption[] = [];
+
   for (const item of list) {
     const record = asRecord(item);
     if (!record) continue;
@@ -172,20 +196,17 @@ const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
 
     assignees.push({
       id,
-      first_name:
-        typeof record.first_name === "string" ? record.first_name : undefined,
-      last_name:
-        typeof record.last_name === "string" ? record.last_name : undefined,
-      username:
-        typeof record.username === "string" ? record.username : undefined,
-      role: typeof record.role === "string" ? record.role : undefined,
-      designation:
-        typeof record.designation === "string" ? record.designation : undefined,
-      email: typeof record.email === "string" ? record.email : undefined,
+      first_name: record.first_name as string,
+      last_name: record.last_name as string,
+      username: record.username as string,
+      role: record.role as string,
+      designation: record.designation as string,
+      email: record.email as string,
     });
   }
+
   return assignees;
-};
+};    
 
 const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =
@@ -226,7 +247,41 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const [loadingPersonnel, setLoadingPersonnel] = React.useState(false);
 
   const clinicId = lead?.clinic_id ?? 1;
-  const today = dayjs().startOf("day");
+  const now = dayjs();
+  const today = now.startOf("day");
+  const users = useSelector(selectUsers);
+
+  // Parse time slot start time (e.g., "02:00 PM" from "02:00 PM - 02:30 PM")
+  const parseSlotStartTime = (slotStr: string): dayjs.Dayjs | null => {
+    const match = slotStr.match(/^(\d{1,2}):(\d{2})\s(AM|PM)/);
+    if (!match) return null;
+    let hour = parseInt(match[1]);
+    const minute = parseInt(match[2]);
+    const meridiem = match[3];
+    if (meridiem === "PM" && hour !== 12) hour += 12;
+    if (meridiem === "AM" && hour === 12) hour = 0;
+    return dayjs().set("hour", hour).set("minute", minute);
+  };
+
+  // Filter slots: if today, exclude past times; otherwise show all
+  const availableSlots = React.useMemo<string[]>(() => {
+    if (!selectedDate) return SLOT_OPTIONS;
+    const selectedDateStartOfDay = selectedDate.startOf("day");
+    const isToday = selectedDateStartOfDay.isSame(today, "day");
+    if (!isToday) return SLOT_OPTIONS;
+
+    return SLOT_OPTIONS.filter((slotStr) => {
+      const slotTime = parseSlotStartTime(slotStr);
+      if (!slotTime) return true;
+      const slotTimeToday = dayjs()
+        .set("hour", slotTime.hour())
+        .set("minute", slotTime.minute());
+      return slotTimeToday.isAfter(now);
+    });
+  }, [selectedDate]);
+
+  const authMode = localStorage.getItem("auth_mode");
+  const isInternal = authMode === "INT";
 
   // ── Reset form when modal opens ──
   React.useEffect(() => {
@@ -266,12 +321,28 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     const timer = window.setTimeout(async () => {
       try {
         setLoadingPersonnel(true);
-        const response = await authApi.searchUsers({
-          search: personnelSearch,
-          limit: 20,
-          offset: 0,
-        });
-        setPersonnelOptions(normalizeAssignees(response));
+
+        if (isInternal) {
+          // LOCAL USERS
+          const normalized = normalizeUsersList(users);
+
+          const filtered = normalized.filter((u) =>
+            `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
+              .toLowerCase()
+              .includes(personnelSearch.toLowerCase()),
+          );
+
+          setPersonnelOptions(filtered);
+        } else {
+          // API
+          const response = await authApi.searchUsers({
+            search: personnelSearch,
+            limit: 20,
+            offset: 0,
+          });
+
+          setPersonnelOptions(normalizeAssignees(response));
+        }
       } catch (e) {
         console.error("Personnel fetch failed:", e);
         setPersonnelOptions([]);
@@ -281,7 +352,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [open, personnelSearch]);
+  }, [open, personnelSearch, isInternal, users]);
 
   // ── Clear selected personnel when department changes ──
   React.useEffect(() => {
@@ -296,45 +367,78 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
 
     // Validation
     if (IS_MEDICAL_APP && !department) {
-      setError("Please select a department.");
-      return;
-    }
-    if (!personnel) {
-      setError("Please select a personnel.");
+      setError(null);
+      toast.error("Please select a department.", toastOptions);
       return;
     }
     if (!selectedDate) {
-      setError("Please select a date.");
+      setError(null);
+      toast.error("Please select a date.", toastOptions);
       return;
     }
-    if (!slot) {
-      setError("Please select a time slot.");
+
+    // Prevent booking for past date/time
+    const selectedDateStartOfDay = selectedDate.startOf("day");
+    if (selectedDateStartOfDay.isBefore(today)) {
+      setError(null);
+      toast.error("Cannot book appointment for a past date.", toastOptions);
       return;
+    }
+
+    if (!slot) {
+      setError(null);
+      toast.error("Please select a time slot.", toastOptions);
+      return;
+    }
+
+    // Prevent booking for past time on today
+    const isToday = selectedDateStartOfDay.isSame(today, "day");
+    if (isToday) {
+      const slotTime = parseSlotStartTime(slot);
+      if (slotTime) {
+        const slotTimeToday = dayjs()
+          .set("hour", slotTime.hour())
+          .set("minute", slotTime.minute());
+        if (slotTimeToday.isBefore(now)) {
+          setError(null);
+          toast.error("Cannot book appointment for a past time.", toastOptions);
+          return;
+        }
+      }
     }
 
     const appointmentDateStr = selectedDate.format("YYYY-MM-DD");
     const deptId = IS_MEDICAL_APP
       ? Number(department)
       : (lead.department_id ?? 0);
-    const personnelId = Number(personnel);
+    const personnelId = personnel ? Number(personnel) : null;
 
     // Lookup display names for the optimistic update
     const selectedDept = departments.find((d) => d.id === deptId);
     const selectedEmp =
       selectedPersonnelOption ??
-      personnelOptions.find((u) => u.id === personnelId);
+      (personnelId != null
+        ? personnelOptions.find((u) => u.id === personnelId)
+        : undefined);
 
     setSaving(true);
     setError(null);
 
     try {
+      const resolvedContactNo =
+        lead.contact_no || lead.phone || lead.phone_number || undefined;
       await api.put(`/leads/${lead.id}/update/?clinic_id=${clinicId}`, {
         clinic_id: clinicId,
         department_id: deptId,
         full_name: lead.full_name || lead.name,
-        contact_no: lead.contact_no || lead.phone || lead.phone_number || "",
+        ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
         source: lead.source || "Unknown",
-        treatment_interest: lead.treatment_interest || "N/A",
+        treatment_interest: Array.isArray(lead.treatment_interest)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? lead.treatment_interest.map((item: any) =>
+              typeof item === "object" ? item.id : item,
+            )
+          : [],
         lead_status: "appointment",
         book_appointment: true,
         appointment_date: appointmentDateStr,
@@ -526,7 +630,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
                 {...params}
                 fullWidth
                 size="small"
-                label="Personnel *"
+                label="Personnel"
                 placeholder="Search personnel"
                 sx={modalFieldSx}
                 InputLabelProps={{
@@ -563,6 +667,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
               value={selectedDate}
+              format="DD/MM/YYYY"
               onChange={(val) => setSelectedDate(val ? dayjs(val) : null)}
               minDate={today}
               disabled={saving}
@@ -592,16 +697,22 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
               label="Select Slot *"
               notched
               onChange={(e) => setSlot(e.target.value)}
-              disabled={saving}
+              disabled={saving || !selectedDate}
             >
               <MenuItem value="">
                 <em>Select Time Slot</em>
               </MenuItem>
-              {SLOT_OPTIONS.map((s) => (
-                <MenuItem key={s} value={s}>
-                  {s}
+              {availableSlots.length > 0 ? (
+                availableSlots.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {s}
+                  </MenuItem>
+                ))
+              ) : (
+                <MenuItem value="" disabled>
+                  <em>No available slots for selected date</em>
                 </MenuItem>
-              ))}
+              )}
             </Select>
           </FormControl>
         </Box>

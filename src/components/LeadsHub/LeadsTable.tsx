@@ -41,11 +41,14 @@ import {
   selectLeads,
   selectLeadsLoading,
   selectLeadsError,
+  // clearError,
 } from "../../store/leadSlice";
+import { selectUsers } from "../../store/userSlice";
+import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
 import BulkActionBar from "./BulkActionBar";
-import { LeadAPI, TwilioAPI } from "../../services/leads.api";
+import { LeadAPI } from "../../services/leads.api";
 import { pipelineApi } from "../../services/pipeline.api";
 import CallDialog from "./CallDialog";
 
@@ -59,6 +62,7 @@ import {
 } from "./LeadsTable.types";
 import {
   extractErrorMessage,
+  hasUsablePhone,
   normalizePhone,
   processLead,
 } from "./LeadsTable.helpers";
@@ -78,9 +82,6 @@ const toastOptions = {
   autoClose: 3000,
   theme: "colored" as const,
 };
-
-const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
-const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
 // Add this helper at the top of LeadsTable.tsx:
 const BACKEND_TO_DISPLAY: Record<string, string> = {
@@ -327,30 +328,34 @@ const EditStatusDialog: React.FC<EditStatusDialogProps> = ({
             }}
           >
             {statusOptions.length === 0 ? (
-              <Typography sx={{ fontSize: 12, color: "#667085", px: 1, py: 0.5 }}>
+              <Typography
+                sx={{ fontSize: 12, color: "#667085", px: 1, py: 0.5 }}
+              >
                 No active stages available for selected pipeline.
               </Typography>
-            ) : statusOptions.map((opt) => (
-              <Box
-                key={opt.id ?? opt.label}
-                onClick={() => {
-                  setSelected(opt.label);
-                  setDropdownOpen(false);
-                }}
-                sx={{ display: "inline-flex", pl: 0.5 }}
-              >
-                <Chip
-                  label={opt.label}
-                  size="small"
-                  sx={{
-                    ...getStatusOptionChipSx(opt.label),
-                    ...(opt.label === selected && {
-                      boxShadow: `0 0 0 2px ${STATUS_CHIP_STYLES[opt.label]?.borderColor ?? "#64748B"}44`,
-                    }),
+            ) : (
+              statusOptions.map((opt) => (
+                <Box
+                  key={opt.id ?? opt.label}
+                  onClick={() => {
+                    setSelected(opt.label);
+                    setDropdownOpen(false);
                   }}
-                />
-              </Box>
-            ))}
+                  sx={{ display: "inline-flex", pl: 0.5 }}
+                >
+                  <Chip
+                    label={opt.label}
+                    size="small"
+                    sx={{
+                      ...getStatusOptionChipSx(opt.label),
+                      ...(opt.label === selected && {
+                        boxShadow: `0 0 0 2px ${STATUS_CHIP_STYLES[opt.label]?.borderColor ?? "#64748B"}44`,
+                      }),
+                    }}
+                  />
+                </Box>
+              ))
+            )}
           </Box>
         )}
       </DialogContent>
@@ -425,8 +430,20 @@ const LeadsTable: React.FC<Props> = ({
   const dispatch = useDispatch();
 
   const leads = useSelector(selectLeads) as RawLead[] | null;
+  const users = useSelector(selectUsers);
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
+  const clinic = useSelector(selectClinic);
+
+  const assigneeNameById = React.useMemo(() => {
+    const map = new Map<number, string>();
+    for (const user of users) {
+      const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+      const displayName = fullName || user.username || `User ${user.id}`;
+      map.set(user.id, user.role ? `${displayName} (${user.role})` : displayName);
+    }
+    return map;
+  }, [users]);
 
   const [localLeads, setLocalLeads] = React.useState<ProcessedLead[]>([]);
   const [page, setPage] = React.useState(1);
@@ -443,9 +460,7 @@ const LeadsTable: React.FC<Props> = ({
   );
   const [editStatusOptions, setEditStatusOptions] = React.useState<
     Array<{ id?: string; label: string }>
-  >(
-    ACTIVE_STATUS_OPTIONS.map((status) => ({ label: status })),
-  );
+  >(ACTIVE_STATUS_OPTIONS.map((status) => ({ label: status })));
 
   const [sortCol, setSortCol] = React.useState<string | null>(null);
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
@@ -456,17 +471,16 @@ const LeadsTable: React.FC<Props> = ({
 
   React.useEffect(() => {
     const loadEditStatusOptions = async () => {
-      const clinicId = Number(localStorage.getItem("clinic_id") ?? 0);
-      const resolvedSelectedIndustry =
-        selectedIndustry ||
-        localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ||
-        "";
-      const resolvedSelectedPipelineId =
-        selectedPipelineId ||
-        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ||
-        "";
+      const clinicIdFromStore = Number(clinic?.id ?? 0);
+      const clinicIdFromLead = Number(
+        editStatusLead?.clinic_id ?? (leads?.[0] as RawLead | undefined)?.clinic_id ?? 0,
+      );
+      const clinicId = clinicIdFromStore || clinicIdFromLead;
+      const resolvedSelectedIndustry = selectedIndustry;
+      const resolvedSelectedPipelineId = selectedPipelineId;
       const hasSelectionContext =
-        Boolean(resolvedSelectedIndustry) || Boolean(resolvedSelectedPipelineId);
+        Boolean(resolvedSelectedIndustry) ||
+        Boolean(resolvedSelectedPipelineId);
       const fallbackStatusOptions = ACTIVE_STATUS_OPTIONS.map((status) => ({
         label: status,
       }));
@@ -481,7 +495,9 @@ const LeadsTable: React.FC<Props> = ({
 
         if (resolvedSelectedPipelineId) {
           try {
-            selectedPipeline = await pipelineApi.getById(resolvedSelectedPipelineId);
+            selectedPipeline = await pipelineApi.getById(
+              resolvedSelectedPipelineId,
+            );
           } catch {
             selectedPipeline = null;
           }
@@ -491,12 +507,15 @@ const LeadsTable: React.FC<Props> = ({
           const pipelines = await pipelineApi.list(clinicId);
           const pipelinesByIndustry = resolvedSelectedIndustry
             ? pipelines.filter(
-                (pipeline) => pipeline.industry_type === resolvedSelectedIndustry,
+                (pipeline) =>
+                  pipeline.industry_type === resolvedSelectedIndustry,
               )
             : pipelines;
 
           selectedPipeline =
-            pipelines.find((pipeline) => pipeline.id === resolvedSelectedPipelineId) ??
+            pipelines.find(
+              (pipeline) => pipeline.id === resolvedSelectedPipelineId,
+            ) ??
             pipelinesByIndustry.find((pipeline) => pipeline.is_active) ??
             pipelinesByIndustry[0] ??
             pipelines.find((pipeline) => pipeline.is_active) ??
@@ -505,7 +524,9 @@ const LeadsTable: React.FC<Props> = ({
         }
 
         if (!selectedPipeline || !Array.isArray(selectedPipeline.stages)) {
-          setEditStatusOptions(hasSelectionContext ? [] : fallbackStatusOptions);
+          setEditStatusOptions(
+            hasSelectionContext ? [] : fallbackStatusOptions,
+          );
           return;
         }
 
@@ -535,7 +556,7 @@ const LeadsTable: React.FC<Props> = ({
 
     if (!editStatusLead) return;
     void loadEditStatusOptions();
-  }, [editStatusLead, selectedIndustry, selectedPipelineId]);
+  }, [clinic?.id, editStatusLead, leads, selectedIndustry, selectedPipelineId]);
 
   React.useEffect(() => {
     if (!leads) return;
@@ -558,8 +579,29 @@ const LeadsTable: React.FC<Props> = ({
       (a, b) => getLeadTimestamp(b) - getLeadTimestamp(a),
     );
 
-    setLocalLeads(sortedMergedLeads.map(processLead));
-  }, [leads, importedLeads]);
+    const withResolvedAssignee = sortedMergedLeads.map((lead) => {
+      if (lead.assigned_to_name && String(lead.assigned_to_name).trim()) {
+        return lead;
+      }
+
+      const assignedIdRaw = (lead as RawLead & { assigned_to?: unknown }).assigned_to;
+      const assignedId = Number(
+        lead.assigned_to_id ??
+          (typeof assignedIdRaw === "number" || typeof assignedIdRaw === "string"
+            ? assignedIdRaw
+            : NaN),
+      );
+
+      if (!Number.isFinite(assignedId) || assignedId <= 0) {
+        return lead;
+      }
+
+      const resolvedName = assigneeNameById.get(assignedId) ?? `User ${assignedId}`;
+      return { ...lead, assigned_to_name: resolvedName };
+    });
+
+    setLocalLeads(withResolvedAssignee.map(processLead));
+  }, [leads, importedLeads, assigneeNameById]);
 
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) =>
@@ -567,7 +609,9 @@ const LeadsTable: React.FC<Props> = ({
     );
   const isSelected = (id: string) => selectedIds.includes(id);
 
-  const handleCallOpen = async (e: React.MouseEvent, lead: ProcessedLead) => {
+  // ✅ FIXED: handleCallOpen now just opens CallDialog with lead data
+  // CallDialog itself handles the Twilio browser call — no more TwilioAPI.makeCall here
+  const handleCallOpen = (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
     const phone = normalizePhone(lead.contact_no);
     if (!phone) {
@@ -579,15 +623,6 @@ const LeadsTable: React.FC<Props> = ({
       return;
     }
     setCallLead(lead);
-    try {
-      await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
-    } catch (err: unknown) {
-      setCallLead(null);
-      toast.error(
-        extractErrorMessage(err, "Failed to initiate call."),
-        toastOptions,
-      );
-    }
   };
 
   const handleSMSOpen = (e: React.MouseEvent, lead: ProcessedLead) => {
@@ -629,26 +664,55 @@ const LeadsTable: React.FC<Props> = ({
       nextStatusLabel,
     );
 
-    const updatePayload = {
-      clinic_id: editStatusLead.clinic_id ?? 0,
-      department_id: editStatusLead.department_id ?? 0,
-      full_name: editStatusLead.full_name || "",
-      contact_no: editStatusLead.contact_no || "",
-      source: editStatusLead.source || "Unknown",
-      treatment_interest: editStatusLead.treatment_interest || "N/A",
-      book_appointment: editStatusLead.book_appointment || false,
-      appointment_date: editStatusLead.appointment_date || null,
-      slot: editStatusLead.slot || "",
-      is_active: editStatusLead.is_active !== false,
-      partner_inquiry: editStatusLead.partner_inquiry || false,
-      next_action_description: stageAwareDescription,
-      ...(selectedStatus.id ? { stage_id: selectedStatus.id } : {}),
-      ...(apiStatus
-        ? { lead_status: apiStatus as "new" | "contacted" }
-        : {}),
-    };
-
+    
     try {
+      const latestLead = await LeadAPI.getById(editStatusLead.id);
+      const treatmentInterest =
+        latestLead.treatment_interest ?? editStatusLead.treatment_interest;
+
+      const resolvedClinicId =
+        latestLead.clinic_id ?? editStatusLead.clinic_id ?? clinic?.id;
+      const resolvedDepartmentId =
+        latestLead.department_id ?? editStatusLead.department_id;
+
+      const resolvedContactNo =
+        latestLead.contact_no || editStatusLead.contact_no;
+
+      const updatePayload = {
+        ...(resolvedClinicId ? { clinic_id: resolvedClinicId } : {}),
+        ...(resolvedDepartmentId
+          ? { department_id: resolvedDepartmentId }
+          : {}),
+        full_name:
+          latestLead.full_name ||
+          editStatusLead.full_name ||
+          editStatusLead.name ||
+          "",
+        ...(resolvedContactNo ? { contact_no: resolvedContactNo } : {}),
+        source: latestLead.source || editStatusLead.source || "",
+        treatment_interest: Array.isArray(treatmentInterest)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? treatmentInterest.map((item: any) =>
+              typeof item === "object" ? item.id : item,
+            )
+          : [],
+        book_appointment:
+          latestLead.book_appointment ??
+          editStatusLead.book_appointment ??
+          false,
+        appointment_date:
+          latestLead.appointment_date ??
+          editStatusLead.appointment_date ??
+          null,
+        slot: latestLead.slot || editStatusLead.slot || "",
+        is_active: latestLead.is_active !== false,
+        partner_inquiry:
+          latestLead.partner_inquiry ?? editStatusLead.partner_inquiry ?? false,
+        next_action_description: stageAwareDescription,
+        ...(selectedStatus.id ? { stage_id: selectedStatus.id } : {}),
+        ...(apiStatus ? { lead_status: apiStatus as "new" | "contacted" } : {}),
+      };
+
       await LeadAPI.update(editStatusLead.id, updatePayload);
       setLocalLeads((prev) =>
         prev.map((l) =>
@@ -677,7 +741,7 @@ const LeadsTable: React.FC<Props> = ({
   const filteredLeads = React.useMemo(() => {
     const result = localLeads.filter((lead: ProcessedLead) => {
       const searchStr =
-        `${lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
+        `${lead.full_name || lead.name || ""} ${lead.displayId || ""}`.toLowerCase();
       const matchSearch = searchStr.includes(search.toLowerCase());
       const matchTab =
         tab === "archived"
@@ -817,12 +881,15 @@ const LeadsTable: React.FC<Props> = ({
     );
     setSelectedIds([]);
   };
-  const handleBulkExport = () => {
-    const selectedLeads = localLeads.filter((lead) =>
-      selectedIds.includes(lead.id),
-    );
-    if (selectedLeads.length === 0) {
-      toast.info("No selected leads to export.", toastOptions);
+
+  const exportLeadsToCsv = (
+    leadsToExport: ProcessedLead[],
+    filePrefix: string,
+    successMessage: string,
+    emptyMessage: string,
+  ) => {
+    if (leadsToExport.length === 0) {
+      toast.info(emptyMessage, toastOptions);
       return;
     }
 
@@ -844,7 +911,7 @@ const LeadsTable: React.FC<Props> = ({
       return text;
     };
 
-    const rows = selectedLeads.map((lead) => [
+    const rows = leadsToExport.map((lead) => [
       lead.id,
       lead.full_name || lead.name || "",
       lead.contact_no || "",
@@ -865,13 +932,34 @@ const LeadsTable: React.FC<Props> = ({
     const anchor = document.createElement("a");
     const stamp = new Date().toISOString().slice(0, 10);
     anchor.href = url;
-    anchor.download = `selected_leads_export_${stamp}.csv`;
+    anchor.download = `${filePrefix}_${stamp}.csv`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
 
-    toast.success("Selected leads exported successfully.", toastOptions);
+    toast.success(successMessage, toastOptions);
+  };
+
+  const handleBulkExport = () => {
+    const selectedLeads = localLeads.filter((lead) =>
+      selectedIds.includes(lead.id),
+    );
+    exportLeadsToCsv(
+      selectedLeads,
+      "selected_leads_export",
+      "Selected leads exported successfully.",
+      "No selected leads to export.",
+    );
+  };
+
+  const handleExportAllLeads = () => {
+    exportLeadsToCsv(
+      sortedLeads,
+      "all_leads_export",
+      "All leads exported successfully.",
+      "No leads available to export.",
+    );
   };
 
   // ── Loading / Error / Empty states ──────────────────────────────────────────
@@ -887,7 +975,9 @@ const LeadsTable: React.FC<Props> = ({
       >
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
-          <Typography color="text.secondary">Loading leads...</Typography>
+          <Typography color="text.secondary">
+            Hold Tight!! Leads are Loading....
+          </Typography>
         </Stack>
       </Box>
     );
@@ -905,8 +995,9 @@ const LeadsTable: React.FC<Props> = ({
             cursor: "pointer",
             textDecoration: "underline",
           }}
-          onClick={() =>
-            dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0])
+          onClick={() => {
+            window.location.reload();
+          }
           }
         >
           Try again
@@ -1495,7 +1586,10 @@ const LeadsTable: React.FC<Props> = ({
                       fontWeight: lead.taskType ? 500 : 400,
                     }}
                   >
-                    {lead.taskType || "—"}
+                    {lead.taskType
+                      ? lead.taskType.charAt(0).toUpperCase() +
+                        lead.taskType.slice(1)
+                      : "—"}
                   </Typography>
                 </TableCell>
 
@@ -1528,45 +1622,72 @@ const LeadsTable: React.FC<Props> = ({
                   sx={contactCellStyle}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Stack direction="row" spacing={1} justifyContent="center">
-                    <Tooltip title={`Call ${lead.contact_no || "N/A"}`}>
-                      <span>
-                        <IconButton
-                          className="action-btn"
-                          size="small"
-                          onClick={(e) => handleCallOpen(e, lead)}
-                        >
-                          <PhoneIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={`SMS ${lead.contact_no || "N/A"}`}>
-                      <IconButton
-                        className="action-btn"
-                        size="small"
-                        onClick={(e) => handleSMSOpen(e, lead)}
+                  {(() => {
+                    const hasPhone = hasUsablePhone(lead.contact_no);
+                    return (
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        justifyContent="center"
                       >
-                        <ChatBubbleOutlineIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip
-                      title={lead.email ? `Email ${lead.email}` : "No email"}
-                    >
-                      <span>
-                        <IconButton
-                          className="action-btn"
-                          size="small"
-                          disabled={!lead.email}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEmailLead(lead);
-                          }}
+                        <Tooltip
+                          title={
+                            hasPhone
+                              ? `Call ${lead.contact_no || "N/A"}`
+                              : "No contact number"
+                          }
                         >
-                          <EmailOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Stack>
+                          <span>
+                            <IconButton
+                              className="action-btn"
+                              size="small"
+                              disabled={!hasPhone}
+                              onClick={(e) => handleCallOpen(e, lead)}
+                            >
+                              <PhoneIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip
+                          title={
+                            hasPhone
+                              ? `SMS ${lead.contact_no || "N/A"}`
+                              : "No contact number"
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              className="action-btn"
+                              size="small"
+                              disabled={!hasPhone}
+                              onClick={(e) => handleSMSOpen(e, lead)}
+                            >
+                              <ChatBubbleOutlineIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip
+                          title={
+                            lead.email ? `Email ${lead.email}` : "No email"
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              className="action-btn"
+                              size="small"
+                              disabled={!lead.email}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEmailLead(lead);
+                              }}
+                            >
+                              <EmailOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    );
+                  })()}
                 </TableCell>
 
                 <TableCell
@@ -1625,13 +1746,20 @@ const LeadsTable: React.FC<Props> = ({
         onDelete={handleBulkDelete}
         onArchive={handleBulkArchive}
         onExport={handleBulkExport}
+        onExportAll={handleExportAllLeads}
       />
       <Dialogs />
+
+      {/* ✅ FIXED: CallDialog now receives toNumber and leadUuid for real Twilio browser call */}
       <CallDialog
         open={Boolean(callLead)}
         name={callLead?.full_name || callLead?.name || "Unknown"}
+        toNumber={normalizePhone(callLead?.contact_no)}
+        leadUuid={callLead?.id || ""}
+        agentIdentity="agent"
         onClose={() => setCallLead(null)}
       />
+
       <SMSDialog
         open={Boolean(smsLead)}
         lead={smsLead}

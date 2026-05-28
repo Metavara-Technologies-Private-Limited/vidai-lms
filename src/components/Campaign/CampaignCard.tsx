@@ -13,14 +13,23 @@ import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import type { Campaign } from "../../types/campaigns.types";
-import { CAMPAIGN_STATUS, platformIcons, PLATFORMS, type CampaignStatus } from "../../constants/campaigns.constants";
-import { formatScheduleTime } from "../../utils/campaigns.utils";
-import { CampaignAPI } from "../../services/campaign.api"; // ← added
+import {
+  CAMPAIGN_STATUS,
+  platformIcons,
+  PLATFORMS,
+  type CampaignStatus,
+} from "../../constants/campaigns.constants";
+import {
+  formatScheduleTime,
+  getComputedCampaignStatus,
+  getPersistedCampaignStatus,
+} from "../../utils/campaigns.utils";
+import { CampaignAPI } from "../../services/campaign.api";
 
 const INACTIVE_STATUSES = new Set<CampaignStatus>([
-  CAMPAIGN_STATUS.STOPPED,
   CAMPAIGN_STATUS.COMPLETED,
   CAMPAIGN_STATUS.FAILED,
+  CAMPAIGN_STATUS.STOPPED,
 ]);
 
 interface CampaignCardProps {
@@ -28,7 +37,11 @@ interface CampaignCardProps {
   openMenuId: string | null;
   setOpenMenuId: (id: string | null) => void;
   onViewDetail: (campaign: Campaign) => void;
-  onStatusChange: (id: string, status: CampaignStatus) => void;
+  onStatusChange: (
+    id: string,
+    status: CampaignStatus,
+    platformData?: Campaign["platform_data"],
+  ) => void;
   onEdit?: (campaign: Campaign) => void;
   onDuplicate?: (campaign: Campaign) => void;
   canEditCampaign?: boolean;
@@ -52,6 +65,7 @@ export default function CampaignCard({
   const isMenuOpen = openMenuId === c.id;
   const menuRef = useRef<HTMLDivElement>(null);
   const [showStopModal, setShowStopModal] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
 
   const platforms = c.platforms ?? [];
 
@@ -70,10 +84,58 @@ export default function CampaignCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setOpenMenuId]);
 
+  const computedStatus = getComputedCampaignStatus(c);
+  const hasPausedPlatforms = platforms.some(
+    (p) => c.platform_data?.[p]?.status === "paused",
+  );
+
+  const getPlatformErrorMessage = (
+    err: unknown,
+    platform: "Facebook" | "Instagram",
+    action: "enable" | "disable",
+  ) => {
+    const fallback =
+      action === "enable"
+        ? `${platform} enable failed.`
+        : `${platform} stop failed.`;
+
+    if (typeof err === "object" && err !== null && "response" in err) {
+      const response = (
+        err as {
+          response?: {
+            data?: {
+              detail?: string;
+            };
+          };
+        }
+      ).response;
+
+      const detail = response?.data?.detail;
+
+      if (detail && detail.toLowerCase().includes("token expired")) {
+        return `${platform} session expired. Please reconnect in Integrations.`;
+      }
+
+      if (detail) {
+        return detail;
+      }
+    }
+
+    return fallback;
+  };
+
   return (
     <div
       className="campaign-card"
+      tabIndex={0}
+      role="button"
       onClick={() => onViewDetail(c)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onViewDetail(c);
+        }
+      }}
       style={{ cursor: "pointer" }}
     >
       <div className="card-header">
@@ -87,7 +149,13 @@ export default function CampaignCard({
           </div>
           <span className="title-text">{c.name}</span>
         </div>
-        <span className={`status ${c.status.toLowerCase()}`}>{c.status}</span>
+        <span
+          className={`status ${computedStatus
+            .toLowerCase()
+            .replace(/\s+/g, "-")}`}
+        >
+          {computedStatus}
+        </span>
       </div>
 
       <div className="card-row">
@@ -103,14 +171,27 @@ export default function CampaignCard({
         <div>
           <label>Platform:</label>
           <div className="platform-icons">
-            {platforms.map((p) => (
-              <img
-                key={p}
-                src={platformIcons[p]}
-                className="platform-icon"
-                alt={p}
-              />
-            ))}
+            {platforms.map((p) => {
+              const isInactiveCampaign = INACTIVE_STATUSES.has(computedStatus);
+
+              const status = isInactiveCampaign
+                ? "inactive"
+                : c.platform_data?.[p]?.status || "active";
+
+              return (
+                <div
+                  key={p}
+                  className={`platform-badge ${status}`}
+                  title={`${p} - ${status}`}
+                >
+                  <img
+                    src={platformIcons[p]}
+                    className="platform-icon"
+                    alt={p}
+                  />
+                </div>
+              );
+            })}
 
             {platforms.length === 0 && c.type === "email" && (
               <img
@@ -126,7 +207,7 @@ export default function CampaignCard({
       <div className="card-divider" />
 
       <div className="card-footer">
-        {c.status === CAMPAIGN_STATUS.SCHEDULED ? (
+        {computedStatus === CAMPAIGN_STATUS.SCHEDULED ? (
           <span>
             <label>SCHEDULED:</label>{" "}
             {formatScheduleTime(c.selected_start, c.enter_time)}
@@ -149,45 +230,59 @@ export default function CampaignCard({
             <img src={viewIcon} alt="View" width={20} height={20} />
           </button>
 
-          {/* ── Pause / Play button ── */}
-          <button
-            className="action-btn pause-btn"
-            disabled={!canEditCampaign}
-            title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
-            onClick={async (e) => {                          // ← async added
-              e.stopPropagation();
-              if (!canEditCampaign) return;
-              if (c.status === CAMPAIGN_STATUS.STOPPED) {
-                // ── Enable in Google Ads if applicable ──
-                if (platforms.includes("google_ads")) {      // ← added
-                  try {                                      // ← added
-                    await CampaignAPI.updateGoogleAdsStatus(c.id, "enable"); // ← added
-                  } catch (err) {                            // ← added
-                    console.error("[GoogleAds] Failed to enable campaign:", err); // ← added
-                    toast.warn("Campaign enabled locally, but Google Ads enable failed."); // ← added
-                  }                                          // ← added
-                }                                            // ← added
-                onStatusChange(c.id, CAMPAIGN_STATUS.LIVE);
-                toast.success("Campaign is Live now");
-              } else {
-                setShowStopModal(true);
+          {/* ── Pause button ── */}
+          {(computedStatus === CAMPAIGN_STATUS.LIVE ||
+            computedStatus === CAMPAIGN_STATUS.PARTIALLY_ACTIVE) && (
+            <button
+              className="action-btn pause-btn"
+              disabled={!canEditCampaign}
+              title={
+                !canEditCampaign
+                  ? "No permission to edit campaigns"
+                  : "Pause Campaign"
               }
-            }}
-          >
-            <img
-              src={c.status === CAMPAIGN_STATUS.STOPPED ? playIcon : pauseIcon}
-              alt="Toggle"
-              width={20}
-              height={20}
-            />
-          </button>
+              onClick={(e) => {
+                e.stopPropagation();
+
+                if (!canEditCampaign) return;
+
+                setShowStopModal(true);
+              }}
+            >
+              <img src={pauseIcon} alt="Pause" width={20} height={20} />
+            </button>
+          )}
+
+          {/* ── Resume button ── */}
+          {!INACTIVE_STATUSES.has(computedStatus) && hasPausedPlatforms && (
+            <button
+              className="action-btn play-btn"
+              disabled={!canEditCampaign}
+              title={
+                !canEditCampaign
+                  ? "No permission to edit campaigns"
+                  : "Resume Campaign"
+              }
+              onClick={(e) => {
+                e.stopPropagation();
+
+                if (!canEditCampaign) return;
+
+                setShowResumeModal(true);
+              }}
+            >
+              <img src={playIcon} alt="Resume" width={20} height={20} />
+            </button>
+          )}
 
           <div className="more-container" ref={menuRef}>
             <button
               className="action-btn more-btn"
               onClick={toggleMenu}
               disabled={!canEditCampaign}
-              title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+              title={
+                !canEditCampaign ? "No permission to edit campaigns" : undefined
+              }
             >
               <img src={moreIcon} alt="More" width={20} height={20} />
             </button>
@@ -206,10 +301,18 @@ export default function CampaignCard({
                     setOpenMenuId(null);
                     onEdit?.(c);
                   }}
-                  title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+                  title={
+                    !canEditCampaign
+                      ? "No permission to edit campaigns"
+                      : undefined
+                  }
                   style={
                     !canEditCampaign
-                      ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
+                      ? {
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                          pointerEvents: "none",
+                        }
                       : undefined
                   }
                 >
@@ -224,36 +327,69 @@ export default function CampaignCard({
                     setOpenMenuId(null);
                     onDuplicate?.(c);
                   }}
-                  title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
+                  title={
+                    !canEditCampaign
+                      ? "No permission to edit campaigns"
+                      : undefined
+                  }
                   style={
                     !canEditCampaign
-                      ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
+                      ? {
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                          pointerEvents: "none",
+                        }
                       : undefined
                   }
                 >
-                  <img src={duplicateIcon} alt="Duplicate" className="menu-icon" />
+                  <img
+                    src={duplicateIcon}
+                    alt="Duplicate"
+                    className="menu-icon"
+                  />
                   Duplicate
                 </div>
-                {!INACTIVE_STATUSES.has(c.status) && (
+                {/* ── Stop menu action ── */}
+                {(computedStatus === CAMPAIGN_STATUS.LIVE ||
+                  computedStatus === CAMPAIGN_STATUS.PARTIALLY_ACTIVE) && (
                   <div
-                    className={`menu-item stop-item ${!canEditCampaign ? "disabled" : ""}`}
+                    className={`menu-item stop-item ${
+                      !canEditCampaign ? "disabled" : ""
+                    }`}
                     onClick={(e) => {
                       e.stopPropagation();
+
                       if (!canEditCampaign) return;
+
                       setOpenMenuId(null);
                       setShowStopModal(true);
                     }}
-                    title={!canEditCampaign ? "No permission to edit campaigns" : undefined}
-                    style={
-                      !canEditCampaign
-                        ? { opacity: 0.5, cursor: "not-allowed", pointerEvents: "none" }
-                        : undefined
-                    }
                   >
                     <img src={stopIcon} alt="Stop" className="menu-icon" />
                     Stop
                   </div>
                 )}
+
+                {/* ── Resume menu action ── */}
+                {!INACTIVE_STATUSES.has(computedStatus) &&
+                  hasPausedPlatforms && (
+                    <div
+                      className={`menu-item ${
+                        !canEditCampaign ? "disabled" : ""
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+
+                        if (!canEditCampaign) return;
+
+                        setOpenMenuId(null);
+                        setShowResumeModal(true);
+                      }}
+                    >
+                      <img src={playIcon} alt="Resume" className="menu-icon" />
+                      Resume
+                    </div>
+                  )}
               </div>
             )}
           </div>
@@ -262,13 +398,244 @@ export default function CampaignCard({
 
       {showStopModal && (
         <StopCampaignModal
+          title="Stop Campaign"
+          confirmText="Stop"
           campaignName={c.name}
           platforms={platforms}
-          campaignId={c.id}           
+          campaignId={c.id}
+          platformStatuses={c.platform_data}
           onClose={() => setShowStopModal(false)}
-          onStop={() => {
-            onStatusChange(c.id, CAMPAIGN_STATUS.STOPPED);
+          onStop={async (selectedPlatforms?: string[]) => {
+            const chosenPlatforms = selectedPlatforms ?? platforms;
+            let shouldStop = true;
+
+            // ── Stop FB/Insta ──
+            // ── Stop Facebook ──
+            if (chosenPlatforms.includes("facebook")) {
+              try {
+                await CampaignAPI.updateFacebookStatus(
+                  c.id,
+                  "disable",
+                  "facebook",
+                );
+
+                toast.success("Facebook campaign stopped successfully.");
+              } catch (err) {
+                shouldStop = false;
+
+                console.error("[Facebook] Failed to stop campaign:", err);
+
+                toast.warn(getPlatformErrorMessage(err, "Facebook", "disable"));
+              }
+            }
+
+            // ── Stop Instagram ──
+            if (chosenPlatforms.includes("instagram")) {
+              try {
+                await CampaignAPI.updateFacebookStatus(
+                  c.id,
+                  "disable",
+                  "instagram",
+                );
+
+                toast.success("Instagram campaign stopped successfully.");
+              } catch (err) {
+                shouldStop = false;
+
+                console.error("[Instagram] Failed to stop campaign:", err);
+
+                toast.warn(
+                  getPlatformErrorMessage(err, "Instagram", "disable"),
+                );
+              }
+            }
+
+            // ── Stop Google Ads ──
+            if (chosenPlatforms.includes("google_ads")) {
+              try {
+                const res = await CampaignAPI.updateGoogleAdsStatus(
+                  c.id,
+                  "pause",
+                );
+
+                if (!res.data?.success) {
+                  shouldStop = false;
+
+                  toast.warn(res.data?.error || "Google Ads stop failed.");
+                } else {
+                  toast.success("Google Ads campaign stopped successfully.");
+                }
+              } catch (err) {
+                shouldStop = false;
+
+                console.error("[GoogleAds] Failed to stop campaign:", err);
+
+                toast.warn("Google Ads stop failed.");
+              }
+            }
+
+            // ── Stop LinkedIn ──
+            if (chosenPlatforms.includes("linkedin")) {
+              try {
+                await CampaignAPI.updateLinkedInStatus(c.id, "PAUSED");
+
+                toast.success("LinkedIn campaign stopped successfully.");
+              } catch (err) {
+                shouldStop = false;
+
+                console.error("[LinkedIn] Failed to stop campaign:", err);
+
+                toast.warn("LinkedIn stop failed.");
+              }
+            }
+
+            if (shouldStop) {
+              const updatedPlatformData = {
+                ...c.platform_data,
+              };
+
+              chosenPlatforms.forEach((platform) => {
+                updatedPlatformData[platform] = {
+                  ...updatedPlatformData[platform],
+                  status: "paused",
+                };
+              });
+
+              const updatedCampaign = {
+                ...c,
+                platform_data: updatedPlatformData,
+              };
+
+              // const computedStatus = getComputedCampaignStatus(updatedCampaign);
+
+              const persistedStatus =
+                getPersistedCampaignStatus(updatedCampaign);
+
+              onStatusChange(c.id, persistedStatus, updatedPlatformData);
+
+              toast.success("Campaign stopped successfully.");
+            }
+
             setShowStopModal(false);
+          }}
+        />
+      )}
+      {showResumeModal && (
+        <StopCampaignModal
+          title="Resume Campaign"
+          confirmText="Resume"
+          campaignName={c.name}
+          platforms={platforms}
+          campaignId={c.id}
+          platformStatuses={c.platform_data}
+          onClose={() => setShowResumeModal(false)}
+          onStop={async (selectedPlatforms?: string[]) => {
+            let shouldSetLive = true;
+
+            const chosenPlatforms = selectedPlatforms ?? platforms;
+
+            // ── Enable FB/Insta ──
+            // ── Enable Facebook ──
+            if (chosenPlatforms.includes("facebook")) {
+              try {
+                await CampaignAPI.updateFacebookStatus(
+                  c.id,
+                  "enable",
+                  "facebook",
+                );
+
+                toast.success("Facebook campaign enabled successfully.");
+              } catch (err) {
+                shouldSetLive = false;
+
+                console.error("[Facebook] Failed to enable campaign:", err);
+
+                toast.warn(getPlatformErrorMessage(err, "Facebook", "enable"));              }
+            }
+
+            // ── Enable Instagram ──
+            if (chosenPlatforms.includes("instagram")) {
+              try {
+                await CampaignAPI.updateFacebookStatus(
+                  c.id,
+                  "enable",
+                  "instagram",
+                );
+
+                toast.success("Instagram campaign enabled successfully.");
+              } catch (err) {
+                shouldSetLive = false;
+
+                console.error("[Instagram] Failed to enable campaign:", err);
+
+                toast.warn(getPlatformErrorMessage(err, "Instagram", "enable"));              }
+            }
+
+            // ── Enable Google Ads ──
+            if (chosenPlatforms.includes("google_ads")) {
+              try {
+                const res = await CampaignAPI.updateGoogleAdsStatus(
+                  c.id,
+                  "enable",
+                );
+
+                if (!res.data?.success && !res.data?.skipped) {
+                  shouldSetLive = false;
+
+                  toast.warn(res.data?.error || "Google Ads enable failed.");
+                } else {
+                  toast.success("Google Ads enabled successfully.");
+                }
+              } catch (err) {
+                shouldSetLive = false;
+
+                console.error("[GoogleAds] Failed to enable campaign:", err);
+
+                toast.warn("Google Ads enable failed.");
+              }
+            }
+
+            // ── Enable LinkedIn ──
+            if (chosenPlatforms.includes("linkedin")) {
+              try {
+                await CampaignAPI.updateLinkedInStatus(c.id, "ACTIVE");
+
+                toast.success("LinkedIn campaign enabled successfully.");
+              } catch (err) {
+                shouldSetLive = false;
+
+                console.error("[LinkedIn] Failed to enable campaign:", err);
+
+                toast.warn("LinkedIn enable failed.");
+              }
+            }
+
+            if (shouldSetLive) {
+              const updatedPlatformData = {
+                ...c.platform_data,
+              };
+
+              chosenPlatforms.forEach((platform) => {
+                updatedPlatformData[platform] = {
+                  ...updatedPlatformData[platform],
+                  status: "active",
+                };
+              });
+
+              const updatedCampaign = {
+                ...c,
+                platform_data: updatedPlatformData,
+              };
+
+              const persistedStatus =
+                getPersistedCampaignStatus(updatedCampaign);
+
+              onStatusChange(c.id, persistedStatus, updatedPlatformData);
+
+              toast.success("Campaign is Live now");
+            }
+
+            setShowResumeModal(false);
           }}
         />
       )}

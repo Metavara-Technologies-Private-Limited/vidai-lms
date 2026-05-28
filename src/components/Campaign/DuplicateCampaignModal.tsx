@@ -16,6 +16,7 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import dayjs, { Dayjs } from "dayjs";
+import { toast } from "react-toastify";
 import viewIcon from "./Icons/view.png";
 import instagramIcon from "./Icons/instagram.png";
 import facebookIcon from "./Icons/facebook.png";
@@ -29,9 +30,13 @@ import {
 } from "../../constants/campaigns.constants";
 import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Campaign/EmailCampaignModal.css";
-import "../../styles/Campaign/SocialCampaignModal.css"; 
+import "../../styles/Campaign/SocialCampaignModal.css";
 import EmailTemplateModal from "../../components/Campaign/EmailTemplateModal";
-interface DuplicateCampaignModalProps { 
+import {
+  canTypeCampaignName,
+  getCampaignNameValidationError,
+} from "./campaignNameValidation";
+interface DuplicateCampaignModalProps {
   campaign: any;
   onClose: () => void;
   onSave: (updatedCampaign: any) => void;
@@ -47,14 +52,12 @@ export default function DuplicateCampaignModal({
 
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
-//   const [fullCampaignData, setFullCampaignData] = useState<any>(null);
+  //   const [fullCampaignData, setFullCampaignData] = useState<any>(null);
 
-  const [campaignName, setCampaignName] = useState(
-  campaign.name + " (Copy)"
-);
+  const [campaignName, setCampaignName] = useState(`${campaign.name}_Copy`);
   const [campaignDescription, setCampaignDescription] = useState(
-  campaign.campaign_description || "",
-);
+    campaign.campaign_description || "",
+  );
   const [objective, setObjective] = useState(campaign.objective || "");
   const [audience, setAudience] = useState(campaign.audience || "");
   const [startDate, setStartDate] = useState(campaign.start);
@@ -65,7 +68,7 @@ export default function DuplicateCampaignModal({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
 
- const [accounts, setAccounts] = useState<Platform[]>(
+  const [accounts, setAccounts] = useState<Platform[]>(
     campaign.platforms || [],
   );
   const [mode, setMode] = useState<"organic" | "paid" | "">("");
@@ -75,10 +78,12 @@ export default function DuplicateCampaignModal({
       ? dayjs(campaign.scheduledAt).format("YYYY-MM-DD")
       : "",
   );
-  const [scheduleRange, setScheduleRange] = useState<[Dayjs | null, Dayjs | null]>([
-  campaign.scheduledAt ? dayjs(campaign.scheduledAt) : null,
-  campaign.scheduledAt ? dayjs(campaign.scheduledAt) : null,
-]);
+  const [scheduleRange, setScheduleRange] = useState<
+    [Dayjs | null, Dayjs | null]
+  >([
+    campaign.scheduledAt ? dayjs(campaign.scheduledAt) : null,
+    campaign.scheduledAt ? dayjs(campaign.scheduledAt) : null,
+  ]);
   const [scheduleTime, setScheduleTime] = useState(
     campaign.scheduledAt ? dayjs(campaign.scheduledAt).format("HH:mm") : "",
   );
@@ -93,7 +98,7 @@ export default function DuplicateCampaignModal({
     );
   };
 
-useEffect(() => {
+  useEffect(() => {
     const fetchCampaign = async () => {
       try {
         const response = await CampaignAPI.get(campaign.id);
@@ -113,16 +118,22 @@ useEffect(() => {
         }
 
         // Social account selection
-        const selectedPlatforms: Platform[] = Array.isArray(data.select_ad_accounts)
+        const selectedPlatforms: Platform[] = Array.isArray(
+          data.select_ad_accounts,
+        )
           ? (data.select_ad_accounts.filter(Boolean) as Platform[])
-          : (data.social_media?.map((sm: any) => sm.platform_name).filter(Boolean) as Platform[]) ?? [];
+          : ((data.social_media
+              ?.map((sm: any) => sm.platform_name)
+              .filter(Boolean) as Platform[]) ?? []);
 
         const fallbackPlatforms = campaign.platforms || [];
-        const derivedAccounts = selectedPlatforms.length > 0 ? selectedPlatforms : fallbackPlatforms;
+        const derivedAccounts =
+          selectedPlatforms.length > 0 ? selectedPlatforms : fallbackPlatforms;
 
         setAccounts(
           derivedAccounts.filter(
-            (platform: Platform) => platform !== "google_ads" || isGoogleAdsConnected,
+            (platform: Platform) =>
+              platform !== "google_ads" || isGoogleAdsConnected,
           ),
         );
 
@@ -149,12 +160,22 @@ useEffect(() => {
       : accounts.length > 0 && mode;
 
   const step3Valid =
-  campaign.type === "email"
-    ? scheduleRange[0] && scheduleRange[1] && scheduleTime
-    : scheduleDate && scheduleTime;
+    campaign.type === "email"
+      ? scheduleRange[0] && scheduleRange[1] && scheduleTime
+      : scheduleDate && scheduleTime;
 
   const handleNext = () => {
     setSubmitted(true);
+    if (step === 1) {
+      const campaignNameError = getCampaignNameValidationError(campaignName);
+      if (campaignNameError) {
+        toast.error(campaignNameError, {
+          toastId: "duplicate-campaign-name-error",
+        });
+        return;
+      }
+    }
+
     if (step === 1 && step1Valid) {
       setStep(2);
       setSubmitted(false);
@@ -245,10 +266,18 @@ useEffect(() => {
           end_date: endDate,
           campaign_mode:
             mode === "paid"
-              ? (["paid_advertising"] as ("organic_posting" | "paid_advertising")[])
-              : (["organic_posting"] as ("organic_posting" | "paid_advertising")[]),
+              ? (["paid_advertising"] as (
+                  | "organic_posting"
+                  | "paid_advertising"
+                )[])
+              : (["organic_posting"] as (
+                  | "organic_posting"
+                  | "paid_advertising"
+                )[]),
           campaign_content:
-            campaign.campaign_content || filteredPlatformData.google_ads || campaignName,
+            campaign.campaign_content ||
+            filteredPlatformData.google_ads ||
+            campaignName,
           select_ad_accounts: selectedAccounts,
           platform_data: filteredPlatformData,
           budget_data: {
@@ -268,709 +297,823 @@ useEffect(() => {
       }
       onClose();
     } catch (error: unknown) {
-      const axiosError = error as { response?: { data?: unknown; status?: number } };
+      const axiosError = error as {
+        response?: { data?: unknown; status?: number };
+      };
       console.error("Update error:", error);
-      console.error("Duplicate social create response:", axiosError.response?.status, axiosError.response?.data);
+      console.error(
+        "Duplicate social create response:",
+        axiosError.response?.status,
+        axiosError.response?.data,
+      );
     }
   };
 
   const audienceLabel =
-  audience === "all"
-    ? "All Subscribers"
-    : audience === "active"
-    ? "Active Users"
-    : "";
+    audience === "all"
+      ? "All Subscribers"
+      : audience === "active"
+        ? "Active Users"
+        : "";
 
   return (
     <>
-    <Modal open={true} onClose={onClose}>
-      <Box className="email-campaign-modal">
-        <div className="add-modal-header">
-          <Typography variant="h6">
-            Duplicate {campaign.type === "email" ? "Email" : "Social Media"} Campaign
-          </Typography>
-          <IconButton onClick={onClose} className="modal-close">
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </div>
-
-        <div className="modal-divider" />
-
-        {/* STEPPER */}
-        <div className="stepper">
-          <div
-            className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
-          >
-            <div className="circle">{step > 1 ? "✓" : "1"}</div>
-            <span>Campaign Details</span>
-          </div>
-          <div className="line" />
-          <div
-            className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}
-          >
-            <div className="circle">{step > 2 ? "✓" : "2"}</div>
-            <span>
-              {campaign.type === "email"
-                ? "Email Setup"
-                : "Content & Configuration"}
-            </span>
-          </div>
-          <div className="line" />
-          <div className={`step ${step === 3 ? "active" : ""}`}>
-            <div className="circle">3</div>
-            <span>
-              Schedule {campaign.type === "email" ? "Email" : "Campaign"}
-            </span>
-          </div>
-        </div>
-
-        {/* STEP 1 - COMMON */}
-        {step === 1 && (
-          <div className="step-content">
-            <Typography variant="h6" sx={{ mb: 3 }}>
-              Campaign Details
+      <Modal open={true} onClose={onClose}>
+        <Box className="email-campaign-modal">
+          <div className="add-modal-header">
+            <Typography variant="h6">
+              Duplicate {campaign.type === "email" ? "Email" : "Social Media"}{" "}
+              Campaign
             </Typography>
+            <IconButton onClick={onClose} className="modal-close">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </div>
 
+          <div className="modal-divider" />
+
+          {/* STEPPER */}
+          <div className="stepper">
             <div
-              className={`form-group ${submitted && !campaignName ? "error" : ""}`}
+              className={`step ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}
             >
-              <label>Campaign Name *</label>
-              <input
-                value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="e.g. New Product Launch"
-              />
+              <div className="circle">{step > 1 ? "✓" : "1"}</div>
+              <span>Campaign Details</span>
             </div>
-
+            <div className="line" />
             <div
-              className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}
+              className={`step ${step === 2 ? "active" : ""} ${step > 2 ? "completed" : ""}`}
             >
-              <label>Campaign Description *</label>
-              <input
-                value={campaignDescription}
-                onChange={(e) => setCampaignDescription(e.target.value)}
-                placeholder="Short description of campaign"
-              />
+              <div className="circle">{step > 2 ? "✓" : "2"}</div>
+              <span>
+                {campaign.type === "email"
+                  ? "Email Setup"
+                  : "Content & Configuration"}
+              </span>
             </div>
-
-            <div className="form-row">
-              <div
-                className={`form-group half ${submitted && !objective ? "error" : ""}`}
-              >
-                <label>Campaign Objective *</label>
-                <FormControl fullWidth>
-                  <Select
-                    value={objective}
-                    onChange={(e) => setObjective(e.target.value)}
-                    displayEmpty
-                  >
-                    <MenuItem value="">Select Objective</MenuItem>
-                    <MenuItem value="awareness">Awareness</MenuItem>
-                    <MenuItem value="leads">Lead Generation</MenuItem>
-                  </Select>
-                </FormControl>
-              </div>
-
-              <div
-                className={`form-group half ${submitted && !audience ? "error" : ""}`}
-              >
-                <label>Target Audience *</label>
-                <FormControl fullWidth>
-                  <Select
-                    value={audience}
-                    onChange={(e) => setAudience(e.target.value)}
-                    displayEmpty
-                  >
-                    <MenuItem value="">Select Audience</MenuItem>
-                    <MenuItem value="all">All Subscribers</MenuItem>
-                    <MenuItem value="active">Active Users</MenuItem>
-                  </Select>
-                </FormControl>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div
-                className={`form-group half ${submitted && !startDate ? "error" : ""}`}
-              >
-                <label>Start Date *</label>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker
-                    format="DD/MM/YYYY"
-                    value={startDate ? dayjs(startDate) : null}
-                    onChange={(v) => setStartDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")}
-                    slots={{ openPickerIcon: CalendarTodayIcon }}
-                  />
-                </LocalizationProvider>
-              </div>
-
-              <div
-                className={`form-group half ${submitted && !endDate ? "error" : ""}`}
-              >
-                <label>End Date *</label>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker
-                    format="DD/MM/YYYY"
-                    value={endDate ? dayjs(endDate) : null}
-                    onChange={(v) => setEndDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")}
-                    slots={{ openPickerIcon: CalendarTodayIcon }}
-                  />
-                </LocalizationProvider>
-              </div>
+            <div className="line" />
+            <div className={`step ${step === 3 ? "active" : ""}`}>
+              <div className="circle">3</div>
+              <span>
+                Schedule {campaign.type === "email" ? "Email" : "Campaign"}
+              </span>
             </div>
           </div>
-        )}
 
-        {/* STEP 2 - EMAIL */}
-        {step === 2 && campaign.type === "email" && (
-          <div className="step-content">
-            <h2>Email Setup</h2>
-
-            <div
-              className={`section-card ${submitted && !audience ? "error" : ""}`}
-            >
-              <h3>Select Audience</h3>
-              <p className="section-subtitle">
-                Choose which audience list to send this email to
-              </p>
+          {/* STEP 1 - COMMON */}
+          {step === 1 && (
+            <div className="step-content">
+              <Typography variant="h6" sx={{ mb: 3 }}>
+                Campaign Details
+              </Typography>
 
               <div
-                className={`form-group ${submitted && !audience ? "error" : ""}`}
+                className={`form-group ${submitted && !campaignName ? "error" : ""}`}
               >
-                <label>Audience List *</label>
-                <FormControl fullWidth>
-                  <Select
-                    value={audience}
-                    onChange={(e) => setAudience(e.target.value)}
-                    displayEmpty
-                  >
-                    <MenuItem value="">Select Audience List</MenuItem>
-                    <MenuItem value="all">All Subscribers</MenuItem>
-                    <MenuItem value="active">Active Users</MenuItem>
-                  </Select>
-                </FormControl>
+                <label>Campaign Name *</label>
+                <input
+                  value={campaignName}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    if (!canTypeCampaignName(nextValue)) {
+                      toast.error(
+                        "Alphanumeric and underscore are allowed",
+                        { toastId: "duplicate-campaign-name-typing" },
+                      );
+                      return;
+                    }
+                    setCampaignName(nextValue);
+                  }}
+                  placeholder="e.g. New Product Launch"
+                />
               </div>
-            </div>
 
-            <div
-  className={`section-card ${
-    submitted && (!subject || !emailBody) ? "error" : ""
-  }`}
->
-  <div className="email-content-header">
-    <div>
-      <h3>Email Content</h3>
-      <p className="section-subtitle">
-        Design your email with AI assistance
-      </p>
-    </div>
-
-    <div className="email-actions">
-      <button
-        className="outline-btn"
-        onClick={() => setPreviewOpen(!previewOpen)}
-      >
-        <img src={viewIcon} alt="View" width={20} height={20} />
-        Preview Email
-      </button>
-
-      <button className="light-btn" onClick={() => setTemplateOpen(true)}>
-        + Email Template
-      </button>
-    </div>
-  </div>
-
-  {/* ⭐ FLEX WRAPPER — THIS IS THE KEY */}
-  <div className="email-body-row">
-
-    {/* LEFT SIDE */}
-    <div className="email-left">
-
-      <div
-        className={`form-group ${submitted && !subject ? "error" : ""}`}
-      >
-        <label>Subject Line *</label>
-        <input
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          placeholder="New Product Launch"
-        />
-        <span className="ai-suggest">✨ AI Suggest</span>
-      </div>
-
-      <div
-        className={`form-group ${submitted && !emailBody ? "error" : ""}`}
-      >
-        <label>Email *</label>
-        <textarea
-          value={emailBody}
-          onChange={(e) => setEmailBody(e.target.value)}
-          placeholder="Enter email content"
-          rows={8}
-        />
-        <span className="ai-suggest">✨ AI Suggest</span>
-      </div>
-
-    </div>
-
-    {/* RIGHT SIDE PREVIEW */}
-    {previewOpen && (
-      <div className="email-preview">
-        <div className="preview-header">
-          <h3>Preview Email</h3>
-          <button onClick={() => setPreviewOpen(false)}>✕</button>
-        </div>
-
-        <div className="preview-body">
-          <p>
-            To: <span className="chip">{audienceLabel}</span>
-          </p>
-
-          <div className="preview-divider"></div>
-
-          <p className="preview-subject">
-            <span className="label">Subject:</span> {subject}
-          </p>
-
-          <div className="preview-divider"></div>
-
-          <div className="preview-email-content">
-            <p>{emailBody}</p>
-          </div>
-        </div>
-      </div>
-    )}
-
-  </div>
-</div>
-          </div>
-        )}
-
-        {/* STEP 2 - SOCIAL */}
-        {step === 2 && campaign.type === "social" && (
-          <div className="step-content">
-            <h2>Content & Configuration</h2>
-
-            {/* Ad Accounts */}
-            <div
-              className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
-            >
-              <h3>Select Ad Accounts</h3>
-              <p className="section-subtitle">
-                Select your social media ad accounts
-              </p>
-
-              <div className="account-row">
-                {([
-                  { id: "instagram" as Platform, label: "Instagram", icon: instagramIcon },
-                  { id: "facebook" as Platform, label: "Facebook", icon: facebookIcon },
-                  { id: "linkedin" as Platform, label: "LinkedIn", icon: linkedinIcon },
-                  { id: "google_ads" as Platform, label: "Google Ads", icon: googleAdsIcon },
-                ] as const).map((acc) => (
-                  <div
-                    key={acc.id}
-                    className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
-                    onClick={() => toggleAccount(acc.id)}
-                  >
-                    <div className="account-left">
-                      <img src={acc.icon} alt={acc.label} />
-                      <span>{acc.label}</span>
-                    </div>
-                    <div
-                      className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
-                    />
-                  </div>
-                ))}
+              <div
+                className={`form-group ${submitted && !campaignDescription ? "error" : ""}`}
+              >
+                <label>Campaign Description *</label>
+                <input
+                  value={campaignDescription}
+                  onChange={(e) => setCampaignDescription(e.target.value)}
+                  placeholder="Short description of campaign"
+                />
               </div>
-            </div>
 
-            {/* Campaign Mode */}
-            <div
-              className={`section-card ${submitted && !mode ? "error" : ""}`}
-            >
-              <h3>Campaign Mode</h3>
-              <p className="section-subtitle">
-                Choose a campaign mode to optimize your ad strategy
-              </p>
-
-              <div className="mode-row">
+              <div className="form-row">
                 <div
-                  className={`mode-card ${mode === "organic" ? "selected" : ""}`}
-                  onClick={() => setMode("organic")}
+                  className={`form-group half ${submitted && !objective ? "error" : ""}`}
                 >
-                  <div className="mode-left">
-                    <div
-                      className={`radio ${mode === "organic" ? "checked" : ""}`}
-                    />
-                    <div className="mode-text">
-                      <h4>Organic Posting</h4>
-                      <p>
-                        Post to your connected social accounts without ad spend.
-                      </p>
-                    </div>
-                  </div>
-                  <span className="badge">No Budget Required</span>
+                  <label>Campaign Objective *</label>
+                  <FormControl fullWidth>
+                    <Select
+                      value={objective}
+                      onChange={(e) => setObjective(e.target.value)}
+                      displayEmpty
+                    >
+                      <MenuItem value="">Select Objective</MenuItem>
+                      <MenuItem value="awareness">Awareness</MenuItem>
+                      <MenuItem value="leads">Lead Generation</MenuItem>
+                    </Select>
+                  </FormControl>
                 </div>
 
                 <div
-                  className={`mode-card ${mode === "paid" ? "selected" : ""}`}
-                  onClick={() => setMode("paid")}
+                  className={`form-group half ${submitted && !audience ? "error" : ""}`}
                 >
-                  <div className="mode-left">
-                    <div
-                      className={`radio ${mode === "paid" ? "checked" : ""}`}
-                    />
-                    <div className="mode-text">
-                      <h4>Paid Advertising</h4>
-                      <p>Boost your reach and engagement with targeted ads.</p>
-                    </div>
-                  </div>
-                  <span className="badge outlined">Budget Setup Required</span>
+                  <label>Target Audience *</label>
+                  <FormControl fullWidth>
+                    <Select
+                      value={audience}
+                      onChange={(e) => setAudience(e.target.value)}
+                      displayEmpty
+                    >
+                      <MenuItem value="">Select Audience</MenuItem>
+                      <MenuItem value="all">All Subscribers</MenuItem>
+                      <MenuItem value="active">Active Users</MenuItem>
+                    </Select>
+                  </FormControl>
                 </div>
               </div>
-            </div>
 
-            {/* Campaign Content */}
-            {mode && (
-              <div className="section-card">
-                <h2>Campaign Content</h2>
-                <p className="section-subtitle">
-                  Create your post content with AI assistance
-                </p>
-
-                <div className="content-row">
-                  <img src={instagramIcon} alt="Instagram" />
-                  <textarea
-                    placeholder="What would you like to share on Instagram?"
-                    disabled={!accounts.includes("instagram")}
-                    style={{
-                      opacity: accounts.includes("instagram") ? 1 : 0.5,
-                      cursor: accounts.includes("instagram")
-                        ? "text"
-                        : "not-allowed",
-                    }}
-                  />
-                </div>
-
-                <div className="content-row">
-                  <img src={facebookIcon} alt="Facebook" />
-                  <input
-                    placeholder="What would you like to share on Facebook?"
-                    disabled={!accounts.includes("facebook")}
-                    style={{
-                      opacity: accounts.includes("facebook") ? 1 : 0.5,
-                      cursor: accounts.includes("facebook")
-                        ? "text"
-                        : "not-allowed",
-                    }}
-                  />
-                </div>
-
-                <div className="content-row">
-                  <img src={linkedinIcon} alt="LinkedIn" />
-                  <input
-                    placeholder="What would you like to share on LinkedIn?"
-                    disabled={!accounts.includes("linkedin")}
-                    style={{
-                      opacity: accounts.includes("linkedin") ? 1 : 0.5,
-                      cursor: accounts.includes("linkedin")
-                        ? "text"
-                        : "not-allowed",
-                    }}
-                  />
-                </div>
-
-                <div className="content-row">
-                  <img src={googleAdsIcon} alt="Google Ads" />
-                  <input
-                    placeholder="What would you like to share on Google Ads?"
-                    disabled={!accounts.includes("google_ads")}
-                    style={{
-                      opacity: accounts.includes("google_ads") ? 1 : 0.5,
-                      cursor: accounts.includes("google_ads")
-                        ? "text"
-                        : "not-allowed",
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* STEP 3 - EMAIL */}
-        {step === 3 && campaign.type === "email" && (
-          <div className="step-content">
-            <Typography variant="h6" sx={{ mb: 3 }}>
-              Schedule Email
-            </Typography>
-
-            <div className="section-card">
-              <div className="schedule-header">
-                <div className="schedule-title">
-                  <h3>Schedule</h3>
-                  <p className="section-subtitle">Select date and time to send the email</p>
-                </div>
-                <button className="ai-btn">✨ AI-Optimization Timing</button>
-              </div>
-
-              <div className="schedule-row">
-                <div className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}>
-                  <label>Select Date</label>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <div style={{ display: "flex", gap: "12px" }}>
-                      <DatePicker
-                        label="From"
-                        value={scheduleRange[0]}
-                        minDate={dayjs()}
-                        maxDate={scheduleRange[1] ?? (endDate ? dayjs(endDate) : undefined)}
-                        onChange={(v) => setScheduleRange([v ? dayjs(v) : null, scheduleRange[1]])}
-                        slotProps={{ textField: { fullWidth: true } }}
-                      />
-                      <DatePicker
-                        label="To"
-                        value={scheduleRange[1]}
-                        minDate={scheduleRange[0] ?? dayjs()}
-                        maxDate={endDate ? dayjs(endDate) : undefined}
-                        onChange={(v) => setScheduleRange([scheduleRange[0], v ? dayjs(v) : null])}
-                        slotProps={{ textField: { fullWidth: true } }}
-                      />
-                    </div>
-                  </LocalizationProvider>
-                </div>
-
-                <div className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}>
-                  <label>Enter Time</label>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <TimePicker
-                      format="hh:mm A"
-                      value={scheduleTime ? dayjs(`2024-01-01 ${scheduleTime}`) : null}
-                      onChange={(v) => { if (v) setScheduleTime((v as Dayjs).format("HH:mm")); }}
-                      ampm
-                      minTime={scheduleRange[0] && scheduleRange[0].isSame(dayjs(), "day") ? dayjs() : undefined}
-                      slotProps={{ textField: { fullWidth: true } }}
-                    />
-                  </LocalizationProvider>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3 - SOCIAL */}
-        {step === 3 && campaign.type === "social" && (
-          <div className="step-content">
-            <h3>Schedule Campaign</h3>
-            <div className="section-card">
-              <div className="schedule-header">
-                <div>
-                  <h3>
-                    {mode === "paid"
-                      ? "Schedule & Budget Allocation"
-                      : "Schedule"}
-                  </h3>
-                  <p className="section-subtitle">
-                    {mode === "paid"
-                      ? "Establish your schedule and budget for every platform."
-                      : "Select a date and time for the campaign."}
-                  </p>
-                </div>
-                <button className="ai-btn">✨ AI-Optimization Timing</button>
-              </div>
-
-              <div className="schedule-row">
-                <div className="form-group half">
-                  <label>Select Date</label>
+              <div className="form-row">
+                <div
+                  className={`form-group half ${submitted && !startDate ? "error" : ""}`}
+                >
+                  <label>Start Date *</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
                       format="DD/MM/YYYY"
-                      value={scheduleDate ? dayjs(scheduleDate) : null}
-                     onChange={(v) =>
-                      setScheduleDate(v ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD") : "")
-                    }
+                      value={startDate ? dayjs(startDate) : null}
+                      onChange={(v) =>
+                        setStartDate(
+                          v
+                            ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD")
+                            : "",
+                        )
+                      }
                       slots={{ openPickerIcon: CalendarTodayIcon }}
                     />
                   </LocalizationProvider>
                 </div>
 
-                <div className="form-group half">
-                  <label>Enter Time</label>
+                <div
+                  className={`form-group half ${submitted && !endDate ? "error" : ""}`}
+                >
+                  <label>End Date *</label>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <TimePicker
-                      format="hh:mm A"
-                      value={
-                        scheduleTime
-                          ? dayjs(`2024-01-01 ${scheduleTime}`)
-                          : null
+                    <DatePicker
+                      format="DD/MM/YYYY"
+                      value={endDate ? dayjs(endDate) : null}
+                      onChange={(v) =>
+                        setEndDate(
+                          v
+                            ? (v as import("dayjs").Dayjs).format("YYYY-MM-DD")
+                            : "",
+                        )
                       }
-                      onChange={(v) => {
-                        if (v) setScheduleTime((v as import("dayjs").Dayjs).format("HH:mm"));
-                      }}
-                      ampm
+                      slots={{ openPickerIcon: CalendarTodayIcon }}
                     />
                   </LocalizationProvider>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Budget Section */}
-              {mode === "paid" && (
-                <>
-                  <div className="budget-divider" />
-                  <div className="budget-section">
-                    <h3>Budget Allocation</h3>
-                    <div className="budget-row">
-                      {accounts.includes("instagram") && (
-                        <div className="budget-card">
-                          <div className="budget-title">
-                            <img
-                              src={instagramIcon}
-                              alt="Instagram"
-                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
-                            />
-                            <span>Instagram (Estimate CPC : $3.5)</span>
-                          </div>
-                          <div className="budget-input-wrapper">
-                            <label>Enter Amount ($)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="10"
-                              value={instagramBudget}
-                              onChange={(e) =>
-                                setInstagramBudget(Number(e.target.value))
-                              }
-                              className="budget-input"
-                            />
-                          </div>
-                        </div>
-                      )}
+          {/* STEP 2 - EMAIL */}
+          {step === 2 && campaign.type === "email" && (
+            <div className="step-content">
+              <h2>Email Setup</h2>
 
-                      {accounts.includes("facebook") && (
-                        <div className="budget-card">
-                          <div className="budget-title">
-                            <img
-                              src={facebookIcon}
-                              alt="Facebook"
-                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
-                            />
-                            <span>Facebook (Estimate CPC : $2.5)</span>
-                          </div>
-                          <div className="budget-input-wrapper">
-                            <label>Enter Amount ($)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="10"
-                              value={facebookBudget}
-                              onChange={(e) =>
-                                setFacebookBudget(Number(e.target.value))
-                              }
-                              className="budget-input"
-                            />
-                          </div>
-                        </div>
-                      )}
+              <div
+                className={`section-card ${submitted && !audience ? "error" : ""}`}
+              >
+                <h3>Select Audience</h3>
+                <p className="section-subtitle">
+                  Choose which audience list to send this email to
+                </p>
 
-                      {accounts.includes("linkedin") && (
-                        <div className="budget-card">
-                          <div className="budget-title">
-                            <img
-                              src={linkedinIcon}
-                              alt="LinkedIn"
-                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
-                            />
-                            <span>LinkedIn (Estimate CPC : $1.5)</span>
-                          </div>
-                          <div className="budget-input-wrapper">
-                            <label>Enter Amount ($)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="10"
-                              value={linkedinBudget}
-                              onChange={(e) =>
-                                setLinkedinBudget(Number(e.target.value))
-                              }
-                              className="budget-input"
-                            />
-                          </div>
-                        </div>
-                      )}
+                <div
+                  className={`form-group ${submitted && !audience ? "error" : ""}`}
+                >
+                  <label>Audience List *</label>
+                  <FormControl fullWidth>
+                    <Select
+                      value={audience}
+                      onChange={(e) => setAudience(e.target.value)}
+                      displayEmpty
+                    >
+                      <MenuItem value="">Select Audience List</MenuItem>
+                      <MenuItem value="all">All Subscribers</MenuItem>
+                      <MenuItem value="active">Active Users</MenuItem>
+                    </Select>
+                  </FormControl>
+                </div>
+              </div>
 
-                      {accounts.includes("google_ads") && (
-                        <div className="budget-card">
-                          <div className="budget-title">
-                            <img
-                              src={googleAdsIcon}
-                              alt="Google Ads"
-                              style={{ width: "22px", height: "22px", objectFit: "contain" }}
-                            />
-                            <span>Google Ads (Estimate CPC : $2.0)</span>
-                          </div>
-                          <div className="budget-input-wrapper">
-                            <label>Enter Amount ($)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="10"
-                              value={googleAdsBudget}
-                              onChange={(e) =>
-                                setGoogleAdsBudget(Number(e.target.value))
-                              }
-                              className="budget-input"
-                            />
-                          </div>
-                        </div>
-                      )}
+              <div
+                className={`section-card ${
+                  submitted && (!subject || !emailBody) ? "error" : ""
+                }`}
+              >
+                <div className="email-content-header">
+                  <div>
+                    <h3>Email Content</h3>
+                    <p className="section-subtitle">
+                      Design your email with AI assistance
+                    </p>
+                  </div>
+
+                  <div className="email-actions">
+                    <button
+                      className="outline-btn"
+                      onClick={() => setPreviewOpen(!previewOpen)}
+                    >
+                      <img src={viewIcon} alt="View" width={20} height={20} />
+                      Preview Email
+                    </button>
+
+                    <button
+                      className="light-btn"
+                      onClick={() => setTemplateOpen(true)}
+                    >
+                      + Email Template
+                    </button>
+                  </div>
+                </div>
+
+                {/* ⭐ FLEX WRAPPER — THIS IS THE KEY */}
+                <div className="email-body-row">
+                  {/* LEFT SIDE */}
+                  <div className="email-left">
+                    <div
+                      className={`form-group ${submitted && !subject ? "error" : ""}`}
+                    >
+                      <label>Subject Line *</label>
+                      <input
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        placeholder="New Product Launch"
+                      />
+                      <span className="ai-suggest">✨ AI Suggest</span>
                     </div>
 
-                    <div className="total-budget">
-                      <div>
-                        <h4>
-                          Total Budget: $
-                          {(accounts.includes("instagram") ? instagramBudget : 0) +
-                            (accounts.includes("facebook") ? facebookBudget : 0) +
-                            (accounts.includes("linkedin") ? linkedinBudget : 0) +
-                            (accounts.includes("google_ads") ? googleAdsBudget : 0)}
-                        </h4>
+                    <div
+                      className={`form-group ${submitted && !emailBody ? "error" : ""}`}
+                    >
+                      <label>Email *</label>
+                      <textarea
+                        value={emailBody}
+                        onChange={(e) => setEmailBody(e.target.value)}
+                        placeholder="Enter email content"
+                        rows={8}
+                      />
+                      <span className="ai-suggest">✨ AI Suggest</span>
+                    </div>
+                  </div>
+
+                  {/* RIGHT SIDE PREVIEW */}
+                  {previewOpen && (
+                    <div className="email-preview">
+                      <div className="preview-header">
+                        <h3>Preview Email</h3>
+                        <button onClick={() => setPreviewOpen(false)}>✕</button>
+                      </div>
+
+                      <div className="preview-body">
                         <p>
-                          Ad spend is charged directly by each connected social
-                          media platform. We don't handle payments.
+                          To: <span className="chip">{audienceLabel}</span>
+                        </p>
+
+                        <div className="preview-divider"></div>
+
+                        <p className="preview-subject">
+                          <span className="label">Subject:</span> {subject}
+                        </p>
+
+                        <div className="preview-divider"></div>
+
+                        <div className="preview-email-content">
+                          <p>{emailBody}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2 - SOCIAL */}
+          {step === 2 && campaign.type === "social" && (
+            <div className="step-content">
+              <h2>Content & Configuration</h2>
+
+              {/* Ad Accounts */}
+              <div
+                className={`section-card ${submitted && accounts.length === 0 ? "error" : ""}`}
+              >
+                <h3>Select Ad Accounts</h3>
+                <p className="section-subtitle">
+                  Select your social media ad accounts
+                </p>
+
+                <div className="account-row">
+                  {(
+                    [
+                      {
+                        id: "instagram" as Platform,
+                        label: "Instagram",
+                        icon: instagramIcon,
+                      },
+                      {
+                        id: "facebook" as Platform,
+                        label: "Facebook",
+                        icon: facebookIcon,
+                      },
+                      {
+                        id: "linkedin" as Platform,
+                        label: "LinkedIn",
+                        icon: linkedinIcon,
+                      },
+                      {
+                        id: "google_ads" as Platform,
+                        label: "Google Ads",
+                        icon: googleAdsIcon,
+                      },
+                    ] as const
+                  ).map((acc) => (
+                    <div
+                      key={acc.id}
+                      className={`account-card ${accounts.includes(acc.id) ? "selected" : ""}`}
+                      onClick={() => toggleAccount(acc.id)}
+                    >
+                      <div className="account-left">
+                        <img src={acc.icon} alt={acc.label} />
+                        <span>{acc.label}</span>
+                      </div>
+                      <div
+                        className={`account-checkbox ${accounts.includes(acc.id) ? "checked" : ""}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Campaign Mode */}
+              <div
+                className={`section-card ${submitted && !mode ? "error" : ""}`}
+              >
+                <h3>Campaign Mode</h3>
+                <p className="section-subtitle">
+                  Choose a campaign mode to optimize your ad strategy
+                </p>
+
+                <div className="mode-row">
+                  <div
+                    className={`mode-card ${mode === "organic" ? "selected" : ""}`}
+                    onClick={() => setMode("organic")}
+                  >
+                    <div className="mode-left">
+                      <div
+                        className={`radio ${mode === "organic" ? "checked" : ""}`}
+                      />
+                      <div className="mode-text">
+                        <h4>Organic Posting</h4>
+                        <p>
+                          Post to your connected social accounts without ad
+                          spend.
                         </p>
                       </div>
                     </div>
+                    <span className="badge">No Budget Required</span>
                   </div>
-                </>
+
+                  <div
+                    className={`mode-card ${mode === "paid" ? "selected" : ""}`}
+                    onClick={() => setMode("paid")}
+                  >
+                    <div className="mode-left">
+                      <div
+                        className={`radio ${mode === "paid" ? "checked" : ""}`}
+                      />
+                      <div className="mode-text">
+                        <h4>Paid Advertising</h4>
+                        <p>
+                          Boost your reach and engagement with targeted ads.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="badge outlined">
+                      Budget Setup Required
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Campaign Content */}
+              {mode && (
+                <div className="section-card">
+                  <h2>Campaign Content</h2>
+                  <p className="section-subtitle">
+                    Create your post content with AI assistance
+                  </p>
+
+                  <div className="content-row">
+                    <img src={instagramIcon} alt="Instagram" />
+                    <textarea
+                      placeholder="What would you like to share on Instagram?"
+                      disabled={!accounts.includes("instagram")}
+                      style={{
+                        opacity: accounts.includes("instagram") ? 1 : 0.5,
+                        cursor: accounts.includes("instagram")
+                          ? "text"
+                          : "not-allowed",
+                      }}
+                    />
+                  </div>
+
+                  <div className="content-row">
+                    <img src={facebookIcon} alt="Facebook" />
+                    <input
+                      placeholder="What would you like to share on Facebook?"
+                      disabled={!accounts.includes("facebook")}
+                      style={{
+                        opacity: accounts.includes("facebook") ? 1 : 0.5,
+                        cursor: accounts.includes("facebook")
+                          ? "text"
+                          : "not-allowed",
+                      }}
+                    />
+                  </div>
+
+                  <div className="content-row">
+                    <img src={linkedinIcon} alt="LinkedIn" />
+                    <input
+                      placeholder="What would you like to share on LinkedIn?"
+                      disabled={!accounts.includes("linkedin")}
+                      style={{
+                        opacity: accounts.includes("linkedin") ? 1 : 0.5,
+                        cursor: accounts.includes("linkedin")
+                          ? "text"
+                          : "not-allowed",
+                      }}
+                    />
+                  </div>
+
+                  <div className="content-row">
+                    <img src={googleAdsIcon} alt="Google Ads" />
+                    <input
+                      placeholder="What would you like to share on Google Ads?"
+                      disabled={!accounts.includes("google_ads")}
+                      style={{
+                        opacity: accounts.includes("google_ads") ? 1 : 0.5,
+                        cursor: accounts.includes("google_ads")
+                          ? "text"
+                          : "not-allowed",
+                      }}
+                    />
+                  </div>
+                </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* FOOTER */}
-        <div className="modal-actions">
-          <button className="cancel-btn" onClick={onClose}>
-            Cancel
-          </button>
-          {step === 3 ? (
-            <button className="next-btn" onClick={handleSubmit}>
-            Submit Campaign
-            </button>
-          ) : (
-            <button className="next-btn" onClick={handleNext}>
-              Next
-            </button>
           )}
-        </div>
-      </Box>
-    </Modal>
-    <EmailTemplateModal
-  open={templateOpen}
-  onClose={() => setTemplateOpen(false)}
-  onSelect={(template: any) => {
-    setSubject(template.title);
-    setEmailBody(template.subtitle);
-  }}
-/>
-</>
+
+          {/* STEP 3 - EMAIL */}
+          {step === 3 && campaign.type === "email" && (
+            <div className="step-content">
+              <Typography variant="h6" sx={{ mb: 3 }}>
+                Schedule Email
+              </Typography>
+
+              <div className="section-card">
+                <div className="schedule-header">
+                  <div className="schedule-title">
+                    <h3>Schedule</h3>
+                    <p className="section-subtitle">
+                      Select date and time to send the email
+                    </p>
+                  </div>
+                  <button className="ai-btn">✨ AI-Optimization Timing</button>
+                </div>
+
+                <div className="schedule-row">
+                  <div
+                    className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}
+                  >
+                    <label>Select Date</label>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <div style={{ display: "flex", gap: "12px" }}>
+                        <DatePicker
+                          label="From"
+                          value={scheduleRange[0]}
+                          minDate={dayjs()}
+                          maxDate={
+                            scheduleRange[1] ??
+                            (endDate ? dayjs(endDate) : undefined)
+                          }
+                          onChange={(v) =>
+                            setScheduleRange([
+                              v ? dayjs(v) : null,
+                              scheduleRange[1],
+                            ])
+                          }
+                          slotProps={{ textField: { fullWidth: true } }}
+                        />
+                        <DatePicker
+                          label="To"
+                          value={scheduleRange[1]}
+                          minDate={scheduleRange[0] ?? dayjs()}
+                          maxDate={endDate ? dayjs(endDate) : undefined}
+                          onChange={(v) =>
+                            setScheduleRange([
+                              scheduleRange[0],
+                              v ? dayjs(v) : null,
+                            ])
+                          }
+                          slotProps={{ textField: { fullWidth: true } }}
+                        />
+                      </div>
+                    </LocalizationProvider>
+                  </div>
+
+                  <div
+                    className={`schedule-field ${submitted && !scheduleTime ? "error" : ""}`}
+                  >
+                    <label>Enter Time</label>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <TimePicker
+                        format="hh:mm A"
+                        value={
+                          scheduleTime
+                            ? dayjs(`2024-01-01 ${scheduleTime}`)
+                            : null
+                        }
+                        onChange={(v) => {
+                          if (v) setScheduleTime((v as Dayjs).format("HH:mm"));
+                        }}
+                        ampm
+                        minTime={
+                          scheduleRange[0] &&
+                          scheduleRange[0].isSame(dayjs(), "day")
+                            ? dayjs()
+                            : undefined
+                        }
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                    </LocalizationProvider>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 - SOCIAL */}
+          {step === 3 && campaign.type === "social" && (
+            <div className="step-content">
+              <h3>Schedule Campaign</h3>
+              <div className="section-card">
+                <div className="schedule-header">
+                  <div>
+                    <h3>
+                      {mode === "paid"
+                        ? "Schedule & Budget Allocation"
+                        : "Schedule"}
+                    </h3>
+                    <p className="section-subtitle">
+                      {mode === "paid"
+                        ? "Establish your schedule and budget for every platform."
+                        : "Select a date and time for the campaign."}
+                    </p>
+                  </div>
+                  <button className="ai-btn">✨ AI-Optimization Timing</button>
+                </div>
+
+                <div className="schedule-row">
+                  <div className="form-group half">
+                    <label>Select Date</label>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <DatePicker
+                        format="DD/MM/YYYY"
+                        value={scheduleDate ? dayjs(scheduleDate) : null}
+                        onChange={(v) =>
+                          setScheduleDate(
+                            v
+                              ? (v as import("dayjs").Dayjs).format(
+                                  "YYYY-MM-DD",
+                                )
+                              : "",
+                          )
+                        }
+                        slots={{ openPickerIcon: CalendarTodayIcon }}
+                      />
+                    </LocalizationProvider>
+                  </div>
+
+                  <div className="form-group half">
+                    <label>Enter Time</label>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <TimePicker
+                        format="hh:mm A"
+                        value={
+                          scheduleTime
+                            ? dayjs(`2024-01-01 ${scheduleTime}`)
+                            : null
+                        }
+                        onChange={(v) => {
+                          if (v)
+                            setScheduleTime(
+                              (v as import("dayjs").Dayjs).format("HH:mm"),
+                            );
+                        }}
+                        ampm
+                      />
+                    </LocalizationProvider>
+                  </div>
+                </div>
+
+                {/* Budget Section */}
+                {mode === "paid" && (
+                  <>
+                    <div className="budget-divider" />
+                    <div className="budget-section">
+                      <h3>Budget Allocation</h3>
+                      <div className="budget-row">
+                        {accounts.includes("instagram") && (
+                          <div className="budget-card">
+                            <div className="budget-title">
+                              <img
+                                src={instagramIcon}
+                                alt="Instagram"
+                                style={{
+                                  width: "22px",
+                                  height: "22px",
+                                  objectFit: "contain",
+                                }}
+                              />
+                              <span>Instagram (Estimate CPC : $3.5)</span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="10"
+                                value={instagramBudget}
+                                onChange={(e) =>
+                                  setInstagramBudget(Number(e.target.value))
+                                }
+                                className="budget-input"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {accounts.includes("facebook") && (
+                          <div className="budget-card">
+                            <div className="budget-title">
+                              <img
+                                src={facebookIcon}
+                                alt="Facebook"
+                                style={{
+                                  width: "22px",
+                                  height: "22px",
+                                  objectFit: "contain",
+                                }}
+                              />
+                              <span>Facebook (Estimate CPC : $2.5)</span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="10"
+                                value={facebookBudget}
+                                onChange={(e) =>
+                                  setFacebookBudget(Number(e.target.value))
+                                }
+                                className="budget-input"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {accounts.includes("linkedin") && (
+                          <div className="budget-card">
+                            <div className="budget-title">
+                              <img
+                                src={linkedinIcon}
+                                alt="LinkedIn"
+                                style={{
+                                  width: "22px",
+                                  height: "22px",
+                                  objectFit: "contain",
+                                }}
+                              />
+                              <span>LinkedIn (Estimate CPC : $1.5)</span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="10"
+                                value={linkedinBudget}
+                                onChange={(e) =>
+                                  setLinkedinBudget(Number(e.target.value))
+                                }
+                                className="budget-input"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {accounts.includes("google_ads") && (
+                          <div className="budget-card">
+                            <div className="budget-title">
+                              <img
+                                src={googleAdsIcon}
+                                alt="Google Ads"
+                                style={{
+                                  width: "22px",
+                                  height: "22px",
+                                  objectFit: "contain",
+                                }}
+                              />
+                              <span>Google Ads (Estimate CPC : $2.0)</span>
+                            </div>
+                            <div className="budget-input-wrapper">
+                              <label>Enter Amount ($)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="10"
+                                value={googleAdsBudget}
+                                onChange={(e) =>
+                                  setGoogleAdsBudget(Number(e.target.value))
+                                }
+                                className="budget-input"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="total-budget">
+                        <div>
+                          <h4>
+                            Total Budget: $
+                            {(accounts.includes("instagram")
+                              ? instagramBudget
+                              : 0) +
+                              (accounts.includes("facebook")
+                                ? facebookBudget
+                                : 0) +
+                              (accounts.includes("linkedin")
+                                ? linkedinBudget
+                                : 0) +
+                              (accounts.includes("google_ads")
+                                ? googleAdsBudget
+                                : 0)}
+                          </h4>
+                          <p>
+                            Ad spend is charged directly by each connected
+                            social media platform. We don't handle payments.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER */}
+          <div className="modal-actions">
+            <button className="cancel-btn" onClick={onClose}>
+              Cancel
+            </button>
+            {step === 3 ? (
+              <button className="next-btn" onClick={handleSubmit}>
+                Submit Campaign
+              </button>
+            ) : (
+              <button className="next-btn" onClick={handleNext}>
+                Next
+              </button>
+            )}
+          </div>
+        </Box>
+      </Modal>
+      <EmailTemplateModal
+        open={templateOpen}
+        onClose={() => setTemplateOpen(false)}
+        onSelect={(template: any) => {
+          setSubject(template.title);
+          setEmailBody(template.subtitle);
+        }}
+      />
+    </>
   );
 }

@@ -83,9 +83,27 @@ const rowCanView = (value: unknown): boolean => {
   return isTrueFlag(row.can_view) || isTrueFlag(row.canView);
 };
 
+const valueContainsViewGrant = (value: unknown): boolean => {
+  if (!value) return false;
+
+  if (Array.isArray(value)) {
+    return value.some((row) => rowCanView(row));
+  }
+
+  if (typeof value !== "object") {
+    return false;
+  }
+
+  if (rowCanView(value)) {
+    return true;
+  }
+
+  const rec = value as Record<string, unknown>;
+  return Object.values(rec).some((child) => valueContainsViewGrant(child));
+};
+
 const rowsContainView = (value: unknown): boolean => {
-  if (!Array.isArray(value)) return false;
-  return value.some((row) => rowCanView(row));
+  return valueContainsViewGrant(value);
 };
 
 const collectPermissionState = (user: UserLike): PermissionState => {
@@ -169,6 +187,19 @@ const collectPermissionState = (user: UserLike): PermissionState => {
           const subcategory = rec.subcategory ?? rec.subcategory_key;
           addLabel(subcategory);
         }
+      } else if (subVal && typeof subVal === "object") {
+        // Support map shape: settings -> { user: {can_view: true, ...}, ... }
+        for (const [subKey, subPerm] of Object.entries(
+          subVal as Record<string, unknown>,
+        )) {
+          if (subKey === "_" || subKey === "can_view" || subKey === "can_add" || subKey === "can_edit" || subKey === "can_print") {
+            continue;
+          }
+
+          if (valueContainsViewGrant(subPerm)) {
+            addLabel(subKey);
+          }
+        }
       }
     }
   }
@@ -176,7 +207,11 @@ const collectPermissionState = (user: UserLike): PermissionState => {
   return { labels, hasPermissionContainer, hasPermissionPayload };
 };
 
-const hasMenuPermission = (user: UserLike, key: string): boolean | null => {
+const hasMenuPermission = (
+  user: UserLike,
+  key: string,
+  role: KnownRole,
+): boolean | null => {
   const { labels, hasPermissionContainer, hasPermissionPayload } =
     collectPermissionState(user);
   if (!hasPermissionContainer) return null;
@@ -202,13 +237,17 @@ const hasMenuPermission = (user: UserLike, key: string): boolean | null => {
   }
 
   if (key === "settings") {
-    const settingsRelated = [
+    const settingsRelatedForUser = [
       "settings",
       "integration",
       "tickets",
       "templates",
-      "user",
     ];
+    const settingsRelatedForAdmin = [...settingsRelatedForUser, "user"];
+
+    const settingsRelated =
+      role === "user" ? settingsRelatedForUser : settingsRelatedForAdmin;
+
     return settingsRelated.some((label) => labels.has(label));
   }
 
@@ -357,7 +396,7 @@ export const canAccessMenuKey = (
   // Explicit super admin should never be blocked by label mismatches.
   if (role === "super_admin") return true;
 
-  const permissionResult = hasMenuPermission(user, key);
+  const permissionResult = hasMenuPermission(user, key, role);
   if (permissionResult !== null) return permissionResult;
 
   if (role === "unknown") {
@@ -369,8 +408,8 @@ export const canAccessMenuKey = (
     return true;
   }
 
-  // user role: only reports + settings
-  return key === "reports" || key === "settings";
+  // user role: settings only when no explicit permission payload is present.
+  return key === "settings";
 };
 
 export const canAccessSubMenuKey = (
@@ -382,14 +421,19 @@ export const canAccessSubMenuKey = (
   // Explicit super admin should always see all settings subtabs.
   if (role === "super_admin") return true;
 
+  // Settings > User is role-gated: only admin/super_admin can access it.
+  // This must override permission payloads that may include view rights.
+  if (parentKey === "settings" && subKey === "users") {
+    return role === "admin";
+  }
+
   const permissionResult = hasSubMenuPermission(user, subKey);
   if (permissionResult !== null) return permissionResult;
 
   if (role === "unknown") return false;
 
   if (role === "admin") {
-    // Admin should not see User tab under Settings
-    return !(parentKey === "settings" && subKey === "users");
+    return true;
   }
 
   // user role: only tickets and templates under settings
@@ -399,7 +443,7 @@ export const canAccessSubMenuKey = (
 
 export const defaultPathForRole = (role: KnownRole): string => {
   if (role === "unknown") return "/dashboard";
-  if (role === "user") return "/reports";
+  if (role === "user") return "/settings";
   return "/dashboard";
 };
 
@@ -409,11 +453,8 @@ export const defaultPathForUser = (
 ): string => {
   const orderedKeys = [
     "dashboard",
-    "reports",
     "leads",
     "referrals",
-    "campaigns",
-    "reputation",
     "pipeline",
     "settings",
   ];
@@ -421,11 +462,8 @@ export const defaultPathForUser = (
   for (const key of orderedKeys) {
     if (canAccessMenuKey(role, key, user)) {
       if (key === "dashboard") return "/dashboard";
-      if (key === "reports") return "/reports";
       if (key === "leads") return "/leads";
       if (key === "referrals") return "/referrals";
-      if (key === "campaigns") return "/campaigns";
-      if (key === "reputation") return "/reputation";
       if (key === "pipeline") return "/pipeline";
       if (key === "settings") return "/settings";
     }
@@ -489,12 +527,38 @@ export const hasSubcategoryActionPermission = (
   };
 
   const rowsAllowAction = (value: unknown, fallbackLabel?: string): boolean => {
-    if (!Array.isArray(value)) return false;
-    return value.some((row) => {
-      if (!row || typeof row !== "object") return false;
-      const rec = row as Record<string, unknown>;
-      return rowMatchesSubcategory(rec, fallbackLabel) && hasActionFlag(rec, action);
-    });
+    if (!value) return false;
+
+    if (Array.isArray(value)) {
+      return value.some((row) => rowsAllowAction(row, fallbackLabel));
+    }
+
+    if (typeof value !== "object") return false;
+
+    const rec = value as Record<string, unknown>;
+    if (rowMatchesSubcategory(rec, fallbackLabel) && hasActionFlag(rec, action)) {
+      return true;
+    }
+
+    // Support nested map payloads like:
+    // permissions[module][category][subcategory] = { can_view, can_add, ... }
+    for (const [childKey, childValue] of Object.entries(rec)) {
+      if (
+        childKey === "can_view" ||
+        childKey === "can_add" ||
+        childKey === "can_edit" ||
+        childKey === "can_print"
+      ) {
+        continue;
+      }
+
+      const nextFallback = childKey === "_" ? fallbackLabel : childKey;
+      if (rowsAllowAction(childValue, nextFallback)) {
+        return true;
+      }
+    }
+
+    return false;
   };
 
   for (const [moduleKey, moduleValue] of Object.entries(root)) {

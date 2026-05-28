@@ -27,7 +27,7 @@ export const STAGE_TYPE_SEQUENCE: PipelineStageType[] = [
 	"closure",
 ];
 
-const NAME_PATTERN = /^[A-Za-z ]+$/;
+const NAME_PATTERN = /^[A-Za-z0-9 \-&.()/]+$/;
 
 export const normalizeNameForCompare = (value: string): string =>
 	value.trim().replace(/\s+/g, " ").toLowerCase();

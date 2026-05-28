@@ -34,14 +34,15 @@ import type { Employee } from "../../../services/leads.api";
 import { toast } from "react-toastify";
 import TicketPropertiesSidebar from "../Menus/TicketPropertiesSidebar";
 import { selectClinic } from "../../../store/clinicSlice";
+import { selectUsers } from "../../../store/userSlice";
 import { useSelector } from "react-redux";
 import { selectUser } from "../../../store/authSlice";
 import {
   resolveUserRole,
   hasSubcategoryActionPermission,
 } from "../../../utils/roleAccess";
-
-const FILE_BASE_URL = "http://127.0.0.1:8000";
+import { toSafePhotoUrl } from "../../../utils/mediaUrl";
+import { usersApi } from "../../../services/users.api";
 
 const ticketTypes = [
   "Question",
@@ -120,22 +121,22 @@ const extractClinicEmails = (clinicData: unknown): string[] => {
   return uniqueEmails([...directCandidates, ...nestedEmails]);
 };
 
-const extractEmployeeEmail = (employeeData: unknown): string => {
-  const record = asRecord(employeeData);
-  const userRecord = asRecord(record.user);
+// const extractEmployeeEmail = (employeeData: unknown): string => {
+//   const record = asRecord(employeeData);
+//   const userRecord = asRecord(record.user);
 
-  const candidates = [
-    getString(record.email),
-    getString(record.emp_email),
-    getString(record.user_email),
-    getString(record.official_email),
-    getString(userRecord.email),
-    getString(userRecord.username),
-  ];
+//   // Prioritize actual email fields, excluding username which may not be a valid email
+//   const candidates = [
+//     getString(record.email),
+//     getString(record.emp_email),
+//     getString(record.user_email),
+//     getString(record.official_email),
+//     getString(userRecord.email),
+//   ];
 
-  const firstValid = candidates.find((mail) => mail && isEmail(mail));
-  return firstValid || "";
-};
+//   const firstValid = candidates.find((mail) => mail && isEmail(mail));
+//   return firstValid || "";
+// };
 
 const resolveClinicId = (ticketData: unknown): string => {
   const ticketRecord = asRecord(ticketData);
@@ -149,6 +150,28 @@ const resolveClinicId = (ticketData: unknown): string => {
   if (fromTicket) return fromTicket;
 
   return "1";
+};
+
+const findEmailByUserName = (
+  userName: string,
+  availableUsers: {
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    email?: string;
+  }[],
+): string => {
+  const normalizedName = userName.trim().toLowerCase();
+  const match = availableUsers.find((user) => {
+    const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+    return [
+      fullName.toLowerCase(),
+      user.username?.trim().toLowerCase() ?? "",
+      user.email?.trim().toLowerCase() ?? "",
+    ].includes(normalizedName);
+  });
+
+  return match?.email?.trim() || "";
 };
 
 const extractApiErrorMessage = (data: unknown): string | null => {
@@ -180,6 +203,7 @@ const TicketView = () => {
   const navigate = useNavigate();
   const clinic = useSelector(selectClinic);
   const authUser = useSelector(selectUser);
+  const users = useSelector(selectUsers);
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [leads, setLeads] = useState<Array<{ id: string; email?: string }>>([]);
@@ -204,6 +228,10 @@ const TicketView = () => {
   const [replyTo, setReplyTo] = useState<string[]>([]);
   const [replyCc, setReplyCc] = useState<string[]>([]);
   const [replyBcc, setReplyBcc] = useState<string[]>([]);
+  const [replyAttachmentIds, setReplyAttachmentIds] = useState<string[]>([]);
+  const [replyAttachments, setReplyAttachments] = useState<
+    Array<{ id: string; name: string; file: string }>
+  >([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [replySubject, setReplySubject] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -217,6 +245,7 @@ const TicketView = () => {
   const [viewTemplateOpen, setViewTemplateOpen] = useState(false);
   const [viewTemplateData, setViewTemplateData] =
     useState<EmailTemplate | null>(null);
+  const previousTicketIdRef = useRef<string | null>(null);
 
   const role = resolveUserRole(authUser as Record<string, unknown> | null);
   const isSuperAdmin = role === "super_admin";
@@ -231,20 +260,20 @@ const TicketView = () => {
     isSuperAdmin ||
     hasSubcategoryActionPermission(permissions, "tickets", "edit");
 
-  type TicketEmployeeApi = {
-    id: number;
-    emp_name: string;
-    emp_type: string;
-    department_name?: string;
-    email?: string;
-    emp_email?: string;
-    user_email?: string;
-    official_email?: string;
-    user?: {
-      email?: string;
-      username?: string;
-    };
-  };
+  // type TicketEmployeeApi = {
+  //   id: number;
+  //   emp_name: string;
+  //   emp_type: string;
+  //   department_name?: string;
+  //   email?: string;
+  //   emp_email?: string;
+  //   user_email?: string;
+  //   official_email?: string;
+  //   user?: {
+  //     email?: string;
+  //     username?: string;
+  //   };
+  // };
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -253,37 +282,34 @@ const TicketView = () => {
       const ticketData = await ticketsApi.getTicketById(id);
       const clinicId = resolveClinicId(ticketData);
 
-      const [empData, leadsData] = await Promise.all([
-        clinicsApi.getClinicEmployees(clinicId),
+      const [usersData, leadsData] = await Promise.all([
+        usersApi.list(),
         clinic?.id ? LeadAPI.list(clinic?.id) : Promise.resolve([]),
       ]);
 
       setTicket(ticketData);
       setLeads(Array.isArray(leadsData) ? leadsData : []);
 
+      const loggedInUserEmail = authUser?.email?.trim() || "";
+
       try {
         const clinicData = await clinicsApi.getClinicDetail(clinicId);
         const clinicEmails = extractClinicEmails(clinicData);
 
-        setReplyFrom((prev) => {
-          const prevNormalized = prev.trim().toLowerCase();
-          if (prevNormalized && clinicEmails.includes(prevNormalized))
-            return prev;
-          return clinicEmails[0] || "";
-        });
+        setReplyFrom(
+          isEmail(loggedInUserEmail) ? loggedInUserEmail : clinicEmails[0] || "",
+        );
       } catch {
-        setReplyFrom("");
+        setReplyFrom(isEmail(loggedInUserEmail) ? loggedInUserEmail : "");
       }
 
       // ✅ Normalize employee type
-      const normalizedEmployees: Employee[] = (
-        empData as TicketEmployeeApi[]
-      ).map((emp) => ({
-        id: emp.id,
-        emp_name: emp.emp_name,
-        emp_type: emp.emp_type,
-        department_name: emp.department_name ?? "",
-        email: extractEmployeeEmail(emp),
+      const normalizedEmployees: Employee[] = usersData.map((user) => ({
+        id: user.id,
+        emp_name: `${user.firstName} ${user.lastName}`.trim() || user.username,
+        emp_type: user.role || "",
+        department_name: "",
+        email: user.email || "",
       }));
 
       setEmployees(normalizedEmployees);
@@ -309,7 +335,7 @@ const TicketView = () => {
     } finally {
       setLoading(false);
     }
-  }, [clinic?.id, id]);
+  }, [authUser?.email, clinic?.id, id]);
 
   useEffect(() => {
     loadData();
@@ -359,17 +385,25 @@ const TicketView = () => {
   }, [ticket]);
 
   useEffect(() => {
+    if (!ticket?.id || previousTicketIdRef.current === ticket.id) return;
+
+    previousTicketIdRef.current = ticket.id;
     setReplyTo([]);
     setReplyCc([]);
     setReplyBcc([]);
-  }, [ticket]);
+    setReplyAttachmentIds([]);
+    setReplyAttachments([]);
+  }, [ticket?.id]);
 
   //  File Preview Handlers
   const handlePreviewOpen = (file: string) => {
-    const fullUrl = file.startsWith("http") ? file : `${FILE_BASE_URL}${file}`;
+    const fileUrl = toSafePhotoUrl(file);
+    if (!fileUrl) {
+      toast.warn("Document link is not available.");
+      return;
+    }
 
-    setPreviewFile(fullUrl);
-    setPreviewOpen(true);
+    window.open(fileUrl, "_blank", "noopener,noreferrer");
   };
 
   const handlePreviewClose = () => {
@@ -395,6 +429,31 @@ const TicketView = () => {
     setError(null);
 
     try {
+      const selectedAssigneeEmail =
+        assigneeEmail?.trim() ||
+        employees.find((emp) => emp.id === assignTo)?.email?.trim() ||
+        "";
+      const requestedByEmail = isEmail(ticket.requested_by?.trim())
+        ? ticket.requested_by.trim()
+        : authUser?.email?.trim() ||
+          findEmailByUserName(ticket.requested_by || "", users);
+
+      if (assignTo !== "" && !isEmail(selectedAssigneeEmail)) {
+        toast.error(
+          "Assigned user's email is invalid. Please check assignee details.",
+        );
+        setUpdating(false);
+        return;
+      }
+
+      if (!isEmail(requestedByEmail)) {
+        toast.error(
+          "Requested by user's email is invalid. Please verify requester email.",
+        );
+        setUpdating(false);
+        return;
+      }
+
       let hasChanges = false;
 
       if (
@@ -403,6 +462,60 @@ const TicketView = () => {
         assignTo !== (ticket.assigned_to_id || "") ||
         type !== ticket.type
       ) {
+        const clinicName = clinic?.name || ticket.lab_name || "Clinic";
+        const changeLines: string[] = [];
+
+        if (status !== ticket.status) {
+          changeLines.push(
+            `- Status changed from ${ticket.status} → ${status}`,
+          );
+        }
+        if (priority !== ticket.priority) {
+          changeLines.push(
+            `- Priority changed from ${ticket.priority} → ${priority}`,
+          );
+        }
+        if (assignTo !== (ticket.assigned_to_id || "")) {
+          changeLines.push(
+            `<strong>- Assigned To changed from ${ticket.assigned_to_name || "Unassigned"} → ${draftAssigneeName || "Unassigned"}</strong>`,
+          );
+        }
+        if (type !== ticket.type) {
+          changeLines.push(
+            `- Type changed from ${ticket.type || "Unknown"} → ${type}`,
+          );
+        }
+
+        const currentStatusLines = [
+          "Current Status:",
+          `Status: ${status}`,
+          `Priority: ${priority}`,
+          `Assigned To: ${draftAssigneeName || ticket.assigned_to_name || "Unassigned"}`,
+        ];
+
+        const updateBodyLines = [
+          `Hi ${draftAssigneeName || ticket.assigned_to_name || "Team"},`,
+          "",
+          "<strong>The following ticket has been updated.</strong>",
+          "",
+          "Ticket Details:",
+          `Ticket ID: ${ticket.ticket_no || ticket.id}`,
+          `Subject: ${ticket.subject}`,
+          "",
+          "<strong>Description:</strong>",
+          getPlainTextFromHtml(description) || "No description provided.",
+          "",
+          "<strong>Updates:</strong>",
+          ...changeLines,
+          "",
+          ...currentStatusLines,
+          "",
+          "Please review the updates and proceed accordingly.",
+          "",
+          "Regards,",
+          `${clinicName} Support Team`,
+        ];
+
         await ticketsApi.updateTicketStatus(id, {
           status,
           priority,
@@ -411,6 +524,11 @@ const TicketView = () => {
             draftAssigneeName.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH) ||
             undefined,
           type,
+          event: "ticket_updated",
+          clinicName,
+          to: [selectedAssigneeEmail],
+          cc: [requestedByEmail],
+          email_body: updateBodyLines.join("\n"),
         });
 
         hasChanges = true;
@@ -447,8 +565,8 @@ const TicketView = () => {
       return;
     }
 
-    if (!replyMessage.trim()) {
-      toast.warn("Reply message cannot be empty.");
+    if (!replyMessage.trim() && replyAttachmentIds.length === 0) {
+      toast.warn("Reply message or attachment is required.");
       return;
     }
 
@@ -472,13 +590,42 @@ const TicketView = () => {
     const toastId = toast.loading("Sending reply...");
 
     try {
-      await ticketsApi.sendTicketReply(id, {
-        subject: replySubject || "Reply",
-        message: replyMessage,
-        to: replyTo,
-        cc: replyCc,
-        bcc: replyBcc,
-      });
+// 🔥 FILTER VALID EMAILS
+const validTo = (replyTo || []).filter(
+  (email) => email && email.includes("@")
+);
+
+const validCc = (replyCc || []).filter(
+  (email) => email && email.includes("@")
+);
+
+const validBcc = (replyBcc || []).filter(
+  (email) => email && email.includes("@")
+);
+
+// 🔥 FILTER VALID ATTACHMENTS (VERY IMPORTANT)
+const validAttachmentIds = (replyAttachmentIds || []).filter((attId) =>
+  ticket?.documents?.some((doc) => doc.id === attId)
+);
+
+// 🔥 EXTRA SAFETY
+if (validTo.length === 0) {
+  toast.warn("Please select at least one valid recipient.");
+  return;
+}
+
+await ticketsApi.sendTicketReply(id, {
+  subject: replySubject?.trim() || "Reply",
+  message: replyMessage?.trim() || "Message",
+
+  sender_email: replyFrom?.trim(),
+
+  to: validTo,
+  cc: validCc,
+  bcc: validBcc,
+
+  attachment_ids: validAttachmentIds, 
+});
 
       toast.update(toastId, {
         render: "Reply sent successfully!",
@@ -491,6 +638,8 @@ const TicketView = () => {
       setReplyTo([]);
       setReplyCc([]);
       setReplyBcc([]);
+      setReplyAttachmentIds([]);
+      setReplyAttachments([]);
       setOpenReply(false);
       setReplySubject("");
     } catch (err) {
@@ -514,6 +663,21 @@ const TicketView = () => {
             ),
           );
 
+          const selectedAttachments = (ticket?.documents ?? []).filter(
+            (doc) => Boolean(doc.id) && replyAttachmentIds.includes(doc.id as string),
+          );
+          const attachmentLines = selectedAttachments
+            .map((doc) => {
+              const fileName = doc.file?.split("/").pop() || "Attachment";
+              const fileUrl = toSafePhotoUrl(doc.file || "") || doc.file || "";
+              return fileUrl ? `- ${fileName}: ${fileUrl}` : `- ${fileName}`;
+            })
+            .filter(Boolean);
+          const fallbackBody =
+            attachmentLines.length > 0
+              ? `${replyMessage}\n\nAttachments:\n${attachmentLines.join("\n")}`
+              : replyMessage;
+
           const leadMatches = allRecipients
             .map((email) =>
               leads.find((lead) => lead.email?.trim().toLowerCase() === email),
@@ -532,7 +696,7 @@ const TicketView = () => {
                   LeadEmailAPI.sendNow({
                     lead: lead.id,
                     subject: replySubject || "Reply",
-                    email_body: replyMessage,
+                    email_body: fallbackBody,
                     sender_email: replyFrom || null,
                   }),
                 ),
@@ -549,6 +713,8 @@ const TicketView = () => {
               setReplyTo([]);
               setReplyCc([]);
               setReplyBcc([]);
+              setReplyAttachmentIds([]);
+              setReplyAttachments([]);
               setOpenReply(false);
               setReplySubject("");
               return;
@@ -580,6 +746,8 @@ const TicketView = () => {
     setReplyTo([]);
     setReplyCc([]);
     setReplyBcc([]);
+    setReplyAttachmentIds([]);
+    setReplyAttachments([]);
     setReplySubject("");
   };
 
@@ -591,18 +759,91 @@ const TicketView = () => {
     imageInputRef.current?.click();
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const addUploadedFileToReply = async (file: File) => {
+    if (!id) return;
 
-    setReplyMessage((prev) => prev + `\n📎 Attached: ${file.name}\n`);
+    const toastId = toast.loading("Uploading attachment...");
+
+    try {
+      const existingDocIds = new Set(
+        (ticket?.documents ?? []).map((doc) => doc.id).filter(Boolean),
+      );
+      const updatedTicket = await ticketsApi.uploadDocument(id, file);
+      setTicket(updatedTicket);
+
+      const uploadedDocument = [...(updatedTicket.documents ?? [])]
+        .reverse()
+        .find((doc) => doc.id && !existingDocIds.has(doc.id)) ??
+        [...(updatedTicket.documents ?? [])]
+          .reverse()
+          .find((doc) => doc.file?.split("/").pop() === file.name);
+
+      if (!uploadedDocument?.id || !uploadedDocument.file) {
+        toast.update(toastId, {
+          render: "Attachment uploaded, but the document link was not returned.",
+          type: "warning",
+          isLoading: false,
+          autoClose: 4000,
+        });
+        return;
+      }
+
+      setReplyAttachmentIds((prev) =>
+        prev.includes(uploadedDocument.id!)
+          ? prev
+          : [...prev, uploadedDocument.id!],
+      );
+      setReplyAttachments((prev) =>
+        prev.some((item) => item.id === uploadedDocument.id)
+          ? prev
+          : [
+              ...prev,
+              {
+                id: uploadedDocument.id!,
+                name: file.name,
+                file: uploadedDocument.file!,
+              },
+            ],
+      );
+
+      toast.update(toastId, {
+        render: "Attachment uploaded.",
+        type: "success",
+        isLoading: false,
+        autoClose: 2500,
+      });
+    } catch (error) {
+      console.error("Attachment upload failed:", error);
+      toast.update(toastId, {
+        render: "Failed to upload attachment.",
+        type: "error",
+        isLoading: false,
+        autoClose: 4000,
+      });
+    }
   };
 
-  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setReplyMessage((prev) => prev + `\n🖼 Image: ${file.name}\n`);
+    await addUploadedFileToReply(file);
+    e.target.value = "";
+  };
+
+  const handleImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    await addUploadedFileToReply(file);
+    e.target.value = "";
+  };
+
+  const handleRemoveReplyAttachment = (attachmentId: string) => {
+    setReplyAttachmentIds((prev) => prev.filter((id) => id !== attachmentId));
+    setReplyAttachments((prev) =>
+      prev.filter((attachment) => attachment.id !== attachmentId),
+    );
   };
 
   const handleEmojiInsert = (emoji: string) => {
@@ -782,11 +1023,13 @@ const TicketView = () => {
           canEdit={canEditTickets}
           canReply={canAddTickets}
           setDescription={setDescription}
+          onTicketUpdate={(updated) => setTicket(updated)}
           handlePreviewOpen={handlePreviewOpen}
           openReply={openReply}
           setOpenReply={setOpenReply}
           assigneeName={currentAssigneeName}
           assigneeEmail={currentAssigneeEmail}
+          employees={employees}
           replyProps={{
             openReply,
             setOpenReply,
@@ -802,6 +1045,9 @@ const TicketView = () => {
             setReplySubject,
             replyMessage,
             setReplyMessage,
+            replyAttachments,
+            onViewAttachment: handlePreviewOpen,
+            onRemoveAttachment: handleRemoveReplyAttachment,
             anchorEl,
             setAnchorEl,
             showEmoji,
@@ -836,6 +1082,7 @@ const TicketView = () => {
           setAssigneeName={(name) =>
             setDraftAssigneeName(name.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH))
           }
+          setAssigneeEmail={setAssigneeEmail}
           selectedAssigneeEmail={currentAssigneeEmail}
           canEdit={canEditTickets}
           handleUpdate={handleUpdate}

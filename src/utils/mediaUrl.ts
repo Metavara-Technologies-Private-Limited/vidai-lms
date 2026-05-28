@@ -36,21 +36,21 @@ export const toSafePhotoUrl = (value: unknown): string | null => {
       typeof window !== "undefined" && window.location.protocol === "https:"
         ? "https:"
         : "http:";
-    return upgradeToHttpsIfNeeded(`${protocol}${raw}`);
+    return upgradeToHttpsIfNeeded(encodeURI(`${protocol}${raw}`));
   }
 
   // Host/path without scheme (e.g. 127.0.0.1:8000/media/x.jpg)
   if (/^[a-z0-9.-]+:\d+\//i.test(raw)) {
     const prefixed = `http://${raw}`;
-    return upgradeToHttpsIfNeeded(prefixed);
+    return upgradeToHttpsIfNeeded(encodeURI(prefixed));
   }
 
   // Already absolute
   if (/^(https?:\/\/|blob:|data:)/i.test(raw)) {
-    return upgradeToHttpsIfNeeded(raw);
+    return upgradeToHttpsIfNeeded(encodeURI(raw));
   }
 
   // Relative path — prefix with API origin
   const absolute = `${API_ORIGIN}${raw.startsWith("/") ? "" : "/"}${raw}`;
-  return upgradeToHttpsIfNeeded(absolute);
+  return upgradeToHttpsIfNeeded(encodeURI(absolute));
 };

@@ -73,6 +73,7 @@ export type UserCreateUpdatePayload = {
   role?: number;
   photo?: File | string | null;
   remove_photo?: boolean;
+  clinic_id?: number;
 };
 
 type UserCreateFallbackPayload = UserCreateUpdatePayload & {
@@ -461,6 +462,17 @@ const shouldRetryCreateWithFallback = (error: unknown): boolean => {
   );
 };
 
+export type UserPermissionRecord = {
+  id?: number;
+  module_key: string;
+  category_key: string;
+  subcategory_key?: string | null;
+  can_view: boolean;
+  can_add: boolean;
+  can_edit: boolean;
+  can_print: boolean;
+};
+
 export const usersApi = {
   listLocal: async (): Promise<UserRecord[]> => {
     const token =
@@ -634,5 +646,32 @@ export const usersApi = {
   remove: async (userId: number): Promise<void> => {
     ensureAuthToken();
     await http.delete(`/users/${userId}/delete/`);
+  },
+
+  getIndividualPermissions: async (userId: number): Promise<UserPermissionRecord[]> => {
+    ensureAuthToken();
+    const response = await http.get<{ success: boolean; data: UserPermissionRecord[] }>(
+      `/users/individual-permissions/`,
+      { params: { user_id: userId } },
+    );
+    return response.data?.data ?? [];
+  },
+
+  saveIndividualPermissions: async (
+    userId: number,
+    permissions: UserPermissionRecord[],
+  ): Promise<void> => {
+    ensureAuthToken();
+    await http.post(`/users/individual-permissions/`, {
+      user_id: userId,
+      permissions,
+    });
+  },
+
+  clearIndividualPermissions: async (userId: number): Promise<void> => {
+    ensureAuthToken();
+    await http.delete(`/users/individual-permissions/`, {
+      params: { user_id: userId },
+    });
   },
 };

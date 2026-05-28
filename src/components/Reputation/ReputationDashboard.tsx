@@ -473,8 +473,9 @@ const ReputationDashboard = () => {
             <Box
               sx={{
                 display: "flex",
-                alignItems: { xs: "stretch", sm: "center" },
-                flexDirection: { xs: "column", sm: "row" },
+                alignItems: "center",
+                flexDirection: "row",
+                flexWrap: "wrap",
                 gap: 1,
                 ml: { xs: 0, sm: "auto" },
                 width: { xs: "100%", sm: "auto" },
@@ -486,12 +487,17 @@ const ReputationDashboard = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 sx={{
-                  width: { xs: "100%", sm: 260 },
-                  minWidth: { xs: 0, sm: 260 },
+                  flex: { xs: "1 1 180px", sm: "0 1 auto" },
+                  width: { xs: "auto", sm: 240 },
+                  minWidth: { xs: 0, sm: 220 },
                   "& .MuiOutlinedInput-root": {
                     borderRadius: "10px",
                     backgroundColor: "#fff",
                   },
+    "& input::placeholder": {   
+      fontSize: "14px",
+      opacity: 0.5,
+    },
                 }}
                 InputProps={{
                   startAdornment: (
@@ -517,6 +523,7 @@ const ReputationDashboard = () => {
                 variant="contained"
                 onClick={() => setOpenReviewDialog(true)}
                 startIcon={<AddCircleOutlineIcon />}
+                className="mobile-add-button"
                 sx={{
                   textTransform: "none",
                   borderRadius: "10px",
@@ -527,13 +534,16 @@ const ReputationDashboard = () => {
                   backgroundColor: "#505050",
                   color: "#fff",
                   whiteSpace: "nowrap",
-                  width: { xs: "100%", sm: "auto" },
+                  flexShrink: 0,
+                  width: "auto",
                   "&:hover": {
                     backgroundColor: "#232323",
                   },
                 }}
               >
-                New Review Request
+                <span className="mobile-add-button-label">
+                  New Review Request
+                </span>
               </Button>
             </Box>
           </Box>

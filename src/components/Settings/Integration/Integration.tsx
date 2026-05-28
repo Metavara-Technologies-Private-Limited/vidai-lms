@@ -19,6 +19,7 @@ import { styles } from "../../../styles/Settings/Integration.styles";
 import IntegrationCard from "./IntegrationCard";
 import { selectLeads } from "../../../store/leadSlice";
 import { integrationApi } from "../../../services/integration.api";
+import { selectClinic } from "../../../store/clinicSlice";
 
 type SocialPlatform = "facebook" | "instagram" | "linkedin" | "google";
 
@@ -34,6 +35,9 @@ const Integration = () => {
   // const location = useLocation();
   const [integrations, setIntegrations] = useState<IntegrationMap>({});
   const user = useSelector(selectUser);
+  const selectedClinic = useSelector(selectClinic);
+  const clinicId =
+    selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
   const authUser = user as unknown as Record<string, unknown> | null;
   const role = resolveUserRole(authUser);
   const permissions = authUser?.permissions;
@@ -86,7 +90,6 @@ const Integration = () => {
 
     const fetchIntegrations = async () => {
       try {
-        const clinicId = 1;
         const res = await integrationApi.getSocialAccounts(clinicId);
 
         const map: IntegrationMap = {};
@@ -110,7 +113,7 @@ const Integration = () => {
     };
 
     fetchIntegrations();
-  }, [canViewIntegration]);
+  }, [canViewIntegration, clinicId]);
 
   // useEffect(() => {
   //   const params = new URLSearchParams(location.search);

@@ -98,22 +98,69 @@ const ReviewRequestStepDetails = ({
           mb: 1.5,
         }}
       >
-        <TextField
-          size="small"
-          fullWidth
-          label="Request Name"
-          value={formData.request_name}
-          onChange={(e) => onRequestNameChange(e.target.value)}
-          onBlur={onRequestNameBlur}
-        />
-        <TextField
-          size="small"
-          fullWidth
-          label="Description"
-          value={formData.description}
-          onChange={(e) => onDescriptionChange(e.target.value)}
-          onBlur={onDescriptionBlur}
-        />
+<TextField
+  size="small"
+  fullWidth
+  label="Request Name"
+  value={formData.request_name}
+  onChange={(e) => onRequestNameChange(e.target.value)}
+  onBlur={onRequestNameBlur}
+  inputProps={{ maxLength: 100 }}
+/>
+<TextField
+  size="small"
+  fullWidth
+  label="Description"
+  value={formData.description}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    // Allow empty value
+    if (value === "") {
+      onDescriptionChange(value);
+      return;
+    }
+
+    // First character must be alphabet
+    const firstChar = value.charAt(0);
+
+    if (!/[A-Za-z]/.test(firstChar)) {
+      return;
+    }
+
+    onDescriptionChange(value);
+  }}
+  onKeyDown={(e) => {
+    const currentValue = formData.description;
+
+    // Only validate first key press
+    if (currentValue.length === 0) {
+      const pressedKey = e.key;
+
+      // Ignore control keys
+      if (
+        pressedKey === "Backspace" ||
+        pressedKey === "Tab" ||
+        pressedKey === "ArrowLeft" ||
+        pressedKey === "ArrowRight" ||
+        pressedKey === "Delete"
+      ) {
+        return;
+      }
+
+if (!/[A-Za-z]/.test(pressedKey)) {
+  e.preventDefault();
+
+  // Direct toast for invalid first character
+  window.dispatchEvent(
+    new CustomEvent("review-description-invalid"),
+  );
+}
+    }
+  }}
+  onBlur={onDescriptionBlur}
+  inputProps={{ maxLength: 255 }}
+/>
       </Box>
 
       <Typography fontWeight={600} fontSize={13} sx={{ mb: 1 }}>
@@ -253,7 +300,7 @@ const ReviewRequestStepDetails = ({
             <TextField
               {...params}
               size="small"
-              label="Assignee"
+              label="Search & Select"
               placeholder={
                 leadSelectionType === "all"
                   ? "All leads selected"

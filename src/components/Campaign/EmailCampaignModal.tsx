@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "../../styles/Campaign/EmailCampaignModal.css";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -13,6 +13,7 @@ import {
   Modal,
   Typography,
   IconButton,
+  CircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
@@ -32,6 +33,10 @@ import {
 import type { EmailCampaignPayload } from "../../types/campaigns.types";
 import { useSelector } from "react-redux";
 import { selectClinic } from "../../store/clinicSlice";
+import {
+  canTypeCampaignName,
+  getCampaignNameValidationError,
+} from "./campaignNameValidation";
 import TemplateService, {
   type TemplateDocument,
 } from "../../services/templates.api";
@@ -43,7 +48,7 @@ interface EmailTemplate {
 }
 interface EmailCampaignModalProps {
   onClose: () => void;
-  onSave: (...args: unknown[]) => void; // ✅ FIXED: accepts any args (including campaign param from CampaignPage)
+  onSave: (...args: unknown[]) => void;
 }
 
 export default function EmailCampaignModal({
@@ -52,6 +57,7 @@ export default function EmailCampaignModal({
 }: EmailCampaignModalProps) {
   const clinic = useSelector(selectClinic);
   const clinicId = clinic?.id || 1;
+  const [modalLoading, setModalLoading] = useState(true);
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [templateAttachments, setTemplateAttachments] = useState<
@@ -60,9 +66,37 @@ export default function EmailCampaignModal({
   /* ================= STEP 1 – DETAILS ================= */
   const [campaignName, setCampaignName] = useState("");
   const [campaignDescription, setCampaignDescription] = useState("");
-  const [objective, setObjective] = useState("");
-  const [audience, setAudience] = useState("");
-  const [startDate, setStartDate] = useState("");
+  const [objective, setObjective] = useState(() => {
+    const keys = Object.keys(CAMPAIGN_OBJECTIVES);
+
+    const leadGenKey = keys.find(
+      (k) =>
+        k === "lead_generation" ||
+        k === "LEAD_GENERATION" ||
+        (CAMPAIGN_OBJECTIVES as Record<string, string>)[k]
+          ?.toLowerCase()
+          .includes("lead"),
+    );
+
+    return leadGenKey ?? keys[0] ?? "";
+  });
+
+  const [audience, setAudience] = useState(() => {
+    const keys = Object.keys(CAMPAIGN_AUDIENCE);
+
+    const allSubKey = keys.find(
+      (k) =>
+        k === "all_subscribers" ||
+        k === "ALL_SUBSCRIBERS" ||
+        (CAMPAIGN_AUDIENCE as Record<string, string>)[k]
+          ?.toLowerCase()
+          .includes("all"),
+    );
+
+    return allSubKey ?? keys[0] ?? "";
+  });
+
+  const [startDate, setStartDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [endDate, setEndDate] = useState("");
   const editorRef = useRef<HTMLDivElement | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
@@ -93,9 +127,27 @@ export default function EmailCampaignModal({
 
   const step3Valid = scheduleRange[0] && scheduleRange[1] && scheduleTime;
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setModalLoading(false);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   /* ================= NAVIGATION ================= */
   const handleNext = () => {
     setSubmitted(true);
+
+    if (step === 1) {
+      const campaignNameError = getCampaignNameValidationError(campaignName);
+      if (campaignNameError) {
+        toast.error(campaignNameError, {
+          toastId: "email-campaign-name-error",
+        });
+        return;
+      }
+    }
 
     if (step === 1 && step1Valid) {
       setStep(2);
@@ -112,7 +164,6 @@ export default function EmailCampaignModal({
         "mail",
         templateId,
       );
-
       setTemplateAttachments(documents ?? []);
     } catch (error) {
       console.error("Failed to fetch template documents:", error);
@@ -177,33 +228,18 @@ export default function EmailCampaignModal({
 
       const createdRes = await CampaignAPI.createEmail(payload);
 
+      // FIX: Pass the created campaign data to onSave so the parent
+      // (CampaignsScreen) can dispatch fetchCampaign() via Redux.
+      // Do NOT call CampaignAPI.list() here — that was causing the
+      // duplicate list/ API call every time a campaign was saved.
       onSave(createdRes?.data ?? payload);
       toast.success("Campaign created successfully");
       onClose();
     } catch (error: unknown) {
-      try {
-        const listRes = await CampaignAPI.list();
-        const list = Array.isArray(listRes.data) ? listRes.data : [];
-        const found = list
-          .filter((item) =>
-            String(item?.campaign_name ?? "").trim().toLowerCase() === campaignName.trim().toLowerCase()
-          )
-          .sort((a, b) => {
-            const at = new Date(String(a?.modified_at ?? a?.created_at ?? 0)).getTime();
-            const bt = new Date(String(b?.modified_at ?? b?.created_at ?? 0)).getTime();
-            return bt - at;
-          })[0];
-
-        if (found) {
-          onSave(found);
-          toast.success("Campaign created successfully");
-          onClose();
-          return;
-        }
-      } catch {
-        // ignore fallback failure
-      }
-
+      // FIX: Removed the CampaignAPI.list() fallback call that was here.
+      // It was calling list() on EVERY failed save attempt, adding an
+      // extra network request. If creation fails, just show the error —
+      // the parent will re-fetch via onSave only on actual success.
       if (error instanceof Error) {
         toast.error(error.message);
       } else {
@@ -218,6 +254,23 @@ export default function EmailCampaignModal({
       : audience === "active"
         ? "Active Users"
         : "";
+
+  if (modalLoading) {
+    return (
+      <Modal open={true} onClose={onClose}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100vh",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </Modal>
+    );
+  }
 
   return (
     <>
@@ -272,7 +325,16 @@ export default function EmailCampaignModal({
                 <label>Campaign Name *</label>
                 <input
                   value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    if (!canTypeCampaignName(nextValue)) {
+                      toast.error("Alphanumeric and underscore are allowed", {
+                        toastId: "email-campaign-name-typing",
+                      });
+                      return;
+                    }
+                    setCampaignName(nextValue);
+                  }}
                   placeholder="e.g. New Product Launch"
                 />
               </div>
@@ -565,7 +627,6 @@ export default function EmailCampaignModal({
                   <div
                     className={`schedule-field ${submitted && (!scheduleRange[0] || !scheduleRange[1]) ? "error" : ""}`}
                   >
-                    {/* <label>Select Date</label> */}
                     <div className="form-row">
                       <div
                         className={`form-group half ${submitted && !startDate ? "error" : ""}`}
@@ -589,7 +650,7 @@ export default function EmailCampaignModal({
                             slots={{ openPickerIcon: CalendarTodayIcon }}
                             slotProps={{ textField: { fullWidth: true } }}
                           />
-                        </LocalizationProvider>{" "}
+                        </LocalizationProvider>
                       </div>
 
                       <div
@@ -638,7 +699,6 @@ export default function EmailCampaignModal({
                             ? dayjs()
                             : undefined
                         }
-                        // slotProps={{ textField: { fullWidth: true } }}
                       />
                     </LocalizationProvider>
                   </div>

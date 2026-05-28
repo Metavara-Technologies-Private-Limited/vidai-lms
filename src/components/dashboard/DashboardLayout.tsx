@@ -19,7 +19,6 @@ import { fetchCampaign, selectCampaign } from "../../store/campaignSlice";
 // import { selectClinic } from "../../store/clinicSlice";
 import { CircularProgress } from "@mui/material";
 
-const SourcePerformanceChart = lazy(() => import("./SourcePerformanceChart"));
 const CommunicationChart = lazy(() => import("./CommunicationChart"));
 const ConversionTrendChart = lazy(() => import("./ConversionTrendChart"));
 const LeadPipelineFunnel = lazy(() => import("./LeadPipelineFunnel"));
@@ -33,7 +32,7 @@ const DashboardLayout = () => {
   const leadsLoading = useSelector(selectLeadsLoading);
   // const clinic = useSelector(selectClinic);
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
-  const [activeTab, setActiveTab] = useState<OverviewTab>("source");
+  const [activeTab, setActiveTab] = useState<OverviewTab>("communication");
 
   // load leads and campaigns once when the dashboard mounts
   useEffect(() => {
@@ -71,7 +70,7 @@ const DashboardLayout = () => {
         <Typography variant="h6" pb={2}>
           Refera MD Dashboard
         </Typography>
-        <KpiCards />
+        <KpiCards timeRange={timeRange} />
         <Card
           sx={{
             p: { xs: 1.25, sm: 2 },
@@ -113,9 +112,6 @@ const DashboardLayout = () => {
               </Box>
             }
           >
-            {activeTab === "source" && (
-              <SourcePerformanceChart timeRange={timeRange} />
-            )}
             {activeTab === "communication" && (
               <CommunicationChart timeRange={timeRange} />
             )}

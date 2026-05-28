@@ -2,6 +2,7 @@
 // Types, interfaces, column config, time slots, quality helper, raw→LeadItem mapper
 
 import type { Department, Employee } from "../../services/leads.api";
+import type { TreatmentInterest } from "../../types/leads.types";
 
 // ====================== Core Lead Type ======================
 // FIX: [key: string]: unknown added so LeadItem is assignable to
@@ -65,7 +66,7 @@ export interface LeadItem {
   remark: string;
   book_appointment: boolean;
   contact_no: string;
-  treatment_interest: string;
+  treatment_interest?: string[] | TreatmentInterest[];
   partner_inquiry: boolean;
   clinic_id: number | null;
   campaign_id: string | null;
@@ -136,10 +137,12 @@ export interface RawLead {
   remark?: string;
   book_appointment?: boolean;
   contact_no?: string;
-  treatment_interest?: string;
+  treatment_interest?: string[] | TreatmentInterest[];
   partner_inquiry?: boolean;
   clinic_id?: number | null;
   campaign_id?: string | null;
+  quality?: "Hot" | "Warm" | "Cold";
+  last_interaction_at?: string;
 }
 
 // ====================== Appointment State ======================
@@ -318,77 +321,84 @@ const extractStageFromDescription = (
 
 // ====================== Raw → LeadItem Mapper ======================
 export const mapRawToLeadItem = (lead: RawLead): LeadItem => {
-  const stageTaskType = extractStageFromDescription(lead.next_action_description);
+  const stageTaskType = extractStageFromDescription(
+    lead.next_action_description,
+  );
 
-  return ({
-  id: lead.id ?? "",
-  full_name: lead.full_name ?? lead.name ?? "",
-  name: lead.full_name ?? lead.name ?? "",
-  initials:
-    lead.initials ??
-    (lead.full_name ?? lead.name ?? "?").charAt(0).toUpperCase(),
-  email: lead.email ?? lead.email_address ?? "",
-  phone: lead.phone ?? lead.mobile ?? lead.phone_number ?? "",
-  phone_number: lead.phone ?? lead.mobile ?? lead.phone_number ?? "",
-  location:
-    lead.location ?? lead.city ?? lead.state ?? lead.address ?? "Not specified",
-  city: lead.city ?? "",
-  state: lead.state ?? "",
-  address: lead.address ?? "",
-  source: lead.source ?? lead.lead_source ?? "Unknown",
-  lead_source: lead.source ?? lead.lead_source ?? "",
-  campaign: lead.campaign ?? "",
-  status: lead.status ?? lead.lead_status ?? "New",
-  lead_status: lead.status ?? lead.lead_status ?? "New",
-  quality: deriveQuality(lead),
-  assigned: lead.assigned_to_name ?? "Unassigned",
-  assigned_to_name: lead.assigned_to_name ?? "",
-  assigned_to_id: lead.assigned_to_id ?? null,
-  score: lead.score ?? lead.ai_score ?? lead.lead_score ?? 0,
-  ai_score: lead.score ?? lead.ai_score ?? 0,
-  department: lead.department ?? lead.department_name ?? "",
-  department_id: lead.department_id ?? null,
-  department_name: lead.department ?? lead.department_name ?? "",
-  created_at: lead.created_at ?? lead.created_date ?? null,
-  updated_at: lead.updated_at ?? lead.modified_date ?? null,
-  last_contacted: lead.last_contacted ?? lead.last_contact_date ?? null,
-  task:
-    lead.next_action_type ??
-    lead.task_type ??
-    lead.task ??
-    stageTaskType ??
-    "N/A",
-  task_type: lead.next_action_type ?? lead.task_type ?? stageTaskType ?? "",
-  taskStatus: lead.next_action_status ?? lead.task_status ?? "Pending",
-  task_status: lead.next_action_status ?? lead.task_status ?? "",
-  next_action_description: lead.next_action_description ?? "",
-  next_action_status: lead.next_action_status,
-  next_action_due_date: lead.next_action_due_date ?? null,
-  activity: lead.last_activity ?? lead.activity ?? "View Activity",
-  last_activity: lead.last_activity ?? lead.activity ?? "",
-  activity_count: lead.activity_count ?? 0,
-  medical_history: lead.medical_history ?? "",
-  treatment_type: lead.treatment_type ?? "",
-  consultation_date: lead.consultation_date ?? null,
-  notes: lead.notes ?? lead.remarks ?? "",
-  remarks: lead.notes ?? lead.remarks ?? "",
-  archived: lead.is_active === false,
-  is_active: lead.is_active !== false,
-  tags: lead.tags ?? [],
-  priority: lead.priority ?? "Medium",
-  converted: lead.converted ?? false,
-  conversion_date: lead.conversion_date ?? null,
-  estimated_value: lead.estimated_value ?? 0,
-  actual_value: lead.actual_value ?? 0,
-  appointment_date: lead.appointment_date ?? null,
-  slot: lead.slot ?? "",
-  remark: lead.remark ?? "",
-  book_appointment: lead.book_appointment ?? false,
-  contact_no:
-    lead.contact_no ?? lead.phone ?? lead.mobile ?? lead.phone_number ?? "",
-  treatment_interest: lead.treatment_interest ?? "",
-  partner_inquiry: lead.partner_inquiry ?? false,
-  clinic_id: lead.clinic_id ?? null,
-  campaign_id: lead.campaign_id ?? null,
-  });
+  return {
+    id: lead.id ?? "",
+    stage_id: lead.stage_id ?? null,
+    full_name: lead.full_name ?? lead.name ?? "",
+    name: lead.full_name ?? lead.name ?? "",
+    initials:
+      lead.initials ??
+      (lead.full_name ?? lead.name ?? "?").charAt(0).toUpperCase(),
+    email: lead.email ?? lead.email_address ?? "",
+    phone: lead.phone ?? lead.mobile ?? lead.phone_number ?? "",
+    phone_number: lead.phone ?? lead.mobile ?? lead.phone_number ?? "",
+    location:
+      lead.location ??
+      lead.city ??
+      lead.state ??
+      lead.address ??
+      "Not specified",
+    city: lead.city ?? "",
+    state: lead.state ?? "",
+    address: lead.address ?? "",
+    source: lead.source ?? lead.lead_source ?? "Unknown",
+    lead_source: lead.source ?? lead.lead_source ?? "",
+    campaign: lead.campaign ?? "",
+    status: lead.status ?? lead.lead_status ?? "New",
+    lead_status: lead.status ?? lead.lead_status ?? "New",
+    quality: lead.quality || "Cold",
+    assigned: lead.assigned_to_name ?? "Unassigned",
+    assigned_to_name: lead.assigned_to_name ?? "",
+    assigned_to_id: lead.assigned_to_id ?? null,
+    score: lead.score ?? lead.ai_score ?? lead.lead_score ?? 0,
+    ai_score: lead.score ?? lead.ai_score ?? 0,
+    department: lead.department ?? lead.department_name ?? "",
+    department_id: lead.department_id ?? null,
+    department_name: lead.department ?? lead.department_name ?? "",
+    created_at: lead.created_at ?? lead.created_date ?? null,
+    updated_at: lead.updated_at ?? lead.modified_date ?? null,
+    last_contacted: lead.last_contacted ?? lead.last_contact_date ?? null,
+    task:
+      lead.next_action_type ??
+      lead.task_type ??
+      lead.task ??
+      stageTaskType ??
+      "N/A",
+    task_type: lead.next_action_type ?? lead.task_type ?? stageTaskType ?? "",
+    taskStatus: lead.next_action_status ?? lead.task_status ?? "Pending",
+    task_status: lead.next_action_status ?? lead.task_status ?? "",
+    next_action_description: lead.next_action_description ?? "",
+    next_action_status: lead.next_action_status,
+    next_action_due_date: lead.next_action_due_date ?? null,
+    activity: lead.last_activity ?? lead.activity ?? "View Activity",
+    last_activity: lead.last_activity ?? lead.activity ?? "",
+    activity_count: lead.activity_count ?? 0,
+    medical_history: lead.medical_history ?? "",
+    treatment_type: lead.treatment_type ?? "",
+    consultation_date: lead.consultation_date ?? null,
+    notes: lead.notes ?? lead.remarks ?? "",
+    remarks: lead.notes ?? lead.remarks ?? "",
+    archived: lead.is_active === false,
+    is_active: lead.is_active !== false,
+    tags: lead.tags ?? [],
+    priority: lead.priority ?? "Medium",
+    converted: lead.converted ?? false,
+    conversion_date: lead.conversion_date ?? null,
+    estimated_value: lead.estimated_value ?? 0,
+    actual_value: lead.actual_value ?? 0,
+    appointment_date: lead.appointment_date ?? null,
+    slot: lead.slot ?? "",
+    remark: lead.remark ?? "",
+    book_appointment: lead.book_appointment ?? false,
+    contact_no:
+      lead.contact_no ?? lead.phone ?? lead.mobile ?? lead.phone_number ?? "",
+    treatment_interest: lead.treatment_interest ?? [],
+    partner_inquiry: lead.partner_inquiry ?? false,
+    clinic_id: lead.clinic_id ?? null,
+    campaign_id: lead.campaign_id ?? null,
+  };
 };

@@ -39,11 +39,13 @@ import {
 } from "../utils/roleAccess";
 import "../styles/Leads/leads.css";
 
-const STORAGE_KEY_FILTERS = "leads_filters";
+// ── Storage keys — filters intentionally excluded ─────────────────────────────
+// STORAGE_KEY_FILTERS removed: filters must not survive a page refresh
 const STORAGE_KEY_TAB = "leads_active_tab";
 const STORAGE_KEY_VIEW = "leads_view_mode";
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
-const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
+const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
+const DEFAULT_PIPELINE_EVENT = "leads-default-pipeline-updated";
 
 interface HeaderMatch {
   tableHeader: string;
@@ -313,6 +315,38 @@ const LeadsBulkImportModal = React.lazy(
   () => import("../components/LeadsHub/LeadsBulkImportModal"),
 );
 
+// ── Empty filter default — always the starting point after refresh ────────────
+const defaultFilters = (): FilterValues => ({
+  department: "",
+  assignee: "",
+  status: "",
+  quality: "",
+  source: "",
+  subSource: "",
+  dateFrom: null,
+  dateTo: null,
+});
+
+const loadSavedTab = (): number => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_TAB);
+    if (saved) return parseInt(saved, 10);
+  } catch (error) {
+    console.error("Failed to load saved tab:", error);
+  }
+  return 0;
+};
+
+const loadSavedViewMode = (): "table" | "board" => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_VIEW);
+    if (saved === "board" || saved === "table") return saved;
+  } catch (error) {
+    console.error("Failed to load saved view mode:", error);
+  }
+  return "table";
+};
+
 const Leads: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
@@ -344,7 +378,6 @@ const Leads: React.FC = () => {
   React.useEffect(() => {
     if (canViewLeads) return;
 
-    // Helps verify the live payload shape when a user can see sidebar but cannot view leads.
     console.warn("Leads permission debug", {
       role,
       hasTopLevelPermissions: Boolean(authUser?.permissions),
@@ -366,53 +399,16 @@ const Leads: React.FC = () => {
     permissions,
   ]);
 
-  const loadSavedFilters = (): FilterValues => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_FILTERS);
-      if (saved) return JSON.parse(saved);
-    } catch (error) {
-      console.error("Failed to load saved filters:", error);
-    }
-    return {
-      department: "",
-      assignee: "",
-      status: "",
-      quality: "",
-      source: "",
-      subSource: "",
-      dateFrom: null,
-      dateTo: null,
-    };
-  };
-
-  const loadSavedTab = (): number => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_TAB);
-      if (saved) return parseInt(saved, 10);
-    } catch (error) {
-      console.error("Failed to load saved tab:", error);
-    }
-    return 0;
-  };
-
-  const loadSavedViewMode = (): "table" | "board" => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_VIEW);
-      if (saved === "board" || saved === "table") return saved;
-    } catch (error) {
-      console.error("Failed to load saved view mode:", error);
-    }
-    return "table";
-  };
-
   const [tab, setTab] = React.useState(loadSavedTab());
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [viewMode, setViewMode] = React.useState<"table" | "board">(
     loadSavedViewMode(),
   );
-  const [activeFilters, setActiveFilters] =
-    React.useState<FilterValues>(loadSavedFilters());
+
+  // ── Filters: always start empty on every page load / refresh ─────────────
+  const [activeFilters, setActiveFilters] = React.useState<FilterValues>(defaultFilters);
+
   const [counts, setCounts] = React.useState({
     all: 0,
     followUps: 0,
@@ -428,7 +424,10 @@ const Leads: React.FC = () => {
     localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "",
   );
   const [selectedPipelineId, setSelectedPipelineId] = React.useState<string>(
-    localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "",
+    localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ?? "",
+  );
+  const [defaultPipelineId, setDefaultPipelineId] = React.useState<string>(
+    localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ?? "",
   );
   const attemptedClinicHydrationRef = React.useRef<Set<number>>(new Set());
   const tabScrollRef = React.useRef<HTMLDivElement>(null);
@@ -460,26 +459,6 @@ const Leads: React.FC = () => {
     if (!el) return;
     el.scrollBy({ left: dir === "left" ? -120 : 120, behavior: "smooth" });
   }, []);
-
-  const industryOptions = React.useMemo(
-    () =>
-      Array.from(
-        new Set(
-          availablePipelines
-            .map((pipeline) => pipeline.industry_type)
-            .filter(Boolean),
-        ),
-      ),
-    [availablePipelines],
-  );
-
-  const filteredPipelinesByIndustry = React.useMemo(
-    () =>
-      availablePipelines.filter((pipeline) =>
-        selectedIndustry ? pipeline.industry_type === selectedIndustry : true,
-      ),
-    [availablePipelines, selectedIndustry],
-  );
 
   const applyFilters = React.useCallback(
     (leadsToFilter: Array<Lead & { status?: string }>) => {
@@ -555,13 +534,8 @@ const Leads: React.FC = () => {
     [activeFilters],
   );
 
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(activeFilters));
-    } catch (error) {
-      console.error("Failed to save filters:", error);
-    }
-  }, [activeFilters]);
+  // ── Removed: useEffect that wrote activeFilters to localStorage ───────────
+  // Filters are session-only; they must not persist across page refreshes.
 
   React.useEffect(() => {
     try {
@@ -660,27 +634,106 @@ const Leads: React.FC = () => {
   }, [selectedIndustry]);
 
   React.useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_SELECTED_PIPELINE, selectedPipelineId);
-  }, [selectedPipelineId]);
+    const syncDefaultFromStorage = () => {
+      const storedDefaultPipelineId =
+        localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ?? "";
+      if (!storedDefaultPipelineId) return;
+
+      const existsInCurrentClinic = availablePipelines.some(
+        (pipeline) => String(pipeline.id) === String(storedDefaultPipelineId),
+      );
+      if (!existsInCurrentClinic) return;
+
+      if (storedDefaultPipelineId !== defaultPipelineId) {
+        setDefaultPipelineId(storedDefaultPipelineId);
+      }
+
+      if (storedDefaultPipelineId !== selectedPipelineId) {
+        setSelectedPipelineId(storedDefaultPipelineId);
+      }
+    };
+
+    syncDefaultFromStorage();
+    window.addEventListener("focus", syncDefaultFromStorage);
+    window.addEventListener("pageshow", syncDefaultFromStorage);
+    document.addEventListener("visibilitychange", syncDefaultFromStorage);
+
+    return () => {
+      window.removeEventListener("focus", syncDefaultFromStorage);
+      window.removeEventListener("pageshow", syncDefaultFromStorage);
+      document.removeEventListener("visibilitychange", syncDefaultFromStorage);
+    };
+  }, [availablePipelines, defaultPipelineId, selectedPipelineId]);
 
   React.useEffect(() => {
-    if (!selectedPipelineId) return;
-    const existsInIndustry = filteredPipelinesByIndustry.some(
-      (pipeline) => pipeline.id === selectedPipelineId,
+    if (availablePipelines.length === 0) return;
+
+    const backendDefaultPipeline =
+      availablePipelines.find((pipeline) => pipeline.is_default) ??
+      availablePipelines.find((pipeline) => pipeline.is_active) ??
+      null;
+    const storageMatchedPipeline = availablePipelines.find(
+      (pipeline) => String(pipeline.id) === String(defaultPipelineId),
     );
-    if (!existsInIndustry) {
-      setSelectedPipelineId(filteredPipelinesByIndustry[0]?.id ?? "");
+    const resolvedDefaultPipeline =
+      backendDefaultPipeline ?? storageMatchedPipeline ?? availablePipelines[0];
+
+    if (resolvedDefaultPipeline.id !== defaultPipelineId) {
+      setDefaultPipelineId(resolvedDefaultPipeline.id);
     }
-  }, [filteredPipelinesByIndustry, selectedPipelineId]);
+    if (resolvedDefaultPipeline.id !== selectedPipelineId) {
+      setSelectedPipelineId(resolvedDefaultPipeline.id);
+    }
+    if (selectedIndustry !== resolvedDefaultPipeline.industry_type) {
+      setSelectedIndustry(resolvedDefaultPipeline.industry_type);
+    }
+
+    localStorage.setItem(STORAGE_KEY_DEFAULT_PIPELINE, resolvedDefaultPipeline.id);
+  }, [availablePipelines, defaultPipelineId, selectedIndustry, selectedPipelineId]);
 
   React.useEffect(() => {
-    // Warm up Calendar chunk so tab switch is instant on first open.
+    const handleDefaultPipelineUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ pipelineId?: string }>).detail;
+      const nextDefaultPipelineId = detail?.pipelineId ?? "";
+      if (!nextDefaultPipelineId) return;
+      setDefaultPipelineId(nextDefaultPipelineId);
+      setSelectedPipelineId(nextDefaultPipelineId);
+
+      const matchedPipeline = availablePipelines.find(
+        (pipeline) => pipeline.id === nextDefaultPipelineId,
+      );
+      if (matchedPipeline) {
+        setSelectedIndustry(matchedPipeline.industry_type);
+      }
+    };
+
+    const handleStorageUpdate = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY_DEFAULT_PIPELINE) return;
+      const nextDefaultPipelineId = event.newValue ?? "";
+      if (!nextDefaultPipelineId) return;
+      const existsInCurrentClinic = availablePipelines.some(
+        (pipeline) => String(pipeline.id) === String(nextDefaultPipelineId),
+      );
+      if (!existsInCurrentClinic) return;
+      setDefaultPipelineId(nextDefaultPipelineId);
+      setSelectedPipelineId(nextDefaultPipelineId);
+    };
+
+    window.addEventListener(DEFAULT_PIPELINE_EVENT, handleDefaultPipelineUpdate as EventListener);
+    window.addEventListener("storage", handleStorageUpdate);
+
+    return () => {
+      window.removeEventListener(DEFAULT_PIPELINE_EVENT, handleDefaultPipelineUpdate as EventListener);
+      window.removeEventListener("storage", handleStorageUpdate);
+    };
+  }, [availablePipelines]);
+
+  React.useEffect(() => {
     void import("../components/LeadsHub/LeadsCalendar");
   }, []);
 
   const waitingForContext = React.useMemo(() => {
     if (!authed) return false;
-    // Wait while profile/clinic context is still being hydrated after refresh.
     if (!user) return true;
     if (clinicLoading) return true;
     return false;
@@ -688,14 +741,22 @@ const Leads: React.FC = () => {
 
   React.useEffect(() => {
     if (leads && leads.length > 0) {
-      const followUpStatuses = ["new", "lost", "cycle conversion"];
+      // const followUpStatuses = ["new", "lost", "cycle conversion", "follow up", "follow-up", "followup", "follow ups", "follow-ups"];
       const filteredLeads = applyFilters(leads);
       const allCount = filteredLeads.filter(
         (l) => l.is_active !== false,
       ).length;
       const followUpCount = filteredLeads.filter((l) => {
-        const status = (l.lead_status || "").toLowerCase().trim();
-        return l.is_active !== false && followUpStatuses.includes(status);
+        const stageName = (l.stage_name || "").toLowerCase().trim();
+
+        console.log("📊 FollowUp Count Debug:", {
+          id: l.id,
+          stage_name: l.stage_name,
+          lead_status: l.lead_status,
+          matches: stageName.includes("follow"),
+        });
+
+        return l.is_active !== false && stageName.includes("follow");
       }).length;
       const archivedCount = filteredLeads.filter(
         (l) => l.is_active === false,
@@ -839,7 +900,6 @@ const Leads: React.FC = () => {
 
           createdLeads.push({
             ...createdLead,
-            // If file has date/created-at mapping, keep it for UI ordering.
             created_at: appointmentDate || createdLead.created_at,
           });
         } catch {
@@ -1123,79 +1183,69 @@ const Leads: React.FC = () => {
             />
           </Box>
 
-          {/* ── View Mode Toggle — highlighted when active ── */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              border: "1px solid #E5E7EB",
-              borderRadius: "10px",
-              overflow: "hidden",
-              bgcolor: "#F9FAFB",
-            }}
-          >
-            <IconButton
-              onClick={() => setViewMode("table")}
-              title="Table view"
-              sx={{
-                borderRadius: 0,
-                width: 38,
-                height: 38,
-                bgcolor: viewMode === "table" ? "#E5E7EB" : "transparent",
-                "&:hover": {
-                  bgcolor: viewMode === "table" ? "#D1D5DB" : "#F3F4F6",
-                },
-                transition: "background-color 0.15s ease",
-              }}
-            >
-              <img
-                src={Leads_Tableview_icon}
-                style={{
-                  width: 18,
-                  height: 18,
-                  filter: "none",
-                  transition: "filter 0.15s ease",
-                }}
-                alt="Table view"
-              />
-            </IconButton>
-
-            {/* thin divider between icons */}
+          {/* View Mode Toggle */}
+          {/* View Mode Toggle — only show for All Leads tab */}
+          {tab === 0 && (
             <Box
               sx={{
-                width: "1px",
-                height: 20,
-                bgcolor: "#E5E7EB",
-                flexShrink: 0,
-              }}
-            />
-
-            <IconButton
-              onClick={() => setViewMode("board")}
-              title="Board view"
-              sx={{
-                borderRadius: 0,
-                width: 38,
-                height: 38,
-                bgcolor: viewMode === "board" ? "#E5E7EB" : "transparent",
-                "&:hover": {
-                  bgcolor: viewMode === "board" ? "#D1D5DB" : "#F3F4F6",
-                },
-                transition: "background-color 0.15s ease",
+                display: "flex",
+                alignItems: "center",
+                border: "1px solid #E5E7EB",
+                borderRadius: "10px",
+                overflow: "hidden",
+                bgcolor: "#F9FAFB",
               }}
             >
-              <img
-                src={Leads_Gridview}
-                style={{
-                  width: 22,
-                  height: 22,
-                  filter: "none",
-                  transition: "filter 0.15s ease",
+              <IconButton
+                onClick={() => setViewMode("table")}
+                title="Table view"
+                sx={{
+                  borderRadius: 0,
+                  width: 38,
+                  height: 38,
+                  bgcolor: viewMode === "table" ? "#E5E7EB" : "transparent",
+                  "&:hover": {
+                    bgcolor: viewMode === "table" ? "#D1D5DB" : "#F3F4F6",
+                  },
+                  transition: "background-color 0.15s ease",
                 }}
-                alt="Board view"
+              >
+                <img
+                  src={Leads_Tableview_icon}
+                  style={{ width: 18, height: 18 }}
+                  alt="Table view"
+                />
+              </IconButton>
+              <Box
+                sx={{
+                  width: "1px",
+                  height: 20,
+                  bgcolor: "#E5E7EB",
+                  flexShrink: 0,
+                }}
               />
-            </IconButton>
-          </Box>
+              <IconButton
+                onClick={() => setViewMode("board")}
+                title="Board view"
+                sx={{
+                  borderRadius: 0,
+                  width: 38,
+                  height: 38,
+                  bgcolor: viewMode === "board" ? "#E5E7EB" : "transparent",
+                  "&:hover": {
+                    bgcolor: viewMode === "board" ? "#D1D5DB" : "#F3F4F6",
+                  },
+                  transition: "background-color 0.15s ease",
+                }}
+              >
+                <img
+                  src={Leads_Gridview}
+                  style={{ width: 22, height: 22 }}
+                  alt="Board view"
+                />
+              </IconButton>
+            </Box>
+          )}
 
           {/* Filter Button */}
           <Box sx={{ position: "relative", flexShrink: 0 }}>
@@ -1226,10 +1276,6 @@ const Leads: React.FC = () => {
                 STORAGE_KEY_SELECTED_INDUSTRY,
                 selectedIndustry,
               );
-              localStorage.setItem(
-                STORAGE_KEY_SELECTED_PIPELINE,
-                selectedPipelineId,
-              );
               navigate("/leads/add");
             }}
             disabled={!canAddLeads}
@@ -1255,7 +1301,6 @@ const Leads: React.FC = () => {
           minHeight: 40,
         }}
       >
-        {/* Scroll wrapper: arrows only on small screens */}
         <Box
           sx={{
             display: "flex",
@@ -1265,7 +1310,6 @@ const Leads: React.FC = () => {
             position: "relative",
           }}
         >
-          {/* Left arrow — small screens only */}
           <Box
             className="tab-scroll-arrow tab-scroll-arrow-left"
             onClick={() => scrollTabs("left")}
@@ -1284,7 +1328,6 @@ const Leads: React.FC = () => {
             <ChevronLeftIcon sx={{ fontSize: 16 }} />
           </Box>
 
-          {/* Scrollable tab strip */}
           <Box
             ref={tabScrollRef}
             className="pill-tabs-scroll"
@@ -1297,15 +1340,10 @@ const Leads: React.FC = () => {
               minWidth: 0,
               alignItems: "center",
               pb: { xs: "3px", lg: 0 },
-              /* thin scrollbar only on small screens */
               scrollbarWidth: { xs: "thin", lg: "none" } as never,
               scrollbarColor: "#D1D5DB transparent",
-              "&::-webkit-scrollbar": {
-                height: { xs: "3px", lg: "0px" },
-              },
-              "&::-webkit-scrollbar-track": {
-                background: "transparent",
-              },
+              "&::-webkit-scrollbar": { height: { xs: "3px", lg: "0px" } },
+              "&::-webkit-scrollbar-track": { background: "transparent" },
               "&::-webkit-scrollbar-thumb": {
                 background: "#D1D5DB",
                 borderRadius: "4px",
@@ -1332,7 +1370,6 @@ const Leads: React.FC = () => {
             ))}
           </Box>
 
-          {/* Right arrow — small screens only */}
           <Box
             className="tab-scroll-arrow tab-scroll-arrow-right"
             onClick={() => scrollTabs("right")}
@@ -1362,62 +1399,33 @@ const Leads: React.FC = () => {
             flexShrink: 1,
             width: { xs: "100%", lg: "auto" },
             alignItems: { xs: "stretch", sm: "center" },
+            position: "relative",
+            zIndex: 5,
+            flexWrap: { xs: "nowrap", lg: "nowrap" },
           }}
         >
-          <Box sx={{ width: { xs: "100%", sm: 150, lg: 136 } }}>
-            <Box
-              component="select"
-              aria-label="Select Industry"
-              value={selectedIndustry}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
-                const nextIndustry = event.target.value;
-                setSelectedIndustry(nextIndustry);
-                setSelectedPipelineId("");
-              }}
-              style={{
-                width: "100%",
-                height: 34,
-                borderRadius: 8,
-                border: "1px solid #D0D5DD",
-                padding: "0 10px",
-                fontSize: 13,
-                backgroundColor: "#fff",
-              }}
-            >
-              <option value="">All Industries</option>
-              {industryOptions.map((industry) => (
-                <option key={industry} value={industry}>
-                  {industry.toUpperCase()}
-                </option>
-              ))}
-            </Box>
-          </Box>
-
-          <Box sx={{ width: { xs: "100%", sm: 170, lg: 148 } }}>
-            <Box
-              component="select"
-              aria-label="Select Pipeline"
-              value={selectedPipelineId}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                setSelectedPipelineId(event.target.value)
-              }
-              style={{
-                width: "100%",
-                height: 34,
-                borderRadius: 8,
-                border: "1px solid #D0D5DD",
-                padding: "0 10px",
-                fontSize: 13,
-                backgroundColor: "#fff",
-              }}
-            >
-              <option value="">All Pipelines</option>
-              {filteredPipelinesByIndustry.map((pipeline) => (
-                <option key={pipeline.id} value={pipeline.id}>
-                  {pipeline.pipeline_name}
-                </option>
-              ))}
-            </Box>
+          <Box
+            sx={{
+              minHeight: 34,
+              border: "1px solid #D0D5DD",
+              borderRadius: 1,
+              px: 1.25,
+              display: "flex",
+              alignItems: "center",
+              backgroundColor: "#F8FAFC",
+              color: "#344054",
+              fontSize: 13,
+              fontWeight: 600,
+              width: { xs: "100%", sm: "auto" },
+            }}
+          >
+            {selectedPipelineId
+              ? `Default Pipeline: ${
+                  availablePipelines.find(
+                    (pipeline) => pipeline.id === selectedPipelineId,
+                  )?.pipeline_name ?? "-"
+                }`
+              : "Default Pipeline: -"}
           </Box>
         </Stack>
       </Stack>
@@ -1449,32 +1457,13 @@ const Leads: React.FC = () => {
             </Box>
           }
         >
-          {tab === 1 && (
-            <LeadsFollowUp
-              search={search}
-              filters={activeFilters}
-              canEditLeads={canEditLeads}
-            />
-          )}
-          {tab === 3 && <LeadsConversation />}
-          {tab === 4 && <Activity />}
-          {tab === 5 && (
-            <LeadsCalendar
-              leads={leads}
-              search={search}
-              filters={activeFilters}
-            />
-          )}
-          {tab !== 1 &&
-            tab !== 3 &&
-            tab !== 4 &&
-            tab !== 5 &&
+          {tab === 0 &&
             (viewMode === "table" ? (
               <LeadsTable
                 search={search}
-                tab={tab === 2 ? "archived" : "active"}
+                tab="active"
                 filters={activeFilters}
-                importedLeads={tab === 0 ? importedLeads : []}
+                importedLeads={importedLeads}
                 canEditLeads={canEditLeads}
                 selectedIndustry={selectedIndustry}
                 selectedPipelineId={selectedPipelineId}
@@ -1488,8 +1477,36 @@ const Leads: React.FC = () => {
                 selectedPipelineId={selectedPipelineId}
               />
             ))}
+          {tab === 1 && (
+            <LeadsFollowUp
+              search={search}
+              filters={activeFilters}
+              canEditLeads={canEditLeads}
+            />
+          )}
+          {tab === 2 && (
+            <LeadsTable
+              search={search}
+              tab="archived"
+              filters={activeFilters}
+              importedLeads={[]}
+              canEditLeads={canEditLeads}
+              selectedIndustry={selectedIndustry}
+              selectedPipelineId={selectedPipelineId}
+            />
+          )}
+          {tab === 3 && <LeadsConversation />}
+          {tab === 4 && <Activity />}
+          {tab === 5 && (
+            <LeadsCalendar
+              leads={leads}
+              search={search}
+              filters={activeFilters}
+            />
+          )}
         </React.Suspense>
       )}
+
       {filterOpen && (
         <React.Suspense fallback={null}>
           <FilterDialog

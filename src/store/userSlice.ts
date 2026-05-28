@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { usersApi } from "../services/users.api";
 import type { UserRecord } from "../services/users.api";
 import { AxiosError } from "axios";
+import type { RootState } from ".";
 
 type UsersState = {
   data: UserRecord[];
@@ -54,3 +55,5 @@ const usersSlice = createSlice({
 });
 
 export default usersSlice.reducer;
+
+export const selectUsers = (state: RootState) => state.users.data;

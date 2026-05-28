@@ -11,16 +11,21 @@ import styles from '../../../styles/Template/TemplateTable.module.css';
 
 interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: any[]; 
+  data: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onAction: (type: 'view' | 'edit' | 'copy' | 'delete', template: any) => void;
+  onAction: (type: "view" | "edit" | "copy" | "delete", template: any) => void;
   canEditTemplate?: boolean;
+  useCases: {
+    id: string;
+    name: string;
+  }[];
 }
 
 export const EmailTemplateTable: React.FC<Props> = ({
   data = [],
   onAction,
   canEditTemplate = true,
+  useCases
 }) => {
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
@@ -89,7 +94,13 @@ export const EmailTemplateTable: React.FC<Props> = ({
               visibleRows.map((row) => {
                 const templateName = row.audience_name || row.name || 'Untitled Template';
                 const subject = row.subject || '--';
-                const useCase = row.use_case || row.useCase || 'General';
+                const useCase =
+                  typeof row.use_case === "object"
+                    ? row.use_case?.name
+                    : useCases.find((u) => u.id === row.use_case)?.name ||
+                      row.useCase ||
+                      row.use_case_name ||
+                      "General";
                 const date = row.modified_at || row.lastUpdatedAt || row.created_at || row.createdAt || 'N/A';
                 const author = row.created_by_name || row.createdBy || 'System';
 
@@ -104,30 +115,66 @@ export const EmailTemplateTable: React.FC<Props> = ({
                       {subject}
                     </TableCell>
                     <TableCell>
-                      <Chip 
-                        label={useCase} 
-                        sx={{ 
-                          color: ui.color, 
-                          bgcolor: ui.bgColor, 
-                          border: `1px solid ${ui.borderColor}`, 
-                          fontWeight: 600, 
-                          fontSize: '11px', 
-                          height: '24px', 
-                          borderRadius: '100px' 
-                        }} 
+                      <Chip
+                        label={useCase}
+                        sx={{
+                          color: ui.color,
+                          bgcolor: ui.bgColor,
+                          border: `1px solid ${ui.borderColor}`,
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          height: "24px",
+                          borderRadius: "100px",
+                        }}
                       />
                     </TableCell>
                     <TableCell className={styles.dateCell}>
                       {formatDisplayDate(date)}
                     </TableCell>
-                    <TableCell className={styles.authorCell}>{author}</TableCell>
+                    <TableCell className={styles.authorCell}>
+                      {author}
+                    </TableCell>
                     <TableCell align="right">
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('view', row)}><Visibility fontSize="inherit" /></IconButton>
-                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('edit', row)} disabled={!canEditTemplate}><Edit fontSize="inherit" /></IconButton>
-                        <IconButton size="small" sx={{ color: '#5A8AEA' }} onClick={() => onAction('copy', row)}><ContentCopy fontSize="inherit" /></IconButton>
-                        <IconButton size="small" onClick={() => onAction('delete', row)} sx={{ p: 0.5 }} disabled={!canEditTemplate}>
-                          <img src={TrashIcon} alt="Delete" style={{ width: '18px', height: '18px' }} />
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          gap: 1,
+                        }}
+                      >
+                        <IconButton
+                          size="small"
+                          sx={{ color: "#5A8AEA" }}
+                          onClick={() => onAction("view", row)}
+                        >
+                          <Visibility fontSize="inherit" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          sx={{ color: "#5A8AEA" }}
+                          onClick={() => onAction("edit", row)}
+                          disabled={!canEditTemplate}
+                        >
+                          <Edit fontSize="inherit" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          sx={{ color: "#5A8AEA" }}
+                          onClick={() => onAction("copy", row)}
+                        >
+                          <ContentCopy fontSize="inherit" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => onAction("delete", row)}
+                          sx={{ p: 0.5 }}
+                          disabled={!canEditTemplate}
+                        >
+                          <img
+                            src={TrashIcon}
+                            alt="Delete"
+                            style={{ width: "18px", height: "18px" }}
+                          />
                         </IconButton>
                       </Box>
                     </TableCell>

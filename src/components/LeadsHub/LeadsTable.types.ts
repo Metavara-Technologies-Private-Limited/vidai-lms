@@ -10,6 +10,7 @@ export interface RawLead {
   next_action_description?: string;
   next_action_status?: string;
   next_action_type?: string;
+  action_status?: string | null;
   task_type?: string;
   nextActionType?: string;
   taskType?: string;
@@ -25,11 +26,16 @@ export interface RawLead {
   activity?: string;
   initials?: string;
   department_id?: number;
+  clinic_id?: number | string;
+  quality?: "Hot" | "Warm" | "Cold";
+  last_interaction_at?: string;
 }
+
+export type Quality = "Hot" | "Warm" | "Cold";
 
 export interface ProcessedLead extends RawLead {
   assigned: string;
-  quality: "Hot" | "Warm" | "Cold";
+  quality: Quality;
   displayId: string;
   taskType: string;
   taskStatus: string;

@@ -48,10 +48,16 @@ export interface CreateTicketRequest {
   status?: TicketStatus;
   due_date?: string | null; // ISO date format (YYYY-MM-DD)
   documents?: TicketDocument[];
+  // Zapier payload fields for backend ticket email webhook
+  event?: "ticket_created";
+  clinicName?: string;
+  to?: string[];
+  cc?: string[];
+  email_body?: string;
 }
 
 // Update Ticket Request
-export interface UpdateTicketRequest {
+export type UpdateTicketRequest = Partial<{
   subject: string;
   description: string;
   lab: string;
@@ -64,14 +70,24 @@ export interface UpdateTicketRequest {
   type?: string;
   due_date?: string | null;
   documents?: TicketDocument[];
-}
-
+  event?: "ticket_updated";
+  clinicName?: string;
+  to?: string[];
+  cc?: string[];
+  email_body?: string;
+}>;
 export interface UpdateTicketStatusPayload {
   status: TicketStatus;
   priority: TicketPriority;
   assigned_to?: number | null;
   assigned_to_name?: string;
   type?: string;
+  // Zapier payload fields for backend ticket email webhook
+  event?: "ticket_updated";
+  clinicName?: string;
+  to?: string[];
+  cc?: string[];
+  email_body?: string;
 }
 
 // Ticket List Item (for list view)
@@ -89,6 +105,7 @@ export interface TicketListItem {
   priority: TicketPriority;
   assigned_to_id?: number | null;
   assigned_to_name?: string;
+  assigned_to_email?: string;
   status: TicketStatus;
 }
 
@@ -106,6 +123,7 @@ export interface TicketDetail {
   type: string;
   assigned_to_id?: number | null;
   assigned_to_name?: string;
+  assigned_to_email?: string; 
   priority: TicketPriority;
   status: TicketStatus;
   due_date?: string | null;
@@ -117,6 +135,8 @@ export interface TicketDetail {
   deleted_at?: string | null;
   documents?: TicketDocument[];
   timeline?: TicketTimeline[];
+  email_history?: TicketReplyResponse[];
+  
 }
 
 // Ticket Filters (for list API)
@@ -211,9 +231,11 @@ export interface EmailTemplate {
 export interface TicketReplyRequest {
   subject: string;
   message: string;
+  sender_email?: string | null;
   to: string[];
   cc?: string[];
   bcc?: string[];
+  attachment_ids?: string[];
 }
 
 export interface TicketReplyResponse {

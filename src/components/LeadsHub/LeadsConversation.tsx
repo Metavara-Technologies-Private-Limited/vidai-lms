@@ -721,7 +721,21 @@ export default function LeadsConversation() {
               </Stack>
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 {activeLead.department_name && <Chip label={activeLead.department_name} size="small" sx={{ bgcolor: "#f3f4f6", color: "#374151", fontSize: 11 }} />}
-                {activeLead.treatment_interest && <Chip label={activeLead.treatment_interest} size="small" sx={{ bgcolor: "#ede9fe", color: "#7b61ff", fontSize: 11 }} />}
+                {activeLead.treatment_interest && (
+  <Chip
+    label={
+      Array.isArray(activeLead.treatment_interest)
+        ? activeLead.treatment_interest
+            .map((item) =>
+              typeof item === "string" ? item : item.name
+            )
+            .join(", ")
+        : activeLead.treatment_interest
+    }
+    size="small"
+    sx={{ bgcolor: "#ede9fe", color: "#7b61ff", fontSize: 11 }}
+  />
+)}
                 {activeLead.source && <Chip label={`Source: ${activeLead.source}`} size="small" sx={{ bgcolor: "#f0fdf4", color: "#16a34a", fontSize: 11 }} />}
                 {activeLead.assigned_to_name && <Chip label={`Assigned: ${activeLead.assigned_to_name}`} size="small" sx={{ bgcolor: "#fff7ed", color: "#ea580c", fontSize: 11 }} />}
               </Stack>

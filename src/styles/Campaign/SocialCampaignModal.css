@@ -221,7 +221,7 @@ select:invalid {
   background: #BDBDBD;
   cursor: not-allowed;
 }
-.MuiInputBase-root {
+.campaign-modal .MuiInputBase-root {
   font-family: 'Montserrat', sans-serif !important;
   background-color: #ffffff !important;
 }
@@ -230,43 +230,43 @@ select:invalid {
   width: 100% !important;
 }
 
-.MuiOutlinedInput-root {
+.campaign-modal .MuiOutlinedInput-root {
   height: 56px !important;
   border-radius: 8px !important;
   padding: 20px 14px 8px !important;
   box-sizing: border-box;
 }
 
-.MuiOutlinedInput-input {
+.campaign-modal .MuiOutlinedInput-input {
   padding: 0 !important;
   font-size: 14px !important;
 }
 
-.MuiInputAdornment-root {
+.campaign-modal .MuiInputAdornment-root {
   margin-right: 4px !important;
 }
 
-.MuiOutlinedInput-notchedOutline {
+.campaign-modal .MuiOutlinedInput-notchedOutline {
   border-width: 1.5px !important;
 }
 
-.MuiOutlinedInput-notchedOutline {
+.campaign-modal .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
 }
 
-.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+.campaign-modal .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
 }
 
-.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+.campaign-modal .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
   background-color: #ffffff !important;
 }
 
-.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
+.campaign-modal .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
 }
-.MuiOutlinedInput-root.Mui-focused.Mui-error .MuiOutlinedInput-notchedOutline {
+.campaign-modal .MuiOutlinedInput-root.Mui-focused.Mui-error .MuiOutlinedInput-notchedOutline {
   border: 1.5px solid #E2E3E5 !important;
 }
 
@@ -274,7 +274,7 @@ select:invalid {
   border: 1px solid #6B6B6B !important;
 }
 
-.MuiFormLabel-root {
+.campaign-modal .MuiFormLabel-root {
   color: #6B6B6B !important;
 }
 
@@ -282,7 +282,7 @@ select:invalid {
   color: #E11D48 !important;
 }
 
-.MuiPickersLayout-root {
+.campaign-modal .MuiPickersLayout-root {
   font-family: 'Montserrat', sans-serif !important;
 }
 
@@ -300,7 +300,7 @@ select:invalid {
   font-size: 14px !important;
 }
 
-.MuiSelect-select.MuiSelect-select {
+.campaign-modal .MuiSelect-select.MuiSelect-select {
   font-style: normal !important;
 }
 
@@ -338,11 +338,12 @@ select:invalid {
   flex: 1;
   border: 1.5px solid #CBD5E1;
   border-radius: 16px;
-  padding: 16px 18px;
+  padding: 20px 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
+  position: relative;
 }
 
 .account-card.selected {
@@ -1062,4 +1063,15 @@ select:invalid {
   font-weight: bold;
   cursor: pointer;
   padding: 0;
+}
+
+.connection-chip {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  height: 18px !important;
+  font-size: 10px !important;
+  border-radius: 16px !important;
+  padding: 0 2px !important;
+  z-index: 2;
 }
