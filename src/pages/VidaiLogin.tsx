@@ -53,6 +53,8 @@ function resolveInitialLanguage(): LanguageCode {
   return legacyMap[normalized] || "en";
 }
 
+const SHOW_CLIENT_PORTAL_LOGIN = false;
+
 export default function VidaiLogin() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
@@ -325,16 +327,18 @@ export default function VidaiLogin() {
 
             {error ? <p className={styles.errorText}>{error}</p> : null}
 
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isExternalLogin}
-                  onChange={handleAuthModeToggle}
-                  size="small"
-                />
-              }
-              label="Use client portal login"
-            />
+            {SHOW_CLIENT_PORTAL_LOGIN ? (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isExternalLogin}
+                    onChange={handleAuthModeToggle}
+                    size="small"
+                  />
+                }
+                label="Use client portal login"
+              />
+            ) : null}
 
             <button
               className={styles.loginButton}
