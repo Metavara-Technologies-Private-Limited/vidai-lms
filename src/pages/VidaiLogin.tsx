@@ -160,11 +160,10 @@ export default function VidaiLogin() {
     const doAutoLogin = async () => {
       try {
         setLoading(true);
-        setIsExternalLogin(true);
 
         const loginRes = await authApi.login(
           { username: decodedUser.trim(), password: decodedPass.trim() },
-          "EXT",
+          "INT",
         );
 
         const authUser = buildAuthUserFromLogin(
@@ -190,7 +189,7 @@ export default function VidaiLogin() {
             token: loginRes.token,
             refresh: loginRes.refresh,
             user: authUser,
-            loginType: "EXT",
+            loginType: "INT",
           }),
         );
 
