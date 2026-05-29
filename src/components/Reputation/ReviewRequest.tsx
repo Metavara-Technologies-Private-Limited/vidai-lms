@@ -29,8 +29,11 @@ import {
   formatDate,
   formatTime,
   getScheduledDateTime,
+  getMessageCharacterCount,
   isFieldFilled,
   isRequestNameValid,
+  REVIEW_REQUEST_BODY_MAX_LENGTH,
+  REVIEW_REQUEST_SUBJECT_MAX_LENGTH,
   sanitizeRequestNameInput,
   type ReviewRequestFormData,
 } from "./reviewRequest.utils";
@@ -65,8 +68,10 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
   );
   const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
   const [fileName, setFileName] = useState("");
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [defaultClinicEmail, setDefaultClinicEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveDraftFlow, setSaveDraftFlow] = useState(false);
   const isSubmittingRef = useRef(false);
   const [formData, setFormData] = useState<ReviewRequestFormData>(() =>
     createInitialReviewRequestFormData(),
@@ -77,6 +82,8 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       dispatch(fetchLeads());
     }
   }, [open, allLeads.length, dispatch]);
+
+
 
   useEffect(() => {
     if (!open) {
@@ -178,6 +185,24 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     toast.warning(message, { toastId: `review-request-warning-${message}` });
   };
 
+useEffect(() => {
+  const handleInvalidDescription = () => {
+    showErrorToast("Starts with Alphabets only");
+  };
+
+  window.addEventListener(
+    "review-description-invalid",
+    handleInvalidDescription,
+  );
+
+  return () => {
+    window.removeEventListener(
+      "review-description-invalid",
+      handleInvalidDescription,
+    );
+  };
+}, []);
+
   const showSavingToast = () =>
     toast.loading("Saving review request...", {
       toastId: "review-request-saving",
@@ -197,6 +222,7 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     setLeadSelectionType("all");
     setSelectedLeads([]);
     setFileName("");
+    setAttachmentFiles([]);
     setDefaultClinicEmail("");
     setIsSubmitting(false);
     isSubmittingRef.current = false;
@@ -267,6 +293,8 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
     const isEmailMode = formData.mode === "email";
     const subjectEmpty = isEmailMode && !isFieldFilled(formData.subject);
     const messageEmpty = !isFieldFilled(formData.message);
+    const subjectLength = formData.subject.length;
+    const messageLength = getMessageCharacterCount(formData.message);
 
     if (subjectEmpty && messageEmpty) {
       showErrorToast("Please fill all fields");
@@ -277,7 +305,21 @@ const ReviewRequest = ({ open, onClose, onOpenChange }: ReviewRequestProps) => {
       return false;
     }
 
+    if (isEmailMode && subjectLength > REVIEW_REQUEST_SUBJECT_MAX_LENGTH) {
+      showErrorToast(
+        `Subject cannot exceed ${REVIEW_REQUEST_SUBJECT_MAX_LENGTH} characters`,
+      );
+      return false;
+    }
+
     if (!validateMandatoryField(formData.message, "Message")) {
+      return false;
+    }
+
+    if (messageLength > REVIEW_REQUEST_BODY_MAX_LENGTH) {
+      showErrorToast(
+        `Message cannot exceed ${REVIEW_REQUEST_BODY_MAX_LENGTH} characters`,
+      );
       return false;
     }
 
@@ -514,6 +556,7 @@ Please share your valuable feedback here:
 
       const response = (await reputationApi.createRequest(
         payload,
+        attachmentFiles,
       )) as CreateRequestResponse;
 
       // Only prepend the request card if:
@@ -572,12 +615,14 @@ Please share your valuable feedback here:
   const handleSaveAsDraft = async () => {
     if (step === 1) {
       if (!validateStep1()) return;
+      setSaveDraftFlow(true);
       setStep(2);
       return;
     }
 
     if (step === 2) {
       if (!validateStep2()) return;
+      setSaveDraftFlow(true);
       setStep(3);
       return;
     }
@@ -589,12 +634,14 @@ Please share your valuable feedback here:
   const handlePrimaryAction = async () => {
     if (step === 1) {
       if (!validateStep1()) return;
+      setSaveDraftFlow(false);
       setStep(2);
       return;
     }
 
     if (step === 2) {
       if (!validateStep2()) return;
+      setSaveDraftFlow(false);
       setStep(3);
       return;
     }
@@ -607,6 +654,9 @@ Please share your valuable feedback here:
   };
 
   const handleRequestNameChange = (rawValue: string) => {
+
+
+
     const sanitized = sanitizeRequestNameInput(rawValue);
 
     if (sanitized === null) {
@@ -617,14 +667,57 @@ Please share your valuable feedback here:
     setFormData((prev) => ({ ...prev, request_name: sanitized }));
   };
 
+const handleDescriptionChange = (rawValue: string) => {
+  // Allow empty for clearing
+  if (rawValue === "") {
+    setFormData((prev) => ({ ...prev, description: "" }));
+    return;
+  }
+
+  // Check ONLY first character
+  const firstChar = rawValue.charAt(0);
+
+  if (!/[A-Za-z]/.test(firstChar)) {
+    showErrorToast("Starts with Alphabets only");
+    return;
+  }
+
+  setFormData((prev) => ({
+    ...prev,
+    description: rawValue,
+  }));
+};
+
   const handleFileSelect = (file: File) => {
+    if (!file?.name) {
+      return;
+    }
     const maxSize = 25 * 1024 * 1024;
     if (file.size > maxSize) {
       showErrorToast("File is too large. Please select a file under 25MB.");
-      setFileName("");
       return;
     }
+    setAttachmentFiles((prev) => {
+      const exists = prev.some(
+        (item) =>
+          item.name === file.name &&
+          item.size === file.size &&
+          item.lastModified === file.lastModified,
+      );
+      if (exists) {
+        return prev;
+      }
+      return [...prev, file];
+    });
     setFileName(file.name);
+  };
+
+  const handleFileRemove = (targetFileName: string) => {
+    setAttachmentFiles((prev) => {
+      const next = prev.filter((file) => file.name !== targetFileName);
+      setFileName(next.length ? next[next.length - 1].name : "");
+      return next;
+    });
   };
 
   return (
@@ -683,14 +776,17 @@ Please share your valuable feedback here:
             onRequestNameBlur={() => {
               validateRequestName(formData.request_name, true);
             }}
-            onDescriptionChange={(value) => {
-              setFormData((prev) => ({ ...prev, description: value }));
-            }}
-            onDescriptionBlur={() => {
-              if (!isFieldFilled(formData.description)) {
-                showErrorToast("Description needed");
-              }
-            }}
+onDescriptionChange={handleDescriptionChange}
+onDescriptionBlur={() => {
+  if (!isFieldFilled(formData.description)) {
+    showErrorToast("Description needed");
+    return;
+  }
+
+  if (!/^[A-Za-z]/.test(formData.description)) {
+    showErrorToast("Starts with Alphabets only");
+  }
+}}
             onLeadSelectionTypeChange={handleLeadSelectionTypeChange}
             onSelectedLeadsChange={setSelectedLeads}
             leadActionFilter={leadActionFilter}
@@ -705,11 +801,13 @@ Please share your valuable feedback here:
           <ReviewRequestStepContent
             formData={formData}
             fileName={fileName}
+            attachmentFiles={attachmentFiles}
             coralRadio={coralRadio}
             onModeChange={(value) => {
               setFormData((prev) => ({
                 ...prev,
                 mode: value,
+                ...(prev.mode !== value ? { message: "" } : {}),
                 ...(value === "email" && !prev.from_email && defaultClinicEmail
                   ? { from_email: defaultClinicEmail }
                   : {}),
@@ -725,11 +823,22 @@ Please share your valuable feedback here:
               setFormData((prev) => ({ ...prev, bcc_emails: value }));
             }}
             onSubjectChange={(value) => {
-              setFormData((prev) => ({ ...prev, subject: value }));
+              const nextValue = value.slice(
+                0,
+                REVIEW_REQUEST_SUBJECT_MAX_LENGTH,
+              );
+              setFormData((prev) => ({ ...prev, subject: nextValue }));
             }}
             onSubjectBlur={() => {
               if (formData.mode === "email") {
                 validateMandatoryField(formData.subject, "Subject");
+                if (
+                  formData.subject.length > REVIEW_REQUEST_SUBJECT_MAX_LENGTH
+                ) {
+                  showErrorToast(
+                    `Subject cannot exceed ${REVIEW_REQUEST_SUBJECT_MAX_LENGTH} characters`,
+                  );
+                }
               }
             }}
             onMessageChange={(value) => {
@@ -737,8 +846,17 @@ Please share your valuable feedback here:
             }}
             onMessageBlur={() => {
               validateMandatoryField(formData.message, "Message");
+              if (
+                getMessageCharacterCount(formData.message) >
+                REVIEW_REQUEST_BODY_MAX_LENGTH
+              ) {
+                showErrorToast(
+                  `Message cannot exceed ${REVIEW_REQUEST_BODY_MAX_LENGTH} characters`,
+                );
+              }
             }}
             onFileSelect={handleFileSelect}
+            onFileRemove={handleFileRemove}
           />
         )}
 
@@ -856,7 +974,15 @@ Please share your valuable feedback here:
             "&:hover": { background: "#333" },
           }}
         >
-          {isSubmitting ? "Saving..." : "Save & Continue"}
+          {isSubmitting
+            ? "Saving..."
+            : step === 3
+              ? saveDraftFlow
+                ? "Save Request"
+                : formData.is_scheduled === "no"
+                  ? "Send Request"
+                  : "Schedule Request"
+              : "Save & Continue"}
         </Button>
       </Box>
     </Dialog>

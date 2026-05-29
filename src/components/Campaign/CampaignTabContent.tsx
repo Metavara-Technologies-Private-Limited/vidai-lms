@@ -20,27 +20,28 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// ✅ NEW: adInsights shape passed from CampaignDashboard
+interface AdInsights {
+  impressions: number;
+  clicks: number;
+  spend: string;
+  reach: string;
+  cpc: string;
+  cpm: string;
+  conversions: number;
+  total_budget: string;
+  conversion_rate: string;
+  ctr: string;
+  currency?: string;
+}
+
 interface Props {
   campaign: Campaign;
   activeTab: string;
   activeSubTab: string;
+  adInsights?: AdInsights; // ✅ NEW: real insights from parent
+  platformInsights?: Record<string, AdInsights>;
 }
-
-// const performanceData = [
-//   { date: "1 Jan", facebook: 650, instagram: 520 },
-//   { date: "2 Jan", facebook: 630, instagram: 600 },
-//   { date: "3 Jan", facebook: 520, instagram: 480 },
-//   { date: "4 Jan", facebook: 280, instagram: 320 },
-//   { date: "5 Jan", facebook: 240, instagram: 260 },
-//   { date: "6 Jan", facebook: 620, instagram: 580 },
-//   { date: "7 Jan", facebook: 160, instagram: 220 },
-// ];
-
-// const platformData = [
-//   { name: "Instagram", value: 30, color: "#A8AEBF" },
-//   { name: "Facebook", value: 20, color: "#C5CAD8" },
-//   { name: "LinkedIn", value: 50, color: "#8D95A8" },
-// ];
 
 const PIE_COLORS: Record<string, string> = {
   instagram: "#A8AEBF",
@@ -50,74 +51,205 @@ const PIE_COLORS: Record<string, string> = {
   google_ads: "#4285F4",
 };
 
-// Kept as fallback for social (FB insights pending app review)
-const performanceData = [
-  { date: "1 Jan", facebook: 650, instagram: 520 },
-  { date: "2 Jan", facebook: 630, instagram: 600 },
-  { date: "3 Jan", facebook: 520, instagram: 480 },
-  { date: "4 Jan", facebook: 280, instagram: 320 },
-  { date: "5 Jan", facebook: 240, instagram: 260 },
-  { date: "6 Jan", facebook: 620, instagram: 580 },
-  { date: "7 Jan", facebook: 160, instagram: 220 },
-];
+// ─── FIX: CSS injected once to make links in content clickable & highlighted ──
+// This targets <a> tags inside the campaign content rendering area.
+// We use a style tag approach since we can't modify the CSS file from here.
+const LINK_STYLES = `
+  .cd-content-text a,
+  .cd-content-html-body a {
+    color: #2563eb !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+    word-break: break-all;
+  }
+  .cd-content-text a:hover,
+  .cd-content-html-body a:hover {
+    color: #1d4ed8 !important;
+    text-decoration: underline !important;
+  }
+  .cd-content-html-body {
+    line-height: 1.6;
+  }
+`;
+
+// ─── FIX: Detect if content is HTML (has tags) or plain text ─────────────────
+const isHtmlContent = (str: string): boolean => /<[a-z][\s\S]*>/i.test(str);
+
+// ─── FIX: Auto-linkify plain text URLs for view display ──────────────────────
+// When content is plain text (not HTML), convert bare URLs to clickable links.
+const linkifyPlainText = (text: string): string => {
+  return text.replace(
+    /(https?:\/\/[^\s<>"']+)/gi,
+    '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;cursor:pointer;word-break:break-all;">$1</a>'
+  );
+};
 
 const CampaignTabContent: React.FC<Props> = ({
   campaign,
   activeTab,
   activeSubTab,
+  adInsights, // ✅ NEW
+  platformInsights,
 }) => {
   const [selectedPlatform, setSelectedPlatform] = React.useState<
-    "facebook" | "instagram"
+    "facebook" | "instagram" | "google_ads" | "linkedin"
   >("facebook");
 
   // ─── Resolve content & image for the active platform ────────────────────
-  const platformData_raw: Record<string, string> =
+  const platformData_raw: Record<string, any> =
     (campaign as any).platform_data ?? {};
 
-  // Get the text for the active sub-tab platform (or fall back to campaign_content)
   const activePlatformKey = (activeSubTab || "").toLowerCase();
+
+  // ✅ FIX: platform_data.linkedin is now a dict {content, location, bid_strategy, bid_amount}
+  // Extract .content if it's an object, otherwise use as string directly
+  const rawPlatformValue = platformData_raw[activePlatformKey];
   const platformText: string =
-    platformData_raw[activePlatformKey] ||
+    (typeof rawPlatformValue === "object" && rawPlatformValue !== null
+      ? (rawPlatformValue.content ?? "")
+      : (rawPlatformValue ?? "")) ||
     (campaign as any).campaign_content ||
     "";
 
-  // Image URL stored on the campaign
-  const imageUrl: string = (campaign as any).image_url || "";
-
-  // Parse the text — strip raw URLs (they are shown as image), extract hashtags
   const URL_REGEX = /https?:\/\/\S+/gi;
-  const cleanedText = platformText.replace(URL_REGEX, "").trim();
-  const lines = cleanedText.split("\n").filter((l) => l.trim());
-  const hashtagLine = lines.find((l) => l.trim().startsWith("#")) || "";
-  const bodyLines = lines.filter((l) => l.trim() && !l.trim().startsWith("#"));
+
+  // ✅ CHANGED: extractImageUrl now checks platform_data[activePlatformKey].image_url
+  // as the FIRST priority source, before falling back to the top-level campaign.image_url
+  // and then to URL scanning. This means images saved per-platform inside platform_data
+  // (as set by the updated SocialCampaignModal) are shown correctly per platform tab.
+  const extractImageUrl = (): string => {
+    // ── 0. Per-platform image_url inside platform_data (HIGHEST priority) ──
+    if (
+      activePlatformKey &&
+      typeof rawPlatformValue === "object" &&
+      rawPlatformValue !== null &&
+      rawPlatformValue.image_url
+    ) {
+      return String(rawPlatformValue.image_url);
+    }
+
+    // ── 1. Scan all platform_data entries for any image_url field ──────────
+    for (const key of Object.keys(platformData_raw)) {
+      const val = platformData_raw[key];
+      if (
+        typeof val === "object" &&
+        val !== null &&
+        val.image_url
+      ) {
+        return String(val.image_url);
+      }
+    }
+
+    // ── 2. Top-level image_url on campaign (backward compatibility) ─────────
+    const direct = (campaign as any).image_url || "";
+    if (direct) return direct;
+
+    // ── 3. Scan platformText for image-like URL ─────────────────────────────
+    // Only scan if platformText is plain text (not HTML with links)
+    if (!isHtmlContent(platformText)) {
+      const urlsInPlatformText = platformText.match(URL_REGEX) || [];
+      const imageFromPlatformText = urlsInPlatformText.find(
+        (url) =>
+          /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
+          url.includes("unsplash.com") ||
+          url.includes("images.") ||
+          url.includes("imgur.com") ||
+          url.includes("cloudinary.com") ||
+          url.includes("googleapis.com") ||
+          url.includes("amazonaws.com") ||
+          url.includes("cdn."),
+      );
+      if (imageFromPlatformText) return imageFromPlatformText;
+    }
+
+    // ── 4. First URL found in platformText (plain text only) ───────────────
+    if (!isHtmlContent(platformText)) {
+      const urlsInPlatformText = platformText.match(URL_REGEX) || [];
+      if (urlsInPlatformText.length > 0) return urlsInPlatformText[0] ?? "";
+    }
+
+    // ── 5. Scan all platform_data values for any URL (text-based scan) ─────
+    for (const key of Object.keys(platformData_raw)) {
+      const val = platformData_raw[key];
+      const text =
+        typeof val === "object" && val !== null
+          ? (val.content ?? "")
+          : (val ?? "");
+      const textStr = String(text);
+      if (!isHtmlContent(textStr)) {
+        const urls = textStr.match(URL_REGEX) || [];
+        if (urls.length > 0) return urls[0] ?? "";
+      }
+    }
+
+    // ── 6. Scan campaign_content for any URL ────────────────────────────────
+    const campaignContent = (campaign as any).campaign_content || "";
+    if (!isHtmlContent(campaignContent)) {
+      const urlsInContent = campaignContent.match(URL_REGEX) || [];
+      if (urlsInContent.length > 0) return urlsInContent[0] ?? "";
+    }
+
+    return "";
+  };
+
+  const imageUrl: string = extractImageUrl();
+
+  // ─── FIX: cleanedText & line splitting only for plain text content ────────
+  // For HTML content, we render it directly with dangerouslySetInnerHTML.
+  // For plain text, we split into lines as before.
+  const isHtml = isHtmlContent(platformText);
+
+  const cleanedText = !isHtml && imageUrl
+    ? platformText.replace(imageUrl, "").trim()
+    : platformText.trim();
+
+  const lines = isHtml ? [] : cleanedText.split("\n").filter((l) => l.trim());
+  const hashtagLine = isHtml ? "" : (lines.find((l) => l.trim().startsWith("#")) || "");
+  const bodyLines = isHtml ? [] : lines.filter((l) => l.trim() && !l.trim().startsWith("#"));
+
+  const currencySymbol =
+    (platformInsights?.[selectedPlatform]?.currency ?? adInsights?.currency) ===
+    "INR"
+      ? "₹"
+      : "$";
 
   /* ================= CONTENT ================= */
   if (activeTab === "Content") {
     const hasImage = Boolean(imageUrl);
-    const hasText = bodyLines.length > 0 || platformText;
+    // FIX: for HTML content, hasText checks the raw HTML string length
+    const hasText = isHtml
+      ? platformText.trim().length > 0
+      : (bodyLines.length > 0 || platformText.trim().length > 0);
 
     return (
       <div className="cd-content-card">
-        {/* Text side */}
+        {/* Inject link styles once */}
+        <style>{LINK_STYLES}</style>
+
         <div
           className="cd-content-text"
           style={{ flex: hasImage ? "1 1 55%" : "1 1 100%" }}
         >
-          {/* Campaign name as title */}
           <h3 className="cd-content-title">{campaign.name}</h3>
 
-          {/* Body paragraphs */}
           {hasText ? (
-            platformText.trim().startsWith("<") ? (
+            isHtml ? (
+              // ─── FIX: HTML content (has <a> tags, <b>, etc.) ─────────────
+              // Rendered with dangerouslySetInnerHTML so links are clickable.
+              // Links are styled blue + underline via the injected LINK_STYLES.
               <div
+                className="cd-content-html-body"
                 dangerouslySetInnerHTML={{ __html: platformText }}
-                style={{ lineHeight: 1.6 }}
               />
             ) : (
+              // ─── Plain text content ───────────────────────────────────────
+              // Run linkifyPlainText so any bare URLs become clickable links.
               bodyLines.map((line, i) => (
-                <p key={i} style={{ marginBottom: "10px", lineHeight: 1.6 }}>
-                  {line}
-                </p>
+                <p
+                  key={i}
+                  style={{ marginBottom: "10px", lineHeight: 1.6 }}
+                  dangerouslySetInnerHTML={{ __html: linkifyPlainText(line) }}
+                />
               ))
             )
           ) : (
@@ -126,11 +258,9 @@ const CampaignTabContent: React.FC<Props> = ({
             </p>
           )}
 
-          {/* Hashtags */}
           {hashtagLine && <p className="cd-content-tags">{hashtagLine}</p>}
         </div>
 
-        {/* Image side — only render if image exists */}
         {hasImage && (
           <div className="cd-content-image">
             <img
@@ -143,7 +273,6 @@ const CampaignTabContent: React.FC<Props> = ({
                 borderRadius: "12px",
               }}
               onError={(e) => {
-                // Hide image container if load fails
                 (e.currentTarget.parentElement as HTMLElement).style.display =
                   "none";
               }}
@@ -156,87 +285,253 @@ const CampaignTabContent: React.FC<Props> = ({
 
   /* ================= PERFORMANCE ================= */
   if (activeTab === "Performance") {
+    const platforms: string[] = (campaign as any).platforms ?? [];
+    const isEmail = campaign.type === "email";
+
+    const selectedInsights = platformInsights?.[selectedPlatform] ?? adInsights;
+
+    const impressions = selectedInsights?.impressions ?? 0;
+
+    const clicks = selectedInsights?.clicks ?? 0;
+
+    const ctr = selectedInsights?.ctr ?? "0";
+
+    const cpc = selectedInsights?.cpc ?? "0";
+
+    const spend = selectedInsights?.spend ?? "0";
+
+    const conversions = selectedInsights?.conversions ?? 0;
+
+    const hasRealData = impressions > 0 || clicks > 0 || parseFloat(spend) > 0;
+
+    const chartData = hasRealData
+      ? [
+          { metric: "Impressions", value: impressions },
+          { metric: "Clicks", value: clicks },
+          { metric: "Conversions", value: conversions },
+        ]
+      : [];
+
+    const availablePlatforms = platforms.filter((p) =>
+      ["facebook", "instagram", "google_ads", "linkedin"].includes(p),
+    );
+
     return (
       <div className="cd-performance-card">
-        <h4 className="cd-perf-title">Impressions</h4>
+        <h4 className="cd-perf-title">Performance Overview</h4>
         <div className="cd-perf-divider"></div>
+
         <div className="cd-perf-row">
           <div className="cd-perf-left">
             <div className="cd-perf-number">
-              {campaign.type === "email"
+              {isEmail
                 ? ((campaign as any).impressions ?? 0)
-                : "—"}
+                : hasRealData
+                  ? impressions.toLocaleString()
+                  : "—"}
             </div>
             <div className="cd-perf-sub">
-              {campaign.type === "email" ? "Total Opens" : "Pending App Review"}
+              {isEmail
+                ? "Total Opens"
+                : hasRealData
+                  ? "Total Impressions"
+                  : "No data yet"}
             </div>
           </div>
 
-          <div className="cd-platform-toggle">
-            <label>
-              <input
-                type="radio"
-                checked={selectedPlatform === "facebook"}
-                onChange={() => setSelectedPlatform("facebook")}
-              />
-              Facebook
-            </label>
-
-            <label>
-              <input
-                type="radio"
-                checked={selectedPlatform === "instagram"}
-                onChange={() => setSelectedPlatform("instagram")}
-              />
-              Instagram
-            </label>
-          </div>
+          {!isEmail && availablePlatforms.length > 0 && (
+            <div className="cd-platform-toggle">
+              {availablePlatforms.map((p) => (
+                <label key={p}>
+                  <input
+                    type="radio"
+                    checked={selectedPlatform === p}
+                    onChange={() => setSelectedPlatform(p as any)}
+                  />
+                  {p === "google_ads"
+                    ? "Google Ads"
+                    : p.charAt(0).toUpperCase() + p.slice(1)}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
-        <ResponsiveContainer width="100%" height={210} minWidth={0}>
-          <LineChart
-            data={performanceData}
-            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+
+        {!isEmail && hasRealData && (
+          <div
+            style={{
+              display: "flex",
+              gap: "16px",
+              marginBottom: "20px",
+              flexWrap: "wrap",
+            }}
           >
-            <defs>
-              <filter id="lineShadow" height="200%">
-                <feDropShadow
-                  dx="0"
-                  dy="4"
-                  stdDeviation="8"
-                  floodColor="#5B6EF5"
-                  floodOpacity="0.15"
-                />
-              </filter>
-            </defs>
-            <CartesianGrid
-              strokeDasharray="4 4"
-              vertical={false}
-              stroke="#F1F1F1"
-            />
-            <XAxis
-              dataKey="date"
-              axisLine={false}
-              tickLine={false}
-              stroke="#9E9E9E"
-            />
-            <YAxis axisLine={false} tickLine={false} stroke="#9E9E9E" />
-            <Tooltip content={<CustomTooltip />} />
-            <Line
-              type="natural"
-              dataKey={selectedPlatform}
-              stroke="#5B6EF5"
-              strokeWidth={2.5}
-              dot={false}
-              filter="url(#lineShadow)"
-              activeDot={{
-                r: 6,
-                stroke: "#ffffff",
-                strokeWidth: 3,
-                fill: "#5B6EF5",
-              }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+            {[
+              {
+                label: "Impressions",
+                value: impressions.toLocaleString(),
+                color: "#5B6EF5",
+              },
+              {
+                label: "Clicks",
+                value: clicks.toLocaleString(),
+                color: "#47B35F",
+              },
+              {
+                label: "CTR",
+                value: `${parseFloat(ctr).toFixed(2)}%`,
+                color: "#ECB856",
+              },
+              {
+                label: "Avg CPC",
+                value: `${currencySymbol}${parseFloat(cpc).toFixed(2)}`,
+                color: "#F25B5B",
+              },
+              {
+                label: "Cost",
+                value: `${currencySymbol}${parseFloat(spend).toFixed(2)}`,
+                color: "#835DEF",
+              },
+              {
+                label: "Conversions",
+                value: String(conversions),
+                color: "#2D6BF0",
+              },
+            ].map((m) => (
+              <div
+                key={m.label}
+                style={{
+                  flex: "1 1 130px",
+                  background: "#f9f9fb",
+                  borderRadius: "12px",
+                  padding: "14px 16px",
+                  borderLeft: `4px solid ${m.color}`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "#888",
+                    marginBottom: "4px",
+                  }}
+                >
+                  {m.label}
+                </div>
+                <div
+                  style={{ fontSize: "18px", fontWeight: 700, color: "#222" }}
+                >
+                  {m.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isEmail ? (
+          <ResponsiveContainer width="100%" height={210} minWidth={0}>
+            <LineChart
+              data={[
+                { date: "Opens", value: (campaign as any).impressions ?? 0 },
+                { date: "Clicks", value: (campaign as any).clicks ?? 0 },
+                { date: "Bounces", value: (campaign as any).bounces ?? 0 },
+                {
+                  date: "Unsubscribes",
+                  value: (campaign as any).unsubscribes ?? 0,
+                },
+              ]}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="4 4"
+                vertical={false}
+                stroke="#F1F1F1"
+              />
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                stroke="#9E9E9E"
+              />
+              <YAxis axisLine={false} tickLine={false} stroke="#9E9E9E" />
+              <Tooltip content={<CustomTooltip />} />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#5B6EF5"
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: "#5B6EF5" }}
+                activeDot={{
+                  r: 6,
+                  stroke: "#ffffff",
+                  strokeWidth: 3,
+                  fill: "#5B6EF5",
+                }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : hasRealData && chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={210} minWidth={0}>
+            <LineChart
+              data={chartData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <defs>
+                <filter id="lineShadow" height="200%">
+                  <feDropShadow
+                    dx="0"
+                    dy="4"
+                    stdDeviation="8"
+                    floodColor="#5B6EF5"
+                    floodOpacity="0.15"
+                  />
+                </filter>
+              </defs>
+              <CartesianGrid
+                strokeDasharray="4 4"
+                vertical={false}
+                stroke="#F1F1F1"
+              />
+              <XAxis
+                dataKey="metric"
+                axisLine={false}
+                tickLine={false}
+                stroke="#9E9E9E"
+              />
+              <YAxis axisLine={false} tickLine={false} stroke="#9E9E9E" />
+              <Tooltip content={<CustomTooltip />} />
+              <Line
+                type="natural"
+                dataKey="value"
+                stroke="#5B6EF5"
+                strokeWidth={2.5}
+                dot={{ r: 5, fill: "#5B6EF5" }}
+                filter="url(#lineShadow)"
+                activeDot={{
+                  r: 6,
+                  stroke: "#ffffff",
+                  strokeWidth: 3,
+                  fill: "#5B6EF5",
+                }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div
+            style={{
+              height: 210,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#aaa",
+              fontSize: "14px",
+              background: "#fafafa",
+              borderRadius: "12px",
+            }}
+          >
+            No performance data yet — insights will appear after Zapier fetches
+            them.
+          </div>
+        )}
       </div>
     );
   }
@@ -263,7 +558,6 @@ const CampaignTabContent: React.FC<Props> = ({
         color: PIE_COLORS[p] ?? "#ccc",
       }));
 
-    // fallback: if no budget data (organic), show equal split
     const pieData =
       platformData.length > 0
         ? platformData
@@ -398,7 +692,10 @@ const CampaignTabContent: React.FC<Props> = ({
                     style={{ background: p.color }}
                   />
                   <img
-                    src={platformIconMap[p.name.toLowerCase().replace(" ", "_")] ?? instagramIcon}
+                    src={
+                      platformIconMap[p.name.toLowerCase().replace(" ", "_")] ??
+                      instagramIcon
+                    }
                     alt={p.name}
                   />
                   {p.name}
@@ -411,8 +708,12 @@ const CampaignTabContent: React.FC<Props> = ({
               <PlatformCard
                 key={p}
                 icon={platformIconMap[p] ?? instagramIcon}
-                title={p === "google_ads" ? "Google Ads" : p.charAt(0).toUpperCase() + p.slice(1)}
-                spend={`$${budgetRaw[p] ?? 0}`}
+                title={
+                  p === "google_ads"
+                    ? "Google Ads"
+                    : p.charAt(0).toUpperCase() + p.slice(1)
+                }
+                spend={`${currencySymbol}${budgetRaw[p] ?? 0}`}
                 conversion={String(leadCount)}
               />
             ))}
@@ -422,6 +723,7 @@ const CampaignTabContent: React.FC<Props> = ({
     );
   }
 
+  /* ================= AI INSIGHTS ================= */
   if (activeTab === "AI Insights") {
     const isEmail = campaign.type === "email";
     const platforms: string[] = (campaign as any).platforms ?? [];
@@ -433,7 +735,9 @@ const CampaignTabContent: React.FC<Props> = ({
       [...platforms].sort(
         (a, b) => (budgetRaw[b] ?? 0) - (budgetRaw[a] ?? 0),
       )[0] ?? "facebook";
-    const cpa = leadCount > 0 ? (totalBudget / leadCount).toFixed(2) : null;
+    const actualSpend = parseFloat(adInsights?.spend ?? "0");
+
+    const cpa = leadCount > 0 ? (actualSpend / leadCount).toFixed(2) : null;
 
     return (
       <div className="cd-ai-wrapper">
@@ -447,7 +751,7 @@ const CampaignTabContent: React.FC<Props> = ({
             <p>
               {isEmail
                 ? `Your email campaign achieved ${(campaign as any).impressions ?? 0} opens and ${(campaign as any).clicks ?? 0} clicks with a ${(campaign as any).conversion_rate ?? 0}% conversion rate.`
-                : `${topPlatform === "google_ads" ? "Google Ads" : topPlatform.charAt(0).toUpperCase() + topPlatform.slice(1)} has the highest budget allocation at $${budgetRaw[topPlatform] ?? 0}. Monitor leads closely from this platform.`}
+                : `${topPlatform === "google_ads" ? "Google Ads" : topPlatform.charAt(0).toUpperCase() + topPlatform.slice(1)} has the highest budget allocation at ${currencySymbol}${budgetRaw[topPlatform] ?? 0}. Monitor leads closely from this platform.`}
             </p>
           </div>
 
@@ -473,8 +777,8 @@ const CampaignTabContent: React.FC<Props> = ({
             <div className="cd-ai-heading">Budget Efficiency</div>
             <p>
               {cpa
-                ? `Current Cost Per Acquisition is $${cpa} based on ${leadCount} lead${leadCount !== 1 ? "s" : ""} from a $${totalBudget} budget.`
-                : `Total budget is $${totalBudget}. No conversions tracked yet — ensure your landing page captures leads correctly.`}
+                ? `Current Cost Per Acquisition is ${currencySymbol}${cpa} based on ${leadCount} lead${leadCount !== 1 ? "s" : ""} from a ${currencySymbol}${totalBudget} budget.`
+                : `Total budget is ${currencySymbol}${totalBudget}. No conversions tracked yet — ensure your landing page captures leads correctly.`}
             </p>
           </div>
         </div>
@@ -488,17 +792,15 @@ const CampaignTabContent: React.FC<Props> = ({
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div
-        style={{
-          background: "#ffffff",
-          padding: "8px 14px",
-          borderRadius: "10px",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
-          fontSize: "13px",
-          fontWeight: 500,
-        }}
-      >
-        {payload[0].value} Impressions
+      <div style={{
+        background: "#ffffff",
+        padding: "8px 14px",
+        borderRadius: "10px",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
+        fontSize: "13px",
+        fontWeight: 500,
+      }}>
+        {payload[0].value?.toLocaleString()} {payload[0].payload?.metric ?? "Impressions"}
       </div>
     );
   }
@@ -506,10 +808,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 const PlatformCard = ({
-  icon,
-  title,
-  spend,
-  conversion,
+  icon, title, spend, conversion,
 }: {
   icon: string;
   title: string;

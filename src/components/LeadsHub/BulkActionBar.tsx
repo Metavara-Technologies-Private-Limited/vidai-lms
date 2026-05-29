@@ -65,6 +65,9 @@ import type { EmailTemplate } from "../../services/leads.api";
 import { clinicsApi } from "../../services/tickets.api";
 import TemplateService from "../../services/templates.api";
 import ArchiveLeadDialog from "./ArchiveLeadDialog";
+import { UseCaseAPI } from "../../services/usecase.api";
+import type { UseCase } from "../../services/usecase.api";
+import { selectClinic } from "../../store/clinicSlice";
 
 // ── Strip HTML ────────────────────────────────────────────────────────
 const decodeEntities = (str: string): string => {
@@ -150,6 +153,7 @@ interface Props {
   onDelete: () => void;
   onArchive: (archive: boolean) => void;
   onExport?: () => void;
+  onExportAll?: () => void;
   onSendEmail?: (to: string, subject: string, body: string, templateId?: string) => void;
   onSendSMS?: (leadIds: string[], message: string) => void;
 }
@@ -208,7 +212,7 @@ const RecipientPickerPopover: React.FC<PickerPopoverProps> = ({ open, anchorEl, 
 );
 
 // ─────────────────────────────────────────────────────────────────────
-const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive, onExport, onSendEmail, onSendSMS }) => {
+const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive, onExport, onExportAll, onSendEmail, onSendSMS }) => {
   const dispatch    = useDispatch<AppDispatch>();
   const deletingIds = useSelector(selectDeletingIds);
 
@@ -280,6 +284,30 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
   const [newTplError,   setNewTplError]   = useState<string | null>(null);
   const [newTplView,    setNewTplView]    = useState<"form" | "preview">("form");
   const [useCaseAnchor, setUseCaseAnchor] = useState<null | HTMLElement>(null);
+  const clinic = useSelector(selectClinic);
+  const CLINIC_ID = clinic?.id;
+
+  const [useCases, setUseCases] = useState<UseCase[]>([]);
+
+  useEffect(() => {
+    if (!CLINIC_ID) return;
+
+    UseCaseAPI.getUseCases(CLINIC_ID)
+      .then((data) => {
+        setUseCases(data || []);
+      })
+      .catch(() => {
+        setUseCases([]);
+      });
+  }, [CLINIC_ID]);
+
+  const getUseCaseName = (useCase: unknown, useCases: UseCase[]): string => {
+    if (!useCase) return "";
+
+    const found = useCases.find((uc) => String(uc.id) === String(useCase));
+
+    return found?.name || String(useCase);
+  };
 
   // ── Picker outside-click handlers ────────────────────────────────
   useEffect(() => {
@@ -543,82 +571,462 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
 
   // ─────────────────────────────────────────────────────────────────
   return (
-    <Box sx={{ position: "sticky", bottom: 0, backgroundColor: "#fff", borderTop: "1px solid #E5E7EB", py: 1.5, px: 2, mt: 2, zIndex: 20 }}>
-      <input ref={fileInputRef}  type="file" multiple style={{ display: "none" }} onChange={(e) => { const files = Array.from(e.target.files || []); if (!files.length) return; saveCursor(); insertAtCursor(`\n[📎 ${files.map((f) => f.name).join(", ")}]\n`); e.target.value = ""; }} />
-      <input ref={imageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; saveCursor(); insertAtCursor(`\n[🖼 ${file.name}]\n`); e.target.value = ""; }} />
+    <Box
+      sx={{
+        position: "sticky",
+        bottom: 0,
+        backgroundColor: "#fff",
+        borderTop: "1px solid #E5E7EB",
+        py: 1.5,
+        px: 2,
+        mt: 2,
+        zIndex: 20,
+      }}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const files = Array.from(e.target.files || []);
+          if (!files.length) return;
+          saveCursor();
+          insertAtCursor(`\n[📎 ${files.map((f) => f.name).join(", ")}]\n`);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          saveCursor();
+          insertAtCursor(`\n[🖼 ${file.name}]\n`);
+          e.target.value = "";
+        }}
+      />
 
       {/* Action Buttons */}
       <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
-        <Button variant="outlined" startIcon={someDeleting || isDeleting ? <CircularProgress size={16} sx={{ color: "black" }} /> : <DeleteOutlineOutlinedIcon />} onClick={() => { setOpenDelete(true); setDeleteError(null); }} disabled={anyProcessing} sx={{ color: "black", borderColor: "black", "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" } }}>
+        <Button
+          variant="outlined"
+          startIcon={
+            someDeleting || isDeleting ? (
+              <CircularProgress size={16} sx={{ color: "black" }} />
+            ) : (
+              <DeleteOutlineOutlinedIcon />
+            )
+          }
+          onClick={() => {
+            setOpenDelete(true);
+            setDeleteError(null);
+          }}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
+          }}
+        >
           {someDeleting || isDeleting ? "Deleting..." : "Delete"}
         </Button>
-        <Button variant="outlined" startIcon={isArchiving ? <CircularProgress size={16} sx={{ color: "black" }} /> : tab === "active" ? <ArchiveOutlinedIcon /> : <UnarchiveOutlinedIcon />} onClick={() => { setOpenArchive(true); setArchiveError(null); }} disabled={anyProcessing} sx={{ color: "black", borderColor: "black", "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" } }}>
-          {isArchiving ? (tab === "active" ? "Archiving..." : "Restoring...") : tab === "active" ? "Archive" : "Restore"}
+        <Button
+          variant="outlined"
+          startIcon={
+            isArchiving ? (
+              <CircularProgress size={16} sx={{ color: "black" }} />
+            ) : tab === "active" ? (
+              <ArchiveOutlinedIcon />
+            ) : (
+              <UnarchiveOutlinedIcon />
+            )
+          }
+          onClick={() => {
+            setOpenArchive(true);
+            setArchiveError(null);
+          }}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
+          }}
+        >
+          {isArchiving
+            ? tab === "active"
+              ? "Archiving..."
+              : "Restoring..."
+            : tab === "active"
+              ? "Archive"
+              : "Restore"}
         </Button>
-        <Button variant="outlined" startIcon={<ChatBubbleOutlineIcon />} onClick={openSMSCompose} disabled={anyProcessing} sx={{ color: "black", borderColor: "black", "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" } }}>SMS</Button>
-        <Button variant="outlined" startIcon={loadingLeads ? <CircularProgress size={16} sx={{ color: "black" }} /> : <EmailOutlinedIcon />} onClick={handleOpenEmail} disabled={anyProcessing || loadingLeads} sx={{ color: "black", borderColor: "black", "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" } }}>
+        <Button
+          variant="outlined"
+          startIcon={<ChatBubbleOutlineIcon />}
+          onClick={openSMSCompose}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
+          }}
+        >
+          SMS
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={
+            loadingLeads ? (
+              <CircularProgress size={16} sx={{ color: "black" }} />
+            ) : (
+              <EmailOutlinedIcon />
+            )
+          }
+          onClick={handleOpenEmail}
+          disabled={anyProcessing || loadingLeads}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
+          }}
+        >
           {loadingLeads ? "Loading..." : "Email"}
         </Button>
-        <Button variant="outlined" startIcon={<img src={ExportIcon} alt="Export" width={18} height={18} />} onClick={onExport} disabled={anyProcessing} sx={{ color: "black", borderColor: "black", "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" } }}>Export</Button>
+        <Button
+          variant="outlined"
+          startIcon={
+            <img src={ExportIcon} alt="Export" width={18} height={18} />
+          }
+          onClick={onExport}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
+          }}
+        >
+          Export
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={
+            <img
+              src={ExportIcon}
+              alt="Export all leads"
+              width={18}
+              height={18}
+            />
+          }
+          onClick={onExportAll}
+          disabled={anyProcessing}
+          sx={{
+            color: "black",
+            borderColor: "black",
+            "&:disabled": { color: "#9CA3AF", borderColor: "#E5E7EB" },
+          }}
+        >
+          Export All Leads
+        </Button>
       </Stack>
 
       {/* ── Delete Dialog ── */}
-      <Dialog open={openDelete} onClose={() => !isDeleting && setOpenDelete(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "16px", px: 3, py: 4, textAlign: "center" } }}>
-        <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center", mx: "auto", mb: 2.5 }}>
+      <Dialog
+        open={openDelete}
+        onClose={() => !isDeleting && setOpenDelete(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: "16px", px: 3, py: 4, textAlign: "center" },
+        }}
+      >
+        <Box
+          sx={{
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            bgcolor: "#FEF2F2",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            mx: "auto",
+            mb: 2.5,
+          }}
+        >
           <DeleteOutlineOutlinedIcon sx={{ fontSize: 30, color: "#EF4444" }} />
         </Box>
-        <Typography fontWeight={700} fontSize="18px" color="#111827" mb={1.5}>Delete Lead</Typography>
-        <Typography fontSize="14px" color="#6B7280" lineHeight={1.6} mb={2} px={1}>This action cannot be undone. Are you sure you want to Delete selected Lead permanently?</Typography>
-        {deleteError && <Alert severity="error" sx={{ borderRadius: "10px", mb: 2, textAlign: "left" }}>{deleteError}</Alert>}
+        <Typography fontWeight={700} fontSize="18px" color="#111827" mb={1.5}>
+          Delete Lead
+        </Typography>
+        <Typography
+          fontSize="14px"
+          color="#6B7280"
+          lineHeight={1.6}
+          mb={2}
+          px={1}
+        >
+          This action cannot be undone. Are you sure you want to Delete selected
+          Lead permanently?
+        </Typography>
+        {deleteError && (
+          <Alert
+            severity="error"
+            sx={{ borderRadius: "10px", mb: 2, textAlign: "left" }}
+          >
+            {deleteError}
+          </Alert>
+        )}
         <Stack direction="row" spacing={1.5}>
-          <Button fullWidth onClick={() => { setOpenDelete(false); setDeleteError(null); }} disabled={isDeleting} sx={{ height: 48, fontWeight: 600, textTransform: "none", borderRadius: "10px", bgcolor: "#F3F4F6", color: "#374151", "&:hover": { bgcolor: "#E5E7EB" } }}>Cancel</Button>
-          <Button fullWidth onClick={handleDelete} disabled={isDeleting} sx={{ height: 48, fontWeight: 600, textTransform: "none", borderRadius: "10px", bgcolor: "#1F2937", color: "#fff", "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "#fff" } }}>
-            {isDeleting ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Delete"}
+          <Button
+            fullWidth
+            onClick={() => {
+              setOpenDelete(false);
+              setDeleteError(null);
+            }}
+            disabled={isDeleting}
+            sx={{
+              height: 48,
+              fontWeight: 600,
+              textTransform: "none",
+              borderRadius: "10px",
+              bgcolor: "#F3F4F6",
+              color: "#374151",
+              "&:hover": { bgcolor: "#E5E7EB" },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            fullWidth
+            onClick={handleDelete}
+            disabled={isDeleting}
+            sx={{
+              height: 48,
+              fontWeight: 600,
+              textTransform: "none",
+              borderRadius: "10px",
+              bgcolor: "#1F2937",
+              color: "#fff",
+              "&:hover": { bgcolor: "#111827" },
+              "&:disabled": { bgcolor: "#9CA3AF", color: "#fff" },
+            }}
+          >
+            {isDeleting ? (
+              <CircularProgress size={18} sx={{ color: "white" }} />
+            ) : (
+              "Delete"
+            )}
           </Button>
         </Stack>
       </Dialog>
 
       {/* ── Archive Dialog ── */}
-      <ArchiveLeadDialog open={openArchive} onClose={() => !isArchiving && setOpenArchive(false)} leadName={`${selectedIds.length} lead${selectedIds.length > 1 ? "s" : ""}`} onConfirm={handleArchiveConfirm} isUnarchive={tab === "archived"} isArchiving={isArchiving} error={archiveError} />
+      <ArchiveLeadDialog
+        open={openArchive}
+        onClose={() => !isArchiving && setOpenArchive(false)}
+        leadName={`${selectedIds.length} lead${selectedIds.length > 1 ? "s" : ""}`}
+        onConfirm={handleArchiveConfirm}
+        isUnarchive={tab === "archived"}
+        isArchiving={isArchiving}
+        error={archiveError}
+      />
 
       {/* ══════════════════════════════════════════════════════════════
           EMAIL — STEP 1: Template selector
       ══════════════════════════════════════════════════════════════ */}
-      <Dialog open={emailStep === "selector"} onClose={() => setEmailStep(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}>
-        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Dialog
+        open={emailStep === "selector"}
+        onClose={() => setEmailStep(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}
+      >
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderBottom: "1px solid #E5E7EB",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Box>
-            <Typography fontWeight={700} fontSize="1.05rem">New Email</Typography>
-            <Typography variant="caption" color="text.secondary">Sending to {selectedIds.length} lead{selectedIds.length > 1 ? "s" : ""}</Typography>
+            <Typography fontWeight={700} fontSize="1.05rem">
+              New Email
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Sending to {selectedIds.length} lead
+              {selectedIds.length > 1 ? "s" : ""}
+            </Typography>
           </Box>
-          <IconButton onClick={() => setEmailStep(null)}><CloseIcon /></IconButton>
+          <IconButton onClick={() => setEmailStep(null)}>
+            <CloseIcon />
+          </IconButton>
         </Box>
         <DialogContent sx={{ pt: 2 }}>
           {/* Compose from scratch */}
-          <Box onClick={() => { setSelectedTemplate(null); setEmailSubject(""); setEmailBody(""); setEmailStep("composer"); setEmailError(null); }} sx={{ border: "1px dashed #D1D5DB", borderRadius: 2, py: 3, textAlign: "center", cursor: "pointer", mb: 2.5, "&:hover": { bgcolor: "#F9FAFB", borderColor: "#9CA3AF" }, transition: "all 0.15s" }}>
+          <Box
+            onClick={() => {
+              setSelectedTemplate(null);
+              setEmailSubject("");
+              setEmailBody("");
+              setEmailStep("composer");
+              setEmailError(null);
+            }}
+            sx={{
+              border: "1px dashed #D1D5DB",
+              borderRadius: 2,
+              py: 3,
+              textAlign: "center",
+              cursor: "pointer",
+              mb: 2.5,
+              "&:hover": { bgcolor: "#F9FAFB", borderColor: "#9CA3AF" },
+              transition: "all 0.15s",
+            }}
+          >
             <EditOutlinedIcon sx={{ color: "#6B7280" }} />
-            <Typography fontWeight={500} mt={0.75} color="#374151">Compose New Email</Typography>
-            <Typography variant="caption" color="text.secondary">Write a custom message from scratch</Typography>
+            <Typography fontWeight={500} mt={0.75} color="#374151">
+              Compose New Email
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Write a custom message from scratch
+            </Typography>
           </Box>
 
-          <Divider sx={{ mb: 2 }}><Typography fontSize="12px" color="text.secondary">OR USE A TEMPLATE</Typography></Divider>
+          <Divider sx={{ mb: 2 }}>
+            <Typography fontSize="12px" color="text.secondary">
+              OR USE A TEMPLATE
+            </Typography>
+          </Divider>
 
-          {templatesLoading && <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}><CircularProgress size={22} /></Box>}
-          {!templatesLoading && templatesError && <Alert severity="warning" sx={{ borderRadius: "8px", mb: 1.5, fontSize: "13px" }} action={<Button size="small" onClick={() => { setTemplatesLoading(true); EmailTemplateAPI.list().then((d) => setEmailTemplates(d.filter((t) => t.is_active !== false))).catch(() => setTemplatesError("Could not load templates.")).finally(() => setTemplatesLoading(false)); }}>Retry</Button>}>{templatesError}</Alert>}
-          {!templatesLoading && !templatesError && emailTemplates.length === 0 && <Box sx={{ textAlign: "center", py: 4 }}><Typography color="text.secondary" fontSize="14px">No email templates found.</Typography></Box>}
+          {templatesLoading && (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
+              <CircularProgress size={22} />
+            </Box>
+          )}
+          {!templatesLoading && templatesError && (
+            <Alert
+              severity="warning"
+              sx={{ borderRadius: "8px", mb: 1.5, fontSize: "13px" }}
+              action={
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setTemplatesLoading(true);
+                    EmailTemplateAPI.list()
+                      .then((d) =>
+                        setEmailTemplates(
+                          d.filter((t) => t.is_active !== false),
+                        ),
+                      )
+                      .catch(() =>
+                        setTemplatesError("Could not load templates."),
+                      )
+                      .finally(() => setTemplatesLoading(false));
+                  }}
+                >
+                  Retry
+                </Button>
+              }
+            >
+              {templatesError}
+            </Alert>
+          )}
+          {!templatesLoading &&
+            !templatesError &&
+            emailTemplates.length === 0 && (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Typography color="text.secondary" fontSize="14px">
+                  No email templates found.
+                </Typography>
+              </Box>
+            )}
           {!templatesLoading && emailTemplates.length > 0 && (
             <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
               {emailTemplates.map((t) => (
-                <Box key={t.id} onClick={() => handleSelectTemplate(t)} sx={{ display: "flex", alignItems: "center", py: 1.5, px: 0.5, borderBottom: "1px solid #F3F4F6", cursor: "pointer", borderRadius: 1, bgcolor: selectedTemplate?.id === t.id ? "#F0F9FF" : "transparent", "&:hover": { bgcolor: selectedTemplate?.id === t.id ? "#F0F9FF" : "#F9FAFB" }, transition: "background 0.15s" }}>
-                  <Radio checked={selectedTemplate?.id === t.id} onChange={() => handleSelectTemplate(t)} size="small" sx={{ color: selectedTemplate?.id === t.id ? "#EF4444" : "#CBD5E1", "&.Mui-checked": { color: "#EF4444" } }} />
+                <Box
+                  key={t.id}
+                  onClick={() => handleSelectTemplate(t)}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    py: 1.5,
+                    px: 0.5,
+                    borderBottom: "1px solid #F3F4F6",
+                    cursor: "pointer",
+                    borderRadius: 1,
+                    bgcolor:
+                      selectedTemplate?.id === t.id ? "#F0F9FF" : "transparent",
+                    "&:hover": {
+                      bgcolor:
+                        selectedTemplate?.id === t.id ? "#F0F9FF" : "#F9FAFB",
+                    },
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <Radio
+                    checked={selectedTemplate?.id === t.id}
+                    onChange={() => handleSelectTemplate(t)}
+                    size="small"
+                    sx={{
+                      color:
+                        selectedTemplate?.id === t.id ? "#EF4444" : "#CBD5E1",
+                      "&.Mui-checked": { color: "#EF4444" },
+                    }}
+                  />
                   <Box sx={{ flex: 1, ml: 0.5, minWidth: 0 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography fontSize="13.5px" fontWeight={600} color="#1E293B" noWrap>{t.name}</Typography>
-                      {t.use_case && <Chip label={t.use_case} size="small" sx={{ ...getUseCaseSx(t.use_case), fontSize: "11px", height: 20, textTransform: "capitalize" }} />}
+                      <Typography
+                        fontSize="13.5px"
+                        fontWeight={600}
+                        color="#1E293B"
+                        noWrap
+                      >
+                        {t.name}
+                      </Typography>
+                      {t.use_case && (
+                        <Chip
+                          label={getUseCaseName(t.use_case, useCases)}
+                          size="small"
+                          sx={{
+                            ...getUseCaseSx(
+                              getUseCaseName(t.use_case, useCases),
+                            ),
+                            fontSize: "11px",
+                            height: 20,
+                            textTransform: "capitalize",
+                          }}
+                        />
+                      )}
                     </Stack>
-                    {t.subject && <Typography fontSize="11px" color="#94A3B8" mt={0.25} noWrap>Subject: {t.subject}</Typography>}
+                    {t.subject && (
+                      <Typography
+                        fontSize="11px"
+                        color="#94A3B8"
+                        mt={0.25}
+                        noWrap
+                      >
+                        Subject: {t.subject}
+                      </Typography>
+                    )}
                   </Box>
                   <Tooltip title="Preview template">
-                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); setPreviewTemplate(t); }} sx={{ color: "#93C5FD", ml: 1, "&:hover": { color: "#3B82F6", bgcolor: "#EFF6FF" } }}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewTemplate(t);
+                      }}
+                      sx={{
+                        color: "#93C5FD",
+                        ml: 1,
+                        "&:hover": { color: "#3B82F6", bgcolor: "#EFF6FF" },
+                      }}
+                    >
                       <VisibilityOutlinedIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                   </Tooltip>
@@ -628,133 +1036,546 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
-          <Button onClick={() => setEmailStep(null)} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>Cancel</Button>
-          <Button onClick={() => { setEmailStep("composer"); setEmailError(null); }} variant="contained" disabled={!selectedTemplate} sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" } }}>Continue</Button>
+          <Button
+            onClick={() => setEmailStep(null)}
+            sx={{
+              height: 40,
+              color: "#374151",
+              fontWeight: 500,
+              textTransform: "none",
+              borderRadius: "8px",
+              border: "1px solid #E5E7EB",
+              px: 3,
+              "&:hover": { bgcolor: "#F3F4F6" },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              setEmailStep("composer");
+              setEmailError(null);
+            }}
+            variant="contained"
+            disabled={!selectedTemplate}
+            sx={{
+              height: 40,
+              backgroundColor: "#1F2937",
+              color: "white",
+              fontWeight: 500,
+              textTransform: "none",
+              borderRadius: "8px",
+              px: 3,
+              "&:hover": { backgroundColor: "#111827" },
+              "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" },
+            }}
+          >
+            Continue
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Template preview */}
-      <Dialog open={!!previewTemplate} onClose={() => setPreviewTemplate(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
-        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Dialog
+        open={!!previewTemplate}
+        onClose={() => setPreviewTemplate(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px" } }}
+      >
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderBottom: "1px solid #E5E7EB",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Box>
             <Typography fontWeight={600}>{previewTemplate?.name}</Typography>
-            {previewTemplate?.use_case && <Chip label={previewTemplate.use_case} size="small" sx={{ ...getUseCaseSx(previewTemplate.use_case), fontSize: "11px", height: 20, mt: 0.5, textTransform: "capitalize" }} />}
+            {previewTemplate?.use_case && (
+              <Chip
+                label={getUseCaseName(previewTemplate.use_case, useCases)}
+                size="small"
+                sx={{
+                  ...getUseCaseSx(
+                    getUseCaseName(previewTemplate.use_case, useCases),
+                  ),
+                  fontSize: "11px",
+                  height: 20,
+                  mt: 0.5,
+                  textTransform: "capitalize",
+                }}
+              />
+            )}
           </Box>
-          <IconButton onClick={() => setPreviewTemplate(null)}><CloseIcon /></IconButton>
+          <IconButton onClick={() => setPreviewTemplate(null)}>
+            <CloseIcon />
+          </IconButton>
         </Box>
         <DialogContent sx={{ px: 3 }}>
-          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px" }}>SUBJECT</Typography>
-          <Typography fontWeight={600} fontSize="14px" mb={2} mt={0.5}>{previewTemplate?.subject}</Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            fontWeight={600}
+            sx={{
+              textTransform: "uppercase",
+              fontSize: "0.6rem",
+              letterSpacing: "0.5px",
+            }}
+          >
+            SUBJECT
+          </Typography>
+          <Typography fontWeight={600} fontSize="14px" mb={2} mt={0.5}>
+            {previewTemplate?.subject}
+          </Typography>
           <Divider sx={{ mb: 2 }} />
-          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px" }}>BODY</Typography>
-          <Typography component="pre" sx={{ mt: 0.5, p: 2, bgcolor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "13px", lineHeight: 1.75, fontFamily: "inherit", whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            fontWeight={600}
+            sx={{
+              textTransform: "uppercase",
+              fontSize: "0.6rem",
+              letterSpacing: "0.5px",
+            }}
+          >
+            BODY
+          </Typography>
+          <Typography
+            component="pre"
+            sx={{
+              mt: 0.5,
+              p: 2,
+              bgcolor: "#F8FAFC",
+              borderRadius: "8px",
+              border: "1px solid #E2E8F0",
+              fontSize: "13px",
+              lineHeight: 1.75,
+              fontFamily: "inherit",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              margin: 0,
+            }}
+          >
             {stripHtml(previewTemplate?.body ?? "")}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={() => setPreviewTemplate(null)} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>Close</Button>
-          <Button variant="contained" onClick={() => { if (previewTemplate) handleSelectTemplate(previewTemplate); setPreviewTemplate(null); }} sx={{ height: 40, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, "&:hover": { backgroundColor: "#111827" } }}>Use This Template</Button>
+          <Button
+            onClick={() => setPreviewTemplate(null)}
+            sx={{
+              height: 40,
+              color: "#374151",
+              fontWeight: 500,
+              textTransform: "none",
+              borderRadius: "8px",
+              border: "1px solid #E5E7EB",
+              px: 3,
+              "&:hover": { bgcolor: "#F3F4F6" },
+            }}
+          >
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (previewTemplate) handleSelectTemplate(previewTemplate);
+              setPreviewTemplate(null);
+            }}
+            sx={{
+              height: 40,
+              backgroundColor: "#1F2937",
+              color: "white",
+              fontWeight: 500,
+              textTransform: "none",
+              borderRadius: "8px",
+              px: 3,
+              "&:hover": { backgroundColor: "#111827" },
+            }}
+          >
+            Use This Template
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* ══════════════════════════════════════════════════════════════
           EMAIL — STEP 2: Composer
       ══════════════════════════════════════════════════════════════ */}
-      <Dialog open={emailStep === "composer"} onClose={() => !isSendingEmail && setEmailStep(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}>
+      <Dialog
+        open={emailStep === "composer"}
+        onClose={() => !isSendingEmail && setEmailStep(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}
+      >
         {/* Header */}
-        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderBottom: "1px solid #E5E7EB",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Stack direction="row" spacing={1} alignItems="center">
-            <IconButton size="small" onClick={() => setEmailStep("selector")} disabled={isSendingEmail}><ChevronLeftIcon fontSize="small" /></IconButton>
+            <IconButton
+              size="small"
+              onClick={() => setEmailStep("selector")}
+              disabled={isSendingEmail}
+            >
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
             <Box>
-              <Typography fontWeight={700} fontSize="1.05rem">{selectedTemplate ? selectedTemplate.name : "New Email"}</Typography>
+              <Typography fontWeight={700} fontSize="1.05rem">
+                {selectedTemplate ? selectedTemplate.name : "New Email"}
+              </Typography>
               <Typography variant="caption" color="text.secondary">
-                Sending to {selectedIds.length} lead{selectedIds.length > 1 ? "s" : ""} · {toEmails.length} recipient{toEmails.length !== 1 ? "s" : ""}
+                Sending to {selectedIds.length} lead
+                {selectedIds.length > 1 ? "s" : ""} · {toEmails.length}{" "}
+                recipient{toEmails.length !== 1 ? "s" : ""}
               </Typography>
             </Box>
           </Stack>
-          <IconButton onClick={() => !isSendingEmail && setEmailStep(null)} disabled={isSendingEmail}><CloseIcon /></IconButton>
+          <IconButton
+            onClick={() => !isSendingEmail && setEmailStep(null)}
+            disabled={isSendingEmail}
+          >
+            <CloseIcon />
+          </IconButton>
         </Box>
 
         <DialogContent sx={{ px: 3, pb: 1 }}>
-          {emailError && <Alert severity="error" sx={{ borderRadius: "10px", mb: 2 }} onClose={() => setEmailError(null)}>{emailError}</Alert>}
+          {emailError && (
+            <Alert
+              severity="error"
+              sx={{ borderRadius: "10px", mb: 2 }}
+              onClose={() => setEmailError(null)}
+            >
+              {emailError}
+            </Alert>
+          )}
 
           <Stack spacing={0} divider={<Divider />}>
             {/* FROM */}
             <Box display="flex" alignItems="center" gap={1} py={1.2}>
-              <Typography fontSize="13px" color="text.secondary" minWidth={55}>From:</Typography>
-              <TextField value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} variant="standard" size="small" placeholder="Sender email" sx={{ minWidth: 260, "& .MuiInputBase-input": { fontSize: "13px" } }} InputProps={{ disableUnderline: true }} />
+              <Typography fontSize="13px" color="text.secondary" minWidth={55}>
+                From:
+              </Typography>
+              <TextField
+                value={fromEmail}
+                onChange={(e) => setFromEmail(e.target.value)}
+                variant="standard"
+                size="small"
+                placeholder="Sender email"
+                sx={{
+                  minWidth: 260,
+                  "& .MuiInputBase-input": { fontSize: "13px" },
+                }}
+                InputProps={{ disableUnderline: true }}
+              />
             </Box>
 
             {/* TO */}
-            <Box ref={toRowRef} display="flex" alignItems="flex-start" gap={1} py={1} sx={{ flexWrap: "wrap" }}>
-              <Typography fontSize="13px" color="text.secondary" minWidth={55} mt="8px">To:</Typography>
+            <Box
+              ref={toRowRef}
+              display="flex"
+              alignItems="flex-start"
+              gap={1}
+              py={1}
+              sx={{ flexWrap: "wrap" }}
+            >
+              <Typography
+                fontSize="13px"
+                color="text.secondary"
+                minWidth={55}
+                mt="8px"
+              >
+                To:
+              </Typography>
               <RecipientChipRow
-                emails={toEmails} inputValue={toInput} onInputChange={setToInput}
-                onInputFocus={() => { if (allLeadRecipients.length > 0 && toRowRef.current) setToAnchorEl(toRowRef.current); }}
-                onInputBlur={() => { addEmailsFromInput(toInput, toEmails, setToEmails); setToInput(""); }}
-                onInputKeyDown={(e) => { if (e.key === "Enter" || e.key === "," || e.key === "Tab") { e.preventDefault(); addEmailsFromInput(toInput, toEmails, setToEmails); setToInput(""); } }}
-                onRemove={(email) => setToEmails(toEmails.filter((m) => m !== email))}
-                chipColor={{ bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" }}
+                emails={toEmails}
+                inputValue={toInput}
+                onInputChange={setToInput}
+                onInputFocus={() => {
+                  if (allLeadRecipients.length > 0 && toRowRef.current)
+                    setToAnchorEl(toRowRef.current);
+                }}
+                onInputBlur={() => {
+                  addEmailsFromInput(toInput, toEmails, setToEmails);
+                  setToInput("");
+                }}
+                onInputKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                    e.preventDefault();
+                    addEmailsFromInput(toInput, toEmails, setToEmails);
+                    setToInput("");
+                  }
+                }}
+                onRemove={(email) =>
+                  setToEmails(toEmails.filter((m) => m !== email))
+                }
+                chipColor={{
+                  bg: "#EFF6FF",
+                  text: "#1D4ED8",
+                  border: "#BFDBFE",
+                }}
                 placeholder="Add recipients"
               />
               <Box display="flex" gap={0.75} ml="auto" pt={1} flexShrink={0}>
-                {!showCc  && <Typography fontSize="12px" color="#64748B" fontWeight={500} sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" }, userSelect: "none" }} onClick={() => setShowCc(true)}>Cc</Typography>}
-                {(!showCc || !showBcc) && <Typography fontSize="12px" color="#CBD5E1">|</Typography>}
-                {!showBcc && <Typography fontSize="12px" color="#64748B" fontWeight={500} sx={{ cursor: "pointer", "&:hover": { color: "#1D4ED8" }, userSelect: "none" }} onClick={() => setShowBcc(true)}>Bcc</Typography>}
+                {!showCc && (
+                  <Typography
+                    fontSize="12px"
+                    color="#64748B"
+                    fontWeight={500}
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": { color: "#1D4ED8" },
+                      userSelect: "none",
+                    }}
+                    onClick={() => setShowCc(true)}
+                  >
+                    Cc
+                  </Typography>
+                )}
+                {(!showCc || !showBcc) && (
+                  <Typography fontSize="12px" color="#CBD5E1">
+                    |
+                  </Typography>
+                )}
+                {!showBcc && (
+                  <Typography
+                    fontSize="12px"
+                    color="#64748B"
+                    fontWeight={500}
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": { color: "#1D4ED8" },
+                      userSelect: "none",
+                    }}
+                    onClick={() => setShowBcc(true)}
+                  >
+                    Bcc
+                  </Typography>
+                )}
               </Box>
-              <RecipientPickerPopover open={Boolean(toAnchorEl)} anchorEl={toAnchorEl} onClose={() => setToAnchorEl(null)} paperRef={toPickerPaperRef} leads={allLeadRecipients} selectedEmails={toEmails} onToggle={(email) => toggleEmail(email, toEmails, setToEmails)} />
+              <RecipientPickerPopover
+                open={Boolean(toAnchorEl)}
+                anchorEl={toAnchorEl}
+                onClose={() => setToAnchorEl(null)}
+                paperRef={toPickerPaperRef}
+                leads={allLeadRecipients}
+                selectedEmails={toEmails}
+                onToggle={(email) => toggleEmail(email, toEmails, setToEmails)}
+              />
             </Box>
 
             {/* CC */}
             {(showCc || ccEmails.length > 0) && (
-              <Box ref={ccRowRef} display="flex" alignItems="flex-start" gap={1} py={1} sx={{ flexWrap: "wrap" }}>
-                <Typography fontSize="13px" color="text.secondary" minWidth={55} mt="8px">Cc:</Typography>
+              <Box
+                ref={ccRowRef}
+                display="flex"
+                alignItems="flex-start"
+                gap={1}
+                py={1}
+                sx={{ flexWrap: "wrap" }}
+              >
+                <Typography
+                  fontSize="13px"
+                  color="text.secondary"
+                  minWidth={55}
+                  mt="8px"
+                >
+                  Cc:
+                </Typography>
                 <RecipientChipRow
-                  emails={ccEmails} inputValue={ccInput} onInputChange={setCcInput}
-                  onInputFocus={() => { if (allLeadRecipients.length > 0 && ccRowRef.current) setCcAnchorEl(ccRowRef.current); }}
-                  onInputBlur={() => { addEmailsFromInput(ccInput, ccEmails, setCcEmails); setCcInput(""); }}
-                  onInputKeyDown={(e) => { if (e.key === "Enter" || e.key === "," || e.key === "Tab") { e.preventDefault(); addEmailsFromInput(ccInput, ccEmails, setCcEmails); setCcInput(""); } }}
-                  onRemove={(email) => setCcEmails(ccEmails.filter((m) => m !== email))}
-                  chipColor={{ bg: "#F0FDF4", text: "#16A34A", border: "#BBF7D0" }}
+                  emails={ccEmails}
+                  inputValue={ccInput}
+                  onInputChange={setCcInput}
+                  onInputFocus={() => {
+                    if (allLeadRecipients.length > 0 && ccRowRef.current)
+                      setCcAnchorEl(ccRowRef.current);
+                  }}
+                  onInputBlur={() => {
+                    addEmailsFromInput(ccInput, ccEmails, setCcEmails);
+                    setCcInput("");
+                  }}
+                  onInputKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                      e.preventDefault();
+                      addEmailsFromInput(ccInput, ccEmails, setCcEmails);
+                      setCcInput("");
+                    }
+                  }}
+                  onRemove={(email) =>
+                    setCcEmails(ccEmails.filter((m) => m !== email))
+                  }
+                  chipColor={{
+                    bg: "#F0FDF4",
+                    text: "#16A34A",
+                    border: "#BBF7D0",
+                  }}
                   placeholder="Add Cc recipients"
                 />
                 <Box display="flex" ml="auto" pt={1} flexShrink={0}>
-                  <Typography fontSize="12px" color="#64748B" sx={{ cursor: "pointer", "&:hover": { color: "#EF4444" }, userSelect: "none" }} onClick={() => { setShowCc(false); setCcEmails([]); setCcAnchorEl(null); }}>✕</Typography>
+                  <Typography
+                    fontSize="12px"
+                    color="#64748B"
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": { color: "#EF4444" },
+                      userSelect: "none",
+                    }}
+                    onClick={() => {
+                      setShowCc(false);
+                      setCcEmails([]);
+                      setCcAnchorEl(null);
+                    }}
+                  >
+                    ✕
+                  </Typography>
                 </Box>
-                <RecipientPickerPopover open={Boolean(ccAnchorEl)} anchorEl={ccAnchorEl} onClose={() => setCcAnchorEl(null)} paperRef={ccPickerPaperRef} leads={allLeadRecipients} selectedEmails={ccEmails} onToggle={(email) => toggleEmail(email, ccEmails, setCcEmails)} />
+                <RecipientPickerPopover
+                  open={Boolean(ccAnchorEl)}
+                  anchorEl={ccAnchorEl}
+                  onClose={() => setCcAnchorEl(null)}
+                  paperRef={ccPickerPaperRef}
+                  leads={allLeadRecipients}
+                  selectedEmails={ccEmails}
+                  onToggle={(email) =>
+                    toggleEmail(email, ccEmails, setCcEmails)
+                  }
+                />
               </Box>
             )}
 
             {/* BCC */}
             {(showBcc || bccEmails.length > 0) && (
-              <Box ref={bccRowRef} display="flex" alignItems="flex-start" gap={1} py={1} sx={{ flexWrap: "wrap" }}>
-                <Typography fontSize="13px" color="text.secondary" minWidth={55} mt="8px">Bcc:</Typography>
+              <Box
+                ref={bccRowRef}
+                display="flex"
+                alignItems="flex-start"
+                gap={1}
+                py={1}
+                sx={{ flexWrap: "wrap" }}
+              >
+                <Typography
+                  fontSize="13px"
+                  color="text.secondary"
+                  minWidth={55}
+                  mt="8px"
+                >
+                  Bcc:
+                </Typography>
                 <RecipientChipRow
-                  emails={bccEmails} inputValue={bccInput} onInputChange={setBccInput}
-                  onInputFocus={() => { if (allLeadRecipients.length > 0 && bccRowRef.current) setBccAnchorEl(bccRowRef.current); }}
-                  onInputBlur={() => { addEmailsFromInput(bccInput, bccEmails, setBccEmails); setBccInput(""); }}
-                  onInputKeyDown={(e) => { if (e.key === "Enter" || e.key === "," || e.key === "Tab") { e.preventDefault(); addEmailsFromInput(bccInput, bccEmails, setBccEmails); setBccInput(""); } }}
-                  onRemove={(email) => setBccEmails(bccEmails.filter((m) => m !== email))}
-                  chipColor={{ bg: "#FFF7ED", text: "#EA580C", border: "#FED7AA" }}
+                  emails={bccEmails}
+                  inputValue={bccInput}
+                  onInputChange={setBccInput}
+                  onInputFocus={() => {
+                    if (allLeadRecipients.length > 0 && bccRowRef.current)
+                      setBccAnchorEl(bccRowRef.current);
+                  }}
+                  onInputBlur={() => {
+                    addEmailsFromInput(bccInput, bccEmails, setBccEmails);
+                    setBccInput("");
+                  }}
+                  onInputKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                      e.preventDefault();
+                      addEmailsFromInput(bccInput, bccEmails, setBccEmails);
+                      setBccInput("");
+                    }
+                  }}
+                  onRemove={(email) =>
+                    setBccEmails(bccEmails.filter((m) => m !== email))
+                  }
+                  chipColor={{
+                    bg: "#FFF7ED",
+                    text: "#EA580C",
+                    border: "#FED7AA",
+                  }}
                   placeholder="Add Bcc recipients"
                 />
                 <Box display="flex" ml="auto" pt={1} flexShrink={0}>
-                  <Typography fontSize="12px" color="#64748B" sx={{ cursor: "pointer", "&:hover": { color: "#EF4444" }, userSelect: "none" }} onClick={() => { setShowBcc(false); setBccEmails([]); setBccAnchorEl(null); }}>✕</Typography>
+                  <Typography
+                    fontSize="12px"
+                    color="#64748B"
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": { color: "#EF4444" },
+                      userSelect: "none",
+                    }}
+                    onClick={() => {
+                      setShowBcc(false);
+                      setBccEmails([]);
+                      setBccAnchorEl(null);
+                    }}
+                  >
+                    ✕
+                  </Typography>
                 </Box>
-                <RecipientPickerPopover open={Boolean(bccAnchorEl)} anchorEl={bccAnchorEl} onClose={() => setBccAnchorEl(null)} paperRef={bccPickerPaperRef} leads={allLeadRecipients} selectedEmails={bccEmails} onToggle={(email) => toggleEmail(email, bccEmails, setBccEmails)} />
+                <RecipientPickerPopover
+                  open={Boolean(bccAnchorEl)}
+                  anchorEl={bccAnchorEl}
+                  onClose={() => setBccAnchorEl(null)}
+                  paperRef={bccPickerPaperRef}
+                  leads={allLeadRecipients}
+                  selectedEmails={bccEmails}
+                  onToggle={(email) =>
+                    toggleEmail(email, bccEmails, setBccEmails)
+                  }
+                />
               </Box>
             )}
 
             {/* SUBJECT */}
             <Box display="flex" alignItems="center" gap={1} py={1}>
-              <Typography fontSize="13px" color="text.secondary" minWidth={55}>Subject:</Typography>
-              <TextField fullWidth variant="standard" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} disabled={isSendingEmail} InputProps={{ disableUnderline: true, sx: { fontSize: "13px" } }} placeholder="Enter subject..." />
+              <Typography fontSize="13px" color="text.secondary" minWidth={55}>
+                Subject:
+              </Typography>
+              <TextField
+                fullWidth
+                variant="standard"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                disabled={isSendingEmail}
+                InputProps={{
+                  disableUnderline: true,
+                  sx: { fontSize: "13px" },
+                }}
+                placeholder="Enter subject..."
+              />
             </Box>
 
             {/* BODY */}
             <Box py={1.5} sx={{ minHeight: 160 }}>
-              <textarea ref={bodyRef} value={emailBody} onChange={(e) => setEmailBody(e.target.value)} onSelect={saveCursor} onKeyUp={saveCursor} onMouseUp={saveCursor} disabled={isSendingEmail} placeholder="Write your message..." rows={9}
-                style={{ width: "100%", boxSizing: "border-box", resize: "vertical", border: "none", outline: "none", fontSize: "13px", lineHeight: 1.7, fontFamily: "inherit", color: "#1E293B", background: "transparent", padding: 0 }}
+              <textarea
+                ref={bodyRef}
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+                onSelect={saveCursor}
+                onKeyUp={saveCursor}
+                onMouseUp={saveCursor}
+                disabled={isSendingEmail}
+                placeholder="Write your message..."
+                rows={9}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  resize: "vertical",
+                  border: "none",
+                  outline: "none",
+                  fontSize: "13px",
+                  lineHeight: 1.7,
+                  fontFamily: "inherit",
+                  color: "#1E293B",
+                  background: "transparent",
+                  padding: 0,
+                }}
               />
             </Box>
           </Stack>
@@ -762,29 +1583,134 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
 
         {/* Toolbar + actions */}
         <Box sx={{ px: 3, pb: 3, pt: 1, borderTop: "1px solid #E5E7EB" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, mb: 1.5, pt: 1, flexWrap: "wrap" }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.25,
+              mb: 1.5,
+              pt: 1,
+              flexWrap: "wrap",
+            }}
+          >
             {[
-              { title: "Attach file",   icon: <AttachFileOutlinedIcon sx={{ fontSize: 18 }} />,       onClick: () => fileInputRef.current?.click() },
-              { title: "Insert link",   icon: <LinkOutlinedIcon sx={{ fontSize: 18 }} />,              onClick: () => { saveCursor(); const url = window.prompt("Enter URL:", "https://"); if (!url) return; const label = window.prompt("Link label:", "Click here") || url; insertAtCursor(`[${label}](${url})`); } },
-              { title: "Emoji",         icon: <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />,    onClick: () => { saveCursor(); const e = window.prompt("Enter emoji:"); if (e) insertAtCursor(e); } },
-              { title: "Insert image",  icon: <ImageOutlinedIcon sx={{ fontSize: 18 }} />,            onClick: () => imageInputRef.current?.click() },
-              { title: "Bold",          icon: <FormatColorTextOutlinedIcon sx={{ fontSize: 18 }} />,  onClick: () => { saveCursor(); wrapSelection("**", "**", "bold text"); } },
-              { title: "Highlight",     icon: <BrushOutlinedIcon sx={{ fontSize: 18 }} />,            onClick: () => { saveCursor(); wrapSelection("==", "==", "highlighted text"); } },
-              { title: "Bullet list",   icon: <AddCircleOutlineIcon sx={{ fontSize: 18 }} />,         onClick: () => { saveCursor(); insertAtCursor("\n• "); } },
+              {
+                title: "Attach file",
+                icon: <AttachFileOutlinedIcon sx={{ fontSize: 18 }} />,
+                onClick: () => fileInputRef.current?.click(),
+              },
+              {
+                title: "Insert link",
+                icon: <LinkOutlinedIcon sx={{ fontSize: 18 }} />,
+                onClick: () => {
+                  saveCursor();
+                  const url = window.prompt("Enter URL:", "https://");
+                  if (!url) return;
+                  const label =
+                    window.prompt("Link label:", "Click here") || url;
+                  insertAtCursor(`[${label}](${url})`);
+                },
+              },
+              {
+                title: "Emoji",
+                icon: <EmojiEmotionsOutlinedIcon sx={{ fontSize: 18 }} />,
+                onClick: () => {
+                  saveCursor();
+                  const e = window.prompt("Enter emoji:");
+                  if (e) insertAtCursor(e);
+                },
+              },
+              {
+                title: "Insert image",
+                icon: <ImageOutlinedIcon sx={{ fontSize: 18 }} />,
+                onClick: () => imageInputRef.current?.click(),
+              },
+              {
+                title: "Bold",
+                icon: <FormatColorTextOutlinedIcon sx={{ fontSize: 18 }} />,
+                onClick: () => {
+                  saveCursor();
+                  wrapSelection("**", "**", "bold text");
+                },
+              },
+              {
+                title: "Highlight",
+                icon: <BrushOutlinedIcon sx={{ fontSize: 18 }} />,
+                onClick: () => {
+                  saveCursor();
+                  wrapSelection("==", "==", "highlighted text");
+                },
+              },
+              {
+                title: "Bullet list",
+                icon: <AddCircleOutlineIcon sx={{ fontSize: 18 }} />,
+                onClick: () => {
+                  saveCursor();
+                  insertAtCursor("\n• ");
+                },
+              },
             ].map(({ title, icon, onClick }) => (
               <Tooltip key={title} title={title}>
-                <IconButton size="small" onClick={onClick} disabled={isSendingEmail} sx={{ color: "#64748B", borderRadius: "6px", "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" } }}>{icon}</IconButton>
+                <IconButton
+                  size="small"
+                  onClick={onClick}
+                  disabled={isSendingEmail}
+                  sx={{
+                    color: "#64748B",
+                    borderRadius: "6px",
+                    "&:hover": { bgcolor: "#F1F5F9", color: "#1E293B" },
+                  }}
+                >
+                  {icon}
+                </IconButton>
               </Tooltip>
             ))}
           </Box>
           <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-            <Button onClick={() => setEmailStep("selector")} disabled={isSendingEmail} sx={{ height: 40, color: "#374151", fontWeight: 500, textTransform: "none", borderRadius: "8px", border: "1px solid #E5E7EB", px: 3, "&:hover": { bgcolor: "#F3F4F6" } }}>Back</Button>
+            <Button
+              onClick={() => setEmailStep("selector")}
+              disabled={isSendingEmail}
+              sx={{
+                height: 40,
+                color: "#374151",
+                fontWeight: 500,
+                textTransform: "none",
+                borderRadius: "8px",
+                border: "1px solid #E5E7EB",
+                px: 3,
+                "&:hover": { bgcolor: "#F3F4F6" },
+              }}
+            >
+              Back
+            </Button>
             <Button
               variant="contained"
               onClick={handleSendEmail}
-              disabled={isSendingEmail || !emailSubject.trim() || !emailBody.trim() || toEmails.length === 0}
-              endIcon={isSendingEmail ? <CircularProgress size={14} sx={{ color: "white" }} /> : <SendOutlinedIcon />}
-              sx={{ height: 40, backgroundColor: "#4B5563", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", px: 3, minWidth: 120, "&:hover": { backgroundColor: "#374151" }, "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" } }}
+              disabled={
+                isSendingEmail ||
+                !emailSubject.trim() ||
+                !emailBody.trim() ||
+                toEmails.length === 0
+              }
+              endIcon={
+                isSendingEmail ? (
+                  <CircularProgress size={14} sx={{ color: "white" }} />
+                ) : (
+                  <SendOutlinedIcon />
+                )
+              }
+              sx={{
+                height: 40,
+                backgroundColor: "#4B5563",
+                color: "white",
+                fontWeight: 500,
+                textTransform: "none",
+                borderRadius: "8px",
+                px: 3,
+                minWidth: 120,
+                "&:hover": { backgroundColor: "#374151" },
+                "&:disabled": { backgroundColor: "#E5E7EB", color: "#9CA3AF" },
+              }}
             >
               {isSendingEmail ? "Sending..." : `Send to ${selectedIds.length}`}
             </Button>
@@ -793,24 +1719,140 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
       </Dialog>
 
       {/* SMS — STEP 1: COMPOSE */}
-      <Dialog open={smsDialog === "compose"} onClose={closeSMS} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
-        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography fontWeight={700} fontSize="1.05rem">Send SMS</Typography>
-          <IconButton size="small" onClick={closeSMS} disabled={isSendingSMS}><CloseIcon fontSize="small" /></IconButton>
+      <Dialog
+        open={smsDialog === "compose"}
+        onClose={closeSMS}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px" } }}
+      >
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderBottom: "1px solid #E5E7EB",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Typography fontWeight={700} fontSize="1.05rem">
+            Send SMS
+          </Typography>
+          <IconButton size="small" onClick={closeSMS} disabled={isSendingSMS}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Box>
         <DialogContent sx={{ pt: 2 }}>
-          <Box sx={{ backgroundColor: "#F8FAFC", borderRadius: "10px", px: 2, py: 1.5, border: "1px solid #E2E8F0", mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" fontSize="12px">Sending to</Typography>
-            <Typography fontWeight={600} fontSize="14px">{selectedIds.length} selected lead{selectedIds.length > 1 ? "s" : ""}</Typography>
+          <Box
+            sx={{
+              backgroundColor: "#F8FAFC",
+              borderRadius: "10px",
+              px: 2,
+              py: 1.5,
+              border: "1px solid #E2E8F0",
+              mb: 2,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" fontSize="12px">
+              Sending to
+            </Typography>
+            <Typography fontWeight={600} fontSize="14px">
+              {selectedIds.length} selected lead
+              {selectedIds.length > 1 ? "s" : ""}
+            </Typography>
           </Box>
-          <TextField label="Message" multiline rows={4} value={smsMessage} onChange={(e) => { setSmsMessage(e.target.value); setSmsError(null); }} disabled={isSendingSMS} placeholder="Type your message here..." inputProps={{ maxLength: 1600 }} helperText={`${smsMessage.length}/1600`} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }} />
-          {smsError && <Alert severity="error" sx={{ borderRadius: "8px", mt: 2 }} onClose={() => setSmsError(null)}>{smsError}</Alert>}
+          <TextField
+            label="Message"
+            multiline
+            rows={4}
+            value={smsMessage}
+            onChange={(e) => {
+              setSmsMessage(e.target.value);
+              setSmsError(null);
+            }}
+            disabled={isSendingSMS}
+            placeholder="Type your message here..."
+            inputProps={{ maxLength: 1600 }}
+            helperText={`${smsMessage.length}/1600`}
+            fullWidth
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+          />
+          {smsError && (
+            <Alert
+              severity="error"
+              sx={{ borderRadius: "8px", mt: 2 }}
+              onClose={() => setSmsError(null)}
+            >
+              {smsError}
+            </Alert>
+          )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, pt: 0, flexDirection: "column", gap: 1, alignItems: "stretch" }}>
-          <Button fullWidth variant="outlined" onClick={openTemplateList} disabled={isSendingSMS} sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>SMS Template</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 3,
+            pt: 0,
+            flexDirection: "column",
+            gap: 1,
+            alignItems: "stretch",
+          }}
+        >
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={openTemplateList}
+            disabled={isSendingSMS}
+            sx={{
+              height: 44,
+              textTransform: "none",
+              fontSize: "14px",
+              fontWeight: 500,
+              borderRadius: "8px",
+              borderColor: "#D1D5DB",
+              color: "#374151",
+              "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" },
+            }}
+          >
+            SMS Template
+          </Button>
           <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
-            <Button fullWidth onClick={closeSMS} disabled={isSendingSMS} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Cancel</Button>
-            <Button fullWidth onClick={handleSendSMS} disabled={isSendingSMS || !smsMessage.trim()} startIcon={isSendingSMS ? <CircularProgress size={16} sx={{ color: "white" }} /> : null} sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>
+            <Button
+              fullWidth
+              onClick={closeSMS}
+              disabled={isSendingSMS}
+              sx={{
+                height: 44,
+                backgroundColor: "#F3F4F6",
+                color: "black",
+                fontWeight: 500,
+                textTransform: "none",
+                borderRadius: "8px",
+                "&:hover": { backgroundColor: "#E5E7EB" },
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              fullWidth
+              onClick={handleSendSMS}
+              disabled={isSendingSMS || !smsMessage.trim()}
+              startIcon={
+                isSendingSMS ? (
+                  <CircularProgress size={16} sx={{ color: "white" }} />
+                ) : null
+              }
+              sx={{
+                height: 44,
+                backgroundColor: "#1F2937",
+                color: "white",
+                fontWeight: 500,
+                textTransform: "none",
+                borderRadius: "8px",
+                "&:hover": { backgroundColor: "#111827" },
+                "&:disabled": { backgroundColor: "#9CA3AF", color: "white" },
+              }}
+            >
               {isSendingSMS ? "Sending..." : "Send SMS"}
             </Button>
           </Stack>
@@ -818,128 +1860,680 @@ const BulkActionBar: React.FC<Props> = ({ selectedIds, tab, onDelete, onArchive,
       </Dialog>
 
       {/* SMS — STEP 2: SELECT TEMPLATE */}
-      <Dialog open={smsDialog === "templates"} onClose={() => setSmsDialog("compose")} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
-        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Dialog
+        open={smsDialog === "templates"}
+        onClose={() => setSmsDialog("compose")}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px" } }}
+      >
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderBottom: "1px solid #E5E7EB",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Typography fontWeight={600}>Select SMS Template</Typography>
-          <IconButton size="small" onClick={() => setSmsDialog("compose")}><CloseIcon fontSize="small" /></IconButton>
+          <IconButton size="small" onClick={() => setSmsDialog("compose")}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Box>
         <DialogContent sx={{ pt: 1, pb: 0 }}>
-          {smsLoading ? <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={28} /></Box>
-           : smsTemplates.length === 0 ? <Box sx={{ textAlign: "center", py: 4 }}><ChatBubbleOutlineIcon sx={{ fontSize: 40, color: "#CBD5E1", mb: 1 }} /><Typography variant="body2" color="text.secondary">No SMS templates found.</Typography></Box>
-           : (
+          {smsLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : smsTemplates.length === 0 ? (
+            <Box sx={{ textAlign: "center", py: 4 }}>
+              <ChatBubbleOutlineIcon
+                sx={{ fontSize: 40, color: "#CBD5E1", mb: 1 }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                No SMS templates found.
+              </Typography>
+            </Box>
+          ) : (
             <List disablePadding sx={{ maxHeight: 340, overflowY: "auto" }}>
               {smsTemplates.map((tpl, idx) => (
                 <React.Fragment key={tpl.id}>
                   <ListItem disablePadding>
-                    <ListItemButton onClick={() => handlePickTemplate(tpl)} sx={{ borderRadius: "8px", px: 1.5, py: 1.25, "&:hover": { bgcolor: "#F8FAFC" } }}>
+                    <ListItemButton
+                      onClick={() => handlePickTemplate(tpl)}
+                      sx={{
+                        borderRadius: "8px",
+                        px: 1.5,
+                        py: 1.25,
+                        "&:hover": { bgcolor: "#F8FAFC" },
+                      }}
+                    >
                       <ListItemText
-                        primary={<Stack direction="row" spacing={1} alignItems="center"><Typography fontSize="14px" fontWeight={600} color="#1E293B">{tpl.name}</Typography>{tpl.use_case && <Chip label={tpl.use_case} size="small" sx={{ ...getUseCaseSx(tpl.use_case), fontSize: "11px", height: 20, textTransform: "capitalize" }} />}</Stack>}
-                        secondary={<Typography fontSize="12px" color="#64748B" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{tpl.body}</Typography>}
+                        primary={
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                          >
+                            <Typography
+                              fontSize="14px"
+                              fontWeight={600}
+                              color="#1E293B"
+                            >
+                              {tpl.name}
+                            </Typography>
+                            {tpl.use_case && (
+                              <Chip
+                                label={getUseCaseName(tpl.use_case, useCases)}
+                                size="small"
+                                sx={{
+                                  ...getUseCaseSx(
+                                    getUseCaseName(tpl.use_case, useCases),
+                                  ),
+                                  fontSize: "11px",
+                                  height: 20,
+                                  textTransform: "capitalize",
+                                }}
+                              />
+                            )}
+                          </Stack>
+                        }
+                        secondary={
+                          <Typography
+                            fontSize="12px"
+                            color="#64748B"
+                            sx={{
+                              mt: 0.5,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {tpl.body}
+                          </Typography>
+                        }
                       />
                     </ListItemButton>
                   </ListItem>
-                  {idx < smsTemplates.length - 1 && <Divider sx={{ my: 0.25 }} />}
+                  {idx < smsTemplates.length - 1 && (
+                    <Divider sx={{ my: 0.25 }} />
+                  )}
                 </React.Fragment>
               ))}
             </List>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, pt: 2, flexDirection: "column", gap: 1, alignItems: "stretch" }}>
-          <Button fullWidth variant="outlined" onClick={openNewTemplate} sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>+ New Template</Button>
-          <Button fullWidth onClick={() => setSmsDialog("compose")} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Cancel</Button>
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 3,
+            pt: 2,
+            flexDirection: "column",
+            gap: 1,
+            alignItems: "stretch",
+          }}
+        >
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={openNewTemplate}
+            sx={{
+              height: 44,
+              textTransform: "none",
+              fontSize: "14px",
+              fontWeight: 500,
+              borderRadius: "8px",
+              borderColor: "#D1D5DB",
+              color: "#374151",
+              "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" },
+            }}
+          >
+            + New Template
+          </Button>
+          <Button
+            fullWidth
+            onClick={() => setSmsDialog("compose")}
+            sx={{
+              height: 44,
+              backgroundColor: "#F3F4F6",
+              color: "black",
+              fontWeight: 500,
+              textTransform: "none",
+              borderRadius: "8px",
+              "&:hover": { backgroundColor: "#E5E7EB" },
+            }}
+          >
+            Cancel
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* SMS — STEP 3: PREVIEW TEMPLATE */}
-      <Dialog open={smsDialog === "preview"} onClose={() => setSmsDialog("templates")} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
-        <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Dialog
+        open={smsDialog === "preview"}
+        onClose={() => setSmsDialog("templates")}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px" } }}
+      >
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderBottom: "1px solid #E5E7EB",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Typography fontWeight={600}>Preview Template</Typography>
-          <IconButton size="small" onClick={() => setSmsDialog("templates")}><CloseIcon fontSize="small" /></IconButton>
+          <IconButton size="small" onClick={() => setSmsDialog("templates")}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Box>
         <DialogContent sx={{ pt: 2 }}>
           {selectedSMSTpl && (
             <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-              <Typography fontSize="13px" color="#64748B">Template:</Typography>
-              <Typography fontSize="13px" fontWeight={600} color="#1E293B">{selectedSMSTpl.name}</Typography>
-              {selectedSMSTpl.use_case && <Chip label={selectedSMSTpl.use_case} size="small" sx={{ ...getUseCaseSx(selectedSMSTpl.use_case), fontSize: "11px", height: 20, textTransform: "capitalize" }} />}
+              <Typography fontSize="13px" color="#64748B">
+                Template:
+              </Typography>
+              <Typography fontSize="13px" fontWeight={600} color="#1E293B">
+                {selectedSMSTpl.name}
+              </Typography>
+              {selectedSMSTpl.use_case && (
+                <Chip
+                  label={selectedSMSTpl.use_case}
+                  size="small"
+                  sx={{
+                    ...getUseCaseSx(selectedSMSTpl.use_case),
+                    fontSize: "11px",
+                    height: 20,
+                    textTransform: "capitalize",
+                  }}
+                />
+              )}
             </Stack>
           )}
-          <Box sx={{ bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", p: 2, minHeight: 120, display: "flex", flexDirection: "column", justifyContent: "flex-end", mb: 2 }}>
-            <Box sx={{ alignSelf: "flex-start", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "0px 12px 12px 12px", px: 2, py: 1.25, maxWidth: "90%", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-              <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                {previewBody.split(/(\{[^}]+\})/g).map((part, i) => /^\{[^}]+\}$/.test(part) ? <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 500 }}>{part}</Box> : part)}
+          <Box
+            sx={{
+              bgcolor: "#F8FAFC",
+              border: "1px solid #E2E8F0",
+              borderRadius: "12px",
+              p: 2,
+              minHeight: 120,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-end",
+              mb: 2,
+            }}
+          >
+            <Box
+              sx={{
+                alignSelf: "flex-start",
+                bgcolor: "#FFFFFF",
+                border: "1px solid #E2E8F0",
+                borderRadius: "0px 12px 12px 12px",
+                px: 2,
+                py: 1.25,
+                maxWidth: "90%",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              }}
+            >
+              <Typography
+                fontSize="13px"
+                color="#1E293B"
+                sx={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}
+              >
+                {previewBody.split(/(\{[^}]+\})/g).map((part, i) =>
+                  /^\{[^}]+\}$/.test(part) ? (
+                    <Box
+                      key={i}
+                      component="span"
+                      sx={{ color: "#4F46E5", fontWeight: 500 }}
+                    >
+                      {part}
+                    </Box>
+                  ) : (
+                    part
+                  ),
+                )}
               </Typography>
             </Box>
-            <Typography fontSize="11px" color="#94A3B8" sx={{ mt: 0.75, alignSelf: "flex-end" }}>{new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</Typography>
+            <Typography
+              fontSize="11px"
+              color="#94A3B8"
+              sx={{ mt: 0.75, alignSelf: "flex-end" }}
+            >
+              {new Date().toLocaleTimeString("en-IN", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </Typography>
           </Box>
-          <TextField label="Edit message before sending" multiline rows={4} value={previewBody} onChange={(e) => setPreviewBody(e.target.value)} inputProps={{ maxLength: 1600 }} helperText={`${previewBody.length}/1600`} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }} />
+          <TextField
+            label="Edit message before sending"
+            multiline
+            rows={4}
+            value={previewBody}
+            onChange={(e) => setPreviewBody(e.target.value)}
+            inputProps={{ maxLength: 1600 }}
+            helperText={`${previewBody.length}/1600`}
+            fullWidth
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+          />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-          <Button fullWidth onClick={() => setSmsDialog("templates")} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Back</Button>
-          <Button fullWidth onClick={handleUseTemplate} disabled={!previewBody.trim()} sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>Use Template</Button>
+          <Button
+            fullWidth
+            onClick={() => setSmsDialog("templates")}
+            sx={{
+              height: 44,
+              backgroundColor: "#F3F4F6",
+              color: "black",
+              fontWeight: 500,
+              textTransform: "none",
+              borderRadius: "8px",
+              "&:hover": { backgroundColor: "#E5E7EB" },
+            }}
+          >
+            Back
+          </Button>
+          <Button
+            fullWidth
+            onClick={handleUseTemplate}
+            disabled={!previewBody.trim()}
+            sx={{
+              height: 44,
+              backgroundColor: "#1F2937",
+              color: "white",
+              fontWeight: 500,
+              textTransform: "none",
+              borderRadius: "8px",
+              "&:hover": { backgroundColor: "#111827" },
+              "&:disabled": { backgroundColor: "#9CA3AF", color: "white" },
+            }}
+          >
+            Use Template
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* SMS — STEP 4: NEW TEMPLATE */}
-      <Dialog open={smsDialog === "newTemplate"} onClose={() => setSmsDialog("templates")} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
+      <Dialog
+        open={smsDialog === "newTemplate"}
+        onClose={() => setSmsDialog("templates")}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px" } }}
+      >
         {newTplView === "form" && (
           <>
-            <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Typography fontWeight={700} fontSize="1.05rem">New SMS Template</Typography>
-              <IconButton size="small" onClick={() => setSmsDialog("templates")}><CloseIcon fontSize="small" /></IconButton>
+            <Box
+              sx={{
+                px: 3,
+                py: 2,
+                borderBottom: "1px solid #E5E7EB",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography fontWeight={700} fontSize="1.05rem">
+                New SMS Template
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => setSmsDialog("templates")}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
             </Box>
             <DialogContent sx={{ pt: 2 }}>
               <Stack spacing={2.5}>
-                <TextField placeholder="Name" value={newTplName} onChange={(e) => { setNewTplName(e.target.value); setNewTplError(null); }} fullWidth size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
+                <TextField
+                  placeholder="Name"
+                  value={newTplName}
+                  onChange={(e) => {
+                    setNewTplName(e.target.value);
+                    setNewTplError(null);
+                  }}
+                  fullWidth
+                  size="small"
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
+                />
                 <Box>
-                  <Typography fontSize="13px" fontWeight={500} color="#374151" mb={0.75}>Use Case</Typography>
-                  <Box onClick={(e) => setUseCaseAnchor(e.currentTarget as HTMLElement)} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid", borderColor: useCaseMenuOpen ? "#1976d2" : "#D1D5DB", borderRadius: "8px", px: 1.5, cursor: "pointer", minHeight: 42, bgcolor: "#fff", boxShadow: useCaseMenuOpen ? "0 0 0 2px rgba(25,118,210,0.15)" : "none", "&:hover": { borderColor: "#9CA3AF" }, transition: "all 0.15s" }}>
-                    {newTplUseCase ? <Chip label={newTplUseCase} size="small" sx={getUseCaseSx(newTplUseCase)} /> : <Typography fontSize="14px" color="#9CA3AF">Select use case</Typography>}
-                    <Typography sx={{ fontSize: "12px", color: "#6B7280", transform: useCaseMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</Typography>
+                  <Typography
+                    fontSize="13px"
+                    fontWeight={500}
+                    color="#374151"
+                    mb={0.75}
+                  >
+                    Use Case
+                  </Typography>
+                  <Box
+                    onClick={(e) =>
+                      setUseCaseAnchor(e.currentTarget as HTMLElement)
+                    }
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      border: "1px solid",
+                      borderColor: useCaseMenuOpen ? "#1976d2" : "#D1D5DB",
+                      borderRadius: "8px",
+                      px: 1.5,
+                      cursor: "pointer",
+                      minHeight: 42,
+                      bgcolor: "#fff",
+                      boxShadow: useCaseMenuOpen
+                        ? "0 0 0 2px rgba(25,118,210,0.15)"
+                        : "none",
+                      "&:hover": { borderColor: "#9CA3AF" },
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {newTplUseCase ? (
+                      <Chip
+                        label={newTplUseCase}
+                        size="small"
+                        sx={getUseCaseSx(newTplUseCase)}
+                      />
+                    ) : (
+                      <Typography fontSize="14px" color="#9CA3AF">
+                        Select use case
+                      </Typography>
+                    )}
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        color: "#6B7280",
+                        transform: useCaseMenuOpen ? "rotate(180deg)" : "none",
+                        transition: "transform 0.2s",
+                      }}
+                    >
+                      ▼
+                    </Typography>
                   </Box>
-                  <Menu anchorEl={useCaseAnchor} open={useCaseMenuOpen} onClose={() => setUseCaseAnchor(null)} anchorOrigin={{ vertical: "bottom", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }} PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", mt: 0.5, minWidth: 220 } }}>
-                    {USE_CASE_OPTIONS.map((uc) => <MenuItem key={uc} selected={newTplUseCase === uc} onClick={() => handleSelectUseCase(uc)} sx={{ py: 1, px: 1.5, "&.Mui-selected": { bgcolor: "#F1F5F9" }, "&:hover": { bgcolor: "#F8FAFC" } }}><Chip label={uc} size="small" sx={getUseCaseSx(uc)} /></MenuItem>)}
+                  <Menu
+                    anchorEl={useCaseAnchor}
+                    open={useCaseMenuOpen}
+                    onClose={() => setUseCaseAnchor(null)}
+                    anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                    transformOrigin={{ vertical: "top", horizontal: "left" }}
+                    PaperProps={{
+                      sx: {
+                        borderRadius: "10px",
+                        boxShadow: "0 8px 30px rgba(0,0,0,0.15)",
+                        mt: 0.5,
+                        minWidth: 220,
+                      },
+                    }}
+                  >
+                    {USE_CASE_OPTIONS.map((uc) => (
+                      <MenuItem
+                        key={uc}
+                        selected={newTplUseCase === uc}
+                        onClick={() => handleSelectUseCase(uc)}
+                        sx={{
+                          py: 1,
+                          px: 1.5,
+                          "&.Mui-selected": { bgcolor: "#F1F5F9" },
+                          "&:hover": { bgcolor: "#F8FAFC" },
+                        }}
+                      >
+                        <Chip label={uc} size="small" sx={getUseCaseSx(uc)} />
+                      </MenuItem>
+                    ))}
                   </Menu>
                 </Box>
                 <Box>
-                  <Typography fontSize="13px" fontWeight={500} color="#374151" mb={0.75}>Body</Typography>
-                  <textarea value={newTplBody} onChange={(e) => { setNewTplBody(e.target.value); setNewTplError(null); }} placeholder="Type your message here..." maxLength={1600} rows={7} style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: "14px", fontFamily: "inherit", color: "#1E293B", lineHeight: "1.6", border: "1px solid #D1D5DB", borderRadius: "8px", resize: "vertical", outline: "none", background: "#fff" }} onFocus={(e) => { e.target.style.borderColor = "#1976d2"; e.target.style.boxShadow = "0 0 0 2px rgba(25,118,210,0.15)"; }} onBlur={(e) => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }} />
-                  <Typography fontSize="11px" color="#94A3B8" mt={0.5}>{newTplBody.length}/1600 — Use {"{variable_name}"} for dynamic fields</Typography>
+                  <Typography
+                    fontSize="13px"
+                    fontWeight={500}
+                    color="#374151"
+                    mb={0.75}
+                  >
+                    Body
+                  </Typography>
+                  <textarea
+                    value={newTplBody}
+                    onChange={(e) => {
+                      setNewTplBody(e.target.value);
+                      setNewTplError(null);
+                    }}
+                    placeholder="Type your message here..."
+                    maxLength={1600}
+                    rows={7}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px 14px",
+                      fontSize: "14px",
+                      fontFamily: "inherit",
+                      color: "#1E293B",
+                      lineHeight: "1.6",
+                      border: "1px solid #D1D5DB",
+                      borderRadius: "8px",
+                      resize: "vertical",
+                      outline: "none",
+                      background: "#fff",
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#1976d2";
+                      e.target.style.boxShadow =
+                        "0 0 0 2px rgba(25,118,210,0.15)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#D1D5DB";
+                      e.target.style.boxShadow = "none";
+                    }}
+                  />
+                  <Typography fontSize="11px" color="#94A3B8" mt={0.5}>
+                    {newTplBody.length}/1600 — Use {"{variable_name}"} for
+                    dynamic fields
+                  </Typography>
                 </Box>
-                {newTplError && <Alert severity="error" sx={{ borderRadius: "8px", py: 0.5 }}>{newTplError}</Alert>}
+                {newTplError && (
+                  <Alert severity="error" sx={{ borderRadius: "8px", py: 0.5 }}>
+                    {newTplError}
+                  </Alert>
+                )}
               </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
-              <Button onClick={() => setSmsDialog("templates")} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>Cancel</Button>
-              <Button onClick={() => { if (!newTplName.trim()) { setNewTplError("Template name is required."); return; } if (!newTplBody.trim()) { setNewTplError("Body is required."); return; } setNewTplError(null); setNewTplView("preview"); }} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>Preview</Button>
-              <Button onClick={handleSaveNewTemplate} disabled={newTplSaving || !newTplName.trim() || !newTplBody.trim()} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", bgcolor: "#1F2937", color: "white", fontWeight: 600, "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } }}>{newTplSaving ? "Saving..." : "Save"}</Button>
+              <Button
+                onClick={() => setSmsDialog("templates")}
+                sx={{
+                  height: 44,
+                  px: 3,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  border: "1px solid #D1D5DB",
+                  color: "#374151",
+                  bgcolor: "white",
+                  "&:hover": { bgcolor: "#F9FAFB" },
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!newTplName.trim()) {
+                    setNewTplError("Template name is required.");
+                    return;
+                  }
+                  if (!newTplBody.trim()) {
+                    setNewTplError("Body is required.");
+                    return;
+                  }
+                  setNewTplError(null);
+                  setNewTplView("preview");
+                }}
+                sx={{
+                  height: 44,
+                  px: 3,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  border: "1px solid #D1D5DB",
+                  color: "#374151",
+                  bgcolor: "white",
+                  "&:hover": { bgcolor: "#F9FAFB" },
+                }}
+              >
+                Preview
+              </Button>
+              <Button
+                onClick={handleSaveNewTemplate}
+                disabled={
+                  newTplSaving || !newTplName.trim() || !newTplBody.trim()
+                }
+                sx={{
+                  height: 44,
+                  px: 3,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  bgcolor: "#1F2937",
+                  color: "white",
+                  fontWeight: 600,
+                  "&:hover": { bgcolor: "#111827" },
+                  "&:disabled": { bgcolor: "#9CA3AF", color: "white" },
+                }}
+              >
+                {newTplSaving ? "Saving..." : "Save"}
+              </Button>
             </DialogActions>
           </>
         )}
         {newTplView === "preview" && (
           <>
-            <Box sx={{ px: 3, py: 2, borderBottom: "1px solid #E5E7EB", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Typography fontWeight={700} fontSize="1.05rem">Preview Template</Typography>
-              <IconButton size="small" onClick={() => setSmsDialog("templates")}><CloseIcon fontSize="small" /></IconButton>
+            <Box
+              sx={{
+                px: 3,
+                py: 2,
+                borderBottom: "1px solid #E5E7EB",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography fontWeight={700} fontSize="1.05rem">
+                Preview Template
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => setSmsDialog("templates")}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
             </Box>
             <DialogContent sx={{ pt: 2 }}>
               <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-                <Typography fontSize="13px" color="#64748B">Template:</Typography>
-                <Typography fontSize="13px" fontWeight={600} color="#1E293B">{newTplName}</Typography>
-                {newTplUseCase && <Chip label={newTplUseCase} size="small" sx={getUseCaseSx(newTplUseCase)} />}
+                <Typography fontSize="13px" color="#64748B">
+                  Template:
+                </Typography>
+                <Typography fontSize="13px" fontWeight={600} color="#1E293B">
+                  {newTplName}
+                </Typography>
+                {newTplUseCase && (
+                  <Chip
+                    label={newTplUseCase}
+                    size="small"
+                    sx={getUseCaseSx(newTplUseCase)}
+                  />
+                )}
               </Stack>
-              <Box sx={{ bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", p: 2, minHeight: 160, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-                <Box sx={{ alignSelf: "flex-start", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "0px 12px 12px 12px", px: 2, py: 1.25, maxWidth: "90%", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                  <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                    {newTplBody.split(/(\{[^}]+\})/g).map((part, i) => /^\{[^}]+\}$/.test(part) ? <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 600 }}>{part}</Box> : part)}
+              <Box
+                sx={{
+                  bgcolor: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: "12px",
+                  p: 2,
+                  minHeight: 160,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <Box
+                  sx={{
+                    alignSelf: "flex-start",
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: "0px 12px 12px 12px",
+                    px: 2,
+                    py: 1.25,
+                    maxWidth: "90%",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                  }}
+                >
+                  <Typography
+                    fontSize="13px"
+                    color="#1E293B"
+                    sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}
+                  >
+                    {newTplBody.split(/(\{[^}]+\})/g).map((part, i) =>
+                      /^\{[^}]+\}$/.test(part) ? (
+                        <Box
+                          key={i}
+                          component="span"
+                          sx={{ color: "#4F46E5", fontWeight: 600 }}
+                        >
+                          {part}
+                        </Box>
+                      ) : (
+                        part
+                      ),
+                    )}
                   </Typography>
                 </Box>
-                <Typography fontSize="11px" color="#94A3B8" sx={{ mt: 0.75, alignSelf: "flex-end" }}>{new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</Typography>
+                <Typography
+                  fontSize="11px"
+                  color="#94A3B8"
+                  sx={{ mt: 0.75, alignSelf: "flex-end" }}
+                >
+                  {new Date().toLocaleTimeString("en-IN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Typography>
               </Box>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
-              <Button onClick={() => setNewTplView("form")} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", border: "1px solid #D1D5DB", color: "#374151", bgcolor: "white", "&:hover": { bgcolor: "#F9FAFB" } }}>Back to Edit</Button>
-              <Button onClick={handleSaveNewTemplate} disabled={newTplSaving} sx={{ height: 44, px: 3, textTransform: "none", borderRadius: "8px", bgcolor: "#1F2937", color: "white", fontWeight: 600, "&:hover": { bgcolor: "#111827" }, "&:disabled": { bgcolor: "#9CA3AF", color: "white" } }}>{newTplSaving ? "Saving..." : "Save"}</Button>
+              <Button
+                onClick={() => setNewTplView("form")}
+                sx={{
+                  height: 44,
+                  px: 3,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  border: "1px solid #D1D5DB",
+                  color: "#374151",
+                  bgcolor: "white",
+                  "&:hover": { bgcolor: "#F9FAFB" },
+                }}
+              >
+                Back to Edit
+              </Button>
+              <Button
+                onClick={handleSaveNewTemplate}
+                disabled={newTplSaving}
+                sx={{
+                  height: 44,
+                  px: 3,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  bgcolor: "#1F2937",
+                  color: "white",
+                  fontWeight: 600,
+                  "&:hover": { bgcolor: "#111827" },
+                  "&:disabled": { bgcolor: "#9CA3AF", color: "white" },
+                }}
+              >
+                {newTplSaving ? "Saving..." : "Save"}
+              </Button>
             </DialogActions>
           </>
         )}

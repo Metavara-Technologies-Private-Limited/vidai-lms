@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import { Box, useMediaQuery, useTheme } from "@mui/material";
+import { Box, useMediaQuery } from "@mui/material";
 import { lazy, Suspense, useState } from "react";
 
 import styles from "../../styles/sidebar.module.css";
@@ -7,9 +7,12 @@ import styles from "../../styles/sidebar.module.css";
 const Header = lazy(() => import("./Header"));
 const Sidebar = lazy(() => import("./Sidebar"));
 
+const DESKTOP_SIDEBAR_BREAKPOINT = 1200;
+
 const MainLayout = () => {
-  const theme = useTheme();
-  const isWideSidebarLayout = useMediaQuery(theme.breakpoints.up("xl"));
+  const isDesktopSidebarLayout = useMediaQuery(
+    `(min-width:${DESKTOP_SIDEBAR_BREAKPOINT}px)`,
+  );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   return (
@@ -26,7 +29,7 @@ const MainLayout = () => {
         fallback={
           <Box
             sx={{
-              width: isWideSidebarLayout ? 320 : 0,
+              width: isDesktopSidebarLayout ? 320 : 0,
               bgcolor: "background.default",
               flexShrink: 0,
             }}
@@ -34,7 +37,7 @@ const MainLayout = () => {
         }
       >
         <Sidebar
-          isDesktop={isWideSidebarLayout}
+          isDesktop={isDesktopSidebarLayout}
           mobileOpen={mobileSidebarOpen}
           onClose={() => setMobileSidebarOpen(false)}
         />
@@ -52,7 +55,7 @@ const MainLayout = () => {
           fallback={<Box sx={{ height: 88, bgcolor: "background.default" }} />}
         >
           <Header
-            showSidebarToggle={!isWideSidebarLayout}
+            showSidebarToggle={!isDesktopSidebarLayout}
             onSidebarToggle={() => setMobileSidebarOpen((open) => !open)}
           />
         </Suspense>

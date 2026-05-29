@@ -4,36 +4,61 @@
   background: #ffffff;
   border-radius: 16px;
   padding: 20px;
-  border: 1px solid rgba(235, 237, 241, 0.6);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   cursor: pointer;
-  transition: 0.2s ease;
+  border: 1px solid transparent;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 }
-.campaign-card:hover {
-  /* transform: translateY(-2px); */
-  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+
+.campaign-card:hover,
+.campaign-card:focus-visible {
+  border: 1px solid #93B4E8;
+  box-shadow:
+    0 8px 28px rgba(59, 130, 246, 0.33),
+    0 2px 8px rgba(0, 0, 0, 0.07);
+}
+.campaign-card.active {
+  border: 1px solid #3B82F6;
+  box-shadow:
+    0 8px 28px rgba(59, 130, 246, 0.33),
+    0 2px 8px rgba(0, 0, 0, 0.07);
 }
 
 /* ================= CARD HEADER ================= */
 
 .card-header {
-  height: 32px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .title {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-weight: 600;
   font-size: large;
-  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.title-text {
+  display: -webkit-box;
   overflow: hidden;
   text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 .title-icon-box {
@@ -60,6 +85,7 @@
   height: 20px;
   object-fit: contain;
 }
+
 /* ================= STATUS CHIP ================= */
 
 .status {
@@ -67,6 +93,7 @@
   padding: 4px 10px;
   border-radius: 20px;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .status.live {
@@ -88,6 +115,7 @@
   background: #efe7ff;
   color: #7c4dff;
 }
+
 .status.paused {
   background: #fff3cd;
   color: #e67e22;
@@ -111,10 +139,21 @@
 /* ================= INFO ROW ================= */
 
 .card-row {
-  height: 41px;
   display: flex;
-  justify-content: flex-start;
-  gap: 140px;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.card-row > div {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.card-row>div:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .card-row label {
@@ -132,6 +171,10 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #333333;
+  display: block;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: nowrap;
 }
 
 /* ================= PLATFORM ICONS ================= */
@@ -155,12 +198,13 @@
   align-items: center;
   position: relative;
 }
+
 /* ================= CARD DIVIDER ================= */
 
 .card-divider {
   height: 1px;
   background: #EEF0F3;
-  margin: 12px -20px;
+  margin: 4px -20px 0;
 }
 
 .leads {
@@ -174,13 +218,13 @@
   align-items: center;
   justify-content: center;
 }
+
 /* ================= ACTION BUTTONS ================= */
 
 .action-buttons {
   display: flex;
   align-items: center;
   gap: 12px;
-
 }
 
 .action-btn {
@@ -276,10 +320,48 @@
 }
 
 .stop-item {
-  
   color: #e74c3c;
 }
 
 .stop-item:hover {
   background-color: #fff5f5;
+}
+
+.platform-badge.paused {
+  opacity: 0.5;
+}
+
+.platform-badge {
+  position: relative;
+}
+
+.platform-badge::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.platform-badge.active::after {
+  background: #22c55e;
+}
+
+.platform-badge.paused::after {
+  background: #ef4444;
+}
+
+.status.partially-active {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.play-btn:hover {
+  background-color: #22c55e;
+}
+
+.pause-btn:hover {
+  background-color: #f59e0b;
 }

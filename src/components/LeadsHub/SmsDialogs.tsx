@@ -10,11 +10,16 @@ import { toast } from "react-toastify";
 import CloseIcon from "@mui/icons-material/Close";
 
 import type { ProcessedLead, SMSTemplate } from "./LeadsTable.types";
-import { USE_CASE_OPTIONS, USE_CASE_BODY_SUGGESTIONS } from "./LeadsTable.types";
+import { USE_CASE_BODY_SUGGESTIONS } from "./LeadsTable.types";
 import { extractErrorMessage, normalizePhone } from "./LeadsTable.helpers";
 import { getUseCaseChipSx, outlineBtn, darkBtn } from "./LeadsTable.styles";
 import { TwilioAPI } from "../../services/leads.api";
+import type { TwilioSMS } from "../../services/leads.api";
 import TemplateService from "../../services/templates.api";
+import { UseCaseAPI } from "../../services/usecase.api";
+import type { UseCase } from "../../services/usecase.api";
+import { useSelector } from "react-redux";
+import { selectClinic } from "../../store/clinicSlice";
 
 // ── Shared toast options — identical to useEditLead.ts ────────────────
 const toastOptions = {
@@ -41,17 +46,28 @@ export const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open
   const [error, setError] = React.useState<string | null>(null);
   const [dropdownAnchor, setDropdownAnchor] = React.useState<null | HTMLElement>(null);
   const dropdownOpen = Boolean(dropdownAnchor);
+  const clinic = useSelector(selectClinic);
+  const CLINIC_ID = clinic?.id;
+  const [useCases, setUseCases] = React.useState<UseCase[]>([]);
 
   React.useEffect(() => {
+    if (!CLINIC_ID) return;
     if (!open) {
       setView("form"); setName(""); setUseCase(""); setBody(""); setError(null); setDropdownAnchor(null);
+      UseCaseAPI.getUseCases(CLINIC_ID)
+        .then((data) => {
+          setUseCases(data || []);
+        })
+        .catch(() => {
+          setUseCases([]);
+        });
     }
-  }, [open]);
+  }, [CLINIC_ID, open]);
 
-  const handleSelectUseCase = (uc: string) => {
-    setUseCase(uc);
+  const handleSelectUseCase = (uc: UseCase) => {
+    setUseCase(uc.name);
     setDropdownAnchor(null);
-    if (!body.trim()) setBody(USE_CASE_BODY_SUGGESTIONS[uc] || "");
+    if (!body.trim()) setBody(USE_CASE_BODY_SUGGESTIONS[uc.name] || "");
   };
 
   const handlePreview = () => {
@@ -87,48 +103,203 @@ export const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1500 }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: "16px" } }}
+      sx={{ zIndex: 1500 }}
+    >
       {view === "form" && (
         <>
-          <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, fontSize: "1.05rem", pb: 0 }}>
+          <DialogTitle
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontWeight: 700,
+              fontSize: "1.05rem",
+              pb: 0,
+            }}
+          >
             New SMS Template
-            <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
+            <IconButton size="small" onClick={onClose}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
           </DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
             <Stack spacing={2}>
-              <TextField label="Name" value={name} onChange={(e) => { setName(e.target.value); setError(null); }}
-                placeholder="e.g. Appointment Confirmation" fullWidth size="small"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
+              <TextField
+                label="Name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError(null);
+                }}
+                placeholder="e.g. Appointment Confirmation"
+                fullWidth
+                size="small"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
+              />
               <Box>
-                <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>Use Case</Typography>
-                <Box onClick={(e) => setDropdownAnchor(e.currentTarget)}
-                  sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid", borderColor: dropdownOpen ? "#1976d2" : "#D1D5DB", borderRadius: "8px", px: 1.5, cursor: "pointer", minHeight: 40, bgcolor: "#fff", boxShadow: dropdownOpen ? "0 0 0 2px rgba(25,118,210,0.15)" : "none", "&:hover": { borderColor: "#9CA3AF" }, transition: "all 0.15s" }}>
-                  {useCase ? <Chip label={useCase} size="small" sx={getUseCaseChipSx(useCase)} /> : <Typography fontSize="14px" color="#9CA3AF" sx={{ py: 1 }}>Select use case</Typography>}
-                  <Typography sx={{ fontSize: "12px", color: "#6B7280", ml: 1, transform: dropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", userSelect: "none" }}>▼</Typography>
+                <Typography
+                  fontSize="12px"
+                  fontWeight={500}
+                  color="#374151"
+                  mb={0.75}
+                >
+                  Use Case
+                </Typography>
+                <Box
+                  onClick={(e) => setDropdownAnchor(e.currentTarget)}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    border: "1px solid",
+                    borderColor: dropdownOpen ? "#1976d2" : "#D1D5DB",
+                    borderRadius: "8px",
+                    px: 1.5,
+                    cursor: "pointer",
+                    minHeight: 40,
+                    bgcolor: "#fff",
+                    boxShadow: dropdownOpen
+                      ? "0 0 0 2px rgba(25,118,210,0.15)"
+                      : "none",
+                    "&:hover": { borderColor: "#9CA3AF" },
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {useCase ? (
+                    <Chip
+                      label={useCase}
+                      size="small"
+                      sx={getUseCaseChipSx(useCase)}
+                    />
+                  ) : (
+                    <Typography fontSize="14px" color="#9CA3AF" sx={{ py: 1 }}>
+                      Select use case
+                    </Typography>
+                  )}
+                  <Typography
+                    sx={{
+                      fontSize: "12px",
+                      color: "#6B7280",
+                      ml: 1,
+                      transform: dropdownOpen ? "rotate(180deg)" : "none",
+                      transition: "transform 0.2s",
+                      userSelect: "none",
+                    }}
+                  >
+                    ▼
+                  </Typography>
                 </Box>
-                <Menu anchorEl={dropdownAnchor} open={dropdownOpen} onClose={() => setDropdownAnchor(null)} anchorOrigin={{ vertical: "bottom", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }} disablePortal={false} PaperProps={{ sx: { borderRadius: "10px", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", mt: 0.5, minWidth: 240 } }} sx={{ zIndex: 99999 }}>
-                  {USE_CASE_OPTIONS.map((uc) => (
-                    <MenuItem key={uc} selected={useCase === uc} onClick={() => handleSelectUseCase(uc)} sx={{ py: 1, px: 1.5, "&.Mui-selected": { bgcolor: "#F1F5F9" }, "&:hover": { bgcolor: "#F8FAFC" } }}>
-                      <Chip label={uc} size="small" sx={getUseCaseChipSx(uc)} />
+                <Menu
+                  anchorEl={dropdownAnchor}
+                  open={dropdownOpen}
+                  onClose={() => setDropdownAnchor(null)}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                  transformOrigin={{ vertical: "top", horizontal: "left" }}
+                  disablePortal={false}
+                  PaperProps={{
+                    sx: {
+                      borderRadius: "10px",
+                      boxShadow: "0 8px 30px rgba(0,0,0,0.15)",
+                      mt: 0.5,
+                      minWidth: 240,
+                    },
+                  }}
+                  sx={{ zIndex: 99999 }}
+                >
+                  {useCases.map((uc) => (
+                    <MenuItem
+                      key={uc.id}
+                      selected={useCase === uc.name}
+                      onClick={() => handleSelectUseCase(uc)}
+                      sx={{
+                        py: 1,
+                        px: 1.5,
+                        "&.Mui-selected": { bgcolor: "#F1F5F9" },
+                        "&:hover": { bgcolor: "#F8FAFC" },
+                      }}
+                    >
+                      <Chip
+                        label={uc.name}
+                        size="small"
+                        sx={getUseCaseChipSx(uc.name)}
+                      />
                     </MenuItem>
                   ))}
                 </Menu>
               </Box>
               <Box>
-                <Typography fontSize="12px" fontWeight={500} color="#374151" mb={0.75}>Body</Typography>
-                <textarea value={body} onChange={(e) => { setBody(e.target.value); setError(null); }} placeholder="Type your message here..." maxLength={1600} rows={6}
-                  style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: "14px", fontFamily: "inherit", color: "#1E293B", lineHeight: "1.6", border: "1px solid #D1D5DB", borderRadius: "8px", resize: "vertical", outline: "none", transition: "border-color 0.15s, box-shadow 0.15s", background: "#fff" }}
-                  onFocus={(e) => { e.target.style.borderColor = "#1976d2"; e.target.style.boxShadow = "0 0 0 2px rgba(25,118,210,0.15)"; }}
-                  onBlur={(e) => { e.target.style.borderColor = "#D1D5DB"; e.target.style.boxShadow = "none"; }} />
-                <Typography fontSize="11px" color="#94A3B8" mt={0.5}>{body.length}/1600 — Use {"{variable_name}"} for dynamic fields</Typography>
+                <Typography
+                  fontSize="12px"
+                  fontWeight={500}
+                  color="#374151"
+                  mb={0.75}
+                >
+                  Body
+                </Typography>
+                <textarea
+                  value={body}
+                  onChange={(e) => {
+                    setBody(e.target.value);
+                    setError(null);
+                  }}
+                  placeholder="Type your message here..."
+                  maxLength={1600}
+                  rows={6}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "12px 14px",
+                    fontSize: "14px",
+                    fontFamily: "inherit",
+                    color: "#1E293B",
+                    lineHeight: "1.6",
+                    border: "1px solid #D1D5DB",
+                    borderRadius: "8px",
+                    resize: "vertical",
+                    outline: "none",
+                    transition: "border-color 0.15s, box-shadow 0.15s",
+                    background: "#fff",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#1976d2";
+                    e.target.style.boxShadow =
+                      "0 0 0 2px rgba(25,118,210,0.15)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#D1D5DB";
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+                <Typography fontSize="11px" color="#94A3B8" mt={0.5}>
+                  {body.length}/1600 — Use {"{variable_name}"} for dynamic
+                  fields
+                </Typography>
               </Box>
-              {error && <Alert severity="error" sx={{ borderRadius: "8px", py: 0.5 }}>{error}</Alert>}
+              {error && (
+                <Alert severity="error" sx={{ borderRadius: "8px", py: 0.5 }}>
+                  {error}
+                </Alert>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
-            <Button onClick={onClose} sx={outlineBtn}>Cancel</Button>
-            <Button onClick={handlePreview} sx={outlineBtn}>Preview</Button>
-            <Button onClick={handleSave} disabled={saving || !name.trim() || !body.trim()} sx={darkBtn}>
+            <Button onClick={onClose} sx={outlineBtn}>
+              Cancel
+            </Button>
+            <Button onClick={handlePreview} sx={outlineBtn}>
+              Preview
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={saving || !name.trim() || !body.trim()}
+              sx={darkBtn}
+            >
               {saving ? "Saving..." : "Save"}
             </Button>
           </DialogActions>
@@ -136,32 +307,100 @@ export const NewSMSTemplateDialog: React.FC<NewSMSTemplateDialogProps> = ({ open
       )}
       {view === "preview" && (
         <>
-          <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, fontSize: "1.05rem", pb: 0 }}>
+          <DialogTitle
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontWeight: 700,
+              fontSize: "1.05rem",
+              pb: 0,
+            }}
+          >
             Preview Template
-            <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
+            <IconButton size="small" onClick={onClose}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
           </DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
             <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-              <Typography fontSize="13px" color="#64748B">Template:</Typography>
-              <Typography fontSize="13px" fontWeight={600} color="#1E293B">{name}</Typography>
-              {useCase && <Chip label={useCase} size="small" sx={getUseCaseChipSx(useCase)} />}
+              <Typography fontSize="13px" color="#64748B">
+                Template:
+              </Typography>
+              <Typography fontSize="13px" fontWeight={600} color="#1E293B">
+                {name}
+              </Typography>
+              {useCase && (
+                <Chip
+                  label={useCase}
+                  size="small"
+                  sx={getUseCaseChipSx(useCase)}
+                />
+              )}
             </Stack>
-            <Box sx={{ bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", p: 2, minHeight: 160, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-              <Box sx={{ alignSelf: "flex-start", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "0px 12px 12px 12px", px: 2, py: 1.25, maxWidth: "90%", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+            <Box
+              sx={{
+                bgcolor: "#F8FAFC",
+                border: "1px solid #E2E8F0",
+                borderRadius: "12px",
+                p: 2,
+                minHeight: 160,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "flex-end",
+              }}
+            >
+              <Box
+                sx={{
+                  alignSelf: "flex-start",
+                  bgcolor: "#FFFFFF",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: "0px 12px 12px 12px",
+                  px: 2,
+                  py: 1.25,
+                  maxWidth: "90%",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                }}
+              >
+                <Typography
+                  fontSize="13px"
+                  color="#1E293B"
+                  sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}
+                >
                   {body.split(/(\{[^}]+\})/g).map((part, i) =>
-                    /^\{[^}]+\}$/.test(part) ? <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 600 }}>{part}</Box> : part
+                    /^\{[^}]+\}$/.test(part) ? (
+                      <Box
+                        key={i}
+                        component="span"
+                        sx={{ color: "#4F46E5", fontWeight: 600 }}
+                      >
+                        {part}
+                      </Box>
+                    ) : (
+                      part
+                    ),
                   )}
                 </Typography>
               </Box>
-              <Typography fontSize="11px" color="#94A3B8" sx={{ mt: 0.75, alignSelf: "flex-end" }}>
-                {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+              <Typography
+                fontSize="11px"
+                color="#94A3B8"
+                sx={{ mt: 0.75, alignSelf: "flex-end" }}
+              >
+                {new Date().toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </Typography>
             </Box>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 3, pt: 1, gap: 1 }}>
-            <Button onClick={() => setView("form")} sx={outlineBtn}>Back to Edit</Button>
-            <Button onClick={handleSave} disabled={saving} sx={darkBtn}>{saving ? "Saving..." : "Save"}</Button>
+            <Button onClick={() => setView("form")} sx={outlineBtn}>
+              Back to Edit
+            </Button>
+            <Button onClick={handleSave} disabled={saving} sx={darkBtn}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
           </DialogActions>
         </>
       )}
@@ -183,6 +422,9 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
   const [selected, setSelected] = React.useState<SMSTemplate | null>(null);
   const [previewBody, setPreviewBody] = React.useState("");
   const [newTemplateOpen, setNewTemplateOpen] = React.useState(false);
+  const [useCases, setUseCases] = React.useState<UseCase[]>([]);
+  const clinic = useSelector(selectClinic);
+  const CLINIC_ID = clinic?.id;
 
   const loadTemplates = React.useCallback(() => {
     setLoadingTpl(true);
@@ -194,8 +436,17 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
 
   React.useEffect(() => {
     if (!open) { setView("list"); setSelected(null); setPreviewBody(""); return; }
+    if (open && CLINIC_ID) {
+      UseCaseAPI.getUseCases(CLINIC_ID)
+        .then((data) => {
+          setUseCases(data || []);
+        })
+        .catch(() => {
+          setUseCases([]);
+        });
+    }
     loadTemplates();
-  }, [open, loadTemplates]);
+  }, [open, loadTemplates, CLINIC_ID]);
 
   const handlePickTemplate = (tpl: SMSTemplate) => { setSelected(tpl); setPreviewBody(tpl.body); setView("preview"); };
   const handleSave = () => { onSelect(previewBody); onClose(); };
@@ -207,77 +458,276 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
     onClose();
   };
 
+  const getUseCaseName = (useCase: unknown, useCases: UseCase[]): string => {
+    if (!useCase) return "";
+
+    const found = useCases.find((uc) => String(uc.id) === String(useCase));
+
+    return found?.name || String(useCase);
+  };
+
   return (
     <>
-      <NewSMSTemplateDialog open={newTemplateOpen} onClose={() => setNewTemplateOpen(false)} onSaved={handleNewTemplateSaved} />
-      <Dialog open={open && !newTemplateOpen} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }} sx={{ zIndex: 1300 }}>
+      <NewSMSTemplateDialog
+        open={newTemplateOpen}
+        onClose={() => setNewTemplateOpen(false)}
+        onSaved={handleNewTemplateSaved}
+      />
+      <Dialog
+        open={open && !newTemplateOpen}
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px" } }}
+        sx={{ zIndex: 1300 }}
+      >
         {view === "list" && (
           <>
-            <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, fontSize: "1.05rem", pb: 1 }}>
+            <DialogTitle
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontWeight: 700,
+                fontSize: "1.05rem",
+                pb: 1,
+              }}
+            >
               Select SMS Template
-              <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={onClose}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
             </DialogTitle>
             <DialogContent sx={{ pt: 0, pb: 0 }}>
               {loadingTpl ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={28} /></Box>
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                  <CircularProgress size={28} />
+                </Box>
               ) : templates.length === 0 ? (
-                <Box sx={{ textAlign: "center", py: 4 }}><Typography color="text.secondary" fontSize="14px">No SMS templates found.</Typography></Box>
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <Typography color="text.secondary" fontSize="14px">
+                    No SMS templates found.
+                  </Typography>
+                </Box>
               ) : (
                 <List disablePadding sx={{ maxHeight: 340, overflowY: "auto" }}>
                   {templates.map((tpl, idx) => (
                     <React.Fragment key={tpl.id}>
                       <ListItem disablePadding>
-                        <ListItemButton onClick={() => handlePickTemplate(tpl)} sx={{ borderRadius: "8px", px: 1.5, py: 1.25, "&:hover": { bgcolor: "#F8FAFC" } }}>
+                        <ListItemButton
+                          onClick={() => handlePickTemplate(tpl)}
+                          sx={{
+                            borderRadius: "8px",
+                            px: 1.5,
+                            py: 1.25,
+                            "&:hover": { bgcolor: "#F8FAFC" },
+                          }}
+                        >
                           <ListItemText
-                            primary={<Stack direction="row" spacing={1} alignItems="center"><Typography fontSize="14px" fontWeight={600} color="#1E293B">{tpl.name}</Typography>{tpl.use_case && <Chip label={tpl.use_case} size="small" sx={getUseCaseChipSx(tpl.use_case)} />}</Stack>}
-                            secondary={<Typography fontSize="12px" color="#64748B" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{tpl.body}</Typography>}
+                            primary={
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                alignItems="center"
+                              >
+                                <Typography
+                                  fontSize="14px"
+                                  fontWeight={600}
+                                  color="#1E293B"
+                                >
+                                  {tpl.name}
+                                </Typography>
+                                {tpl.use_case && (
+                                  <Chip
+                                    label={getUseCaseName(
+                                      tpl.use_case,
+                                      useCases,
+                                    )}
+                                    size="small"
+                                    sx={getUseCaseChipSx(
+                                      getUseCaseName(tpl.use_case, useCases),
+                                    )}
+                                  />
+                                )}
+                              </Stack>
+                            }
+                            secondary={
+                              <Typography
+                                fontSize="12px"
+                                color="#64748B"
+                                sx={{
+                                  mt: 0.5,
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {tpl.body}
+                              </Typography>
+                            }
                           />
                         </ListItemButton>
                       </ListItem>
-                      {idx < templates.length - 1 && <Divider sx={{ my: 0.25 }} />}
+                      {idx < templates.length - 1 && (
+                        <Divider sx={{ my: 0.25 }} />
+                      )}
                     </React.Fragment>
                   ))}
                 </List>
               )}
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3, pt: 2, flexDirection: "column", gap: 1, alignItems: "stretch" }}>
-              <Button fullWidth variant="outlined" onClick={() => setNewTemplateOpen(true)} sx={{ height: 44, textTransform: "none", fontSize: "14px", fontWeight: 500, borderRadius: "8px", borderColor: "#D1D5DB", color: "#374151", "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" } }}>+ New Template</Button>
-              <Button fullWidth onClick={onClose} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Cancel</Button>
+            <DialogActions
+              sx={{
+                px: 3,
+                pb: 3,
+                pt: 2,
+                flexDirection: "column",
+                gap: 1,
+                alignItems: "stretch",
+              }}
+            >
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={() => setNewTemplateOpen(true)}
+                sx={{
+                  height: 44,
+                  textTransform: "none",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  borderRadius: "8px",
+                  borderColor: "#D1D5DB",
+                  color: "#374151",
+                  "&:hover": { borderColor: "#9CA3AF", bgcolor: "#F9FAFB" },
+                }}
+              >
+                + New Template
+              </Button>
+              <Button
+                fullWidth
+                onClick={onClose}
+                sx={{
+                  height: 44,
+                  backgroundColor: "#F3F4F6",
+                  color: "black",
+                  fontWeight: 500,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  "&:hover": { backgroundColor: "#E5E7EB" },
+                }}
+              >
+                Cancel
+              </Button>
             </DialogActions>
           </>
         )}
         {view === "preview" && (
           <>
-            <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, fontSize: "1.05rem", pb: 1 }}>
+            <DialogTitle
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontWeight: 700,
+                fontSize: "1.05rem",
+                pb: 1,
+              }}
+            >
               Preview Template
-              <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={onClose}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
             </DialogTitle>
             <DialogContent sx={{ pt: 1 }}>
               <Stack spacing={2}>
                 {selected && (
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography fontSize="13px" color="#64748B">Template:</Typography>
-                    <Typography fontSize="13px" fontWeight={600} color="#1E293B">{selected.name}</Typography>
-                    {selected.use_case && <Chip label={selected.use_case} size="small" sx={getUseCaseChipSx(selected.use_case)} />}
+                    <Typography fontSize="13px" color="#64748B">
+                      Template:
+                    </Typography>
+                    <Typography
+                      fontSize="13px"
+                      fontWeight={600}
+                      color="#1E293B"
+                    >
+                      {selected.name}
+                    </Typography>
+                    {selected.use_case && (
+                      <Chip
+                        label={getUseCaseName(selected.use_case, useCases)}
+                        size="small"
+                        sx={getUseCaseChipSx(
+                          getUseCaseName(selected.use_case, useCases),
+                        )}
+                      />
+                    )}
                   </Stack>
                 )}
-                <Box sx={{ bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", p: 2, minHeight: 120, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-                  <Box sx={{ alignSelf: "flex-start", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "0px 12px 12px 12px", px: 2, py: 1.25, maxWidth: "90%", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                    <Typography fontSize="13px" color="#1E293B" sx={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                <Box
+                  sx={{
+                    bgcolor: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: "12px",
+                    p: 2,
+                    minHeight: 120,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      alignSelf: "flex-start",
+                      bgcolor: "#FFFFFF",
+                      border: "1px solid #E2E8F0",
+                      borderRadius: "0px 12px 12px 12px",
+                      px: 2,
+                      py: 1.25,
+                      maxWidth: "90%",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    <Typography
+                      fontSize="13px"
+                      color="#1E293B"
+                      sx={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}
+                    >
                       {previewBody.split(/(\{[^}]+\})/g).map((part, i) =>
-                        /^\{[^}]+\}$/.test(part) ? <Box key={i} component="span" sx={{ color: "#4F46E5", fontWeight: 500 }}>{part}</Box> : part
+                        /^\{[^}]+\}$/.test(part) ? (
+                          <Box
+                            key={i}
+                            component="span"
+                            sx={{ color: "#4F46E5", fontWeight: 500 }}
+                          >
+                            {part}
+                          </Box>
+                        ) : (
+                          part
+                        ),
                       )}
                     </Typography>
                   </Box>
-                  <Typography fontSize="11px" color="#94A3B8" sx={{ mt: 0.75, alignSelf: "flex-end" }}>
-                    {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                  <Typography
+                    fontSize="11px"
+                    color="#94A3B8"
+                    sx={{ mt: 0.75, alignSelf: "flex-end" }}
+                  >
+                    {new Date().toLocaleTimeString("en-IN", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </Typography>
                 </Box>
 
                 {/* ── Variable hint ── */}
                 {previewBody.match(/\{[^}]+\}/g) && (
-                  <Alert severity="info" sx={{ borderRadius: "8px", py: 0.5, fontSize: "12px" }}>
-                    Replace the <strong>highlighted variables</strong> in the message box below before sending.
+                  <Alert
+                    severity="info"
+                    sx={{ borderRadius: "8px", py: 0.5, fontSize: "12px" }}
+                  >
+                    Replace the <strong>highlighted variables</strong> in the
+                    message box below before sending.
                   </Alert>
                 )}
 
@@ -294,8 +744,38 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
               </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-              <Button fullWidth onClick={() => setView("list")} sx={{ height: 44, backgroundColor: "#F3F4F6", color: "black", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#E5E7EB" } }}>Back to Edit</Button>
-              <Button fullWidth onClick={handleSave} disabled={!previewBody.trim()} sx={{ height: 44, backgroundColor: "#1F2937", color: "white", fontWeight: 500, textTransform: "none", borderRadius: "8px", "&:hover": { backgroundColor: "#111827" }, "&:disabled": { backgroundColor: "#9CA3AF", color: "white" } }}>Use Template</Button>
+              <Button
+                fullWidth
+                onClick={() => setView("list")}
+                sx={{
+                  height: 44,
+                  backgroundColor: "#F3F4F6",
+                  color: "black",
+                  fontWeight: 500,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  "&:hover": { backgroundColor: "#E5E7EB" },
+                }}
+              >
+                Back to Edit
+              </Button>
+              <Button
+                fullWidth
+                onClick={handleSave}
+                disabled={!previewBody.trim()}
+                sx={{
+                  height: 44,
+                  backgroundColor: "#1F2937",
+                  color: "white",
+                  fontWeight: 500,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  "&:hover": { backgroundColor: "#111827" },
+                  "&:disabled": { backgroundColor: "#9CA3AF", color: "white" },
+                }}
+              >
+                Use Template
+              </Button>
             </DialogActions>
           </>
         )}
@@ -308,7 +788,7 @@ export const SMSTemplatePicker: React.FC<SMSTemplatePickerProps> = ({ open, onCl
 interface SMSDialogProps {
   open: boolean;
   lead: ProcessedLead | null;
-  onClose: () => void;
+  onClose: (sent?: boolean, sentItem?: TwilioSMS) => void;
 }
 
 export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => {
@@ -317,7 +797,7 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
   const [error, setError] = React.useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
 
-  const handleClose = () => { if (sending) return; setMessage(""); setError(null); onClose(); };
+  const handleClose = () => { if (sending) return; setMessage(""); setError(null); onClose(false); };
 
   // ── Check for unfilled variables like {name}, {date} etc ──────────────
   const unfilledVars = React.useMemo(() => {
@@ -342,7 +822,16 @@ export const SMSDialog: React.FC<SMSDialogProps> = ({ open, lead, onClose }) => 
       await TwilioAPI.sendSMS({ lead_uuid: lead.id, to: phone, message: message.trim() });
       toast.success(`SMS sent to ${lead?.full_name || lead?.name}!`, toastOptions);
       setMessage("");
-      onClose();
+      onClose(true, {
+        id: `optimistic-${Date.now()}`,
+        sid: `optimistic-${Date.now()}`,
+        to_number: phone,
+        from_number: "",
+        body: message.trim(),
+        status: "sent",
+        direction: "outbound",
+        created_at: new Date().toISOString(),
+      } as TwilioSMS);
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to send SMS. Please try again."));
     } finally {

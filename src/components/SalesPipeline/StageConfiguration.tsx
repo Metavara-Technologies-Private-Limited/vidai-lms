@@ -56,17 +56,21 @@ export type StageConfigPayload = {
 };
 
 const DEFAULT_STAGE_ACTIONS: StageAction[] = [
-	{ id: "manual-move", label: "Allow manual move via drag & drop", checked: true },
-	{
-		id: "auto-move",
-		label: "Auto-move lead to next stage after actions are completed",
-		checked: true,
-	},
-	{ id: "call", label: "Call", checked: true },
-	{ id: "proposal-email", label: "Proposal - Email", checked: false },
-	{ id: "whatsapp", label: "WhatsApp", checked: false },
-	{ id: "sms", label: "SMS", checked: false },
-	{ id: "appointment", label: "Appointment", checked: false },
+  {
+    id: "manual-move",
+    label: "Allow manual move via drag & drop",
+    checked: true,
+  },
+  {
+    id: "auto-move",
+    label: "Auto-move lead to next stage after actions are completed",
+    checked: true,
+  },
+  { id: "call", label: "Call", checked: true },
+  { id: "proposal-email", label: "Proposal - Email", checked: true },
+  { id: "whatsapp", label: "WhatsApp", checked: true },
+  { id: "sms", label: "SMS", checked: true },
+  { id: "appointment", label: "Appointment", checked: false },
 ];
 
 const normalizeHexColorInput = (value: string): string => {
@@ -75,7 +79,7 @@ const normalizeHexColorInput = (value: string): string => {
 };
 
 const isValidHexColor = (value: string): boolean => /^#[0-9A-F]{6}$/.test(value.toUpperCase());
-const NAME_PATTERN = /^[A-Za-z ]+$/;
+const NAME_PATTERN = /^[A-Za-z0-9 \-&.()/]+$/;
 const MAX_NAME_LENGTH = 50;
 const isAlphabeticName = (value?: string): boolean => {
 	if (!value) return false;
@@ -84,7 +88,7 @@ const isAlphabeticName = (value?: string): boolean => {
 };
 
 const sanitizeAlphabeticName = (value: string): string =>
-	value.replace(/[^A-Za-z ]/g, "").slice(0, MAX_NAME_LENGTH);
+  value.replace(/[^A-Za-z0-9 \-&.()/]/g, "").slice(0, MAX_NAME_LENGTH);
 
 const INPUT_TOAST_OPTIONS = {
 	position: "top-right" as const,
@@ -129,6 +133,13 @@ const StageConfiguration = ({
 	});
 
 	const handleAddAnotherField = () => {
+		if (!stageName.trim()) {
+			toast.error("Please enter stage name before adding data capture", {
+				position: "top-right",
+				autoClose: 2000,
+			});
+			return;
+		}
 		setDataCaptureFields((previous) => [...previous, createEmptyField()]);
 	};
 
@@ -159,9 +170,12 @@ const StageConfiguration = ({
 		value: string,
 	) => {
 		if (key === "fieldName") {
-			if (/[^A-Za-z ]/.test(value)) {
-				showInputToast("pipeline-data-capture-name-alpha", "Only letters and spaces are allowed");
-			}
+			if (/[^A-Za-z0-9 \-&.()/]/.test(value)) {
+        showInputToast(
+          "pipeline-data-capture-name-alpha",
+          "Only letters, numbers, hyphens, and special characters are allowed",
+        );
+      }
 			if (value.length > MAX_NAME_LENGTH) {
 				showInputToast("pipeline-data-capture-name-length", "Maximum 50 characters allowed");
 			}
@@ -185,9 +199,12 @@ const StageConfiguration = ({
 	};
 
 	const handleStageNameInputChange = (value: string) => {
-		if (/[^A-Za-z ]/.test(value)) {
-			showInputToast("pipeline-stage-name-alpha", "Only letters and spaces are allowed");
-		}
+		if (/[^A-Za-z0-9 \-&.()/]/.test(value)) {
+      showInputToast(
+        "pipeline-stage-name-alpha",
+        "Only letters, numbers, hyphens, and special characters are allowed",
+      );
+    }
 		if (value.length > MAX_NAME_LENGTH) {
 			showInputToast("pipeline-stage-name-length", "Maximum 50 characters allowed");
 		}
@@ -312,609 +329,669 @@ const StageConfiguration = ({
 		normalizedTypedStageName.length === 1 && /^[A-Za-z]$/.test(normalizedTypedStageName);
 
 	return (
-		<Box
-			data-stage-config-keep-open="true"
-			sx={{
-				position: "absolute",
-				top: 8,
-				right: 8,
-				bottom: 8,
-				width: 352,
-				borderRadius: 3,
-				border: `1px solid ${theme.palette.grey[200]}`,
-				backgroundColor: "#FBFBFC",
-				display: "flex",
-				flexDirection: "column",
-				zIndex: 4,
-				overflow: "hidden",
-			}}
-		>
-			<Box
-				sx={{
-					px: 2,
-					py: 1.7,
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-				}}
-			>
-				<Typography sx={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.2 }}>
-					Stage Configuration
-				</Typography>
-				<IconButton
-					size="small"
-					onClick={onClose}
-					sx={{
-						backgroundColor: "#F2F2F2",
-						width: 30,
-						height: 30,
-						"&:hover": { backgroundColor: "#EAEAEA" },
-					}}
-				>
-					<CloseIcon fontSize="small" />
-				</IconButton>
-			</Box>
+    <Box
+      data-stage-config-keep-open="true"
+      sx={{
+        position: "absolute",
+        top: 8,
+        right: 8,
+        bottom: 8,
+        width: 352,
+        borderRadius: 3,
+        border: `1px solid ${theme.palette.grey[200]}`,
+        backgroundColor: "#FBFBFC",
+        display: "flex",
+        flexDirection: "column",
+        zIndex: 4,
+        overflow: "hidden",
+      }}
+    >
+      <Box
+        sx={{
+          px: 2,
+          py: 1.7,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Typography sx={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.2 }}>
+          Stage Configuration
+        </Typography>
+        <IconButton
+          size="small"
+          onClick={onClose}
+          sx={{
+            backgroundColor: "#F2F2F2",
+            width: 30,
+            height: 30,
+            "&:hover": { backgroundColor: "#EAEAEA" },
+          }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Box>
 
-			<Box sx={{ px: 2, pb: 1.5 }}>
-				<Stack direction="row" spacing={1}>
-					<Box
-						onClick={() => setActiveTab("stage-rules")}
-						sx={{
-							flex: 1,
-							py: 0.85,
-							borderRadius: 2,
-							textAlign: "center",
-							fontSize: 14,
-							fontWeight: activeTab === "stage-rules" ? 600 : 500,
-							color:
-								activeTab === "stage-rules"
-									? "#EA7C5A"
-									: "text.primary",
-							border:
-								activeTab === "stage-rules"
-									? "1px solid #ECECEC"
-									: "1px solid transparent",
-							backgroundColor: "#FFFFFF",
-							boxShadow:
-								activeTab === "stage-rules"
-									? "0 2px 10px rgba(15, 23, 42, 0.08)"
-									: "none",
-							cursor: "pointer",
-						}}
-					>
-						Stage Rules
-					</Box>
-					<Box
-						onClick={() => setActiveTab("data-capture")}
-						sx={{
-							flex: 1,
-							py: 0.85,
-							borderRadius: 2,
-							textAlign: "center",
-							fontSize: 14,
-							fontWeight: activeTab === "data-capture" ? 600 : 500,
-							color:
-								activeTab === "data-capture"
-									? "#EA7C5A"
-									: "text.primary",
-							border:
-								activeTab === "data-capture"
-									? "1px solid #ECECEC"
-									: "1px solid transparent",
-							backgroundColor: "#FFFFFF",
-							boxShadow:
-								activeTab === "data-capture"
-									? "0 2px 10px rgba(15, 23, 42, 0.08)"
-									: "none",
-							cursor: "pointer",
-						}}
-					>
-						Data Capture
-					</Box>
-				</Stack>
-			</Box>
+      <Box sx={{ px: 2, pb: 1.5 }}>
+        <Stack direction="row" spacing={1}>
+          <Box
+            onClick={() => setActiveTab("stage-rules")}
+            sx={{
+              flex: 1,
+              py: 0.85,
+              borderRadius: 2,
+              textAlign: "center",
+              fontSize: 14,
+              fontWeight: activeTab === "stage-rules" ? 600 : 500,
+              color: activeTab === "stage-rules" ? "#EA7C5A" : "text.primary",
+              border:
+                activeTab === "stage-rules"
+                  ? "1px solid #ECECEC"
+                  : "1px solid transparent",
+              backgroundColor: "#FFFFFF",
+              boxShadow:
+                activeTab === "stage-rules"
+                  ? "0 2px 10px rgba(15, 23, 42, 0.08)"
+                  : "none",
+              cursor: "pointer",
+            }}
+          >
+            Stage Rules
+          </Box>
+          <Box
+            onClick={() => setActiveTab("data-capture")}
+            sx={{
+              flex: 1,
+              py: 0.85,
+              borderRadius: 2,
+              textAlign: "center",
+              fontSize: 14,
+              fontWeight: activeTab === "data-capture" ? 600 : 500,
+              color: activeTab === "data-capture" ? "#EA7C5A" : "text.primary",
+              border:
+                activeTab === "data-capture"
+                  ? "1px solid #ECECEC"
+                  : "1px solid transparent",
+              backgroundColor: "#FFFFFF",
+              boxShadow:
+                activeTab === "data-capture"
+                  ? "0 2px 10px rgba(15, 23, 42, 0.08)"
+                  : "none",
+              cursor: "pointer",
+            }}
+          >
+            Data Capture
+          </Box>
+        </Stack>
+      </Box>
 
-			<Box sx={{ px: 2, pb: 1.2, overflowY: "auto" }}>
-				{activeTab === "stage-rules" ? (
-					<>
-						<Box
-							sx={{
-								border: `1px solid ${theme.palette.grey[200]}`,
-								borderRadius: 2,
-								backgroundColor: "#FAFAFB",
-								p: 1.5,
-								mb: 1.4,
-							}}
-						>
-							<Stack spacing={1.05}>
-								<TextField
-									size="small"
-									label="Stage Name"
-									value={stageName}
-									onChange={(event) =>
-										handleStageNameInputChange(event.target.value)
-									}
-									error={
-										showValidation &&
-										(isSingleLetterTypedStageName ||
-											stageName.trim().length > MAX_NAME_LENGTH ||
-											(stageName.trim().length > 0 && !isAlphabeticName(stageName)))
-									}
-									helperText={
-										showValidation && isSingleLetterTypedStageName
-												? "Stage name cannot be a single letter"
-											: showValidation && stageName.trim().length > MAX_NAME_LENGTH
-												? "Maximum 50 characters allowed"
-											: showValidation && !isAlphabeticName(stageName)
-												&& stageName.trim().length > 0
-												? "Only letters and spaces are allowed"
-												: " "
-									}
-									inputProps={{ maxLength: MAX_NAME_LENGTH }}
-									sx={{
-										"& .MuiOutlinedInput-root": {
-											borderRadius: 1.4,
-											backgroundColor: "#FFFFFF",
-										},
-										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-									}}
-								/>
-								<TextField
-									size="small"
-									label="Stage Type"
-																		select
-									value={stageType}
-									onChange={(event) => setStageType(event.target.value)}
-									SelectProps={{
-										MenuProps: {
-											disablePortal: true,
-											PaperProps: { "data-stage-config-keep-open": "true" },
-										},
-									}}
-									error={showValidation && !stageType.trim()}
-									helperText={
-										showValidation && !stageType.trim() ? "Stage type is required" : " "
-									}
-									sx={{
-										"& .MuiOutlinedInput-root": {
-											borderRadius: 1.4,
-											backgroundColor: "#FFFFFF",
-										},
-										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-									}}
-								>
-								<MenuItem value="">
-									<em>Select stage type</em>
-								</MenuItem>
-									<MenuItem value="Entry">Entry</MenuItem>
-									<MenuItem value="Mid">Mid</MenuItem>
-									<MenuItem value="Final">Final</MenuItem>
-								</TextField>
-								<TextField
-									size="small"
-									label="Stage Status"
-																		select
-									value={stageStatus}
-									onChange={(event) => setStageStatus(event.target.value)}
-									SelectProps={{
-										MenuProps: {
-											disablePortal: true,
-											PaperProps: { "data-stage-config-keep-open": "true" },
-										},
-									}}
-									error={showValidation && !stageStatus.trim()}
-									helperText={
-										showValidation && !stageStatus.trim() ? "Stage status is required" : " "
-									}
-									sx={{
-										"& .MuiOutlinedInput-root": {
-											borderRadius: 1.4,
-											backgroundColor: "#FFFFFF",
-										},
-										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-									}}
-								>
-								<MenuItem value="">
-									<em>Select stage status</em>
-								</MenuItem>
-									<MenuItem value="Active">Active</MenuItem>
-									<MenuItem value="Inactive">Inactive</MenuItem>
-								</TextField>
+      <Box sx={{ px: 2, pb: 1.2, overflowY: "auto" }}>
+        {activeTab === "stage-rules" ? (
+          <>
+            <Box
+              sx={{
+                border: `1px solid ${theme.palette.grey[200]}`,
+                borderRadius: 2,
+                backgroundColor: "#FAFAFB",
+                p: 1.5,
+                mb: 1.4,
+              }}
+            >
+              <Stack spacing={1.05}>
+                <TextField
+                  size="small"
+                  label="Stage Name"
+                  value={stageName}
+                  onChange={(event) =>
+                    handleStageNameInputChange(event.target.value)
+                  }
+                  error={
+                    showValidation &&
+                    (isSingleLetterTypedStageName ||
+                      stageName.trim().length > MAX_NAME_LENGTH ||
+                      (stageName.trim().length > 0 &&
+                        !isAlphabeticName(stageName)))
+                  }
+                  helperText={
+                    showValidation && isSingleLetterTypedStageName
+                      ? "Stage name cannot be a single letter"
+                      : showValidation &&
+                          stageName.trim().length > MAX_NAME_LENGTH
+                        ? "Maximum 50 characters allowed"
+                        : showValidation &&
+                            !isAlphabeticName(stageName) &&
+                            stageName.trim().length > 0
+                          ? "Only letters, numbers, hyphens, and special characters are allowed"
+                          : " "
+                  }
+                  inputProps={{ maxLength: MAX_NAME_LENGTH }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 1.4,
+                      backgroundColor: "#FFFFFF",
+                    },
+                    "& .MuiFormHelperText-root": {
+                      minHeight: 18,
+                      m: 0,
+                      pt: 0.35,
+                    },
+                  }}
+                />
+                <TextField
+                  size="small"
+                  label="Stage Type"
+                  select
+                  value={stageType}
+                  onChange={(event) => setStageType(event.target.value)}
+                  SelectProps={{
+                    MenuProps: {
+                      disablePortal: true,
+                      PaperProps: { "data-stage-config-keep-open": "true" },
+                    },
+                  }}
+                  error={showValidation && !stageType.trim()}
+                  helperText={
+                    showValidation && !stageType.trim()
+                      ? "Stage type is required"
+                      : " "
+                  }
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 1.4,
+                      backgroundColor: "#FFFFFF",
+                    },
+                    "& .MuiFormHelperText-root": {
+                      minHeight: 18,
+                      m: 0,
+                      pt: 0.35,
+                    },
+                    "& .MuiSelect-select": { textAlign: "left" },
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>Select stage type</em>
+                  </MenuItem>
+                  <MenuItem value="Entry">Entry</MenuItem>
+                  <MenuItem value="Mid">Mid</MenuItem>
+                  <MenuItem value="Final">Final</MenuItem>
+                </TextField>
+                <TextField
+                  size="small"
+                  label="Stage Status"
+                  select
+                  value={stageStatus}
+                  onChange={(event) => setStageStatus(event.target.value)}
+                  SelectProps={{
+                    MenuProps: {
+                      disablePortal: true,
+                      PaperProps: { "data-stage-config-keep-open": "true" },
+                    },
+                  }}
+                  error={showValidation && !stageStatus.trim()}
+                  helperText={
+                    showValidation && !stageStatus.trim()
+                      ? "Stage status is required"
+                      : " "
+                  }
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 1.4,
+                      backgroundColor: "#FFFFFF",
+                    },
+                    "& .MuiFormHelperText-root": {
+                      minHeight: 18,
+                      m: 0,
+                      pt: 0.35,
+                    },
+                    "& .MuiSelect-select": { textAlign: "left" },
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>Select stage status</em>
+                  </MenuItem>
+                  <MenuItem value="Active">Active</MenuItem>
+                  <MenuItem value="Inactive">Inactive</MenuItem>
+                </TextField>
 
-								<TextField
-									size="small"
-									label="Color Code"
-									value={colorCode}
-									onChange={(event) =>
-										setColorCode(normalizeHexColorInput(event.target.value))
-									}
-									error={showValidation && !isValidHexColor(colorCode)}
-									helperText={
-										showValidation && !isValidHexColor(colorCode)
-											? "Use valid hex color (example: #EEE788)"
-											: " "
-									}
-									InputProps={{
-										endAdornment: (
-											<InputAdornment position="end">
-												<>
-													<input
-														type="color"
-														ref={colorPickerRef}
-														value={isValidHexColor(colorCode) ? colorCode : "#EEE788"}
-														onChange={handleColorPickerChange}
-														style={{
-															position: "absolute",
-															opacity: 0,
-															pointerEvents: "none",
-															width: 0,
-															height: 0,
-														}}
-													/>
-													<Box
-														onClick={() => colorPickerRef.current?.click()}
-														sx={{
-															width: 28,
-															height: 28,
-															borderRadius: 1,
-															border: "1px solid #DDE3DD",
-															backgroundColor: isValidHexColor(colorCode)
-																? colorCode
-																: "#EEE788",
-															cursor: "pointer",
-														}}
-													/>
-												</>
-											</InputAdornment>
-										),
-									}}
-									sx={{
-										"& .MuiOutlinedInput-root": {
-											borderRadius: 1.4,
-											backgroundColor: "#FFFFFF",
-										},
-										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-									}}
-								/>
+                <TextField
+                  size="small"
+                  label="Color Code"
+                  value={colorCode}
+                  onChange={(event) =>
+                    setColorCode(normalizeHexColorInput(event.target.value))
+                  }
+                  error={showValidation && !isValidHexColor(colorCode)}
+                  helperText={
+                    showValidation && !isValidHexColor(colorCode)
+                      ? "Use valid hex color (example: #EEE788)"
+                      : " "
+                  }
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <>
+                          <input
+                            type="color"
+                            ref={colorPickerRef}
+                            value={
+                              isValidHexColor(colorCode) ? colorCode : "#EEE788"
+                            }
+                            onChange={handleColorPickerChange}
+                            style={{
+                              position: "absolute",
+                              opacity: 0,
+                              pointerEvents: "none",
+                              width: 0,
+                              height: 0,
+                            }}
+                          />
+                          <Box
+                            onClick={() => colorPickerRef.current?.click()}
+                            sx={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 1,
+                              border: "1px solid #DDE3DD",
+                              backgroundColor: isValidHexColor(colorCode)
+                                ? colorCode
+                                : "#EEE788",
+                              cursor: "pointer",
+                            }}
+                          />
+                        </>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 1.4,
+                      backgroundColor: "#FFFFFF",
+                    },
+                    "& .MuiFormHelperText-root": {
+                      minHeight: 18,
+                      m: 0,
+                      pt: 0.35,
+                    },
+                  }}
+                />
 
-								<TextField
-									size="small"
-									label="Entry Rule"
-																		select
-									value={entryRule}
-									onChange={(event) => setEntryRule(event.target.value)}
-									SelectProps={{
-										MenuProps: {
-											disablePortal: true,
-											PaperProps: { "data-stage-config-keep-open": "true" },
-										},
-									}}
-									error={showValidation && !entryRule.trim()}
-									helperText={
-										showValidation && !entryRule.trim() ? "Entry rule is required" : " "
-									}
-									sx={{
-										"& .MuiOutlinedInput-root": {
-											borderRadius: 1.4,
-											backgroundColor: "#FFFFFF",
-										},
-										"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-									}}
-								>
-									<MenuItem value="Manual">Manual</MenuItem>
-									<MenuItem value="Auto">Auto</MenuItem>
-								</TextField>
-							</Stack>
-						</Box>
+                <TextField
+                  size="small"
+                  label="Entry Rule"
+                  select
+                  value={entryRule}
+                  onChange={(event) => setEntryRule(event.target.value)}
+                  SelectProps={{
+                    MenuProps: {
+                      disablePortal: true,
+                      PaperProps: { "data-stage-config-keep-open": "true" },
+                    },
+                  }}
+                  error={showValidation && !entryRule.trim()}
+                  helperText={
+                    showValidation && !entryRule.trim()
+                      ? "Entry rule is required"
+                      : " "
+                  }
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 1.4,
+                      backgroundColor: "#FFFFFF",
+                    },
+                    "& .MuiFormHelperText-root": {
+                      minHeight: 18,
+                      m: 0,
+                      pt: 0.35,
+                    },
+                    "& .MuiSelect-select": { textAlign: "left" },
+                  }}
+                >
+                  <MenuItem value="Manual">Manual</MenuItem>
+                  <MenuItem value="Auto">Auto</MenuItem>
+                </TextField>
+              </Stack>
+            </Box>
 
-						<Box
-							sx={{
-								border: `1px solid ${theme.palette.grey[200]}`,
-								borderRadius: 2,
-								backgroundColor: "#FAFAFB",
-								overflow: "hidden",
-							}}
-						>
-							<Typography
-								sx={{
-									fontSize: 14,
-									fontWeight: 700,
-									px: 1.4,
-									pt: 1.2,
-									pb: 1,
-									borderBottom: `1px solid ${theme.palette.grey[200]}`,
-								}}
-							>
-								ACTIONS
-							</Typography>
-							<Typography sx={{ fontSize: 12, color: "#E9A67A", px: 1.4, pt: 1.2, mb: 1.2 }}>
-								*Define actions that must be completed before a lead moves to the
-								next stage.
-							</Typography>
+            <Box
+              sx={{
+                border: `1px solid ${theme.palette.grey[200]}`,
+                borderRadius: 2,
+                backgroundColor: "#FAFAFB",
+                overflow: "hidden",
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  px: 1.4,
+                  pt: 1.2,
+                  pb: 1,
+                  borderBottom: `1px solid ${theme.palette.grey[200]}`,
+                }}
+              >
+                ACTIONS
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  color: "#E9A67A",
+                  px: 1.4,
+                  pt: 1.2,
+                  mb: 1.2,
+                }}
+              >
+                *Define actions that must be completed before a lead moves to
+                the next stage.
+              </Typography>
 
-							<Stack spacing={1.05} sx={{ px: 1.4, pb: 1.3 }}>
-								{stageActions.map((item) => (
-									<Box
-										key={item.id}
-										onClick={() => handleToggleStageAction(item.id)}
-										onKeyDown={(event) => {
-											if (event.key === "Enter" || event.key === " ") {
-												event.preventDefault();
-												handleToggleStageAction(item.id);
-											}
-										}}
-										role="checkbox"
-										aria-checked={item.checked}
-										tabIndex={0}
-										sx={{
-											display: "flex",
-											alignItems: "center",
-											gap: 0.9,
-											cursor: "pointer",
-										}}
-									>
-										<Box
-											sx={{
-												width: 18,
-												height: 18,
-												borderRadius: 0.8,
-												border: `1px solid ${item.checked ? "#B8DCBE" : "#CFCFCF"}`,
-												display: "flex",
-												alignItems: "center",
-												justifyContent: "center",
-												backgroundColor: item.checked ? "#D8F0DC" : "#FFFFFF",
-												color: "#4D9E5E",
-											}}
-										>
-											{item.checked ? <CheckRoundedIcon sx={{ fontSize: 13 }} /> : null}
-										</Box>
-										<Typography
-											sx={{
-												fontSize: 13,
-												lineHeight: 1.35,
-												fontWeight: 400,
-												color: item.checked ? "#252525" : "#A4A4A4",
-											}}
-										>
-											{item.label}
-										</Typography>
-									</Box>
-								))}
+              <Stack spacing={1.05} sx={{ px: 1.4, pb: 1.3 }}>
+                {stageActions.map((item) => (
+                  <Box
+                    key={item.id}
+                    onClick={() => handleToggleStageAction(item.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleToggleStageAction(item.id);
+                      }
+                    }}
+                    role="checkbox"
+                    aria-checked={item.checked}
+                    tabIndex={0}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      textAlign: "left",
+                      gap: 0.9,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 0.8,
+                        border: `1px solid ${item.checked ? "#B8DCBE" : "#CFCFCF"}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: item.checked ? "#D8F0DC" : "#FFFFFF",
+                        color: "#4D9E5E",
+                      }}
+                    >
+                      {item.checked ? (
+                        <CheckRoundedIcon sx={{ fontSize: 13 }} />
+                      ) : null}
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontSize: 13,
+                        lineHeight: 1.35,
+                        fontWeight: 400,
+                        color: item.checked ? "#252525" : "#A4A4A4",
+                      }}
+                    >
+                      {item.label}
+                    </Typography>
+                  </Box>
+                ))}
 
-								{showCustomActionForm ? (
-									<Box sx={{ pt: 0.8 }}>
-										<TextField
-											size="small"
-											placeholder="Enter action name"
-											value={customActionText}
-											autoFocus
-											onChange={(event) => setCustomActionText(event.target.value)}
-											onKeyDown={(event) => {
-												if (event.key === "Enter") handleSaveCustomAction();
-												if (event.key === "Escape") {
-													setShowCustomActionForm(false);
-													setCustomActionText("");
-												}
-											}}
-											fullWidth
-											sx={{
-												mb: 0.8,
-												"& .MuiOutlinedInput-root": {
-													borderRadius: 1.4,
-													backgroundColor: "#FFFFFF",
-												},
-											}}
-										/>
-										<Stack direction="row" spacing={0.8}>
-											<Button
-												size="small"
-												variant="contained"
-												onClick={handleSaveCustomAction}
-												disabled={!isAlphabeticName(customActionText)}
-												sx={{
-													backgroundColor: "#545454",
-													fontSize: 12,
-													px: 1.4,
-													"&:hover": { backgroundColor: "#3F3F3F" },
-												}}
-											>
-												Add
-											</Button>
-											<Button
-												size="small"
-												variant="outlined"
-												onClick={() => {
-													setShowCustomActionForm(false);
-													setCustomActionText("");
-												}}
-												sx={{ fontSize: 12, px: 1.4 }}
-											>
-												Cancel
-											</Button>
-										</Stack>
-									</Box>
-								) : (
-									<Box
-										onClick={() => setShowCustomActionForm(true)}
-										sx={{
-											display: "flex",
-											alignItems: "center",
-											gap: 0.7,
-											color: "#4584FF",
-											cursor: "pointer",
-											pt: 0.8,
-										}}
-									>
-										<AddBoxOutlinedIcon sx={{ fontSize: 18 }} />
-										<Typography sx={{ fontSize: 13, fontWeight: 500 }}>Add Custom Action</Typography>
-									</Box>
-								)}
-							</Stack>
-						</Box>
-					</>
-				) : (
-					<>
-						<Typography sx={{ fontSize: 12, color: "#E9A67A", mb: 1.2 }}>
-							*Choose what information must be filled before moving to the next stage.
-						</Typography>
+                {showCustomActionForm ? (
+                  <Box sx={{ pt: 0.8 }}>
+                    <TextField
+                      size="small"
+                      placeholder="Enter action name"
+                      value={customActionText}
+                      autoFocus
+                      onChange={(event) =>
+                        setCustomActionText(event.target.value)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") handleSaveCustomAction();
+                        if (event.key === "Escape") {
+                          setShowCustomActionForm(false);
+                          setCustomActionText("");
+                        }
+                      }}
+                      fullWidth
+                      sx={{
+                        mb: 0.8,
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 1.4,
+                          backgroundColor: "#FFFFFF",
+                        },
+                      }}
+                    />
+                    <Stack direction="row" spacing={0.8}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={handleSaveCustomAction}
+                        disabled={!isAlphabeticName(customActionText)}
+                        sx={{
+                          backgroundColor: "#545454",
+                          fontSize: 12,
+                          px: 1.4,
+                          "&:hover": { backgroundColor: "#3F3F3F" },
+                        }}
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          setShowCustomActionForm(false);
+                          setCustomActionText("");
+                        }}
+                        sx={{ fontSize: 12, px: 1.4 }}
+                      >
+                        Cancel
+                      </Button>
+                    </Stack>
+                  </Box>
+                ) : (
+                  <Box
+                    onClick={() => setShowCustomActionForm(true)}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.7,
+                      color: "#4584FF",
+                      cursor: "pointer",
+                      pt: 0.8,
+                    }}
+                  >
+                    <AddBoxOutlinedIcon sx={{ fontSize: 18 }} />
+                    <Typography sx={{ fontSize: 13, fontWeight: 500 }}>
+                      Add Custom Action
+                    </Typography>
+                  </Box>
+                )}
+              </Stack>
+            </Box>
+          </>
+        ) : (
+          <>
+            <Typography sx={{ fontSize: 12, color: "#E9A67A", mb: 1.2 }}>
+              *Choose what information must be filled before moving to the next
+              stage.
+            </Typography>
 
-						{dataCaptureFields.map((field, index) => (
-							<Box
-								key={field.id}
-								sx={{
-									border: `1px solid ${theme.palette.grey[200]}`,
-									borderRadius: 2,
-									mb: 1.4,
-									overflow: "hidden",
-								}}
-							>
-								<Box
-									sx={{
-										px: 1.4,
-										py: 1.1,
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "space-between",
-										borderBottom: `1px solid ${theme.palette.grey[200]}`,
-									}}
-								>
-									<Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-										{`FIELD ${index + 1}`}
-									</Typography>
-									<Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
-										<ContentCopyOutlinedIcon
-											onClick={() => handleCopyField(field.id)}
-											sx={{
-												fontSize: 19,
-												color: theme.palette.primary.main,
-												cursor: "pointer",
-											}}
-										/>
-										<DeleteOutlineOutlinedIcon
-											onClick={() => handleDeleteField(field.id)}
-											sx={{
-												fontSize: 19,
-												color: theme.palette.error.main,
-												cursor: "pointer",
-											}}
-										/>
-									</Box>
-								</Box>
+            {dataCaptureFields.map((field, index) => (
+              <Box
+                key={field.id}
+                sx={{
+                  border: `1px solid ${theme.palette.grey[200]}`,
+                  borderRadius: 2,
+                  mb: 1.4,
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  sx={{
+                    px: 1.4,
+                    py: 1.1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderBottom: `1px solid ${theme.palette.grey[200]}`,
+                  }}
+                >
+                  <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                    {`FIELD ${index + 1}`}
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                    <ContentCopyOutlinedIcon
+                      onClick={() => handleCopyField(field.id)}
+                      sx={{
+                        fontSize: 19,
+                        color: theme.palette.primary.main,
+                        cursor: "pointer",
+                      }}
+                    />
+                    <DeleteOutlineOutlinedIcon
+                      onClick={() => handleDeleteField(field.id)}
+                      sx={{
+                        fontSize: 19,
+                        color: theme.palette.error.main,
+                        cursor: "pointer",
+                      }}
+                    />
+                  </Box>
+                </Box>
 
-								<Box sx={{ p: 1.4 }}>
-									<TextField
-										size="small"
-										label="Field Name"
-										value={field.fieldName}
-										onChange={(event) =>
-											handleUpdateField(field.id, "fieldName", event.target.value)
-										}
-										error={
-											showValidation &&
-											(
-												!field.fieldName.trim() ||
-												field.fieldName.trim().length > MAX_NAME_LENGTH ||
-												!isAlphabeticName(field.fieldName)
-											)
-										}
-										helperText={
-											showValidation && !field.fieldName.trim()
-												? "Field name is required"
-												: showValidation && field.fieldName.trim().length > MAX_NAME_LENGTH
-													? "Maximum 50 characters allowed"
-													: showValidation && !isAlphabeticName(field.fieldName)
-														? "Only letters and spaces are allowed"
-														: " "
-										}
-										inputProps={{ maxLength: MAX_NAME_LENGTH }}
-										fullWidth
-										sx={{
-											mb: 1.2,
-											"& .MuiFormHelperText-root": { minHeight: 18, m: 0, pt: 0.35 },
-										}}
-									/>
-									<TextField
-										size="small"
-										label="Field Type"
-										value={field.fieldType}
-										onChange={(event) =>
-											handleUpdateField(field.id, "fieldType", event.target.value)
-										}
-										select
-										SelectProps={{
-											MenuProps: {
-												disablePortal: true,
-												PaperProps: { "data-stage-config-keep-open": "true" },
-											},
-										}}
-										fullWidth
-										sx={{ mb: 1.1 }}
-									>
-										<MenuItem value="text">Text</MenuItem>
-										<MenuItem value="number">Number</MenuItem>
-										<MenuItem value="date">Date</MenuItem>
-										<MenuItem value="dropdown">Dropdown</MenuItem>
-									</TextField>
+                <Box sx={{ p: 1.4 }}>
+                  <TextField
+                    size="small"
+                    label="Field Name"
+                    value={field.fieldName}
+                    onChange={(event) =>
+                      handleUpdateField(
+                        field.id,
+                        "fieldName",
+                        event.target.value,
+                      )
+                    }
+                    error={
+                      showValidation &&
+                      (!field.fieldName.trim() ||
+                        field.fieldName.trim().length > MAX_NAME_LENGTH ||
+                        !isAlphabeticName(field.fieldName))
+                    }
+                    helperText={
+                      showValidation && !field.fieldName.trim()
+                        ? "Field name is required"
+                        : showValidation &&
+                            field.fieldName.trim().length > MAX_NAME_LENGTH
+                          ? "Maximum 50 characters allowed"
+                          : showValidation && !isAlphabeticName(field.fieldName)
+                            ? "Only letters, numbers, hyphens, and special characters are allowed"
+                            : " "
+                    }
+                    inputProps={{ maxLength: MAX_NAME_LENGTH }}
+                    fullWidth
+                    sx={{
+                      mb: 1.2,
+                      "& .MuiFormHelperText-root": {
+                        minHeight: 18,
+                        m: 0,
+                        pt: 0.35,
+                      },
+                    }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Field Type"
+                    value={field.fieldType}
+                    onChange={(event) =>
+                      handleUpdateField(
+                        field.id,
+                        "fieldType",
+                        event.target.value,
+                      )
+                    }
+                    select
+                    SelectProps={{
+                      MenuProps: {
+                        disablePortal: true,
+                        PaperProps: { "data-stage-config-keep-open": "true" },
+                      },
+                    }}
+                    fullWidth
+                    sx={{ mb: 1.1 }}
+                  >
+                    <MenuItem value="text">Text</MenuItem>
+                    <MenuItem value="number">Number</MenuItem>
+                    <MenuItem value="date">Date</MenuItem>
+                    <MenuItem value="dropdown">Dropdown</MenuItem>
+                  </TextField>
 
-									<Box
-										onClick={() => handleToggleMandatory(field.id)}
-										sx={{ display: "flex", alignItems: "center", gap: 0.9, cursor: "pointer" }}
-									>
-										<Switch
-											size="small"
-											checked={field.isMandatory}
-											onChange={() => handleToggleMandatory(field.id)}
-											color="success"
-											sx={{ m: 0 }}
-										/>
-										<Typography sx={{ fontSize: 13, color: "text.primary" }}>
-											Mandatory
-										</Typography>
-									</Box>
-								</Box>
-							</Box>
-						))}
+                  <Box
+                    onClick={() => handleToggleMandatory(field.id)}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.9,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Switch
+                      size="small"
+                      checked={field.isMandatory}
+                      onChange={() => handleToggleMandatory(field.id)}
+                      color="success"
+                      sx={{ m: 0 }}
+                    />
+                    <Typography sx={{ fontSize: 13, color: "text.primary" }}>
+                      Mandatory
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            ))}
 
-						<Box
-							onClick={handleAddAnotherField}
-							sx={{
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "flex-end",
-								gap: 0.7,
-								color: theme.palette.primary.main,
-								fontWeight: 500,
-								fontSize: 14,
-								cursor: "pointer",
-							}}
-						>
-							<AddBoxOutlinedIcon sx={{ fontSize: 17 }} />
-							Add Another Field
-						</Box>
-					</>
-				)}
-			</Box>
+            <Box
+              onClick={handleAddAnotherField}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 0.7,
+                color: theme.palette.primary.main,
+                fontWeight: 500,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              <AddBoxOutlinedIcon sx={{ fontSize: 17 }} />
+              Add Another Field
+            </Box>
+          </>
+        )}
+      </Box>
 
-			<Divider />
-			<Box sx={{ p: 1.5 }}>
-				<Button
-					fullWidth
-					variant="contained"
-					onClick={handleSave}
-					disabled={isSaving}
-					sx={{
-						backgroundColor: "#545454",
-						fontWeight: 700,
-						fontSize: 14,
-						py: 1,
-						"&:hover": { backgroundColor: "#3F3F3F" },
-					}}
-				>
-					{mode === "edit" ? "Update" : "Save"}
-				</Button>
-			</Box>
-		</Box>
-	);
+      <Divider />
+      <Box sx={{ p: 1.5 }}>
+        <Button
+          fullWidth
+          variant="contained"
+          onClick={handleSave}
+          disabled={isSaving}
+          sx={{
+            backgroundColor: "#545454",
+            fontWeight: 700,
+            fontSize: 14,
+            py: 1,
+            "&:hover": { backgroundColor: "#3F3F3F" },
+          }}
+        >
+          {mode === "edit" ? "Update" : "Save"}
+        </Button>
+      </Box>
+    </Box>
+  );
 };
 
 export default StageConfiguration;

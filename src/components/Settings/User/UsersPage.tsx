@@ -1,6 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { lazy, Suspense, useEffect, useState } from "react";
-import { Box, CircularProgress, Tab, Tabs } from "@mui/material";
+import {
+  Box,
+  CircularProgress,
+  Tab,
+  Tabs,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
@@ -18,9 +25,7 @@ import {
 import { selectLoginType, selectUser, setUser } from "../../../store/authSlice";
 import { fetchUsers } from "../../../store/userSlice";
 import { toSafePhotoUrl } from "../../../utils/mediaUrl";
-import {
-  hasAnySubcategoryActionPermission,
-} from "../../../utils/roleAccess";
+import { hasAnySubcategoryActionPermission, resolveUserRole } from "../../../utils/roleAccess";
 import type { AppDispatch, RootState } from "../../../store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -61,6 +66,8 @@ const normalizeRoleName = (value: unknown): string =>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const UsersPage: React.FC = () => {
+  const theme = useTheme();
+  const isCompactDesktop = useMediaQuery(theme.breakpoints.down("xl"));
   const authUser = useSelector(selectUser);
   const loginType = useSelector(selectLoginType);
   const [activeTab, setActiveTab] = useState<TabKey>("details");
@@ -72,7 +79,8 @@ const UsersPage: React.FC = () => {
     roles.length > 0
       ? [...roles]
           .sort((a, b) => {
-            const byPriority = roleOrderPriority(a.name) - roleOrderPriority(b.name);
+            const byPriority =
+              roleOrderPriority(a.name) - roleOrderPriority(b.name);
             if (byPriority !== 0) return byPriority;
             return a.name.localeCompare(b.name);
           })
@@ -94,14 +102,20 @@ const UsersPage: React.FC = () => {
   const canAssignRoles =
     loginType === "INT" &&
     (currentRoleName === "super admin" || currentRoleName === "superadmin");
-  const usersPermissions = (authUser as Record<string, unknown> | null)?.permissions;
+  const usersPermissions = (authUser as Record<string, unknown> | null)
+    ?.permissions;
+  const isSuperAdmin =
+    resolveUserRole(authUser as Record<string, unknown> | null) === "super_admin";
   const userAliases = ["user", "users"];
   const canViewUsers =
+    isSuperAdmin ||
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "view") ||
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "print");
   const canAddUsers =
+    isSuperAdmin ||
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "add");
   const canEditUsers =
+    isSuperAdmin ||
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "edit");
 
   const extractApiErrorMessage = (error: unknown): string => {
@@ -329,7 +343,7 @@ const UsersPage: React.FC = () => {
         photo: nextPhoto,
       };
     });
-  }, [authUser, editingUser?.id]);
+  }, [authUser, editingUser, editingUser?.id]);
 
   const mapUserToFormData = (user: User): UserFormData => {
     const record = user as any;
@@ -341,19 +355,31 @@ const UsersPage: React.FC = () => {
     const roleFromRecord =
       typeof record.role === "object" && record.role
         ? record.role.id
-        : record.roleId ?? record.role;
+        : (record.roleId ?? record.role);
 
     return {
       firstName:
         profile.first_name || record.first_name || record.firstName || "",
       lastName: profile.last_name || record.last_name || record.lastName || "",
       gender: profile.gender || record.gender || "",
-      dateOfJoining: profile.date_of_joining || record.date_of_joining || record.dateOfJoining
-        ? dayjs(profile.date_of_joining || record.date_of_joining || record.dateOfJoining)
-        : null,
-      dateOfBirth: profile.date_of_birth || record.date_of_birth || record.dateOfBirth
-        ? dayjs(profile.date_of_birth || record.date_of_birth || record.dateOfBirth)
-        : null,
+      dateOfJoining:
+        profile.date_of_joining ||
+        record.date_of_joining ||
+        record.dateOfJoining
+          ? dayjs(
+              profile.date_of_joining ||
+                record.date_of_joining ||
+                record.dateOfJoining,
+            )
+          : null,
+      dateOfBirth:
+        profile.date_of_birth || record.date_of_birth || record.dateOfBirth
+          ? dayjs(
+              profile.date_of_birth ||
+                record.date_of_birth ||
+                record.dateOfBirth,
+            )
+          : null,
       userRole:
         roleFromProfile != null
           ? String(roleFromProfile)
@@ -361,7 +387,8 @@ const UsersPage: React.FC = () => {
             ? String(roleFromRecord)
             : "",
       userName: record.username || "",
-      mobileNo: profile.mobile_no || record.mobile_no || record.mobileNumber || "",
+      mobileNo:
+        profile.mobile_no || record.mobile_no || record.mobileNumber || "",
       emailId: record.email || "",
       password: EDIT_PASSWORD_PLACEHOLDER,
       confirmPassword: EDIT_PASSWORD_PLACEHOLDER,
@@ -397,6 +424,7 @@ const UsersPage: React.FC = () => {
       : {}),
     ...(data.profilePhotoFile ? { photo: data.profilePhotoFile } : {}),
     ...(data.removeProfilePhoto ? { remove_photo: true } : {}),
+    clinic_id: Number(localStorage.getItem("clinic_id")) || undefined,
   });
 
   // const resolvedRoleOptions =
@@ -414,7 +442,9 @@ const UsersPage: React.FC = () => {
 
     if (editingUser?.source === "client") {
       toast.error("This user belongs to client DB and cannot be updated here");
-      return;
+      throw new Error(
+        "This user belongs to client DB and cannot be updated here",
+      );
     }
 
     const normalizedUserName = normalizeText(data.userName);
@@ -430,7 +460,7 @@ const UsersPage: React.FC = () => {
 
     if (duplicateUserName) {
       toast.error("Username already exists");
-      return;
+      throw new Error("Username already exists");
     }
 
     const duplicateEmail = users.some(
@@ -442,7 +472,7 @@ const UsersPage: React.FC = () => {
 
     if (duplicateEmail) {
       toast.error("Email already exists");
-      return;
+      throw new Error("Email already exists");
     }
 
     const duplicateMobile = users.some(
@@ -455,7 +485,7 @@ const UsersPage: React.FC = () => {
 
     if (duplicateMobile) {
       toast.error("Mobile number already exists");
-      return;
+      throw new Error("Mobile number already exists");
     }
 
     setIsSubmitting(true);
@@ -648,8 +678,8 @@ const UsersPage: React.FC = () => {
         sx={{
           borderBottom: "1px solid #E0E0E0",
           minHeight: 40,
-          mx: -3,
-          mt: -2,
+          mx: { xs: -2, md: isCompactDesktop ? -2.5 : -3 },
+          mt: { xs: -1.5, md: -2 },
           "& .MuiTabs-indicator": {
             backgroundColor: "#E17E61",
             height: 2.1,
@@ -657,11 +687,12 @@ const UsersPage: React.FC = () => {
 
           "& .MuiTab-root": {
             textTransform: "none",
-            fontSize: 15,
+            fontSize: { xs: 13, sm: 14, lg: isCompactDesktop ? 14 : 15 },
             fontWeight: 500,
             color: "#BBBBBB",
             minHeight: 40,
-            p: 0,
+            px: { xs: 1, sm: 1.5 },
+            py: 0,
           },
 
           "& .MuiTab-root.Mui-selected": {
@@ -675,7 +706,13 @@ const UsersPage: React.FC = () => {
       </Tabs>
 
       {/* ── Content area ── */}
-      <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          p: { xs: 2, md: isCompactDesktop ? 2.5 : 3 },
+        }}
+      >
         {/* Tab panels */}
         <Suspense fallback={<CircularProgress size={24} />}>
           {activeTab === "details" && detailsView === "list" && (

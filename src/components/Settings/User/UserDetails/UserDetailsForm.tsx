@@ -112,10 +112,10 @@ const defaultForm: UserFormData = {
   removeProfilePhoto: false,
 };
 
-const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
+const MAX_PROFILE_PHOTO_SIZE = 5 * 1024 * 1024;
 
 const FieldGrid = ({ children }: { children: React.ReactNode }) => (
-  <Grid size={{ xs: 12, sm: 3 }}>{children}</Grid>
+  <Grid size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>{children}</Grid>
 );
 
 const SelectField = ({
@@ -216,6 +216,8 @@ const PasswordField = ({
   show,
   onToggle,
   onFocus,
+  autoComplete,
+  name,
 }: {
   label: string;
   value: string;
@@ -223,11 +225,15 @@ const PasswordField = ({
   show: boolean;
   onToggle: () => void;
   onFocus?: () => void;
+  autoComplete?: string;
+  name?: string;
 }) => (
   <TextField
     fullWidth
     label={label}
     placeholder="Type Here..."
+    name={name}
+    autoComplete={autoComplete}
     type={show ? "text" : "password"}
     value={value}
     onChange={(e) => onChange(e.target.value)}
@@ -295,7 +301,7 @@ const UserDetailsForm: React.FC<Props> = ({
     }
 
     if (file.size > MAX_PROFILE_PHOTO_SIZE) {
-      toast.error("Profile photo must be 20MB or smaller");
+      toast.error("Profile photo size must be up to 5MB");
       e.target.value = "";
       return;
     }
@@ -375,8 +381,8 @@ const UserDetailsForm: React.FC<Props> = ({
       return false;
     }
 
-    if (form.mobileNo.trim() && !/^\d{10}$/.test(form.mobileNo)) {
-      toast.error("Mobile Number must be 10 digits");
+    if (form.mobileNo.trim() && !/^\d{7,15}$/.test(form.mobileNo)) {
+      toast.error("Mobile Number must be between 7 and 15 digits");
       return false;
     }
 
@@ -404,10 +410,21 @@ const UserDetailsForm: React.FC<Props> = ({
     }
   };
 
+  // Required label helper for plain string labels
+  const getRequiredLabel = (label: string) => `${label} *`;
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Box>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 2 }}>
+      <Box component="form" autoComplete="off">
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            mb: 3,
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
           <Box sx={{ position: "relative", width: 64, height: 64 }}>
             {form.profilePhoto && !photoLoadFailed && (
               <Box
@@ -476,12 +493,13 @@ const UserDetailsForm: React.FC<Props> = ({
                 sx={{
                   position: "absolute",
                   bottom: 0,
-                  right: -4,
+                  right: 0,
                   bgcolor: "#505050",
                   color: "#fff",
                   width: 20,
                   height: 20,
                   "&:hover": { bgcolor: "#2E2E2E" },
+                  zIndex: 2,
                 }}
               >
                 <DeleteOutlineIcon sx={{ fontSize: 12 }} />
@@ -528,7 +546,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="First Name"
+              label={getRequiredLabel("First Name")}
               placeholder="Type Here..."
               value={form.firstName}
               onChange={(e) =>
@@ -545,7 +563,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="Last Name"
+              label={getRequiredLabel("Last Name")}
               placeholder="Type Here..."
               value={form.lastName}
               onChange={(e) =>
@@ -592,7 +610,7 @@ const UserDetailsForm: React.FC<Props> = ({
 
           <FieldGrid>
             <SelectField
-              label="User Role"
+              label={requireRole ? getRequiredLabel("User Role") : "User Role"}
               value={form.userRole}
               onChange={(v) => setForm((prev) => ({ ...prev, userRole: v }))}
               options={roleOptions}
@@ -603,7 +621,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="User Name"
+              label={getRequiredLabel("User Name")}
               placeholder="Type Here..."
               value={form.userName}
               onChange={(e) =>
@@ -617,18 +635,18 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="Mobile Number"
+              label={getRequiredLabel("Mobile Number")}
               placeholder="Type Here..."
               value={form.mobileNo}
               onChange={(e) => {
-                if (/\D/.test(e.target.value)) {
+                const onlyDigits = e.target.value
+                  .replace(/\D/g, "")
+                  .slice(0, 15);
+                if (/\D/.test(e.target.value) && onlyDigits.length >= 15) {
                   toast.error("Enter only digits", {
                     toastId: "user-mobile-only-digits",
                   });
                 }
-                const onlyDigits = e.target.value
-                  .replace(/\D/g, "")
-                  .slice(0, 10);
                 setForm((prev) => ({ ...prev, mobileNo: onlyDigits }));
               }}
               sx={inputSx}
@@ -639,8 +657,10 @@ const UserDetailsForm: React.FC<Props> = ({
           <FieldGrid>
             <TextField
               fullWidth
-              label="Email"
+              label={getRequiredLabel("Email")}
               placeholder="Type Here..."
+              name="new-user-email"
+              autoComplete="off"
               value={form.emailId}
               onChange={(e) =>
                 setForm((prev) => ({
@@ -655,7 +675,9 @@ const UserDetailsForm: React.FC<Props> = ({
 
           <FieldGrid>
             <PasswordField
-              label="Password"
+              label={getRequiredLabel("Password")}
+              name="new-user-password"
+              autoComplete="new-password"
               value={form.password}
               onChange={(v) => setForm((prev) => ({ ...prev, password: v }))}
               onFocus={() => {
@@ -673,7 +695,9 @@ const UserDetailsForm: React.FC<Props> = ({
 
           <FieldGrid>
             <PasswordField
-              label="Confirm Password"
+              label={getRequiredLabel("Confirm Password")}
+              name="new-user-confirm-password"
+              autoComplete="new-password"
               value={form.confirmPassword}
               onChange={(v) =>
                 setForm((prev) => ({ ...prev, confirmPassword: v }))
@@ -693,7 +717,13 @@ const UserDetailsForm: React.FC<Props> = ({
         </Grid>
 
         <Box
-          sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 4 }}
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 2,
+            mt: 4,
+            flexWrap: "wrap",
+          }}
         >
           <Button
             variant="outlined"
@@ -706,6 +736,7 @@ const UserDetailsForm: React.FC<Props> = ({
               fontSize: 13,
               borderRadius: "6px",
               px: 3,
+              minWidth: { xs: "100%", sm: 140 },
               "&:hover": { borderColor: "#505050", bgcolor: "transparent" },
             }}
           >
@@ -722,6 +753,7 @@ const UserDetailsForm: React.FC<Props> = ({
               fontSize: 13,
               borderRadius: "6px",
               px: 3,
+              minWidth: { xs: "100%", sm: 180 },
               "&:hover": { bgcolor: "#232323" },
             }}
           >

@@ -1,3 +1,5 @@
+import type { TreatmentInterest } from "../../types/leads.types";
+
 // ====================== Task Type Config ======================
 export const TASK_TYPES = [
   "Follow Up",
@@ -11,13 +13,22 @@ export const TASK_TYPES = [
 
 export type TaskType = (typeof TASK_TYPES)[number];
 
+// ====================== Task Status Options ======================
+export const TASK_STATUS_OPTIONS = [
+  { label: "To-do",       value: "to_do"       },
+  { label: "In Progress", value: "in_progress" },
+  { label: "Completed",   value: "completed"   },
+] as const;
+
+export type TaskStatusValue = "to_do" | "in_progress" | "completed";
+
 // ====================== Source Options ======================
 export const SOURCE_OPTIONS = ["Direct", "Referral", "Social Media", "Other"] as const;
 
 // "Referral" sub-sources are fetched dynamically from the backend referral departments API
 export const SUB_SOURCE_OPTIONS: Record<string, string[]> = {
   "Social Media": ["Facebook", "Instagram", "LinkedIn", "Google Ads"],
-  Direct: ["Walk-in", "Phone Call", "Website", "Google", "Gmail"],
+  Direct: ["Walk-in", "Conference","Phone Call", "Website", "Google", "Gmail"],
 };
 
 // ====================== Referral Department Options ======================
@@ -94,6 +105,7 @@ export type LeadPayload = {
   next_action_status?: string | null;
   next_action_description?: string;
   next_action_type?: string;
+  action_status?: TaskStatusValue | null;    // ← backend field stays as action_status
   lead_status?:
     | "new"
     | "contacted"
@@ -106,13 +118,19 @@ export type LeadPayload = {
     | "cycle_conversion"
     | "lost"
     | "lost lead";
-  treatment_interest: string;
+  treatment_interest?: string[] | TreatmentInterest[];
   book_appointment: boolean;
   appointment_date: string | null;
   slot: string;
   remark: string;
   is_active: boolean;
   referral_department_id?: number | null;
+
+  // ── Contact Information (contracts app) ───────────────────────────────────
+  contact_full_name?: string | null;
+  contact_designation?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
 };
 
 // ====================== Campaign Type ======================

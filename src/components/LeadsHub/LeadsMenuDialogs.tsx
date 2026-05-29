@@ -52,8 +52,15 @@ interface MenuProps<T extends Lead> {
 
 let openCallSetter: ((name: string) => void) | null = null;
 
-export const CallButton = ({ lead }: { lead: Lead }) => (
+export const CallButton = ({
+  lead,
+  disabled = false,
+}: {
+  lead: Lead;
+  disabled?: boolean;
+}) => (
   <IconButton
+    disabled={disabled}
     onClick={() => openCallSetter?.(lead.full_name || lead.name || "")}
   >
     <CallIcon fontSize="small" />

@@ -7,6 +7,7 @@ import {
   type LeadDocument,
 } from "../services/leads.api";
 import type { RootState } from ".";
+import { resolveUserRole } from "../utils/roleAccess";
 
 // ====================== API Error Type ======================
 type ApiError = {
@@ -18,6 +19,83 @@ type ApiError = {
     };
   };
   message?: string;
+};
+
+type AuthLikeUser = {
+  id?: number | string;
+  user_id?: number | string;
+  user?: {
+    id?: number | string;
+    user_id?: number | string;
+  };
+};
+
+const toNumericId = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const collectLeadIds = (lead: Lead, keys: string[]): number[] => {
+  const rawLead = lead as unknown as Record<string, unknown>;
+  return keys
+    .map((key) => toNumericId(rawLead[key]))
+    .filter((value): value is number => value !== null);
+};
+
+const resolveCurrentUserId = (
+  authUser: AuthLikeUser | null | undefined,
+): number | null => {
+  return (
+    toNumericId(authUser?.id) ??
+    toNumericId(authUser?.user_id) ??
+    toNumericId(authUser?.user?.id) ??
+    toNumericId(authUser?.user?.user_id) ??
+    null
+  );
+};
+
+const filterLeadsForRole = (
+  leads: Lead[],
+  role: "super_admin" | "admin" | "user" | "unknown",
+  currentUserId: number | null,
+): Lead[] => {
+  if (role !== "user") {
+    return leads;
+  }
+
+  // Keep existing behavior when user identity is unavailable.
+  if (!currentUserId) {
+    return leads;
+  }
+
+  // User-level visibility includes assignee ownership and creator/generator
+  // ownership so users can still see leads they created/generated even when
+  // assigned to another teammate.
+  return leads.filter((lead) => {
+    const assigneeIds = collectLeadIds(lead, [
+      "assigned_to_id",
+      "assigned_to",
+      "assignee_id",
+      "owner_id",
+    ]);
+    const creatorIds = collectLeadIds(lead, [
+      "created_by_id",
+      "created_by",
+      "lead_generated_by_id",
+      "generated_by_id",
+      "generator_id",
+      "personal_id",
+    ]);
+
+    return (
+      assigneeIds.includes(currentUserId) ||
+      creatorIds.includes(currentUserId)
+    );
+  });
 };
 
 // ====================== Type Definitions ======================
@@ -92,6 +170,36 @@ const formatDateForApi = (value: unknown): string => {
   return "";
 };
 
+const normalizeTreatmentInterestForUpdate = (
+  value: Lead["treatment_interest"],
+): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object") {
+          const obj = item as { id?: unknown; name?: unknown };
+          if (typeof obj.id === "string") return obj.id.trim();
+          if (typeof obj.id === "number") return String(obj.id);
+          if (typeof obj.name === "string") return obj.name.trim();
+        }
+        return "";
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    return trimmed
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 // ====================== Async Thunks ======================
 
 /** Fetch all leads */
@@ -102,16 +210,19 @@ export const fetchLeads = createAsyncThunk<
 >("leads/fetchAll", async (_, { rejectWithValue, getState }) => {
   try {
     const state = getState();
-    console.log("cc:state", state);
     const clinicId = state.clinic.data?.id;
+    const authUser = state.auth.user as AuthLikeUser | null;
+    const role = resolveUserRole(
+      authUser as unknown as Record<string, unknown> | null,
+    );
+    const currentUserId = resolveCurrentUserId(authUser);
 
     if (!clinicId) {
       return rejectWithValue("Clinic not selected");
     }
 
     const leads = await LeadAPI.list(clinicId);
-    console.log("📊 Fetched leads from API:", leads.length);
-    return leads;
+    return filterLeadsForRole(leads, role, currentUserId);
   } catch (err) {
     const error = err as ApiError;
     const message =
@@ -126,13 +237,22 @@ export const fetchLeads = createAsyncThunk<
 /** Book Appointment */
 export const bookAppointment = createAsyncThunk<
   { leadId: string; appointmentData: any },
-  { leadId: string; payload: any },
+  { leadId: string; payload: any; leadSnapshot?: Partial<Lead> },
   { rejectValue: string; state: { leads: LeadState } }
 >(
   "leads/bookAppointment",
-  async ({ leadId, payload }, { rejectWithValue, getState }) => {
-    const lead = getState().leads.leads.find((l) => l.id === leadId);
-    if (!lead) return rejectWithValue("Lead not found in state");
+  async ({ leadId, payload, leadSnapshot }, { rejectWithValue, getState }) => {
+    const normalizedLeadId = String(leadId).replace(/^#/, "").trim();
+
+    const leadFromState = getState().leads.leads.find((l) => {
+      const currentId = String(l.id ?? "").replace(/^#/, "").trim();
+      return currentId === normalizedLeadId;
+    });
+
+    const lead = leadFromState ?? (leadSnapshot as Lead | undefined);
+    if (!lead) {
+      return rejectWithValue("Lead not found for appointment update");
+    }
 
     const normalizedAppointmentDate = formatDateForApi(
       payload.appointment_date,
@@ -149,7 +269,9 @@ export const bookAppointment = createAsyncThunk<
       full_name: lead.full_name,
       contact_no: lead.contact_no,
       source: lead.source || "Unknown",
-      treatment_interest: lead.treatment_interest || "N/A",
+      treatment_interest: normalizeTreatmentInterestForUpdate(
+        lead.treatment_interest,
+      ),
       book_appointment: true,
       appointment_date: normalizedAppointmentDate,
       slot: payload.slot,
@@ -162,10 +284,10 @@ export const bookAppointment = createAsyncThunk<
 
     try {
       await api.put(
-        `/leads/${leadId}/update/?clinic_id=${lead.clinic_id}`,
+        `/leads/${normalizedLeadId}/update/?clinic_id=${lead.clinic_id}`,
         apiPayload,
       );
-      console.log("✅ Appointment saved to server:", leadId);
+      console.log("✅ Appointment saved to server:", normalizedLeadId);
     } catch (err) {
       const error = err as ApiError;
       const message =
@@ -201,7 +323,16 @@ export const convertLead = createAsyncThunk<
       full_name: lead.full_name,
       contact_no: lead.contact_no,
       source: lead.source || "Unknown",
-      treatment_interest: lead.treatment_interest || "N/A",
+      treatment_interest: Array.isArray(lead.treatment_interest)
+        ? lead.treatment_interest.map((t: any) =>
+            typeof t === "string" ? t : t.id,
+          )
+        : typeof lead.treatment_interest === "string"
+          ? lead.treatment_interest
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : [],
       book_appointment: shouldKeepAppointment,
       appointment_date: shouldKeepAppointment
         ? normalizedAppointmentDate

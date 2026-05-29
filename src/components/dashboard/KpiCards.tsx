@@ -8,6 +8,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { useTheme } from "@mui/material/styles";
+import type { Theme, SystemStyleObject } from "@mui/system";
 
 import TotalLeadsIcon from "../../assets/icons/TotalLeads.svg";
 import NewLeadsIcon from "../../assets/icons/NewLeads.svg";
@@ -16,12 +17,37 @@ import FollowUpsIcon from "../../assets/icons/FollowUps.svg";
 import TotalConvertedIcon from "../../assets/icons/TotalConverted.svg";
 import LostLeadsIcon from "../../assets/icons/LostLeads.svg";
 
-import { IS_MEDICAL_APP, IS_CONTRACTS_APP } from "../../config/appType";
 import { kpiCardsStyles } from "../../styles/dashboard/KpiCards.styles";
 import { selectLeads } from "../../store/leadSlice";
-import { LEAD_STATUS } from "../../utils/constants";
+import { selectPipelines } from "../../store/pipelineSlice";
 import type { LiveKpiCounts } from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
+import {
+  buildStageCountMap,
+  getActivePipelineStages,
+  normalizeStageName,
+} from "./pipelineStage.utils";
+
+// Array of available icons for random assignment
+// Exclude TotalLeadsIcon (the 'three person' icon) from dynamic stage icons
+const RANDOM_STAGE_ICONS = [
+  NewLeadsIcon,
+  AppointmentsIcon,
+  FollowUpsIcon,
+  TotalConvertedIcon,
+  LostLeadsIcon,
+];
+
+// Exclude totalLeads style from dynamic stage styles
+const RANDOM_STAGE_STYLES = [
+  kpiCardsStyles.newLeads,
+  kpiCardsStyles.appointments,
+  kpiCardsStyles.followUps,
+  kpiCardsStyles.totalConverted,
+  kpiCardsStyles.lostLeads,
+];
+import type { TimeRange } from "./TimeRangeSelector";
+import { getTimeRangeBounds, isDateWithinBounds } from "./timeRange.utils";
 
 type KpiCardId =
   | "totalLeads"
@@ -42,6 +68,8 @@ type LocalKpiCardData = {
   breakdown?: Array<{ label: string; value: number }>;
 };
 
+type DynamicKpiCardData = LocalKpiCardData & { icon: string; cardStyle: SystemStyleObject<Theme> };
+
 type ExtendedKpiCounts = LiveKpiCounts & {
   cycleConversion: number;
   negotiation: number;
@@ -52,92 +80,89 @@ type ExtendedKpiCounts = LiveKpiCounts & {
 };
 
 /* KPI → ICON MAP */
-const KPI_ICONS: Record<KpiCardId, string> = {
-  totalLeads: TotalLeadsIcon,
-  newLeads: NewLeadsIcon,
-  appointments: AppointmentsIcon,
-  followUps: FollowUpsIcon,
-  cycleConversion: TotalConvertedIcon,
-  totalConverted: TotalConvertedIcon,
-  lostLeads: LostLeadsIcon,
-  negotiation: FollowUpsIcon,
-  proposalSent: AppointmentsIcon,
-  contractSigned: TotalConvertedIcon,
+
+
+const formatCount = (value: number) =>
+  new Intl.NumberFormat("en-IN").format(value || 0);
+
+const equivalentStatuses: Record<string, string[]> = {
+  new: ["new"],
+  contacted: ["contacted"],
+  "follow-ups": [
+    "follow-ups",
+    "follow-up",
+    "followup",
+    "follow-up-leads",
+    "follow-up-lead",
+    "follow-up-lead-stage",
+    "follow-up-stage",
+    "contacted",
+  ],
+  converted: ["converted", "converted-lead", "converted-leads"],
+  lost: ["lost", "lost-lead", "lost-leads", "closed", "closed-lost"],
+  "cycle-conversion": ["cycle-conversion", "cycleconversion"],
+  appointment: ["appointment", "appointments"],
+  negotiation: ["negotiation", "negotiating"],
+  "proposal-sent": ["proposal-sent", "proposal"],
+  "contract-signed": ["contract-signed", "contractsigned", "contract"],
 };
 
-const getCardStyle = (id: KpiCardId) => {
-  switch (id) {
-    case "totalLeads":
-      return kpiCardsStyles.totalLeads;
-    case "newLeads":
-      return kpiCardsStyles.newLeads;
-    case "appointments":
-      return kpiCardsStyles.appointments;
-    case "followUps":
-      return kpiCardsStyles.followUps;
-    case "cycleConversion":
-      return kpiCardsStyles.totalConverted;
-    case "totalConverted":
-      return kpiCardsStyles.totalConverted;
-    case "lostLeads":
-      return kpiCardsStyles.lostLeads;
-    case "negotiation":
-      return kpiCardsStyles.followUps;
-    case "proposalSent":
-      return kpiCardsStyles.appointments;
-    case "contractSigned":
-      return kpiCardsStyles.totalConverted;
-    default:
-      return {};
-  }
+const getEquivalentStatusKeys = (statusKey: string): Set<string> => {
+  const normalized = normalizeStageName(statusKey);
+  return new Set(equivalentStatuses[normalized] ?? [normalized]);
 };
 
-const normalizeLeadStatus = (status?: string | null): string => {
-  if (!status) return "";
-
-  const value = status.toLowerCase().trim().replace(/[_\s]+/g, "-");
-
-  if (value === "new" || value === "new-lead" || value === "new-leads") {
-    return LEAD_STATUS.NEW.toLowerCase();
-  }
-  if (value === "appointment" || value === "appointments") {
-    return LEAD_STATUS.APPOINTMENT.toLowerCase();
-  }
-  if (
-    value === "follow-up" ||
-    value === "follow-ups" ||
-    value === "followup" ||
-    value === "followups" ||
-    value === "follow-up-lead" ||
-    value === "follow-up-leads"
-  ) {
-    return LEAD_STATUS.FOLLOW_UPS.toLowerCase();
-  }
-  if (value === "converted" || value === "converted-lead") return LEAD_STATUS.CONVERTED.toLowerCase();
-  if (value === "cycle-conversion" || value === "cycleconversion") {
-    return LEAD_STATUS.CYCLE_CONVERSION.toLowerCase();
-  }
-  if (value === "lost" || value === "lost-lead") return LEAD_STATUS.LOST.toLowerCase();
-
-  // Contracts statuses
-  if (value === "negotiation" || value === "in-negotiation" || value === "under-negotiation") {
-    return "negotiation";
-  }
-  if (value === "proposal-sent" || value === "proposalsent" || value === "proposal") {
-    return "proposal-sent";
-  }
-  if (value === "contract-signed" || value === "contractsigned" || value === "signed") {
-    return "contract-signed";
-  }
-
-  return value;
+const stageMatchesStatusKey = (
+  stageName: string,
+  statusKey: string,
+): boolean => {
+  const normalizedStage = normalizeStageName(stageName);
+  return getEquivalentStatusKeys(statusKey).has(normalizedStage);
 };
 
-const formatCount = (value: number) => new Intl.NumberFormat("en-IN").format(value || 0);
+interface KpiCardsProps {
+  timeRange: TimeRange;
+}
 
-const KpiCards = () => {
+const KpiCards = ({ timeRange }: KpiCardsProps) => {
   const leads = useSelector(selectLeads);
-  const sourceLeads = useMemo<Lead[]>(() => (Array.isArray(leads) ? (leads as Lead[]) : []), [leads]);
+  const pipelines = useSelector(selectPipelines);
+  const sourceLeads = useMemo<Lead[]>(
+    () => (Array.isArray(leads) ? (leads as Lead[]) : []),
+    [leads],
+  );
+  const defaultPipeline = useMemo(() => {
+    const backendDefault =
+      pipelines.find((pipeline) => pipeline.is_default) ??
+      pipelines.find((pipeline) => pipeline.is_active) ??
+      null;
+    if (backendDefault) return backendDefault;
+
+    const storedDefaultPipelineId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("leads_default_pipeline_id")
+        : null;
+    if (!storedDefaultPipelineId) return null;
+
+    return (
+      pipelines.find(
+        (pipeline) => String(pipeline.id) === String(storedDefaultPipelineId),
+      ) ?? null
+    );
+  }, [pipelines]);
+  const pipelineStages = useMemo(
+    () => {
+      if (!defaultPipeline) return [];
+      // sort ASCENDING by stage_order to match the pipeline stages view
+      const stages = getActivePipelineStages([defaultPipeline]);
+      return [...stages].sort((a, b) => {
+        const aOrder = typeof a.stage_order === 'number' ? a.stage_order : 0;
+        const bOrder = typeof b.stage_order === 'number' ? b.stage_order : 0;
+        return aOrder - bOrder;
+      });
+    },
+    [defaultPipeline],
+  );
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -145,10 +170,34 @@ const KpiCards = () => {
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
+  const filteredLeads = useMemo<Lead[]>(() => {
+    const bounds = getTimeRangeBounds(timeRange);
+    const isAllTime = timeRange === "all";
+    return sourceLeads.filter((lead) => {
+      if (lead?.is_active === false) return false;
+      if (isAllTime) return true;
+      const rawDate = lead.modified_at || lead.created_at;
+      if (!rawDate) return false;
+      const leadDate = new Date(rawDate);
+      if (Number.isNaN(leadDate.getTime())) return false;
+      if (bounds && !isDateWithinBounds(leadDate, bounds)) return false;
+      return true;
+    });
+  }, [sourceLeads, timeRange]);
+
+  // Shared stage count map — computed once, used by both counts and dynamicKpis
+  const stageCounts = useMemo(
+    () => buildStageCountMap(filteredLeads, pipelineStages),
+    [filteredLeads, pipelineStages],
+  );
+
   const counts = useMemo<ExtendedKpiCounts>(() => {
-    if (sourceLeads.length === 0) {
+    // totalLeads = ALL active leads regardless of time range
+    const totalLeads = sourceLeads.filter((l) => l.is_active !== false).length;
+
+    if (filteredLeads.length === 0 || pipelineStages.length === 0) {
       return {
-        totalLeads: 0,
+        totalLeads,
         newLeads: 0,
         appointments: 0,
         followUps: 0,
@@ -163,41 +212,23 @@ const KpiCards = () => {
       };
     }
 
-    let totalLeads = 0;
-    let newLeads = 0;
-    let appointments = 0;
-    let followUps = 0;
-    let converted = 0;
-    let cycleConversion = 0;
-    let lostLeads = 0;
+    const sumCountsByStatusKey = (statusKey: string): number =>
+      pipelineStages.reduce((total, stage) => {
+        if (!stageMatchesStatusKey(stage.stage_name, statusKey)) return total;
+        return total + (stageCounts[stage.id] ?? 0);
+      }, 0);
 
-    let negotiation = 0;
-    let proposalSent = 0;
-    let contractSigned = 0;
+    const newLeads = sumCountsByStatusKey("new");
+    const appointments = sumCountsByStatusKey("appointment");
+    const followUps = sumCountsByStatusKey("follow-ups");
+    const cycleConversion = sumCountsByStatusKey("cycle-conversion");
+    const converted = sumCountsByStatusKey("converted");
+    const lostLeads = sumCountsByStatusKey("lost");
+    const negotiation = sumCountsByStatusKey("negotiation");
+    const proposalSent = sumCountsByStatusKey("proposal-sent");
+    const contractSigned = sumCountsByStatusKey("contract-signed");
 
-    for (const lead of sourceLeads) {
-      if (lead?.is_active === false) continue;
-
-      totalLeads += 1;
-      const status = normalizeLeadStatus(
-        lead.lead_status || (lead as { status?: string }).status,
-      );
-
-      if (status === LEAD_STATUS.NEW.toLowerCase()) newLeads += 1;
-      else if (status === LEAD_STATUS.APPOINTMENT.toLowerCase()) appointments += 1;
-      else if (status === LEAD_STATUS.FOLLOW_UPS.toLowerCase()) followUps += 1;
-      else if (status === LEAD_STATUS.CONVERTED.toLowerCase()) converted += 1;
-      else if (status === LEAD_STATUS.CYCLE_CONVERSION.toLowerCase()) cycleConversion += 1;
-      else if (status === LEAD_STATUS.LOST.toLowerCase()) lostLeads += 1;
-      else if (status === "negotiation") negotiation += 1;
-      else if (status === "proposal-sent") proposalSent += 1;
-      else if (status === "contract-signed") contractSigned += 1;
-    }
-
-    const totalConverted =
-      converted +
-      (IS_MEDICAL_APP ? cycleConversion : 0) +
-      (IS_CONTRACTS_APP ? contractSigned : 0);
+    const totalConverted = converted + cycleConversion + contractSigned;
 
     return {
       totalLeads,
@@ -213,59 +244,40 @@ const KpiCards = () => {
       proposalSent,
       contractSigned,
     };
-  }, [sourceLeads]);
+  }, [pipelineStages, filteredLeads, stageCounts, sourceLeads]);
 
-  const dynamicKpis = useMemo<LocalKpiCardData[]>(() => {
-    const cards: LocalKpiCardData[] = [
-      { id: "totalLeads", label: "Total Leads", value: counts.totalLeads },
-      { id: "newLeads", label: "New Leads", value: counts.newLeads },
+  // Fully dynamic: show a KPI card for every pipeline stage with a random icon
+  const dynamicKpis = useMemo<DynamicKpiCardData[]>(() => {
+    // Always show total leads first
+    const cards: DynamicKpiCardData[] = [
+      { id: "totalLeads", label: "Total Leads", value: counts.totalLeads, icon: TotalLeadsIcon, cardStyle: kpiCardsStyles.totalLeads },
     ];
 
-    if (IS_MEDICAL_APP) {
-      cards.push({ id: "appointments", label: "Appointments", value: counts.appointments });
-    }
-
-    if (IS_CONTRACTS_APP) {
-      cards.push(
-        { id: "negotiation", label: "Negotiation", value: counts.negotiation },
-        { id: "proposalSent", label: "Proposal Sent", value: counts.proposalSent },
-        { id: "contractSigned", label: "Contract Signed", value: counts.contractSigned },
-      );
-    }
-
-    cards.push({ id: "followUps", label: "Follow Ups", value: counts.followUps });
-
-    if (IS_MEDICAL_APP) {
+    // Sort stages by stage_order before rendering
+    const sortedStages = [...pipelineStages].sort((a, b) => {
+      const aOrder = typeof a.stage_order === 'number' ? a.stage_order : 0;
+      const bOrder = typeof b.stage_order === 'number' ? b.stage_order : 0;
+      return aOrder - bOrder;
+    });
+    sortedStages.forEach((stage, idx) => {
+      const icon = RANDOM_STAGE_ICONS[idx % RANDOM_STAGE_ICONS.length];
+      const cardStyle = RANDOM_STAGE_STYLES[idx % RANDOM_STAGE_STYLES.length];
       cards.push({
-        id: "cycleConversion",
-        label: "Cycle Conversion",
-        value: counts.cycleConversion,
+        id: normalizeStageName(stage.stage_name) as KpiCardId,
+        label: stage.stage_name,
+        value: stageCounts[stage.id] || 0,
+        icon,
+        cardStyle,
       });
-    }
-
-    cards.push({
-      id: "totalConverted",
-      label: "Total Converted",
-      value: counts.totalConverted,
-      breakdown: IS_MEDICAL_APP
-        ? [
-            { label: "Registered", value: counts.registered },
-            { label: "Treatment", value: counts.treatment },
-          ]
-        : [
-            { label: "Proposal Sent", value: counts.proposalSent },
-            { label: "Signed", value: counts.contractSigned },
-          ],
     });
 
-    cards.push({ id: "lostLeads", label: "Lost Leads", value: counts.lostLeads });
-
     return cards;
-  }, [counts]);
+  }, [counts, pipelineStages, stageCounts]);
 
   const checkScroll = useCallback(() => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setShowLeftArrow(scrollLeft > 10);
       const isAtEnd = scrollLeft >= scrollWidth - clientWidth - 10;
       setShowRightArrow(!isAtEnd && scrollWidth > clientWidth);
@@ -345,12 +357,13 @@ const KpiCards = () => {
               ? 280
               : 170;
 
+          // Ensure cardStyle is always a plain object, not undefined or array
           return (
             <Card
               key={item.id}
               sx={[
                 kpiCardsStyles.cardBase,
-                getCardStyle(item.id),
+                item.cardStyle,
                 {
                   flexShrink: 0,
                   width: cardWidth,
@@ -361,39 +374,20 @@ const KpiCards = () => {
               ]}
             >
               <Box sx={kpiCardsStyles.iconWrapper}>
-                <Box component="img" src={KPI_ICONS[item.id]} alt={item.label} sx={kpiCardsStyles.icon} />
+                <Box
+                  component="img"
+                  src={item.icon}
+                  alt={item.label}
+                  sx={kpiCardsStyles.icon}
+                />
               </Box>
 
-              {item.id === "totalConverted" ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-end",
-                    width: "100%",
-                    mt: 1,
-                  }}
-                >
-                  <Box>
-                    <Typography sx={kpiCardsStyles.label}>{item.label}</Typography>
-                    <Typography sx={kpiCardsStyles.value}>{formatCount(item.value)}</Typography>
-                  </Box>
-
-                  <Box sx={{ display: "flex", gap: 3 }}>
-                    {item.breakdown?.map((b) => (
-                      <Box key={b.label}>
-                        <Typography sx={kpiCardsStyles.breakdownLabel}>{b.label}</Typography>
-                        <Typography sx={kpiCardsStyles.breakdownValue}>{formatCount(b.value)}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-              ) : (
-                <>
-                  <Typography sx={kpiCardsStyles.label}>{item.label}</Typography>
-                  <Typography sx={kpiCardsStyles.value}>{formatCount(item.value)}</Typography>
-                </>
-              )}
+              <Typography sx={kpiCardsStyles.label}>
+                {item.label}
+              </Typography>
+              <Typography sx={kpiCardsStyles.value}>
+                {formatCount(item.value)}
+              </Typography>
             </Card>
           );
         })}

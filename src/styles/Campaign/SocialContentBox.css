@@ -1,0 +1,29 @@
+.image-url-section {
+    margin-top: 10px;
+}
+
+.image-url-label {
+    font-size: 12px;
+    color: #666;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.image-url-input {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+}
+
+.image-url-input:focus {
+    border-color: #1976d2;
+}
+
+.image-url-preview img {
+    margin-top: 6px;
+    max-height: 100px;
+    border-radius: 4px;
+    border: 1px solid #eee; }

@@ -6,3 +6,7 @@ export const sanitizeNameInput = (value: string): string =>
   value
     .replace(NON_ALPHANUMERIC_WITH_SPACE, "")
     .replace(LEADING_NON_LETTER, "");
+
+// Capitalizes the first letter of a string
+export const capitalizeFirst = (value: string): string =>
+  value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);

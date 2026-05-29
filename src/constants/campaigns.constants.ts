@@ -17,12 +17,12 @@ export type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS];
 export const CAMPAIGN_STATUS = {
   LIVE: "Live",
   DRAFT: "Draft",
-  SCHEDULE: "Schedule",
   SCHEDULED: "Scheduled",
   PAUSED: "Paused",
   STOPPED: "Stopped",
   COMPLETED: "Completed",
   FAILED: "Failed",
+  PARTIALLY_ACTIVE: "Partially Active",
 } as const;
 
 export type CampaignStatus =
@@ -31,23 +31,23 @@ export type CampaignStatus =
 export const STATUS_MAP: Record<string, CampaignStatus> = {
   live: CAMPAIGN_STATUS.LIVE,
   draft: CAMPAIGN_STATUS.DRAFT,
-  schedule: CAMPAIGN_STATUS.SCHEDULE,
   scheduled: CAMPAIGN_STATUS.SCHEDULED,
   paused: CAMPAIGN_STATUS.PAUSED,
   stopped: CAMPAIGN_STATUS.STOPPED,
   completed: CAMPAIGN_STATUS.COMPLETED,
   failed: CAMPAIGN_STATUS.FAILED,
+  partial: CAMPAIGN_STATUS.PARTIALLY_ACTIVE,
 };
 
 export const STATUS_TO_API: Record<CampaignStatus, string> = {
   [CAMPAIGN_STATUS.LIVE]: "live",
   [CAMPAIGN_STATUS.DRAFT]: "draft",
-  [CAMPAIGN_STATUS.SCHEDULE]: "schedule",
   [CAMPAIGN_STATUS.SCHEDULED]: "scheduled",
   [CAMPAIGN_STATUS.PAUSED]: "paused",
   [CAMPAIGN_STATUS.STOPPED]: "stopped",
   [CAMPAIGN_STATUS.COMPLETED]: "completed",
   [CAMPAIGN_STATUS.FAILED]: "failed",
+  [CAMPAIGN_STATUS.PARTIALLY_ACTIVE]: "partial",
 };
 
 export const CAMPAIGN_TYPE = {

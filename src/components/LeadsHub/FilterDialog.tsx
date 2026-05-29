@@ -16,148 +16,214 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs, { Dayjs } from "dayjs";
 
-import { DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
-import type { Department, Employee } from "../../services/leads.api";
-import { SOURCE_OPTIONS, SUB_SOURCE_OPTIONS, REFERRAL_DEPARTMENT_OPTIONS } from "./addNewLead.constants";
+// import { DepartmentAPI, EmployeeAPI } from "../../services/leads.api";
+// import type { Department, Employee } from "../../services/leads.api";
+import {
+  SOURCE_OPTIONS,
+  SUB_SOURCE_OPTIONS,
+  REFERRAL_DEPARTMENT_OPTIONS,
+} from "./addNewLead.constants";
 import type { FilterValues } from "../../types/leads.types";
-import { ACTIVE_STATUS_OPTIONS } from "../../config/appType";
+import {
+  pipelineApi,
+  isActiveStageStatus,
+  type Pipeline,
+} from "../../services/pipeline.api";
 import type { Lead } from "../../services/leads.api";
 
-// Mapping from backend status to display status
-const BACKEND_TO_DISPLAY: Record<string, string> = {
-  new: "New",
-  appointment: "Appointment",
-  "follow up": "Follow Up",
-  follow_up: "Follow Up",
-  negotiation: "Negotiation",
-  "proposal sent": "Proposal Sent",
-  "contract signed": "Contract Signed",
-  converted: "Converted Lead",
-  "converted lead": "Converted Lead",
-  lost: "Lost Lead",
-  "lost lead": "Lost Lead",
-};
+// ── Only pipeline/industry keys remain — filter keys are fully removed ────────
+const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
+const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const defaultFilters = (): FilterValues => ({
+  department: "",
+  assignee: "",
+  status: "",
+  quality: "",
+  source: "",
+  subSource: "",
+  dateFrom: null,
+  dateTo: null,
+});
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface FilterDialogProps {
   open: boolean;
   onClose: () => void;
-  onApplyFilters?: (filters: FilterValues) => void;
+  onApplyFilters?: (filters: FilterValues & { location?: string }) => void;
   leads?: Lead[];
 }
 
-const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilters, leads = [] }) => {
-  const [clinicId] = React.useState(1);
+// ── Component ─────────────────────────────────────────────────────────────────
+const FilterDialog: React.FC<FilterDialogProps> = ({
+  open,
+  onClose,
+  onApplyFilters,
+  leads = [],
+}) => {
+  const [clinicId] = React.useState(
+    Number(localStorage.getItem("clinic_id") ?? 1),
+  );
 
-  const [departments, setDepartments] = React.useState<Department[]>([]);
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
+  // const [departments, setDepartments] = React.useState<Department[]>([]);
+  // const [employees, setEmployees] = React.useState<Employee[]>([]);
+  // const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
 
-  const setLoadingDepartments = React.useState(false)[1];
-  const [loadingEmployees, setLoadingEmployees] = React.useState(false);
+  // const setLoadingDepartments = React.useState(false)[1];
+  // const [loadingEmployees, setLoadingEmployees] = React.useState(false);
 
-  const [filters, setFilters] = React.useState<FilterValues>({
-    department: "",
-    assignee: "",
-    status: "",
-    quality: "",
-    source: "",
-    subSource: "",
-    dateFrom: null,
-    dateTo: null,
-  });
+  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
+  const [loadingPipeline, setLoadingPipeline] = React.useState(false);
 
+  // ── All filter state starts empty — never read from localStorage ──────────
+  const [filters, setFilters] = React.useState<FilterValues>(defaultFilters);
   const [dateFrom, setDateFrom] = React.useState<Dayjs | null>(null);
   const [dateTo, setDateTo] = React.useState<Dayjs | null>(null);
-  const [location, setLocation] = React.useState("");
+  const [location, setLocation] = React.useState<string>("");
 
-  // Extract unique statuses and locations from current leads data
-  const availableStatuses = React.useMemo(() => {
-    if (!leads || leads.length === 0) return ACTIVE_STATUS_OPTIONS;
-    
-    const statusSet = new Set<string>();
-    leads.forEach((lead) => {
-      const status = lead.lead_status || lead.status;
-      if (status) {
-        // Convert backend status to display status
-        const displayStatus = Object.keys(BACKEND_TO_DISPLAY).find(
-          key => key.toLowerCase() === status.toLowerCase() || 
-                 BACKEND_TO_DISPLAY[key]?.toLowerCase() === status.toLowerCase()
-        );
-        if (displayStatus) {
-          statusSet.add(BACKEND_TO_DISPLAY[displayStatus]);
-        } else {
-          // If not found in mapping, add the status as-is
-          statusSet.add(status);
-        }
-      }
-    });
-    
-    return Array.from(statusSet).sort();
-  }, [leads]);
-
+  // ── Unique locations derived from current leads ───────────────────────────
   const availableLocations = React.useMemo(() => {
     if (!leads || leads.length === 0) return [];
-    
     const locationSet = new Set<string>();
     leads.forEach((lead) => {
       if (lead.location && lead.location.trim()) {
         locationSet.add(lead.location.trim());
       }
     });
-    
     return Array.from(locationSet).sort();
   }, [leads]);
 
+  const availableAssignees = React.useMemo(() => {
+    const map = new Map();
+
+    leads.forEach((lead) => {
+      if (lead.assigned_to_id && lead.assigned_to_name) {
+        map.set(lead.assigned_to_id, lead.assigned_to_name);
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, name]) => ({
+      id,
+      name,
+    }));
+  }, [leads]);
+
+  // ── Load pipeline stages when dialog opens ────────────────────────────────
   React.useEffect(() => {
     if (!open) return;
-    const fetchDepartments = async () => {
+
+    const loadStages = async () => {
       try {
-        setLoadingDepartments(true);
-        const departments = await DepartmentAPI.listActiveByClinic(clinicId);
-        setDepartments(departments);
-      } catch (err) {
-        console.error("Failed to load departments:", err);
+        setLoadingPipeline(true);
+        const selectedIndustry =
+          localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
+        const selectedPipelineId =
+          localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ?? "";
+
+        let selectedPipeline: Pipeline | null = null;
+
+        if (selectedPipelineId) {
+          try {
+            selectedPipeline = await pipelineApi.getById(selectedPipelineId);
+          } catch {
+            selectedPipeline = null;
+          }
+        }
+
+        if (!selectedPipeline) {
+          const pipelines = await pipelineApi.list(clinicId);
+          const byIndustry = selectedIndustry
+            ? pipelines.filter((p) => p.industry_type === selectedIndustry)
+            : pipelines;
+
+          selectedPipeline =
+            pipelines.find((p) => p.id === selectedPipelineId) ??
+            byIndustry.find((p) => p.is_active) ??
+            byIndustry[0] ??
+            pipelines.find((p) => p.is_active) ??
+            pipelines[0] ??
+            null;
+        }
+
+        const activeStages = (selectedPipeline?.stages ?? [])
+          .filter((s) => isActiveStageStatus(s.stage_status))
+          .filter((s) => s.stage_name.trim())
+          .sort((a, b) => {
+            const aOrder = typeof a.stage_order === "number" ? a.stage_order : 0;
+            const bOrder = typeof b.stage_order === "number" ? b.stage_order : 0;
+            return aOrder - bOrder;
+          })
+          .map((s) => s.stage_name.trim());
+
+        setPipelineStageNames(activeStages);
+      } catch {
+        setPipelineStageNames([]);
       } finally {
-        setLoadingDepartments(false);
+        setLoadingPipeline(false);
       }
     };
-    fetchDepartments();
+
+    void loadStages();
   }, [open, clinicId]);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const fetchEmployees = async () => {
-      try {
-        setLoadingEmployees(true);
-        const employees = await EmployeeAPI.listByClinic(clinicId);
-        setEmployees(Array.isArray(employees) ? employees : []);
-      } catch (err) {
-        console.error("Failed to load employees:", err);
-        setEmployees([]);
-      } finally {
-        setLoadingEmployees(false);
-      }
-    };
-    fetchEmployees();
-  }, [open, clinicId]);
+  // ── Load departments when dialog opens ────────────────────────────────────
+  // React.useEffect(() => {
+  //   if (!open) return;
+  //   const fetchDepartments = async () => {
+  //     try {
+  //       setLoadingDepartments(true);
+  //       const data = await DepartmentAPI.listActiveByClinic(clinicId);
+  //       setDepartments(data);
+  //     } catch (err) {
+  //       console.error("Failed to load departments:", err);
+  //     } finally {
+  //       setLoadingDepartments(false);
+  //     }
+  //   };
+  //   void fetchDepartments();
+  // }, [open, clinicId]);
 
-  React.useEffect(() => {
-    if (!filters.department || employees.length === 0) {
-      setFilteredEmployees(employees);
-      return;
-    }
-    const selectedDept = departments.find((d) => d.id === Number(filters.department));
-    if (!selectedDept) {
-      setFilteredEmployees(employees);
-      return;
-    }
-    const normalize = (s: string) => (s ?? "").trim().toLowerCase();
-    const filtered = employees.filter(
-      (emp) => normalize(emp.department_name) === normalize(selectedDept.name)
-    );
-    setFilteredEmployees(filtered);
-  }, [filters.department, employees, departments]);
+  // ── Load employees when dialog opens ─────────────────────────────────────
+  // React.useEffect(() => {
+  //   if (!open) return;
+  //   const fetchEmployees = async () => {
+  //     try {
+  //       setLoadingEmployees(true);
+  //       const data = await EmployeeAPI.listByClinic(clinicId);
+  //       setEmployees(Array.isArray(data) ? data : []);
+  //     } catch (err) {
+  //       console.error("Failed to load employees:", err);
+  //       setEmployees([]);
+  //     } finally {
+  //       setLoadingEmployees(false);
+  //     }
+  //   };
+  //   void fetchEmployees();
+  // }, [open, clinicId]);
 
+  // ── Filter employees by selected department ───────────────────────────────
+  // React.useEffect(() => {
+  //   if (!filters.department || employees.length === 0) {
+  //     setFilteredEmployees(employees);
+  //     return;
+  //   }
+  //   const selectedDept = departments.find(
+  //     (d) => d.id === Number(filters.department),
+  //   );
+  //   if (!selectedDept) {
+  //     setFilteredEmployees(employees);
+  //     return;
+  //   }
+  //   const normalize = (s: string) => (s ?? "").trim().toLowerCase();
+  //   setFilteredEmployees(
+  //     employees.filter(
+  //       (emp) => normalize(emp.department_name) === normalize(selectedDept.name),
+  //     ),
+  //   );
+  // }, [filters.department, employees, departments]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleFilterChange = (field: keyof FilterValues, value: string) => {
     setFilters((prev) => ({
       ...prev,
@@ -186,37 +252,31 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
   };
 
   const handleApply = () => {
-    console.log("🔍 Applying filters:", filters);
-    if (onApplyFilters) {
-      onApplyFilters(filters);
-    }
+    // Filters live in React state only — no localStorage write
+    if (onApplyFilters) onApplyFilters({ ...filters, location });
     onClose();
   };
 
   const handleClearAll = () => {
-    const emptyFilters: FilterValues = {
-      department: "",
-      assignee: "",
-      status: "",
-      quality: "",
-      source: "",
-      subSource: "",
-      dateFrom: null,
-      dateTo: null,
-    };
+    const emptyFilters = defaultFilters();
+
+    // One-time cleanup of any stale keys left by the old implementation
+    try {
+      localStorage.removeItem("leads_filter_values");
+      localStorage.removeItem("leads_filter_location");
+    } catch {
+      /* ignore */
+    }
 
     setFilters(emptyFilters);
     setDateFrom(null);
     setDateTo(null);
     setLocation("");
 
-    if (onApplyFilters) {
-      onApplyFilters(emptyFilters);
-    }
-
-    console.log("🧹 Filters cleared and applied:", emptyFilters);
+    if (onApplyFilters) onApplyFilters({ ...emptyFilters, location: "" });
   };
 
+  // ── Styles ────────────────────────────────────────────────────────────────
   const labelStyle = {
     fontSize: "11px",
     color: "#9CA3AF",
@@ -231,12 +291,8 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       fontSize: "13px",
       backgroundColor: "#FFFFFF",
       height: "40px",
-      "& fieldset": {
-        borderColor: "#E5E7EB",
-      },
-      "&:hover fieldset": {
-        borderColor: "#D1D5DB",
-      },
+      "& fieldset": { borderColor: "#E5E7EB" },
+      "&:hover fieldset": { borderColor: "#D1D5DB" },
       "&.Mui-focused fieldset": {
         borderColor: "#9CA3AF",
         borderWidth: "1px",
@@ -256,6 +312,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
     },
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Dialog
       open={open}
@@ -282,7 +339,11 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
           py: 2,
         }}
       >
-        <Typography variant="h6" fontWeight={600} sx={{ fontSize: "16px", color: "#111827" }}>
+        <Typography
+          variant="h6"
+          fontWeight={600}
+          sx={{ fontSize: "16px", color: "#111827" }}
+        >
           Filter By
         </Typography>
         <IconButton onClick={onClose} size="small" sx={{ color: "#6B7280" }}>
@@ -294,25 +355,21 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
       <DialogContent sx={{ px: { xs: 2, sm: 3 }, py: 0, pb: 2 }}>
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+
             {/* Row 1: From Date & To Date */}
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
+              <Box>
                 <Typography sx={labelStyle}>From Date</Typography>
                 <DatePicker
                   value={dateFrom}
                   onChange={handleDateFromChange}
                   format="DD/MM/YYYY"
                   slotProps={{
-                    textField: {
-                      size: "small",
-                      fullWidth: true,
-                      placeholder: "DD/MM/YYYY",
-                      sx: inputStyle,
-                    },
+                    textField: { size: "small", fullWidth: true, placeholder: "DD/MM/YYYY", sx: inputStyle },
                   }}
                 />
               </Box>
-              <Box sx={{ flex: 1 }}>
+              <Box>
                 <Typography sx={labelStyle}>To Date</Typography>
                 <DatePicker
                   value={dateTo}
@@ -320,12 +377,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                   minDate={dateFrom || undefined}
                   format="DD/MM/YYYY"
                   slotProps={{
-                    textField: {
-                      size: "small",
-                      fullWidth: true,
-                      placeholder: "DD/MM/YYYY",
-                      sx: inputStyle,
-                    },
+                    textField: { size: "small", fullWidth: true, placeholder: "DD/MM/YYYY", sx: inputStyle },
                   }}
                 />
               </Box>
@@ -333,18 +385,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
 
             {/* Row 2: Lead Quality & Status */}
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
+              <Box>
                 <Typography sx={labelStyle}>Lead Quality</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.quality}
                   onChange={(e) => handleFilterChange("quality", e.target.value)}
                   sx={inputStyle}
-                  SelectProps={{
-                    displayEmpty: true,
-                  }}
+                  SelectProps={{ displayEmpty: true }}
                 >
                   <MenuItem value="">Select Quality</MenuItem>
                   <MenuItem value="Hot">Hot</MenuItem>
@@ -352,24 +400,21 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
                   <MenuItem value="Cold">Cold</MenuItem>
                 </TextField>
               </Box>
-              <Box sx={{ flex: 1 }}>
+              <Box>
                 <Typography sx={labelStyle}>Status</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.status}
                   onChange={(e) => handleFilterChange("status", e.target.value)}
+                  disabled={loadingPipeline}
                   sx={inputStyle}
-                  SelectProps={{
-                    displayEmpty: true,
-                  }}
+                  SelectProps={{ displayEmpty: true }}
                 >
-                  <MenuItem value="">Select Status</MenuItem>
-                  {availableStatuses.map((status) => (
-                    <MenuItem key={status} value={status}>
-                      {status}
-                    </MenuItem>
+                  <MenuItem value="">
+                    {loadingPipeline ? "Loading…" : "Select Status"}
+                  </MenuItem>
+                  {pipelineStageNames.map((name) => (
+                    <MenuItem key={name} value={name}>{name}</MenuItem>
                   ))}
                 </TextField>
               </Box>
@@ -377,45 +422,35 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
 
             {/* Row 3: Location & Assignee */}
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
+              <Box>
                 <Typography sx={labelStyle}>Location</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   sx={inputStyle}
-                  SelectProps={{
-                    displayEmpty: true,
-                  }}
+                  SelectProps={{ displayEmpty: true }}
                 >
                   <MenuItem value="">Select Location</MenuItem>
                   {availableLocations.map((loc) => (
-                    <MenuItem key={loc} value={loc}>
-                      {loc}
-                    </MenuItem>
+                    <MenuItem key={loc} value={loc}>{loc}</MenuItem>
                   ))}
                 </TextField>
               </Box>
-              <Box sx={{ flex: 1 }}>
+              <Box>
                 <Typography sx={labelStyle}>Assignee</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.assignee}
                   onChange={(e) => handleFilterChange("assignee", e.target.value)}
-                  disabled={loadingEmployees}
+                  // disabled={loadingEmployees}
                   sx={inputStyle}
-                  SelectProps={{
-                    displayEmpty: true,
-                  }}
+                  SelectProps={{ displayEmpty: true }}
                 >
                   <MenuItem value="">Select Assignee</MenuItem>
-                  {filteredEmployees.map((emp) => (
-                    <MenuItem key={emp.id} value={emp.id.toString()}>
-                      {emp.emp_name}
+                  {availableAssignees.map((a) => (
+                    <MenuItem key={a.id} value={a.id.toString()}>
+                      {a.name}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -424,67 +459,48 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
 
             {/* Row 4: Source & Sub-Source */}
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
+              <Box>
                 <Typography sx={labelStyle}>Source</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.source}
                   onChange={(e) => handleFilterChange("source", e.target.value)}
                   sx={inputStyle}
-                  SelectProps={{
-                    displayEmpty: true,
-                  }}
+                  SelectProps={{ displayEmpty: true }}
                 >
                   <MenuItem value="">Select Source</MenuItem>
                   {SOURCE_OPTIONS.map((value) => (
-                    <MenuItem key={value} value={value}>
-                      {value}
-                    </MenuItem>
+                    <MenuItem key={value} value={value}>{value}</MenuItem>
                   ))}
                 </TextField>
               </Box>
-              <Box sx={{ flex: 1 }}>
+              <Box>
                 <Typography sx={labelStyle}>Sub-Source</Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
+                  select fullWidth size="small"
                   value={filters.subSource}
                   onChange={(e) => handleFilterChange("subSource", e.target.value)}
                   disabled={!filters.source || filters.source === "Other"}
                   sx={inputStyle}
-                  SelectProps={{
-                    displayEmpty: true,
-                  }}
+                  SelectProps={{ displayEmpty: true }}
                 >
                   <MenuItem value="">Select Sub-Source</MenuItem>
                   {(() => {
-                    if (!filters.source || filters.source === "Other") {
-                      return null;
-                    }
-
+                    if (!filters.source || filters.source === "Other") return null;
                     const availableSubSources =
                       filters.source === "Referral"
                         ? REFERRAL_DEPARTMENT_OPTIONS
-                        : SUB_SOURCE_OPTIONS[filters.source] ?? [];
-
-                    return availableSubSources.length > 0 ? (
-                      availableSubSources.map((value) => (
-                        <MenuItem key={value} value={value}>
-                          {value}
-                        </MenuItem>
-                      ))
-                    ) : (
-                      <MenuItem value="" disabled>
-                        No sub-sources available
-                      </MenuItem>
-                    );
+                        : (SUB_SOURCE_OPTIONS[filters.source] ?? []);
+                    return availableSubSources.length > 0
+                      ? availableSubSources.map((value) => (
+                          <MenuItem key={value} value={value}>{value}</MenuItem>
+                        ))
+                      : <MenuItem value="" disabled>No sub-sources available</MenuItem>;
                   })()}
                 </TextField>
               </Box>
             </Box>
+
           </Box>
         </LocalizationProvider>
       </DialogContent>
@@ -512,10 +528,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
             fontSize: "14px",
             color: "#374151",
             borderColor: "#E5E7EB",
-            "&:hover": {
-              borderColor: "#D1D5DB",
-              bgcolor: "#F9FAFB",
-            },
+            "&:hover": { borderColor: "#D1D5DB", bgcolor: "#F9FAFB" },
           }}
         >
           Clear All
@@ -532,10 +545,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({ open, onClose, onApplyFilte
             fontWeight: 500,
             fontSize: "14px",
             boxShadow: "none",
-            "&:hover": {
-              bgcolor: "#1A1A1A",
-              boxShadow: "none",
-            },
+            "&:hover": { bgcolor: "#1A1A1A", boxShadow: "none" },
           }}
         >
           Apply

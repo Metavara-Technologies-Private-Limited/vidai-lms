@@ -7,6 +7,26 @@ import type {
   Platform,
 } from "../constants/campaigns.constants";
 
+// Social Post type (new from backend migration 0070)
+export interface SocialPost {
+  id: string;
+  campaign: string;
+  platform_name: "facebook" | "linkedin";
+  post_id?: string | null;
+  status: "pending" | "posted" | "failed";
+  error_message?: string | null;
+  requested_at: string;
+  synced_at?: string | null;
+  creative_id?: string | null;
+  ads_manager_url?: string | null;
+  uploaded_image?: string | null;
+  image_url?: string | null;
+  image?: string | null; // computed field: prioritizes image_url then uploaded_image
+  document_name?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // UI
 export interface Campaign {
   id: string;
@@ -33,7 +53,16 @@ export interface Campaign {
 
   budget_data: Record<string, number>;
 
-  platform_data?: Record<string, { is_active?: boolean }>;
+  platform_data?: Record<
+    string,
+    {
+      is_active?: boolean;
+      status?: "active" | "paused";
+      content?: string;
+      state?: string;
+      country_code?: string;
+    }
+  >;
 
   campaign_content: string;
 
@@ -44,6 +73,7 @@ export interface Campaign {
 
   // ✅ Facebook Ad Campaign ID
   fb_campaign_id?: string | null;
+  instagram_campaign_id?: string | null;
 
   // Mailchimp insights
   impressions?: number;
@@ -57,6 +87,23 @@ export interface Campaign {
   last_click?: string | null;
   insights_synced_at?: string | null;
   conversion_rate?: number;
+  // ✅ ADD LINKEDIN FIELDS
+  linkedin_live_status?: string | null;
+  linkedin_external_campaign_id?: string | null;
+  linkedin_account_id?: string | null;
+  linkedin_ads_manager_url?: string | null;
+
+  last_synced_metrics?: {
+    campaign_metrics?: {
+      impressions?: number;
+      clicks?: number;
+      spend?: number;
+      ctr?: number;
+      conversions?: number;
+    };
+  } | null;
+
+  last_metrics_synced_at?: string | null;
 }
 
 // API TYPE
@@ -82,6 +129,9 @@ export interface CampaignAPIType {
     is_active: boolean;
   }[];
 
+  // ✅ NEW: Social posts (from migration 0070)
+  social_posts?: SocialPost[];
+
   adv_accounts: unknown | null;
 
   campaign_mode: CampaignMode;
@@ -97,7 +147,16 @@ export interface CampaignAPIType {
 
   enter_time: string;
 
-  platform_data?: Record<string, { is_active?: boolean }>;
+  platform_data?: Record<
+    string,
+    {
+      is_active?: boolean;
+      status?: "active" | "paused";
+      content?: string;
+      state?: string;
+      country_code?: string;
+    }
+  >;
   budget_data: Record<string, number>;
 
   status: CampaignStatus;
@@ -118,6 +177,7 @@ export interface CampaignAPIType {
 
   // ✅ Facebook Ad Campaign ID
   fb_campaign_id?: string | null;
+  instagram_campaign_id?: string | null;
 
   clinic: number;
 
@@ -141,6 +201,24 @@ export interface CampaignAPIType {
   fb_impressions?: number;
   fb_reach?: number;
   fb_clicks?: number;
+  fb_spend?: number;
+
+  linkedin_live_status?: string | null;
+  linkedin_external_campaign_id?: string | null;
+  linkedin_account_id?: string | null;
+  linkedin_ads_manager_url?: string | null;
+
+  last_synced_metrics?: {
+    campaign_metrics?: {
+      impressions?: number;
+      clicks?: number;
+      spend?: number;
+      ctr?: number;
+      conversions?: number;
+    };
+  } | null;
+
+  last_metrics_synced_at?: string | null;
 }
 
 // Payloads
@@ -191,7 +269,9 @@ export interface SocialCampaignPayload {
 
   campaign_content: string;
 
-  platform_data: Partial<Record<Platform, string>>;
+  // ✅ FIX: Changed from 'string' to 'any' to allow JSON objects (LinkedIn/Instagram data)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  platform_data: Partial<Record<Platform, any>>;
 
   image_url: string | null;
 
@@ -204,4 +284,38 @@ export interface SocialCampaignPayload {
   is_active?: boolean;
 
   schedule_date_range?: string;
+}
+
+// ✅ Google Ads campaign creation payload
+export interface GoogleAdsCampaignPayload {
+  clinic_id: number;
+  customer_id: string;
+  campaign_name: string;
+  budget?: number;
+  bidding_strategy?: string;
+  locations?: string[];
+  keywords?: string[];
+  cpc_bid?: number;
+  ad_group_name?: string;
+  final_url?: string;
+  headline_1?: string;
+  headline_2?: string;
+  headline_3?: string;
+  description?: string;
+  description_2?: string;
+  image_url?: string | null;
+  platform_data?: Record<string, string>;
+  login_customer_id?: string;
+  // ✅ FIX: controls which campaign type Zapier creates (prevents duplicate Search + Display)
+  campaign_type?: string;
+  // ✅ FIX: links Zapier callback response back to our internal campaign DB record
+  internal_campaign_id?: string;
+  // ✅ NEW: campaign objective, target audience, schedule dates & time
+  campaign_objective?: string;
+  target_audience?: string;
+  start_date?: string;
+  end_date?: string;
+  start_time?: string;
+  // ✅ FIX: campaign status — "live" → ENABLED in Google Ads, else → PAUSED
+  campaign_status?: string;
 }

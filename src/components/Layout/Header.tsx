@@ -45,7 +45,8 @@ import WorkIcon from "@mui/icons-material/Work";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { clinicApi } from "../../services/clinic.api";
 import { fetchLeads } from "../../store/leadSlice";
-import { fetchCampaign } from "../../store/campaignSlice";
+import { fetchCampaign, clearCampaigns } from "../../store/campaignSlice";
+import { fetchPipelines } from "../../store/pipelineSlice";
 import { fetchUsers } from "../../store/userSlice";
 import { authApi } from "../../services/auth.api";
 import { toast } from "react-toastify";
@@ -68,18 +69,20 @@ const Header = ({
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down("md"));
   const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
+  const isCompactDesktop = useMediaQuery(theme.breakpoints.down("lg"));
   const user = useSelector(selectUser);
   const dbClinic = useSelector(selectClinic);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
   type DropdownClinic = { id: number; name: string; isDefault: boolean };
 
   const [dbClinics, setDbClinics] = useState<DropdownClinic[]>([]);
+  const [isClinicLoading, setIsClinicLoading] = useState(false);
   const [selectedClinicId, setSelectedClinicId] = useState<number | null>(null);
   const [photoAnchorEl, setPhotoAnchorEl] = useState<HTMLElement | null>(null);
   const [isPhotoUpdating, setIsPhotoUpdating] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [photoVersion, setPhotoVersion] = useState(() => Date.now());
-  const lastFetchedClinicIdRef = useRef<number | null>(null);
+  // const lastFetchedClinicIdRef = useRef<number | null>(null);
   const latestUserRef = useRef(user);
 
   const userClinics = useMemo<DropdownClinic[]>(() => {
@@ -173,35 +176,85 @@ const Header = ({
 
     const storedClinicId =
       Number(localStorage.getItem("clinic_id") || 0) || null;
-    const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
-    const validStored =
-      storedClinicId &&
-      allowedClinics.some((clinic) => clinic.id === storedClinicId)
-        ? storedClinicId
-        : null;
-    const defaultClinicId =
-      allowedClinics.find((clinic) => clinic.isDefault)?.id ||
-      allowedClinics[0]?.id ||
+
+    // const isSuperAdmin =
+    //   user?.role?.name === "Super Admin" ||
+    //   user?.designation === "Super Admin" ||
+    //   user?.designation_label === "Super Admin";
+
+    const profileClinicId =
+      userClinics.find((clinic) => clinic.isDefault)?.id ||
+      userClinics[0]?.id ||
+      clinics[0]?.id ||
       null;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedClinicId(validStored || defaultClinicId);
-  }, [clinics, selectedClinicId, userClinics]);
+    let nextClinicId: number | null = profileClinicId;
+
+    // if (isSuperAdmin) {
+    //   // Superadmin can access any clinic
+    //   nextClinicId = storedClinicId || profileClinicId;
+    // } else {
+    //   // Normal users only allowed their clinics
+    //   const allowedClinics = userClinics.length > 0 ? userClinics : clinics;
+
+    //   const validStored =
+    //     storedClinicId &&
+    //     allowedClinics.some((clinic) => clinic.id === storedClinicId)
+    //       ? storedClinicId
+    //       : null;
+
+    //   nextClinicId = validStored || profileClinicId;
+    // }
+    
+    nextClinicId = storedClinicId || profileClinicId;
+
+    setSelectedClinicId(nextClinicId);
+  }, [
+    clinics,
+    selectedClinicId,
+    user?.designation,
+    user?.designation_label,
+    user?.role?.name,
+    userClinics,
+  ]);
 
   useEffect(() => {
-    const hydrateClinic = async () => {
-      if (!selectedClinicId) return;
-      if (lastFetchedClinicIdRef.current === selectedClinicId) return;
+    let isMounted = true;
 
-      lastFetchedClinicIdRef.current = selectedClinicId;
-      // Persist to localStorage FIRST so all service calls pick up the new clinic
-      localStorage.setItem("clinic_id", String(selectedClinicId));
-      await dispatch(fetchClinic(selectedClinicId));
-      // Re-fetch all clinic-scoped data in parallel
-      await Promise.all([dispatch(fetchLeads()), dispatch(fetchCampaign())]);
+    const hydrateClinic = async () => {
+      try {
+        if (!selectedClinicId) {
+          setIsClinicLoading(false);
+          return;
+        }
+
+        if (isMounted) {
+          setIsClinicLoading(true);
+        }
+        // if (lastFetchedClinicIdRef.current === selectedClinicId) return;
+
+        dispatch(clearCampaigns());
+
+        localStorage.setItem("clinic_id", String(selectedClinicId));
+
+        await dispatch(fetchClinic(selectedClinicId));
+
+        await Promise.allSettled([
+          dispatch(fetchLeads()),
+          dispatch(fetchCampaign()),
+          dispatch(fetchPipelines(selectedClinicId)),
+        ]);
+
+        // lastFetchedClinicIdRef.current = selectedClinicId;
+      } finally {
+        setIsClinicLoading(false);
+      }
     };
 
     hydrateClinic();
+    return () => {
+      isMounted = false;
+    };
   }, [dispatch, selectedClinicId]);
 
   useEffect(() => {
@@ -331,9 +384,7 @@ const Header = ({
       setPhotoVersion(Date.now());
     }
 
-    dispatch(
-      setUser(nextUser),
-    );
+    dispatch(setUser(nextUser));
   };
 
   const handleProfilePhotoFileChange = async (
@@ -419,10 +470,10 @@ const Header = ({
       <Toolbar
         sx={{
           justifyContent: "space-between",
-          py: 2,
-          px: { xs: 1.5, sm: 2 },
-          gap: 1.5,
-          flexWrap: { xs: "wrap", lg: "nowrap" },
+          py: { xs: 1.5, lg: isCompactDesktop ? 1.5 : 2 },
+          px: { xs: 1.5, sm: 2, lg: isCompactDesktop ? 1.5 : 2 },
+          gap: { xs: 1.25, lg: isCompactDesktop ? 1 : 1.5 },
+          flexWrap: { xs: "wrap", lg: isCompactDesktop ? "wrap" : "nowrap" },
           alignItems: { xs: "flex-start", lg: "center" },
         }}
       >
@@ -433,7 +484,10 @@ const Header = ({
             alignItems: "center",
             gap: 1,
             minWidth: 0,
-            flex: { xs: "1 1 100%", lg: "1 1 auto" },
+            flex: {
+              xs: "1 1 100%",
+              lg: isCompactDesktop ? "1 1 100%" : "1 1 auto",
+            },
           }}
         >
           {showSidebarToggle && (
@@ -460,38 +514,86 @@ const Header = ({
           sx={{
             display: "flex",
             alignItems: "center",
-            justifyContent: { xs: "space-between", md: "flex-end" },
-            gap: { xs: 1, sm: 1.5, md: 2 },
-            flexWrap: "wrap",
-            width: { xs: "100%", lg: "auto" },
+            justifyContent: {
+              xs: "flex-start",
+              md: isCompactDesktop ? "space-between" : "flex-end",
+            },
+            gap: { xs: 1, sm: 1.25, md: isCompactDesktop ? 1.25 : 2 },
+            flexWrap: "nowrap",
+            width: { xs: "100%", lg: isCompactDesktop ? "100%" : "auto" },
+            minWidth: 0,
+            overflowX: { xs: "auto", md: "visible" },
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": {
+              display: "none",
+            },
           }}
         >
-          <Box>
+          <Box sx={{ flex: { xs: "1 1 auto", md: "0 1 auto" }, minWidth: 0 }}>
             <Box
               onClick={handleClinicOpen}
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
+                gap: 0.75,
                 cursor: "pointer",
                 background: "#f3f4f6",
-                px: { xs: 1.25, sm: 2 },
-                py: 1,
+                px: { xs: 0.75, sm: 1.5, md: 2 },
+                py: { xs: 0.75, md: isCompactDesktop ? 0.875 : 1 },
                 borderRadius: 2,
-                maxWidth: { xs: "100%", sm: 260 },
+                maxWidth: {
+                  xs: "min(72vw, 280px)",
+                  sm: isCompactDesktop ? 240 : 280,
+                },
+                minWidth: 0,
               }}
             >
               <Typography
-                variant="body2"
+                component="span"
                 sx={{
+                  fontSize: {
+                    xs: 10.5,
+                    sm: 11.5,
+                    md: isCompactDesktop ? 12 : 13,
+                  },
+                  color: "#6B7280",
+                  flexShrink: 0,
+                  lineHeight: 1.2,
+                }}
+              >
+                Lab:
+              </Typography>
+              <Typography
+                component="span"
+                sx={{
+                  fontSize: {
+                    xs: 11,
+                    sm: 12,
+                    md: isCompactDesktop ? 12.5 : 13.5,
+                  },
+                  fontWeight: 700,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
+                  minWidth: 0,
+                  flex: 1,
                 }}
               >
-                Clinic: <b>{displayClinicName}</b>
+                {displayClinicName}
               </Typography>
-              <ArrowDropDownIcon />
+              <ArrowDropDownIcon
+                sx={{ fontSize: { xs: 18, sm: 20 }, flexShrink: 0 }}
+              />
+              {isClinicLoading && (
+                <CircularProgress
+                  size={14}
+                  thickness={5}
+                  sx={{
+                    color: "#ff6b35",
+                    flexShrink: 0,
+                  }}
+                />
+              )}
             </Box>
 
             <Menu
@@ -518,28 +620,40 @@ const Header = ({
               key={type}
               onClick={(e) => handleIconClick(e, type)}
               sx={{
-                width: isSmDown ? 42 : 48,
-                height: isSmDown ? 42 : 48,
+                width: isSmDown ? 42 : isCompactDesktop ? 44 : 48,
+                height: isSmDown ? 42 : isCompactDesktop ? 44 : 48,
                 backgroundColor: "#fff",
                 borderRadius: 1,
+                flexShrink: 0,
               }}
             >
-              <Box component="img" src={icon} width={isSmDown ? 20 : 24} />
+              <Box
+                component="img"
+                src={icon}
+                width={isSmDown ? 20 : isCompactDesktop ? 22 : 24}
+              />
             </IconButton>
           ))}
 
           {/* USER */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+              flexShrink: 0,
+            }}
+          >
             <Avatar
               src={getPhotoSrc(user?.photo)}
               onClick={handlePhotoPopoverOpen}
               sx={{
-                width: 36,
-                height: 36,
+                width: isCompactDesktop ? 34 : 36,
+                height: isCompactDesktop ? 34 : 36,
                 borderRadius: "10px",
                 bgcolor: "#F3E8E2",
                 color: "#A4471C",
-                fontSize: 14,
+                fontSize: isCompactDesktop ? 13 : 14,
                 fontWeight: 700,
                 cursor: "pointer",
               }}
@@ -556,9 +670,17 @@ const Header = ({
               onClick={handleUserMenuOpen}
             >
               <Box sx={{ display: { xs: "none", md: "block" } }}>
-                <Typography fontWeight={600}>{displayUserName}</Typography>
+                <Typography
+                  fontWeight={600}
+                  sx={{ fontSize: isCompactDesktop ? 14 : 16 }}
+                >
+                  {displayUserName}
+                </Typography>
 
-                <Typography fontSize={12} color="#6b7280">
+                <Typography
+                  fontSize={isCompactDesktop ? 11 : 12}
+                  color="#6b7280"
+                >
                   {user?.designation_label || user?.designation || "—"}
                 </Typography>
               </Box>

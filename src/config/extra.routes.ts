@@ -29,41 +29,78 @@ export const EXTRA_ROUTES = [
   {
     key: "referral-doctors",
     path: "referrals/doctors",
-    page: lazy(() => import("../components/Referrals/Doctors")),
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.Doctors,
+      })),
+    ),
   },
   {
     key: "referral-doctor-detail",
     path: "referrals/doctors/:doctorId",
-    page: lazy(() => import("../components/Referrals/DoctorReferrals.tsx")),
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.DoctorReferrals,
+      })),
+    ),
   },
   {
     key: "referral-corporate",
     path: "referrals/corporate",
-    page: lazy(() => import("../components/Referrals/Corporate")),
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.Corporate,
+      })),
+    ),
   },
   {
     key: "referral-insurance",
     path: "referrals/insurance",
-    page: lazy(() => import("../components/Referrals/Insurance")),
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.Insurance,
+      })),
+    ),
   },
   {
     key: "referral-diagnostic",
     path: "referrals/diagnostic",
-    page: lazy(() => import("../components/Referrals/Daignostic")),
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.Diagnostic,
+      })),
+    ),
   },
   {
     key: "referral-zoya",
     path: "referrals/zoya",
-    page: lazy(() => import("../components/Referrals/Zoya")),
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.Zoya,
+      })),
+    ),
   },
   {
     key: "referral-practo",
     path: "referrals/practo",
-    page: lazy(() => import("../components/Referrals/Practo")),
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.Practo,
+      })),
+    ),
   },
   {
     key: "reputation",
     path: "reputation",
     page: lazy(() => import("../pages/Reputation.tsx")),
+  },
+  {
+    key: "referral-source-detail",
+    path: "referrals/source/:type/:id",
+    page: lazy(() =>
+      import("../components/Referrals/ReferralsManager.tsx").then((m) => ({
+        default: m.SourceReferrals,
+      })),
+    ),
   },
 ];

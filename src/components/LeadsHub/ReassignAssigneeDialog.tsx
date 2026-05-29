@@ -1,4 +1,6 @@
 import * as React from "react";
+import { useSelector } from "react-redux";
+import { selectUsers } from "../../store/userSlice";
 import {
   Dialog,
   DialogTitle,
@@ -11,16 +13,31 @@ import {
   MenuItem,
   TextField,
   Alert,
-  CircularProgress,
   Box,
   IconButton,
   Typography,
+  CircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useDispatch } from "react-redux";
-import { EmployeeAPI, LeadAPI } from "../../services/leads.api";
-import type { Employee, LeadPayload } from "../../services/leads.api";
+import { LeadAPI } from "../../services/leads.api";
+import type { LeadPayload } from "../../services/leads.api";
 import { fetchLeads } from "../../store/leadSlice";
+import { selectClinic } from "../../store/clinicSlice";
+import {
+  pipelineApi,
+  isActiveStageStatus,
+  type PipelineStage,
+} from "../../services/pipeline.api";
+import {
+  TASK_TYPES,
+  TASK_STATUS_OPTIONS,
+  type TaskStatusValue,
+} from "../LeadsHub/addNewLead.constants";
+
+const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
+const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
+const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
 
 // ── Typed error helper ──────────────────────────────────────────────────────
 interface ApiError {
@@ -38,7 +55,52 @@ const getErrorMessage = (err: unknown, fallback: string): string => {
   );
 };
 
-// ── Sanitize helpers — narrow loose strings to literal unions ───────────────
+type AssigneeOption = {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  role?: string;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const normalizeUsersList = (users: any[]): AssigneeOption[] => {
+  return users.map((u) => ({
+    id: u.id,
+    first_name: u.first_name || u.firstName,
+    last_name: u.last_name || u.lastName,
+    username: u.username,
+    role: u.role?.name || u.role || "",
+  }));
+};
+
+const assigneeLabel = (option: AssigneeOption): string => {
+  const fullName =
+    `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
+  const primary = fullName || option.username || `User ${option.id}`;
+  return option.role ? `${primary} (${option.role})` : primary;
+};
+
+const getSelectedAssigneeName = (
+  assignees: AssigneeOption[],
+  id: number | null,
+): string | null => {
+  if (!id) return null;
+  const matched = assignees.find((a) => a.id === id);
+  return matched ? assigneeLabel(matched) : null;
+};
+
+const normalizeTreatmentInterest = (
+  value: string | string[] | { id: string; name: string }[] | undefined,
+): string[] => {
+  if (!value) return [];
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) {
+    return value.map((item) => (typeof item === "object" ? item.id : item));
+  }
+  return [];
+};
+
 const toMaritalStatus = (
   v: string | undefined,
 ): "single" | "married" | undefined => {
@@ -53,12 +115,33 @@ const toPartnerGender = (
   return undefined;
 };
 
-const toNextActionStatus = (v: string | undefined): "pending" | "completed" => {
-  if (v === "completed") return "completed";
-  return "pending";
+// ── Derive action type labels from a single stage's enabled rules ────────────
+const deriveActionTypeOptions = (stage: PipelineStage): string[] => {
+  const labels = stage.rules
+    .filter((r) => r.is_enabled)
+    .map((r) =>
+      r.custom_label?.trim() ? r.custom_label.trim() : r.action_type,
+    );
+  return labels.length > 0 ? labels : [...TASK_TYPES];
 };
 
-// ── LeadProp — fields kept as loose strings; sanitized before hitting LeadPayload
+// ── Derive union of action type labels across all stages ─────────────────────
+const deriveAllActionTypeOptions = (stages: PipelineStage[]): string[] => {
+  const labels = Array.from(
+    new Set(
+      stages.flatMap((s) =>
+        s.rules
+          .filter((r) => r.is_enabled)
+          .map((r) =>
+            r.custom_label?.trim() ? r.custom_label.trim() : r.action_type,
+          ),
+      ),
+    ),
+  );
+  return labels.length > 0 ? labels : [...TASK_TYPES];
+};
+
+// ── LeadProp ─────────────────────────────────────────────────────────────────
 interface LeadProp {
   id: string;
   clinic_id?: number;
@@ -68,19 +151,20 @@ interface LeadProp {
   contact_no?: string;
   contact?: string;
   source?: string;
-  treatment_interest?: string;
-  treatmentInterest?: string;
+  treatment_interest?: string | string[] | { id: string; name: string }[];
+  treatmentInterest?: string | string[] | { id: string; name: string }[];
   appointment_date?: string;
   appointmentDate?: string;
   date?: string;
   slot?: string;
   assigned_to_id?: number;
   next_action_type?: string;
-  next_action_status?: string; // loose — sanitized via toNextActionStatus()
+  /** Maps to action_status on the payload — same as form.taskStatus in AddNewLead */
+  action_status?: string;
   next_action_description?: string;
   email?: string;
   age?: number;
-  marital_status?: string; // loose — sanitized via toMaritalStatus()
+  marital_status?: string;
   marital?: string;
   location?: string;
   address?: string;
@@ -89,7 +173,7 @@ interface LeadProp {
   partnerName?: string;
   partner_age?: number;
   partnerAge?: number;
-  partner_gender?: string; // loose — sanitized via toPartnerGender()
+  partner_gender?: string;
   partnerGender?: string;
   sub_source?: string;
   subSource?: string;
@@ -107,72 +191,162 @@ interface Props {
   onClose: () => void;
 }
 
-// ── Constants ───────────────────────────────────────────────────────────────
-const nextActionTypes = [
-  "Follow Up",
-  "Call Patient",
-  "Send Message",
-  "Send Email",
-  "Book Appointment",
-  "Review Details",
-  "No Action",
-] as const;
-
-const nextActionStatuses: { value: "pending" | "completed"; label: string }[] =
-  [
-    { value: "pending", label: "To Do" },
-    { value: "completed", label: "Completed" },
-  ];
-
 // ════════════════════════════════════════════════════════════════════════════
 const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
   const dispatch = useDispatch();
 
+  const users = useSelector(selectUsers);
+  const selectedClinic = useSelector(selectClinic);
+  const clinicId =
+    selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
+
   // ── State ────────────────────────────────────────────────────────────────
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
+  const [assignees, setAssignees] = React.useState<AssigneeOption[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = React.useState<
     number | null
   >(null);
   const [nextActionType, setNextActionType] = React.useState("");
-  const [nextActionStatus, setNextActionStatus] = React.useState<
-    "pending" | "completed"
-  >("pending");
+  const [taskStatus, setTaskStatus] = React.useState<TaskStatusValue | "">("");
+  // Always blank on open — never pre-filled from the lead
   const [nextActionDesc, setNextActionDesc] = React.useState("");
 
   const [loading, setLoading] = React.useState(false);
-  const [fetchingEmployees, setFetchingEmployees] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // ── Fetch employees & pre-populate ──────────────────────────────────────
+  // ── Pipeline-derived next action type options ────────────────────────────
+  const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<
+    string[]
+  >([]);
+  const [loadingPipeline, setLoadingPipeline] = React.useState(false);
+
+  // ── Load pipeline stages (same logic as AddNewLead) ──────────────────────
   React.useEffect(() => {
-    const load = async () => {
-      if (!open || !lead.clinic_id) return;
+    if (!open) return;
+
+    const loadFromPipeline = async () => {
+      const selectedIndustry =
+        localStorage.getItem(STORAGE_KEY_SELECTED_INDUSTRY) ?? "";
+      const selectedPipelineId =
+        localStorage.getItem(STORAGE_KEY_SELECTED_PIPELINE) ??
+        localStorage.getItem(STORAGE_KEY_DEFAULT_PIPELINE) ??
+        "";
+
       try {
-        setFetchingEmployees(true);
-        setError(null);
-        const list = await EmployeeAPI.listByClinic(lead.clinic_id);
-        setEmployees(list);
-        if (lead.assigned_to_id) setSelectedEmployeeId(lead.assigned_to_id);
-        if (lead.next_action_type) setNextActionType(lead.next_action_type);
-        if (lead.next_action_status)
-          setNextActionStatus(toNextActionStatus(lead.next_action_status));
-        if (lead.next_action_description)
-          setNextActionDesc(lead.next_action_description);
-      } catch (err: unknown) {
-        setError(getErrorMessage(err, "Failed to load employees"));
+        setLoadingPipeline(true);
+
+        let selectedPipeline = null;
+
+        if (selectedPipelineId) {
+          try {
+            selectedPipeline = await pipelineApi.getById(selectedPipelineId);
+          } catch {
+            selectedPipeline = null;
+          }
+        }
+
+        if (!selectedPipeline) {
+          const pipelines = await pipelineApi.list(clinicId);
+          const byIndustry = selectedIndustry
+            ? pipelines.filter((p) => p.industry_type === selectedIndustry)
+            : pipelines;
+
+          selectedPipeline =
+            pipelines.find((p) => p.id === selectedPipelineId) ??
+            byIndustry.find((p) => p.is_active) ??
+            byIndustry[0] ??
+            pipelines.find((p) => p.is_active) ??
+            pipelines[0] ??
+            null;
+        }
+
+        const rawStages = selectedPipeline?.stages ?? [];
+        const activeStages = rawStages
+          .filter((s) => isActiveStageStatus(s.stage_status))
+          .filter((s) => s.stage_name.trim())
+          .sort((a, b) => {
+            const aOrder =
+              typeof a.stage_order === "number" ? a.stage_order : 0;
+            const bOrder =
+              typeof b.stage_order === "number" ? b.stage_order : 0;
+            if (aOrder === bOrder) return 0;
+            return aOrder - bOrder;
+          });
+
+        // Scope next action type options to the stage after the lead's current status
+        const currentLeadStatus = lead.lead_status ?? lead.status ?? "";
+        const matchedStage = currentLeadStatus
+          ? activeStages.find(
+              (s) =>
+                s.stage_name.trim().toLowerCase() ===
+                currentLeadStatus.trim().toLowerCase(),
+            )
+          : null;
+
+        const nextStage = matchedStage
+          ? activeStages.find(
+              (s) => s.stage_order > matchedStage.stage_order,
+            ) ?? null
+          : activeStages[1] ?? null;
+
+        const options = nextStage
+          ? deriveActionTypeOptions(nextStage)
+          : deriveAllActionTypeOptions(activeStages);
+
+        setNextActionTypeOptions(options);
+      } catch {
+        setNextActionTypeOptions([...TASK_TYPES]);
       } finally {
-        setFetchingEmployees(false);
+        setLoadingPipeline(false);
       }
     };
-    load();
+
+    void loadFromPipeline();
+  }, [open, clinicId, lead.lead_status, lead.status]);
+
+  // ── Pre-populate from lead (description intentionally excluded) ──────────
+  React.useEffect(() => {
+    if (!open) return;
+
+    const normalized = normalizeUsersList(users);
+    setAssignees(normalized);
+
+    if (lead.assigned_to_id) {
+      setSelectedEmployeeId(lead.assigned_to_id);
+    }
+
+    if (lead.next_action_type) {
+      setNextActionType(lead.next_action_type);
+    }
+
+    // Pre-populate task status from lead's action_status field
+    const existingTaskStatus = (lead.action_status ?? "").trim().toLowerCase();
+    const isValidTaskStatus = TASK_STATUS_OPTIONS.some(
+      (opt) => opt.value === existingTaskStatus,
+    );
+    setTaskStatus(
+      isValidTaskStatus ? (existingTaskStatus as TaskStatusValue) : "",
+    );
+
+    // ── next_action_description is deliberately NOT read from the lead ──
+    // The dialog always opens with a blank description so the user writes
+    // a fresh note for the reassignment, not a stale/system-generated one.
+    setNextActionDesc("");
   }, [
     open,
-    lead.clinic_id,
+    users,
     lead.assigned_to_id,
     lead.next_action_type,
-    lead.next_action_status,
-    lead.next_action_description,
+    lead.action_status,
   ]);
+
+  // ── Auto-clear nextActionType if no longer valid after pipeline loads ─────
+  React.useEffect(() => {
+    if (!nextActionType) return;
+    if (nextActionTypeOptions.includes(nextActionType)) return;
+    if (!loadingPipeline && nextActionTypeOptions.length > 0) {
+      setNextActionType("");
+    }
+  }, [nextActionType, nextActionTypeOptions, loadingPipeline]);
 
   // ── Save ─────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -185,13 +359,13 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
       setLoading(true);
       setError(null);
 
-      // ✅ All literal-union fields sanitized — fully assignable to Partial<LeadPayload>
       const updatePayload: Partial<LeadPayload> = {
         full_name: lead.full_name ?? lead.name,
         contact_no: lead.contact_no ?? lead.contact,
         source: lead.source,
-        treatment_interest:
-          lead.treatment_interest ?? lead.treatmentInterest ?? "",
+        treatment_interest: normalizeTreatmentInterest(
+          lead.treatment_interest ?? lead.treatmentInterest,
+        ),
         appointment_date:
           lead.appointment_date ??
           lead.appointmentDate ??
@@ -201,16 +375,22 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
 
         // Reassign fields
         assigned_to_id: selectedEmployeeId,
+        assigned_to_name: getSelectedAssigneeName(
+          assignees,
+          selectedEmployeeId,
+        ),
         next_action_type: nextActionType || undefined,
-        next_action_status: nextActionStatus, // "pending" | "completed" ✅
         next_action_description: nextActionDesc || undefined,
 
-        // Preserved fields — all sanitized to match LeadPayload literals
+        // Task Status → action_status (same mapping as AddNewLead buildPayload)
+        action_status: (taskStatus as TaskStatusValue) || null,
+
+        // Preserved fields
         clinic_id: lead.clinic_id,
         department_id: lead.department_id,
         email: lead.email ?? undefined,
         age: lead.age ?? undefined,
-        marital_status: toMaritalStatus(lead.marital_status ?? lead.marital), // ✅
+        marital_status: toMaritalStatus(lead.marital_status ?? lead.marital),
         location: lead.location ?? undefined,
         address: lead.address ?? undefined,
         partner_inquiry: lead.partner_inquiry ?? false,
@@ -219,7 +399,7 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
         partner_age: lead.partner_age ?? lead.partnerAge ?? undefined,
         partner_gender: toPartnerGender(
           lead.partner_gender ?? lead.partnerGender,
-        ), // ✅
+        ),
         sub_source: lead.sub_source ?? lead.subSource ?? undefined,
         book_appointment:
           lead.book_appointment ?? lead.wantAppointment === "yes",
@@ -230,7 +410,7 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
       // ⚡ Optimistic close for snappy UX
       onClose();
 
-      LeadAPI.update(lead.id, updatePayload)
+      await LeadAPI.update(lead.id, updatePayload)
         .then(() => {
           dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
           window.dispatchEvent(
@@ -238,8 +418,12 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
               detail: {
                 id: lead.id,
                 assigned_to_id: selectedEmployeeId,
+                assigned_to_name: getSelectedAssigneeName(
+                  assignees,
+                  selectedEmployeeId,
+                ),
                 next_action_type: nextActionType,
-                next_action_status: nextActionStatus,
+                action_status: taskStatus,
                 next_action_description: nextActionDesc,
               },
             }),
@@ -255,14 +439,21 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
     }
   };
 
-  // ── Close / reset ────────────────────────────────────────────────────────
+  // ── Close / reset ─────────────────────────────────────────────────────────
   const handleClose = () => {
     if (loading) return;
     setError(null);
     setSelectedEmployeeId(lead.assigned_to_id ?? null);
     setNextActionType(lead.next_action_type ?? "");
-    setNextActionStatus(toNextActionStatus(lead.next_action_status));
-    setNextActionDesc(lead.next_action_description ?? "");
+    const existingTaskStatus = (lead.action_status ?? "").trim().toLowerCase();
+    const isValidTaskStatus = TASK_STATUS_OPTIONS.some(
+      (opt) => opt.value === existingTaskStatus,
+    );
+    setTaskStatus(
+      isValidTaskStatus ? (existingTaskStatus as TaskStatusValue) : "",
+    );
+    // Always reset to blank on close too
+    setNextActionDesc("");
     onClose();
   };
 
@@ -319,11 +510,7 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
           )}
 
           {/* Assignee */}
-          <FormControl
-            fullWidth
-            disabled={fetchingEmployees || loading}
-            size="small"
-          >
+          <FormControl fullWidth disabled={loading} size="small">
             <InputLabel
               sx={{ fontSize: "14px", "&.Mui-focused": { color: "#1976d2" } }}
             >
@@ -346,37 +533,24 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
                 },
               }}
             >
-              {fetchingEmployees ? (
-                <MenuItem disabled>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <CircularProgress size={16} />
-                    <Typography fontSize="14px">
-                      Loading employees...
-                    </Typography>
-                  </Box>
+              {assignees.map((user) => (
+                <MenuItem
+                  key={user.id}
+                  value={user.id}
+                  sx={{ fontSize: "14px" }}
+                >
+                  {assigneeLabel(user)}
                 </MenuItem>
-              ) : employees.length === 0 ? (
-                <MenuItem disabled>
-                  <Typography fontSize="14px">
-                    No employees available
-                  </Typography>
-                </MenuItem>
-              ) : (
-                employees.map((emp) => (
-                  <MenuItem
-                    key={emp.id}
-                    value={emp.id}
-                    sx={{ fontSize: "14px" }}
-                  >
-                    {emp.emp_name}
-                  </MenuItem>
-                ))
-              )}
+              ))}
             </Select>
           </FormControl>
 
-          {/* Next Action Type */}
-          <FormControl fullWidth disabled={loading} size="small">
+          {/* Next Action Type — dynamic from pipeline */}
+          <FormControl
+            fullWidth
+            disabled={loading || loadingPipeline}
+            size="small"
+          >
             <InputLabel
               sx={{ fontSize: "14px", "&.Mui-focused": { color: "#1976d2" } }}
             >
@@ -386,6 +560,11 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
               value={nextActionType}
               onChange={(e) => setNextActionType(e.target.value)}
               label="Next Action Type"
+              endAdornment={
+                loadingPipeline ? (
+                  <CircularProgress size={16} sx={{ mr: 3, color: "#999" }} />
+                ) : null
+              }
               sx={{
                 fontSize: "14px",
                 "& .MuiOutlinedInput-notchedOutline": {
@@ -399,27 +578,40 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
                 },
               }}
             >
-              {nextActionTypes.map((type) => (
-                <MenuItem key={type} value={type} sx={{ fontSize: "14px" }}>
-                  {type}
+              <MenuItem value="" sx={{ fontSize: "14px" }}>
+                -- Select --
+              </MenuItem>
+              {loadingPipeline ? (
+                <MenuItem value="" disabled sx={{ fontSize: "14px" }}>
+                  Loading…
                 </MenuItem>
-              ))}
+              ) : nextActionTypeOptions.length === 0 ? (
+                <MenuItem value="" disabled sx={{ fontSize: "14px" }}>
+                  No actions configured
+                </MenuItem>
+              ) : (
+                nextActionTypeOptions.map((type) => (
+                  <MenuItem key={type} value={type} sx={{ fontSize: "14px" }}>
+                    {type}
+                  </MenuItem>
+                ))
+              )}
             </Select>
           </FormControl>
 
-          {/* Next Action Status */}
+          {/* Task Status — matches form.taskStatus / action_status in AddNewLead */}
           <FormControl fullWidth disabled={loading} size="small">
             <InputLabel
               sx={{ fontSize: "14px", "&.Mui-focused": { color: "#1976d2" } }}
             >
-              Next Action Status
+              Task Status
             </InputLabel>
             <Select
-              value={nextActionStatus}
+              value={taskStatus}
               onChange={(e) =>
-                setNextActionStatus(e.target.value as "pending" | "completed")
+                setTaskStatus(e.target.value as TaskStatusValue | "")
               }
-              label="Next Action Status"
+              label="Task Status"
               sx={{
                 fontSize: "14px",
                 "& .MuiOutlinedInput-notchedOutline": {
@@ -433,19 +625,22 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
                 },
               }}
             >
-              {nextActionStatuses.map((s) => (
+              <MenuItem value="" sx={{ fontSize: "14px" }}>
+                -- Select --
+              </MenuItem>
+              {TASK_STATUS_OPTIONS.map((opt) => (
                 <MenuItem
-                  key={s.value}
-                  value={s.value}
+                  key={opt.value}
+                  value={opt.value}
                   sx={{ fontSize: "14px" }}
                 >
-                  {s.label}
+                  {opt.label}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
 
-          {/* Description */}
+          {/* Next Action Description — always starts blank */}
           <TextField
             fullWidth
             multiline
@@ -499,7 +694,7 @@ const ReassignAssigneeDialog: React.FC<Props> = ({ open, lead, onClose }) => {
         <Button
           onClick={handleSave}
           variant="contained"
-          disabled={loading || fetchingEmployees || !selectedEmployeeId}
+          disabled={loading || !selectedEmployeeId}
           sx={{
             minWidth: 100,
             textTransform: "none",

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ import {
 } from "../../../styles/Settings/Tickets.styles";
 import { selectUser } from "../../../store/authSlice";
 import { selectClinic } from "../../../store/clinicSlice";
+import { selectUsers } from "../../../store/userSlice";
 
 type AssigneeOption = {
   id: number;
@@ -52,63 +54,51 @@ type AssigneeOption = {
   username: string | undefined;
   role: string | undefined;
   designation: string | undefined;
+  email?: string;
 };
 
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const normalizeAssignees = (raw: unknown): AssigneeOption[] => {
-  const root = asRecord(raw);
-  const list: unknown[] = Array.isArray(raw)
-    ? raw
-    : Array.isArray(root?.objects)
-      ? (root?.objects as unknown[])
-      : Array.isArray(root?.results)
-        ? (root?.results as unknown[])
-        : Array.isArray(root?.data)
-          ? (root?.data as unknown[])
-          : [];
+const normalizeAssignees = (res: any): AssigneeOption[] => {
+  const users = res?.data?.objects || [];
 
-  return list
-    .map((item) => {
-      const record = asRecord(item);
-      if (!record) return null;
-
-      const idValue = record.id ?? record.user_id;
-      const id =
-        typeof idValue === "number"
-          ? idValue
-          : typeof idValue === "string"
-            ? Number(idValue)
-            : NaN;
-
-      if (!Number.isFinite(id)) return null;
-
-      return {
-        id,
-        first_name:
-          typeof record.first_name === "string" ? record.first_name : undefined,
-        last_name:
-          typeof record.last_name === "string" ? record.last_name : undefined,
-        username:
-          typeof record.username === "string" ? record.username : undefined,
-        role: typeof record.role === "string" ? record.role : undefined,
-        designation:
-          typeof record.designation === "string"
-            ? record.designation
-            : undefined,
-      };
-    })
-    .filter((item): item is AssigneeOption => item !== null);
+  return users.map((u: any) => ({
+    id: u.id,
+    first_name: u.first_name,
+    last_name: u.last_name,
+    username: u.username,
+    role: u.role_label || u.role,
+    designation: u.designation,
+    email:
+      u.email ||
+      u.emp_email ||
+      u.user_email ||
+      u.official_email ||
+      u?.user?.email ||
+      undefined,
+  }));
 };
+
+const normalizeUsersList = (users: any[]): AssigneeOption[] => {
+  return users.map((u) => ({
+    id: u.id,
+    first_name: u.first_name ?? u.firstName,
+    last_name: u.last_name ?? u.lastName,
+    username: u.username,
+    role: u.role?.name || u.role,
+    designation: undefined,
+    email: u.email ?? undefined,
+  }));
+};
+
+const isValidEmail = (email: string | undefined): email is string =>
+  typeof email === "string" && EMAIL_REGEX.test(email.trim());
 
 const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =
     `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
-  const secondary = option.role || option.designation;
+  const secondary = option.role;
   return secondary ? `${primary} (${secondary})` : primary;
 };
 
@@ -136,11 +126,13 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [departmentId, setDepartmentId] = useState<number | "">("");
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [assigneeId, setAssigneeId] = useState<number | "">("");
+  const [assigneeName, setAssigneeName] = useState("");
   const [assigneeSearch, setAssigneeSearch] = useState("");
   const [assigneeOptions, setAssigneeOptions] = useState<AssigneeOption[]>([]);
   const [assigneeLoading, setAssigneeLoading] = useState(false);
   const [requestedBy, setRequestedBy] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
   // --- Data States (Dropdowns) ---
   const [labs, setLabs] = useState<Lab[]>([]);
@@ -149,6 +141,32 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   // --- UI States ---
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const users = useSelector(selectUsers);
+
+  const authMode = localStorage.getItem("auth_mode");
+  const isInternal = authMode === "INT";
+
+  const getAssigneeEmailById = (id: number | "") => {
+    if (!id) return "";
+
+    const assigneeFromOptions = assigneeOptions.find(
+      (option) => option.id === id,
+    );
+    if (assigneeFromOptions?.email) return assigneeFromOptions.email.trim();
+
+    const assigneeFromUsers = users.find((u) => u.id === id);
+    if (assigneeFromUsers?.email) return assigneeFromUsers.email.trim();
+
+    return "";
+  };
+
+  const getRequestedByEmail = () => {
+    // Always use the logged-in user's email as the requester
+    if (user?.email && isValidEmail(user.email)) {
+      return user.email.trim();
+    }
+    return "";
+  };
 
   useEffect(() => {
     if (user?.first_name && user?.last_name) {
@@ -172,21 +190,36 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
       try {
         setAssigneeLoading(true);
-        const response = await authApi.searchUsers({
-          search: assigneeSearch,
-          limit: 20,
-          offset: 0,
-        });
-        setAssigneeOptions(normalizeAssignees(response));
+
+        if (isInternal) {
+          const normalized = normalizeUsersList(users);
+
+          const filtered = normalized.filter((u) =>
+            `${u.first_name ?? ""} ${u.last_name ?? ""} ${u.username ?? ""}`
+              .toLowerCase()
+              .includes(assigneeSearch.toLowerCase()),
+          );
+
+          setAssigneeOptions(filtered);
+        } else {
+          // API
+          const response = await authApi.searchUsers({
+            search: assigneeSearch,
+            limit: 20,
+            offset: 0,
+          });
+
+          setAssigneeOptions(normalizeAssignees(response));
+        }
       } catch {
         setAssigneeOptions([]);
       } finally {
         setAssigneeLoading(false);
       }
-    }, 350);
+    }, 300);
 
     return () => clearTimeout(timer);
-  }, [assigneeSearch]);
+  }, [assigneeSearch, isInternal, users]);
 
   // 1. Fetch live data for dropdowns matching Swagger definitions
   useEffect(() => {
@@ -195,7 +228,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
         setLoadingData(true);
         try {
           const results = await Promise.allSettled([
-            labsApi.getLabs(),
+            labsApi.getLabs(clinicId),
             clinicsApi.getClinicDetail(clinicId),
           ]);
 
@@ -283,8 +316,51 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
       return;
     }
 
+    const assigneeEmail = getAssigneeEmailById(assigneeId);
+    const requestedByEmail = getRequestedByEmail();
+
+    if (!isValidEmail(assigneeEmail)) {
+      toast.error(
+        "Assigned user's email is invalid. Please choose a valid assignee.",
+      );
+      return;
+    }
+
+    if (!isValidEmail(requestedByEmail)) {
+      toast.error(
+        "Requested by user's email is invalid. Please verify your login email.",
+      );
+      return;
+    }
+
     setLoading(true);
     try {
+      const clinicName = selectedClinic?.name || "Clinic";
+      const dueDateString = dueDate ? dueDate.format("YYYY-MM-DD") : "";
+      const createdBodyLines = [
+        `Hi ${assigneeName || "Team"},`,
+        "",
+        "A new support ticket has been created and assigned to you.",
+        "",
+        "Ticket Details:",
+        `Ticket ID: Pending`,
+        `Subject: ${subject.trim()}`,
+        `Priority: ${priority}`,
+        `Status: New`,
+        `Due Date: ${dueDateString || "Not set"}`,
+        "",
+        "Description:",
+        description.trim() || "No description provided.",
+        "",
+        "Requested By:",
+        requestedBy.trim() || "Unknown",
+        "",
+        "Please review and respond to this ticket at your earliest convenience.",
+        "",
+        "Regards,",
+        `${clinicName} Support Team`,
+      ].join("\n");
+
       const payload: CreateTicketRequest = {
         subject: subject.trim(),
         description: description.trim() || "No description provided",
@@ -294,7 +370,13 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
         priority: priority as TicketPriority,
         status: "new",
         assigned_to: assigneeId ? Number(assigneeId) : null,
+        assigned_to_name: assigneeName || undefined,
         due_date: dueDate ? dueDate.format("YYYY-MM-DD") : null,
+        event: "ticket_created",
+        clinicName,
+        to: [assigneeEmail],
+        cc: [requestedByEmail],
+        email_body: createdBodyLines,
       };
 
       const res = await ticketsApi.createTicket(payload);
@@ -342,6 +424,18 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size should be less than 25MB");
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
   const reset = () => {
     setSubject("");
     setDescription("");
@@ -350,6 +444,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
     setDepartmentId("");
     setPriority("");
     setAssigneeId("");
+    setAssigneeName("");
     setRequestedBy("");
     setAssigneeSearch("");
     setAssigneeOptions([]);
@@ -598,10 +693,22 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                   assigneeOptions.find((option) => option.id === assigneeId) ||
                   null
                 }
-                onInputChange={(_, value) =>
-                  setAssigneeSearch(value.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH))
-                }
-                onChange={(_, value) => setAssigneeId(value?.id ?? "")}
+                onInputChange={(_, value, reason) => {
+                  if (reason === "input") {
+                    setAssigneeSearch(
+                      value.slice(0, MAX_TICKET_ASSIGNED_TO_LENGTH),
+                    );
+                  }
+                }}
+                onChange={(_, value) => {
+                  setAssigneeId(value?.id ?? "");
+                  if (value) {
+                    const fullName = assigneeLabel(value);
+                    setAssigneeName(fullName);
+                  } else {
+                    setAssigneeName("");
+                  }
+                }}
                 getOptionLabel={assigneeLabel}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
                 fullWidth
@@ -646,10 +753,22 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
             >
               <TextField
                 label="Upload Documents"
-                value={selectedFile?.name || ""}
-                placeholder="No file Choosen"
                 fullWidth
-                sx={createTicketFocusedFieldSx}
+                value=""
+                placeholder="No file chosen"
+                sx={{
+                  ...createTicketFocusedFieldSx,
+
+                  // 🔥 reduce height
+                  "& .MuiInputBase-root": {
+                    height: 40,
+                    paddingRight: "8px",
+                  },
+
+                  "& input": {
+                    padding: "6px 8px",
+                  },
+                }}
                 InputLabelProps={{ shrink: true }}
                 disabled={loading}
                 InputProps={{
@@ -657,21 +776,72 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                     <Button
                       component="label"
                       disabled={loading}
-                      sx={createTicketUploadButtonSx}
+                      sx={{
+                        ...createTicketUploadButtonSx,
+                        height: 28, // 🔥 smaller button
+                        fontSize: 12,
+                        px: 1.5,
+                      }}
                     >
                       Choose File
                       <input
                         hidden
                         type="file"
-                        onChange={(e) =>
-                          setSelectedFile(e.target.files?.[0] || null)
-                        }
+                        onChange={(e) => handleFileChange(e)}
                       />
                     </Button>
                   ),
+
+                  // ✅ FILE DISPLAY INSIDE BOX
+                  endAdornment: selectedFile ? (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        maxWidth: "70%",
+                      }}
+                    >
+                      {/* FILE NAME */}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontSize: 13,
+                          cursor: "pointer",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        onClick={() => {
+                          const url = URL.createObjectURL(selectedFile);
+                          window.open(url, "_blank");
+                        }}
+                      >
+                        {selectedFile.name}
+                      </Typography>
+
+                      {/* ❌ SMALL REMOVE */}
+                      <IconButton
+                        size="small"
+                        onClick={() => setSelectedFile(null)}
+                        sx={{ p: 0.3 }}
+                      >
+                        ✕
+                      </IconButton>
+                    </Box>
+                  ) : null,
+
                   readOnly: true,
                 }}
               />
+
+              {/* HELPER TEXT */}
+              <Typography
+                variant="caption"
+                sx={{ mt: 0.5, display: "block", color: "text.secondary" }}
+              >
+                All formats accepted. Max file size 25 MB
+              </Typography>
             </Box>
 
             <Stack direction="row" justifyContent="flex-end" spacing={2} pt={1}>

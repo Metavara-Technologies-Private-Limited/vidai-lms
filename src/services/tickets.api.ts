@@ -40,7 +40,17 @@ export const ticketsApi = {
       },
     });
     // Defensive check for Django Rest Framework pagination
-    return response.data?.results || response.data || [];
+    const tickets = response.data?.results || response.data || [];
+    console.log(
+      "Tickets API response with assigned_to_name:",
+      (tickets as TicketListItem[]).map((t) => ({
+        id: t.id,
+        ticket_no: t.ticket_no,
+        assigned_to_id: t.assigned_to_id,
+        assigned_to_name: t.assigned_to_name,
+      })),
+    );
+    return tickets;
   },
 
   createTicket: async (data: CreateTicketRequest): Promise<TicketDetail> => {
@@ -57,15 +67,19 @@ export const ticketsApi = {
     return response.data;
   },
 
-  updateTicket: async (
-    ticketId: string,
-    data: UpdateTicketRequest,
-  ): Promise<TicketDetail> => {
-    const response = await apiClient.put(`/tickets/${ticketId}/update/`, data, {
+updateTicket: async (
+  ticketId: string,
+  data: UpdateTicketRequest,
+): Promise<TicketDetail> => {
+  const response = await apiClient.put(
+    `/tickets/${ticketId}/update/`,
+    data,
+    {
       params: { clinic_id: storedClinicId() },
-    });
-    return response.data;
-  },
+    }
+  );
+  return response.data;
+},
 
   assignTicket: async (
     ticketId: string,
@@ -98,7 +112,7 @@ export const ticketsApi = {
     return response.data;
   },
 
-  uploadDocument: async (ticketId: string, file: File): Promise<unknown> => {
+  uploadDocument: async (ticketId: string, file: File): Promise<TicketDetail> => {
     const formData = new FormData();
     formData.append("file", file);
     const response = await apiClient.post(
@@ -106,6 +120,19 @@ export const ticketsApi = {
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
+        params: { clinic_id: storedClinicId() },
+      },
+    );
+    return response.data;
+  },
+
+  deleteDocument: async (
+    ticketId: string,
+    documentId: string,
+  ): Promise<TicketDetail> => {
+    const response = await apiClient.delete(
+      `/tickets/${ticketId}/documents/${documentId}/`,
+      {
         params: { clinic_id: storedClinicId() },
       },
     );
@@ -135,8 +162,10 @@ export const ticketsApi = {
 };
 
 export const labsApi = {
-  getLabs: async (): Promise<Lab[]> => {
-    const response = await apiClient.get("/labs/");
+  getLabs: async (clinicId: number): Promise<Lab[]> => {
+    const response = await apiClient.get("/labs/", {
+      params: { clinic_id: clinicId },
+    });
     // Always return the results array if it exists (for paginated endpoints)
     return response.data?.results || response.data || [];
   },
