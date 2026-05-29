@@ -2,6 +2,9 @@ import * as React from "react";
 import {
   Box,
   Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   TextField,
   Typography,
   MenuItem,
@@ -20,6 +23,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
@@ -904,6 +908,31 @@ export function Step2({
   interestOptions,
   interestOptionsLoading = false,
 }: Step2Props) {
+  const [previewFile, setPreviewFile] = React.useState<{
+    url: string;
+    name: string;
+    type: string;
+  } | null>(null);
+
+  const openPendingFile = (file: File) => {
+    const fileUrl = URL.createObjectURL(file);
+    setPreviewFile((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return {
+        url: fileUrl,
+        name: file.name,
+        type: file.type || "",
+      };
+    });
+  };
+
+  const closePreview = () => {
+    setPreviewFile((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
+
   const sectionHeading = IS_MEDICAL_APP ? "TREATMENT INFORMATION" : "PRODUCT INFORMATION";
   const interestLabel = ACTIVE_FLOW_COPY.treatmentLabel;
 
@@ -1132,6 +1161,30 @@ export function Step2({
                     {ext} · {(file.size / 1024).toFixed(0)} KB
                   </Typography>
                 </Box>
+                <Tooltip title="View">
+                  <IconButton
+                    size="medium"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPendingFile(file);
+                    }}
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      border: "1px solid #CBD5E1",
+                      borderRadius: "8px",
+                      bgcolor: "#FFFFFF",
+                      color: "#0F172A",
+                      "&:hover": {
+                        bgcolor: "#F8FAFC",
+                        borderColor: "#94A3B8",
+                        color: "#020617",
+                      },
+                    }}
+                  >
+                    <VisibilityOutlinedIcon fontSize="medium" />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Remove">
                   <IconButton
                     size="small"
@@ -1149,6 +1202,82 @@ export function Step2({
           })}
         </Stack>
       )}
+
+      <Dialog
+        open={Boolean(previewFile)}
+        onClose={closePreview}
+        fullWidth
+        maxWidth="lg"
+      >
+        <DialogTitle
+          sx={{
+            pr: 6,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Typography
+            variant="subtitle1"
+            sx={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "100%",
+            }}
+          >
+            {previewFile?.name ?? "File preview"}
+          </Typography>
+          <IconButton
+            onClick={closePreview}
+            sx={{ color: "#64748B", "&:hover": { color: "#334155" } }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0, minHeight: "70vh" }}>
+          {previewFile &&
+          (previewFile.type.startsWith("image/") ||
+            /\.(png|jpe?g|webp|gif)$/i.test(previewFile.name)) ? (
+            <Box
+              component="img"
+              src={previewFile.url}
+              alt={previewFile.name}
+              sx={{
+                width: "100%",
+                maxHeight: "70vh",
+                objectFit: "contain",
+                bgcolor: "#F8FAFC",
+              }}
+            />
+          ) : previewFile &&
+            (previewFile.type === "application/pdf" ||
+              /\.pdf$/i.test(previewFile.name)) ? (
+            <Box
+              component="iframe"
+              src={previewFile.url}
+              title={previewFile.name}
+              sx={{ width: "100%", height: "70vh", border: 0 }}
+            />
+          ) : (
+            <Box
+              sx={{
+                height: "70vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 1,
+                p: 3,
+              }}
+            >
+              <Typography color="text.secondary">
+                Preview is not supported for this file type.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

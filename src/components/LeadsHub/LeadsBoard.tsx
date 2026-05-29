@@ -1918,27 +1918,6 @@ const LeadsBoard: React.FC<Props> = ({
       </Alert>
     );
 
-  if (leads.length === 0)
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-        }}
-      >
-        <Stack alignItems="center" spacing={2}>
-          <Typography variant="h6" color="text.secondary">
-            No leads found
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Create your first lead to get started
-          </Typography>
-        </Stack>
-      </Box>
-    );
-
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box
