@@ -98,10 +98,26 @@ const refreshAccessToken = async (): Promise<string | null> => {
   }
 
   try {
-    const response = await axios.post(`${API_BASE_URL}/token/refresh/`, {
-      refresh: refreshToken,
-      refresh_token: refreshToken,
-    });
+    const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+    let response;
+    try {
+      response = await axios.post(`${baseUrl}/token/refresh/`, {
+        refresh: refreshToken,
+        refresh_token: refreshToken,
+      });
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        // Fallback: try without /api prefix in case base URL already includes full path
+        response = await axios.post(`${baseUrl}/api/token/refresh/`, {
+          refresh: refreshToken,
+          refresh_token: refreshToken,
+        });
+      } else {
+        console.error("[Token Refresh] Failed with status:", err?.response?.status, err?.message);
+        throw err;
+      }
+    }
+
 
     const nextToken =
       response.data?.data?.access_token ||
