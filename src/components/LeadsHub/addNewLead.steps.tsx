@@ -2,6 +2,8 @@ import * as React from "react";
 import {
   Box,
   Button,
+  Dialog,
+  DialogContent,
   TextField,
   Typography,
   MenuItem,
@@ -20,6 +22,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
@@ -62,8 +65,7 @@ const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =
     `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
-  const secondary = option.role || option.designation;
-  return secondary ? `${primary} (${secondary})` : primary;
+  return primary;
 };
 
 // ── Capitalize first letter of each word ─────────────────────────────────────
@@ -620,11 +622,6 @@ export function Step1({
                   <Typography variant="body2" fontWeight={600}>
                     {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() || option.username}
                   </Typography>
-                  {(option.role || option.designation) && (
-                    <Typography variant="caption" color="text.secondary">
-                      {option.role || option.designation}
-                    </Typography>
-                  )}
                 </Box>
               </li>
             )}
@@ -676,9 +673,6 @@ export function Step1({
                     <Typography variant="body2" fontWeight={600}>
                       {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() || option.username || `User ${option.id}`}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {[option.role || option.designation, option.email].filter(Boolean).join(" · ")}
-                    </Typography>
                   </Box>
                 </li>
               )}
@@ -708,8 +702,6 @@ export function Step1({
                   [
                     ["FIRST NAME", selectedLeadGeneratedBy.first_name],
                     ["LAST NAME", selectedLeadGeneratedBy.last_name],
-                    ["ROLE", selectedLeadGeneratedBy.role],
-                    ["EMAIL", selectedLeadGeneratedBy.email],
                   ] as [string, string | undefined][]
                 ).map(([fieldLabel, fieldValue]) => (
                   <Box key={fieldLabel}>
@@ -719,7 +711,7 @@ export function Step1({
                     <Typography
                       sx={{
                         fontSize: "0.8rem", fontWeight: 500,
-                        color: fieldLabel === "EMAIL" ? "#6366F1" : "#1E293B",
+                        color: "#1E293B",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}
                     >
@@ -913,6 +905,20 @@ export function Step2({
   interestOptions,
   interestOptionsLoading = false,
 }: Step2Props) {
+  const [previewFileUrl, setPreviewFileUrl] = React.useState<string | null>(null);
+
+  const openPendingFile = (file: File) => {
+    const fileUrl = URL.createObjectURL(file);
+    setPreviewFileUrl(fileUrl);
+  };
+
+  const closePreview = () => {
+    setPreviewFileUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
+
   const sectionHeading = IS_MEDICAL_APP ? "TREATMENT INFORMATION" : "PRODUCT INFORMATION";
   const interestLabel = ACTIVE_FLOW_COPY.treatmentLabel;
 
@@ -1141,6 +1147,18 @@ export function Step2({
                     {ext} · {(file.size / 1024).toFixed(0)} KB
                   </Typography>
                 </Box>
+                <Tooltip title="View">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPendingFile(file);
+                    }}
+                    sx={{ color: "#64748B", "&:hover": { color: "#334155" } }}
+                  >
+                    <VisibilityOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Remove">
                   <IconButton
                     size="small"
@@ -1158,6 +1176,34 @@ export function Step2({
           })}
         </Stack>
       )}
+
+      <Dialog open={Boolean(previewFileUrl)} onClose={closePreview} maxWidth="lg" fullWidth>
+        <DialogContent sx={{ p: 0, position: "relative", minHeight: "70vh" }}>
+          <IconButton
+            onClick={closePreview}
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              zIndex: 2,
+              bgcolor: "rgba(15,23,42,0.7)",
+              color: "#FFFFFF",
+              "&:hover": { bgcolor: "rgba(15,23,42,0.85)" },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+
+          {previewFileUrl && (
+            <Box
+              component="iframe"
+              src={previewFileUrl}
+              title="File preview"
+              sx={{ width: "100%", height: "70vh", border: 0 }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }
@@ -1340,11 +1386,6 @@ export function Step3({
                         {`${option.first_name ?? ""} ${option.last_name ?? ""}`.trim() ||
                           option.username}
                       </Typography>
-                      {(option.role || option.designation) && (
-                        <Typography variant="caption" color="text.secondary">
-                          {option.role || option.designation}
-                        </Typography>
-                      )}
                     </Box>
                   </li>
                 )}
