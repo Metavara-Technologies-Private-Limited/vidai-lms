@@ -431,8 +431,7 @@ export default function EditLead() {
     const fullNameStr =
       `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
     const primary = fullNameStr || option.username || `User ${option.id}`;
-    const secondary = option.role || option.designation;
-    return secondary ? `${primary} (${secondary})` : primary;
+    return primary;
   };
 
   return (

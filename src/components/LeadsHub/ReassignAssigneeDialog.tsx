@@ -78,7 +78,7 @@ const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =
     `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
-  return option.role ? `${primary} (${option.role})` : primary;
+  return primary;
 };
 
 const getSelectedAssigneeName = (

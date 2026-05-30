@@ -19,6 +19,7 @@ import { useState, useEffect } from "react";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -308,6 +309,11 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
 
     if (!dueDate) {
       toast.warn("Please select Due Date!");
+      return;
+    }
+
+    if (dueDate.startOf("day").isBefore(dayjs().startOf("day"))) {
+      toast.warn("Past due dates are not allowed. Please select today or a future date.");
       return;
     }
 
@@ -734,6 +740,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                   label="Due Date"
                   value={dueDate}
                   onChange={(v) => setDueDate(v as Dayjs | null)}
+                  minDate={dayjs().startOf("day")}
                   disabled={loading}
                   slotProps={{
                     textField: {
