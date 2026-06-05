@@ -753,8 +753,10 @@ const UsersPage: React.FC = () => {
               onToggleUserStatus={handleToggleUserStatus}
               onNewUser={handleOpenNewUser}
               onEditUser={handleEditUser}
+              onDeleteUser={handleDeleteUser}
               canAddUsers={canAddUsers}
               canEditUsers={canEditUsers}
+              canDeleteUsers={canDeleteUsers}
               canViewUsers={canViewUsers}
               pinnedUserId={pinnedUserId}
             />
@@ -769,8 +771,6 @@ const UsersPage: React.FC = () => {
               disableRoleSelection={!canAssignRoles}
               onSave={handleSaveUser}
               onCancel={handleCancelDetails}
-              onDelete={editingUser ? () => handleDeleteUser(editingUser.id) : undefined}
-              canDeleteUser={canDeleteUsers}
               isSubmitting={isSubmitting}
             />
           )}
