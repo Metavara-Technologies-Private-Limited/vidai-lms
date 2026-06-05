@@ -17,6 +17,7 @@ import {
   CircularProgress,
   IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -205,6 +206,7 @@ const SalesPipeLineData = ({
   zoomPercent = 100,
 }: SalesPipeLineDataProps) => {
   const theme = useTheme();
+  const addStageTooltip = "You do not have permission to create stages.";
   const dispatch = useDispatch<AppDispatch>();
   const leads = useSelector(selectLeads) as ApiLead[];
   const leadsLoading = useSelector(selectLeadsLoading);
@@ -803,45 +805,52 @@ const SalesPipeLineData = ({
             },
           )}
 
-          <Box
-            onClick={handleAddStageClick}
-            sx={{
-              flexShrink: 0,
-              width: 176,
-              height: 188,
-              borderRadius: 2,
-              border: `1px dashed ${theme.palette.grey[300]}`,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 1,
-              backgroundColor: alpha(theme.palette.background.paper, 0.58),
-              cursor: canEditPipeline ? "pointer" : "not-allowed",
-              opacity: canEditPipeline ? 1 : 0.65,
-              scrollSnapAlign: "start",
-            }}
+          <Tooltip
+            title={!canEditPipeline ? addStageTooltip : ""}
+            disableHoverListener={canEditPipeline}
+            disableFocusListener={canEditPipeline}
+            disableTouchListener={canEditPipeline}
           >
             <Box
+              onClick={handleAddStageClick}
               sx={{
-                width: 30,
-                height: 30,
-                borderRadius: 1,
+                flexShrink: 0,
+                width: 176,
+                height: 188,
+                borderRadius: 2,
+                border: `1px dashed ${theme.palette.grey[300]}`,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: "#2F2F2F",
-                color: "#FFFFFF",
+                gap: 1,
+                backgroundColor: alpha(theme.palette.background.paper, 0.58),
+                cursor: canEditPipeline ? "pointer" : "not-allowed",
+                opacity: canEditPipeline ? 1 : 0.65,
+                scrollSnapAlign: "start",
               }}
             >
-              <AddBoxOutlinedIcon sx={{ fontSize: 17 }} />
+              <Box
+                sx={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "#2F2F2F",
+                  color: "#FFFFFF",
+                }}
+              >
+                <AddBoxOutlinedIcon sx={{ fontSize: 17 }} />
+              </Box>
+              <Typography
+                sx={{ fontSize: 18, fontWeight: 700, textAlign: "center" }}
+              >
+                Add New Stage
+              </Typography>
             </Box>
-            <Typography
-              sx={{ fontSize: 18, fontWeight: 700, textAlign: "center" }}
-            >
-              Add New Stage
-            </Typography>
-          </Box>
+          </Tooltip>
         </Box>
       </Box>
 

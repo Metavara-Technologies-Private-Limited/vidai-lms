@@ -826,13 +826,22 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
   const toggleAllUsersSelection = (roleName: RoleName, checked: boolean) => {
     if (!canManageUserRights) return;
+    const roleIndex = roles.findIndex((role) => role.name === roleName);
+    const roleUsers = roleUsersMap[roleName] ?? [];
+
     setSelectedUserIdsByRole((prev) => {
-      const users = roleUsersMap[roleName] ?? [];
       return {
         ...prev,
-        [roleName]: checked ? new Set(users.map((u) => u.id)) : new Set<number>(),
+        [roleName]: checked
+          ? new Set(roleUsers.map((u) => u.id))
+          : new Set<number>(),
       };
     });
+
+    // Keep Select All aligned with role-level behavior (same as clicking role row).
+    if (roleIndex >= 0) {
+      selectRole(roleIndex);
+    }
   };
 
   return (
@@ -982,7 +991,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
                           >
                             <Checkbox
                               size="small"
-                              checked={focusedUser?.id === user.id}
+                              checked={selectedIds.has(user.id)}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedUserIdsByRole((prev) => ({

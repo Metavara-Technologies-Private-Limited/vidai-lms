@@ -645,7 +645,17 @@ export const usersApi = {
 
   remove: async (userId: number): Promise<void> => {
     ensureAuthToken();
-    await http.delete(`/users/${userId}/delete/`);
+    try {
+      await http.delete(`/users/${userId}/delete/`);
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === 404) {
+        return;
+      }
+
+      throw error;
+    }
   },
 
   getIndividualPermissions: async (userId: number): Promise<UserPermissionRecord[]> => {
