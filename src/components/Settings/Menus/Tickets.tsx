@@ -8,6 +8,7 @@ import {
   Stack,
   Tab,
   Tabs,
+  Tooltip,
   Typography,
   Avatar,
   CircularProgress,
@@ -96,6 +97,8 @@ const Tickets = () => {
   const canAddTickets =
     isSuperAdmin ||
     hasSubcategoryActionPermission(permissions, "tickets", "add");
+  const createTicketTooltip =
+    "You do not have permission to create tickets.";
   const hasTicketView403 =
     typeof error === "string" &&
     (error.includes("403") ||
@@ -318,16 +321,25 @@ const Tickets = () => {
             <Box component="img" src={Filter_Leads} />
           </IconButton>
 
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            className="mobile-add-button"
-            sx={createTicketButtonSx}
-            disabled={!canAddTickets}
-            onClick={() => setOpenCreate(true)}
+          <Tooltip
+            title={!canAddTickets ? createTicketTooltip : ""}
+            disableHoverListener={canAddTickets}
+            disableFocusListener={canAddTickets}
+            disableTouchListener={canAddTickets}
           >
-            <span className="mobile-add-button-label">Create New</span>
-          </Button>
+            <span>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                className="mobile-add-button"
+                sx={createTicketButtonSx}
+                disabled={!canAddTickets}
+                onClick={() => setOpenCreate(true)}
+              >
+                <span className="mobile-add-button-label">Create New</span>
+              </Button>
+            </span>
+          </Tooltip>
         </Stack>
       </Stack>
 

@@ -24,6 +24,8 @@ import {
 } from "../../../services/users.api";
 import { selectLoginType, selectUser, setUser } from "../../../store/authSlice";
 import { fetchUsers } from "../../../store/userSlice";
+import { fetchLeads } from "../../../store/leadSlice";
+import { fetchTickets } from "../../../store/ticketSlice";
 import { toSafePhotoUrl } from "../../../utils/mediaUrl";
 import { hasAnySubcategoryActionPermission, resolveUserRole } from "../../../utils/roleAccess";
 import type { AppDispatch, RootState } from "../../../store";
@@ -31,8 +33,6 @@ import type { AppDispatch, RootState } from "../../../store";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabKey = "details" | "rights";
 type DetailsView = "list" | "form";
-
-const EDIT_PASSWORD_PLACEHOLDER = "********";
 
 const FALLBACK_ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "1", label: "Super Admin" },
@@ -117,6 +117,7 @@ const UsersPage: React.FC = () => {
   const canEditUsers =
     isSuperAdmin ||
     hasAnySubcategoryActionPermission(usersPermissions, userAliases, "edit");
+  const canDeleteUsers = isSuperAdmin;
 
   const extractApiErrorMessage = (error: unknown): string => {
     const payload =
@@ -390,8 +391,8 @@ const UsersPage: React.FC = () => {
       mobileNo:
         profile.mobile_no || record.mobile_no || record.mobileNumber || "",
       emailId: record.email || "",
-      password: EDIT_PASSWORD_PLACEHOLDER,
-      confirmPassword: EDIT_PASSWORD_PLACEHOLDER,
+      password: "",
+      confirmPassword: "",
       profilePhoto: toSafePhotoUrl(profile.photo || record.photo) ?? null,
       profilePhotoFile: null,
       removeProfilePhoto: false,
@@ -415,11 +416,10 @@ const UsersPage: React.FC = () => {
         ? Number(data.userRole)
         : undefined,
     mobile_no: data.mobileNo.trim() || undefined,
-    ...(data.password.trim() && data.password !== EDIT_PASSWORD_PLACEHOLDER
+    ...(data.password.trim()
       ? { password: data.password.trim() }
       : {}),
-    ...(data.confirmPassword.trim() &&
-    data.confirmPassword !== EDIT_PASSWORD_PLACEHOLDER
+    ...(data.confirmPassword.trim()
       ? { confirm_password: data.confirmPassword.trim() }
       : {}),
     ...(data.profilePhotoFile ? { photo: data.profilePhotoFile } : {}),
@@ -512,6 +512,8 @@ const UsersPage: React.FC = () => {
         // );
         // const patchedUser = { ...updatedUser, role: roleName };
         dispatch(fetchUsers());
+        dispatch(fetchLeads());
+        dispatch(fetchTickets());
         setPinnedUserId(updatedUser.id);
 
         const authRecord = authUser as Record<string, unknown> | null;
@@ -650,6 +652,35 @@ const UsersPage: React.FC = () => {
     }
   };
 
+  const handleDeleteUser = async (userId: number) => {
+    if (!canDeleteUsers) {
+      toast.error("You do not have permission to delete users");
+      return;
+    }
+
+    const targetUser = users.find((user) => user.id === userId);
+    if (!targetUser) {
+      return;
+    }
+
+    if (targetUser.source === "client") {
+      toast.error("Client DB users are read-only in this app");
+      return;
+    }
+
+    try {
+      await usersApi.remove(userId);
+      toast.success("User deleted successfully");
+      dispatch(fetchUsers());
+      setEditingUser(null);
+      setDetailsView("list");
+      setActiveTab("details");
+    } catch (error) {
+      console.error("Failed to delete user", error);
+      toast.error("Failed to delete user");
+    }
+  };
+
   const handleCancelDetails = () => {
     setEditingUser(null);
     setDetailsView("list");
@@ -738,6 +769,8 @@ const UsersPage: React.FC = () => {
               disableRoleSelection={!canAssignRoles}
               onSave={handleSaveUser}
               onCancel={handleCancelDetails}
+              onDelete={editingUser ? () => handleDeleteUser(editingUser.id) : undefined}
+              canDeleteUser={canDeleteUsers}
               isSubmitting={isSubmitting}
             />
           )}
