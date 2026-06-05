@@ -7,6 +7,7 @@ import {
   IconButton,
   Button,
   CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -374,6 +375,7 @@ const Leads: React.FC = () => {
   const canEditLeads =
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
+  const addLeadTooltip = "You do not have permission to create leads.";
 
   React.useEffect(() => {
     if (canViewLeads) return;
@@ -1269,24 +1271,33 @@ const Leads: React.FC = () => {
           </React.Suspense>
 
           {/* Add New Lead */}
-          <Button
-            className="add-lead-btn"
-            onClick={() => {
-              localStorage.setItem(
-                STORAGE_KEY_SELECTED_INDUSTRY,
-                selectedIndustry,
-              );
-              navigate("/leads/add");
-            }}
-            disabled={!canAddLeads}
-            sx={{
-              flexShrink: 0,
-              width: { xs: "100%", sm: "auto" },
-              ml: { xs: 0, sm: "auto", lg: 0 },
-            }}
+          <Tooltip
+            title={!canAddLeads ? addLeadTooltip : ""}
+            disableHoverListener={canAddLeads}
+            disableFocusListener={canAddLeads}
+            disableTouchListener={canAddLeads}
           >
-            + Add New Lead
-          </Button>
+            <span>
+              <Button
+                className="add-lead-btn"
+                onClick={() => {
+                  localStorage.setItem(
+                    STORAGE_KEY_SELECTED_INDUSTRY,
+                    selectedIndustry,
+                  );
+                  navigate("/leads/add");
+                }}
+                disabled={!canAddLeads}
+                sx={{
+                  flexShrink: 0,
+                  width: { xs: "100%", sm: "auto" },
+                  ml: { xs: 0, sm: "auto", lg: 0 },
+                }}
+              >
+                + Add New Lead
+              </Button>
+            </span>
+          </Tooltip>
         </Stack>
       </Stack>
 

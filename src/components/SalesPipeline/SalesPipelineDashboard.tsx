@@ -7,6 +7,7 @@ import {
 	IconButton,
 	Paper,
 	Stack,
+	Tooltip,
 	Typography,
 	CircularProgress,
 } from "@mui/material";
@@ -72,6 +73,7 @@ const SalesPipelineDashboard = () => {
 		role === "super_admin" ||
 		hasAnySubcategoryActionPermission(permissions, pipelineAliases, "add") ||
 		hasAnySubcategoryActionPermission(permissions, pipelineAliases, "edit");
+	const createPipelineTooltip = "You do not have permission to create pipeline.";
 	const pipelines = useSelector(selectPipelines);
 	const selectedPipeline = useSelector(selectSelectedPipeline);
 	const pipelineLoading = useSelector(selectPipelineLoading);
@@ -877,22 +879,31 @@ const SalesPipelineDashboard = () => {
                   Create a new pipeline or Select a pipeline to see the stages
                   from left sidebar.
                 </Typography>
-                <Button
-                  startIcon={<AddIcon fontSize="small" />}
-                  className="mobile-add-button"
-                  variant="outlined"
-                  onClick={handleOpenCreatePipeline}
-                  disabled={!canEditPipeline}
-                  sx={{
-                    mt: 1.5,
-                    borderRadius: 2,
-                    fontWeight: 700,
-                  }}
-                >
-                  <span className="mobile-add-button-label">
-                    Create New Pipeline
-                  </span>
-                </Button>
+				<Tooltip
+					title={!canEditPipeline ? createPipelineTooltip : ""}
+					disableHoverListener={canEditPipeline}
+					disableFocusListener={canEditPipeline}
+					disableTouchListener={canEditPipeline}
+				>
+					<span>
+						<Button
+							startIcon={<AddIcon fontSize="small" />}
+							className="mobile-add-button"
+							variant="outlined"
+							onClick={handleOpenCreatePipeline}
+							disabled={!canEditPipeline}
+							sx={{
+								mt: 1.5,
+								borderRadius: 2,
+								fontWeight: 700,
+							}}
+						>
+							<span className="mobile-add-button-label">
+								Create New Pipeline
+							</span>
+						</Button>
+					</span>
+				</Tooltip>
               </Box>
             )}
           </Box>

@@ -8,6 +8,7 @@ import {
   IconButton,
   Tabs,
   Tab,
+  Tooltip,
 } from "@mui/material";
 import { Search, Add } from "@mui/icons-material";
 import styles from "../../../styles/Template/TemplateHeader.module.css";
@@ -103,18 +104,24 @@ export const TemplateHeader: React.FC<TemplateHeaderProps> = ({
             useCaseOptions={useCaseOptions}
           />
 
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            className={`${styles.newTemplateBtn} mobile-add-button`}
-            onClick={onNewTemplate}
-            disabled={!canAddTemplate}
-            title={
-              !canAddTemplate ? "No permission to add templates" : undefined
-            }
+          <Tooltip
+            title={!canAddTemplate ? "You do not have permission to create templates." : ""}
+            disableHoverListener={canAddTemplate}
+            disableFocusListener={canAddTemplate}
+            disableTouchListener={canAddTemplate}
           >
-            <span className="mobile-add-button-label">New Template</span>
-          </Button>
+            <span>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                className={`${styles.newTemplateBtn} mobile-add-button`}
+                onClick={onNewTemplate}
+                disabled={!canAddTemplate}
+              >
+                <span className="mobile-add-button-label">New Template</span>
+              </Button>
+            </span>
+          </Tooltip>
         </Box>
       </Box>
 
