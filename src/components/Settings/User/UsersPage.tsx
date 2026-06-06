@@ -3,6 +3,12 @@ import React, { lazy, Suspense, useEffect, useState } from "react";
 import {
   Box,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Button,
+  Typography,
   Tab,
   Tabs,
   useMediaQuery,
@@ -75,6 +81,8 @@ const UsersPage: React.FC = () => {
   // const [users, setUsers] = useState<User[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<RoleRecord[]>([]);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const resolvedRoleOptions =
     roles.length > 0
       ? [...roles]
@@ -652,22 +660,41 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
+  const handleRequestDeleteUser = (userId: number) => {
+    setDeleteTargetId(userId);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    if (isDeleting) return;
+    setDeleteTargetId(null);
+  };
+
+  const handleConfirmDeleteUser = async () => {
+    if (deleteTargetId == null || isDeleting) {
+      return;
+    }
+
+    const userId = deleteTargetId;
+
     if (!canDeleteUsers) {
       toast.error("You do not have permission to delete users");
+      setDeleteTargetId(null);
       return;
     }
 
     const targetUser = users.find((user) => user.id === userId);
     if (!targetUser) {
+      setDeleteTargetId(null);
       return;
     }
 
     if (targetUser.source === "client") {
       toast.error("Client DB users are read-only in this app");
+      setDeleteTargetId(null);
       return;
     }
 
+    setIsDeleting(true);
     try {
       await usersApi.remove(userId);
       toast.success("User deleted successfully");
@@ -675,9 +702,12 @@ const UsersPage: React.FC = () => {
       setEditingUser(null);
       setDetailsView("list");
       setActiveTab("details");
+      setDeleteTargetId(null);
     } catch (error) {
       console.error("Failed to delete user", error);
       toast.error("Failed to delete user");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -696,6 +726,11 @@ const UsersPage: React.FC = () => {
     setDetailsView("list");
     setActiveTab("details");
   };
+
+  const deleteTargetUser =
+    deleteTargetId != null
+      ? users.find((user) => user.id === deleteTargetId) ?? null
+      : null;
 
   return (
     <Box
@@ -753,8 +788,10 @@ const UsersPage: React.FC = () => {
               onToggleUserStatus={handleToggleUserStatus}
               onNewUser={handleOpenNewUser}
               onEditUser={handleEditUser}
+              onDeleteUser={handleRequestDeleteUser}
               canAddUsers={canAddUsers}
               canEditUsers={canEditUsers}
+              canDeleteUsers={canDeleteUsers}
               canViewUsers={canViewUsers}
               pinnedUserId={pinnedUserId}
             />
@@ -769,8 +806,6 @@ const UsersPage: React.FC = () => {
               disableRoleSelection={!canAssignRoles}
               onSave={handleSaveUser}
               onCancel={handleCancelDetails}
-              onDelete={editingUser ? () => handleDeleteUser(editingUser.id) : undefined}
-              canDeleteUser={canDeleteUsers}
               isSubmitting={isSubmitting}
             />
           )}
@@ -782,6 +817,40 @@ const UsersPage: React.FC = () => {
           )}
         </Suspense>
       </Box>
+
+      <Dialog
+        open={deleteTargetId != null}
+        onClose={handleCloseDeleteDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+          Delete User?
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 14, color: "#4A4A4A" }}>
+            This action cannot be undone.
+          </Typography>
+          {deleteTargetUser?.username ? (
+            <Typography sx={{ fontSize: 13, color: "#7A7A7A", mt: 1 }}>
+              User: {deleteTargetUser.username}
+            </Typography>
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={handleCloseDeleteDialog} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDeleteUser}
+            disabled={isDeleting}
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
