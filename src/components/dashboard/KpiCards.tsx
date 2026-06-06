@@ -19,7 +19,7 @@ import LostLeadsIcon from "../../assets/icons/LostLeads.svg";
 
 import { kpiCardsStyles } from "../../styles/dashboard/KpiCards.styles";
 import { selectLeads } from "../../store/leadSlice";
-import { selectPipelines } from "../../store/pipelineSlice";
+import { selectPipelines, selectSelectedPipeline } from "../../store/pipelineSlice";
 import type { LiveKpiCounts } from "../../types/dashboard.types";
 import type { Lead } from "../../services/leads.api";
 import {
@@ -113,11 +113,15 @@ const getEquivalentStatusKeys = (statusKey: string): Set<string> => {
 };
 
 const stageMatchesStatusKey = (
-  stageName: string,
+  stage: { stage_name: string; stage_type: string; stage_status: string },
   statusKey: string,
 ): boolean => {
-  const normalizedStage = normalizeStageName(stageName);
-  return getEquivalentStatusKeys(statusKey).has(normalizedStage);
+  const normalizedStatusKeys = getEquivalentStatusKeys(statusKey);
+  const stageKeys = [stage.stage_name, stage.stage_type, stage.stage_status]
+    .map((value) => normalizeStageName(value))
+    .filter(Boolean);
+
+  return stageKeys.some((key) => normalizedStatusKeys.has(key));
 };
 
 interface KpiCardsProps {
@@ -127,11 +131,14 @@ interface KpiCardsProps {
 const KpiCards = ({ timeRange }: KpiCardsProps) => {
   const leads = useSelector(selectLeads);
   const pipelines = useSelector(selectPipelines);
+  const selectedPipeline = useSelector(selectSelectedPipeline);
   const sourceLeads = useMemo<Lead[]>(
     () => (Array.isArray(leads) ? (leads as Lead[]) : []),
     [leads],
   );
   const defaultPipeline = useMemo(() => {
+    if (selectedPipeline) return selectedPipeline;
+
     const backendDefault =
       pipelines.find((pipeline) => pipeline.is_default) ??
       pipelines.find((pipeline) => pipeline.is_active) ??
@@ -149,7 +156,7 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
         (pipeline) => String(pipeline.id) === String(storedDefaultPipelineId),
       ) ?? null
     );
-  }, [pipelines]);
+  }, [pipelines, selectedPipeline]);
   const pipelineStages = useMemo(
     () => {
       if (!defaultPipeline) return [];
@@ -214,7 +221,7 @@ const KpiCards = ({ timeRange }: KpiCardsProps) => {
 
     const sumCountsByStatusKey = (statusKey: string): number =>
       pipelineStages.reduce((total, stage) => {
-        if (!stageMatchesStatusKey(stage.stage_name, statusKey)) return total;
+        if (!stageMatchesStatusKey(stage, statusKey)) return total;
         return total + (stageCounts[stage.id] ?? 0);
       }, 0);
 

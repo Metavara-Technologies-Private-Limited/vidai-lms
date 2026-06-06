@@ -8,6 +8,7 @@ import {
   Pagination,
   PaginationItem,
   Popover,
+  Tooltip,
   Table,
   TableBody,
   TableCell,
@@ -25,6 +26,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { type UserRecord as User } from "../../../../services/users.api";
 import EditUser from "../../../../assets/icons/Edit_User_List.svg";
 
@@ -34,9 +36,11 @@ interface Props {
   onToggleUserStatus: (userId: number) => Promise<void> | void;
   onNewUser: () => void;
   onEditUser?: (user: User) => void;
+  onDeleteUser?: (userId: number) => Promise<void> | void;
   canViewUsers?: boolean;
   canAddUsers?: boolean;
   canEditUsers?: boolean;
+  canDeleteUsers?: boolean;
   pinnedUserId?: number | null;
 }
 
@@ -169,11 +173,18 @@ const UsersList: React.FC<Props> = ({
   onToggleUserStatus,
   onNewUser,
   onEditUser,
+  onDeleteUser,
   canViewUsers = true,
   canAddUsers = true,
   canEditUsers = true,
+  canDeleteUsers = false,
   pinnedUserId,
 }) => {
+  const addPermissionTooltip = "You do not have permission to add users.";
+  const editPermissionTooltip = "You do not have permission to edit users.";
+  const deletePermissionTooltip =
+    "You do not have permission to delete users.";
+
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [columnPickerAnchor, setColumnPickerAnchor] =
@@ -349,28 +360,38 @@ const UsersList: React.FC<Props> = ({
             }}
           />
 
-          <Button
-            variant="contained"
-            onClick={onNewUser}
-            disabled={!canAddUsers}
-            startIcon={<AddCircleOutlineIcon sx={{ fontSize: 16 }} />}
-            className="mobile-add-button"
-            sx={{
-              bgcolor: "#505050",
-              color: "#FFFFFF",
-              textTransform: "none",
-              borderRadius: "6px",
-              px: 2,
-              minWidth: 86,
-              height: 31,
-              fontSize: 13,
-              fontWeight: 600,
-              boxShadow: "none",
-              "&:hover": { bgcolor: "#232323", boxShadow: "none" },
-            }}
+          <Tooltip
+            title={!canAddUsers ? addPermissionTooltip : ""}
+            disableHoverListener={canAddUsers}
+            disableFocusListener={canAddUsers}
+            disableTouchListener={canAddUsers}
+            placement="top"
           >
-            <span className="mobile-add-button-label">New</span>
-          </Button>
+            <span>
+              <Button
+                variant="contained"
+                onClick={onNewUser}
+                disabled={!canAddUsers}
+                startIcon={<AddCircleOutlineIcon sx={{ fontSize: 16 }} />}
+                className="mobile-add-button"
+                sx={{
+                  bgcolor: "#505050",
+                  color: "#FFFFFF",
+                  textTransform: "none",
+                  borderRadius: "6px",
+                  px: 2,
+                  minWidth: 86,
+                  height: 31,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  boxShadow: "none",
+                  "&:hover": { bgcolor: "#232323", boxShadow: "none" },
+                }}
+              >
+                <span className="mobile-add-button-label">New</span>
+              </Button>
+            </span>
+          </Tooltip>
         </Box>
       </Box>
 
@@ -458,7 +479,7 @@ const UsersList: React.FC<Props> = ({
               <TableCell sx={{ ...headerCellSx, minWidth: 90 }}>
                 Status
               </TableCell>
-              <TableCell sx={{ ...headerCellSx, minWidth: 48 }} align="right">
+              <TableCell sx={{ ...headerCellSx, minWidth: 88 }} align="right">
                 <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                   <IconButton
                     onClick={handleOpenColumnPicker}
@@ -494,27 +515,79 @@ const UsersList: React.FC<Props> = ({
                   </TableCell>
                 ))}
                 <TableCell sx={{ ...bodyCellSx, minWidth: 90 }}>
-                  <Checkbox
-                    checked={user.status}
-                    onChange={() => onToggleUserStatus(user.id)}
-                    disabled={isLoading || !canEditUsers}
-                    icon={checkboxIcon}
-                    checkedIcon={checkedCheckboxIcon}
-                    sx={checkboxSx}
-                    inputProps={{
-                      "aria-label": `Toggle status for ${user.username}`,
-                    }}
-                  />
-                </TableCell>
-                <TableCell sx={{ ...bodyCellSx, minWidth: 48 }} align="right">
-                  {canEditUsers ? (
-                    <Button
-                      onClick={() => onEditUser?.(user)}
-                      sx={{ minWidth: "auto", p: 0 }}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Checkbox
+                      checked={user.status}
+                      onChange={() => onToggleUserStatus(user.id)}
+                      disabled={isLoading || !canEditUsers}
+                      icon={checkboxIcon}
+                      checkedIcon={checkedCheckboxIcon}
+                      sx={checkboxSx}
+                      inputProps={{
+                        "aria-label": `Toggle status for ${user.username}`,
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: user.status ? "#3F7D4A" : "#8A8A8A",
+                      }}
                     >
-                      <EditActionIcon />
-                    </Button>
-                  ) : null}
+                      {user.status ? "Active" : "Inactive"}
+                    </Typography>
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ ...bodyCellSx, minWidth: 88 }} align="right">
+                  <Box
+                    sx={{ display: "flex", justifyContent: "flex-end", gap: 0.6 }}
+                  >
+                    <Tooltip
+                      title={!canEditUsers ? editPermissionTooltip : ""}
+                      disableHoverListener={canEditUsers}
+                      disableFocusListener={canEditUsers}
+                      disableTouchListener={canEditUsers}
+                      placement="top"
+                    >
+                      <span>
+                        <Button
+                          onClick={() => onEditUser?.(user)}
+                          disabled={!canEditUsers}
+                          sx={{
+                            minWidth: "auto",
+                            p: 0,
+                            opacity: canEditUsers ? 1 : 0.45,
+                          }}
+                        >
+                          <EditActionIcon />
+                        </Button>
+                      </span>
+                    </Tooltip>
+
+                    <Tooltip
+                      title={!canDeleteUsers ? deletePermissionTooltip : ""}
+                      disableHoverListener={canDeleteUsers}
+                      disableFocusListener={canDeleteUsers}
+                      disableTouchListener={canDeleteUsers}
+                      placement="top"
+                    >
+                      <span>
+                        <Button
+                          onClick={() => onDeleteUser?.(user.id)}
+                          disabled={!canDeleteUsers || !onDeleteUser}
+                          sx={{
+                            minWidth: "auto",
+                            p: 0,
+                            color: "#D55252",
+                            opacity: canDeleteUsers ? 1 : 0.45,
+                          }}
+                          aria-label={`Delete ${user.username}`}
+                        >
+                          <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}

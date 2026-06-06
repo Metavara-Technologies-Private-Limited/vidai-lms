@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import type { Lead as ApiLead } from "../../services/leads.api";
-import { selectPipelines } from "../../store/pipelineSlice";
+import { selectPipelines, selectSelectedPipeline } from "../../store/pipelineSlice";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 import type { TimeRange } from "./TimeRangeSelector";
 import { getTimeRangeBounds, isDateWithinBounds } from "./timeRange.utils";
@@ -47,12 +47,19 @@ const LeadPipelineFunnel = ({ timeRange }: LeadPipelineFunnelProps) => {
   const leads = useSelector(selectLeads) as ApiLead[] | undefined;
   const loading = useSelector(selectLeadsLoading);
   const pipelines = useSelector(selectPipelines);
+  const selectedPipeline = useSelector(selectSelectedPipeline);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const sourceLeads = useMemo(() => leads ?? [], [leads]);
   const pipelineStages = useMemo(
-    () => getActivePipelineStages(pipelines),
-    [pipelines],
+    () => {
+      if (selectedPipeline) {
+        return getActivePipelineStages([selectedPipeline]);
+      }
+
+      return getActivePipelineStages(pipelines);
+    },
+    [pipelines, selectedPipeline],
   );
 
   const stages = useMemo<FunnelStage[]>(

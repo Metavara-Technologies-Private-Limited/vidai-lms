@@ -7,6 +7,7 @@ import {
 	IconButton,
 	Paper,
 	Stack,
+	Tooltip,
 	Typography,
 	CircularProgress,
 } from "@mui/material";
@@ -78,6 +79,11 @@ const SalesPipelineDashboard = () => {
 	const pipelineError = useSelector(selectPipelineError);
 	const selectedPipelineId = selectedPipeline?.id ?? null;
 	const canCreatePipeline = canEditPipeline && pipelines.length === 0;
+	const createPipelineTooltip = !canEditPipeline
+		? "Only one pipeline you can create. Please ask admin to give permission."
+		: !canCreatePipeline
+			? "Only one pipeline can be created."
+			: "";
 
 	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 	const [editPipelineData, setEditPipelineData] = useState<{ id: string; pipelineName: string; industry: string } | null>(null);
@@ -878,22 +884,31 @@ const SalesPipelineDashboard = () => {
                   Create a new pipeline or Select a pipeline to see the stages
                   from left sidebar.
                 </Typography>
-                <Button
-                  startIcon={<AddIcon fontSize="small" />}
-                  className="mobile-add-button"
-                  variant="outlined"
-                  onClick={handleOpenCreatePipeline}
-					disabled={!canCreatePipeline}
-                  sx={{
-                    mt: 1.5,
-                    borderRadius: 2,
-                    fontWeight: 700,
-                  }}
-                >
-                  <span className="mobile-add-button-label">
-                    Create New Pipeline
-                  </span>
-                </Button>
+					<Tooltip
+						title={createPipelineTooltip}
+						disableHoverListener={!createPipelineTooltip}
+						disableFocusListener={!createPipelineTooltip}
+						disableTouchListener={!createPipelineTooltip}
+					>
+						<span>
+							<Button
+								startIcon={<AddIcon fontSize="small" />}
+								className="mobile-add-button"
+								variant="outlined"
+								onClick={handleOpenCreatePipeline}
+								disabled={!canCreatePipeline}
+								sx={{
+									mt: 1.5,
+									borderRadius: 2,
+									fontWeight: 700,
+								}}
+							>
+								<span className="mobile-add-button-label">
+									Create New Pipeline
+								</span>
+							</Button>
+						</span>
+					</Tooltip>
               </Box>
             )}
           </Box>

@@ -15,7 +15,9 @@ export const normalizeStageName = (value: unknown): string =>
 
 const equivalentStatuses: Record<string, string[]> = {
   new: ["new"],
+  "new-lead": ["new-lead", "new-leads", "new"],
   contacted: ["contacted"],
+  "follow-up": ["follow-up", "followup", "follow-ups", "follow up"],
   "follow-ups": [
     "follow-ups",
     "follow-up",
@@ -33,11 +35,72 @@ const equivalentStatuses: Record<string, string[]> = {
   negotiation: ["negotiation", "negotiating"],
   "proposal-sent": ["proposal-sent", "proposal"],
   "contract-signed": ["contract-signed", "contractsigned", "contract"],
+  "converted-lead": ["converted-lead", "converted-leads", "converted"],
+  "follow up": ["follow up", "follow-up", "followup", "follow-ups"],
+  "contract signed": ["contract signed", "contract-signed", "contract"],
+  "proposal sent": ["proposal sent", "proposal-sent", "proposal"],
+  closed: ["closed", "lost", "closed-lost"],
 };
 
 const getEquivalentStatusKeys = (statusKey: string): string[] => {
   const normalized = normalizeStageName(statusKey);
   return equivalentStatuses[normalized] ?? [normalized];
+};
+
+const getStageMatchKeys = (stage: PipelineStage): string[] => {
+  const rawKeys = [stage.stage_name, stage.stage_type, stage.stage_status]
+    .map((value) => normalizeStageName(value))
+    .filter(Boolean);
+
+  return Array.from(
+    new Set(rawKeys.flatMap((key) => getEquivalentStatusKeys(key))),
+  );
+};
+
+const getStageStatusKeysForLooseMatch = (stage: PipelineStage): string[] => {
+  const stageName = String(stage.stage_name ?? "").toLowerCase().trim();
+  const byName = getEquivalentStatusKeys(stage.stage_name);
+  const byType = stage.stage_type ? getEquivalentStatusKeys(stage.stage_type) : [];
+  const byStatus = stage.stage_status ? getEquivalentStatusKeys(stage.stage_status) : [];
+  const explicit = [
+    stageName,
+    String(stage.stage_name ?? "").toLowerCase().trim(),
+    String(stage.stage_status ?? "").toLowerCase().trim(),
+    String(stage.stage_type ?? "").toLowerCase().trim(),
+  ];
+
+  return Array.from(
+    new Set(
+      [...byName, ...byType, ...byStatus, ...explicit]
+        .map((item) => String(item ?? "").toLowerCase().trim())
+        .filter(Boolean),
+    ),
+  );
+};
+
+const getLeadCandidateKeys = (lead: Lead): string[] => {
+  const anyLead = lead as Lead & {
+    stage_name?: string;
+    pipeline_stage_name?: string;
+    task_type?: string;
+    task?: string;
+    next_action_description?: string;
+  };
+
+  const candidateValues = [
+    resolveLeadStatusText(lead),
+    anyLead.stage_name,
+    anyLead.pipeline_stage_name,
+    anyLead.task_type,
+    anyLead.task,
+    extractStageFromDescription(anyLead.next_action_description),
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+
+  return Array.from(
+    new Set(candidateValues.flatMap((value) => getEquivalentStatusKeys(value))),
+  );
 };
 
 const resolveActivePipeline = (pipelines: Pipeline[]): Pipeline | null => {
@@ -79,6 +142,42 @@ const resolveLeadStatusText = (lead: Lead): string => {
   );
 };
 
+const getLeadCandidateStatusesForLooseMatch = (lead: Lead): string[] => {
+  const anyLead = lead as Lead & {
+    stage_name?: string;
+    pipeline_stage_name?: string;
+    task_type?: string;
+    task?: string;
+  };
+
+  return [
+    lead.lead_status,
+    typeof lead.status === "string" ? lead.status : "",
+    anyLead.stage_name,
+    anyLead.pipeline_stage_name,
+    anyLead.task_type,
+    anyLead.task,
+    extractStageFromDescription(lead.next_action_description),
+  ]
+    .map((value) => String(value ?? "").toLowerCase().trim())
+    .filter(Boolean);
+};
+
+const doesLeadMatchStage = (lead: Lead, stage: PipelineStage): boolean => {
+  if (
+    lead.stage_id !== null &&
+    lead.stage_id !== undefined &&
+    String(lead.stage_id) === String(stage.id)
+  ) {
+    return true;
+  }
+
+  const stageKeys = getStageStatusKeysForLooseMatch(stage);
+  const leadCandidateStatuses = getLeadCandidateStatusesForLooseMatch(lead);
+
+  return stageKeys.some((key) => leadCandidateStatuses.includes(key));
+};
+
 const extractStageFromDescription = (
   description: string | null | undefined,
 ): string => {
@@ -99,37 +198,12 @@ export const resolveLeadStage = (
     if (matchedById) return matchedById;
   }
 
-  const byName = new Map(
-    stages.map((stage) => [normalizeStageName(stage.stage_name), stage]),
-  );
-  const anyLead = lead as Lead & {
-    stage_name?: string;
-    pipeline_stage_name?: string;
-    task_type?: string;
-    task?: string;
-    next_action_description?: string;
-  };
+  const leadCandidateKeys = new Set(getLeadCandidateKeys(lead));
 
-  const candidateStatuses = [
-    resolveLeadStatusText(lead),
-    anyLead.stage_name,
-    anyLead.pipeline_stage_name,
-    anyLead.task_type,
-    anyLead.task,
-    extractStageFromDescription(anyLead.next_action_description),
-  ]
-    .map((value) => String(value ?? "").trim())
-    .filter(Boolean);
-
-  for (const statusText of candidateStatuses) {
-    const normalizedLeadStatus = normalizeStageName(statusText);
-    const exact = byName.get(normalizedLeadStatus);
-    if (exact) return exact;
-
-    const candidateKeys = getEquivalentStatusKeys(normalizedLeadStatus);
-    for (const candidate of candidateKeys) {
-      const matched = byName.get(candidate);
-      if (matched) return matched;
+  for (const stage of stages) {
+    const stageCandidateKeys = getStageMatchKeys(stage);
+    if (stageCandidateKeys.some((key) => leadCandidateKeys.has(key))) {
+      return stage;
     }
   }
 
@@ -145,11 +219,12 @@ export const buildStageCountMap = (
     stageCounts[stage.id] = 0;
   }
 
-  for (const lead of leads) {
-    if (lead?.is_active === false) continue;
-    const stage = resolveLeadStage(lead, stages);
-    if (!stage) continue;
-    stageCounts[stage.id] = (stageCounts[stage.id] ?? 0) + 1;
+  for (const stage of stages) {
+    for (const lead of leads) {
+      if (lead?.is_active === false) continue;
+      if (!doesLeadMatchStage(lead, stage)) continue;
+      stageCounts[stage.id] = (stageCounts[stage.id] ?? 0) + 1;
+    }
   }
 
   return stageCounts;
