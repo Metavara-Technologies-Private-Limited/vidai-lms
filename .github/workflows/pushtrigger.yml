@@ -1,6 +1,7 @@
 name: VIDAI-LMS Push Trigger
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
