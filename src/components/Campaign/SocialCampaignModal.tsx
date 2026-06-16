@@ -893,10 +893,33 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       );
       return;
     }
-    setAccounts((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setAccounts((prev) => {
+      const newAccounts = prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id];
+
+      // ── FIX: If Google Ads or LinkedIn is selected, force paid mode ──
+      // Organic posting is not supported for Google Ads or LinkedIn.
+      // Reset mode to "" so user must explicitly choose "paid".
+      const requiresPaid =
+        newAccounts.includes("google_ads") ||
+        newAccounts.includes("linkedin");
+      if (requiresPaid && mode === "organic") {
+        setMode("");
+        toast.info(
+          "Organic posting is not available for Google Ads or LinkedIn. Please select Paid Advertising.",
+          { toastId: "organic-not-supported" },
+        );
+      }
+
+      return newAccounts;
+    });
   };
+
+  // ─── Derived: whether organic mode should be locked out ──────────────
+  // True when any selected platform requires paid (Google Ads or LinkedIn).
+  const isOrganicDisabled =
+    accounts.includes("google_ads") || accounts.includes("linkedin");
 
   const handleNext = () => {
     setSubmitted(true);
@@ -1768,10 +1791,67 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
               <p className="section-subtitle">
                 Choose a campaign mode to optimize your ad strategy
               </p>
-              <div className="mode-row">
+
+              {/* ── FIX: Show info banner when organic is disabled ── */}
+              {isOrganicDisabled && (
                 <div
-                  className={`mode-card ${mode === "organic" ? "selected" : ""}`}
-                  onClick={() => setMode("organic")}
+                  style={{
+                    backgroundColor: "#fffbeb",
+                    border: "1px solid #fcd34d",
+                    borderRadius: 6,
+                    padding: "8px 12px",
+                    marginBottom: 12,
+                    fontSize: 13,
+                    color: "#92400e",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 16, lineHeight: 1.4 }}>⚠️</span>
+                  <span>
+                    <strong>Organic posting is not available</strong> for{" "}
+                    {[
+                      accounts.includes("google_ads") && "Google Ads",
+                      accounts.includes("linkedin") && "LinkedIn",
+                    ]
+                      .filter(Boolean)
+                      .join(" and ")}
+                    . These platforms require <strong>Paid Advertising</strong>{" "}
+                    to run campaigns. Please select Paid Advertising below.
+                  </span>
+                </div>
+              )}
+
+              <div className="mode-row">
+                {/* ── Organic Posting card — disabled when Google Ads or LinkedIn selected ── */}
+                <div
+                  className={`mode-card ${mode === "organic" ? "selected" : ""} ${isOrganicDisabled ? "disabled" : ""}`}
+                  onClick={() => {
+                    if (isOrganicDisabled) {
+                      toast.warn(
+                        `Organic posting is not supported for ${[
+                          accounts.includes("google_ads") && "Google Ads",
+                          accounts.includes("linkedin") && "LinkedIn",
+                        ]
+                          .filter(Boolean)
+                          .join(" and ")}. Please use Paid Advertising.`,
+                        { toastId: "organic-disabled-click" },
+                      );
+                      return;
+                    }
+                    setMode("organic");
+                  }}
+                  style={
+                    isOrganicDisabled
+                      ? { opacity: 0.5, cursor: "not-allowed" }
+                      : undefined
+                  }
+                  title={
+                    isOrganicDisabled
+                      ? "Organic posting is not available for Google Ads or LinkedIn."
+                      : undefined
+                  }
                 >
                   <div className="mode-left">
                     <div
@@ -1786,6 +1866,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   </div>
                   <span className="badge">No Budget Required</span>
                 </div>
+
+                {/* ── Paid Advertising card — always enabled ── */}
                 <div
                   className={`mode-card ${mode === "paid" ? "selected" : ""}`}
                   onClick={() => setMode("paid")}
@@ -1802,6 +1884,19 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   <span className="badge outlined">Budget Setup Required</span>
                 </div>
               </div>
+
+              {/* ── FIX: Lock message shown below mode cards when organic is blocked ── */}
+              {isOrganicDisabled && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#b45309",
+                    marginTop: 10,
+                  }}
+                >
+                  Deselect Google Ads and LinkedIn to enable organic posting.
+                </p>
+              )}
             </div>
 
             {/* Google Ads Keywords — paid mode only */}
@@ -1888,8 +1983,8 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                   </h3>
                 </div>
                 <p style={{ fontSize: 13, color: "#166534", margin: 0 }}>
-                  Your campaign content will be saved for Google Ads. No paid ad
-                  will be triggered — no money will be spent. Switch to{" "}
+                  Your campaign content will be saved for Google Ads. No paid
+                  ad will be triggered — no money will be spent. Switch to{" "}
                   <strong>Paid Advertising</strong> mode to run a real Google
                   Ad.
                 </p>
