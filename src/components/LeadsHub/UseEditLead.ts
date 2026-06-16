@@ -1341,9 +1341,28 @@ export function useEditLead() {
         });
 
         // ── Send appointment confirmation email if appointment is booked ──
-        if (wantAppointment === "yes" && appointmentDate && slot) {
-          const recipientEmail = (email || leadData?.email || "").trim();
-          console.log("[EditLead] Appointment email check — recipientEmail:", recipientEmail, "appointmentDate:", appointmentDate, "slot:", slot);
+        console.log("[EditLead Email Debug]", {
+          wantAppointment,
+          appointmentDate,
+          slot,
+          email,
+          leadDataEmail: (leadData as any)?.email,
+        });
+
+        const bookingActive = wantAppointment === "yes";
+        const finalAppointmentDate = appointmentDate || (leadData as any)?.appointment_date || "";
+        const finalSlot = slot || (leadData as any)?.slot || "";
+        const finalEmail = (email || (leadData as any)?.email || "").trim();
+
+        console.log("[EditLead Email Send Check]", {
+          bookingActive,
+          finalAppointmentDate,
+          finalSlot,
+          finalEmail,
+        });
+
+        if (bookingActive && finalAppointmentDate && finalSlot && finalEmail) {
+          const recipientEmail = finalEmail;
           if (recipientEmail) {
             try {
               // using LeadEmailAPI from top-level import
@@ -1361,14 +1380,14 @@ export function useEditLead() {
                 departments.find((d) => d.id.toString() === department)?.name ||
                 "-";
 
-              const subject = `Appointment Updated - ${appointmentDate}`;
+              const subject = `Appointment Updated - ${finalAppointmentDate}`;
               const emailBody = [
                 `Hi ${leadFirstName},`,
                 "",
                 `Your appointment details at ${clinicName} have been updated.`,
                 "",
-                `Date: ${appointmentDate}`,
-                `Time: ${slot}`,
+                `Date: ${finalAppointmentDate}`,
+                `Time: ${finalSlot}`,
                 `Doctor: ${personnelName}`,
                 `Department: ${deptName}`,
                 "",
