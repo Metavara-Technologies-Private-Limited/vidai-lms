@@ -9,7 +9,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
-import { LeadAPI, DepartmentAPI, EmployeeAPI, InterestAPI } from "../../services/leads.api";
+import { LeadAPI, DepartmentAPI, EmployeeAPI, InterestAPI, LeadEmailAPI } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import {
   pipelineApi,
@@ -1342,10 +1342,11 @@ export function useEditLead() {
 
         // ── Send appointment confirmation email if appointment is booked ──
         if (wantAppointment === "yes" && appointmentDate && slot) {
-          const recipientEmail = email.trim();
+          const recipientEmail = (email || leadData?.email || "").trim();
+          console.log("[EditLead] Appointment email check — recipientEmail:", recipientEmail, "appointmentDate:", appointmentDate, "slot:", slot);
           if (recipientEmail) {
             try {
-              const { LeadEmailAPI } = await import("../../services/leads.api");
+              // using LeadEmailAPI from top-level import
               const leadName = fullName.trim() || "Patient";
               const leadFirstName = leadName.split(/\s+/)[0] || "Patient";
               const clinicName = selectedClinic?.name || "Our Clinic";
