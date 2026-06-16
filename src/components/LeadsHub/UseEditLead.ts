@@ -1335,10 +1335,67 @@ export function useEditLead() {
     };
 
     doSave()
-      .then(() => {
+      .then(async () => {
         toast.success("Lead saved successfully!", {
           position: "top-right", autoClose: 1500, theme: "colored",
         });
+
+        // ── Send appointment confirmation email if appointment is booked ──
+        if (wantAppointment === "yes" && appointmentDate && slot) {
+          const recipientEmail = email.trim();
+          if (recipientEmail) {
+            try {
+              const { LeadEmailAPI } = await import("../../services/leads.api");
+              const leadName = fullName.trim() || "Patient";
+              const leadFirstName = leadName.split(/\s+/)[0] || "Patient";
+              const clinicName = selectedClinic?.name || "Our Clinic";
+              const senderEmail =
+                (authUser?.email as string | undefined)?.trim() || undefined;
+              const personnelName = selectedAppointmentPersonnel
+                ? `${selectedAppointmentPersonnel.first_name ?? ""} ${selectedAppointmentPersonnel.last_name ?? ""}`.trim() ||
+                  selectedAppointmentPersonnel.username ||
+                  "-"
+                : "-";
+              const deptName =
+                departments.find((d) => d.id.toString() === department)?.name ||
+                "-";
+
+              const subject = `Appointment Updated - ${appointmentDate}`;
+              const emailBody = [
+                `Hi ${leadFirstName},`,
+                "",
+                `Your appointment details at ${clinicName} have been updated.`,
+                "",
+                `Date: ${appointmentDate}`,
+                `Time: ${slot}`,
+                `Doctor: ${personnelName}`,
+                `Department: ${deptName}`,
+                "",
+                remark ? `Note: ${remark}` : "",
+                "",
+                `If you have any questions, please contact us.`,
+                "",
+                `Thank you,`,
+                `${clinicName} Team`,
+              ]
+                .filter((line) => line !== undefined)
+                .join("\n");
+
+              await LeadEmailAPI.sendNow({
+                lead: String(id),
+                subject,
+                sender_email: senderEmail || null,
+                email_body: emailBody,
+              });
+            } catch {
+              toast.warning(
+                "Lead saved, but appointment email could not be sent.",
+                { position: "top-right", autoClose: 3000, theme: "colored" },
+              );
+            }
+          }
+        }
+
         setTimeout(() => {
           navigate("/leads", { replace: true });
           dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
