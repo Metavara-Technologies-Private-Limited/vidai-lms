@@ -2245,31 +2245,9 @@ export default function LeadDetailView() {
   }, [activeLead]);
 
   const handleAppointmentSaved = React.useCallback(
-    (result: AppointmentResult) => {
+    async (result: AppointmentResult) => {
       setBookApptOpen(false);
-      const mailLeadData = {
-        ...(activeLead ?? {}),
-        book_appointment: true,
-        lead_status: "Appointment",
-        status: "Appointment",
-        appointment_date: result.appointment_date,
-        slot: result.slot,
-        remark: result.remark,
-        personal_name: result.personnelName || activeLead?.personal_name,
-        department_id: result.department_id ?? activeLead?.department_id,
-        department_name: result.departmentName || activeLead?.department_name,
-      } as LeadRecord;
-      void sendLeadSummaryEmail({
-        leadData: mailLeadData,
-        eventType: "appointment",
-        appointmentResult: result,
-        statusLabel: "Appointment",
-      }).catch(() => {
-        toast.warning(
-          "Appointment saved, but confirmation email could not be sent.",
-          toastOptions,
-        );
-      });
+      // ── 1. Update local lead state immediately ─────────────────────────
       setFullLead((prev) => {
         const base = prev ?? activeLead ?? null;
         if (!base) return prev;
@@ -2288,8 +2266,61 @@ export default function LeadDetailView() {
         } as LeadRecord;
       });
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+      // ── 2. Send appointment confirmation email directly ─────────────────
+      const recipientEmail = (
+        activeLead?.email ||
+        fullLead?.email ||
+        ""
+      ).trim();
+      if (recipientEmail) {
+        const leadName = (
+          activeLead?.full_name ||
+          activeLead?.name ||
+          "Patient"
+        ).trim();
+        const leadFirstName = leadName.split(/\s+/)[0] || "Patient";
+        const appointmentDate = result.appointment_date || "-";
+        const appointmentSlot = result.slot || "-";
+        const senderEmail = authedUser?.email as string | undefined;
+        const subject = `Appointment Confirmed - ${appointmentDate}`;
+        const emailBody = [
+          `Hi ${leadFirstName},`,
+          "",
+          `Your appointment with ${clinicName} has been successfully scheduled.`,
+          "",
+          `Date: ${appointmentDate}`,
+          `Time: ${appointmentSlot}`,
+          `Doctor: ${result.personnelName || activeLead?.personal_name || "-"}`,
+          `Department: ${result.departmentName || activeLead?.department_name || "-"}`,
+          "",
+          result.remark ? `Note: ${result.remark}` : "",
+          "",
+          `If you need to reschedule or have any questions, please contact us.`,
+          "",
+          `Thank you,`,
+          `${clinicName} Team`,
+        ]
+          .filter((line) => line !== undefined)
+          .join("\n");
+        try {
+          await LeadEmailAPI.sendNow({
+            lead: String(activeLead!.id),
+            subject,
+            sender_email: senderEmail || null,
+            email_body: emailBody,
+          });
+          toast.success("Appointment confirmation email sent.", toastOptions);
+        } catch {
+          toast.warning(
+            "Appointment saved, but confirmation email could not be sent.",
+            toastOptions,
+          );
+        }
+      } else {
+        toast.success("Appointment booked successfully.", toastOptions);
+      }
     },
-    [activeLead, dispatch, sendLeadSummaryEmail],
+    [activeLead, fullLead, authedUser, clinicName, dispatch],
   );
 
   if (loading && !activeLead)
