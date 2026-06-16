@@ -1341,7 +1341,9 @@ export function useEditLead() {
         });
 
         // ── Send appointment confirmation email if appointment is booked ──
-        const bookingActive = updateData.book_appointment === true;
+        const bookingActive =
+          updateData.book_appointment === true ||
+          isTruthy((leadData as any)?.book_appointment);
         const finalAppointmentDate =
           (updateData.appointment_date as string | undefined) ||
           (leadData as any)?.appointment_date ||
@@ -1354,8 +1356,15 @@ export function useEditLead() {
           (updateData.email as string | undefined) ||
           (leadData as any)?.email ||
           "";
+        const resolvedLeadId = String(id || (leadData as any)?.id || "");
 
-        if (bookingActive && finalAppointmentDate && finalSlot && finalEmail) {
+        if (
+          bookingActive &&
+          finalAppointmentDate &&
+          finalSlot &&
+          finalEmail &&
+          resolvedLeadId
+        ) {
           const recipientEmail = finalEmail.trim();
           if (recipientEmail) {
             try {
@@ -1395,13 +1404,27 @@ export function useEditLead() {
                 .filter((line) => line !== undefined)
                 .join("\n");
 
+              console.log("[EditLead] Sending appointment update email", {
+                resolvedLeadId,
+                recipientEmail,
+                subject,
+                finalAppointmentDate,
+                finalSlot,
+              });
+
               await LeadEmailAPI.sendNow({
-                lead: String(id),
+                lead: resolvedLeadId,
                 subject,
                 sender_email: senderEmail || null,
                 email_body: emailBody,
               });
-            } catch {
+            } catch (err) {
+              console.error("[EditLead] Appointment email failed", err, {
+                resolvedLeadId,
+                recipientEmail,
+                finalAppointmentDate,
+                finalSlot,
+              });
               toast.warning(
                 "Lead saved, but appointment email could not be sent.",
                 { position: "top-right", autoClose: 3000, theme: "colored" },
