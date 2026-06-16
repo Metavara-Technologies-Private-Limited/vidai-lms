@@ -1341,28 +1341,22 @@ export function useEditLead() {
         });
 
         // ── Send appointment confirmation email if appointment is booked ──
-        console.log("[EditLead Email Debug]", {
-          wantAppointment,
-          appointmentDate,
-          slot,
-          email,
-          leadDataEmail: (leadData as any)?.email,
-        });
-
-        const bookingActive = wantAppointment === "yes";
-        const finalAppointmentDate = appointmentDate || (leadData as any)?.appointment_date || "";
-        const finalSlot = slot || (leadData as any)?.slot || "";
-        const finalEmail = (email || (leadData as any)?.email || "").trim();
-
-        console.log("[EditLead Email Send Check]", {
-          bookingActive,
-          finalAppointmentDate,
-          finalSlot,
-          finalEmail,
-        });
+        const bookingActive = updateData.book_appointment === true;
+        const finalAppointmentDate =
+          (updateData.appointment_date as string | undefined) ||
+          (leadData as any)?.appointment_date ||
+          "";
+        const finalSlot =
+          (updateData.slot as string | undefined) ||
+          (leadData as any)?.slot ||
+          "";
+        const finalEmail =
+          (updateData.email as string | undefined) ||
+          (leadData as any)?.email ||
+          "";
 
         if (bookingActive && finalAppointmentDate && finalSlot && finalEmail) {
-          const recipientEmail = finalEmail;
+          const recipientEmail = finalEmail.trim();
           if (recipientEmail) {
             try {
               // using LeadEmailAPI from top-level import
