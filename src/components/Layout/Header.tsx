@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   AppBar,
   Avatar,
+  Badge,
   Box,
   CircularProgress,
   Dialog,
@@ -44,16 +45,30 @@ import BusinessIcon from "@mui/icons-material/Business";
 import WorkIcon from "@mui/icons-material/Work";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { clinicApi } from "../../services/clinic.api";
-import { fetchLeads } from "../../store/leadSlice";
-import { fetchCampaign, clearCampaigns } from "../../store/campaignSlice";
+import { fetchLeads, selectLeads } from "../../store/leadSlice";
+import {
+  fetchCampaign,
+  clearCampaigns,
+  selectCampaign,
+} from "../../store/campaignSlice";
 import { fetchPipelines } from "../../store/pipelineSlice";
 import { fetchUsers } from "../../store/userSlice";
+import { fetchTickets, selectAllTickets } from "../../store/ticketSlice";
 import { authApi } from "../../services/auth.api";
 import { toast } from "react-toastify";
 import { getAvatarLetter } from "../../utils/avatar";
 import { toSafePhotoUrl } from "../../utils/mediaUrl";
 
 const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
+const NOTIFICATION_LAST_SEEN_KEY = "dashboard_notification_last_seen_at";
+const NOTIFICATION_POLL_MS = 15_000;
+
+type HeaderNotification = {
+  id: string;
+  title: string;
+  subtitle: string;
+  timestamp: number;
+};
 
 type HeaderProps = {
   showSidebarToggle?: boolean;
@@ -72,6 +87,9 @@ const Header = ({
   const isCompactDesktop = useMediaQuery(theme.breakpoints.down("lg"));
   const user = useSelector(selectUser);
   const dbClinic = useSelector(selectClinic);
+  const leads = useSelector(selectLeads);
+  const tickets = useSelector(selectAllTickets);
+  const campaigns = useSelector(selectCampaign);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
   type DropdownClinic = { id: number; name: string; isDefault: boolean };
 
@@ -127,6 +145,13 @@ const Header = ({
   const [activeMenu, setActiveMenu] = useState<
     "calendar" | "notification" | "help" | null
   >(null);
+  const [lastNotificationSeenAt, setLastNotificationSeenAt] = useState<number>(
+    () => {
+      const raw = localStorage.getItem(NOTIFICATION_LAST_SEEN_KEY);
+      const parsed = raw ? Number(raw) : 0;
+      return Number.isFinite(parsed) ? parsed : 0;
+    },
+  );
 
   useEffect(() => {
     const loadClinics = async () => {
@@ -242,6 +267,7 @@ const Header = ({
         await Promise.allSettled([
           dispatch(fetchLeads()),
           dispatch(fetchCampaign()),
+          dispatch(fetchTickets()),
           dispatch(fetchPipelines(selectedClinicId)),
         ]);
 
@@ -258,6 +284,20 @@ const Header = ({
   }, [dispatch, selectedClinicId]);
 
   useEffect(() => {
+    if (!selectedClinicId) return;
+
+    const interval = setInterval(() => {
+      void Promise.allSettled([
+        dispatch(fetchLeads()),
+        dispatch(fetchCampaign()),
+        dispatch(fetchTickets()),
+      ]);
+    }, NOTIFICATION_POLL_MS);
+
+    return () => clearInterval(interval);
+  }, [dispatch, selectedClinicId]);
+
+  useEffect(() => {
     // dispatch(fetchCampaign());
     if (!selectedClinicId) return;
     dispatch(fetchAllTemplates());
@@ -269,6 +309,12 @@ const Header = ({
   ) => {
     setAnchorEl(event.currentTarget);
     setActiveMenu(type);
+
+    if (type === "notification") {
+      const now = Date.now();
+      setLastNotificationSeenAt(now);
+      localStorage.setItem(NOTIFICATION_LAST_SEEN_KEY, String(now));
+    }
   };
 
   const handleMenuClose = () => {
@@ -296,6 +342,183 @@ const Header = ({
     { icon: NotificationIcon, type: "notification" },
     { icon: MessageQuestionIcon, type: "help" },
   ] as const;
+
+  const toNumericId = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const nestedUser =
+    user && typeof user === "object" && "user" in user
+      ? ((user as Record<string, unknown>).user as Record<string, unknown> | null)
+      : null;
+
+  const currentUserId =
+    toNumericId(user?.id) ??
+    toNumericId(user?.user_id) ??
+    toNumericId(nestedUser?.id) ??
+    toNumericId(nestedUser?.user_id) ??
+    null;
+
+  const parseTimestamp = (value: unknown): number => {
+    if (typeof value !== "string" || !value.trim()) return 0;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const notificationItems = useMemo<HeaderNotification[]>(() => {
+    if (!currentUserId) return [];
+
+    const items: HeaderNotification[] = [];
+
+    for (const lead of leads) {
+      const leadRecord = lead as unknown as Record<string, unknown>;
+      const assignedToId = toNumericId(leadRecord.assigned_to_id);
+      const createdById = toNumericId(leadRecord.created_by_id);
+      const leadName =
+        typeof leadRecord.full_name === "string" && leadRecord.full_name.trim()
+          ? leadRecord.full_name.trim()
+          : "Lead";
+      const department =
+        typeof leadRecord.department_name === "string"
+          ? leadRecord.department_name.trim()
+          : "";
+
+      if (assignedToId === currentUserId) {
+        const timestamp =
+          parseTimestamp(leadRecord.modified_at) ||
+          parseTimestamp(leadRecord.created_at);
+        items.push({
+          id: `lead-assigned-${String(leadRecord.id ?? leadName)}`,
+          title: "Lead assigned to you",
+          subtitle: department
+            ? `${leadName} (${department})`
+            : `${leadName}`,
+          timestamp,
+        });
+      } else if (createdById === currentUserId) {
+        const timestamp =
+          parseTimestamp(leadRecord.created_at) ||
+          parseTimestamp(leadRecord.modified_at);
+        items.push({
+          id: `lead-created-${String(leadRecord.id ?? leadName)}`,
+          title: "Lead created by you",
+          subtitle: department
+            ? `${leadName} (${department})`
+            : `${leadName}`,
+          timestamp,
+        });
+      }
+    }
+
+    for (const ticket of tickets) {
+      const ticketRecord = ticket as unknown as Record<string, unknown>;
+      const assignedToId = toNumericId(ticketRecord.assigned_to_id);
+      const requestedById = toNumericId(ticketRecord.requested_by_id);
+      const ticketNo =
+        typeof ticketRecord.ticket_no === "string" && ticketRecord.ticket_no
+          ? ticketRecord.ticket_no
+          : "Ticket";
+      const subject =
+        typeof ticketRecord.subject === "string" && ticketRecord.subject.trim()
+          ? ticketRecord.subject.trim()
+          : "Support request";
+
+      if (assignedToId === currentUserId) {
+        const timestamp =
+          parseTimestamp(ticketRecord.updated_at) ||
+          parseTimestamp(ticketRecord.created_at);
+        items.push({
+          id: `ticket-assigned-${String(ticketRecord.id ?? ticketNo)}`,
+          title: "Ticket assigned to you",
+          subtitle: `${ticketNo} - ${subject}`,
+          timestamp,
+        });
+      } else if (requestedById === currentUserId) {
+        const timestamp =
+          parseTimestamp(ticketRecord.created_at) ||
+          parseTimestamp(ticketRecord.updated_at);
+        items.push({
+          id: `ticket-created-${String(ticketRecord.id ?? ticketNo)}`,
+          title: "Ticket created by you",
+          subtitle: `${ticketNo} - ${subject}`,
+          timestamp,
+        });
+      }
+    }
+
+    for (const campaign of campaigns) {
+      const campaignRecord = campaign as unknown as Record<string, unknown>;
+      const assignedToId =
+        toNumericId(campaignRecord.assigned_to_id) ??
+        toNumericId(campaignRecord.owner_id) ??
+        toNumericId(campaignRecord.user_id);
+      const createdById = toNumericId(campaignRecord.created_by_id);
+      const campaignName =
+        typeof campaignRecord.campaign_name === "string" &&
+        campaignRecord.campaign_name.trim()
+          ? campaignRecord.campaign_name.trim()
+          : "Campaign";
+
+      if (assignedToId === currentUserId) {
+        const timestamp =
+          parseTimestamp(campaignRecord.modified_at) ||
+          parseTimestamp(campaignRecord.created_at);
+        items.push({
+          id: `campaign-assigned-${String(campaignRecord.id ?? campaignName)}`,
+          title: "Campaign assigned to you",
+          subtitle: campaignName,
+          timestamp,
+        });
+      } else if (createdById === currentUserId) {
+        const timestamp =
+          parseTimestamp(campaignRecord.created_at) ||
+          parseTimestamp(campaignRecord.modified_at);
+        items.push({
+          id: `campaign-created-${String(campaignRecord.id ?? campaignName)}`,
+          title: "Campaign created by you",
+          subtitle: campaignName,
+          timestamp,
+        });
+      }
+    }
+
+    return items
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 10);
+  }, [campaigns, currentUserId, leads, tickets]);
+
+  const unreadNotificationCount = notificationItems.filter(
+    (item) => item.timestamp > lastNotificationSeenAt,
+  ).length;
+
+  const formatRelativeTime = (timestamp: number): string => {
+    if (!timestamp) return "";
+
+    const diffMs = Date.now() - timestamp;
+    if (diffMs <= 0) return "just now";
+
+    const minuteMs = 60_000;
+    const hourMs = 60 * minuteMs;
+    const dayMs = 24 * hourMs;
+
+    if (diffMs < hourMs) {
+      const mins = Math.max(1, Math.floor(diffMs / minuteMs));
+      return `${mins}m ago`;
+    }
+
+    if (diffMs < dayMs) {
+      const hours = Math.floor(diffMs / hourMs);
+      return `${hours}h ago`;
+    }
+
+    const days = Math.floor(diffMs / dayMs);
+    return `${days}d ago`;
+  };
 
   useEffect(() => {
     latestUserRef.current = user;
@@ -627,11 +850,41 @@ const Header = ({
                 flexShrink: 0,
               }}
             >
-              <Box
-                component="img"
-                src={icon}
-                width={isSmDown ? 20 : isCompactDesktop ? 22 : 24}
-              />
+              {type === "notification" ? (
+                <Badge
+                  color="error"
+                  badgeContent={unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                  invisible={unreadNotificationCount === 0}
+                  overlap="circular"
+                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      minWidth: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      padding: 0,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      border: "2px solid #FFFFFF",
+                      transform: "translate(72%, -72%)",
+                      boxShadow: "0 2px 6px rgba(0, 0, 0, 0.16)",
+                    },
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={icon}
+                    width={isSmDown ? 20 : isCompactDesktop ? 22 : 24}
+                  />
+                </Badge>
+              ) : (
+                <Box
+                  component="img"
+                  src={icon}
+                  width={isSmDown ? 20 : isCompactDesktop ? 22 : 24}
+                />
+              )}
             </IconButton>
           ))}
 
@@ -699,12 +952,47 @@ const Header = ({
         onClose={handleMenuClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
+        PaperProps={{
+          sx: {
+            minWidth: 300,
+            maxWidth: 360,
+          },
+        }}
       >
         {activeMenu === "calendar" && (
           <MenuItem disabled>No events for today</MenuItem>
         )}
         {activeMenu === "notification" && (
-          <MenuItem disabled>No notifications</MenuItem>
+          <>
+            {notificationItems.length === 0 ? (
+              <MenuItem disabled>No notifications</MenuItem>
+            ) : (
+              notificationItems.map((item) => (
+                <MenuItem
+                  key={item.id}
+                  sx={{
+                    alignItems: "flex-start",
+                    whiteSpace: "normal",
+                    py: 1,
+                  }}
+                >
+                  <Box>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                      {item.title}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "#6B7280" }}>
+                      {item.subtitle}
+                    </Typography>
+                    {item.timestamp ? (
+                      <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>
+                        {formatRelativeTime(item.timestamp)}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                </MenuItem>
+              ))
+            )}
+          </>
         )}
         {activeMenu === "help" && <MenuItem disabled>No messages</MenuItem>}
       </Menu>
