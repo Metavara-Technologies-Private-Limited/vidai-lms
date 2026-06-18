@@ -55,6 +55,9 @@ import { fetchPipelines } from "../../store/pipelineSlice";
 import { fetchUsers } from "../../store/userSlice";
 import { fetchTickets, selectAllTickets } from "../../store/ticketSlice";
 import { authApi } from "../../services/auth.api";
+import { LeadAPI } from "../../services/leads.api";
+import { ticketsApi } from "../../services/tickets.api";
+import { CampaignAPI } from "../../services/campaign.api";
 import { toast } from "react-toastify";
 import { getAvatarLetter } from "../../utils/avatar";
 import { toSafePhotoUrl } from "../../utils/mediaUrl";
@@ -90,6 +93,10 @@ const Header = ({
   const leads = useSelector(selectLeads);
   const tickets = useSelector(selectAllTickets);
   const campaigns = useSelector(selectCampaign);
+  const [notificationLeads, setNotificationLeads] = useState(leads);
+  const [notificationTickets, setNotificationTickets] = useState(tickets);
+  const [notificationCampaigns, setNotificationCampaigns] =
+    useState(campaigns);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
   type DropdownClinic = { id: number; name: string; isDefault: boolean };
 
@@ -284,18 +291,55 @@ const Header = ({
   }, [dispatch, selectedClinicId]);
 
   useEffect(() => {
+    setNotificationLeads(leads);
+  }, [leads]);
+
+  useEffect(() => {
+    setNotificationTickets(tickets);
+  }, [tickets]);
+
+  useEffect(() => {
+    setNotificationCampaigns(campaigns);
+  }, [campaigns]);
+
+  useEffect(() => {
     if (!selectedClinicId) return;
 
+    let cancelled = false;
+
+    const pollNotificationData = async () => {
+      const [leadsResult, ticketsResult, campaignsResult] =
+        await Promise.allSettled([
+          LeadAPI.list(selectedClinicId),
+          ticketsApi.getTickets({ page_size: 100, ordering: "-created_at" }),
+          CampaignAPI.list(selectedClinicId).then((response) => response.data),
+        ]);
+
+      if (cancelled) return;
+
+      if (leadsResult.status === "fulfilled") {
+        setNotificationLeads(leadsResult.value);
+      }
+
+      if (ticketsResult.status === "fulfilled") {
+        setNotificationTickets(ticketsResult.value);
+      }
+
+      if (campaignsResult.status === "fulfilled") {
+        setNotificationCampaigns(campaignsResult.value);
+      }
+    };
+
+    void pollNotificationData();
     const interval = setInterval(() => {
-      void Promise.allSettled([
-        dispatch(fetchLeads()),
-        dispatch(fetchCampaign()),
-        dispatch(fetchTickets()),
-      ]);
+      void pollNotificationData();
     }, NOTIFICATION_POLL_MS);
 
-    return () => clearInterval(interval);
-  }, [dispatch, selectedClinicId]);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [selectedClinicId]);
 
   useEffect(() => {
     // dispatch(fetchCampaign());
@@ -375,7 +419,7 @@ const Header = ({
 
     const items: HeaderNotification[] = [];
 
-    for (const lead of leads) {
+    for (const lead of notificationLeads) {
       const leadRecord = lead as unknown as Record<string, unknown>;
       const assignedToId = toNumericId(leadRecord.assigned_to_id);
       const createdById = toNumericId(leadRecord.created_by_id);
@@ -415,7 +459,7 @@ const Header = ({
       }
     }
 
-    for (const ticket of tickets) {
+    for (const ticket of notificationTickets) {
       const ticketRecord = ticket as unknown as Record<string, unknown>;
       const assignedToId = toNumericId(ticketRecord.assigned_to_id);
       const requestedById = toNumericId(ticketRecord.requested_by_id);
@@ -451,7 +495,7 @@ const Header = ({
       }
     }
 
-    for (const campaign of campaigns) {
+    for (const campaign of notificationCampaigns) {
       const campaignRecord = campaign as unknown as Record<string, unknown>;
       const assignedToId =
         toNumericId(campaignRecord.assigned_to_id) ??
@@ -490,7 +534,12 @@ const Header = ({
     return items
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 10);
-  }, [campaigns, currentUserId, leads, tickets]);
+  }, [
+    currentUserId,
+    notificationCampaigns,
+    notificationLeads,
+    notificationTickets,
+  ]);
 
   const unreadNotificationCount = notificationItems.filter(
     (item) => item.timestamp > lastNotificationSeenAt,
