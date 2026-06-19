@@ -1210,7 +1210,10 @@ export function useEditLead() {
       return;
     }
 
-    const bookingActive = wantAppointment === "yes";
+    const bookingActive =
+      wantAppointment === "yes" ||
+      Boolean((appointmentDate || "") && (slot || "")) ||
+      isTruthy((leadData as any)?.book_appointment);
 
     if (bookingActive) {
       if (IS_MEDICAL_APP && !department) {
@@ -1343,7 +1346,11 @@ export function useEditLead() {
         // ── Send appointment confirmation email if appointment is booked ──
         const bookingActive =
           updateData.book_appointment === true ||
-          isTruthy((leadData as any)?.book_appointment);
+          isTruthy((leadData as any)?.book_appointment) ||
+          Boolean(
+            ((updateData.appointment_date as string | undefined) || "") &&
+              ((updateData.slot as string | undefined) || "")
+          );
         const finalAppointmentDate =
           (updateData.appointment_date as string | undefined) ||
           (leadData as any)?.appointment_date ||
@@ -1355,8 +1362,19 @@ export function useEditLead() {
         const finalEmail =
           (updateData.email as string | undefined) ||
           (leadData as any)?.email ||
+          email ||
           "";
         const resolvedLeadId = String(id || (leadData as any)?.id || "");
+
+        console.log("[EditLead] appointment mail precheck", {
+          bookingActive,
+          wantAppointment,
+          finalAppointmentDate,
+          finalSlot,
+          finalEmail,
+          resolvedLeadId,
+          updateDataBook: updateData.book_appointment,
+        });
 
         if (
           bookingActive &&
