@@ -636,6 +636,14 @@ const LeadsTable: React.FC<Props> = ({
   const handleEditStatusOpen = (e: React.MouseEvent, lead: ProcessedLead) => {
     e.stopPropagation();
     if (!canEditLeads) return;
+    if (
+      matchesStatusFilter(
+        String(lead.lead_status || lead.status || ""),
+        "converted",
+      )
+    ) {
+      return;
+    }
     setEditStatusLead(lead as unknown as LeadItem);
   };
 
@@ -1537,25 +1545,43 @@ const LeadsTable: React.FC<Props> = ({
                       size="small"
                       sx={getStatusChipSx(lead.status ?? "")}
                     />
-                    <Tooltip title="Edit status">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => handleEditStatusOpen(e, lead)}
-                        disabled={!canEditLeads}
-                        sx={{
-                          p: 0.25,
-                          color: "text.secondary",
-                          "&:hover": { color: "primary.main" },
-                        }}
-                      >
-                        <Box
-                          component="img"
-                          src={Lead_Status_Edit}
-                          alt="Edit status"
-                          sx={{ width: 14, height: 14 }}
-                        />
-                      </IconButton>
-                    </Tooltip>
+                    {(() => {
+                      const isConverted = matchesStatusFilter(
+                        String(lead.lead_status || lead.status || ""),
+                        "converted",
+                      );
+                      const editDisabled = !canEditLeads || isConverted;
+
+                      return (
+                        <Tooltip
+                          title={
+                            isConverted
+                              ? "Converted leads cannot be edited"
+                              : "Edit status"
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleEditStatusOpen(e, lead)}
+                              disabled={editDisabled}
+                              sx={{
+                                p: 0.25,
+                                color: "text.secondary",
+                                "&:hover": { color: "primary.main" },
+                              }}
+                            >
+                              <Box
+                                component="img"
+                                src={Lead_Status_Edit}
+                                alt="Edit status"
+                                sx={{ width: 14, height: 14 }}
+                              />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      );
+                    })()}
                   </Stack>
                 </TableCell>
 

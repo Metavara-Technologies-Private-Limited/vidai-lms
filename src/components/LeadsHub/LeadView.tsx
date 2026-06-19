@@ -2549,7 +2549,7 @@ export default function LeadDetailView() {
   const leadStatusPill = getStagePillColor(leadStatus);
 
   const openStatusDialog = () => {
-    if (!canEditLeads) return;
+    if (!canEditLeads || isConverted) return;
     setDraftLeadStatus(selectedLeadStatus);
     setStatusDialogOpen(true);
   };
@@ -2559,7 +2559,7 @@ export default function LeadDetailView() {
   };
 
   const saveLeadStatus = async () => {
-    if (!activeLead || statusSaving || !canEditLeads) return;
+    if (!activeLead || statusSaving || !canEditLeads || isConverted) return;
     const nextLeadStatus = getLeadStatusApiValue(draftLeadStatus);
     try {
       setStatusSaving(true);
@@ -2822,20 +2822,32 @@ sx={{
                     size="small"
                     sx={pillChipSx(leadStatusPill.color, leadStatusPill.bg)}
                   />
-                  <IconButton
-                    size="small"
-                    onClick={openStatusDialog}
-                    disabled={!canEditLeads}
-                    sx={{ p: 0.35, flexShrink: 0 }}
-                    aria-label="Edit lead status"
+                  <Tooltip
+                    title={
+                      isConverted
+                        ? "Converted leads cannot be edited"
+                        : !canEditLeads
+                          ? "No permission to edit leads"
+                          : "Edit status"
+                    }
                   >
-                    <Box
-                      component="img"
-                      src={Lead_Status_Edit}
-                      alt="Edit Status"
-                      sx={{ width: 14, height: 14 }}
-                    />
-                  </IconButton>
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={openStatusDialog}
+                        disabled={!canEditLeads || isConverted}
+                        sx={{ p: 0.35, flexShrink: 0 }}
+                        aria-label="Edit lead status"
+                      >
+                        <Box
+                          component="img"
+                          src={Lead_Status_Edit}
+                          alt="Edit Status"
+                          sx={{ width: 14, height: 14 }}
+                        />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 </Stack>
               )}
             </Box>

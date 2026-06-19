@@ -23,6 +23,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import MenuIcon from "@mui/icons-material/Menu";
+import dayjs from "dayjs";
 
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import NotificationIcon from "@/assets/icons/notification.svg";
@@ -65,12 +66,23 @@ import { toSafePhotoUrl } from "../../utils/mediaUrl";
 const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
 const NOTIFICATION_LAST_SEEN_KEY = "dashboard_notification_last_seen_at";
 const NOTIFICATION_POLL_MS = 15_000;
+const MAX_UPCOMING_APPOINTMENTS = 8;
 
 type HeaderNotification = {
   id: string;
   title: string;
   subtitle: string;
   timestamp: number;
+};
+
+type UpcomingAppointment = {
+  id: string;
+  name: string;
+  dateLabel: string;
+  timeLabel: string;
+  assignedTo: string;
+  leadId: string | number;
+  isToday: boolean;
 };
 
 type HeaderProps = {
@@ -237,7 +249,7 @@ const Header = ({
 
     //   nextClinicId = validStored || profileClinicId;
     // }
-    
+
     nextClinicId = storedClinicId || profileClinicId;
 
     setSelectedClinicId(nextClinicId);
@@ -543,6 +555,96 @@ const Header = ({
 
   const unreadNotificationCount = notificationItems.filter(
     (item) => item.timestamp > lastNotificationSeenAt,
+  ).length;
+
+  // ── Upcoming appointments for the calendar dropdown ────────────────────
+  // Pulls from the same `notificationLeads` source (already polled every
+  // NOTIFICATION_POLL_MS), filtering to leads with a valid, non-past
+  // appointment_date — mirroring the logic used in LeadsCalendar.tsx.
+  const resolveAssigneeName = (record: Record<string, unknown>): string => {
+    const direct =
+      (typeof record.assigned_to_name === "string" &&
+        record.assigned_to_name.trim()) ||
+      (typeof record.assignee_name === "string" &&
+        record.assignee_name.trim()) ||
+      (typeof record.assigned_to === "string" && record.assigned_to.trim());
+
+    if (direct) return direct;
+
+    const nestedAssignee =
+      record.assigned_to && typeof record.assigned_to === "object"
+        ? (record.assigned_to as Record<string, unknown>)
+        : record.assignee && typeof record.assignee === "object"
+          ? (record.assignee as Record<string, unknown>)
+          : null;
+
+    if (nestedAssignee) {
+      const nestedName =
+        (typeof nestedAssignee.name === "string" && nestedAssignee.name) ||
+        (typeof nestedAssignee.full_name === "string" &&
+          nestedAssignee.full_name) ||
+        [nestedAssignee.first_name, nestedAssignee.last_name]
+          .filter((part) => typeof part === "string" && part)
+          .join(" ")
+          .trim() ||
+        (typeof nestedAssignee.username === "string" &&
+          nestedAssignee.username);
+
+      if (nestedName) return String(nestedName);
+    }
+
+    return "Unassigned";
+  };
+
+  const upcomingAppointments = useMemo<UpcomingAppointment[]>(() => {
+    const today = dayjs().startOf("day");
+
+    const items = notificationLeads
+      .map((lead) => {
+        const record = lead as unknown as Record<string, unknown>;
+        if (!record.appointment_date) return null;
+        if (record.is_active === false) return null;
+
+        const apptDate = dayjs(record.appointment_date as string);
+        if (!apptDate.isValid()) return null;
+        if (apptDate.startOf("day").isBefore(today)) return null;
+
+        const name =
+          typeof record.full_name === "string" && record.full_name.trim()
+            ? record.full_name.trim()
+            : "Unnamed lead";
+
+        const slot =
+          typeof record.slot === "string" && record.slot.trim()
+            ? record.slot.trim()
+            : "";
+
+        return {
+          id: `appt-${String(record.id ?? name)}`,
+          name,
+          dateLabel: apptDate.format("DD MMM YYYY"),
+          timeLabel: slot || apptDate.format("hh:mm A"),
+          assignedTo: resolveAssigneeName(record),
+          leadId: record.id as string | number,
+          isToday: apptDate.startOf("day").isSame(today),
+          sortKey: apptDate.valueOf(),
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is UpcomingAppointment & { sortKey: number } =>
+          item !== null,
+      );
+
+    return items
+      .sort((a, b) => a.sortKey - b.sortKey)
+      .slice(0, MAX_UPCOMING_APPOINTMENTS)
+      .map(({ sortKey, ...rest }) => rest);
+  }, [notificationLeads]);
+
+  const todayAppointmentCount = upcomingAppointments.filter(
+    (item) => item.isToday,
   ).length;
 
   const formatRelativeTime = (timestamp: number): string => {
@@ -927,6 +1029,36 @@ const Header = ({
                     width={isSmDown ? 20 : isCompactDesktop ? 22 : 24}
                   />
                 </Badge>
+              ) : type === "calendar" ? (
+                <Badge
+                  color="primary"
+                  badgeContent={
+                    todayAppointmentCount > 99 ? "99+" : todayAppointmentCount
+                  }
+                  invisible={todayAppointmentCount === 0}
+                  overlap="circular"
+                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      minWidth: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      padding: 0,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      border: "2px solid #FFFFFF",
+                      transform: "translate(72%, -72%)",
+                      boxShadow: "0 2px 6px rgba(0, 0, 0, 0.16)",
+                    },
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={icon}
+                    width={isSmDown ? 20 : isCompactDesktop ? 22 : 24}
+                  />
+                </Badge>
               ) : (
                 <Box
                   component="img"
@@ -1009,7 +1141,75 @@ const Header = ({
         }}
       >
         {activeMenu === "calendar" && (
-          <MenuItem disabled>No events for today</MenuItem>
+          <>
+            {upcomingAppointments.length === 0 ? (
+              <MenuItem disabled>No upcoming appointments</MenuItem>
+            ) : (
+              [
+                <MenuItem
+                  key="calendar-header"
+                  disabled
+                  sx={{ opacity: "1 !important", py: 0.5 }}
+                >
+                  <Typography
+                    sx={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF" }}
+                  >
+                    UPCOMING APPOINTMENTS
+                  </Typography>
+                </MenuItem>,
+                ...upcomingAppointments.map((appt) => (
+                  <MenuItem
+                    key={appt.id}
+                    onClick={() => {
+                      handleMenuClose();
+                      navigate(
+                        `/leads/${String(appt.leadId).replace(/^#/, "")}`,
+                      );
+                    }}
+                    sx={{
+                      alignItems: "flex-start",
+                      whiteSpace: "normal",
+                      py: 1,
+                    }}
+                  >
+                    <Box sx={{ width: "100%" }}>
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                      >
+                        <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                          {appt.name}
+                        </Typography>
+                        {appt.isToday && (
+                          <Typography
+                            sx={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#15803D",
+                              bgcolor: "#DCFCE7",
+                              px: 0.7,
+                              py: 0.1,
+                              borderRadius: "6px",
+                              ml: 1,
+                            }}
+                          >
+                            Today
+                          </Typography>
+                        )}
+                      </Stack>
+                      <Typography sx={{ fontSize: 12, color: "#6B7280" }}>
+                        {appt.dateLabel} · {appt.timeLabel}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#9CA3AF" }}>
+                        Assigned to {appt.assignedTo}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                )),
+              ]
+            )}
+          </>
         )}
         {activeMenu === "notification" && (
           <>
