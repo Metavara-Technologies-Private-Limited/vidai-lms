@@ -1,8 +1,6 @@
 // ====================== Types ======================
 export interface RawLead {
   id: string;
-  stage_id?: string | number | null;
-  stage_name?: string;
   full_name?: string;
   name?: string;
   contact_no?: string;

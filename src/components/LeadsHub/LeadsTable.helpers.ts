@@ -144,13 +144,7 @@ export const processLead = (lead: RawLead): ProcessedLead => {
   const stageTaskType = extractStageFromDescription(
     lead.next_action_description,
   );
-  const stageName =
-    typeof lead.stage_name === "string" ? lead.stage_name.trim() : "";
-  const stageStatus =
-    stageName ||
-    (typeof lead.status === "string" ? lead.status.trim() : "") ||
-    (typeof lead.lead_status === "string" ? lead.lead_status.trim() : "") ||
-    stageTaskType;
+  const stageStatus = stageTaskType;
   const rawTaskType =
     lead.next_action_type ||
     lead.task_type ||
@@ -171,8 +165,10 @@ export const processLead = (lead: RawLead): ProcessedLead => {
   return {
     ...lead,
     assigned: lead.assigned_to_name || "Unassigned",
-    status: formatStatus(stageStatus || "New"),
-    lead_status: stageStatus || "New",
+    status: formatStatus(
+      stageStatus || lead.status || lead.lead_status || "New",
+    ),
+    lead_status: stageStatus || lead.lead_status || lead.status || "New",
     quality:
       (lead as unknown as { quality?: Quality }).quality ||
       lead.quality ||
