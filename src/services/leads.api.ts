@@ -630,9 +630,7 @@ const buildFallbackEnrichPayload = (
     next.slot = data.slot;
   }
 
-  return removeBlankUpdateFields(next as Record<string, unknown>) as Partial<
-    LeadPayload
-  >;
+  return removeBlankUpdateFields(next as Record<string, unknown>) as Partial<LeadPayload>;
 };
 
 const isServer500 = (error: unknown): boolean =>
@@ -1018,15 +1016,25 @@ export const TwilioAPI = {
 
   getSMSHistory: async (leadUuid: string): Promise<TwilioSMS[]> => {
     const response = await api.get<TwilioSMS[]>(
-      `/twilio/sms-history/?lead_uuid=${leadUuid}`,
+      `/twilio/sms/?lead_uuid=${leadUuid}`,
     );
     return response.data;
   },
 
   getCallHistory: async (leadUuid: string): Promise<TwilioCall[]> => {
     const response = await api.get<TwilioCall[]>(
-      `/twilio/call-history/?lead_uuid=${leadUuid}`,
+      `/twilio/calls/?lead_uuid=${leadUuid}`,
     );
+    return response.data;
+  },
+
+  // ✅ NEW: Link unmatched inbound calls to a lead by phone number
+  linkInboundCall: async (payload: {
+    lead_uuid: string;
+    from_number: string;
+  }): Promise<unknown> => {
+    const response = await api.post("/twilio/link-inbound-call/", payload);
+    console.log("🔗 Inbound call linked:", response.data);
     return response.data;
   },
 };

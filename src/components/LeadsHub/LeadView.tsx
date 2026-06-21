@@ -69,6 +69,7 @@ import {
   LeadEmailAPI,
   EmailTemplateAPI,
   InterestAPI,
+  TwilioAPI, // ✅ NEW
 } from "../../services/leads.api";
 import type {
   EmailTemplate,
@@ -405,9 +406,7 @@ const EmailDialog: React.FC<EmailDialogProps> = ({
   const [step, setStep] = React.useState<"template" | "preview" | "compose">(
     "template",
   );
-  const [selectedTemplateId, setSelectedTemplateId] = React.useState<
-    string | null
-  >(null);
+  const [selectedTemplateId, setSelectedTemplateId] = React.useState<string | null>(null);
   const [previewTemplate, setPreviewTemplate] =
     React.useState<EmailTemplate | null>(null);
   const [fromEmail, setFromEmail] = React.useState("noreply@fertility.com");
@@ -1490,20 +1489,14 @@ export default function LeadDetailView() {
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
 
-  // ── Pipeline stages (fetched dynamically, same logic as AddNewLead) ────────
-  const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>(
-    [],
-  );
-  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>(
-    [],
-  );
+  const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>([]);
+  const [pipelineStageNames, setPipelineStageNames] = React.useState<string[]>([]);
   const [pipelineLoading, setPipelineLoading] = React.useState(false);
 
   const selectedClinic = useSelector(selectClinic);
   const clinicId =
     selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
 
-  // Pill colour helper — cycles through palette by stage index
   const getStagePillColor = React.useCallback(
     (stageName: string): { color: string; bg: string } => {
       const idx = pipelineStageNames.findIndex(
@@ -1515,19 +1508,14 @@ export default function LeadDetailView() {
     [pipelineStageNames],
   );
 
-  // Map a raw lead status string → the matching pipeline stage name (display)
   const normalizeLeadStatusForPill = React.useCallback(
     (status: string | undefined): string => {
       const raw = (status || "").trim().toLowerCase();
       if (!raw) return pipelineStageNames[0] ?? "New";
-
-      // Direct match against loaded stage names (case-insensitive)
       const direct = pipelineStageNames.find(
         (n) => n.trim().toLowerCase() === raw,
       );
       if (direct) return direct;
-
-      // Legacy API value mappings → display name
       const legacyMap: Record<string, string> = {
         new: "New",
         appointment: "Appointment",
@@ -1543,30 +1531,24 @@ export default function LeadDetailView() {
       };
       const legacy = legacyMap[raw];
       if (legacy) {
-        // Check if pipeline has that stage, else return it raw-capitalized
         const found = pipelineStageNames.find(
           (n) => n.trim().toLowerCase() === legacy.toLowerCase(),
         );
         return found ?? legacy;
       }
-
       return pipelineStageNames[0] ?? "New";
     },
     [pipelineStageNames],
   );
 
-  // API value for PATCH (what backend expects)
   const getLeadStatusApiValue = React.useCallback(
     (displayName: string): string => {
-      // Try to find the stage and use its name directly as most backends accept stage names
       const stage = pipelineStages.find(
         (s) =>
           s.stage_name.trim().toLowerCase() ===
           displayName.trim().toLowerCase(),
       );
       if (stage) return stage.stage_name.trim().toLowerCase();
-
-      // Legacy fallback
       const legacyApiMap: Record<string, string> = {
         New: "new",
         Appointment: "appointment",
@@ -1582,7 +1564,6 @@ export default function LeadDetailView() {
     [pipelineStages],
   );
 
-  // Fetch pipeline stages on mount (same logic as AddNewLead)
   React.useEffect(() => {
     const loadPipeline = async () => {
       try {
@@ -1637,7 +1618,7 @@ export default function LeadDetailView() {
         setPipelineStages(activeStages);
         setPipelineStageNames(activeStages.map((s) => s.stage_name.trim()));
       } catch {
-        // Keep empty — fallback to whatever was already set
+        // Keep empty
       } finally {
         setPipelineLoading(false);
       }
@@ -1655,9 +1636,7 @@ export default function LeadDetailView() {
   const clinic = useSelector(selectClinic);
   const clinicName = clinic?.name || "Our Clinic";
   const [bookApptOpen, setBookApptOpen] = React.useState(false);
-  const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>(
-    [],
-  );
+  const [emailHistory, setEmailHistory] = React.useState<LeadMailListItem[]>([]);
   const [emailHistoryLoading, setEmailHistoryLoading] = React.useState(false);
 
   const fetchEmailHistory = React.useCallback(async (leadId: string) => {
@@ -1689,33 +1668,22 @@ export default function LeadDetailView() {
   const [actionDescription, setActionDescription] = React.useState("");
   const [actionSubmitting, setActionSubmitting] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
-  const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(
-    null,
-  );
-  const [documents, setDocuments] = React.useState<
-    { url: string; name: string }[]
-  >([]);
+  const [deleteNoteDialog, setDeleteNoteDialog] = React.useState<string | null>(null);
+  const [documents, setDocuments] = React.useState<{ url: string; name: string }[]>([]);
   const [docsLoading, setDocsLoading] = React.useState(false);
   const [docsError, setDocsError] = React.useState<string | null>(null);
   const [callHistory, setCallHistory] = React.useState<TwilioCall[]>([]);
   const [callHistoryLoading, setCallHistoryLoading] = React.useState(false);
-  const [callHistoryError, setCallHistoryError] = React.useState<string | null>(
-    null,
-  );
+  const [callHistoryError, setCallHistoryError] = React.useState<string | null>(null);
   const [smsHistory, setSmsHistory] = React.useState<TwilioSMS[]>([]);
   const [smsHistoryLoading, setSmsHistoryLoading] = React.useState(false);
-  const [smsHistoryError, setSmsHistoryError] = React.useState<string | null>(
-    null,
-  );
+  const [smsHistoryError, setSmsHistoryError] = React.useState<string | null>(null);
   const [fullLead, setFullLead] = React.useState<LeadRecord | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false);
-  const [selectedLeadStatus, setSelectedLeadStatus] =
-    React.useState<string>("");
+  const [selectedLeadStatus, setSelectedLeadStatus] = React.useState<string>("");
   const [draftLeadStatus, setDraftLeadStatus] = React.useState<string>("");
   const [statusSaving, setStatusSaving] = React.useState(false);
-  const [interests, setInterests] = React.useState<
-    { id: string; name: string }[]
-  >([]);
+  const [interests, setInterests] = React.useState<{ id: string; name: string }[]>([]);
 
   const pillChipSx = (color: string, bg: string) => ({
     borderRadius: "999px",
@@ -1826,7 +1794,6 @@ export default function LeadDetailView() {
       });
   }, [activeLead?.clinic_id]);
 
-  // Sync selectedLeadStatus from activeLead once pipeline is loaded
   React.useEffect(() => {
     if (!activeLead) return;
     const raw = activeLead?.status || activeLead?.lead_status || "";
@@ -1926,6 +1893,7 @@ export default function LeadDetailView() {
     dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
   }, [location.key, dispatch]);
 
+  // ✅ FIXED: Added linkInboundCall to link inbound calls on Lead Activity load
   React.useEffect(() => {
     if (activeLead) {
       const rawId = decodeURIComponent(id || "");
@@ -1934,6 +1902,14 @@ export default function LeadDetailView() {
       fetchCallHistory(activeLead.id);
       fetchSMSHistory(activeLead.id);
       fetchEmailHistory(activeLead.id);
+
+      // ✅ NEW: Link any unmatched inbound calls to this lead
+      if (activeLead.contact_no) {
+        TwilioAPI.linkInboundCall({
+          lead_uuid: activeLead.id,
+          from_number: activeLead.contact_no,
+        }).catch(() => {});
+      }
     }
   }, [
     activeLead,
@@ -2247,7 +2223,6 @@ export default function LeadDetailView() {
   const handleAppointmentSaved = React.useCallback(
     async (result: AppointmentResult) => {
       setBookApptOpen(false);
-      // ── 1. Update local lead state immediately ─────────────────────────
       setFullLead((prev) => {
         const base = prev ?? activeLead ?? null;
         if (!base) return prev;
@@ -2266,7 +2241,6 @@ export default function LeadDetailView() {
         } as LeadRecord;
       });
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-      // ── 2. Send appointment confirmation email directly ─────────────────
       const recipientEmail = (
         activeLead?.email ||
         fullLead?.email ||
@@ -2419,9 +2393,7 @@ export default function LeadDetailView() {
   const leadSource = capitalizeWords(activeLead.source || "Unknown");
   const leadSubSource = capitalizeWords(activeLead.sub_source || "N/A");
   const leadCampaignName = capitalizeWords(activeLead.campaign_name || "N/A");
-  const leadCampaignDuration = capitalize(
-    activeLead.campaign_duration || "N/A",
-  );
+  const leadCampaignDuration = capitalize(activeLead.campaign_duration || "N/A");
   const leadDisplayId = formatLeadId(activeLead.id);
   const partnerName = capitalizeWords(
     activeLead.partner_name || activeLead.partner_full_name || "N/A",
@@ -2627,16 +2599,14 @@ export default function LeadDetailView() {
       ];
 
   return (
-<Box
-  p={1}
-  sx={{
-    minHeight: "80vh",
-    overflowY: "auto",
-    position: "relative",
-  }}
->
-
-
+    <Box
+      p={1}
+      sx={{
+        minHeight: "80vh",
+        overflowY: "auto",
+        position: "relative",
+      }}
+    >
       <Card
         elevation={0}
         sx={{
@@ -2649,7 +2619,6 @@ export default function LeadDetailView() {
           boxShadow: "none",
         }}
       >
-
         <Box
           sx={{
             position: "absolute",
@@ -2676,7 +2645,6 @@ export default function LeadDetailView() {
           />
         </Box>
 
-        {/* ── Header card content — fixed layout ── */}
         <Box
           sx={{
             position: "relative",
@@ -2688,7 +2656,6 @@ export default function LeadDetailView() {
             width: "100%",
           }}
         >
-          {/* Avatar */}
           <Avatar
             sx={{
               bgcolor: "#EEF2FF",
@@ -2706,7 +2673,6 @@ export default function LeadDetailView() {
             {leadInitials}
           </Avatar>
 
-          {/* Fields row */}
           <Box
             sx={{
               display: "flex",
@@ -2718,14 +2684,13 @@ export default function LeadDetailView() {
               width: "100%",
             }}
           >
-            {/* Lab Name */}
             <Stack
               spacing={0.5}
-sx={{
-  flex: "1 1 140px",
-  minWidth: 0,
-  transform: { xs: "none", md: "translateY(14px)" },
-}}
+              sx={{
+                flex: "1 1 140px",
+                minWidth: 0,
+                transform: { xs: "none", md: "translateY(14px)" },
+              }}
             >
               <Typography
                 variant="caption"
@@ -2741,14 +2706,7 @@ sx={{
               </Typography>
             </Stack>
 
-            {/* Lead ID */}
-            <Box
-              sx={{
-                flex: "1 1 0",
-                minWidth: 0,
-                px: { xs: 0, md: 1.5 },
-              }}
-            >
+            <Box sx={{ flex: "1 1 0", minWidth: 0, px: { xs: 0, md: 1.5 } }}>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -2763,14 +2721,7 @@ sx={{
               </Typography>
             </Box>
 
-            {/* Source */}
-            <Box
-              sx={{
-                flex: "1 1 0",
-                minWidth: 0,
-                px: { xs: 0, md: 1.5 },
-              }}
-            >
+            <Box sx={{ flex: "1 1 0", minWidth: 0, px: { xs: 0, md: 1.5 } }}>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -2796,14 +2747,7 @@ sx={{
               </Stack>
             </Box>
 
-            {/* Lead Status */}
-            <Box
-              sx={{
-                flex: "1.4 1 0",
-                minWidth: 0,
-                px: { xs: 0, md: 1.5 },
-              }}
-            >
+            <Box sx={{ flex: "1.4 1 0", minWidth: 0, px: { xs: 0, md: 1.5 } }}>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -2852,14 +2796,7 @@ sx={{
               )}
             </Box>
 
-            {/* Lead Quality */}
-            <Box
-              sx={{
-                flex: "1 1 0",
-                minWidth: 0,
-                px: { xs: 0, md: 1.5 },
-              }}
-            >
+            <Box sx={{ flex: "1 1 0", minWidth: 0, px: { xs: 0, md: 1.5 } }}>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -2882,14 +2819,7 @@ sx={{
               />
             </Box>
 
-            {/* Task Status */}
-            <Box
-              sx={{
-                flex: "1 1 0",
-                minWidth: 0,
-                px: { xs: 0, md: 1.5 },
-              }}
-            >
+            <Box sx={{ flex: "1 1 0", minWidth: 0, px: { xs: 0, md: 1.5 } }}>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -2918,15 +2848,8 @@ sx={{
               )}
             </Box>
 
-            {/* AI Lead Score — medical app only */}
             {!IS_CONTRACTS_APP && (
-              <Box
-                sx={{
-                  flex: "1 1 0",
-                  minWidth: 0,
-                  px: { xs: 0, md: 1.5 },
-                }}
-              >
+              <Box sx={{ flex: "1 1 0", minWidth: 0, px: { xs: 0, md: 1.5 } }}>
                 <Typography
                   variant="caption"
                   color="text.secondary"
@@ -2945,7 +2868,6 @@ sx={{
         </Box>
       </Card>
 
-      {/* Edit Status Dialog — now uses dynamic pipeline stages */}
       <Dialog
         open={statusDialogOpen}
         onClose={closeStatusDialog}
