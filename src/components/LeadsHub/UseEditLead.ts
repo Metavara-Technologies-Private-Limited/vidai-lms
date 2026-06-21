@@ -1381,9 +1381,8 @@ export function useEditLead() {
           (leadData as any)?.slot ||
           "";
         const finalEmail =
-          (updateData.email as string | undefined) ||
-          (leadData as any)?.email ||
-          email ||
+          email.trim() ||
+          (leadData as any)?.email?.trim() ||
           "";
         const resolvedLeadId = String(id || (leadData as any)?.id || "");
 
