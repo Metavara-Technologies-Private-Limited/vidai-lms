@@ -1477,9 +1477,9 @@ export function useEditLead() {
         }
 
         setTimeout(() => {
-          navigate("/leads", { replace: true });
-          dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-        }, 800);
+  navigate("/leads", { replace: true });
+  dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+}, 3000);
       })
       .catch((err: unknown) => {
         let msg = "Failed to save lead";
