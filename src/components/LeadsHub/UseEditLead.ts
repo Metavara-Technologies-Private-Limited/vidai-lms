@@ -1343,6 +1343,24 @@ export function useEditLead() {
           position: "top-right", autoClose: 1500, theme: "colored",
         });
 
+        // ✅ FORCE SEND EMAIL FOR TESTING
+        try {
+          await LeadEmailAPI.sendNow({
+            lead: String(id),
+            subject: "Appointment Updated Test",
+            sender_email: null,
+            email_body: `Hi, your appointment has been updated. Date: ${appointmentDate} Slot: ${slot}`,
+          });
+          toast.success("Email sent!", {
+            position: "top-right", autoClose: 2000, theme: "colored",
+          });
+        } catch (err) {
+          console.error("Email failed:", err);
+          toast.error("Email failed!", {
+            position: "top-right", autoClose: 2000, theme: "colored",
+          });
+        }
+
         // ✅ DEBUG: confirm save flow reached this point
         console.log("SAVE SUCCESS - checking email");
 
