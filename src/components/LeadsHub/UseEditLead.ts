@@ -1343,6 +1343,9 @@ export function useEditLead() {
           position: "top-right", autoClose: 1500, theme: "colored",
         });
 
+        // ✅ DEBUG: confirm save flow reached this point
+        console.log("SAVE SUCCESS - checking email");
+
         // ── Send appointment confirmation email if appointment is booked ──
         const bookingActive =
           updateData.book_appointment === true ||
@@ -1366,14 +1369,13 @@ export function useEditLead() {
           "";
         const resolvedLeadId = String(id || (leadData as any)?.id || "");
 
-        console.log("[EditLead] appointment mail precheck", {
+        console.log("EMAIL CHECK:", {
           bookingActive,
           wantAppointment,
           finalAppointmentDate,
           finalSlot,
           finalEmail,
           resolvedLeadId,
-          updateDataBook: updateData.book_appointment,
         });
 
         if (
