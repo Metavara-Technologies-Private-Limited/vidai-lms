@@ -2,11 +2,6 @@ import { lazy } from "react";
 
 export const EXTRA_ROUTES = [
   {
-    key: "reports-tab",
-    path: "reports/:tab",
-    page: lazy(() => import("../pages/Reports.tsx")),
-  },
-  {
     key: "ticket-view",
     path: "settings/tickets/:id",
     page: lazy(() => import("../components/Settings/Menus/TicketView")),
@@ -88,11 +83,6 @@ export const EXTRA_ROUTES = [
         default: m.Practo,
       })),
     ),
-  },
-  {
-    key: "reputation",
-    path: "reputation",
-    page: lazy(() => import("../pages/Reputation.tsx")),
   },
   {
     key: "referral-source-detail",

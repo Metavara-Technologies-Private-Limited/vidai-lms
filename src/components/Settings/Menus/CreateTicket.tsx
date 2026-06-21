@@ -19,8 +19,7 @@ import { useState, useEffect } from "react";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import dayjs from "dayjs";
-import type { Dayjs } from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import type { AppDispatch } from "../../../store";
@@ -99,8 +98,7 @@ const assigneeLabel = (option: AssigneeOption): string => {
   const fullName =
     `${option.first_name ?? ""} ${option.last_name ?? ""}`.trim();
   const primary = fullName || option.username || `User ${option.id}`;
-  const secondary = option.role;
-  return secondary ? `${primary} (${secondary})` : primary;
+  return primary;
 };
 
 const MAX_TICKET_SUBJECT_LENGTH = 150;
@@ -143,6 +141,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const users = useSelector(selectUsers);
+  const minimumDueDate = dayjs().startOf("day");
 
   const authMode = localStorage.getItem("auth_mode");
   const isInternal = authMode === "INT";
@@ -312,8 +311,8 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
       return;
     }
 
-    if (dueDate.startOf("day").isBefore(dayjs().startOf("day"))) {
-      toast.warn("Past due dates are not allowed. Please select today or a future date.");
+    if (dueDate.isBefore(minimumDueDate, "day")) {
+      toast.warn("Due Date cannot be in the past.");
       return;
     }
 
@@ -740,7 +739,7 @@ const CreateTicket = ({ open, onClose }: CreateTicketProps) => {
                   label="Due Date"
                   value={dueDate}
                   onChange={(v) => setDueDate(v as Dayjs | null)}
-                  minDate={dayjs().startOf("day")}
+                  minDate={minimumDueDate}
                   disabled={loading}
                   slotProps={{
                     textField: {

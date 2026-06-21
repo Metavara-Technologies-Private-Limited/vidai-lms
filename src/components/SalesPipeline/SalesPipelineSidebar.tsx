@@ -67,7 +67,12 @@ const SalesPipelineSidebar = ({
   onDeletePipeline,
 }: SalesPipelineSidebarProps) => {
   const theme = useTheme();
-  const createPipelineTooltip = "You do not have permission to create pipeline.";
+  const canCreatePipeline = canEditPipeline && pipelines.length === 0;
+  const createPipelineTooltip = !canEditPipeline
+    ? "You do not have permission to create pipeline."
+    : !canCreatePipeline
+      ? "Only one pipeline can be created."
+      : "";
   const sortedPipelines = [...pipelines].sort((left, right) => {
     const leftIsDefault = left.id === defaultPipelineId;
     const rightIsDefault = right.id === defaultPipelineId;
@@ -108,10 +113,10 @@ const SalesPipelineSidebar = ({
       </Typography>
 
       <Tooltip
-        title={!canEditPipeline ? createPipelineTooltip : ""}
-        disableHoverListener={canEditPipeline}
-        disableFocusListener={canEditPipeline}
-        disableTouchListener={canEditPipeline}
+        title={createPipelineTooltip}
+        disableHoverListener={!createPipelineTooltip}
+        disableFocusListener={!createPipelineTooltip}
+        disableTouchListener={!createPipelineTooltip}
       >
         <span>
           <Button
@@ -120,7 +125,7 @@ const SalesPipelineSidebar = ({
             className="mobile-add-button"
             variant="outlined"
             onClick={onOpenCreatePipeline}
-            disabled={!canEditPipeline}
+            disabled={!canCreatePipeline}
             sx={{
               justifyContent: "center",
               color: "text.primary",

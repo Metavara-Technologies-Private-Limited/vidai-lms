@@ -73,12 +73,17 @@ const SalesPipelineDashboard = () => {
 		role === "super_admin" ||
 		hasAnySubcategoryActionPermission(permissions, pipelineAliases, "add") ||
 		hasAnySubcategoryActionPermission(permissions, pipelineAliases, "edit");
-	const createPipelineTooltip = "You do not have permission to create pipeline.";
 	const pipelines = useSelector(selectPipelines);
 	const selectedPipeline = useSelector(selectSelectedPipeline);
 	const pipelineLoading = useSelector(selectPipelineLoading);
 	const pipelineError = useSelector(selectPipelineError);
 	const selectedPipelineId = selectedPipeline?.id ?? null;
+	const canCreatePipeline = canEditPipeline && pipelines.length === 0;
+	const createPipelineTooltip = !canEditPipeline
+		? "You do not have permission to create pipeline."
+		: !canCreatePipeline
+			? "Only one pipeline can be created."
+			: "";
 
 	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 	const [editPipelineData, setEditPipelineData] = useState<{ id: string; pipelineName: string; industry: string } | null>(null);
@@ -265,7 +270,7 @@ const SalesPipelineDashboard = () => {
 	};
 
 	const handleOpenCreatePipeline = () => {
-		if (!canEditPipeline) return;
+		if (!canCreatePipeline) return;
 		if (document.activeElement instanceof HTMLElement) {
 			document.activeElement.blur();
 		}
@@ -879,31 +884,31 @@ const SalesPipelineDashboard = () => {
                   Create a new pipeline or Select a pipeline to see the stages
                   from left sidebar.
                 </Typography>
-				<Tooltip
-					title={!canEditPipeline ? createPipelineTooltip : ""}
-					disableHoverListener={canEditPipeline}
-					disableFocusListener={canEditPipeline}
-					disableTouchListener={canEditPipeline}
-				>
-					<span>
-						<Button
-							startIcon={<AddIcon fontSize="small" />}
-							className="mobile-add-button"
-							variant="outlined"
-							onClick={handleOpenCreatePipeline}
-							disabled={!canEditPipeline}
-							sx={{
-								mt: 1.5,
-								borderRadius: 2,
-								fontWeight: 700,
-							}}
-						>
-							<span className="mobile-add-button-label">
-								Create New Pipeline
-							</span>
-						</Button>
-					</span>
-				</Tooltip>
+					<Tooltip
+						title={createPipelineTooltip}
+						disableHoverListener={!createPipelineTooltip}
+						disableFocusListener={!createPipelineTooltip}
+						disableTouchListener={!createPipelineTooltip}
+					>
+						<span>
+							<Button
+								startIcon={<AddIcon fontSize="small" />}
+								className="mobile-add-button"
+								variant="outlined"
+								onClick={handleOpenCreatePipeline}
+								disabled={!canCreatePipeline}
+								sx={{
+									mt: 1.5,
+									borderRadius: 2,
+									fontWeight: 700,
+								}}
+							>
+								<span className="mobile-add-button-label">
+									Create New Pipeline
+								</span>
+							</Button>
+						</span>
+					</Tooltip>
               </Box>
             )}
           </Box>

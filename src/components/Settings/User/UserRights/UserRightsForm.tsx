@@ -231,8 +231,11 @@ type ViewMode = "empty" | "summary" | "edit" | "user-summary" | "user-edit";
 
 const STEP_LABELS = ["Module", "Category", "Sub Category"];
 const MODULE_OPTIONS = ["Vidai Leads"];
-const FALLBACK_SUBCATEGORY_OPTIONS = ["Integration", "Tickets", "Templates", "User"];
-const EXCLUDED_ROW_LABELS = new Set(["vidai leads"]);
+const FALLBACK_SUBCATEGORY_OPTIONS = ["Tickets", "Templates", "User"];
+const EXCLUDED_ROW_LABELS = new Set(["vidai leads", "integration"]);
+
+const isHiddenPermissionLabel = (label: string): boolean =>
+  EXCLUDED_ROW_LABELS.has(normalizePermissionLabel(label));
 
 const emptyPerm = (): PermissionFlags => ({
   add: false,
@@ -265,7 +268,7 @@ const normalizeRoleKey = (value: string): string =>
   value.trim().toLowerCase().replace(/[-_\s]+/g, "");
 
 const shouldShowPermissionRow = (label: string): boolean =>
-  !EXCLUDED_ROW_LABELS.has(normalizePermissionLabel(label));
+  !isHiddenPermissionLabel(label);
 
 const hasAnyEnabledPermission = (perm: PermissionFlags): boolean =>
   perm.add || perm.edit || perm.view || perm.print;
@@ -500,13 +503,48 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     return () => { cancelled = true; };
   }, []);
 
-  const categories = useMemo(() => LEADS_MENU.map((item) => item.label), []);
+  const categories = useMemo(
+    () => LEADS_MENU.map((item) => item.label).filter((label) => !isHiddenPermissionLabel(label)),
+    [],
+  );
   const subCategories = useMemo(() => {
     const settings = LEADS_MENU.find((item) => item.key === "settings");
     const dynamic = settings?.subMenu?.map((item) => item.label) ?? [];
     const merged = [...dynamic, ...FALLBACK_SUBCATEGORY_OPTIONS];
-    return Array.from(new Set(merged));
+    return Array.from(new Set(merged)).filter((label) => !isHiddenPermissionLabel(label));
   }, []);
+  const allowedPermissionLabels = useMemo(() => {
+    const allowed = new Set<string>();
+    [...MODULE_OPTIONS, ...categories, ...subCategories].forEach((label) => {
+      allowed.add(normalizePermissionLabel(label));
+    });
+    return allowed;
+  }, [categories, subCategories]);
+  const isAllowedPermissionLabel = (label: string): boolean =>
+    allowedPermissionLabels.has(normalizePermissionLabel(label));
+
+  const sanitizeRights = (rights: RoleRights): RoleRights => ({
+    modules: rights.modules.filter((label) => isAllowedPermissionLabel(label)),
+    categories: rights.categories.filter((label) => isAllowedPermissionLabel(label)),
+    subCategories: rights.subCategories.filter((label) => isAllowedPermissionLabel(label)),
+  });
+
+  const sanitizePerms = (
+    perms: Record<string, PermissionFlags>,
+    rights: RoleRights,
+  ): Record<string, PermissionFlags> => {
+    const allowedKeys = new Set<string>([
+      ...rights.modules,
+      ...rights.categories,
+      ...rights.subCategories,
+    ]);
+    const next: Record<string, PermissionFlags> = {};
+    for (const key of Object.keys(perms)) {
+      if (!allowedKeys.has(key)) continue;
+      next[key] = perms[key];
+    }
+    return next;
+  };
 
   const activeRole = selectedRoleIdx !== null ? roles[selectedRoleIdx] : null;
 
@@ -520,8 +558,9 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
   const optionList = activeStep === 0 ? MODULE_OPTIONS : activeStep === 1 ? categories : subCategories;
   const rightsKey: keyof RoleRights = activeStep === 0 ? "modules" : activeStep === 1 ? "categories" : "subCategories";
 
-  const allSelected = optionList.length > 0 && draftRights[rightsKey].length === optionList.length;
-  const hasStepSelection = draftRights[rightsKey].length > 0;
+  const selectedForStep = draftRights[rightsKey].filter((item) => optionList.includes(item));
+  const allSelected = optionList.length > 0 && selectedForStep.length === optionList.length;
+  const hasStepSelection = selectedForStep.length > 0;
   const hasAnySelection =
     draftRights.categories.length > 0 ||
     draftRights.subCategories.length > 0;
@@ -530,24 +569,34 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     if (!activeRole) return [] as { label: string; perm: PermissionFlags }[];
 
     return Object.entries(activeRole.permissions)
-      .filter(([label, perm]) => shouldShowPermissionRow(label) && hasAnyEnabledPermission(perm))
+      .filter(
+        ([label, perm]) =>
+          shouldShowPermissionRow(label) &&
+          isAllowedPermissionLabel(label) &&
+          hasAnyEnabledPermission(perm),
+      )
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([label, perm]) => ({ label, perm }));
-  }, [activeRole]);
+  }, [activeRole, allowedPermissionLabels]);
 
   const userSummaryRows = useMemo(() => {
     return Object.entries(draftPerms)
-      .filter(([label, perm]) => shouldShowPermissionRow(label) && hasAnyEnabledPermission(perm))
+      .filter(
+        ([label, perm]) =>
+          shouldShowPermissionRow(label) &&
+          isAllowedPermissionLabel(label) &&
+          hasAnyEnabledPermission(perm),
+      )
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([label, perm]) => ({ label, perm }));
-  }, [draftPerms]);
+  }, [draftPerms, allowedPermissionLabels]);
 
   const editRows = useMemo(() => {
     const labels = Array.from(
       new Set([...draftRights.modules, ...draftRights.categories, ...draftRights.subCategories]),
-    ).filter(shouldShowPermissionRow);
+    ).filter((label) => shouldShowPermissionRow(label) && isAllowedPermissionLabel(label));
     return labels.map((label) => ({ label, perm: draftPerms[label] ?? emptyPerm() }));
-  }, [draftRights, draftPerms]);
+  }, [draftRights, draftPerms, allowedPermissionLabels]);
 
   const selectRole = (idx: number) => {
     const role = roles[idx];
@@ -693,8 +742,8 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
 
     const role = roles[selectedRoleIdx];
     // Use the freshly persisted values from draftRights/draftPerms
-    const rights = draftRights;
-    const perms = draftPerms;
+    const rights = sanitizeRights(draftRights);
+    const perms = sanitizePerms(draftPerms, rights);
     const name = role.name;
 
     // Gather existing API perm objects for id-passing on update
@@ -757,7 +806,9 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     const role = roles[selectedRoleIdx];
     const selectedIds = Array.from(selectedUserIdsByRole[role.name] ?? []);
     if (selectedIds.length === 0) return;
-    const permissions = rightsToUserPermissions(draftRights, draftPerms);
+    const rights = sanitizeRights(draftRights);
+    const perms = sanitizePerms(draftPerms, rights);
+    const permissions = rightsToUserPermissions(rights, perms);
     setSaving(true);
     try {
       for (const userId of selectedIds) {

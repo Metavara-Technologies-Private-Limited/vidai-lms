@@ -34,24 +34,6 @@ const ALL_LEADS_MENU: MenuItem[] = [
     page: lazy(() => import("../pages/Referrals")),
   },
   {
-    key: "campaigns",
-    label: "Campaigns",
-    path: "/campaigns",
-    page: lazy(() => import("../pages/Campaigns")),
-  },
-  {
-    key: "reputation",
-    label: "Reputation Management",
-    path: "/reputation",
-    page: lazy(() => import("../pages/Reputation")),
-  },
-  {
-    key: "reports",
-    label: "Reports",
-    path: "/reports",
-    page: lazy(() => import("../pages/Reports.tsx")),
-  },
-  {
     key: "pipeline",
     label: "Sales Pipeline Configuration",
     path: "/pipeline",
@@ -63,14 +45,6 @@ const ALL_LEADS_MENU: MenuItem[] = [
     path: "/settings",
     page: lazy(() => import("../pages/Settings")),
     subMenu: [
-      {
-        key: "integration",
-        label: "Integration",
-        path: "/settings/integration",
-        page: lazy(
-          () => import("../components/Settings/Integration/Integration.tsx"),
-        ),
-      },
       {
         key: "tickets",
         label: "Tickets",

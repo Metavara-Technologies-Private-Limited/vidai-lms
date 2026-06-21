@@ -578,6 +578,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                           </Typography>
                         </Box>
                       </Stack>
+
                       <Stack direction="row" spacing={4}>
                         <Box sx={{ flex: 1 }}>
                           <Typography
@@ -596,6 +597,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                             {appointmentDepartment}
                           </Typography>
                         </Box>
+
                         <Box sx={{ flex: 1 }}>
                           <Typography
                             variant="caption"
@@ -617,21 +619,25 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                           >
                             <Avatar
                               sx={{
-                                width: 22,
-                                height: 22,
-                                fontSize: "11px",
-                                bgcolor: "#EEF2FF",
-                                color: "#6366F1",
+                                width: 40,
+                                height: 40,
+                                bgcolor: "#FEF2F2",
+                                color: "#EF4444",
+                                fontSize: 12,
+                                fontWeight: 700,
                               }}
                             >
                               {appointmentPersonnel.charAt(0)}
                             </Avatar>
-                            <Typography fontWeight={600} fontSize="14px">
-                              {appointmentPersonnel}
-                            </Typography>
+                            <Box>
+                              <Typography variant="body2" fontWeight={700}>
+                                {appointmentPersonnel}
+                              </Typography>
+                            </Box>
                           </Stack>
                         </Box>
                       </Stack>
+
                       {appointmentRemark && appointmentRemark !== "N/A" && (
                         <Box>
                           <Typography
@@ -1535,17 +1541,27 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                               sx={{
                                 width: 40,
                                 height: 40,
-                                bgcolor: "#FEF2F2",
-                                color: "#EF4444",
+                                bgcolor:
+                                  mail.status?.toUpperCase() === "RECEIVED"
+                                    ? "#EFF6FF"
+                                    : "#FEF2F2",
+                                color:
+                                  mail.status?.toUpperCase() === "RECEIVED"
+                                    ? "#3B82F6"
+                                    : "#EF4444",
                                 fontSize: 12,
                                 fontWeight: 700,
                               }}
                             >
-                              CC
+                              {mail.status?.toUpperCase() === "RECEIVED"
+                                ? "↩"
+                                : "CC"}
                             </Avatar>
                             <Box>
                               <Typography variant="body2" fontWeight={700}>
-                                Crysta Clinic
+                                {mail.status?.toUpperCase() === "RECEIVED"
+                                  ? "Lead Reply"
+                                  : "Crysta Clinic"}
                               </Typography>
                               <Typography
                                 variant="caption"

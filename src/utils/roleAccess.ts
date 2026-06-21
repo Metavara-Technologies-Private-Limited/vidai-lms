@@ -408,8 +408,8 @@ export const canAccessMenuKey = (
     return true;
   }
 
-  // user role: only reports + settings
-  return key === "reports" || key === "settings";
+  // user role: settings only when no explicit permission payload is present.
+  return key === "settings";
 };
 
 export const canAccessSubMenuKey = (
@@ -443,7 +443,7 @@ export const canAccessSubMenuKey = (
 
 export const defaultPathForRole = (role: KnownRole): string => {
   if (role === "unknown") return "/dashboard";
-  if (role === "user") return "/reports";
+  if (role === "user") return "/settings";
   return "/dashboard";
 };
 
@@ -453,11 +453,8 @@ export const defaultPathForUser = (
 ): string => {
   const orderedKeys = [
     "dashboard",
-    "reports",
     "leads",
     "referrals",
-    "campaigns",
-    "reputation",
     "pipeline",
     "settings",
   ];
@@ -465,11 +462,8 @@ export const defaultPathForUser = (
   for (const key of orderedKeys) {
     if (canAccessMenuKey(role, key, user)) {
       if (key === "dashboard") return "/dashboard";
-      if (key === "reports") return "/reports";
       if (key === "leads") return "/leads";
       if (key === "referrals") return "/referrals";
-      if (key === "campaigns") return "/campaigns";
-      if (key === "reputation") return "/reputation";
       if (key === "pipeline") return "/pipeline";
       if (key === "settings") return "/settings";
     }

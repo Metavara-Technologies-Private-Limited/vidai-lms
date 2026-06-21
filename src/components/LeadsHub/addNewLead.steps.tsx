@@ -4,6 +4,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogTitle,
   TextField,
   Typography,
   MenuItem,
@@ -980,16 +981,27 @@ export function Step2({
   interestOptions,
   interestOptionsLoading = false,
 }: Step2Props) {
-  const [previewFileUrl, setPreviewFileUrl] = React.useState<string | null>(null);
+  const [previewFile, setPreviewFile] = React.useState<{
+    url: string;
+    name: string;
+    type: string;
+  } | null>(null);
 
   const openPendingFile = (file: File) => {
     const fileUrl = URL.createObjectURL(file);
-    setPreviewFileUrl(fileUrl);
+    setPreviewFile((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return {
+        url: fileUrl,
+        name: file.name,
+        type: file.type || "",
+      };
+    });
   };
 
   const closePreview = () => {
-    setPreviewFileUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
+    setPreviewFile((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
       return null;
     });
   };
@@ -1222,18 +1234,30 @@ export function Step2({
                     {ext} · {(file.size / 1024).toFixed(0)} KB
                   </Typography>
                 </Box>
-                <Tooltip title="View">
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openPendingFile(file);
+                  <Tooltip title="View">
+                    <IconButton
+                    size="medium"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPendingFile(file);
+                      }}
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      border: "1px solid #CBD5E1",
+                      borderRadius: "8px",
+                      bgcolor: "#FFFFFF",
+                      color: "#0F172A",
+                      "&:hover": {
+                        bgcolor: "#F8FAFC",
+                        borderColor: "#94A3B8",
+                        color: "#020617",
+                      },
                     }}
-                    sx={{ color: "#64748B", "&:hover": { color: "#334155" } }}
                   >
-                    <VisibilityOutlinedIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                    <VisibilityOutlinedIcon fontSize="medium" />
+                   </IconButton>
+                 </Tooltip>
                 <Tooltip title="Remove">
                   <IconButton
                     size="small"
@@ -1252,33 +1276,81 @@ export function Step2({
         </Stack>
       )}
 
-      <Dialog open={Boolean(previewFileUrl)} onClose={closePreview} maxWidth="lg" fullWidth>
-        <DialogContent sx={{ p: 0, position: "relative", minHeight: "70vh" }}>
+      <Dialog
+        open={Boolean(previewFile)}
+        onClose={closePreview}
+        fullWidth
+        maxWidth="lg"
+      >
+        <DialogTitle
+          sx={{
+            pr: 6,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Typography
+            variant="subtitle1"
+            sx={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "100%",
+            }}
+          >
+            {previewFile?.name ?? "File preview"}
+          </Typography>
           <IconButton
             onClick={closePreview}
-            sx={{
-              position: "absolute",
-              top: 8,
-              right: 8,
-              zIndex: 2,
-              bgcolor: "rgba(15,23,42,0.7)",
-              color: "#FFFFFF",
-              "&:hover": { bgcolor: "rgba(15,23,42,0.85)" },
-            }}
+            sx={{ color: "#64748B", "&:hover": { color: "#334155" } }}
           >
             <CloseIcon />
           </IconButton>
-
-          {previewFileUrl && (
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0, minHeight: "70vh" }}>
+          {previewFile &&
+          (previewFile.type.startsWith("image/") ||
+            /\.(png|jpe?g|webp|gif)$/i.test(previewFile.name)) ? (
+            <Box
+              component="img"
+              src={previewFile.url}
+              alt={previewFile.name}
+              sx={{
+                width: "100%",
+                maxHeight: "70vh",
+                objectFit: "contain",
+                bgcolor: "#F8FAFC",
+              }}
+            />
+          ) : previewFile &&
+            (previewFile.type === "application/pdf" ||
+              /\.pdf$/i.test(previewFile.name)) ? (
             <Box
               component="iframe"
-              src={previewFileUrl}
-              title="File preview"
+              src={previewFile.url}
+              title={previewFile.name}
               sx={{ width: "100%", height: "70vh", border: 0 }}
             />
-          )}
-        </DialogContent>
-      </Dialog>
+          ) : (
+            <Box
+              sx={{
+                height: "70vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 1,
+                p: 3,
+              }}
+            >
+              <Typography color="text.secondary">
+                Preview is not supported for this file type.
+              </Typography>
+            </Box>
+           )}
+         </DialogContent>
+       </Dialog>
     </Box>
   );
 }

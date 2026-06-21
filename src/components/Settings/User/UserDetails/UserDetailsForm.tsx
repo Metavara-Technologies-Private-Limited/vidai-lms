@@ -3,6 +3,11 @@ import {
   Avatar,
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   Grid,
   IconButton,
@@ -50,6 +55,8 @@ interface Props {
   disableRoleSelection?: boolean;
   onSave: (data: UserFormData) => Promise<void> | void;
   onCancel: () => void;
+  onDelete?: () => Promise<void> | void;
+  canDeleteUser?: boolean;
   isSubmitting?: boolean;
 }
 
@@ -269,12 +276,16 @@ const UserDetailsForm: React.FC<Props> = ({
   disableRoleSelection = false,
   onSave,
   onCancel,
+  onDelete,
+  canDeleteUser = false,
   isSubmitting = false,
 }) => {
   const [form, setForm] = useState<UserFormData>(defaultForm);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -405,6 +416,29 @@ const UserDetailsForm: React.FC<Props> = ({
       );
     } catch {
       // Error toast is handled by page-level integration.
+    }
+  };
+
+  const handleOpenDeleteDialog = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    if (isDeleting) return;
+    setIsDeleteDialogOpen(false);
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete();
+      setIsDeleteDialogOpen(false);
+    } catch {
+      // Error toast is handled by the parent page.
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -707,10 +741,29 @@ const UserDetailsForm: React.FC<Props> = ({
             flexWrap: "wrap",
           }}
         >
+          {mode === "edit" && canDeleteUser && onDelete ? (
+            <Button
+              variant="outlined"
+              onClick={handleOpenDeleteDialog}
+              disabled={isSubmitting || isDeleting}
+              sx={{
+                borderColor: "#D32F2F",
+                color: "#D32F2F",
+                textTransform: "none",
+                fontSize: 13,
+                borderRadius: "6px",
+                px: 3,
+                minWidth: { xs: "100%", sm: 140 },
+                "&:hover": { borderColor: "#B71C1C", bgcolor: "#FFF5F5" },
+              }}
+            >
+              Delete User
+            </Button>
+          ) : null}
           <Button
             variant="outlined"
             onClick={onCancel}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isDeleting}
             sx={{
               borderColor: "#BDBDBD",
               color: "#505050",
@@ -727,7 +780,7 @@ const UserDetailsForm: React.FC<Props> = ({
           <Button
             variant="contained"
             onClick={handleSave}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isDeleting}
             sx={{
               bgcolor: "#505050",
               color: "#ffffff",
@@ -742,6 +795,54 @@ const UserDetailsForm: React.FC<Props> = ({
             {mode === "edit" ? "Update User" : "Create New User"}
           </Button>
         </Box>
+
+        <Dialog
+          open={isDeleteDialogOpen}
+          onClose={handleCloseDeleteDialog}
+          disableRestoreFocus
+          aria-labelledby="delete-user-dialog-title"
+          aria-describedby="delete-user-dialog-description"
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              minWidth: { xs: "calc(100vw - 32px)", sm: 420 },
+            },
+          }}
+        >
+          <DialogTitle id="delete-user-dialog-title" sx={{ fontWeight: 700 }}>
+            Delete User
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText
+              id="delete-user-dialog-description"
+              sx={{ color: "#5F5F5F" }}
+            >
+              This will permanently remove the user from the database. This
+              action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 3 }}>
+            <Button
+              onClick={handleCloseDeleteDialog}
+              disabled={isDeleting}
+              sx={{ textTransform: "none", color: "#505050" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              variant="contained"
+              sx={{
+                textTransform: "none",
+                bgcolor: "#D32F2F",
+                "&:hover": { bgcolor: "#B71C1C" },
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </LocalizationProvider>
   );
