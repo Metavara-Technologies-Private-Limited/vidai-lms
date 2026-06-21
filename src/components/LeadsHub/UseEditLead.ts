@@ -1343,33 +1343,6 @@ export function useEditLead() {
           position: "top-right", autoClose: 1500, theme: "colored",
         });
 
-        // ✅ FORCE SEND EMAIL FOR TESTING
-        try {
-          const actualLeadId = String((leadData as any)?.id || id || "");
-          await LeadEmailAPI.sendNow({
-            lead: actualLeadId,
-            subject: "Appointment Updated Test",
-            sender_email: null,
-            email_body: `Hi, your appointment has been updated. Date: ${appointmentDate} Slot: ${slot}`,
-          });
-          toast.success("Email sent!", {
-            position: "top-right", autoClose: 2000, theme: "colored",
-          });
-        } catch (err: any) {
-          const errorMessage =
-            err?.response?.data?.detail ||
-            err?.response?.data?.message ||
-            err?.message ||
-            "unknown";
-          console.error("Email failed:", err);
-          toast.error(`Email failed: ${errorMessage}`, {
-            position: "top-right", autoClose: 5000, theme: "colored",
-          });
-        }
-
-        // ✅ DEBUG: confirm save flow reached this point
-        console.log("SAVE SUCCESS - checking email");
-
         // ── Send appointment confirmation email if appointment is booked ──
         const bookingActive =
           updateData.book_appointment === true ||
@@ -1391,15 +1364,6 @@ export function useEditLead() {
           (leadData as any)?.email?.trim() ||
           "";
         const resolvedLeadId = String(id || (leadData as any)?.id || "");
-
-        console.log("EMAIL CHECK:", {
-          bookingActive,
-          wantAppointment,
-          finalAppointmentDate,
-          finalSlot,
-          finalEmail,
-          resolvedLeadId,
-        });
 
         if (
           bookingActive &&
@@ -1479,7 +1443,7 @@ export function useEditLead() {
         setTimeout(() => {
   navigate("/leads", { replace: true });
   dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-}, 3000);
+}, 800);
       })
       .catch((err: unknown) => {
         let msg = "Failed to save lead";
