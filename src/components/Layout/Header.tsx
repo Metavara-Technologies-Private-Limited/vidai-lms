@@ -62,6 +62,7 @@ import { CampaignAPI } from "../../services/campaign.api";
 import { toast } from "react-toastify";
 import { getAvatarLetter } from "../../utils/avatar";
 import { toSafePhotoUrl } from "../../utils/mediaUrl";
+import { resolveUserRole } from "../../utils/roleAccess";
 
 const MAX_PROFILE_PHOTO_SIZE = 20 * 1024 * 1024;
 const NOTIFICATION_LAST_SEEN_KEY = "dashboard_notification_last_seen_at";
@@ -420,6 +421,20 @@ const Header = ({
     toNumericId(nestedUser?.user_id) ??
     null;
 
+  // Calendar visibility is role-gated: only Super Admin sees every lead's
+  // appointment for the clinic. Admin and User accounts both only see
+  // appointments for leads assigned directly to them.
+  //
+  // resolveUserRole (roleAccess.ts) returns a closed KnownRole union:
+  // "super_admin" | "admin" | "user" | "unknown". We gate on anything other
+  // than "super_admin" rather than matching "user" specifically, since
+  // Admin is intentionally restricted here too — confirmed against the
+  // actual role values rather than assumed.
+  const currentUserRole = resolveUserRole(
+    user as Record<string, unknown> | null,
+  );
+  const isRestrictedToOwnLeads = currentUserRole !== "super_admin";
+
   const parseTimestamp = (value: unknown): number => {
     if (typeof value !== "string" || !value.trim()) return 0;
     const parsed = Date.parse(value);
@@ -561,6 +576,10 @@ const Header = ({
   // Pulls from the same `notificationLeads` source (already polled every
   // NOTIFICATION_POLL_MS), filtering to leads with a valid, non-past
   // appointment_date — mirroring the logic used in LeadsCalendar.tsx.
+  //
+  // For plain "User" role accounts, this is further restricted to leads
+  // assigned to the current user — they should never see other people's
+  // appointments here. Admins / Super Admins see all clinic appointments.
   const resolveAssigneeName = (record: Record<string, unknown>): string => {
     const direct =
       (typeof record.assigned_to_name === "string" &&
@@ -596,6 +615,27 @@ const Header = ({
     return "Unassigned";
   };
 
+  const resolveAssigneeId = (record: Record<string, unknown>): number | null => {
+    const directId =
+      toNumericId(record.assigned_to_id) ?? toNumericId(record.assignee_id);
+    if (directId !== null) return directId;
+
+    const nestedAssignee =
+      record.assigned_to && typeof record.assigned_to === "object"
+        ? (record.assigned_to as Record<string, unknown>)
+        : record.assignee && typeof record.assignee === "object"
+          ? (record.assignee as Record<string, unknown>)
+          : null;
+
+    if (nestedAssignee) {
+      return (
+        toNumericId(nestedAssignee.id) ?? toNumericId(nestedAssignee.user_id)
+      );
+    }
+
+    return toNumericId(record.assigned_to);
+  };
+
   const upcomingAppointments = useMemo<UpcomingAppointment[]>(() => {
     const today = dayjs().startOf("day");
 
@@ -604,6 +644,14 @@ const Header = ({
         const record = lead as unknown as Record<string, unknown>;
         if (!record.appointment_date) return null;
         if (record.is_active === false) return null;
+
+        // Restrict "User" role accounts to leads assigned to them.
+        if (isRestrictedToOwnLeads) {
+          const assigneeId = resolveAssigneeId(record);
+          if (assigneeId === null || assigneeId !== currentUserId) {
+            return null;
+          }
+        }
 
         const apptDate = dayjs(record.appointment_date as string);
         if (!apptDate.isValid()) return null;
@@ -641,7 +689,7 @@ const Header = ({
       .sort((a, b) => a.sortKey - b.sortKey)
       .slice(0, MAX_UPCOMING_APPOINTMENTS)
       .map(({ sortKey, ...rest }) => rest);
-  }, [notificationLeads]);
+  }, [notificationLeads, isRestrictedToOwnLeads, currentUserId]);
 
   const todayAppointmentCount = upcomingAppointments.filter(
     (item) => item.isToday,
@@ -1373,5 +1421,6 @@ const Header = ({
     </AppBar>
   );
 };
+
 
 export default Header;
