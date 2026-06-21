@@ -718,8 +718,6 @@ export function Step1({
                   [
                     ["FIRST NAME", selectedLeadGeneratedBy.first_name],
                     ["LAST NAME", selectedLeadGeneratedBy.last_name],
-                    ["ROLE", selectedLeadGeneratedBy.role],
-                    ["EMAIL", selectedLeadGeneratedBy.email],
                   ] as [string, string | undefined][]
                 ).map(([fieldLabel, fieldValue]) => (
                   <Box key={fieldLabel}>
@@ -729,7 +727,7 @@ export function Step1({
                     <Typography
                       sx={{
                         fontSize: "0.8rem", fontWeight: 500,
-                        color: fieldLabel === "EMAIL" ? "#6366F1" : "#1E293B",
+                        color: "#1E293B",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}
                     >
@@ -1236,13 +1234,13 @@ export function Step2({
                     {ext} · {(file.size / 1024).toFixed(0)} KB
                   </Typography>
                 </Box>
-                <Tooltip title="View">
-                  <IconButton
+                  <Tooltip title="View">
+                    <IconButton
                     size="medium"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openPendingFile(file);
-                    }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPendingFile(file);
+                      }}
                     sx={{
                       width: 32,
                       height: 32,
@@ -1258,8 +1256,8 @@ export function Step2({
                     }}
                   >
                     <VisibilityOutlinedIcon fontSize="medium" />
-                  </IconButton>
-                </Tooltip>
+                   </IconButton>
+                 </Tooltip>
                 <Tooltip title="Remove">
                   <IconButton
                     size="small"
@@ -1350,9 +1348,9 @@ export function Step2({
                 Preview is not supported for this file type.
               </Typography>
             </Box>
-          )}
-        </DialogContent>
-      </Dialog>
+           )}
+         </DialogContent>
+       </Dialog>
     </Box>
   );
 }

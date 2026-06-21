@@ -1057,9 +1057,9 @@ const Header = ({
                     component="img"
                     src={icon}
                     width={isSmDown ? 20 : isCompactDesktop ? 22 : 24}
-                  />
-                </Badge>
-              ) : (
+                    />
+                  </Badge>
+                ) : (
                 <Box
                   component="img"
                   src={icon}

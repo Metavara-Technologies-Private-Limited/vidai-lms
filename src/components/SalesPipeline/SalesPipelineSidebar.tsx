@@ -69,7 +69,7 @@ const SalesPipelineSidebar = ({
   const theme = useTheme();
   const canCreatePipeline = canEditPipeline && pipelines.length === 0;
   const createPipelineTooltip = !canEditPipeline
-    ? "Only one pipeline you can create. Please ask admin to give permission."
+    ? "You do not have permission to create pipeline."
     : !canCreatePipeline
       ? "Only one pipeline can be created."
       : "";

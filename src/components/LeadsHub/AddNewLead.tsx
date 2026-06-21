@@ -119,7 +119,7 @@ const normalizeUsersList = (users: any[]): AssigneeOption[] => {
 };
 
 const normalizeAssignees = (res: any): AssigneeOption[] => {
-  const users =
+  const candidate =
     (Array.isArray(res) && res) ||
     res?.data?.objects ||
     res?.data?.results ||
@@ -129,6 +129,9 @@ const normalizeAssignees = (res: any): AssigneeOption[] => {
     res?.users ||
     res?.data ||
     [];
+
+  const users = Array.isArray(candidate) ? candidate : [];
+
   return users.map((u: any) => ({
     id: u.id,
     first_name: u.first_name,
