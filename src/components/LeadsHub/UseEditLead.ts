@@ -1345,8 +1345,9 @@ export function useEditLead() {
 
         // ✅ FORCE SEND EMAIL FOR TESTING
         try {
+          const actualLeadId = String((leadData as any)?.id || id || "");
           await LeadEmailAPI.sendNow({
-            lead: String(id),
+            lead: actualLeadId,
             subject: "Appointment Updated Test",
             sender_email: null,
             email_body: `Hi, your appointment has been updated. Date: ${appointmentDate} Slot: ${slot}`,
@@ -1354,10 +1355,15 @@ export function useEditLead() {
           toast.success("Email sent!", {
             position: "top-right", autoClose: 2000, theme: "colored",
           });
-        } catch (err) {
+        } catch (err: any) {
+          const errorMessage =
+            err?.response?.data?.detail ||
+            err?.response?.data?.message ||
+            err?.message ||
+            "unknown";
           console.error("Email failed:", err);
-          toast.error("Email failed!", {
-            position: "top-right", autoClose: 2000, theme: "colored",
+          toast.error(`Email failed: ${errorMessage}`, {
+            position: "top-right", autoClose: 5000, theme: "colored",
           });
         }
 
