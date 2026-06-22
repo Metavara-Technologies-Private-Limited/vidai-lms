@@ -9,13 +9,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
-import { LeadAPI, DepartmentAPI, EmployeeAPI, InterestAPI, LeadEmailAPI } from "../../services/leads.api";
+import { LeadAPI, DepartmentAPI, EmployeeAPI, InterestAPI, LeadEmailAPI, LeadFormFieldAPI } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import {
   pipelineApi,
   isActiveStageStatus,
   type Pipeline,
   type PipelineStage,
+  type PipelineStageField,
 } from "../../services/pipeline.api";
 import { fetchLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
@@ -26,6 +27,7 @@ import type {
   LeadPayload,
   Department,
   Employee,
+  LeadFormField,
 } from "../../services/leads.api";
 import type { AppDispatch, RootState } from "../../store";
 import { TASK_TYPES, TASK_STATUS_FOR_TYPE } from "./LeadTaskConfig";
@@ -326,6 +328,11 @@ const deriveAllActionTypeOptions = (stages: PipelineStage[]): string[] => {
 const isTruthy = (val: unknown): boolean =>
   val === true || val === 1 || val === "1" || val === "true";
 
+const buildDataCaptureKey = (field: PipelineStageField): string =>
+  field.field_key ||
+  field.id ||
+  field.field_name.trim().toLowerCase().replace(/\s+/g, "_");
+
 // ====================== Task Status Options ======================
 export const TASK_STATUS_OPTIONS = [
   { label: "To-do", value: "to_do" },
@@ -409,6 +416,9 @@ export function useEditLead() {
   // ── Pipeline / stage state ──
   const [pipelineStages, setPipelineStages] = React.useState<PipelineStage[]>([]);
   const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string | null>(null);
+  const [dataCaptureFields, setDataCaptureFields] = React.useState<PipelineStageField[]>([]);
+  const [dataCaptureValues, setDataCaptureValues] = React.useState<Record<string, string>>({});
+  const [leadFormFields, setLeadFormFields] = React.useState<LeadFormField[]>([]);
 
   // ── Next action type options ──
   const [nextActionTypeOptions, setNextActionTypeOptions] = React.useState<string[]>([...TASK_TYPES]);
@@ -554,6 +564,60 @@ export function useEditLead() {
       .map((s) => ({ label: s.stage_name.trim(), value: s.stage_name.trim() }));
   }, [pipelineStages, leadStatus]);
 
+  const resolvedDataCaptureFields = React.useMemo(
+    () =>
+      dataCaptureFields
+        .filter((field) => field.field_name.trim().length > 0)
+        .filter((field) => {
+          if (!field.field_key) return true;
+          const catalogField = leadFormFields.find(
+            (leadField) => leadField.field_key === field.field_key,
+          );
+          return !catalogField?.model_field;
+        })
+        .map((field) => {
+          const catalogField = field.field_key
+            ? leadFormFields.find(
+                (leadField) => leadField.field_key === field.field_key,
+              )
+            : undefined;
+          return {
+            key: buildDataCaptureKey(field),
+            label: catalogField?.field_label || field.field_name.trim(),
+            type: field.field_type,
+            required: field.is_mandatory,
+          };
+        }),
+    [dataCaptureFields, leadFormFields],
+  );
+
+  const applyStageDataCapture = React.useCallback((stage: PipelineStage | null) => {
+    const nextFields = Array.isArray(stage?.fields) ? stage.fields : [];
+    setDataCaptureFields(nextFields);
+    setDataCaptureValues((previous) => {
+      const next: Record<string, string> = {};
+      nextFields.forEach((field) => {
+        const key = buildDataCaptureKey(field);
+        next[key] = previous[key] ?? "";
+      });
+      return next;
+    });
+  }, []);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    LeadFormFieldAPI.list()
+      .then((fields) => {
+        if (isMounted) setLeadFormFields(fields);
+      })
+      .catch(() => {
+        if (isMounted) setLeadFormFields([]);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // ── Auto-clear nextType if no longer valid ─────────────────────────────────
   React.useEffect(() => {
     if (!nextType) return;
@@ -642,6 +706,12 @@ export function useEditLead() {
   const pipelineStagesLoaded = pipelineStages.length > 0;
   React.useEffect(() => {
     if (!pipelineStagesLoaded) return;
+    const leadStage = pipelineStages.find(
+      (s) => s.stage_name.trim().toLowerCase() === leadStatus.trim().toLowerCase(),
+    );
+    applyStageDataCapture(leadStage ?? null);
+    setSelectedNextActionStageId(leadStage?.id ?? null);
+
     const nextStage = pipelineStages.find(
       (s) => s.stage_name.trim().toLowerCase() === nextStatus.trim().toLowerCase(),
     );
@@ -649,9 +719,6 @@ export function useEditLead() {
       setNextActionTypeOptions(deriveActionTypeOptions(nextStage));
       return;
     }
-    const leadStage = pipelineStages.find(
-      (s) => s.stage_name.trim().toLowerCase() === leadStatus.trim().toLowerCase(),
-    );
     if (leadStage) {
       const afterStages = pipelineStages
         .filter((s) => s.stage_order > leadStage.stage_order)
@@ -665,8 +732,7 @@ export function useEditLead() {
     } else {
       setNextActionTypeOptions(deriveAllActionTypeOptions(pipelineStages));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pipelineStagesLoaded]);
+  }, [pipelineStagesLoaded, pipelineStages, leadStatus, nextStatus, applyStageDataCapture]);
 
   // ── Fetch Referral Departments ──
   React.useEffect(() => {
@@ -692,6 +758,7 @@ export function useEditLead() {
       (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
     );
     setSelectedNextActionStageId(matched?.id ?? null);
+    applyStageDataCapture(matched ?? null);
     const nextStages = pipelineStages
       .filter((s) => (matched ? s.stage_order > matched.stage_order : true))
       .sort((a, b) => a.stage_order - b.stage_order);
@@ -868,6 +935,19 @@ export function useEditLead() {
           (anyLead.lead_status as string) ??
           "";
         setLeadStatus(rawLeadStatus);
+
+        const customFieldValues = Array.isArray(anyLead.custom_field_values)
+          ? (anyLead.custom_field_values as Array<{
+              field_key?: string;
+              value?: string | number | null;
+            }>)
+          : [];
+        setDataCaptureValues(
+          customFieldValues.reduce<Record<string, string>>((values, item) => {
+            if (item.field_key) values[item.field_key] = String(item.value ?? "");
+            return values;
+          }, {}),
+        );
 
         // ── Referral Department ──
         const rawReferralDept = anyLead.referral_department_id;
@@ -1324,6 +1404,14 @@ export function useEditLead() {
             remark: "",
             ...(IS_MEDICAL_APP ? { personal_id: null } : {}),
           }),
+      custom_field_values: resolvedDataCaptureFields.reduce<Record<string, string>>(
+        (values, field) => {
+          const value = (dataCaptureValues[field.key] ?? "").trim();
+          values[field.key] = value;
+          return values;
+        },
+        {},
+      ),
     };
 
     setShowSuccess(true);
@@ -1493,6 +1581,9 @@ export function useEditLead() {
     referralDepartments,
     loadingReferralDepts,
     referralDepartment,
+    resolvedDataCaptureFields,
+    dataCaptureValues,
+    setDataCaptureValues,
     // ── Shared fields ──
     fullName,
     setFullName,

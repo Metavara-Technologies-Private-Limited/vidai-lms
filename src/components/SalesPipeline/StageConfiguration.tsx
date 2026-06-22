@@ -18,6 +18,11 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { toast } from "react-toastify";
+import {
+	FALLBACK_LEAD_FORM_FIELDS,
+	LeadFormFieldAPI,
+	type LeadFormField,
+} from "../../services/leads.api";
 
 type StageConfigurationProps = {
 	open: boolean;
@@ -31,6 +36,8 @@ type StageConfigurationProps = {
 
 type DataCaptureField = {
 	id: string;
+	mode: "existing" | "custom";
+	fieldKey: string;
 	fieldName: string;
 	fieldType: "text" | "number" | "date" | "dropdown";
 	isMandatory: boolean;
@@ -49,6 +56,7 @@ export type StageConfigPayload = {
 	entryRule: string;
 	actions: StageAction[];
 	dataCaptureFields?: Array<{
+		fieldKey?: string;
 		fieldName: string;
 		fieldType: "text" | "number" | "date" | "dropdown";
 		isMandatory: boolean;
@@ -124,15 +132,40 @@ const StageConfiguration = ({
 	const colorPickerRef = useRef<HTMLInputElement | null>(null);
 	const [dataCaptureFields, setDataCaptureFields] = useState<DataCaptureField[]>([
 	]);
+	const [expandedFieldIds, setExpandedFieldIds] = useState<Set<string>>(new Set());
+	const [leadFormFields, setLeadFormFields] = useState<LeadFormField[]>([]);
+	const [leadFormFieldsLoading, setLeadFormFieldsLoading] = useState(false);
 
-	const createEmptyField = (): DataCaptureField => ({
+	const createExistingField = (): DataCaptureField => ({
 		id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+		mode: "existing",
+		fieldKey: "",
 		fieldName: "",
 		fieldType: "text",
 		isMandatory: false,
 	});
 
-	const handleAddAnotherField = () => {
+	const createCustomField = (): DataCaptureField => ({
+		id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+		mode: "custom",
+		fieldKey: "",
+		fieldName: "",
+		fieldType: "text",
+		isMandatory: false,
+	});
+
+	const getCatalogField = (fieldKey: string): LeadFormField | undefined =>
+		leadFormFields.find((field) => field.field_key === fieldKey);
+
+	const getSelectedFieldKeys = (currentFieldId?: string): Set<string> =>
+		new Set(
+			dataCaptureFields
+				.filter((field) => field.id !== currentFieldId)
+				.map((field) => field.fieldKey)
+				.filter(Boolean),
+		);
+
+	const handleAddField = (fieldMode: DataCaptureField["mode"]) => {
 		if (!stageName.trim()) {
 			toast.error("Please enter stage name before adding data capture", {
 				position: "top-right",
@@ -140,7 +173,10 @@ const StageConfiguration = ({
 			});
 			return;
 		}
-		setDataCaptureFields((previous) => [...previous, createEmptyField()]);
+		const nextField =
+			fieldMode === "existing" ? createExistingField() : createCustomField();
+		setDataCaptureFields((previous) => [...previous, nextField]);
+		setExpandedFieldIds((previous) => new Set([...previous, nextField.id]));
 	};
 
 	const handleCopyField = (fieldId: string) => {
@@ -152,16 +188,28 @@ const StageConfiguration = ({
 			const copiedField: DataCaptureField = {
 				...fieldToCopy,
 				id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+				mode: fieldToCopy.mode,
+				fieldKey: "",
+				fieldName:
+					fieldToCopy.mode === "custom" ? `${fieldToCopy.fieldName} Copy` : "",
+				fieldType: fieldToCopy.mode === "custom" ? fieldToCopy.fieldType : "text",
+				isMandatory: false,
 			};
 
 			const next = [...previous];
 			next.splice(fieldIndex + 1, 0, copiedField);
+			setExpandedFieldIds((expanded) => new Set([...expanded, copiedField.id]));
 			return next;
 		});
 	};
 
 	const handleDeleteField = (fieldId: string) => {
 		setDataCaptureFields((previous) => previous.filter((field) => field.id !== fieldId));
+		setExpandedFieldIds((previous) => {
+			const next = new Set(previous);
+			next.delete(fieldId);
+			return next;
+		});
 	};
 
 	const handleUpdateField = (
@@ -198,6 +246,26 @@ const StageConfiguration = ({
 		);
 	};
 
+	const handleSelectLeadFormField = (fieldId: string, fieldKey: string) => {
+		const catalogField = getCatalogField(fieldKey);
+		setDataCaptureFields((previous) =>
+			previous.map((field) =>
+				field.id === fieldId
+					? {
+							...field,
+							fieldKey,
+							fieldName: catalogField?.field_label ?? "",
+							fieldType: catalogField?.stage_field_type ?? "text",
+							isMandatory:
+								catalogField?.is_locked && catalogField?.is_required
+									? true
+									: field.isMandatory,
+						}
+					: field,
+			),
+		);
+	};
+
 	const handleStageNameInputChange = (value: string) => {
 		if (/[^A-Za-z0-9 \-&.()/]/.test(value)) {
       showInputToast(
@@ -214,7 +282,10 @@ const StageConfiguration = ({
 	const handleToggleMandatory = (fieldId: string) => {
 		setDataCaptureFields((previous) =>
 			previous.map((field) =>
-				field.id === fieldId ? { ...field, isMandatory: !field.isMandatory } : field,
+				field.id === fieldId &&
+				!(getCatalogField(field.fieldKey)?.is_locked && getCatalogField(field.fieldKey)?.is_required)
+					? { ...field, isMandatory: !field.isMandatory }
+					: field,
 			),
 		);
 	};
@@ -225,6 +296,59 @@ const StageConfiguration = ({
 				action.id === actionId ? { ...action, checked: !action.checked } : action,
 			),
 		);
+	};
+
+	const syncDataCaptureFieldsWithCatalog = async (): Promise<DataCaptureField[]> => {
+		const syncedFields: DataCaptureField[] = [];
+		let nextCatalog = [...leadFormFields];
+
+		for (const field of dataCaptureFields) {
+			const trimmedLabel = field.fieldName.trim();
+			if (field.mode === "custom") {
+				const createdField = await LeadFormFieldAPI.create({
+					field_label: trimmedLabel,
+					field_type: field.fieldType,
+					stage_field_type: field.fieldType,
+					form_step: 1,
+					section: "Additional Fields",
+					is_required: false,
+					is_active: true,
+				});
+				nextCatalog = [...nextCatalog, createdField];
+				syncedFields.push({
+					...field,
+					mode: "existing",
+					fieldKey: createdField.field_key,
+					fieldName: createdField.field_label,
+					fieldType: createdField.stage_field_type,
+				});
+				continue;
+			}
+
+			const catalogField = nextCatalog.find(
+				(item) => item.field_key === field.fieldKey,
+			);
+			if (catalogField && catalogField.field_label !== trimmedLabel) {
+				const updatedField = await LeadFormFieldAPI.update(field.fieldKey, {
+					field_label: trimmedLabel,
+				});
+				nextCatalog = nextCatalog.map((item) =>
+					item.field_key === updatedField.field_key ? updatedField : item,
+				);
+				syncedFields.push({
+					...field,
+					fieldName: updatedField.field_label,
+					fieldType: updatedField.stage_field_type,
+				});
+				continue;
+			}
+
+			syncedFields.push(field);
+		}
+
+		setLeadFormFields(nextCatalog);
+		setDataCaptureFields(syncedFields);
+		return syncedFields;
 	};
 
 	const handleSaveCustomAction = () => {
@@ -258,17 +382,72 @@ const StageConfiguration = ({
 		setShowCustomActionForm(false);
 		setCustomActionText("");
 		if (initialValues?.dataCaptureFields !== undefined) {
-			setDataCaptureFields(
-				initialValues.dataCaptureFields.map((field, i) => ({
+			const nextFields: DataCaptureField[] = initialValues.dataCaptureFields.map((field, i) => ({
 					id: `field-${Date.now()}-${i}`,
+					mode: field.fieldKey ? "existing" : "custom",
+					fieldKey: field.fieldKey ?? "",
 					fieldName: field.fieldName,
 					fieldType: field.fieldType,
 					isMandatory: field.isMandatory,
-				})),
+				}));
+			setDataCaptureFields(nextFields);
+			setExpandedFieldIds(
+				new Set(
+					nextFields
+						.filter((field) => field.mode === "custom" || !field.fieldKey)
+						.map((field) => field.id),
+				),
 			);
 		}
 		setShowValidation(false);
 	}, [open, initialValues, mode, stageName]);
+
+	useEffect(() => {
+		if (!open || leadFormFieldsLoading) return;
+		let isMounted = true;
+		setLeadFormFieldsLoading(true);
+		LeadFormFieldAPI.list()
+			.then((fields) => {
+				if (isMounted) setLeadFormFields(fields.length > 0 ? fields : FALLBACK_LEAD_FORM_FIELDS);
+			})
+			.catch(() => {
+				if (isMounted) {
+					setLeadFormFields(FALLBACK_LEAD_FORM_FIELDS);
+					toast.error("Unable to load lead form fields", {
+						position: "top-right",
+						autoClose: 2000,
+					});
+				}
+			})
+			.finally(() => {
+				if (isMounted) setLeadFormFieldsLoading(false);
+			});
+		return () => {
+			isMounted = false;
+		};
+	}, [open]);
+
+	useEffect(() => {
+		if (!leadFormFields.length) return;
+		setDataCaptureFields((previous) =>
+			previous.map((field) => {
+				if (field.mode !== "existing" || !field.fieldKey) return field;
+				const catalogField = leadFormFields.find(
+					(leadField) => leadField.field_key === field.fieldKey,
+				);
+				if (!catalogField) return field;
+				return {
+					...field,
+					fieldName: catalogField.field_label,
+					fieldType: catalogField.stage_field_type,
+					isMandatory:
+						catalogField.is_locked && catalogField.is_required
+							? true
+							: field.isMandatory,
+				};
+			}),
+		);
+	}, [leadFormFields]);
 
 	const handleSave = async () => {
 		const trimmedStageName = stageName.trim();
@@ -282,17 +461,24 @@ const StageConfiguration = ({
 		const hasInvalidDataCaptureName = dataCaptureFields.some((field) => {
 			const trimmedFieldName = field.fieldName.trim();
 			return (
+				(field.mode === "existing" && !field.fieldKey.trim()) ||
 				!trimmedFieldName ||
 				trimmedFieldName.length > MAX_NAME_LENGTH ||
 				!isAlphabeticName(trimmedFieldName)
 			);
 		});
+		const selectedFieldKeys = dataCaptureFields
+			.map((field) => field.fieldKey)
+			.filter(Boolean);
+		const hasDuplicateDataCaptureFields =
+			new Set(selectedFieldKeys).size !== selectedFieldKeys.length;
 
 		const hasValidationError =
 			isSingleLetterStageName ||
 			trimmedStageName.length > MAX_NAME_LENGTH ||
 			(trimmedStageName.length > 0 && !isAlphabeticName(trimmedStageName)) ||
 			hasInvalidDataCaptureName ||
+			hasDuplicateDataCaptureFields ||
 			!trimmedStageType ||
 			!trimmedStageStatus ||
 			!isValidHexColor(trimmedColorCode) ||
@@ -305,17 +491,26 @@ const StageConfiguration = ({
 		if (typeof onSave !== "function") return;
 		try {
 			setIsSaving(true);
+			const syncedDataCaptureFields =
+				await syncDataCaptureFieldsWithCatalog();
 			await onSave(normalizedStageName, {
 				stageType: trimmedStageType,
 				stageStatus: trimmedStageStatus,
 				colorCode: trimmedColorCode.toUpperCase(),
 				entryRule: trimmedEntryRule,
 				actions: stageActions,
-				dataCaptureFields: dataCaptureFields.map(({ fieldName, fieldType, isMandatory }) => ({
+				dataCaptureFields: syncedDataCaptureFields.map(({ fieldKey, fieldName, fieldType, isMandatory }) => ({
+					fieldKey,
 					fieldName,
 					fieldType,
 					isMandatory,
 				})),
+			});
+		} catch (error) {
+			console.error("[StageConfiguration] Failed to save data capture", error);
+			toast.error("Unable to save data capture fields", {
+				position: "top-right",
+				autoClose: 2000,
 			});
 		} finally {
 			setIsSaving(false);
@@ -819,16 +1014,75 @@ const StageConfiguration = ({
               stage.
             </Typography>
 
-            {dataCaptureFields.map((field, index) => (
-              <Box
-                key={field.id}
-                sx={{
-                  border: `1px solid ${theme.palette.grey[200]}`,
-                  borderRadius: 2,
-                  mb: 1.4,
-                  overflow: "hidden",
-                }}
-              >
+            {dataCaptureFields.map((field, index) => {
+              const catalogField = getCatalogField(field.fieldKey);
+              const selectedKeys = getSelectedFieldKeys(field.id);
+              const isLockedMandatory = Boolean(
+                catalogField?.is_locked && catalogField?.is_required,
+              );
+              const hasDuplicateField =
+                field.fieldKey.trim().length > 0 && selectedKeys.has(field.fieldKey);
+              const isExpanded =
+                expandedFieldIds.has(field.id) ||
+                field.mode === "custom" ||
+                !field.fieldKey;
+
+              if (!isExpanded) {
+                return (
+                  <Box
+                    key={field.id}
+                    onClick={() =>
+                      setExpandedFieldIds((previous) =>
+                        new Set([...previous, field.id]),
+                      )
+                    }
+                    sx={{
+                      border: `1px solid ${theme.palette.grey[200]}`,
+                      borderRadius: 2,
+                      mb: 1.1,
+                      px: 1.4,
+                      py: 1.1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      backgroundColor: "#FFFFFF",
+                      cursor: "pointer",
+                      "&:hover": { backgroundColor: "#FAFAFB" },
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                        {field.fieldName || catalogField?.field_label || `FIELD ${index + 1}`}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
+                        Existing lead field
+                        {field.isMandatory ? " • Mandatory" : ""}
+                      </Typography>
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        color: theme.palette.primary.main,
+                        fontWeight: 600,
+                        flexShrink: 0,
+                      }}
+                    >
+                      Edit
+                    </Typography>
+                  </Box>
+                );
+              }
+
+              return (
+                <Box
+                  key={field.id}
+                  sx={{
+                    border: `1px solid ${theme.palette.grey[200]}`,
+                    borderRadius: 2,
+                    mb: 1.4,
+                    overflow: "hidden",
+                  }}
+                >
                 <Box
                   sx={{
                     px: 1.4,
@@ -843,6 +1097,22 @@ const StageConfiguration = ({
                     {`FIELD ${index + 1}`}
                   </Typography>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                    {field.mode === "existing" && field.fieldKey ? (
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() =>
+                          setExpandedFieldIds((previous) => {
+                            const next = new Set(previous);
+                            next.delete(field.id);
+                            return next;
+                          })
+                        }
+                        sx={{ minWidth: 0, px: 0.7, fontSize: 12, textTransform: "none" }}
+                      >
+                        Done
+                      </Button>
+                    ) : null}
                     <ContentCopyOutlinedIcon
                       onClick={() => handleCopyField(field.id)}
                       sx={{
@@ -863,9 +1133,70 @@ const StageConfiguration = ({
                 </Box>
 
                 <Box sx={{ p: 1.4 }}>
+                  {field.mode === "existing" ? (
+                    <TextField
+                      size="small"
+                      label="Existing Lead Field"
+                      value={field.fieldKey || (field.fieldName ? "__legacy__" : "")}
+                      onChange={(event) =>
+                        handleSelectLeadFormField(field.id, event.target.value)
+                      }
+                      select
+                      SelectProps={{
+                        MenuProps: {
+                          disablePortal: true,
+                          PaperProps: { "data-stage-config-keep-open": "true" },
+                        },
+                      }}
+                      error={showValidation && (!field.fieldKey.trim() || hasDuplicateField)}
+                      helperText={
+                        showValidation && !field.fieldKey.trim()
+                          ? "Select a lead field"
+                          : showValidation && hasDuplicateField
+                            ? "This field is already selected"
+                            : " "
+                      }
+                      fullWidth
+                      sx={{
+                        mb: 1.2,
+                        "& .MuiFormHelperText-root": {
+                          minHeight: 18,
+                          m: 0,
+                          pt: 0.35,
+                        },
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>
+                          {leadFormFieldsLoading
+                            ? "Loading fields..."
+                            : "Select lead field"}
+                        </em>
+                      </MenuItem>
+                      {field.fieldName && !field.fieldKey && (
+                        <MenuItem value="__legacy__" disabled>
+                          {field.fieldName}
+                        </MenuItem>
+                      )}
+                      {field.fieldKey && !catalogField && field.fieldName && (
+                        <MenuItem value={field.fieldKey} disabled>
+                          {field.fieldName}
+                        </MenuItem>
+                      )}
+                      {leadFormFields.map((leadField) => (
+                        <MenuItem
+                          key={leadField.field_key}
+                          value={leadField.field_key}
+                          disabled={selectedKeys.has(leadField.field_key)}
+                        >
+                          {leadField.field_label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  ) : null}
                   <TextField
                     size="small"
-                    label="Field Name"
+                    label={field.mode === "existing" ? "Stage Field Label" : "New Field Label"}
                     value={field.fieldName}
                     onChange={(event) =>
                       handleUpdateField(
@@ -882,13 +1213,15 @@ const StageConfiguration = ({
                     }
                     helperText={
                       showValidation && !field.fieldName.trim()
-                        ? "Field name is required"
+                        ? "Field label is required"
                         : showValidation &&
                             field.fieldName.trim().length > MAX_NAME_LENGTH
                           ? "Maximum 50 characters allowed"
                           : showValidation && !isAlphabeticName(field.fieldName)
                             ? "Only letters, numbers, hyphens, and special characters are allowed"
-                            : " "
+                            : field.mode === "existing" && catalogField
+                              ? `Default label: ${catalogField.field_label}`
+                              : " "
                     }
                     inputProps={{ maxLength: MAX_NAME_LENGTH }}
                     fullWidth
@@ -913,6 +1246,7 @@ const StageConfiguration = ({
                       )
                     }
                     select
+                    disabled={field.mode === "existing" && Boolean(field.fieldKey)}
                     SelectProps={{
                       MenuProps: {
                         disablePortal: true,
@@ -929,19 +1263,22 @@ const StageConfiguration = ({
                   </TextField>
 
                   <Box
-                    onClick={() => handleToggleMandatory(field.id)}
                     sx={{
                       display: "flex",
                       alignItems: "center",
                       gap: 0.9,
-                      cursor: "pointer",
+                      cursor: isLockedMandatory ? "default" : "pointer",
                     }}
                   >
                     <Switch
                       size="small"
                       checked={field.isMandatory}
-                      onChange={() => handleToggleMandatory(field.id)}
+                      onChange={(event) => {
+                        event.stopPropagation();
+                        handleToggleMandatory(field.id);
+                      }}
                       color="success"
+                      disabled={isLockedMandatory}
                       sx={{ m: 0 }}
                     />
                     <Typography sx={{ fontSize: 13, color: "text.primary" }}>
@@ -949,25 +1286,42 @@ const StageConfiguration = ({
                     </Typography>
                   </Box>
                 </Box>
-              </Box>
-            ))}
+                </Box>
+              );
+            })}
 
-            <Box
-              onClick={handleAddAnotherField}
+            <Stack
+              direction="row"
+              spacing={1}
               sx={{
-                display: "flex",
-                alignItems: "center",
                 justifyContent: "flex-end",
-                gap: 0.7,
-                color: theme.palette.primary.main,
-                fontWeight: 500,
-                fontSize: 14,
-                cursor: "pointer",
+                flexWrap: "wrap",
+                rowGap: 1,
               }}
             >
-              <AddBoxOutlinedIcon sx={{ fontSize: 17 }} />
-              Add Another Field
-            </Box>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AddBoxOutlinedIcon sx={{ fontSize: 17 }} />}
+                onClick={() => handleAddField("existing")}
+                sx={{ fontSize: 12, textTransform: "none" }}
+              >
+                Use Existing Field
+              </Button>
+              <Button
+                size="small"
+                variant="text"
+                startIcon={<AddBoxOutlinedIcon sx={{ fontSize: 17 }} />}
+                onClick={() => handleAddField("custom")}
+                sx={{
+                  fontSize: 12,
+                  textTransform: "none",
+                  color: theme.palette.primary.main,
+                }}
+              >
+                Add New Field
+              </Button>
+            </Stack>
           </>
         )}
       </Box>

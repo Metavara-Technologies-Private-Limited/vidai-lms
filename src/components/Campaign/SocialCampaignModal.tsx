@@ -54,7 +54,6 @@ const PLATFORM_LIST: { id: Platform; label: string; cpc: number }[] = [
 
 // FIX: minimum budget is strictly greater than $2 — so minimum accepted is $3
 const PLATFORM_MIN_BUDGET = 2; // must be strictly greater than this
-
 const isPlainUrl = (str: string) =>
   str.trim().startsWith("http") && !str.trim().includes(" ");
 

@@ -163,6 +163,7 @@ export const mapRulesToActions = (rules: PipelineStageRule[]): StageAction[] => 
  */
 export const mapDataCaptureToFields = (
 	dataCaptureFields?: Array<{
+		fieldKey?: string;
 		fieldName: string;
 		fieldType: "text" | "number" | "date" | "dropdown";
 		isMandatory: boolean;
@@ -170,6 +171,7 @@ export const mapDataCaptureToFields = (
 ): PipelineStageField[] => {
 	if (!dataCaptureFields?.length) return [];
 	return dataCaptureFields.map((f) => ({
+		field_key: f.fieldKey || undefined,
 		field_name: f.fieldName,
 		field_type: f.fieldType,
 		is_mandatory: f.isMandatory,

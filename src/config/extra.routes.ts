@@ -22,6 +22,11 @@ export const EXTRA_ROUTES = [
     page: lazy(() => import("../components/LeadsHub/LeadView")),
   },
   {
+    key: "reports-tab",
+    path: "reports/:tab",
+    page: lazy(() => import("../pages/Reports")),
+  },
+  {
     key: "referral-doctors",
     path: "referrals/doctors",
     page: lazy(() =>

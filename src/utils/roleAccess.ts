@@ -455,6 +455,9 @@ export const defaultPathForUser = (
     "dashboard",
     "leads",
     "referrals",
+    "campaigns",
+    "reputation",
+    "reports",
     "pipeline",
     "settings",
   ];
@@ -464,6 +467,9 @@ export const defaultPathForUser = (
       if (key === "dashboard") return "/dashboard";
       if (key === "leads") return "/leads";
       if (key === "referrals") return "/referrals";
+      if (key === "campaigns") return "/campaigns";
+      if (key === "reputation") return "/reputation";
+      if (key === "reports") return "/reports";
       if (key === "pipeline") return "/pipeline";
       if (key === "settings") return "/settings";
     }

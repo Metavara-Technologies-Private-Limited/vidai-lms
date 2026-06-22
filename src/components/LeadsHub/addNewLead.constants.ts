@@ -131,6 +131,7 @@ export type LeadPayload = {
   contact_designation?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
+  custom_field_values?: Record<string, string>;
 };
 
 // ====================== Campaign Type ======================

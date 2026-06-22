@@ -207,6 +207,9 @@ export default function EditLead() {
     referralDepartments,
     loadingReferralDepts,
     referralDepartment,
+    resolvedDataCaptureFields,
+    dataCaptureValues,
+    setDataCaptureValues,
     // ── Shared fields ──
     fullName,
     setFullName,
@@ -1214,6 +1217,57 @@ export default function EditLead() {
                   />
                 </Box>
               </Box>
+
+              {resolvedDataCaptureFields.length > 0 && (
+                <>
+                  <Typography sx={sectionLabelStyle}>
+                    STAGE DATA CAPTURE
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, 1fr)",
+                      gap: 2,
+                      mb: 3,
+                    }}
+                  >
+                    {resolvedDataCaptureFields.map((field) => (
+                      <Box key={field.key}>
+                        <Typography sx={labelStyle}>
+                          {field.label}
+                          {field.required && (
+                            <Typography
+                              component="span"
+                              sx={{ color: "#EF4444", fontSize: "0.75rem" }}
+                            >
+                              {" "}*
+                            </Typography>
+                          )}
+                        </Typography>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type={
+                            field.type === "number"
+                              ? "number"
+                              : field.type === "date"
+                                ? "date"
+                                : "text"
+                          }
+                          value={dataCaptureValues[field.key] ?? ""}
+                          onChange={(e) =>
+                            setDataCaptureValues((prev) => ({
+                              ...prev,
+                              [field.key]: e.target.value,
+                            }))
+                          }
+                          sx={inputStyle}
+                        />
+                      </Box>
+                    ))}
+                  </Box>
+                </>
+              )}
             </Box>
           )}
 
