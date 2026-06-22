@@ -41,7 +41,7 @@ import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import DataObjectIcon from "@mui/icons-material/DataObject";
 import DriveFileRenameOutlineIcon from "@mui/icons-material/DriveFileRenameOutline";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
@@ -1470,7 +1470,6 @@ export default function LeadDetailView() {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const dispatch = useDispatch();
 
   const leads = useSelector(selectLeads) as LeadRecord[] | null;
@@ -1889,10 +1888,6 @@ export default function LeadDetailView() {
     }
   }, []);
 
-  React.useEffect(() => {
-    dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-  }, [location.key, dispatch]);
-
   // ✅ FIXED: Added linkInboundCall to link inbound calls on Lead Activity load
   React.useEffect(() => {
     if (activeLead) {
@@ -1912,10 +1907,9 @@ export default function LeadDetailView() {
       }
     }
   }, [
-    activeLead,
     activeLead?.id,
+    activeLead?.contact_no,
     activeLead?.documents,
-    location.key,
     fetchNotes,
     fetchDocuments,
     fetchCallHistory,
@@ -3125,6 +3119,7 @@ export default function LeadDetailView() {
           appointmentSlot={appointmentSlot}
           appointmentRemark={appointmentRemark}
           treatmentInterest={treatmentInterest}
+          customFieldValues={activeLead.custom_field_values ?? []}
           documents={documents}
           docsLoading={docsLoading}
           docsError={docsError}

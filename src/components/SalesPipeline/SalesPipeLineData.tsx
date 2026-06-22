@@ -383,6 +383,7 @@ const SalesPipeLineData = ({
           ? mapRulesToActions(stage.rules)
           : [],
       dataCaptureFields: stage.fields?.map((f) => ({
+        fieldKey: f.field_key ?? "",
         fieldName: f.field_name,
         fieldType: f.field_type,
         isMandatory: f.is_mandatory,

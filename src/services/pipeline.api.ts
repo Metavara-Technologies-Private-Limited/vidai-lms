@@ -53,6 +53,7 @@ export interface PipelineStageRule {
 
 export interface PipelineStageField {
   id?: string;
+  field_key?: string | null;
   field_name: string;
   field_type: PipelineFieldType;
   is_mandatory: boolean;

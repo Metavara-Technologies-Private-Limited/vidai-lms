@@ -27,10 +27,19 @@ import {
 import { fetchUsers } from "../../store/userSlice";
 
 import type { FormState, Interest } from "../../types/leads.types";
-import { LeadAPI, DepartmentAPI, LeadEmailAPI, InterestAPI } from "../../services/leads.api";
+import {
+  LeadAPI,
+  DepartmentAPI,
+  LeadEmailAPI,
+  InterestAPI,
+  LeadFormFieldAPI,
+} from "../../services/leads.api";
 import type { Department } from "../../services/leads.api";
 // FIX ERROR 3: Import the API-side Interest type under an alias so we can cast
-import type { Interest as ApiInterest } from "../../services/leads.api";
+import type {
+  Interest as ApiInterest,
+  LeadFormField,
+} from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import {
   pipelineApi,
@@ -201,9 +210,76 @@ const deriveAllActionTypeOptions = (stages: PipelineStage[]): string[] => {
 };
 
 const buildDataCaptureKey = (field: PipelineStageField): string => {
+  if (field.field_key) return String(field.field_key);
   if (field.id) return String(field.id);
   return field.field_name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_");
 };
+
+const getLeadFormDataCaptureValue = (form: FormState, fieldKey: string): unknown => {
+  const values: Record<string, unknown> = {
+    full_name: form.full_name,
+    contact_no: form.contact,
+    email: form.email,
+    location: form.location,
+    gender: form.gender,
+    age: form.age,
+    marital_status: form.marital,
+    address: form.address,
+    language_preference: form.language,
+    contact_full_name: form.contactFullName,
+    contact_designation: form.designation,
+    contact_phone: form.contactPhone,
+    contact_email: form.contactEmail,
+    lead_generated_by: form.leadGeneratedBy,
+    source: form.source,
+    sub_source: form.subSource,
+    campaign: form.campaign,
+    assigned_to_id: form.assignee,
+    lead_status: form.leadStatus,
+    next_action_status: form.nextStatus,
+    next_action_type: form.nextType,
+    next_action_description: form.nextDesc,
+    action_status: form.taskStatus,
+    referral_department: form.referralDepartment,
+    treatment_interest: form.treatments,
+    book_appointment: form.wantAppointment === "yes" ? "yes" : "",
+    department: form.department,
+    personal_id: form.personnel,
+    appointment_date: form.appointmentDate,
+    slot: form.slot,
+    remark: form.remark,
+    partner_full_name: form.partnerName,
+    partner_age: form.partnerAge,
+    partner_gender: form.partnerGender,
+  };
+
+  return values[fieldKey];
+};
+
+const hasDataCaptureValue = (
+  form: FormState,
+  fieldKey: string,
+  fallbackValues: Record<string, string>,
+): boolean => {
+  const formValue = getLeadFormDataCaptureValue(form, fieldKey);
+  if (Array.isArray(formValue)) return formValue.length > 0;
+  if (formValue !== undefined) return String(formValue ?? "").trim().length > 0;
+  return String(fallbackValues[fieldKey] ?? "").trim().length > 0;
+};
+
+const DATA_CAPTURE_STEP_BY_FIELD_KEY: Record<string, number> = {
+  treatment_interest: 2,
+  documents: 2,
+  book_appointment: 3,
+  department: 3,
+  personal_id: 3,
+  appointment_date: 3,
+  slot: 3,
+  remark: 3,
+};
+
+const getDataCaptureStep = (fieldKey: string): number =>
+  DATA_CAPTURE_STEP_BY_FIELD_KEY[fieldKey] ?? 1;
 
 // ====================== Component ======================
 export default function AddNewLead() {
@@ -248,6 +324,7 @@ export default function AddNewLead() {
   const [selectedNextActionStageId, setSelectedNextActionStageId] = React.useState<string | null>(null);
   const [dataCaptureFields, setDataCaptureFields] = React.useState<PipelineStageField[]>([]);
   const [dataCaptureValues, setDataCaptureValues] = React.useState<Record<string, string>>({});
+  const [leadFormFields, setLeadFormFields] = React.useState<LeadFormField[]>([]);
   
   // ── Interests ─────────────────────────────────────────────────
   const [interests, setInterests] = React.useState<Interest[]>([]);
@@ -265,14 +342,29 @@ export default function AddNewLead() {
   const resolvedDataCaptureFields = React.useMemo(
     () =>
       dataCaptureFields
-        .filter((field) => field.field_name.trim().length > 0)
-        .map((field) => ({
-          key: buildDataCaptureKey(field),
-          label: field.field_name.trim(),
-          type: field.field_type,
-          required: field.is_mandatory,
-        })),
-    [dataCaptureFields],
+        .filter((field) => {
+          if (field.field_name.trim().length === 0) return false;
+          if (!field.field_key) return true;
+          const catalogField = leadFormFields.find(
+            (leadField) => leadField.field_key === field.field_key,
+          );
+          return !catalogField?.model_field;
+        })
+        .map((field) => {
+          const catalogField = field.field_key
+            ? leadFormFields.find(
+                (leadField) => leadField.field_key === field.field_key,
+              )
+            : undefined;
+          return {
+            key: buildDataCaptureKey(field),
+            label: field.field_name.trim(),
+            type: field.field_type,
+            required: field.is_mandatory,
+            mapsToLeadForm: Boolean(catalogField?.model_field),
+          };
+        }),
+    [dataCaptureFields, leadFormFields],
   );
 
   const applyStageDataCapture = React.useCallback((stage: PipelineStage | null) => {
@@ -286,6 +378,20 @@ export default function AddNewLead() {
       });
       return next;
     });
+  }, []);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    LeadFormFieldAPI.list()
+      .then((fields) => {
+        if (isMounted) setLeadFormFields(fields);
+      })
+      .catch(() => {
+        if (isMounted) setLeadFormFields([]);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const rawCampaigns = useSelector(selectCampaign);
@@ -966,21 +1072,20 @@ export default function AddNewLead() {
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   const handleNext = async () => {
-    if (currentStep === 1) {
-      const missingRequiredDataCapture = resolvedDataCaptureFields.find(
-        (field) =>
-          field.required &&
-          String(dataCaptureValues[field.key] ?? "").trim().length === 0,
-      );
+    const missingRequiredDataCapture = resolvedDataCaptureFields.find(
+      (field) =>
+        field.required &&
+        getDataCaptureStep(field.key) <= currentStep &&
+        !hasDataCaptureValue(form, field.key, dataCaptureValues),
+    );
 
-      if (missingRequiredDataCapture) {
-        toast.error(`${missingRequiredDataCapture.label} is required`, {
-          position: "top-right",
-          autoClose: 3000,
-          theme: "colored",
-        });
-        return;
-      }
+    if (missingRequiredDataCapture) {
+      toast.error(`${missingRequiredDataCapture.label} is required`, {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "colored",
+      });
+      return;
     }
 
     const isValid = await validateStep(
@@ -1086,6 +1191,14 @@ export default function AddNewLead() {
         contact_phone: form.contactPhone.trim() || null,
         contact_email: strOrNull(form.contactEmail) ?? null,
       }),
+      custom_field_values: resolvedDataCaptureFields.reduce<Record<string, string>>(
+        (values, field) => {
+          const value = (dataCaptureValues[field.key] ?? "").trim();
+          if (value) values[field.key] = value;
+          return values;
+        },
+        {},
+      ),
     };
   };
 
@@ -1454,6 +1567,7 @@ export default function AddNewLead() {
             handleReferralDepartmentChange={handleReferralDepartmentChange}
             referralDepartments={referralDepartments}
             loadingReferralDepts={loadingReferralDepts}
+            leadFormFields={leadFormFields}
             dataCaptureFields={resolvedDataCaptureFields}
             dataCaptureValues={dataCaptureValues}
             onDataCaptureChange={(fieldKey, value) => {
@@ -1480,6 +1594,7 @@ export default function AddNewLead() {
             // The runtime data is the same; this is a type-definition divergence.
             interests={interests as unknown as ApiInterest[]}
             loadingInterests={loadingInterests}
+            leadFormFields={leadFormFields}
           />
         )}
         {currentStep === 3 && (
@@ -1508,6 +1623,7 @@ export default function AddNewLead() {
             }}
             handleChange={handleChange}
             handleDepartmentChange={handleDepartmentChange}
+            leadFormFields={leadFormFields}
           />
         )}
       </Box>

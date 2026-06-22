@@ -27,8 +27,11 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
-import type { Department } from "../../services/leads.api";
-import type { Interest } from "../../services/leads.api";
+import type {
+  Department,
+  Interest,
+  LeadFormField,
+} from "../../services/leads.api";
 import type { ReferralDepartment } from "../../services/referral.api";
 import type { FormState } from "../../types/leads.types";
 import {
@@ -66,7 +69,73 @@ type DataCaptureFormField = {
   label: string;
   type: "text" | "number" | "date" | "dropdown";
   required: boolean;
+  mapsToLeadForm?: boolean;
 };
+
+const findLeadFormField = (
+  fields: LeadFormField[] | undefined,
+  fieldKey: string,
+): LeadFormField | undefined =>
+  fields?.find((field) => field.field_key === fieldKey && field.is_active !== false);
+
+const isLeadFormFieldVisible = (
+  fields: LeadFormField[] | undefined,
+  fieldKey: string,
+): boolean => {
+  if (!fields || fields.length === 0) return true;
+  return Boolean(findLeadFormField(fields, fieldKey));
+};
+
+const leadFormFieldLabel = (
+  fields: LeadFormField[] | undefined,
+  fieldKey: string,
+  fallback: string,
+): string => findLeadFormField(fields, fieldKey)?.field_label ?? fallback;
+
+const isLeadFormFieldRequired = (
+  fields: LeadFormField[] | undefined,
+  fieldKey: string,
+): boolean => Boolean(findLeadFormField(fields, fieldKey)?.is_required);
+
+const FORM_STATE_TO_LEAD_FIELD_KEY: Partial<Record<keyof FormState, string>> = {
+  full_name: "full_name",
+  contact: "contact_no",
+  email: "email",
+  location: "location",
+  gender: "gender",
+  age: "age",
+  marital: "marital_status",
+  address: "address",
+  language: "language_preference",
+  contactFullName: "contact_full_name",
+  designation: "contact_designation",
+  contactPhone: "contact_phone",
+  contactEmail: "contact_email",
+  leadGeneratedBy: "lead_generated_by",
+  source: "source",
+  subSource: "sub_source",
+  campaign: "campaign",
+  assignee: "assigned_to_id",
+  leadStatus: "lead_status",
+  nextStatus: "next_action_status",
+  nextType: "next_action_type",
+  nextDesc: "next_action_description",
+  taskStatus: "action_status",
+  referralDepartment: "referral_department",
+  treatmentInterest: "treatment_interest",
+  wantAppointment: "book_appointment",
+  department: "department",
+  personnel: "personal_id",
+  appointmentDate: "appointment_date",
+  slot: "slot",
+  remark: "remark",
+  partnerName: "partner_full_name",
+  partnerAge: "partner_age",
+  partnerGender: "partner_gender",
+};
+
+const toLeadFieldKey = (field: keyof FormState): string =>
+  FORM_STATE_TO_LEAD_FIELD_KEY[field] ?? String(field);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const assigneeLabel = (option: AssigneeOption): string => {
@@ -235,6 +304,7 @@ interface Step1Props {
   handleReferralDepartmentChange: (value: string) => void;
   referralDepartments: ReferralDepartment[];
   loadingReferralDepts: boolean;
+  leadFormFields?: LeadFormField[];
   dataCaptureFields?: DataCaptureFormField[];
   dataCaptureValues?: Record<string, string>;
   onDataCaptureChange?: (fieldKey: string, value: string) => void;
@@ -270,6 +340,7 @@ export function Step1({
   handleReferralDepartmentChange,
   referralDepartments,
   loadingReferralDepts,
+  leadFormFields,
   dataCaptureFields,
   dataCaptureValues,
   onDataCaptureChange,
@@ -332,8 +403,16 @@ export function Step1({
   const resolvedLeadStatusOptions: NextActionStatusOption[] = leadStatusOptions ?? [];
   const resolvedNextActionStatusOptions: NextActionStatusOption[] = nextActionStatusOptions ?? [];
   const resolvedNextActionTypeOptions: string[] = nextActionTypeOptions ?? [];
-  const resolvedDataCaptureFields = dataCaptureFields ?? [];
+  const resolvedDataCaptureFields = (dataCaptureFields ?? []).filter(
+    (field) => !field.mapsToLeadForm,
+  );
   const resolvedDataCaptureValues = dataCaptureValues ?? {};
+  const showFormField = (field: keyof FormState): boolean =>
+    isLeadFormFieldVisible(leadFormFields, toLeadFieldKey(field));
+  const labelFor = (field: keyof FormState, fallback: string): string =>
+    leadFormFieldLabel(leadFormFields, toLeadFieldKey(field), fallback);
+  const requiredFor = (field: keyof FormState): boolean =>
+    isLeadFormFieldRequired(leadFormFields, toLeadFieldKey(field));
 
   const isCampaignDisabled =
     form.source === "Referral" ||
@@ -362,11 +441,13 @@ export function Step1({
             ["Location", "location"],
             ...(IS_CONTRACTS_APP ? [["Address", "address"]] : []),
           ] as [string, keyof FormState][]
-        ).map(([lbl, field]) => (
+        )
+          .filter(([, field]) => showFormField(field))
+          .map(([lbl, field]) => (
           <Box key={field}>
             <Typography sx={labelStyle}>
-              {lbl}
-              {field === "full_name" && (
+              {labelFor(field, lbl)}
+              {requiredFor(field) && (
                 <Typography component="span" sx={{ color: "#EF4444", fontSize: "0.75rem" }}>
                   {" "}*
                 </Typography>
@@ -964,6 +1045,7 @@ interface Step2Props {
   // ── legacy flat-string options (kept for backward compat) ─────────────────
   interestOptions?: string[];
   interestOptionsLoading?: boolean;
+  leadFormFields?: LeadFormField[];
 }
 
 export function Step2({
@@ -980,6 +1062,7 @@ export function Step2({
   loadingInterests = false,
   interestOptions,
   interestOptionsLoading = false,
+  leadFormFields,
 }: Step2Props) {
   const [previewFile, setPreviewFile] = React.useState<{
     url: string;
@@ -1010,6 +1093,20 @@ export function Step2({
   const interestLabel = ACTIVE_FLOW_COPY.treatmentLabel;
 
   const isLoading = loadingInterests || interestOptionsLoading;
+  const showTreatmentInterest = isLeadFormFieldVisible(
+    leadFormFields,
+    "treatment_interest",
+  );
+  const showDocuments = isLeadFormFieldVisible(leadFormFields, "documents");
+  const treatmentLabel = leadFormFieldLabel(
+    leadFormFields,
+    "treatment_interest",
+    interestLabel,
+  );
+  const treatmentRequired = isLeadFormFieldRequired(
+    leadFormFields,
+    "treatment_interest",
+  );
 
   // Build the flat string list to display in the dropdown.
   // Priority: Interest[] objects from backend → flat string interestOptions → static fallback
@@ -1035,10 +1132,13 @@ export function Step2({
         {sectionHeading}
       </Typography>
 
+      {showTreatmentInterest && (
       <Box sx={{ mb: 3 }}>
         <Typography sx={labelStyle}>
-          {interestLabel}
-          <span style={{ color: "red", marginLeft: "4px" }}>*</span>
+          {treatmentLabel}
+          {treatmentRequired && (
+            <span style={{ color: "red", marginLeft: "4px" }}>*</span>
+          )}
         </Typography>
         <TextField
           select
@@ -1078,8 +1178,9 @@ export function Step2({
           ))}
         </TextField>
       </Box>
+      )}
 
-      {form.treatments.length > 0 && (
+      {showTreatmentInterest && form.treatments.length > 0 && (
         <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
           {form.treatments.map((id) => {
             const matched = interests?.find((i) => String(i.id) === id);
@@ -1110,16 +1211,18 @@ export function Step2({
         </Stack>
       )}
 
-      <Typography
-        variant="subtitle2"
-        fontWeight={700}
-        color="#1E293B"
-        sx={{ mb: 2 }}
-      >
-        DOCUMENTS & REPORTS (Optional)
-      </Typography>
+      {showDocuments && (
+      <>
+        <Typography
+          variant="subtitle2"
+          fontWeight={700}
+          color="#1E293B"
+          sx={{ mb: 2 }}
+        >
+          {leadFormFieldLabel(leadFormFields, "documents", "DOCUMENTS & REPORTS")} (Optional)
+        </Typography>
 
-      <Box
+        <Box
         onDrop={(e) => {
           e.preventDefault();
           setDocDragOver(false);
@@ -1144,7 +1247,7 @@ export function Step2({
           transition: "all 0.2s",
           cursor: "pointer",
         }}
-      >
+        >
         <input
           ref={fileInputRef}
           type="file"
@@ -1182,7 +1285,9 @@ export function Step2({
             ? `${pendingFiles.length} file${pendingFiles.length > 1 ? "s" : ""} selected`
             : "No File Chosen · PDF, Word, JPG, PNG up to 10MB"}
         </Typography>
-      </Box>
+        </Box>
+      </>
+      )}
 
       {pendingFiles.length > 0 && (
         <Stack spacing={1} sx={{ mt: 2, maxWidth: "500px" }}>
@@ -1372,6 +1477,7 @@ interface Step3Props {
   handlePersonnelChange: (value: AssigneeOption | null) => void;
   handleChange: (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleDepartmentChange: (value: string) => void;
+  leadFormFields?: LeadFormField[];
 }
 
 export function Step3({
@@ -1390,8 +1496,13 @@ export function Step3({
   handlePersonnelChange,
   handleChange,
   handleDepartmentChange,
+  leadFormFields,
 }: Step3Props) {
   const noAppointment = form.wantAppointment === "no";
+  const showFormField = (field: keyof FormState): boolean =>
+    isLeadFormFieldVisible(leadFormFields, toLeadFieldKey(field));
+  const labelFor = (field: keyof FormState, fallback: string): string =>
+    leadFormFieldLabel(leadFormFields, toLeadFieldKey(field), fallback);
 
   const availableSlots = React.useMemo<string[]>(() => {
     if (!selectedDate) return TIME_SLOTS;
@@ -1444,7 +1555,9 @@ export function Step3({
         APPOINTMENT DETAILS
       </Typography>
       <Box sx={{ mb: 3 }}>
-        <Typography sx={{ ...labelStyle, mb: 1 }}>Want to Book an Appointment?</Typography>
+        <Typography sx={{ ...labelStyle, mb: 1 }}>
+          {labelFor("wantAppointment", "Want to Book an Appointment?")}
+        </Typography>
         <RadioGroup
           row
           value={form.wantAppointment}
@@ -1465,9 +1578,9 @@ export function Step3({
               mb: 2,
             }}
           >
-            {IS_MEDICAL_APP && (
+            {IS_MEDICAL_APP && showFormField("department") && (
               <Box>
-                <Typography sx={labelStyle}>Department</Typography>
+                <Typography sx={labelStyle}>{labelFor("department", "Department")}</Typography>
                 <Autocomplete
                   options={departments}
                   loading={loadingDepartments}
@@ -1504,8 +1617,9 @@ export function Step3({
               </Box>
             )}
 
+            {showFormField("personnel") && (
             <Box>
-              <Typography sx={labelStyle}>Appointment Personnel</Typography>
+              <Typography sx={labelStyle}>{labelFor("personnel", "Appointment Personnel")}</Typography>
               <Autocomplete
                 options={personnelOptions}
                 loading={personnelLoading || loadingEmployees}
@@ -1558,11 +1672,13 @@ export function Step3({
                 )}
               />
             </Box>
+            )}
           </Box>
 
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 3 }}>
+            {showFormField("appointmentDate") && (
             <Box>
-              <Typography sx={labelStyle}>Date</Typography>
+              <Typography sx={labelStyle}>{labelFor("appointmentDate", "Date")}</Typography>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DatePicker
                   value={selectedDate}
@@ -1583,8 +1699,10 @@ export function Step3({
                 />
               </LocalizationProvider>
             </Box>
+            )}
+            {showFormField("slot") && (
             <Box>
-              <Typography sx={labelStyle}>Select Slot</Typography>
+              <Typography sx={labelStyle}>{labelFor("slot", "Select Slot")}</Typography>
               <TextField
                 select
                 fullWidth
@@ -1603,10 +1721,12 @@ export function Step3({
                 )}
               </TextField>
             </Box>
+            )}
           </Box>
 
+          {showFormField("remark") && (
           <Box>
-            <Typography sx={labelStyle}>Remark</Typography>
+            <Typography sx={labelStyle}>{labelFor("remark", "Remark")}</Typography>
             <TextField
               fullWidth
               size="small"
@@ -1618,6 +1738,7 @@ export function Step3({
               sx={inputStyle}
             />
           </Box>
+          )}
         </>
       )}
     </Box>

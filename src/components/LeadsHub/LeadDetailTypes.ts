@@ -100,6 +100,12 @@ export interface LeadRecord {
   documents?: DocumentEntry[];
   referral_source_name?: string;
   referral_department_name?: string;
+  custom_field_values?: Array<{
+    field_key: string;
+    field_label: string;
+    field_type?: string;
+    value: string;
+  }>;
 }
 
 export interface CallMessageProps {

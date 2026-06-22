@@ -746,6 +746,11 @@ interface PatientInfoTabProps {
   appointmentSlot: string;
   appointmentRemark: string;
   treatmentInterest: string[];
+  customFieldValues: Array<{
+    field_key: string;
+    field_label: string;
+    value: string;
+  }>;
   documents: { url: string; name: string }[];
   docsLoading: boolean;
   docsError: string | null;
@@ -781,6 +786,7 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
   appointmentSlot,
   appointmentRemark,
   treatmentInterest,
+  customFieldValues,
   documents,
   docsLoading,
   docsError,
@@ -848,6 +854,22 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
           )}
 
           <InfoCell label="CREATED DATE & TIME" value={leadCreatedAt} />
+
+          {customFieldValues.length > 0 && (
+            <>
+              <SectionLabel>Additional Information</SectionLabel>
+              <InfoGrid>
+                {customFieldValues.map((field) => (
+                  <InfoCell
+                    key={field.field_key}
+                    label={field.field_label.toUpperCase()}
+                    value={field.value || "N/A"}
+                    truncate={false}
+                  />
+                ))}
+              </InfoGrid>
+            </>
+          )}
         </Stack>
 
         <Divider sx={{ mb: 2, mx: -3 }} />
