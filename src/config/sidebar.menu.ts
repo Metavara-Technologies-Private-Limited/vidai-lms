@@ -34,6 +34,24 @@ const ALL_LEADS_MENU: MenuItem[] = [
     page: lazy(() => import("../pages/Referrals")),
   },
   {
+    key: "campaigns",
+    label: "Campaigns",
+    path: "/campaigns",
+    page: lazy(() => import("../pages/Campaigns")),
+  },
+  {
+    key: "reputation",
+    label: "Reputation Management",
+    path: "/reputation",
+    page: lazy(() => import("../pages/Reputation")),
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    path: "/reports",
+    page: lazy(() => import("../pages/Reports")),
+  },
+  {
     key: "pipeline",
     label: "Sales Pipeline Configuration",
     path: "/pipeline",
