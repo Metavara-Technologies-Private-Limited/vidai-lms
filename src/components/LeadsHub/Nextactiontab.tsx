@@ -30,6 +30,7 @@ import { useSelector } from "react-redux";
 
 import type { LeadRecord, NoteData } from "./LeadDetailTypes";
 import { TwilioAPI } from "../../services/leads.api";
+import type { TwilioCall, TwilioSMS } from "../../services/leads.api";
 import { selectClinic } from "../../store/clinicSlice";
 import {
   pipelineApi,
@@ -39,14 +40,9 @@ import {
 } from "../../services/pipeline.api";
 import CallDialog from "./CallDialog";
 
-// ── NEW: wire up the real SMS + Appointment dialogs ───────────────────────
-// Adjust these two import paths to match where these components actually
-// live in your project (SMSDialog is a NAMED export, BookAppointmentModal
-// is a DEFAULT export — per the files you shared).
 import { SMSDialog } from "./SmsDialogs";
 import BookAppointmentModal from "./BookAppointmentModal";
 import type { AppointmentResult } from "./BookAppointmentModal";
-import type { TwilioSMS } from "../../services/leads.api";
 import type { ProcessedLead } from "./LeadsTable.types";
 
 interface NextActionTabProps {
@@ -72,6 +68,18 @@ interface NextActionTabProps {
   onCloseActionDialog: () => void;
   taskStatus?: string;
   onMarkDone?: () => Promise<void>;
+  /**
+   * Call activity for this lead — used to derive whether the "Call" channel
+   * is considered complete. Any recorded call means the channel is done.
+   * Already fetched in LeadDetailView; just pass callHistory={callHistory}.
+   */
+  callHistory?: TwilioCall[];
+  /**
+   * SMS activity for this lead — used to derive whether the "SMS" channel
+   * is considered complete. Any recorded SMS means the channel is done.
+   * Already fetched in LeadDetailView; just pass smsHistory={smsHistory}.
+   */
+  smsHistory?: TwilioSMS[];
   notes: NoteData[];
   notesLoading: boolean;
   notesError: string | null;
@@ -94,9 +102,7 @@ interface NextActionTabProps {
   onSaveEditNote: (noteId: string) => void;
   onAddNote: () => void;
   onDeleteNote: (noteId: string) => void;
-  /** Optional — let parent refresh/refetch the lead after an appointment is booked */
   onAppointmentBooked?: (result: AppointmentResult) => void;
-  /** Optional — let parent refresh/refetch the lead's SMS thread after sending */
   onSmsSent?: (sentItem: TwilioSMS) => void;
 }
 
@@ -136,17 +142,13 @@ function getStatusChipStyle(status: string) {
   return STATUS_CHIP_STYLES[key] ?? STATUS_CHIP_STYLES.default;
 }
 
-// ── Pipeline storage keys (kept in sync with Add New Lead) ──────────────────
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
 
 type PipelineOption = { value: string; label: string };
-
-// ── Channel keys (used to key per-channel completion state) ─────────────────
 type ChannelKey = "call" | "sms" | "appointment";
 
-// ── Derive action type labels from a single stage's enabled rules ───────────
 const deriveActionTypeOptions = (stage: PipelineStage): PipelineOption[] => {
   const labels = Array.from(
     new Set(
@@ -160,7 +162,6 @@ const deriveActionTypeOptions = (stage: PipelineStage): PipelineOption[] => {
   return labels.map((label) => ({ value: label, label }));
 };
 
-// ── Derive union of action type labels across all stages (fallback) ─────────
 const deriveAllActionTypeOptions = (stages: PipelineStage[]): PipelineOption[] => {
   const labels = Array.from(
     new Set(
@@ -176,7 +177,6 @@ const deriveAllActionTypeOptions = (stages: PipelineStage[]): PipelineOption[] =
   return labels.map((label) => ({ value: label, label }));
 };
 
-// ── Action channel card config (Call / SMS / Appointment) ───────────────────
 type ActionChannel = {
   key: ChannelKey;
   title: string;
@@ -189,6 +189,11 @@ type ActionChannel = {
   buttonHoverBg: string;
   onTrigger: () => void;
 };
+
+// Stable empty arrays so useMemo deps don't fire on every render when
+// the parent hasn't passed these props yet.
+const EMPTY_CALL_HISTORY: TwilioCall[] = [];
+const EMPTY_SMS_HISTORY: TwilioSMS[] = [];
 
 const NextActionTab: React.FC<NextActionTabProps> = ({
   lead,
@@ -213,6 +218,8 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
   onCloseActionDialog,
   taskStatus = "",
   onMarkDone,
+  callHistory = EMPTY_CALL_HISTORY,
+  smsHistory = EMPTY_SMS_HISTORY,
   notes,
   notesLoading,
   notesError,
@@ -238,19 +245,9 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
   onAppointmentBooked,
   onSmsSent,
 }) => {
-  // nextActionType is reserved for future use (e.g. highlighting the
-  // recommended channel); not rendered directly now that all 3 channel
-  // cards share the same due/status/description.
   void nextActionType;
-
-  // taskStatus is reserved for future use — it will drive per-channel
-  // seeding logic once completion state is read from the backend (or
-  // derived from call/SMS history + book_appointment) instead of being
-  // tracked purely in local React state. Currently unused because the
-  // seeding effect below is commented out (see completedChannels).
   void taskStatus;
 
-  // ── Call state ──
   const [callDialogOpen, setCallDialogOpen] = React.useState(false);
   const [actionSnackbar, setActionSnackbar] = React.useState<{
     open: boolean;
@@ -258,44 +255,57 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     severity: "error" | "info" | "success";
   }>({ open: false, message: "", severity: "error" });
 
-  // ── SMS dialog state ──
   const [smsDialogOpen, setSmsDialogOpen] = React.useState(false);
-
-  // ── Book Appointment dialog state ──
   const [appointmentDialogOpen, setAppointmentDialogOpen] = React.useState(false);
 
-  // ── Mark Done state ──
-  // FIX: completion is now tracked PER CHANNEL instead of one shared
-  // `localTaskStatus` boolean. Previously, marking ANY one of Call / SMS /
-  // Appointment as done (or sending an SMS, or booking an appointment)
-  // flipped a single `isAlreadyCompleted` flag that all three cards read
-  // from — so completing one card visually completed all three.
-  const [markDoneLoading, setMarkDoneLoading] = React.useState<ChannelKey | null>(
-    null,
-  );
+  const [markDoneLoading, setMarkDoneLoading] = React.useState<ChannelKey | null>(null);
   const [markDoneError, setMarkDoneError] = React.useState<string | null>(null);
-  const [completedChannels, setCompletedChannels] = React.useState<
-    Record<ChannelKey, boolean>
-  >({
-    call: false,
-    sms: false,
-    appointment: false,
-  });
 
-  // If the backend taskStatus changes (e.g. on lead refetch), you can decide
-  // whether that should seed any particular channel. By default we don't
-  // assume which channel it belongs to, so we leave completedChannels alone.
-  // If your backend taskStatus is specifically the "call" task, uncomment:
+  // ── FIX: completion derived from real persisted backend data ─────────────
+  // Each channel's "done" state is computed from actual activity records that
+  // already exist and are already fetched in LeadDetailView. This survives
+  // page reloads and tab switches because it re-derives from real data on
+  // every render instead of relying on local-only React state.
   //
-  // React.useEffect(() => {
-  //   if (taskStatus?.toLowerCase() === "completed") {
-  //     setCompletedChannels((prev) => ({ ...prev, call: true }));
-  //   }
-  // }, [taskStatus]);
+  //  Call        → at least one call record exists in callHistory
+  //  SMS         → at least one SMS record exists in smsHistory
+  //  Appointment → lead.book_appointment is true
+  const derivedCompleted = React.useMemo<Record<ChannelKey, boolean>>(
+    () => ({
+      call: (callHistory?.length ?? 0) > 0,
+      sms: (smsHistory?.length ?? 0) > 0,
+      appointment: lead?.book_appointment === true,
+    }),
+    [callHistory, smsHistory, lead?.book_appointment],
+  );
+
+  // ── Manual overrides ─────────────────────────────────────────────────────
+  // Provides optimistic UI feedback the moment a user clicks "Mark Done"
+  // (or sends an SMS / books appointment), before the parent's refetch
+  // completes and the derived value catches up. Only ever forces true —
+  // once the derived value confirms completion it takes over naturally.
+  const [manualOverrides, setManualOverrides] = React.useState<
+    Partial<Record<ChannelKey, boolean>>
+  >({});
+
+  // Clear overrides when navigating to a different lead so stale optimistic
+  // state from a previous lead never leaks into the new one.
+  React.useEffect(() => {
+    setManualOverrides({});
+  }, [lead?.id]);
+
+  const completedChannels = React.useMemo<Record<ChannelKey, boolean>>(
+    () => ({
+      call: derivedCompleted.call || manualOverrides.call === true,
+      sms: derivedCompleted.sms || manualOverrides.sms === true,
+      appointment: derivedCompleted.appointment || manualOverrides.appointment === true,
+    }),
+    [derivedCompleted, manualOverrides],
+  );
 
   const isChannelCompleted = (key: ChannelKey) => completedChannels[key] === true;
 
-  // ── Pipeline state — drives Status / Action Type in the Add Next Action dialog ──
+  // ── Pipeline state ────────────────────────────────────────────────────────
   const selectedClinic = useSelector(selectClinic);
   const clinicId =
     selectedClinic?.id ?? Number(localStorage.getItem("clinic_id") ?? 1);
@@ -361,7 +371,6 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     void loadPipelineStages();
   }, [clinicId]);
 
-  // Lead's current stage in the pipeline (matched by name)
   const currentStage = React.useMemo(() => {
     const currentName = (lead?.lead_status || lead?.status || "")
       .trim()
@@ -374,7 +383,6 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     );
   }, [pipelineStages, lead?.lead_status, lead?.status]);
 
-  // "Status" options = stages this lead can move into next
   const statusOptions = React.useMemo<PipelineOption[]>(() => {
     const upcoming = currentStage
       ? pipelineStages.filter((s) => s.stage_order > currentStage.stage_order)
@@ -384,7 +392,6 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
       .map((s) => ({ value: s.stage_name.trim(), label: s.stage_name.trim() }));
   }, [pipelineStages, currentStage]);
 
-  // Stage matching whatever is currently selected in "Status"
   const selectedStatusStage = React.useMemo(() => {
     const trimmed = actionStatus.trim().toLowerCase();
     if (!trimmed) return null;
@@ -395,14 +402,12 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     );
   }, [pipelineStages, actionStatus]);
 
-  // "Action Type" options = enabled rules for the selected destination stage
   const pipelineActionTypeOptions = React.useMemo<PipelineOption[]>(() => {
     if (selectedStatusStage) return deriveActionTypeOptions(selectedStatusStage);
     if (pipelineStages.length > 0) return deriveAllActionTypeOptions(pipelineStages);
-    return availableActions; // fall back to whatever the parent passed in
+    return availableActions;
   }, [selectedStatusStage, pipelineStages, availableActions]);
 
-  // ── Auto-clear actionType if it's no longer valid for the selected status ──
   React.useEffect(() => {
     if (!actionType) return;
     if (pipelineActionTypeOptions.some((o) => o.value === actionType)) return;
@@ -410,13 +415,12 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actionType, pipelineActionTypeOptions]);
 
-  // FIX: handleMarkDone now takes the channel key and only flips/reverts
-  // that one channel's completion state, never the others.
+  // ── Mark Done — sets manual override for instant UI, calls backend ────────
   const handleMarkDone = async (channelKey: ChannelKey) => {
     if (!onMarkDone || isChannelCompleted(channelKey) || markDoneLoading) return;
     setMarkDoneLoading(channelKey);
     setMarkDoneError(null);
-    setCompletedChannels((prev) => ({ ...prev, [channelKey]: true }));
+    setManualOverrides((prev) => ({ ...prev, [channelKey]: true }));
     try {
       await onMarkDone();
       toast.success("Task status updated to Completed", {
@@ -425,8 +429,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
         theme: "colored",
       });
     } catch (err: unknown) {
-      // revert ONLY this channel on failure
-      setCompletedChannels((prev) => ({ ...prev, [channelKey]: false }));
+      setManualOverrides((prev) => ({ ...prev, [channelKey]: false }));
       setMarkDoneError(
         extractErrorMessage(err, "Failed to mark action as done. Please try again.")
       );
@@ -442,11 +445,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
       return;
     }
     if (!lead?.id) {
-      setActionSnackbar({
-        open: true,
-        message: "Lead ID is missing. Cannot initiate call.",
-        severity: "error",
-      });
+      setActionSnackbar({ open: true, message: "Lead ID is missing. Cannot initiate call.", severity: "error" });
       return;
     }
     setCallDialogOpen(true);
@@ -462,74 +461,44 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     }
   };
 
-  // ── Send SMS opens the SMSDialog ──
   const handleSmsOpen = () => {
     const phone = normalizePhone(lead?.contact_no);
     if (!phone) {
-      setActionSnackbar({
-        open: true,
-        message: "No contact number for this lead.",
-        severity: "error",
-      });
+      setActionSnackbar({ open: true, message: "No contact number for this lead.", severity: "error" });
       return;
     }
     if (!lead?.id) {
-      setActionSnackbar({
-        open: true,
-        message: "Lead ID is missing. Cannot send SMS.",
-        severity: "error",
-      });
+      setActionSnackbar({ open: true, message: "Lead ID is missing. Cannot send SMS.", severity: "error" });
       return;
     }
     setSmsDialogOpen(true);
   };
 
-  // Called by <SMSDialog onClose={...} /> — fires with (sent, sentItem)
-  // FIX: only marks the "sms" channel complete, not call/appointment.
   const handleSmsDialogClose = (sent?: boolean, sentItem?: TwilioSMS) => {
     setSmsDialogOpen(false);
     if (sent) {
-      setCompletedChannels((prev) => ({ ...prev, sms: true }));
-      setActionSnackbar({
-        open: true,
-        message: "SMS sent successfully!",
-        severity: "success",
-      });
-      if (sentItem) {
-        onSmsSent?.(sentItem);
-      }
+      setManualOverrides((prev) => ({ ...prev, sms: true }));
+      setActionSnackbar({ open: true, message: "SMS sent successfully!", severity: "success" });
+      if (sentItem) onSmsSent?.(sentItem);
     }
   };
 
-  // ── Book Appointment opens the BookAppointmentModal ──
   const handleAppointmentOpen = () => {
     if (!lead?.id) {
-      setActionSnackbar({
-        open: true,
-        message: "Lead ID is missing. Cannot book appointment.",
-        severity: "error",
-      });
+      setActionSnackbar({ open: true, message: "Lead ID is missing. Cannot book appointment.", severity: "error" });
       return;
     }
     setAppointmentDialogOpen(true);
   };
 
-  // Called by <BookAppointmentModal onSaved={...} /> after a successful save
-  // FIX: only marks the "appointment" channel complete, not call/sms.
   const handleAppointmentSaved = (result: AppointmentResult) => {
-    setCompletedChannels((prev) => ({ ...prev, appointment: true }));
-    setActionSnackbar({
-      open: true,
-      message: "Appointment booked successfully!",
-      severity: "success",
-    });
+    setManualOverrides((prev) => ({ ...prev, appointment: true }));
+    setActionSnackbar({ open: true, message: "Appointment booked successfully!", severity: "success" });
     onAppointmentBooked?.(result);
   };
 
   const chipStyle = getStatusChipStyle(nextActionStatus);
 
-  // ── Channels shown for the current next action — same due/status/description,
-  // different icon, title, and trigger button ──────────────────────────────
   const actionChannels: ActionChannel[] = [
     {
       key: "call",
@@ -589,7 +558,6 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
               </IconButton>
             </Stack>
             <Box sx={{ p: 2 }}>
-              {/* Mark Done error banner */}
               {markDoneError && (
                 <Alert
                   severity="error"
@@ -600,24 +568,17 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                 </Alert>
               )}
 
-              {/* Current Next Action — shown across Call / SMS / Appointment */}
               <Typography
                 variant="caption"
                 fontWeight={700}
                 color="text.secondary"
-                sx={{
-                  textTransform: "uppercase",
-                  letterSpacing: "0.8px",
-                  display: "block",
-                  mb: 1.5,
-                }}
+                sx={{ textTransform: "uppercase", letterSpacing: "0.8px", display: "block", mb: 1.5 }}
               >
                 Next Action
               </Typography>
 
               <Stack spacing={2} sx={{ mb: 3 }}>
                 {actionChannels.map((channel) => {
-                  // FIX: each card now reads ITS OWN completion state.
                   const channelCompleted = isChannelCompleted(channel.key);
                   const channelLoading = markDoneLoading === channel.key;
 
@@ -628,9 +589,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                       sx={{
                         p: 2,
                         borderRadius: "12px",
-                        border: channelCompleted
-                          ? "1px solid #BBF7D0"
-                          : "1px solid #E2E8F0",
+                        border: channelCompleted ? "1px solid #BBF7D0" : "1px solid #E2E8F0",
                         bgcolor: channelCompleted ? "#F0FDF4" : "transparent",
                         transition: "all 0.3s ease",
                       }}
@@ -646,9 +605,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                           }}
                         >
                           {channelCompleted ? (
-                            <CheckCircleOutlineIcon
-                              sx={{ color: "#16A34A", fontSize: 20 }}
-                            />
+                            <CheckCircleOutlineIcon sx={{ color: "#16A34A", fontSize: 20 }} />
                           ) : (
                             channel.icon
                           )}
@@ -663,28 +620,18 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                                 variant="caption"
                                 color="text.secondary"
                                 fontWeight={600}
-                                sx={{
-                                  textTransform: "uppercase",
-                                  fontSize: "0.65rem",
-                                  letterSpacing: "0.5px",
-                                }}
+                                sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}
                               >
                                 DUE
                               </Typography>
-                              <Typography variant="body2" fontWeight={600}>
-                                Today
-                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>Today</Typography>
                             </Box>
                             <Box>
                               <Typography
                                 variant="caption"
                                 color="text.secondary"
                                 fontWeight={600}
-                                sx={{
-                                  textTransform: "uppercase",
-                                  fontSize: "0.65rem",
-                                  letterSpacing: "0.5px",
-                                }}
+                                sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}
                               >
                                 STATUS
                               </Typography>
@@ -692,8 +639,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                                 <Chip
                                   label={
                                     nextActionStatus
-                                      ? nextActionStatus.charAt(0).toUpperCase() +
-                                        nextActionStatus.slice(1)
+                                      ? nextActionStatus.charAt(0).toUpperCase() + nextActionStatus.slice(1)
                                       : nextActionStatus
                                   }
                                   size="small"
@@ -714,18 +660,13 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                               variant="caption"
                               color="text.secondary"
                               fontWeight={600}
-                              sx={{
-                                textTransform: "uppercase",
-                                fontSize: "0.65rem",
-                                letterSpacing: "0.5px",
-                              }}
+                              sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}
                             >
                               DESCRIPTION
                             </Typography>
                             <Typography variant="body2">{nextActionDescription}</Typography>
                           </Box>
                           <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
-                            {/* ── Mark Done Button (now per-channel) ── */}
                             <Button
                               variant="outlined"
                               size="small"
@@ -737,11 +678,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                                 )
                               }
                               onClick={() => handleMarkDone(channel.key)}
-                              disabled={
-                                channelCompleted ||
-                                markDoneLoading !== null ||
-                                !onMarkDone
-                              }
+                              disabled={channelCompleted || markDoneLoading !== null || !onMarkDone}
                               sx={{
                                 textTransform: "none",
                                 borderRadius: "8px",
@@ -783,7 +720,6 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                               {channelCompleted ? "Completed" : "Mark Done"}
                             </Button>
 
-                            {/* ── Channel-specific trigger button ── */}
                             <Button
                               variant="outlined"
                               size="small"
@@ -822,78 +758,30 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                 })}
               </Stack>
 
-              {/* Previous Actions */}
               <Typography
                 variant="caption"
                 fontWeight={700}
                 color="text.secondary"
-                sx={{
-                  textTransform: "uppercase",
-                  letterSpacing: "0.8px",
-                  display: "block",
-                  mb: 1.5,
-                }}
+                sx={{ textTransform: "uppercase", letterSpacing: "0.8px", display: "block", mb: 1.5 }}
               >
                 Previous Actions
               </Typography>
-              <Card
-                variant="outlined"
-                sx={{ p: 2, borderRadius: "12px", border: "1px solid #E2E8F0" }}
-              >
+              <Card variant="outlined" sx={{ p: 2, borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                 <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                  <Box
-                    sx={{ p: 1, bgcolor: "#F0FDF4", borderRadius: "8px", mt: 0.25 }}
-                  >
+                  <Box sx={{ p: 1, bgcolor: "#F0FDF4", borderRadius: "8px", mt: 0.25 }}>
                     <CallOutlinedIcon sx={{ color: "#10B981", fontSize: 20 }} />
                   </Box>
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="body2" fontWeight={700} mb={1.5}>
-                      Follow-Up Call
-                    </Typography>
+                    <Typography variant="body2" fontWeight={700} mb={1.5}>Follow-Up Call</Typography>
                     <Stack direction="row" spacing={4} mb={1}>
                       <Box>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          fontWeight={600}
-                          sx={{
-                            textTransform: "uppercase",
-                            fontSize: "0.65rem",
-                            letterSpacing: "0.5px",
-                          }}
-                        >
-                          DUE
-                        </Typography>
-                        <Typography variant="body2" fontWeight={600}>
-                          16/01/2026
-                        </Typography>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>DUE</Typography>
+                        <Typography variant="body2" fontWeight={600}>16/01/2026</Typography>
                       </Box>
                       <Box>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          fontWeight={600}
-                          sx={{
-                            textTransform: "uppercase",
-                            fontSize: "0.65rem",
-                            letterSpacing: "0.5px",
-                          }}
-                        >
-                          STATUS
-                        </Typography>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.5px" }}>STATUS</Typography>
                         <Box mt={0.25}>
-                          <Chip
-                            label="Completed"
-                            size="small"
-                            sx={{
-                              bgcolor: "#F0FDF4",
-                              color: "#16A34A",
-                              fontWeight: 600,
-                              borderRadius: "6px",
-                              height: 22,
-                              fontSize: "0.7rem",
-                            }}
-                          />
+                          <Chip label="Completed" size="small" sx={{ bgcolor: "#F0FDF4", color: "#16A34A", fontWeight: 600, borderRadius: "6px", height: 22, fontSize: "0.7rem" }} />
                         </Box>
                       </Box>
                     </Stack>
@@ -908,17 +796,11 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
         <Box sx={{ flexGrow: 1 }}>
           <Card sx={{ borderRadius: "16px", overflow: "hidden" }}>
             <Box sx={{ px: 2.5, py: 2, borderBottom: "1px solid #F1F5F9" }}>
-              <Typography variant="subtitle2" fontWeight={700}>
-                Notes
-              </Typography>
+              <Typography variant="subtitle2" fontWeight={700}>Notes</Typography>
             </Box>
             <Box sx={{ p: 2.5 }}>
               {notesError && (
-                <Alert
-                  severity="error"
-                  onClose={() => setNotesError(null)}
-                  sx={{ mb: 2, borderRadius: "10px" }}
-                >
+                <Alert severity="error" onClose={() => setNotesError(null)} sx={{ mb: 2, borderRadius: "10px" }}>
                   {notesError}
                 </Alert>
               )}
@@ -926,161 +808,59 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                 <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                   <Stack alignItems="center" spacing={1}>
                     <CircularProgress size={24} />
-                    <Typography variant="caption" color="text.secondary">
-                      Loading notes...
-                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Loading notes...</Typography>
                   </Stack>
                 </Box>
               ) : (
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 2,
-                    mb: 3,
-                  }}
-                >
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mb: 3 }}>
                   {notes.map((note) =>
                     editingNoteId === note.id ? (
-                      <Card
-                        key={note.id}
-                        variant="outlined"
-                        sx={{
-                          p: 2,
-                          borderRadius: "12px",
-                          border: "2px solid #6366F1",
-                          bgcolor: "#FAFAFE",
-                        }}
-                      >
+                      <Card key={note.id} variant="outlined" sx={{ p: 2, borderRadius: "12px", border: "2px solid #6366F1", bgcolor: "#FAFAFE" }}>
                         <TextField
                           fullWidth
                           value={editTitle}
                           onChange={(e) => setEditTitle(e.target.value)}
                           variant="standard"
                           placeholder="Title"
-                          inputProps={{
-                            style: { fontWeight: 700, fontSize: "0.875rem" },
-                          }}
+                          inputProps={{ style: { fontWeight: 700, fontSize: "0.875rem" } }}
                           sx={{
                             mb: 1,
-                            "& .MuiInput-underline:before": {
-                              borderBottomColor: "#E2E8F0",
-                            },
-                            "& .MuiInput-underline:after": {
-                              borderBottomColor: "#6366F1",
-                            },
+                            "& .MuiInput-underline:before": { borderBottomColor: "#E2E8F0" },
+                            "& .MuiInput-underline:after": { borderBottomColor: "#6366F1" },
                           }}
                         />
                         <TextField
-                          fullWidth
-                          multiline
-                          minRows={3}
+                          fullWidth multiline minRows={3}
                           value={editContent}
                           onChange={(e) => setEditContent(e.target.value)}
                           variant="standard"
                           placeholder="Note content..."
-                          inputProps={{
-                            style: {
-                              fontSize: "0.875rem",
-                              color: "#475569",
-                              lineHeight: 1.6,
-                            },
-                          }}
+                          inputProps={{ style: { fontSize: "0.875rem", color: "#475569", lineHeight: 1.6 } }}
                           sx={{
                             mb: 2,
                             "& .MuiInput-underline:before": { borderBottom: "none" },
                             "& .MuiInput-underline:after": { borderBottom: "none" },
-                            "& .MuiInput-underline:hover:not(.Mui-disabled):before": {
-                              borderBottom: "none",
-                            },
+                            "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" },
                           }}
                         />
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <Button
-                            size="small"
-                            onClick={onCancelEditNote}
-                            disabled={editSubmitting}
-                            sx={{
-                              textTransform: "none",
-                              fontSize: "0.75rem",
-                              color: "#64748B",
-                              borderRadius: "8px",
-                              "&:hover": { bgcolor: "#F1F5F9" },
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={() => onSaveEditNote(note.id)}
-                            disabled={editSubmitting}
-                            sx={{
-                              textTransform: "none",
-                              fontSize: "0.75rem",
-                              bgcolor: "#334155",
-                              borderRadius: "8px",
-                              boxShadow: "none",
-                              minWidth: 64,
-                              "&:hover": { bgcolor: "#1E293B", boxShadow: "none" },
-                            }}
-                          >
-                            {editSubmitting ? (
-                              <CircularProgress size={14} sx={{ color: "white" }} />
-                            ) : (
-                              "Save"
-                            )}
+                          <Button size="small" onClick={onCancelEditNote} disabled={editSubmitting} sx={{ textTransform: "none", fontSize: "0.75rem", color: "#64748B", borderRadius: "8px", "&:hover": { bgcolor: "#F1F5F9" } }}>Cancel</Button>
+                          <Button size="small" variant="contained" onClick={() => onSaveEditNote(note.id)} disabled={editSubmitting} sx={{ textTransform: "none", fontSize: "0.75rem", bgcolor: "#334155", borderRadius: "8px", boxShadow: "none", minWidth: 64, "&:hover": { bgcolor: "#1E293B", boxShadow: "none" } }}>
+                            {editSubmitting ? <CircularProgress size={14} sx={{ color: "white" }} /> : "Save"}
                           </Button>
                         </Stack>
                       </Card>
                     ) : (
-                      <Card
-                        key={note.id}
-                        variant="outlined"
-                        sx={{
-                          p: 2,
-                          borderRadius: "12px",
-                          border: "1px solid #E2E8F0",
-                          position: "relative",
-                        }}
-                      >
-                        <Typography variant="body2" fontWeight={700} mb={0.5}>
-                          {note.title}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ whiteSpace: "pre-line", mb: 1.5, lineHeight: 1.6 }}
-                        >
-                          {note.content}
-                        </Typography>
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
-                        >
-                          <Typography variant="caption" color="text.secondary">
-                            {note.time}
-                          </Typography>
+                      <Card key={note.id} variant="outlined" sx={{ p: 2, borderRadius: "12px", border: "1px solid #E2E8F0", position: "relative" }}>
+                        <Typography variant="body2" fontWeight={700} mb={0.5}>{note.title}</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-line", mb: 1.5, lineHeight: 1.6 }}>{note.content}</Typography>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Typography variant="caption" color="text.secondary">{note.time}</Typography>
                           <Stack direction="row" spacing={0.5}>
-                            <IconButton
-                              size="small"
-                              onClick={() => onStartEditNote(note)}
-                              sx={{
-                                color: "#3B82F6",
-                                "&:hover": { bgcolor: "#EFF6FF" },
-                              }}
-                            >
+                            <IconButton size="small" onClick={() => onStartEditNote(note)} sx={{ color: "#3B82F6", "&:hover": { bgcolor: "#EFF6FF" } }}>
                               <EditIcon sx={{ fontSize: 14 }} />
                             </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => setDeleteNoteDialog(note.id)}
-                              sx={{
-                                color: "#EF4444",
-                                "&:hover": { bgcolor: "#FEF2F2" },
-                              }}
-                            >
+                            <IconButton size="small" onClick={() => setDeleteNoteDialog(note.id)} sx={{ color: "#EF4444", "&:hover": { bgcolor: "#FEF2F2" } }}>
                               <DeleteOutlineIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                           </Stack>
@@ -1091,57 +871,32 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                 </Box>
               )}
 
-              {/* Add Note Input */}
-              <Card
-                variant="outlined"
-                sx={{
-                  borderRadius: "12px",
-                  border: "1px solid #E2E8F0",
-                  overflow: "hidden",
-                }}
-              >
+              <Card variant="outlined" sx={{ borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden" }}>
                 <TextField
-                  fullWidth
-                  placeholder="Title"
-                  value={newNoteTitle}
+                  fullWidth placeholder="Title" value={newNoteTitle}
                   onChange={(e) => setNewNoteTitle(e.target.value)}
                   variant="standard"
                   sx={{
-                    px: 2,
-                    pt: 1.5,
-                    "& .MuiInputBase-root": {
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                    },
+                    px: 2, pt: 1.5,
+                    "& .MuiInputBase-root": { fontSize: "0.875rem", fontWeight: 600 },
                     "& .MuiInput-underline:before": { borderBottom: "none" },
                     "& .MuiInput-underline:after": { borderBottom: "none" },
-                    "& .MuiInput-underline:hover:not(.Mui-disabled):before": {
-                      borderBottom: "none",
-                    },
+                    "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" },
                   }}
                 />
                 <Divider sx={{ mx: 2, borderColor: "#F1F5F9" }} />
                 <Stack direction="row" alignItems="flex-end">
                   <TextField
-                    fullWidth
-                    multiline
-                    minRows={2}
-                    placeholder="Write note here..."
+                    fullWidth multiline minRows={2} placeholder="Write note here..."
                     value={newNoteContent}
                     onChange={(e) => setNewNoteContent(e.target.value)}
                     variant="standard"
                     sx={{
-                      px: 2,
-                      py: 1,
-                      "& .MuiInputBase-root": {
-                        fontSize: "0.875rem",
-                        color: "#64748B",
-                      },
+                      px: 2, py: 1,
+                      "& .MuiInputBase-root": { fontSize: "0.875rem", color: "#64748B" },
                       "& .MuiInput-underline:before": { borderBottom: "none" },
                       "& .MuiInput-underline:after": { borderBottom: "none" },
-                      "& .MuiInput-underline:hover:not(.Mui-disabled):before": {
-                        borderBottom: "none",
-                      },
+                      "& .MuiInput-underline:hover:not(.Mui-disabled):before": { borderBottom: "none" },
                     }}
                   />
                   <Box sx={{ p: 1.5, flexShrink: 0 }}>
@@ -1149,33 +904,13 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                       onClick={onAddNote}
                       disabled={noteSubmitting}
                       sx={{
-                        bgcolor:
-                          (newNoteTitle.trim() || newNoteContent.trim()) &&
-                          !noteSubmitting
-                            ? "#334155"
-                            : "#F1F5F9",
-                        color:
-                          (newNoteTitle.trim() || newNoteContent.trim()) &&
-                          !noteSubmitting
-                            ? "white"
-                            : "#94A3B8",
-                        width: 36,
-                        height: 36,
-                        transition: "all 0.2s",
-                        "&:hover": {
-                          bgcolor:
-                            (newNoteTitle.trim() || newNoteContent.trim()) &&
-                            !noteSubmitting
-                              ? "#1E293B"
-                              : "#E2E8F0",
-                        },
+                        bgcolor: (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting ? "#334155" : "#F1F5F9",
+                        color: (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting ? "white" : "#94A3B8",
+                        width: 36, height: 36, transition: "all 0.2s",
+                        "&:hover": { bgcolor: (newNoteTitle.trim() || newNoteContent.trim()) && !noteSubmitting ? "#1E293B" : "#E2E8F0" },
                       }}
                     >
-                      {noteSubmitting ? (
-                        <CircularProgress size={16} sx={{ color: "#94A3B8" }} />
-                      ) : (
-                        <SendIcon sx={{ fontSize: 16 }} />
-                      )}
+                      {noteSubmitting ? <CircularProgress size={16} sx={{ color: "#94A3B8" }} /> : <SendIcon sx={{ fontSize: 16 }} />}
                     </IconButton>
                   </Box>
                 </Stack>
@@ -1185,43 +920,21 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
         </Box>
 
         {/* ══ ADD NEXT ACTION DIALOG ══ */}
-        <Dialog
-          open={openAddActionDialog}
-          onClose={onCloseActionDialog}
-          PaperProps={{
-            sx: { borderRadius: "16px", p: 3, maxWidth: "500px", width: "100%" },
-          }}
-        >
+        <Dialog open={openAddActionDialog} onClose={onCloseActionDialog} PaperProps={{ sx: { borderRadius: "16px", p: 3, maxWidth: "500px", width: "100%" } }}>
           <DialogContent sx={{ p: 0 }}>
             <Stack spacing={3}>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="flex-start"
-              >
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
-                  <Typography variant="h6" fontWeight={700}>
-                    Add Next Action
-                  </Typography>
+                  <Typography variant="h6" fontWeight={700}>Add Next Action</Typography>
                   <Typography fontSize="12px" color="#64748B" mt={0.5}>
                     Lead status:{" "}
                     <Chip
                       label={lead?.status || lead?.lead_status || "New"}
                       size="small"
                       sx={{
-                        height: 18,
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        bgcolor: isAppointment
-                          ? "#EFF6FF"
-                          : isFollowUp
-                          ? "#FEF3C7"
-                          : "#F0FDF4",
-                        color: isAppointment
-                          ? "#3B82F6"
-                          : isFollowUp
-                          ? "#F59E0B"
-                          : "#16A34A",
+                        height: 18, fontSize: "11px", fontWeight: 600,
+                        bgcolor: isAppointment ? "#EFF6FF" : isFollowUp ? "#FEF3C7" : "#F0FDF4",
+                        color: isAppointment ? "#3B82F6" : isFollowUp ? "#F59E0B" : "#16A34A",
                       }}
                     />
                   </Typography>
@@ -1230,124 +943,68 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
 
               {isAppointment && (
                 <Alert severity="info" sx={{ borderRadius: "10px", fontSize: "13px" }}>
-                  This lead already has an <strong>Appointment</strong> status. Fields
-                  are disabled.
+                  This lead already has an <strong>Appointment</strong> status. Fields are disabled.
                 </Alert>
               )}
               {actionError && (
-                <Alert
-                  severity="error"
-                  onClose={() => setActionError(null)}
-                  sx={{ borderRadius: "10px", fontSize: "13px" }}
-                >
+                <Alert severity="error" onClose={() => setActionError(null)} sx={{ borderRadius: "10px", fontSize: "13px" }}>
                   {actionError}
                 </Alert>
               )}
 
-              {/* ── Status: which pipeline stage this lead moves to next ───── */}
               <Box>
                 <Typography fontSize="13px" fontWeight={600} mb={1}>
                   Status *
                   {!isAppointment && (
-                    <Typography
-                      component="span"
-                      fontSize="11px"
-                      color="#94A3B8"
-                      fontWeight={400}
-                      ml={1}
-                    >
+                    <Typography component="span" fontSize="11px" color="#94A3B8" fontWeight={400} ml={1}>
                       pipeline stage this lead will move to
                     </Typography>
                   )}
                 </Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  value={actionStatus}
-                  onChange={(e) => {
-                    setActionStatus(e.target.value);
-                    setActionType(""); // action type depends on the chosen stage
-                  }}
+                  select fullWidth size="small" value={actionStatus}
+                  onChange={(e) => { setActionStatus(e.target.value); setActionType(""); }}
                   disabled={isAppointment || pipelineLoading}
                   sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
-                  InputProps={{
-                    endAdornment: pipelineLoading ? (
-                      <CircularProgress size={16} sx={{ mr: 3 }} />
-                    ) : null,
-                  }}
+                  InputProps={{ endAdornment: pipelineLoading ? <CircularProgress size={16} sx={{ mr: 3 }} /> : null }}
                 >
                   <MenuItem value="">-- Select --</MenuItem>
                   {statusOptions.length === 0 ? (
-                    <MenuItem value="" disabled>
-                      {pipelineLoading
-                        ? "Loading pipeline..."
-                        : "No further stages configured"}
-                    </MenuItem>
+                    <MenuItem value="" disabled>{pipelineLoading ? "Loading pipeline..." : "No further stages configured"}</MenuItem>
                   ) : (
-                    statusOptions.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))
+                    statusOptions.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)
                   )}
                 </TextField>
               </Box>
 
-              {/* ── Action Type: enabled rules for the selected stage ──────── */}
               <Box>
                 <Typography fontSize="13px" fontWeight={600} mb={1}>
                   Action Type *
                   {!isAppointment && (
-                    <Typography
-                      component="span"
-                      fontSize="11px"
-                      color="#94A3B8"
-                      fontWeight={400}
-                      ml={1}
-                    >
-                      {actionStatus
-                        ? `actions configured for "${actionStatus}"`
-                        : "select a status first"}
+                    <Typography component="span" fontSize="11px" color="#94A3B8" fontWeight={400} ml={1}>
+                      {actionStatus ? `actions configured for "${actionStatus}"` : "select a status first"}
                     </Typography>
                   )}
                 </Typography>
                 <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  value={actionType}
+                  select fullWidth size="small" value={actionType}
                   onChange={(e) => setActionType(e.target.value)}
                   disabled={isAppointment || pipelineActionTypeOptions.length === 0}
                   sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
                 >
                   <MenuItem value="">-- Select --</MenuItem>
                   {pipelineActionTypeOptions.length === 0 ? (
-                    <MenuItem value="" disabled>
-                      {actionStatus
-                        ? "No actions configured for this stage"
-                        : "Select a status first"}
-                    </MenuItem>
+                    <MenuItem value="" disabled>{actionStatus ? "No actions configured for this stage" : "Select a status first"}</MenuItem>
                   ) : (
-                    pipelineActionTypeOptions.map((a) => (
-                      <MenuItem key={a.value} value={a.value}>
-                        {a.label}
-                      </MenuItem>
-                    ))
+                    pipelineActionTypeOptions.map((a) => <MenuItem key={a.value} value={a.value}>{a.label}</MenuItem>)
                   )}
                 </TextField>
               </Box>
 
               <Box>
-                <Typography fontSize="13px" fontWeight={600} mb={1}>
-                  Description *
-                </Typography>
+                <Typography fontSize="13px" fontWeight={600} mb={1}>Description *</Typography>
                 <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  size="small"
-                  value={actionDescription}
+                  fullWidth multiline rows={3} size="small" value={actionDescription}
                   onChange={(e) => setActionDescription(e.target.value)}
                   placeholder="Enter action description..."
                   disabled={isAppointment}
@@ -1356,78 +1013,24 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
               </Box>
 
               {!isAppointment && actionStatus && actionType && (
-                <Box
-                  sx={{
-                    bgcolor: "#F8FAFC",
-                    borderRadius: "8px",
-                    px: 2,
-                    py: 1.25,
-                    border: "1px solid #E2E8F0",
-                  }}
-                >
+                <Box sx={{ bgcolor: "#F8FAFC", borderRadius: "8px", px: 2, py: 1.25, border: "1px solid #E2E8F0" }}>
                   <Typography fontSize="11px" color="#64748B">
                     This lead will move to{" "}
-                    <Typography
-                      component="span"
-                      fontWeight={700}
-                      color="#0F172A"
-                      fontSize="11px"
-                    >
-                      {actionStatus}
-                    </Typography>{" "}
-                    with next action{" "}
-                    <Typography
-                      component="span"
-                      fontWeight={700}
-                      color="#0F172A"
-                      fontSize="11px"
-                    >
-                      {actionType}
-                    </Typography>
+                    <Typography component="span" fontWeight={700} color="#0F172A" fontSize="11px">{actionStatus}</Typography>
+                    {" "}with next action{" "}
+                    <Typography component="span" fontWeight={700} color="#0F172A" fontSize="11px">{actionType}</Typography>
                   </Typography>
                 </Box>
               )}
 
               <Stack direction="row" spacing={2} justifyContent="flex-end">
+                <Button onClick={onCloseActionDialog} variant="outlined" disabled={actionSubmitting} sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 600, color: "#475569", borderColor: "#E2E8F0" }}>Cancel</Button>
                 <Button
-                  onClick={onCloseActionDialog}
-                  variant="outlined"
-                  disabled={actionSubmitting}
-                  sx={{
-                    borderRadius: "8px",
-                    textTransform: "none",
-                    fontWeight: 600,
-                    color: "#475569",
-                    borderColor: "#E2E8F0",
-                  }}
+                  onClick={onAddNextAction} variant="contained"
+                  disabled={isAppointment || !actionStatus || !actionType || !actionDescription || actionSubmitting}
+                  sx={{ bgcolor: "#334155", borderRadius: "8px", textTransform: "none", fontWeight: 600, boxShadow: "none", "&:hover": { bgcolor: "#1E293B" }, "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" } }}
                 >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={onAddNextAction}
-                  variant="contained"
-                  disabled={
-                    isAppointment ||
-                    !actionStatus ||
-                    !actionType ||
-                    !actionDescription ||
-                    actionSubmitting
-                  }
-                  sx={{
-                    bgcolor: "#334155",
-                    borderRadius: "8px",
-                    textTransform: "none",
-                    fontWeight: 600,
-                    boxShadow: "none",
-                    "&:hover": { bgcolor: "#1E293B" },
-                    "&:disabled": { bgcolor: "#E2E8F0", color: "#94A3B8" },
-                  }}
-                >
-                  {actionSubmitting ? (
-                    <CircularProgress size={20} sx={{ color: "white" }} />
-                  ) : (
-                    "Save"
-                  )}
+                  {actionSubmitting ? <CircularProgress size={20} sx={{ color: "white" }} /> : "Save"}
                 </Button>
               </Stack>
             </Stack>
@@ -1435,119 +1038,40 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
         </Dialog>
 
         {/* ══ DELETE NOTE DIALOG ══ */}
-        <Dialog
-          open={deleteNoteDialog !== null}
-          onClose={() => setDeleteNoteDialog(null)}
-          PaperProps={{
-            sx: {
-              borderRadius: "24px",
-              p: 4,
-              textAlign: "center",
-              maxWidth: "420px",
-              boxShadow: "0px 20px 25px -5px rgba(0,0,0,0.1)",
-            },
-          }}
-        >
+        <Dialog open={deleteNoteDialog !== null} onClose={() => setDeleteNoteDialog(null)} PaperProps={{ sx: { borderRadius: "24px", p: 4, textAlign: "center", maxWidth: "420px", boxShadow: "0px 20px 25px -5px rgba(0,0,0,0.1)" } }}>
           <DialogContent sx={{ p: 0 }}>
             <Stack alignItems="center" spacing={2.5}>
-              <Box
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  bgcolor: "#FEF2F2",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+              <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <DeleteOutlineIcon sx={{ fontSize: 32, color: "#EF4444" }} />
               </Box>
               <Box>
-                <Typography variant="h6" fontWeight={700} gutterBottom>
-                  Delete Note
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ px: 2, lineHeight: 1.6 }}
-                >
-                  This action cannot be undone. Are you sure you want to delete this note
-                  permanently?
+                <Typography variant="h6" fontWeight={700} gutterBottom>Delete Note</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ px: 2, lineHeight: 1.6 }}>
+                  This action cannot be undone. Are you sure you want to delete this note permanently?
                 </Typography>
               </Box>
               <Stack direction="row" spacing={2} sx={{ width: "100%", mt: 2 }}>
-                <Button
-                  fullWidth
-                  onClick={() => setDeleteNoteDialog(null)}
-                  variant="outlined"
-                  sx={{
-                    borderRadius: "12px",
-                    textTransform: "none",
-                    fontWeight: 600,
-                    color: "#475569",
-                    borderColor: "#E2E8F0",
-                    py: 1.2,
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  onClick={() => deleteNoteDialog && onDeleteNote(deleteNoteDialog)}
-                  sx={{
-                    bgcolor: "#EF4444",
-                    borderRadius: "12px",
-                    textTransform: "none",
-                    fontWeight: 600,
-                    py: 1.2,
-                    boxShadow: "none",
-                    "&:hover": { bgcolor: "#DC2626" },
-                  }}
-                >
-                  Delete
-                </Button>
+                <Button fullWidth onClick={() => setDeleteNoteDialog(null)} variant="outlined" sx={{ borderRadius: "12px", textTransform: "none", fontWeight: 600, color: "#475569", borderColor: "#E2E8F0", py: 1.2 }}>Cancel</Button>
+                <Button fullWidth variant="contained" onClick={() => deleteNoteDialog && onDeleteNote(deleteNoteDialog)} sx={{ bgcolor: "#EF4444", borderRadius: "12px", textTransform: "none", fontWeight: 600, py: 1.2, boxShadow: "none", "&:hover": { bgcolor: "#DC2626" } }}>Delete</Button>
               </Stack>
             </Stack>
           </DialogContent>
         </Dialog>
       </Stack>
 
-      {/* ── Call Dialog ── */}
-      <CallDialog
-        open={callDialogOpen}
-        name={lead?.full_name || lead?.name || "Unknown"}
-        onClose={() => setCallDialogOpen(false)}
-      />
+      <CallDialog open={callDialogOpen} name={lead?.full_name || lead?.name || "Unknown"} onClose={() => setCallDialogOpen(false)} />
 
-      {/* ── SMS Dialog ── */}
-      <SMSDialog
-        open={smsDialogOpen}
-        lead={lead as unknown as ProcessedLead}
-        onClose={handleSmsDialogClose}
-      />
+      <SMSDialog open={smsDialogOpen} lead={lead as unknown as ProcessedLead} onClose={handleSmsDialogClose} />
 
-      {/* ── Book Appointment Modal ── */}
-      <BookAppointmentModal
-        open={appointmentDialogOpen}
-        lead={lead}
-        onClose={() => setAppointmentDialogOpen(false)}
-        onSaved={handleAppointmentSaved}
-      />
+      <BookAppointmentModal open={appointmentDialogOpen} lead={lead} onClose={() => setAppointmentDialogOpen(false)} onSaved={handleAppointmentSaved} />
 
-      {/* ── Action Error / Info Snackbar (Call / SMS / Appointment) ── */}
       <Snackbar
         open={actionSnackbar.open}
         autoHideDuration={4000}
         onClose={() => setActionSnackbar((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert
-          onClose={() => setActionSnackbar((s) => ({ ...s, open: false }))}
-          severity={actionSnackbar.severity}
-          sx={{ borderRadius: "10px" }}
-        >
+        <Alert onClose={() => setActionSnackbar((s) => ({ ...s, open: false }))} severity={actionSnackbar.severity} sx={{ borderRadius: "10px" }}>
           {actionSnackbar.message}
         </Alert>
       </Snackbar>
