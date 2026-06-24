@@ -24,12 +24,12 @@ export const store = configureStore({
     tickets: ticketReducer,
     templates: templateReducer,
     emailHistory: emailHistoryReducer,
-    mailInsights: mailInsightsReducer, // ✅ mail insights KPI
+    mailInsights: mailInsightsReducer,
     reputation: reputationReducer,
     pipeline: pipelineReducer,
     referral: referralReducer,
   },
 });
 
-export type RootState   = ReturnType<typeof store.getState>;
+export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

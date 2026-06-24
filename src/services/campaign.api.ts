@@ -110,6 +110,11 @@ export const CampaignAPI = {
       // ── Ad content — BE reads both keys
       content?: string;
       campaign_content?: string;
+      start_date?: string;
+      end_date?: string;
+      selected_start?: string;
+      selected_end?: string;
+      enter_time?: string | null;
       // ── Full platform_data so BE can resolve resource_names
       platform_data?: Record<string, unknown>;
     },

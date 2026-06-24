@@ -366,7 +366,7 @@ export default function AppRoutes() {
       >
         <Route index element={<Navigate to={roleDefaultPath} replace />} />
 
-        {/* ✅ Sidebar routes — filtered by demo condition */}
+        {/* Sidebar routes filtered by demo mode and permissions. */}
         {SIDEBAR_TABS.flatMap((tab) =>
           tab.menu.flatMap((item) => {
             // In demo mode, skip routes not in allowed list
@@ -406,7 +406,7 @@ export default function AppRoutes() {
           }),
         )}
 
-        {/* Extra routes — always available */}
+        {/* Extra routes always available inside the authenticated layout. */}
         {EXTRA_ROUTES.map((route) => (
           <Route
             key={route.key}

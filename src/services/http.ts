@@ -1,10 +1,20 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosError, type AxiosInstance } from "axios";
-import { store, type AppDispatch } from "../store";
+import { store, type AppDispatch, type RootState } from "../store";
 import { setAuth, setExternalToken } from "../store/authSlice";
 
-// Base axios instance used everywhere in the app.
-// Keep all network + auth related setup here.
+type HttpInstance = AxiosInstance & {
+  redirect: (path: string) => void;
+};
+
+type RetryableRequestConfig = NonNullable<AxiosError["config"]> & {
+  _retry?: boolean;
+};
+
+type HeaderBag = {
+  set?: (name: string, value: string) => void;
+  Authorization?: string;
+};
+
 const resolveApiBaseUrl = (): string => {
   const configured = (
     import.meta.env.VITE_API_BASE_URL as string | undefined
@@ -18,43 +28,67 @@ const resolveApiBaseUrl = (): string => {
   return "http://127.0.0.1:8000/api";
 };
 
+const readEnv = (key: string, fallback: string): string => {
+  const value = (import.meta.env[key] as string | undefined)?.trim();
+  return value || fallback;
+};
+
 const API_BASE_URL = resolveApiBaseUrl();
-interface HttpInstance extends AxiosInstance {
-  redirect: (path: string) => void;
-}
+const EXT_PROXY_USERNAME = readEnv("VITE_EXT_PROXY_USERNAME", "");
+const EXT_PROXY_PASSWORD = readEnv("VITE_EXT_PROXY_PASSWORD", "");
 
 export const http = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
 }) as HttpInstance;
 
-// let extTokenPromise: Promise<string> | null = null;
+const setAuthorizationHeader = (
+  headers: RetryableRequestConfig["headers"],
+  token: string,
+): RetryableRequestConfig["headers"] => {
+  if (typeof headers?.set === "function") {
+    headers.set("Authorization", `Bearer ${token}`);
+    return headers;
+  }
 
-// Add interceptor to handle FormData properly
-// When FormData is sent, remove the Content-Type header to allow browser/axios
-// to automatically set multipart/form-data with the correct boundary
+  const nextHeaders = (headers ?? {}) as HeaderBag;
+  nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders as RetryableRequestConfig["headers"];
+};
+
+const isFormData = (value: unknown): value is FormData =>
+  typeof FormData !== "undefined" && value instanceof FormData;
+
 http.interceptors.request.use((config) => {
-  if (config.data instanceof FormData) {
-    // Remove Content-Type header for FormData - let the browser set it automatically
+  if (isFormData(config.data)) {
     if (config.headers && typeof config.headers.delete === "function") {
       config.headers.delete("Content-Type");
     } else if (config.headers) {
-      delete config.headers["Content-Type"];
+      delete (config.headers as Record<string, unknown>)["Content-Type"];
     }
   }
+
   return config;
 });
 
-export const getExtToken = async (dispatch: AppDispatch, getState:any, forceRefresh = false) => {
+export const getExtToken = async (
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  forceRefresh = false,
+): Promise<string> => {
   const state = getState();
   const stored = localStorage.getItem("ext_token");
 
   if (!forceRefresh && state.auth.extToken) return state.auth.extToken;
   if (!forceRefresh && stored) return stored;
 
+  if (!EXT_PROXY_USERNAME || !EXT_PROXY_PASSWORD) {
+    throw new Error("External proxy credentials are not configured.");
+  }
+
   const res = await http.post("/proxy/login/", {
-    username: "Admin",
-    password: "vidai_admin@2023",
+    username: EXT_PROXY_USERNAME,
+    password: EXT_PROXY_PASSWORD,
   });
 
   const token = res.data?.data?.ext_token;
@@ -125,6 +159,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
         }),
       );
     }
+
     return nextToken;
   } catch {
     clearAuthTokens();
@@ -137,29 +172,18 @@ http.redirect = (path: string): void => {
   window.location.href = `${baseURL}${path}`;
 };
 
-// Add auth token to every request if it exists
 http.interceptors.request.use(async (config) => {
   const state = store.getState();
+  let token = state.auth.token;
 
-  let token = state.auth.token; // default INT
-
-  // 🔥 Detect external API
   if (config.url?.includes("/users-search/")) {
     token = await getExtToken(store.dispatch, store.getState);
   }
 
   if (token) {
-    if (typeof config.headers?.set === "function") {
-      config.headers.set("Authorization", `Bearer ${token}`);
-    } else {
-      const headers = (config.headers ?? {}) as Record<string, string>;
-      headers.Authorization = `Bearer ${token}`;
-      config.headers = headers as typeof config.headers;
-    }
+    config.headers = setAuthorizationHeader(config.headers, token);
   }
 
-  // Ensure active clinic context is sent across all clinic-scoped modules.
-  // Skip auth/proxy endpoints where clinic is not relevant.
   const clinicId = Number(localStorage.getItem("clinic_id") ?? 0);
   const shouldAttachClinic =
     Number.isFinite(clinicId) &&
@@ -184,13 +208,10 @@ http.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Handle auth errors in one place
 http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as
-      | (typeof error.config & { _retry?: boolean })
-      | undefined;
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
     const status = error.response?.status;
     const url = originalRequest?.url || "";
 
@@ -198,36 +219,35 @@ http.interceptors.response.use(
       url.includes("/auth/login/") ||
       url.includes("/proxy/login/") ||
       url.includes("/token/refresh/");
-    
-    // const isExternalApi = url.includes("/users-search/");
 
     if (
       !originalRequest ||
       (status !== 401 && status !== 403) ||
       originalRequest._retry ||
       isAuthRoute
-      // isExternalApi
     ) {
       return Promise.reject(error);
     }
 
     originalRequest._retry = true;
 
-    // HANDLE EXT TOKEN
-if (url.includes("/users-search/")) {
-  try {
-    const newExtToken = await getExtToken(store.dispatch, store.getState, true); // force refresh
+    if (url.includes("/users-search/")) {
+      try {
+        const newExtToken = await getExtToken(
+          store.dispatch,
+          store.getState,
+          true,
+        );
+        originalRequest.headers = setAuthorizationHeader(
+          originalRequest.headers,
+          newExtToken,
+        );
 
-    (originalRequest.headers as any)?.set?.(
-      "Authorization",
-      `Bearer ${newExtToken}`,
-    );
-
-    return http.request(originalRequest);
-  } catch {
-    return Promise.reject(error);
-  }
-}
+        return http.request(originalRequest);
+      } catch {
+        return Promise.reject(error);
+      }
+    }
 
     if (!refreshPromise) {
       refreshPromise = refreshAccessToken().finally(() => {
@@ -250,14 +270,10 @@ if (url.includes("/users-search/")) {
       return new Promise(() => {});
     }
 
-    if (typeof originalRequest.headers?.set === "function") {
-      originalRequest.headers.set("Authorization", `Bearer ${newToken}`);
-    } else {
-      (originalRequest.headers as any)?.set?.(
-        "Authorization",
-        `Bearer ${newToken}`,
-      );
-    }
+    originalRequest.headers = setAuthorizationHeader(
+      originalRequest.headers,
+      newToken,
+    );
 
     return http.request(originalRequest);
   },

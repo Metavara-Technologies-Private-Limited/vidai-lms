@@ -2059,7 +2059,7 @@ export default function LeadDetailView() {
       );
       setOpenAddActionDialog(false);
       setActionType("");
-      setActionStatus("pending");
+      setActionStatus("");
       setActionDescription("");
       setActionError(null);
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
@@ -2084,7 +2084,7 @@ export default function LeadDetailView() {
   const closeActionDialog = () => {
     setOpenAddActionDialog(false);
     setActionType("");
-    setActionStatus("pending");
+    setActionStatus("");
     setActionDescription("");
     setActionError(null);
   };

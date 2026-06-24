@@ -36,6 +36,7 @@ import {
   pipelineApi,
   isActiveStageStatus,
   type Pipeline,
+  type PipelineRuleActionType,
   type PipelineStage,
 } from "../../services/pipeline.api";
 import CallDialog from "./CallDialog";
@@ -149,6 +150,13 @@ const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
 type PipelineOption = { value: string; label: string };
 type ChannelKey = "call" | "sms" | "appointment";
 
+const normalizeStageName = (value?: string | null): string =>
+  (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
 const deriveActionTypeOptions = (stage: PipelineStage): PipelineOption[] => {
   const labels = Array.from(
     new Set(
@@ -188,6 +196,12 @@ type ActionChannel = {
   buttonBg: string;
   buttonHoverBg: string;
   onTrigger: () => void;
+};
+
+const CHANNEL_RULE_TYPES: Record<ChannelKey, PipelineRuleActionType[]> = {
+  call: ["call"],
+  sms: ["sms", "whatsapp"],
+  appointment: ["appointment"],
 };
 
 // Stable empty arrays so useMemo deps don't fire on every render when
@@ -339,8 +353,20 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
           const byIndustry = selectedIndustry
             ? pipelines.filter((p) => p.industry_type === selectedIndustry)
             : pipelines;
+          const leadStageId = String(
+            (lead as { stage_id?: unknown; pipeline_stage_id?: unknown })?.stage_id ??
+              (lead as { stage_id?: unknown; pipeline_stage_id?: unknown })
+                ?.pipeline_stage_id ??
+              "",
+          );
+          const byLeadStage = leadStageId
+            ? pipelines.find((p) =>
+                p.stages?.some((s) => String(s.id) === leadStageId),
+              )
+            : undefined;
 
           selectedPipeline =
+            byLeadStage ??
             pipelines.find((p) => p.id === selectedPipelineId) ??
             byIndustry.find((p) => p.is_active) ??
             byIndustry[0] ??
@@ -372,13 +398,11 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
   }, [clinicId]);
 
   const currentStage = React.useMemo(() => {
-    const currentName = (lead?.lead_status || lead?.status || "")
-      .trim()
-      .toLowerCase();
+    const currentName = normalizeStageName(lead?.lead_status || lead?.status);
     if (!currentName) return null;
     return (
       pipelineStages.find(
-        (s) => s.stage_name.trim().toLowerCase() === currentName,
+        (s) => normalizeStageName(s.stage_name) === currentName,
       ) ?? null
     );
   }, [pipelineStages, lead?.lead_status, lead?.status]);
@@ -393,11 +417,11 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
   }, [pipelineStages, currentStage]);
 
   const selectedStatusStage = React.useMemo(() => {
-    const trimmed = actionStatus.trim().toLowerCase();
+    const trimmed = normalizeStageName(actionStatus);
     if (!trimmed) return null;
     return (
       pipelineStages.find(
-        (s) => s.stage_name.trim().toLowerCase() === trimmed,
+        (s) => normalizeStageName(s.stage_name) === trimmed,
       ) ?? null
     );
   }, [pipelineStages, actionStatus]);
@@ -538,6 +562,24 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     },
   ];
 
+  const visibleActionChannels = React.useMemo(() => {
+    if (!currentStage?.rules?.length) return actionChannels;
+
+    const enabledRuleTypes = new Set(
+      currentStage.rules
+        .filter((rule) => rule.is_enabled)
+        .map((rule) => rule.action_type),
+    );
+
+    if (enabledRuleTypes.size === 0) return actionChannels;
+
+    return actionChannels.filter((channel) =>
+      CHANNEL_RULE_TYPES[channel.key].some((ruleType) =>
+        enabledRuleTypes.has(ruleType),
+      ),
+    );
+  }, [actionChannels, currentStage]);
+
   return (
     <>
       <Stack direction="row" spacing={3} alignItems="flex-start">
@@ -578,7 +620,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
               </Typography>
 
               <Stack spacing={2} sx={{ mb: 3 }}>
-                {actionChannels.map((channel) => {
+                {visibleActionChannels.map((channel) => {
                   const channelCompleted = isChannelCompleted(channel.key);
                   const channelLoading = markDoneLoading === channel.key;
 

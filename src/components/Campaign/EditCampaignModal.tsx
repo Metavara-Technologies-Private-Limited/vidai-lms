@@ -1171,11 +1171,40 @@ export default function EditCampaignModal({
         resolvedImageUrl = resolveImageUrl(String(fullDataAsRecord.image_url));
       }
 
+      const selectedStart =
+        campaign.type === "email"
+          ? scheduleRange[0]?.format("YYYY-MM-DD") ?? startDate
+          : scheduleDate;
+      const selectedEnd =
+        campaign.type === "email"
+          ? scheduleRange[1]?.format("YYYY-MM-DD") ?? endDate
+          : endDate;
+
+      await CampaignAPI.update(campaign.id, {
+        ...fullCampaignData,
+        campaign_name: campaignName,
+        campaign_description: campaignDescription,
+        campaign_objective: objective,
+        target_audience: audience,
+        start_date: startDate,
+        end_date: endDate,
+        selected_start: selectedStart,
+        selected_end: selectedEnd,
+        enter_time: scheduleTime || null,
+        platform_data: updatedPlatformData,
+        budget_data: budgets,
+        image_url: resolvedImageUrl,
+        select_ad_accounts: accounts,
+      });
+
       const facebookPayload = {
         campaign_name: campaignName,
         campaign_objective: objective,
         campaign_content: platformContent.facebook,
         image_url: resolvedImageUrl,
+        selected_start: selectedStart,
+        selected_end: selectedEnd,
+        enter_time: scheduleTime || null,
         budget_data: {
           facebook: budgets.facebook,
         },
@@ -1189,6 +1218,9 @@ export default function EditCampaignModal({
         campaign_objective: objective,
         campaign_content: platformContent.instagram,
         image_url: resolvedImageUrl,
+        selected_start: selectedStart,
+        selected_end: selectedEnd,
+        enter_time: scheduleTime || null,
         budget_data: {
           instagram: budgets.instagram,
         },
@@ -1258,6 +1290,11 @@ export default function EditCampaignModal({
             // ── Ad content ──────────────────────────────────────
             content: platformContent["google_ads"],
             campaign_content: platformContent["google_ads"],
+            start_date: startDate,
+            end_date: endDate,
+            selected_start: selectedStart,
+            selected_end: selectedEnd,
+            enter_time: scheduleTime || null,
             // ── Full platform_data so BE can read resource names ─
             platform_data: { google_ads: updatedPlatformData["google_ads"] },
           };
