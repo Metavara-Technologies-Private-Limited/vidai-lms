@@ -34,6 +34,8 @@ import {
 } from "../store/clinicSlice";
 import { selectAuthed, selectUser } from "../store/authSlice";
 import type { AppDispatch } from "../store";
+import { fetchUsers, selectUsers } from "../store/userSlice";
+import type { UserRecord } from "../services/users.api";
 import {
   hasAnySubcategoryActionPermission,
   resolveUserRole,
@@ -62,6 +64,13 @@ interface ImportedRow {
   rowNumber: number;
   values: Record<string, string>;
 }
+
+type ImportResult = {
+  createdLeads: Lead[];
+  failedCount: number;
+  noteFailedCount: number;
+  errorMessages: string[];
+};
 
 const IMPORT_FIELD_CONFIGS: Array<{
   payloadKey:
@@ -95,7 +104,7 @@ const IMPORT_FIELD_CONFIGS: Array<{
   {
     payloadKey: "location",
     tableHeader: "Location",
-    aliases: ["location", "city", "area"],
+    aliases: ["location", "lead location", "city", "area", "branch"],
   },
   {
     payloadKey: "source",
@@ -110,7 +119,15 @@ const IMPORT_FIELD_CONFIGS: Array<{
   {
     payloadKey: "assigned_to_name",
     tableHeader: "Assigned To",
-    aliases: ["assigned to", "assignee", "owner", "assigned_to"],
+    aliases: [
+      "assigned to",
+      "assigned user",
+      "assignee",
+      "owner",
+      "employee",
+      "user",
+      "assigned_to",
+    ],
   },
   {
     payloadKey: "department_name",
@@ -120,12 +137,21 @@ const IMPORT_FIELD_CONFIGS: Array<{
   {
     payloadKey: "email",
     tableHeader: "Email",
-    aliases: ["email", "mail", "email address"],
+    aliases: ["email", "e-mail", "mail", "email address", "lead email"],
   },
   {
     payloadKey: "treatment_interest",
     tableHeader: "Treatment Interest",
-    aliases: ["treatment interest", "treatment", "service", "interest"],
+    aliases: [
+      "treatment interest",
+      "treatment interested",
+      "product interest",
+      "product interested",
+      "product",
+      "service",
+      "interest",
+      "treatment_interest",
+    ],
   },
   {
     payloadKey: "appointment_date",
@@ -153,7 +179,11 @@ const IMPORT_FIELD_CONFIGS: Array<{
     tableHeader: "Notes",
     aliases: ["note", "notes", "lead note", "lead notes"],
   },
-  { payloadKey: "address", tableHeader: "Address", aliases: ["address"] },
+  {
+    payloadKey: "address",
+    tableHeader: "Address",
+    aliases: ["address", "lead address", "full address", "address line"],
+  },
 ];
 
 const parseCsvRow = (line: string): string[] => {
@@ -197,18 +227,55 @@ const normalizeHeader = (value: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-const normalizeLeadStatus = (value: string): "new" | "contacted" => {
-  const normalized = value.toLowerCase().trim();
-  if (
-    normalized.includes("contact") ||
-    normalized.includes("follow") ||
-    normalized.includes("appoint") ||
-    normalized.includes("convert") ||
-    normalized.includes("lost")
-  ) {
-    return "contacted";
+const normalizeLeadStatus = (
+  value: string,
+): NonNullable<LeadPayload["lead_status"]> => {
+  const normalized = normalizeHeader(value).replace(/\s+/g, " ");
+  if (!normalized) return "new";
+  if (["new", "new lead", "lead"].includes(normalized)) return "new";
+  if (normalized.includes("appoint")) return "appointment";
+  if (normalized.includes("follow")) return "follow up";
+  if (normalized.includes("negotiation")) return "negotiation";
+  if (normalized.includes("proposal")) return "proposal sent";
+  if (normalized.includes("contract")) return "contract signed";
+  if (normalized.includes("cycle")) return "cycle_conversion";
+  if (normalized.includes("convert") || normalized.includes("registered")) {
+    return "converted";
   }
+  if (normalized.includes("lost")) return "lost";
+  if (normalized.includes("contact")) return "contacted";
   return "new";
+};
+
+const stringifyImportedCell = (value: unknown): string => {
+  if (value == null) return "";
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value).trim();
+  }
+  if (typeof value !== "object") return "";
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.text === "string") return record.text.trim();
+  if (typeof record.result === "string" || typeof record.result === "number") {
+    return String(record.result).trim();
+  }
+  if (typeof record.hyperlink === "string" && typeof record.text === "string") {
+    return record.text.trim();
+  }
+  if (Array.isArray(record.richText)) {
+    return record.richText
+      .map((part) =>
+        part && typeof part === "object"
+          ? String((part as Record<string, unknown>).text ?? "")
+          : "",
+      )
+      .join("")
+      .trim();
+  }
+
+  return String(value).trim();
 };
 
 const normalizeStatusFilterValue = (value: string): string =>
@@ -223,6 +290,59 @@ const sanitizeImportedEmail = (value: string): string | null => {
 
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailPattern.test(normalized) ? normalized : null;
+};
+
+const getUserDisplayName = (user: UserRecord): string => {
+  const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+  return fullName || user.username || user.email || `User ${user.id}`;
+};
+
+const buildUserLookup = (users: UserRecord[]): Map<string, UserRecord> => {
+  const lookup = new Map<string, UserRecord>();
+
+  const add = (key: string, user: UserRecord) => {
+    const normalized = normalizeHeader(key);
+    if (normalized && !lookup.has(normalized)) {
+      lookup.set(normalized, user);
+    }
+  };
+
+  for (const user of users) {
+    add(getUserDisplayName(user), user);
+    add(user.username, user);
+    add(user.email, user);
+    add(user.mobileNumber, user);
+  }
+
+  return lookup;
+};
+
+const extractImportErrorMessage = (error: unknown): string => {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+
+  const normalize = (value: unknown): string => {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map(normalize).filter(Boolean).join(", ");
+    }
+    if (typeof value === "object") {
+      const entries = Object.entries(value as Record<string, unknown>);
+      return entries
+        .map(([key, val]) => {
+          const message = normalize(val);
+          return message ? `${key}: ${message}` : "";
+        })
+        .filter(Boolean)
+        .join("; ");
+    }
+    return "";
+  };
+
+  return normalize(data) || (error instanceof Error ? error.message : "");
 };
 
 const formatDateParts = (
@@ -356,6 +476,7 @@ const Leads: React.FC = () => {
   const clinic = useSelector(selectClinic);
   const clinicLoading = useSelector(selectClinicLoading);
   const user = useSelector(selectUser);
+  const users = useSelector(selectUsers);
   const authed = useSelector(selectAuthed);
   const authUser = user as unknown as Record<string, unknown> | null;
   const nestedAuthUser =
@@ -435,6 +556,12 @@ const Leads: React.FC = () => {
   const tabScrollRef = React.useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = React.useState(false);
   const [canScrollRight, setCanScrollRight] = React.useState(false);
+
+  React.useEffect(() => {
+    if (users.length === 0) {
+      void dispatch(fetchUsers());
+    }
+  }, [dispatch, users.length]);
 
   const updateTabScrollState = React.useCallback(() => {
     const el = tabScrollRef.current;
@@ -805,6 +932,7 @@ const Leads: React.FC = () => {
           createdLeads: [] as Lead[],
           failedCount: 0,
           noteFailedCount: 0,
+          errorMessages: [],
         };
       }
 
@@ -832,6 +960,7 @@ const Leads: React.FC = () => {
       const sourceHeaderByPayloadKey = new Map(
         headerMatches.map((match) => [match.payloadKey, match.importedHeader]),
       );
+      const userByLookupKey = buildUserLookup(users);
       const getValue = (
         row: ImportedRow,
         payloadKey: HeaderMatch["payloadKey"],
@@ -845,6 +974,7 @@ const Leads: React.FC = () => {
       const createdLeads: Lead[] = [];
       let failedCount = 0;
       let noteFailedCount = 0;
+      const errorMessages: string[] = [];
 
       for (const row of rows) {
         const departmentName = getValue(row, "department_name");
@@ -858,6 +988,10 @@ const Leads: React.FC = () => {
         const importedNote = getValue(row, "import_note");
         const hasAppointmentDetails = Boolean(appointmentDate && slot);
         const sanitizedEmail = sanitizeImportedEmail(getValue(row, "email"));
+        const assignedToInput = getValue(row, "assigned_to_name");
+        const assignedUser = assignedToInput
+          ? userByLookupKey.get(normalizeHeader(assignedToInput))
+          : null;
 
         const payload: LeadPayload = {
           clinic_id: clinicId,
@@ -876,7 +1010,10 @@ const Leads: React.FC = () => {
           book_appointment: hasAppointmentDetails,
           is_active: true,
           lead_status: normalizeLeadStatus(getValue(row, "lead_status")),
-          assigned_to_id: null,
+          assigned_to_id: assignedUser?.id ?? null,
+          assigned_to_name: assignedUser
+            ? getUserDisplayName(assignedUser)
+            : assignedToInput || null,
           personal_id: null,
           campaign_id: null,
           age: null,
@@ -904,18 +1041,22 @@ const Leads: React.FC = () => {
             ...createdLead,
             created_at: appointmentDate || createdLead.created_at,
           });
-        } catch {
+        } catch (error) {
           failedCount += 1;
+          const message = extractImportErrorMessage(error);
+          errorMessages.push(
+            `Row ${row.rowNumber}: ${message || "Lead could not be saved."}`,
+          );
         }
       }
 
-      return { createdLeads, failedCount, noteFailedCount };
+      return { createdLeads, failedCount, noteFailedCount, errorMessages };
     },
-    [clinic?.id, leads],
+    [clinic?.id, leads, users],
   );
 
   const importSingleFile = React.useCallback(
-    async (file: File) => {
+    async (file: File): Promise<ImportResult> => {
       const isExcelFile = /\.(xlsx|xls)$/i.test(file.name);
       const isCsvFile = /\.csv$/i.test(file.name);
       if (!isExcelFile && !isCsvFile) {
@@ -924,6 +1065,7 @@ const Leads: React.FC = () => {
           createdLeads: [] as Lead[],
           failedCount: 0,
           noteFailedCount: 0,
+          errorMessages: [],
         };
       }
 
@@ -969,6 +1111,7 @@ const Leads: React.FC = () => {
               createdLeads: [] as Lead[],
               failedCount: 0,
               noteFailedCount: 0,
+              errorMessages: [],
             };
           }
 
@@ -983,6 +1126,7 @@ const Leads: React.FC = () => {
               createdLeads: [] as Lead[],
               failedCount: 0,
               noteFailedCount: 0,
+              errorMessages: [],
             };
           }
 
@@ -992,7 +1136,7 @@ const Leads: React.FC = () => {
             : [];
           sourceHeaders = rowValues
             .slice(1)
-            .map((value: unknown) => String(value ?? "").trim())
+            .map((value: unknown) => stringifyImportedCell(value))
             .filter((value: string) => value.length > 0);
 
           parsedRows = [];
@@ -1002,7 +1146,7 @@ const Leads: React.FC = () => {
             const values = Array.isArray(row.values) ? row.values.slice(1) : [];
             const rowRecord = sourceHeaders.reduce<Record<string, string>>(
               (accumulator, header, index) => {
-                accumulator[header] = String(values[index] ?? "").trim();
+                accumulator[header] = stringifyImportedCell(values[index]);
                 return accumulator;
               },
               {},
@@ -1043,13 +1187,20 @@ const Leads: React.FC = () => {
           createdLeads: [] as Lead[],
           failedCount: 0,
           noteFailedCount: 0,
+          errorMessages: [],
         };
-      } catch {
-        toast.error(`Failed to read imported file: ${file.name}`);
+      } catch (error) {
+        const message = extractImportErrorMessage(error);
+        toast.error(
+          message
+            ? `Failed to read ${file.name}: ${message}`
+            : `Failed to read imported file: ${file.name}`,
+        );
         return {
           createdLeads: [] as Lead[],
           failedCount: 0,
           noteFailedCount: 0,
+          errorMessages: message ? [`${file.name}: ${message}`] : [],
         };
       }
     },
@@ -1065,13 +1216,15 @@ const Leads: React.FC = () => {
       const allCreatedLeads: Lead[] = [];
       let totalFailed = 0;
       let totalNoteFailed = 0;
+      const importErrors: string[] = [];
 
       for (const file of files) {
-        const { createdLeads, failedCount, noteFailedCount } =
+        const { createdLeads, failedCount, noteFailedCount, errorMessages } =
           await importSingleFile(file);
         allCreatedLeads.push(...createdLeads);
         totalFailed += failedCount;
         totalNoteFailed += noteFailedCount;
+        importErrors.push(...errorMessages);
       }
 
       if (allCreatedLeads.length > 0) {
@@ -1101,6 +1254,11 @@ const Leads: React.FC = () => {
         );
       } else {
         toast.error("No imported rows could be saved.");
+      }
+
+      importErrors.slice(0, 3).forEach((message) => toast.error(message));
+      if (importErrors.length > 3) {
+        toast.error(`${importErrors.length - 3} more import errors found.`);
       }
 
       setIsSavingImport(false);

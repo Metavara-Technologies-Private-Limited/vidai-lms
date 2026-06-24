@@ -47,7 +47,7 @@ const TEMPLATE_HEADERS = [
   "Assigned To",
   "Department",
   "Email",
-  "Treatment Interest",
+  "Product Interest",
   "Date",
   "Time",
   "Activity",
