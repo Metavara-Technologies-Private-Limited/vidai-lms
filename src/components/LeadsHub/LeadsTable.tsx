@@ -29,6 +29,9 @@ import { useDispatch, useSelector } from "react-redux";
 import PhoneIcon from "@mui/icons-material/Phone";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
+import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
+import LanguageOutlinedIcon from "@mui/icons-material/LanguageOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
@@ -62,6 +65,7 @@ import {
 } from "./LeadsTable.types";
 import {
   extractErrorMessage,
+  formatLeadAiScore,
   hasUsablePhone,
   normalizePhone,
   processLead,
@@ -73,7 +77,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 
 // ── App-type config ───────────────────────────────────────────────────────────
-import { IS_CONTRACTS_APP, ACTIVE_STATUS_OPTIONS } from "../../config/appType";
+import { ACTIVE_STATUS_OPTIONS } from "../../config/appType";
 import type { LeadItem } from "./Leadsboardtypes";
 
 // ── Shared toast options ──────────────────────────────────────────────────────
@@ -136,6 +140,47 @@ const getStatusOptionChipSx = (status: string) => {
     "& .MuiChip-label": { px: 1.5 },
     "&:hover": { opacity: 0.85 },
   };
+};
+
+const getSourceIconMeta = (source?: string) => {
+  const value = (source || "").toLowerCase();
+  if (value.includes("email") || value.includes("gmail")) {
+    return { icon: <EmailOutlinedIcon />, color: "#0EA5E9", bg: "#E0F2FE" };
+  }
+  if (value.includes("referral") || value.includes("partner")) {
+    return { icon: <HandshakeOutlinedIcon />, color: "#8B5CF6", bg: "#F3E8FF" };
+  }
+  if (value.includes("website") || value.includes("chat")) {
+    return { icon: <LanguageOutlinedIcon />, color: "#3B82F6", bg: "#DBEAFE" };
+  }
+  return { icon: <CampaignOutlinedIcon />, color: "#F59E0B", bg: "#FEF3C7" };
+};
+
+const SourceCell = ({ source }: { source?: string }) => {
+  const meta = getSourceIconMeta(source);
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.75}>
+      <Box
+        sx={{
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
+          bgcolor: meta.bg,
+          color: meta.color,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          "& .MuiSvgIcon-root": { fontSize: 13 },
+        }}
+      >
+        {meta.icon}
+      </Box>
+      <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#1F2937" }}>
+        {source || "N/A"}
+      </Typography>
+    </Stack>
+  );
 };
 
 const normalizeStatusKey = (value: string): string =>
@@ -984,7 +1029,7 @@ const LeadsTable: React.FC<Props> = ({
         <Stack alignItems="center" spacing={2}>
           <CircularProgress />
           <Typography color="text.secondary">
-            Hold Tight!! Leads are Loading....
+            Loading leads...
           </Typography>
         </Stack>
       </Box>
@@ -1004,9 +1049,8 @@ const LeadsTable: React.FC<Props> = ({
             textDecoration: "underline",
           }}
           onClick={() => {
-            window.location.reload();
-          }
-          }
+            dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+          }}
         >
           Try again
         </Typography>
@@ -1320,8 +1364,7 @@ const LeadsTable: React.FC<Props> = ({
                   </Box>
                 </Box>
               </TableCell>
-              {/* AI Score — hidden for contracts app */}
-              {!IS_CONTRACTS_APP && <TableCell>AI Score</TableCell>}
+              <TableCell>AI Score</TableCell>
               <TableCell
                 onClick={() => handleSort("assigned")}
                 sx={{
@@ -1530,7 +1573,9 @@ const LeadsTable: React.FC<Props> = ({
                 </TableCell>
 
                 <TableCell>{lead.location || "N/A"}</TableCell>
-                <TableCell>{lead.source || "N/A"}</TableCell>
+                <TableCell>
+                  <SourceCell source={lead.source} />
+                </TableCell>
 
                 {/* ── Lead Status cell with inline edit icon ── */}
                 <TableCell>
@@ -1593,14 +1638,9 @@ const LeadsTable: React.FC<Props> = ({
                   />
                 </TableCell>
 
-                {/* AI Score — hidden for contracts app */}
-                {!IS_CONTRACTS_APP && (
-                  <TableCell className="score">
-                    {String(lead.score || 0).includes("%")
-                      ? lead.score
-                      : `${lead.score || 0}%`}
-                  </TableCell>
-                )}
+                <TableCell className="score">
+                  {formatLeadAiScore(lead.score)}
+                </TableCell>
 
                 <TableCell>{lead.assigned}</TableCell>
 

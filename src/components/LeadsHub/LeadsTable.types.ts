@@ -21,11 +21,16 @@ export interface RawLead {
   lead_status?: string;
   is_active?: boolean;
   created_at?: string;
+  modified_at?: string;
   appointment_date?: string | null;
   location?: string;
   source?: string;
   score?: number | string;
+  ai_score?: number | string;
+  lead_score?: number | string;
   activity?: string;
+  last_activity?: string;
+  activity_count?: number | string | null;
   initials?: string;
   department_id?: number;
   clinic_id?: number | string;

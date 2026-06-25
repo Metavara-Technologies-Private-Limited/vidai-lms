@@ -25,19 +25,18 @@ import type { FilterValues } from "../../types/leads.types";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
 import { formatLeadId } from "./LeadDetailHelpers";
 import BulkActionBar from "./BulkActionBar";
-import { TwilioAPI } from "../../services/leads.api";
 import { SMSDialog } from "./SmsDialogs";
 import { EmailDialog } from "./EmailDialogs";
 import CallDialog from "./CallDialog";
 import type { ProcessedLead } from "./LeadsTable.types";
 import {
-  extractErrorMessage,
+  calculateLeadAiScore,
+  formatLeadAiScore,
   hasUsablePhone,
   normalizePhone,
 } from "./LeadsTable.helpers";
 
 // ── App-type config (same import as LeadsTable) ───────────────────────────────
-import { IS_CONTRACTS_APP } from "../../config/appType";
 
 // ====================== Types ======================
 
@@ -65,6 +64,7 @@ interface RawFollowUpLead {
   source?: string;
   score?: number | string;
   ai_score?: number | string;
+  lead_score?: number | string;
   activity?: string;
   last_activity?: string;
   initials?: string;
@@ -185,7 +185,7 @@ const LeadsFollowUp: React.FC<Props> = ({
             taskType: lead.next_action_type || lead.task_type || "",
             taskStatus: lead.next_action_status || lead.task_status || "Pending",
             activity: lead.last_activity || lead.activity || "View Activity",
-            score: lead.score || lead.ai_score || 0,
+            score: calculateLeadAiScore(lead as unknown as ProcessedLead),
             initials:
               lead.initials ||
               (lead.full_name || lead.name || "?").charAt(0).toUpperCase(),
@@ -202,7 +202,6 @@ const LeadsFollowUp: React.FC<Props> = ({
   const filteredLeads = React.useMemo<MappedFollowUpLead[]>(() => {
     // const followUpStatuses = ["new", "lost", "cycle conversion", "follow up", "follow-up", "followup", "follow ups", "follow-ups"];
     return leads.filter((lead: MappedFollowUpLead) => {
-      console.log("cc:", lead.status);
       const leadStatus = (lead.status || "").toLowerCase().trim();
 
       const matchesStatus = leadStatus.includes("follow");
@@ -261,7 +260,7 @@ const LeadsFollowUp: React.FC<Props> = ({
   };
 
   // ── Contact handlers — exactly mirroring LeadsTable ───────────────────────
-  const handleCallOpen = async (e: React.MouseEvent, lead: MappedFollowUpLead) => {
+  const handleCallOpen = (e: React.MouseEvent, lead: MappedFollowUpLead) => {
     e.stopPropagation();
     const phone = normalizePhone(lead.contact_no);
     if (!phone) {
@@ -273,12 +272,6 @@ const LeadsFollowUp: React.FC<Props> = ({
       return;
     }
     setCallLead(lead);
-    try {
-      await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
-    } catch (err: unknown) {
-      setCallLead(null);
-      toast.error(extractErrorMessage(err, "Failed to initiate call."), toastOptions);
-    }
   };
 
   const handleSMSOpen = (e: React.MouseEvent, lead: MappedFollowUpLead) => {
@@ -373,8 +366,7 @@ const LeadsFollowUp: React.FC<Props> = ({
               <TableCell>Source</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Quality</TableCell>
-              {/* AI Score — hidden for contracts app, same as LeadsTable */}
-              {!IS_CONTRACTS_APP && <TableCell>AI Score</TableCell>}
+              <TableCell>AI Score</TableCell>
               <TableCell>Assigned</TableCell>
               <TableCell>Task Type</TableCell>
               <TableCell>Task Status</TableCell>
@@ -450,14 +442,9 @@ const LeadsFollowUp: React.FC<Props> = ({
                     />
                   </TableCell>
 
-                  {/* AI Score — hidden for contracts app, same as LeadsTable */}
-                  {!IS_CONTRACTS_APP && (
-                    <TableCell className="score">
-                      {String(lead.score || 0).includes("%")
-                        ? lead.score
-                        : `${lead.score || 0}%`}
-                    </TableCell>
-                  )}
+                  <TableCell className="score">
+                    {formatLeadAiScore(lead.score)}
+                  </TableCell>
 
                   <TableCell>{lead.assigned}</TableCell>
                   <TableCell>{lead.task || "N/A"}</TableCell>
@@ -577,6 +564,8 @@ const LeadsFollowUp: React.FC<Props> = ({
       <CallDialog
         open={Boolean(callLead)}
         name={callLead?.full_name || callLead?.name || "Unknown"}
+        toNumber={normalizePhone(callLead?.contact_no)}
+        leadUuid={callLead?.id}
         onClose={() => setCallLead(null)}
       />
       <SMSDialog

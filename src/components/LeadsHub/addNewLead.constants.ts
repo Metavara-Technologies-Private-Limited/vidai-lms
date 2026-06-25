@@ -232,6 +232,19 @@ export const inputStyle = {
   },
 };
 
+export const inputStyleWithError = (hasError: boolean) =>
+  hasError
+    ? {
+        "& .MuiOutlinedInput-root": {
+          borderRadius: "8px",
+          fontSize: "0.875rem",
+          "& fieldset": { borderColor: "#EF4444" },
+          "&:hover fieldset": { borderColor: "#DC2626" },
+          "&.Mui-focused fieldset": { borderColor: "#EF4444" },
+        },
+      }
+    : inputStyle;
+
 export const readOnlyStyle = {
   "& .MuiOutlinedInput-root": {
     borderRadius: "8px",

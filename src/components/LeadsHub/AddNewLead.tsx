@@ -288,6 +288,7 @@ export default function AddNewLead() {
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isCouple, setIsCouple] = React.useState<"yes" | "no">("yes");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [invalidFields, setInvalidFields] = React.useState<Record<string, boolean>>({});
   const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
 
   const [departments, setDepartments] = React.useState<Department[]>([]);
@@ -328,6 +329,16 @@ export default function AddNewLead() {
   
   // ── Interests ─────────────────────────────────────────────────
   const [interests, setInterests] = React.useState<Interest[]>([]);
+
+  const clearInvalidField = React.useCallback((field: string) => {
+    setInvalidFields((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
   const [loadingInterests, setLoadingInterests] = React.useState(false);
 
   const leadStatusOptions = React.useMemo<NextActionStatusOption[]>(
@@ -505,6 +516,27 @@ export default function AddNewLead() {
     leadGeneratedBy: "",
     referralDepartment: "",
   });
+
+  React.useEffect(() => {
+    if (form.full_name?.trim()) clearInvalidField("full_name");
+    if (form.assignee?.trim()) clearInvalidField("assignee");
+    if (form.leadStatus?.trim()) clearInvalidField("leadStatus");
+    if (form.nextStatus?.trim()) clearInvalidField("nextStatus");
+    if (form.treatments?.length > 0) clearInvalidField("treatments");
+    if (form.department) clearInvalidField("department");
+    if (form.appointmentDate) clearInvalidField("appointmentDate");
+    if (form.slot) clearInvalidField("slot");
+  }, [
+    clearInvalidField,
+    form.assignee,
+    form.appointmentDate,
+    form.department,
+    form.full_name,
+    form.leadStatus,
+    form.nextStatus,
+    form.slot,
+    form.treatments,
+  ]);
 
   const users = useSelector(selectUsers);
 
@@ -720,8 +752,7 @@ export default function AddNewLead() {
         } else {
           setAssigneeOptions([]);
         }
-      } catch (err) {
-        console.log(err);
+      } catch {
         const normalizedUsers = Array.isArray(users)
           ? normalizeUsersList(users)
           : [];
@@ -896,6 +927,7 @@ export default function AddNewLead() {
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleChange =
     (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      clearInvalidField(field);
       const rawValue = e.target.value;
       if (field === "full_name") {
         const sanitized = sanitizeNameInput(rawValue);
@@ -948,8 +980,10 @@ export default function AddNewLead() {
     };
 
   const handleSelectChange =
-    (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      clearInvalidField(field);
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    };
 
   const handleCampaignChange = (value: string) => {
     if (!value) {
@@ -994,6 +1028,7 @@ export default function AddNewLead() {
   };
 
   const handleLeadStatusChange = (value: string) => {
+    clearInvalidField("leadStatus");
     const trimmed = value.trim();
     const matched = pipelineStages.find(
       (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
@@ -1022,6 +1057,7 @@ export default function AddNewLead() {
     setForm((prev) => ({ ...prev, nextType: value }));
 
   const handleNextStatusChange = (value: string) => {
+    clearInvalidField("nextStatus");
     const trimmed = value.trim();
     const matched = pipelineStages.find(
       (s) => s.stage_name.trim().toLowerCase() === trimmed.toLowerCase(),
@@ -1072,6 +1108,24 @@ export default function AddNewLead() {
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   const handleNext = async () => {
+    const nextInvalidFields: Record<string, boolean> = {};
+
+    if (currentStep === 1) {
+      if (!form.full_name?.trim()) nextInvalidFields.full_name = true;
+      if (!form.assignee?.trim()) nextInvalidFields.assignee = true;
+      if (!form.leadStatus?.trim()) nextInvalidFields.leadStatus = true;
+      if (!form.nextStatus?.trim()) nextInvalidFields.nextStatus = true;
+    }
+
+    if (currentStep === 2 && (!form.treatments || form.treatments.length === 0)) {
+      nextInvalidFields.treatments = true;
+    }
+
+    if (currentStep === 3 && form.wantAppointment === "yes") {
+      if (!form.appointmentDate) nextInvalidFields.appointmentDate = true;
+      if (!form.slot) nextInvalidFields.slot = true;
+    }
+
     const missingRequiredDataCapture = resolvedDataCaptureFields.find(
       (field) =>
         field.required &&
@@ -1080,11 +1134,24 @@ export default function AddNewLead() {
     );
 
     if (missingRequiredDataCapture) {
+      nextInvalidFields[`data:${missingRequiredDataCapture.key}`] = true;
+      setInvalidFields(nextInvalidFields);
       toast.error(`${missingRequiredDataCapture.label} is required`, {
         position: "top-right",
         autoClose: 3000,
         theme: "colored",
       });
+      return;
+    }
+
+    setInvalidFields(nextInvalidFields);
+    if (Object.keys(nextInvalidFields).length > 0) {
+      await validateStep(
+        currentStep,
+        form,
+        isCouple,
+        pendingFiles.length > 0,
+      );
       return;
     }
 
@@ -1423,7 +1490,8 @@ export default function AddNewLead() {
       className="add-lead-page"
       sx={{
         overflow: "hidden",
-        minHeight: "88vh",
+        height: "calc(100vh - 112px)",
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
       }}
@@ -1502,6 +1570,7 @@ export default function AddNewLead() {
           bgcolor: "white",
           p: 1,
           flex: 1,
+          minHeight: 0,
           overflowY: "auto",
           "&::-webkit-scrollbar": { width: "8px" },
           "&::-webkit-scrollbar-thumb": {
@@ -1571,11 +1640,13 @@ export default function AddNewLead() {
             dataCaptureFields={resolvedDataCaptureFields}
             dataCaptureValues={dataCaptureValues}
             onDataCaptureChange={(fieldKey, value) => {
+              clearInvalidField(`data:${fieldKey}`);
               setDataCaptureValues((prev) => ({
                 ...prev,
                 [fieldKey]: value,
               }));
             }}
+            invalidFields={invalidFields}
           />
         )}
         {currentStep === 2 && (
@@ -1595,6 +1666,7 @@ export default function AddNewLead() {
             interests={interests as unknown as ApiInterest[]}
             loadingInterests={loadingInterests}
             leadFormFields={leadFormFields}
+            invalidFields={invalidFields}
           />
         )}
         {currentStep === 3 && (
@@ -1624,6 +1696,7 @@ export default function AddNewLead() {
             handleChange={handleChange}
             handleDepartmentChange={handleDepartmentChange}
             leadFormFields={leadFormFields}
+            invalidFields={invalidFields}
           />
         )}
       </Box>

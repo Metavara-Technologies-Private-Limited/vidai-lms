@@ -848,7 +848,14 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
               />
               <InfoCell
                 label="REFERRAL DEPARTMENT"
-                value={lead?.referral_department_name || "N/A"}
+                value={
+                  lead?.referral_department_name ||
+                  lead?.referral_department ||
+                  lead?.referralDepartment ||
+                  (lead?.referral_department_id
+                    ? String(lead.referral_department_id)
+                    : "N/A")
+                }
               />
             </InfoGrid>
           )}

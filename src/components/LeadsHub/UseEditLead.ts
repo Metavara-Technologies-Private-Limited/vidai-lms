@@ -1414,7 +1414,6 @@ export function useEditLead() {
       ),
     };
 
-    setShowSuccess(true);
     setSaving(true);
 
     const doSave = async () => {
@@ -1427,6 +1426,7 @@ export function useEditLead() {
 
     doSave()
       .then(async () => {
+        setShowSuccess(true);
         toast.success("Lead saved successfully!", {
           position: "top-right", autoClose: 1500, theme: "colored",
         });
@@ -1498,14 +1498,6 @@ export function useEditLead() {
               ]
                 .filter((line) => line !== undefined)
                 .join("\n");
-
-              console.log("[EditLead] Sending appointment update email", {
-                resolvedLeadId,
-                recipientEmail,
-                subject,
-                finalAppointmentDate,
-                finalSlot,
-              });
 
               await LeadEmailAPI.sendNow({
                 lead: resolvedLeadId,

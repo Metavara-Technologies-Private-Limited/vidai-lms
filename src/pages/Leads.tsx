@@ -22,7 +22,7 @@ import Leads_Gridview from "../assets/icons/Leads_Gridview.svg";
 import Leads_Tableview_icon from "../assets/icons/Leads_Tableview_icon.svg";
 
 import type { FilterValues } from "../types/leads.types";
-import { api, DepartmentAPI, LeadAPI } from "../services/leads.api";
+import { api, DepartmentAPI, InterestAPI, LeadAPI } from "../services/leads.api";
 import type { Department, Lead, LeadPayload } from "../services/leads.api";
 import { pipelineApi, type Pipeline } from "../services/pipeline.api";
 
@@ -49,6 +49,7 @@ const STORAGE_KEY_VIEW = "leads_view_mode";
 const STORAGE_KEY_SELECTED_INDUSTRY = "leads_selected_industry";
 const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
 const DEFAULT_PIPELINE_EVENT = "leads-default-pipeline-updated";
+const MAX_IMPORT_ERROR_TOASTS = 3;
 
 interface HeaderMatch {
   tableHeader: string;
@@ -317,6 +318,70 @@ const buildUserLookup = (users: UserRecord[]): Map<string, UserRecord> => {
   return lookup;
 };
 
+type ImportInterestRecord = {
+  id?: number | string;
+  name?: string;
+  interest_name?: string;
+  title?: string;
+};
+
+const getInterestDisplayName = (interest: ImportInterestRecord): string =>
+  interest.name || interest.interest_name || interest.title || "";
+
+const buildInterestLookup = (
+  interests: ImportInterestRecord[],
+): Map<string, ImportInterestRecord> => {
+  const lookup = new Map<string, ImportInterestRecord>();
+
+  interests.forEach((interest) => {
+    const displayName = getInterestDisplayName(interest);
+    const normalizedName = normalizeHeader(displayName);
+    if (normalizedName && !lookup.has(normalizedName)) {
+      lookup.set(normalizedName, interest);
+    }
+
+    if (interest.id != null) {
+      lookup.set(String(interest.id).trim(), interest);
+    }
+  });
+
+  return lookup;
+};
+
+const splitImportedMultiValue = (value: string): string[] =>
+  value
+    .split(/[;,|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+const resolveImportedTreatmentInterest = (
+  value: string,
+  interestByLookupKey: Map<string, ImportInterestRecord>,
+): { value: string | string[] | undefined; unresolved: string[] } => {
+  const parts = splitImportedMultiValue(value);
+  if (parts.length === 0) return { value: undefined, unresolved: [] };
+
+  const resolved = parts
+    .map((part) => {
+    const interest = interestByLookupKey.get(normalizeHeader(part));
+      return interest?.id != null ? String(interest.id) : "";
+    })
+    .filter(Boolean);
+  const unresolved = parts.filter(
+    (part) => !interestByLookupKey.has(normalizeHeader(part)),
+  );
+
+  return {
+    value:
+      resolved.length === 0
+        ? undefined
+        : resolved.length === 1
+          ? resolved[0]
+          : resolved,
+    unresolved,
+  };
+};
+
 const extractImportErrorMessage = (error: unknown): string => {
   const data = (error as { response?: { data?: unknown } })?.response?.data;
 
@@ -497,30 +562,6 @@ const Leads: React.FC = () => {
     role === "super_admin" ||
     hasAnySubcategoryActionPermission(permissions, leadAliases, "edit");
   const addLeadTooltip = "You do not have permission to create leads.";
-
-  React.useEffect(() => {
-    if (canViewLeads) return;
-
-    console.warn("Leads permission debug", {
-      role,
-      hasTopLevelPermissions: Boolean(authUser?.permissions),
-      hasNestedPermissions: Boolean(nestedAuthUser?.permissions),
-      aliases: leadAliases,
-      canViewLeads,
-      canAddLeads,
-      canEditLeads,
-      permissions,
-    });
-  }, [
-    canViewLeads,
-    role,
-    authUser?.permissions,
-    nestedAuthUser?.permissions,
-    leadAliases,
-    canAddLeads,
-    canEditLeads,
-    permissions,
-  ]);
 
   const [tab, setTab] = React.useState(loadSavedTab());
   const [filterOpen, setFilterOpen] = React.useState(false);
@@ -877,14 +918,6 @@ const Leads: React.FC = () => {
       ).length;
       const followUpCount = filteredLeads.filter((l) => {
         const stageName = (l.stage_name || "").toLowerCase().trim();
-
-        console.log("📊 FollowUp Count Debug:", {
-          id: l.id,
-          stage_name: l.stage_name,
-          lead_status: l.lead_status,
-          matches: stageName.includes("follow"),
-        });
-
         return l.is_active !== false && stageName.includes("follow");
       }).length;
       const archivedCount = filteredLeads.filter(
@@ -895,19 +928,12 @@ const Leads: React.FC = () => {
         followUps: followUpCount,
         archived: archivedCount,
       });
-      console.log("📊 Counts updated:", {
-        all: allCount,
-        followUps: followUpCount,
-        archived: archivedCount,
-        total: filteredLeads.length,
-      });
     } else {
       setCounts({ all: 0, followUps: 0, archived: 0 });
     }
   }, [leads, applyFilters]);
 
   const handleApplyFilters = (filters: FilterValues) => {
-    console.log("🔍 Applying filters to leads:", filters);
     setActiveFilters(filters);
   };
 
@@ -949,6 +975,16 @@ const Leads: React.FC = () => {
         departments = [];
       }
 
+      let interests: ImportInterestRecord[] = [];
+      try {
+        const interestResponse = await InterestAPI.listActiveByClinic(clinicId);
+        interests = Array.isArray(interestResponse)
+          ? (interestResponse as ImportInterestRecord[])
+          : [];
+      } catch {
+        interests = [];
+      }
+
       const defaultDepartmentId =
         departments[0]?.id ?? leads[0]?.department_id ?? 1;
       const departmentByName = new Map(
@@ -957,6 +993,7 @@ const Leads: React.FC = () => {
           department.id,
         ]),
       );
+      const interestByLookupKey = buildInterestLookup(interests);
       const sourceHeaderByPayloadKey = new Map(
         headerMatches.map((match) => [match.payloadKey, match.importedHeader]),
       );
@@ -992,6 +1029,23 @@ const Leads: React.FC = () => {
         const assignedUser = assignedToInput
           ? userByLookupKey.get(normalizeHeader(assignedToInput))
           : null;
+        const treatmentInput = getValue(row, "treatment_interest");
+        const resolvedTreatment = resolveImportedTreatmentInterest(
+          treatmentInput,
+          interestByLookupKey,
+        );
+
+        if (assignedToInput && !assignedUser) {
+          errorMessages.push(
+            `Row ${row.rowNumber}: Assigned To "${assignedToInput}" was not matched to a user; lead was imported as unassigned.`,
+          );
+        }
+
+        if (resolvedTreatment.unresolved.length > 0) {
+          errorMessages.push(
+            `Row ${row.rowNumber}: Product Interest "${resolvedTreatment.unresolved.join(", ")}" was not matched to configured interests.`,
+          );
+        }
 
         const payload: LeadPayload = {
           clinic_id: clinicId,
@@ -1002,7 +1056,7 @@ const Leads: React.FC = () => {
           location: getValue(row, "location") || "",
           address: getValue(row, "address") || "",
           source: getValue(row, "source") || "Direct",
-          treatment_interest: getValue(row, "treatment_interest") || "General",
+          treatment_interest: resolvedTreatment.value,
           appointment_date: appointmentDate || null,
           slot: slot || "",
           remark: getValue(row, "remark") || "",
@@ -1023,12 +1077,47 @@ const Leads: React.FC = () => {
 
         try {
           const createdLead = await LeadAPI.create(payload);
+          let savedLead = createdLead;
+
+          try {
+            const updatePayload: Partial<LeadPayload> = {
+              clinic_id: payload.clinic_id,
+              department_id: payload.department_id,
+              email: payload.email,
+              location: payload.location,
+              address: payload.address,
+              source: payload.source,
+              lead_status: payload.lead_status,
+              assigned_to_id: payload.assigned_to_id,
+              assigned_to_name: payload.assigned_to_name,
+              remark: payload.remark,
+              ...(payload.treatment_interest
+                ? { treatment_interest: payload.treatment_interest }
+                : {}),
+              ...(payload.book_appointment
+                ? {
+                    book_appointment: payload.book_appointment,
+                    appointment_date: payload.appointment_date,
+                    slot: payload.slot,
+                  }
+                : {}),
+            };
+
+            savedLead = await LeadAPI.update(String(createdLead.id), {
+              ...updatePayload,
+            });
+          } catch (updateError) {
+            errorMessages.push(
+              `Row ${row.rowNumber}: Lead was created, but imported details could not be fully updated: ${extractImportErrorMessage(updateError) || "Update failed."}`,
+            );
+          }
+
           if (importedNote) {
             try {
               await api.post("/leads/notes/", {
                 title: "Imported Note",
                 note: importedNote,
-                lead: createdLead.id,
+                lead: savedLead.id,
                 is_active: true,
                 is_deleted: false,
               });
@@ -1037,10 +1126,24 @@ const Leads: React.FC = () => {
             }
           }
 
-          createdLeads.push({
-            ...createdLead,
-            created_at: appointmentDate || createdLead.created_at,
-          });
+          const importedLead = {
+            ...savedLead,
+            location: savedLead.location || payload.location,
+            address: savedLead.address || payload.address,
+            email: savedLead.email || payload.email || "",
+            source: savedLead.source || payload.source,
+            status: savedLead.status || payload.lead_status,
+            lead_status: savedLead.lead_status || payload.lead_status,
+            assigned_to_id:
+              savedLead.assigned_to_id ?? payload.assigned_to_id ?? undefined,
+            assigned_to_name:
+              savedLead.assigned_to_name || payload.assigned_to_name || "",
+            treatment_interest:
+              savedLead.treatment_interest || payload.treatment_interest,
+            created_at: appointmentDate || savedLead.created_at,
+          } as Lead;
+
+          createdLeads.push(importedLead);
         } catch (error) {
           failedCount += 1;
           const message = extractImportErrorMessage(error);
@@ -1080,9 +1183,29 @@ const Leads: React.FC = () => {
             .map((line) => line.trim())
             .filter((line) => line.length > 0);
 
+          if (lines.length === 0) {
+            toast.error(`${file.name} is empty.`);
+            return {
+              createdLeads: [] as Lead[],
+              failedCount: 0,
+              noteFailedCount: 0,
+              errorMessages: [`${file.name}: File is empty.`],
+            };
+          }
+
           sourceHeaders = parseCsvRow(lines[0] ?? "")
             .map((value: string) => value.trim().replace(/^"|"$/g, ""))
             .filter((value: string) => value.length > 0);
+
+          if (sourceHeaders.length === 0) {
+            toast.error(`${file.name} does not contain a header row.`);
+            return {
+              createdLeads: [] as Lead[],
+              failedCount: 0,
+              noteFailedCount: 0,
+              errorMessages: [`${file.name}: Header row is missing.`],
+            };
+          }
 
           parsedRows = lines.slice(1).map((line: string, index: number) => {
             const columns = parseCsvRow(line).map((value: string) =>
@@ -1138,6 +1261,16 @@ const Leads: React.FC = () => {
             .slice(1)
             .map((value: unknown) => stringifyImportedCell(value))
             .filter((value: string) => value.length > 0);
+
+          if (sourceHeaders.length === 0) {
+            toast.error(`${file.name} does not contain a header row.`);
+            return {
+              createdLeads: [] as Lead[],
+              failedCount: 0,
+              noteFailedCount: 0,
+              errorMessages: [`${file.name}: Header row is missing.`],
+            };
+          }
 
           parsedRows = [];
           worksheet.eachRow((row, rowNumber) => {
@@ -1213,55 +1346,67 @@ const Leads: React.FC = () => {
 
       setIsSavingImport(true);
 
-      const allCreatedLeads: Lead[] = [];
-      let totalFailed = 0;
-      let totalNoteFailed = 0;
-      const importErrors: string[] = [];
+      try {
+        const allCreatedLeads: Lead[] = [];
+        let totalFailed = 0;
+        let totalNoteFailed = 0;
+        const importErrors: string[] = [];
 
-      for (const file of files) {
-        const { createdLeads, failedCount, noteFailedCount, errorMessages } =
-          await importSingleFile(file);
-        allCreatedLeads.push(...createdLeads);
-        totalFailed += failedCount;
-        totalNoteFailed += noteFailedCount;
-        importErrors.push(...errorMessages);
-      }
+        for (const file of files) {
+          const { createdLeads, failedCount, noteFailedCount, errorMessages } =
+            await importSingleFile(file);
+          allCreatedLeads.push(...createdLeads);
+          totalFailed += failedCount;
+          totalNoteFailed += noteFailedCount;
+          importErrors.push(...errorMessages);
+        }
 
-      if (allCreatedLeads.length > 0) {
-        setImportedLeads((current) => [...allCreatedLeads, ...current]);
-        await dispatch(fetchLeads());
-      }
+        if (allCreatedLeads.length > 0) {
+          setImportedLeads((current) => [...allCreatedLeads, ...current]);
+          await dispatch(fetchLeads());
+        }
 
-      if (
-        allCreatedLeads.length > 0 &&
-        totalFailed === 0 &&
-        totalNoteFailed === 0
-      ) {
-        toast.success(
-          `${allCreatedLeads.length} leads imported and saved to DB.`,
+        if (
+          allCreatedLeads.length > 0 &&
+          totalFailed === 0 &&
+          totalNoteFailed === 0
+        ) {
+          toast.success(
+            `${allCreatedLeads.length} leads imported and saved to DB.`,
+          );
+        } else if (
+          allCreatedLeads.length > 0 &&
+          totalFailed === 0 &&
+          totalNoteFailed > 0
+        ) {
+          toast.warning(
+            `${allCreatedLeads.length} leads saved, but ${totalNoteFailed} imported notes could not be saved.`,
+          );
+        } else if (allCreatedLeads.length > 0) {
+          toast.warning(
+            `${allCreatedLeads.length} leads saved, ${totalFailed} failed.`,
+          );
+        } else {
+          toast.error("No imported rows could be saved.");
+        }
+
+        const uniqueImportErrors = Array.from(new Set(importErrors));
+        uniqueImportErrors
+          .slice(0, MAX_IMPORT_ERROR_TOASTS)
+          .forEach((message) => toast.error(message));
+        if (uniqueImportErrors.length > MAX_IMPORT_ERROR_TOASTS) {
+          toast.error(
+            `${uniqueImportErrors.length - MAX_IMPORT_ERROR_TOASTS} more import errors found.`,
+          );
+        }
+      } catch (error) {
+        const message = extractImportErrorMessage(error);
+        toast.error(
+          message || "Import failed. Please check the file and try again.",
         );
-      } else if (
-        allCreatedLeads.length > 0 &&
-        totalFailed === 0 &&
-        totalNoteFailed > 0
-      ) {
-        toast.warning(
-          `${allCreatedLeads.length} leads saved, but ${totalNoteFailed} imported notes could not be saved.`,
-        );
-      } else if (allCreatedLeads.length > 0) {
-        toast.warning(
-          `${allCreatedLeads.length} leads saved, ${totalFailed} failed.`,
-        );
-      } else {
-        toast.error("No imported rows could be saved.");
+      } finally {
+        setIsSavingImport(false);
       }
-
-      importErrors.slice(0, 3).forEach((message) => toast.error(message));
-      if (importErrors.length > 3) {
-        toast.error(`${importErrors.length - 3} more import errors found.`);
-      }
-
-      setIsSavingImport(false);
     },
     [dispatch, importSingleFile],
   );

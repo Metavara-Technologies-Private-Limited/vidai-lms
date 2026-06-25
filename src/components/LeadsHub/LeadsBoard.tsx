@@ -1638,16 +1638,6 @@ const LeadsBoard: React.FC<Props> = ({
       return;
     }
     setCallLead(lead);
-    try {
-      await TwilioAPI.makeCall({ lead_uuid: lead.id, to: phone });
-    } catch (err: unknown) {
-      setCallLead(null);
-      toast.error(extractErrorMessage(err, "Failed to initiate call."), {
-        position: "top-right",
-        autoClose: 3000,
-        theme: "colored",
-      });
-    }
   };
 
   React.useEffect(() => {
@@ -2078,6 +2068,8 @@ const LeadsBoard: React.FC<Props> = ({
         <CallDialog
           open={Boolean(callLead)}
           name={(callLead?.full_name ?? callLead?.name ?? "Unknown") as string}
+          toNumber={normalizePhone(callLead?.contact_no as string | undefined)}
+          leadUuid={callLead?.id}
           onClose={() => setCallLead(null)}
         />
 

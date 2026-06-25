@@ -39,6 +39,7 @@ import {
   SUB_SOURCE_OPTIONS,
   TIME_SLOTS,
   inputStyle,
+  inputStyleWithError,
   labelStyle,
   getDocColor,
   TASK_STATUS_OPTIONS,
@@ -308,6 +309,7 @@ interface Step1Props {
   dataCaptureFields?: DataCaptureFormField[];
   dataCaptureValues?: Record<string, string>;
   onDataCaptureChange?: (fieldKey: string, value: string) => void;
+  invalidFields?: Record<string, boolean>;
 }
 
 export function Step1({
@@ -344,6 +346,7 @@ export function Step1({
   dataCaptureFields,
   dataCaptureValues,
   onDataCaptureChange,
+  invalidFields,
 }: Step1Props) {
   const campaignSelected = Boolean(form.campaign);
   const [leadGeneratedByOpen, setLeadGeneratedByOpen] = React.useState(false);
@@ -413,6 +416,10 @@ export function Step1({
     leadFormFieldLabel(leadFormFields, toLeadFieldKey(field), fallback);
   const requiredFor = (field: keyof FormState): boolean =>
     isLeadFormFieldRequired(leadFormFields, toLeadFieldKey(field));
+  const hasError = (field: keyof FormState): boolean =>
+    Boolean(invalidFields?.[field]);
+  const hasDataCaptureError = (fieldKey: string): boolean =>
+    Boolean(invalidFields?.[`data:${fieldKey}`]);
 
   const isCampaignDisabled =
     form.source === "Referral" ||
@@ -458,8 +465,9 @@ export function Step1({
               size="small"
               value={form[field] as string}
               onChange={handleChange(field)}
+              error={hasError(field)}
               inputProps={field === "contact" ? { maxLength: 15, inputMode: "numeric" } : undefined}
-              sx={inputStyle}
+              sx={inputStyleWithError(hasError(field))}
             />
           </Box>
         ))}
@@ -724,7 +732,12 @@ export function Step1({
             )}
             renderInput={(params) => (
               <TextField
-                {...params} fullWidth size="small" placeholder="Search assignee" sx={inputStyle}
+                {...params}
+                fullWidth
+                size="small"
+                placeholder="Search assignee"
+                error={hasError("assignee")}
+                sx={inputStyleWithError(hasError("assignee"))}
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (
@@ -871,7 +884,8 @@ export function Step1({
             select fullWidth size="small"
             value={form.leadStatus}
             onChange={(e) => handleLeadStatusChange(e.target.value)}
-            sx={inputStyle}
+            error={hasError("leadStatus")}
+            sx={inputStyleWithError(hasError("leadStatus"))}
           >
             <MenuItem value="">-- Select --</MenuItem>
             {resolvedLeadStatusOptions.map((opt) => (
@@ -890,7 +904,8 @@ export function Step1({
             select fullWidth size="small"
             value={form.nextStatus}
             onChange={(e) => handleNextStatusChange(e.target.value)}
-            sx={inputStyle}
+            error={hasError("nextStatus")}
+            sx={inputStyleWithError(hasError("nextStatus"))}
           >
             <MenuItem value="">-- Select --</MenuItem>
             {resolvedNextActionStatusOptions.map((opt) => (
@@ -981,13 +996,15 @@ export function Step1({
           >
             {resolvedDataCaptureFields.map((field) => {
               const value = resolvedDataCaptureValues[field.key] ?? "";
+              const fieldHasError = hasDataCaptureError(field.key);
               const commonProps = {
                 fullWidth: true,
                 size: "small" as const,
                 value,
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                   onDataCaptureChange?.(field.key, e.target.value),
-                sx: inputStyle,
+                error: fieldHasError,
+                sx: inputStyleWithError(fieldHasError),
               };
 
               return (
@@ -1046,6 +1063,7 @@ interface Step2Props {
   interestOptions?: string[];
   interestOptionsLoading?: boolean;
   leadFormFields?: LeadFormField[];
+  invalidFields?: Record<string, boolean>;
 }
 
 export function Step2({
@@ -1063,6 +1081,7 @@ export function Step2({
   interestOptions,
   interestOptionsLoading = false,
   leadFormFields,
+  invalidFields,
 }: Step2Props) {
   const [previewFile, setPreviewFile] = React.useState<{
     url: string;
@@ -1107,6 +1126,7 @@ export function Step2({
     leadFormFields,
     "treatment_interest",
   );
+  const treatmentHasError = Boolean(invalidFields?.treatments);
 
   // Build the flat string list to display in the dropdown.
   // Priority: Interest[] objects from backend → flat string interestOptions → static fallback
@@ -1145,6 +1165,7 @@ export function Step2({
           fullWidth
           size="small"
           value={form.treatmentInterest}
+          error={treatmentHasError}
           onChange={(e) => {
             const selectedName = e.target.value;
             // Find the matching interest object to get its ID
@@ -1159,7 +1180,7 @@ export function Step2({
                 : [...prev.treatments, selectedId],
             }));
           }}
-          sx={{ ...inputStyle, maxWidth: "50%" }}
+          sx={{ ...inputStyleWithError(treatmentHasError), maxWidth: "50%" }}
           SelectProps={{ displayEmpty: true }}
           disabled={isLoading}
           InputProps={{
@@ -1478,6 +1499,7 @@ interface Step3Props {
   handleChange: (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleDepartmentChange: (value: string) => void;
   leadFormFields?: LeadFormField[];
+  invalidFields?: Record<string, boolean>;
 }
 
 export function Step3({
@@ -1497,12 +1519,15 @@ export function Step3({
   handleChange,
   handleDepartmentChange,
   leadFormFields,
+  invalidFields,
 }: Step3Props) {
   const noAppointment = form.wantAppointment === "no";
   const showFormField = (field: keyof FormState): boolean =>
     isLeadFormFieldVisible(leadFormFields, toLeadFieldKey(field));
   const labelFor = (field: keyof FormState, fallback: string): string =>
     leadFormFieldLabel(leadFormFields, toLeadFieldKey(field), fallback);
+  const hasError = (field: keyof FormState): boolean =>
+    Boolean(invalidFields?.[field]);
 
   const availableSlots = React.useMemo<string[]>(() => {
     if (!selectedDate) return TIME_SLOTS;
@@ -1600,7 +1625,8 @@ export function Step3({
                       size="small"
                       fullWidth
                       placeholder="Search department"
-                      sx={inputStyle}
+                      error={hasError("department")}
+                      sx={inputStyleWithError(hasError("department"))}
                       InputProps={{
                         ...params.InputProps,
                         endAdornment: (
@@ -1694,7 +1720,12 @@ export function Step3({
                     }));
                   }}
                   slotProps={{
-                    textField: { size: "small", fullWidth: true, sx: inputStyle },
+                    textField: {
+                      size: "small",
+                      fullWidth: true,
+                      error: hasError("appointmentDate"),
+                      sx: inputStyleWithError(hasError("appointmentDate")),
+                    },
                   }}
                 />
               </LocalizationProvider>
@@ -1709,7 +1740,8 @@ export function Step3({
                 size="small"
                 value={form.slot}
                 onChange={handleChange("slot")}
-                sx={inputStyle}
+                error={hasError("slot")}
+                sx={inputStyleWithError(hasError("slot"))}
                 SelectProps={{ native: false, MenuProps: SLOT_MENU_PROPS }}
               >
                 <MenuItem value="">-- Select --</MenuItem>

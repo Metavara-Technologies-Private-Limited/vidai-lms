@@ -17,6 +17,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -773,9 +774,9 @@ const Activity = () => {
       </Box>
 
       {error && (
-        <Typography variant="caption" color="error" sx={{ px: 2, pt: 1, display: "block" }}>
+        <Alert severity="error" sx={{ mx: 2, mt: 1, borderRadius: "10px" }} onClose={() => setError(null)}>
           {error}
-        </Typography>
+        </Alert>
       )}
 
       {/* ─── Table ─── */}

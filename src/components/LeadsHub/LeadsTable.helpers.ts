@@ -5,7 +5,7 @@ import type {
   Quality,
 } from "./LeadsTable.types";
 
-import { VALID_TASK_TYPES } from "./LeadsTable.types";;
+import { VALID_TASK_TYPES } from "./LeadsTable.types";
 
 // ====================== Error extractor ======================
 export const extractErrorMessage = (err: unknown, fallback: string): string => {
@@ -111,6 +111,67 @@ export const formatTaskType = (raw: string | null | undefined): string => {
   return found ?? trimmed;
 };
 
+const toNumericScore = (value: number | string | null | undefined): number | null => {
+  if (value == null || value === "") return null;
+  const parsed =
+    typeof value === "number" ? value : Number(String(value).replace("%", ""));
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.min(100, parsed));
+};
+
+export const calculateLeadAiScore = (lead: RawLead): number => {
+  const quality = `${lead.quality || deriveQuality(lead)}`.toLowerCase();
+  let score = quality === "hot" ? 72 : quality === "warm" ? 55 : 35;
+  const status = `${lead.stage_name ?? lead.lead_status ?? lead.status ?? ""}`.toLowerCase();
+  const activityCount = toNumericScore(lead.activity_count) ?? 0;
+  const lastTouchAt =
+    lead.last_interaction_at ||
+    lead.modified_at ||
+    lead.created_at ||
+    "";
+
+  if (status.includes("converted")) score += 18;
+  else if (status.includes("appointment") || Boolean(lead.appointment_date)) score += 14;
+  else if (status.includes("follow")) score += 8;
+  else if (status.includes("new")) score += 4;
+  else if (status.includes("lost")) score -= 22;
+
+  if (activityCount >= 5) score += 14;
+  else if (activityCount >= 3) score += 10;
+  else if (activityCount >= 1) score += 6;
+  else score -= 6;
+
+  if (lastTouchAt) {
+    const touchDate = new Date(lastTouchAt);
+    if (!isNaN(touchDate.getTime())) {
+      const diffHours =
+        (Date.now() - touchDate.getTime()) / (1000 * 60 * 60);
+      if (diffHours <= 1) score += 12;
+      else if (diffHours <= 12) score += 8;
+      else if (diffHours <= 24) score += 2;
+      else if (diffHours <= 72) score -= 8;
+      else score -= 16;
+    }
+  }
+
+  if (lead.last_activity || (lead.activity && lead.activity !== "View Activity")) {
+    score += 5;
+  }
+  if (lead.next_action_type || lead.next_action_description) score += 5;
+  if (lead.assigned_to_id || lead.assigned_to_name) score += 4;
+  if (hasUsablePhone(lead.contact_no)) score += 2;
+  if (lead.email) score += 2;
+
+  return Number(Math.max(0, Math.min(100, score)).toFixed(2));
+};
+
+export const formatLeadAiScore = (
+  value: number | string | null | undefined,
+): string => {
+  const score = toNumericScore(value);
+  return `${(score ?? 0).toFixed(2)}%`;
+};
+
 const extractStageFromDescription = (
   description: string | null | undefined,
 ): string => {
@@ -177,7 +238,7 @@ export const processLead = (lead: RawLead): ProcessedLead => {
       (lead as unknown as { quality?: Quality }).quality ||
       lead.quality ||
       "Cold",
-    score: lead.score ?? 0,
+    score: calculateLeadAiScore(lead),
     taskType,
     taskStatus,
     displayId: formatLeadId(lead.id),

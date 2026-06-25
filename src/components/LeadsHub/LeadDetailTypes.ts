@@ -54,6 +54,11 @@ export interface LeadRecord {
   lead_status?: string;
   quality?: string;
   score?: number | string;
+  ai_score?: number | string;
+  lead_score?: number | string;
+  activity?: string;
+  last_activity?: string;
+  activity_count?: number | string | null;
   source?: string;
   sub_source?: string;
   campaign_name?: string;
@@ -80,6 +85,7 @@ export interface LeadRecord {
   appointment_date?: string;
   slot?: string;
   appointment_slot?: string;
+  modified_at?: string;
   remark?: string;
   appointment_remark?: string;
   treatment_interest?: string[] | TreatmentInterest[];
@@ -100,6 +106,9 @@ export interface LeadRecord {
   documents?: DocumentEntry[];
   referral_source_name?: string;
   referral_department_name?: string;
+  referral_department?: string;
+  referralDepartment?: string;
+  referral_department_id?: number | string | null;
   custom_field_values?: Array<{
     field_key: string;
     field_label: string;

@@ -82,6 +82,7 @@ import {
   formatNoteTime,
   getCleanLeadId,
 } from "./LeadDetailHelpers";
+import { calculateLeadAiScore, formatLeadAiScore } from "./LeadsTable.helpers";
 import type {
   LeadRecord,
   NoteData,
@@ -95,7 +96,6 @@ import type {
 import {
   APP_TYPE,
   FLOW_COPY_BY_APP,
-  IS_CONTRACTS_APP,
 } from "../../config/appType";
 
 import {
@@ -2379,11 +2379,11 @@ export default function LeadDetailView() {
   );
   const leadStatus = selectedLeadStatus;
   const leadQuality = capitalize(activeLead.quality || "N/A");
-  const leadScore = !IS_CONTRACTS_APP
-    ? String(activeLead.score || 0).includes("%")
-      ? activeLead.score
-      : `${activeLead.score || 0}%`
-    : null;
+  const leadScore = formatLeadAiScore(
+    calculateLeadAiScore(
+      activeLead as unknown as Parameters<typeof calculateLeadAiScore>[0],
+    ),
+  );
   const leadSource = capitalizeWords(activeLead.source || "Unknown");
   const leadSubSource = capitalizeWords(activeLead.sub_source || "N/A");
   const leadCampaignName = capitalizeWords(activeLead.campaign_name || "N/A");
@@ -2641,13 +2641,12 @@ export default function LeadDetailView() {
 
         <Box
           sx={{
-            position: "relative",
-            zIndex: 1,
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 2,
-            width: "100%",
+            position: "absolute",
+            top: { xs: 14, sm: 18, md: 20 },
+            left: { xs: 20, sm: 26, md: 32 },
+            zIndex: 2,
+            width: 40,
+            height: 40,
           }}
         >
           <Avatar
@@ -2658,26 +2657,25 @@ export default function LeadDetailView() {
               height: 40,
               fontSize: "20px",
               fontWeight: 700,
-              flexShrink: 0,
-              position: "relative",
-              top: -26,
-              zIndex: 2,
             }}
           >
             {leadInitials}
           </Avatar>
+        </Box>
 
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: { xs: "column", md: "row" },
-              alignItems: { xs: "flex-start", md: "center" },
-              flexWrap: { xs: "wrap", md: "nowrap" },
-              gap: { xs: 2, md: 0 },
-              flex: 1,
-              width: "100%",
-            }}
-          >
+        <Box
+          sx={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            alignItems: { xs: "flex-start", md: "center" },
+            flexWrap: { xs: "wrap", md: "nowrap" },
+            gap: { xs: 2, md: 0 },
+            width: "100%",
+            pl: { xs: 6.5, sm: 7, md: 8 },
+          }}
+        >
             <Stack
               spacing={0.5}
               sx={{
@@ -2842,23 +2840,20 @@ export default function LeadDetailView() {
               )}
             </Box>
 
-            {!IS_CONTRACTS_APP && (
-              <Box sx={{ flex: "1 1 0", minWidth: 0, px: { xs: 0, md: 1.5 } }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  fontSize="10px"
-                  display="block"
-                  mb={0.5}
-                >
-                  AI Lead Score
-                </Typography>
-                <Typography fontWeight={700} color="#EC4899" fontSize="12px">
-                  {leadScore}
-                </Typography>
-              </Box>
-            )}
-          </Box>
+            <Box sx={{ flex: "1 1 0", minWidth: 0, px: { xs: 0, md: 1.5 } }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontSize="10px"
+                display="block"
+                mb={0.5}
+              >
+                AI Lead Score
+              </Typography>
+              <Typography fontWeight={700} color="#EC4899" fontSize="12px">
+                {leadScore}
+              </Typography>
+            </Box>
         </Box>
       </Card>
 
