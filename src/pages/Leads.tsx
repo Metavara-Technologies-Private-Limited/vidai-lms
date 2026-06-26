@@ -95,6 +95,8 @@ const IMPORT_FIELD_CONFIGS: Array<{
       "lead number",
       "contact no",
       "contact number",
+      "lab contact no",
+      "lab contact number",
       "phone",
       "phone number",
       "mobile",
@@ -221,6 +223,7 @@ const parseCsvRow = (line: string): string[] => {
 const normalizeHeader = (value: string): string =>
   value
     .toLowerCase()
+    .replace(/\*/g, "")
     .replace(/\|/g, " ")
     .replace(/_/g, " ")
     .replace(/\//g, " ")
@@ -246,6 +249,60 @@ const normalizeLeadStatus = (
   if (normalized.includes("lost")) return "lost";
   if (normalized.includes("contact")) return "contacted";
   return "new";
+};
+
+const resolveImportedStage = (
+  value: string,
+  pipelines: Pipeline[],
+  selectedPipelineId: string,
+): {
+  stageId: string | null;
+  leadStatus: NonNullable<LeadPayload["lead_status"]>;
+  matchedLabel: string;
+} => {
+  const selectedPipeline =
+    pipelines.find((pipeline) => String(pipeline.id) === String(selectedPipelineId)) ??
+    pipelines.find((pipeline) => pipeline.is_default) ??
+    pipelines.find((pipeline) => pipeline.is_active) ??
+    pipelines[0];
+  const preferredStages = selectedPipeline?.stages ?? [];
+  const allStages = pipelines.flatMap((pipeline) => pipeline.stages ?? []);
+  const stagesToSearch = [
+    ...preferredStages,
+    ...allStages.filter(
+      (stage) => !preferredStages.some((preferred) => preferred.id === stage.id),
+    ),
+  ];
+  const normalizedInput = normalizeHeader(value);
+
+  if (!normalizedInput) {
+    const defaultStage = preferredStages[0] ?? allStages[0];
+    return {
+      stageId: defaultStage?.id ?? null,
+      leadStatus: normalizeLeadStatus(defaultStage?.stage_name ?? value),
+      matchedLabel: defaultStage?.stage_name ?? "",
+    };
+  }
+
+  const normalizedStatus = normalizeLeadStatus(value);
+  const matchedStage = stagesToSearch.find((stage) => {
+    const stageName = normalizeHeader(stage.stage_name);
+    const stageStatus = normalizeHeader(stage.stage_status);
+    const canonicalStageName = normalizeHeader(normalizeLeadStatus(stage.stage_name));
+    return (
+      stageName === normalizedInput ||
+      stageStatus === normalizedInput ||
+      canonicalStageName === normalizeHeader(normalizedStatus)
+    );
+  });
+
+  return {
+    stageId: matchedStage?.id ?? null,
+    leadStatus: (matchedStage?.stage_name || normalizedStatus) as NonNullable<
+      LeadPayload["lead_status"]
+    >,
+    matchedLabel: matchedStage?.stage_name ?? "",
+  };
 };
 
 const stringifyImportedCell = (value: unknown): string => {
@@ -1014,6 +1071,8 @@ const Leads: React.FC = () => {
       const errorMessages: string[] = [];
 
       for (const row of rows) {
+        const importedFullName = getValue(row, "full_name");
+        const importedContactNo = getValue(row, "contact_no");
         const departmentName = getValue(row, "department_name");
         const resolvedDepartmentId =
           departmentByName.get(normalizeHeader(departmentName)) ??
@@ -1034,6 +1093,38 @@ const Leads: React.FC = () => {
           treatmentInput,
           interestByLookupKey,
         );
+        const importedLeadStatus = getValue(row, "lead_status");
+        const resolvedStage = resolveImportedStage(
+          importedLeadStatus,
+          availablePipelines,
+          selectedPipelineId,
+        );
+
+        const rowErrors: string[] = [];
+
+        if (!importedFullName) {
+          rowErrors.push("Lead Name is required");
+        }
+
+        if (!importedContactNo) {
+          rowErrors.push("Contact No is required");
+        }
+
+        if (!assignedToInput) {
+          rowErrors.push("Assigned To is required");
+        } else if (!assignedUser) {
+          rowErrors.push(`Assigned To "${assignedToInput}" was not matched to a user`);
+        }
+
+        if (getValue(row, "email") && !sanitizedEmail) {
+          rowErrors.push(`Email "${getValue(row, "email")}" is invalid`);
+        }
+
+        if (rowErrors.length > 0) {
+          failedCount += 1;
+          errorMessages.push(`Row ${row.rowNumber}: ${rowErrors.join("; ")}.`);
+          continue;
+        }
 
         if (assignedToInput && !assignedUser) {
           errorMessages.push(
@@ -1047,11 +1138,18 @@ const Leads: React.FC = () => {
           );
         }
 
+        if (importedLeadStatus && !resolvedStage.stageId) {
+          errorMessages.push(
+            `Row ${row.rowNumber}: Lead Status "${importedLeadStatus}" was not matched to a configured pipeline stage; status was imported as "${resolvedStage.leadStatus}".`,
+          );
+        }
+
         const payload: LeadPayload = {
           clinic_id: clinicId,
           department_id: resolvedDepartmentId,
-          full_name: getValue(row, "full_name") || "Unknown Lead",
-          contact_no: getValue(row, "contact_no") || "0000000000",
+          stage_id: resolvedStage.stageId,
+          full_name: importedFullName,
+          contact_no: importedContactNo,
           email: sanitizedEmail,
           location: getValue(row, "location") || "",
           address: getValue(row, "address") || "",
@@ -1063,7 +1161,7 @@ const Leads: React.FC = () => {
           partner_inquiry: false,
           book_appointment: hasAppointmentDetails,
           is_active: true,
-          lead_status: normalizeLeadStatus(getValue(row, "lead_status")),
+          lead_status: resolvedStage.leadStatus,
           assigned_to_id: assignedUser?.id ?? null,
           assigned_to_name: assignedUser
             ? getUserDisplayName(assignedUser)
@@ -1087,6 +1185,7 @@ const Leads: React.FC = () => {
               location: payload.location,
               address: payload.address,
               source: payload.source,
+              stage_id: payload.stage_id,
               lead_status: payload.lead_status,
               assigned_to_id: payload.assigned_to_id,
               assigned_to_name: payload.assigned_to_name,
@@ -1134,6 +1233,12 @@ const Leads: React.FC = () => {
             source: savedLead.source || payload.source,
             status: savedLead.status || payload.lead_status,
             lead_status: savedLead.lead_status || payload.lead_status,
+            stage_id: savedLead.stage_id ?? payload.stage_id ?? undefined,
+            stage_name:
+              savedLead.stage_name ||
+              resolvedStage.matchedLabel ||
+              savedLead.lead_status ||
+              payload.lead_status,
             assigned_to_id:
               savedLead.assigned_to_id ?? payload.assigned_to_id ?? undefined,
             assigned_to_name:
@@ -1155,7 +1260,7 @@ const Leads: React.FC = () => {
 
       return { createdLeads, failedCount, noteFailedCount, errorMessages };
     },
-    [clinic?.id, leads, users],
+    [availablePipelines, clinic?.id, leads, selectedPipelineId, users],
   );
 
   const importSingleFile = React.useCallback(

@@ -39,37 +39,31 @@ const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_FILE_REGEX = /\.(xls|xlsx|csv)$/i;
 
 const TEMPLATE_HEADERS = [
-  "Lead Name",
-  "Contact No",
+  "Lab Name",
+  "Lab Contact No",
+  "Lead Name*",
+  "Contact No*",
+  "Email",
   "Location",
   "Source",
   "Lead Status",
-  "Assigned To",
+  "Assigned To*",
   "Department",
-  "Email",
   "Product Interest",
-  "Date",
-  "Time",
-  "Activity",
-  "Notes",
-  "Address",
 ];
 
 const TEMPLATE_SAMPLE_ROW = [
+  "Progenesis",
+  "0224567890",
   "John Doe",
   "9876543210",
+  "john.doe@example.com",
   "Mumbai",
   "Website",
-  "New",
-  "",
-  "",
-  "john.doe@example.com",
+  "New Lead",
+  "superadmin",
   "General",
-  "2026-03-15",
-  "10:30 AM",
-  "Initial outreach",
-  "Interested in pricing details",
-  "Andheri East",
+  "PGT-A",
 ];
 
 const formatSize = (size: number): string => {
@@ -296,17 +290,41 @@ const LeadsBulkImportModal: React.FC<LeadsBulkImportModalProps> = ({
   const hasUploading = uploadItems.some((item) => item.status === "uploading");
   const canImport = uploadItems.some((item) => item.status === "ready") && !hasUploading && !importing;
 
-  const handleDownloadTemplate = () => {
-    const rows = [TEMPLATE_HEADERS, TEMPLATE_SAMPLE_ROW];
-    const csv = rows
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+  const handleDownloadTemplate = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Sheet1");
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    worksheet.addRow(TEMPLATE_HEADERS);
+    worksheet.addRow(TEMPLATE_SAMPLE_ROW);
+
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF1F4E78" },
+      };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+    });
+
+    TEMPLATE_HEADERS.forEach((header, index) => {
+      const sample = TEMPLATE_SAMPLE_ROW[index] ?? "";
+      worksheet.getColumn(index + 1).width = Math.min(
+        Math.max(String(header).length, String(sample).length) + 4,
+        32,
+      );
+    });
+
+    worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "leads-import-template.csv";
+    anchor.download = "Bulk Upload format.xlsx";
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
