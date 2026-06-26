@@ -23,6 +23,7 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import SendIcon from "@mui/icons-material/Send";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import AddIcon from "@mui/icons-material/Add";
+import { useSelector } from "react-redux";
 
 import { TimelineItem } from "./LeadDetailSubComponents";
 import {
@@ -40,6 +41,7 @@ import type { LeadMailListItem } from "../../services/leads.api";
 import CallDialog from "./CallDialog";
 import { EmailDialog } from "../LeadsHub/EmailDialogs";
 import { SMSDialog } from "../LeadsHub/SmsDialogs";
+import { selectClinic } from "../../store/clinicSlice";
 
 /* ── Pure helpers ────────────────────────────────────────────────────────────── */
 
@@ -167,6 +169,10 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   emailHistoryLoading,
   onRefreshEmailHistory,
 }) => {
+  const selectedClinic = useSelector(selectClinic);
+  const clinicDisplayName = selectedClinic?.name?.trim() || "Clinic";
+  const clinicDisplayEmail = selectedClinic?.email?.trim() || "team@clinic.com";
+
   const parseTimestamp = React.useCallback((value?: string | null): number => {
     if (!value) return 0;
     const parsed = Date.parse(value);
@@ -1561,13 +1567,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                               <Typography variant="body2" fontWeight={700}>
                                 {mail.status?.toUpperCase() === "RECEIVED"
                                   ? "Lead Reply"
-                                  : "Crysta Clinic"}
+                                  : clinicDisplayName}
                               </Typography>
                               <Typography
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {mail.sender_email || "team@crystaivf.com"}
+                                {mail.sender_email || clinicDisplayEmail}
                               </Typography>
                             </Box>
                           </Stack>
