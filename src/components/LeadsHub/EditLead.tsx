@@ -305,6 +305,23 @@ export default function EditLead() {
     interests,
   } = useEditLead();
 
+  const clearInvalidField = React.useCallback((field: string) => {
+    setInvalidFields((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const hasError = (field: string): boolean => Boolean(invalidFields[field]);
+
+  React.useEffect(() => {
+    if (department) clearInvalidField("department");
+    if (selectedDate) clearInvalidField("appointmentDate");
+    if (slot) clearInvalidField("slot");
+  }, [clearInvalidField, department, selectedDate, slot]);
+
   // ====================== Loading / Error states ======================
   if (loading) {
     return (
@@ -362,23 +379,6 @@ export default function EditLead() {
     leadData.referral_department_name ||
     referralDepartment ||
     "N/A";
-
-  const clearInvalidField = React.useCallback((field: string) => {
-    setInvalidFields((prev) => {
-      if (!prev[field]) return prev;
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-  }, []);
-
-  const hasError = (field: string): boolean => Boolean(invalidFields[field]);
-
-  React.useEffect(() => {
-    if (department) clearInvalidField("department");
-    if (selectedDate) clearInvalidField("appointmentDate");
-    if (slot) clearInvalidField("slot");
-  }, [clearInvalidField, department, selectedDate, slot]);
 
   const handleValidatedSave = () => {
     const nextInvalidFields: Record<string, boolean> = {};
