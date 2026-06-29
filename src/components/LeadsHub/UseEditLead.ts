@@ -331,7 +331,7 @@ const isTruthy = (val: unknown): boolean =>
 const buildDataCaptureKey = (field: PipelineStageField): string =>
   field.field_key ||
   field.id ||
-  field.field_name.trim().toLowerCase().replace(/\s+/g, "_");
+  String(field.field_name || "").trim().toLowerCase().replace(/\s+/g, "_");
 
 // ====================== Task Status Options ======================
 export const TASK_STATUS_OPTIONS = [
@@ -567,7 +567,7 @@ export function useEditLead() {
   const resolvedDataCaptureFields = React.useMemo(
     () =>
       dataCaptureFields
-        .filter((field) => field.field_name.trim().length > 0)
+        .filter((field) => String(field.field_name || "").trim().length > 0)
         .filter((field) => {
           if (!field.field_key) return true;
           const catalogField = leadFormFields.find(
@@ -583,7 +583,7 @@ export function useEditLead() {
             : undefined;
           return {
             key: buildDataCaptureKey(field),
-            label: catalogField?.field_label || field.field_name.trim(),
+            label: catalogField?.field_label || String(field.field_name || "").trim(),
             type: field.field_type,
             required: field.is_mandatory,
           };

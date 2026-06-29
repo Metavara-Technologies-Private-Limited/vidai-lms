@@ -30,7 +30,6 @@ import type { FormState, Interest } from "../../types/leads.types";
 import {
   LeadAPI,
   DepartmentAPI,
-  LeadEmailAPI,
   InterestAPI,
   LeadFormFieldAPI,
 } from "../../services/leads.api";
@@ -212,7 +211,7 @@ const deriveAllActionTypeOptions = (stages: PipelineStage[]): string[] => {
 const buildDataCaptureKey = (field: PipelineStageField): string => {
   if (field.field_key) return String(field.field_key);
   if (field.id) return String(field.id);
-  return field.field_name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_");
+  return String(field.field_name || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_");
 };
 
 const getLeadFormDataCaptureValue = (form: FormState, fieldKey: string): unknown => {
@@ -354,7 +353,7 @@ export default function AddNewLead() {
     () =>
       dataCaptureFields
         .filter((field) => {
-          if (field.field_name.trim().length === 0) return false;
+          if (String(field.field_name || "").trim().length === 0) return false;
           if (!field.field_key) return true;
           const catalogField = leadFormFields.find(
             (leadField) => leadField.field_key === field.field_key,
@@ -369,7 +368,7 @@ export default function AddNewLead() {
             : undefined;
           return {
             key: buildDataCaptureKey(field),
-            label: field.field_name.trim(),
+            label: String(field.field_name || "").trim(),
             type: field.field_type,
             required: field.is_mandatory,
             mapsToLeadForm: Boolean(catalogField?.model_field),
@@ -1269,27 +1268,27 @@ export default function AddNewLead() {
     };
   };
 
-  // FIX ERRORS 1 & 2: Accept string as a valid input (API may return string for legacy data)
-  const getInterestNames = (
-    interests: string | string[] | { id: string; name: string }[] | undefined | null,
-  ): string => {
-    if (!interests || (Array.isArray(interests) && interests.length === 0)) {
-      return "-";
-    }
+  // // FIX ERRORS 1 & 2: Accept string as a valid input (API may return string for legacy data)
+  // const getInterestNames = (
+  //   interests: string | string[] | { id: string; name: string }[] | undefined | null,
+  // ): string => {
+  //   if (!interests || (Array.isArray(interests) && interests.length === 0)) {
+  //     return "-";
+  //   }
 
-    // Handle legacy string value returned from API
-    if (typeof interests === "string") {
-      return interests || "-";
-    }
+  //   // Handle legacy string value returned from API
+  //   if (typeof interests === "string") {
+  //     return interests || "-";
+  //   }
 
-    if (typeof interests[0] === "string") {
-      return (interests as string[]).join(", ");
-    }
+  //   if (typeof interests[0] === "string") {
+  //     return (interests as string[]).join(", ");
+  //   }
 
-    return (interests as { id: string; name: string }[])
-      .map((i) => i.name)
-      .join(", ");
-  };
+  //   return (interests as { id: string; name: string }[])
+  //     .map((i) => i.name)
+  //     .join(", ");
+  // };
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const submitForm = async () => {
@@ -1347,89 +1346,94 @@ export default function AddNewLead() {
         }
       }
 
-      const recipientEmail =
-        response.email?.trim() ||
-        payload.email?.trim() ||
-        form.contactEmail.trim() ||
-        "";
+      // const recipientEmail =
+      //   response.email?.trim() ||
+      //   payload.email?.trim() ||
+      //   form.contactEmail.trim() ||
+      //   "";
 
-      if (recipientEmail) {
-        const leadFirstName =
-          (response.full_name || payload.full_name || "Patient")
-            .trim()
-            .split(/\s+/)[0] || "Patient";
-        const appointmentDateText = payload.appointment_date || "-";
-        const appointmentSlotText = payload.slot || "-";
-        const clinicName = selectedClinic?.name || "Our Clinic";
-        const senderName = `${clinicName} Team`;
-        const senderEmail = selectedClinic?.email || "noreply@clinic.com";
+      // if (recipientEmail) {
+      //   const leadFirstName =
+      //     (response.full_name || payload.full_name || "Patient")
+      //       .trim()
+      //       .split(/\s+/)[0] || "Patient";
+      //   const appointmentDateText = payload.appointment_date || "-";
+      //   const appointmentSlotText = payload.slot || "-";
+      //   const clinicName = selectedClinic?.name || "Our Clinic";
+      //   const senderName = `${clinicName} Team`;
+      //   const senderEmail = selectedClinic?.email || "noreply@clinic.com";
 
-        const subject = payload.book_appointment
-          ? `Appointment Confirmed - ${appointmentDateText}`
-          : `Your details have been registered with us`;
+      //   const subject = payload.book_appointment
+      //     ? `Appointment Confirmed - ${appointmentDateText}`
+      //     : `Your details have been registered with us`;
 
-        const emailBody = payload.book_appointment
-          ? [
-              `Hi ${leadFirstName},`,
-              "",
-              `Your appointment with our clinic has been successfully scheduled.`,
-              "",
-              `Date: ${appointmentDateText}`,
-              `Time: ${appointmentSlotText}`,
-              "",
-              `Details:`,
-              `- Name: ${response.full_name || payload.full_name || "-"}`,
-              `- Contact: ${response.contact_no || payload.contact_no || "-"}`,
-              `- Treatment Interest: ${getInterestNames(
-                // FIX ERRORS 1 & 2: Cast to any to accept string | string[] | {id,name}[]
-                (response.treatment_interest || payload.treatment_interest) as any,
-              )}`,
-              "",
-              `If you need to reschedule or have any questions, please contact us.`,
-              "",
-              `We look forward to assisting you.`,
-              "",
-              `Thank you,`,
-              `${senderName}`,
-            ].join("\n")
-          : [
-              `Hi ${leadFirstName},`,
-              "",
-              `Your details have been successfully registered with our clinic.`,
-              "",
-              `Here's a quick summary:`,
-              `- Name: ${response.full_name || payload.full_name || "-"}`,
-              `- Contact: ${response.contact_no || payload.contact_no || "-"}`,
-              `- Email: ${recipientEmail}`,
-              `- Location: ${response.location || payload.location || "-"}`,
-              `- Treatment Interest: ${getInterestNames(
-                // FIX ERRORS 1 & 2: Cast to any to accept string | string[] | {id,name}[]
-                (response.treatment_interest || payload.treatment_interest) as any,
-              )}`,
-              "",
-              `Our team will review your details and get in touch with you shortly.`,
-              "",
-              `If you have any questions, feel free to reach out to us anytime.`,
-              "",
-              `Thank you,`,
-              `${senderName}`,
-            ].join("\n");
+      //   const emailBody = payload.book_appointment
+      //     ? [
+      //         `Hi ${leadFirstName},`,
+      //         "",
+      //         `Your appointment with our clinic has been successfully scheduled.`,
+      //         "",
+      //         `Date: ${appointmentDateText}`,
+      //         `Time: ${appointmentSlotText}`,
+      //         "",
+      //         `Details:`,
+      //         `- Name: ${response.full_name || payload.full_name || "-"}`,
+      //         `- Contact: ${response.contact_no || payload.contact_no || "-"}`,
+      //         `- Treatment Interest: ${getInterestNames(
+      //           // FIX ERRORS 1 & 2: Cast to any to accept string | string[] | {id,name}[]
+      //           (response.treatment_interest ||
+      //             payload.treatment_interest) as any,
+      //         )}`,
+      //         "",
+      //         `If you need to reschedule or have any questions, please contact us.`,
+      //         "",
+      //         `We look forward to assisting you.`,
+      //         "",
+      //         `Thank you,`,
+      //         `${senderName}`,
+      //       ].join("\n")
+      //     : [
+      //         `Hi ${leadFirstName},`,
+      //         "",
+      //         `Your details have been successfully registered with our clinic.`,
+      //         "",
+      //         `Here's a quick summary:`,
+      //         `- Name: ${response.full_name || payload.full_name || "-"}`,
+      //         `- Contact: ${response.contact_no || payload.contact_no || "-"}`,
+      //         `- Email: ${recipientEmail}`,
+      //         `- Location: ${response.location || payload.location || "-"}`,
+      //         `- Treatment Interest: ${getInterestNames(
+      //           // FIX ERRORS 1 & 2: Cast to any to accept string | string[] | {id,name}[]
+      //           (response.treatment_interest ||
+      //             payload.treatment_interest) as any,
+      //         )}`,
+      //         "",
+      //         `Our team will review your details and get in touch with you shortly.`,
+      //         "",
+      //         `If you have any questions, feel free to reach out to us anytime.`,
+      //         "",
+      //         `Thank you,`,
+      //         `${senderName}`,
+      //       ].join("\n");
 
-        try {
-          await LeadEmailAPI.sendNow({
-            lead: response.id,
-            subject,
-            sender_email: senderEmail,
-            email_body: emailBody,
-          });
-        } catch {
-          toast.warning("Lead was created, but confirmation email could not be sent.", {
-            position: "top-right",
-            autoClose: 2500,
-            theme: "colored",
-          });
-        }
-      }
+      //   try {
+      //     await LeadEmailAPI.sendNow({
+      //       lead: response.id,
+      //       subject,
+      //       sender_email: senderEmail,
+      //       email_body: emailBody,
+      //     });
+      //   } catch {
+      //     toast.warning(
+      //       "Lead was created, but confirmation email could not be sent.",
+      //       {
+      //         position: "top-right",
+      //         autoClose: 2500,
+      //         theme: "colored",
+      //       },
+      //     );
+      //   }
+      // }
 
       toast.success("Lead saved successfully!", {
         position: "top-right",
