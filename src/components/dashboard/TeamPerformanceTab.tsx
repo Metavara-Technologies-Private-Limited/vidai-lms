@@ -5,6 +5,7 @@ import {
   Avatar,
   Card,
   Chip,
+  CircularProgress,
   Grid,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
@@ -21,7 +22,11 @@ import type { TimeRange } from "./TimeRangeSelector";
 import { selectLeads } from "../../store/leadSlice";
 import { selectCampaign } from "../../store/campaignSlice";
 import { selectClinic } from "../../store/clinicSlice";
-import { EmployeeAPI, type Employee, type Lead } from "../../services/leads.api";
+import {
+  dashboardApi,
+  type TeamPerformanceResponse,
+} from "../../services/dashboard.api";
+import type { Employee, Lead } from "../../services/leads.api";
 import { chartStyles } from "../../styles/dashboard/SourcePerformanceChart.style";
 import SafeResponsiveContainer from "./SafeResponsiveContainer";
 import {
@@ -225,13 +230,115 @@ interface TeamPerformanceTabProps {
   timeRange: TimeRange;
 }
 
+const emptyTeamPerformanceView = () => ({
+  members: [] as TeamMember[],
+  overview: {
+    calls: "0",
+    followUps: "0",
+    appointments: "0",
+    converted: "0",
+    rate: "0.0%",
+    referrals: "0",
+    revenue: "N/A",
+    sla: "N/A",
+  },
+  memberStatsMap: {} as Record<string, DerivedMemberStats>,
+  memberPerformanceMap: {} as Record<string, PerformanceChartPoint[]>,
+});
+
+const buildTeamPerformanceView = (
+  data: TeamPerformanceResponse,
+  buckets: ReturnType<typeof getTimeRangeBuckets>,
+) => {
+  const members: TeamMember[] = data.members.map((member, index) => ({
+    name: member.name,
+    role: member.role,
+    img: "",
+    growth: `${member.growth >= 0 ? "+" : ""}${member.growth.toFixed(1)}%`,
+    rank:
+      index === 0
+        ? "1st (Top)"
+        : index === 1
+          ? "2nd"
+          : index === 2
+            ? "3rd"
+            : undefined,
+  }));
+
+  const memberStatsMap: Record<string, DerivedMemberStats> = {};
+  const memberPerformanceMap: Record<string, PerformanceChartPoint[]> = {};
+
+  data.members.forEach((member) => {
+    memberStatsMap[member.name] = {
+      assignedLeads: member.assigned_leads,
+      callsMade: member.calls_made,
+      followUps: member.follow_ups,
+      appointments: member.appointments,
+      leadConverted: member.converted,
+      revenueGenerated: "N/A",
+      slaCompliance: "N/A",
+      campaigns: 0,
+      conversionRate: member.conversion_rate,
+      revenueValue: 0,
+      slaValue: 0,
+      lostLeads: member.lost,
+    };
+
+    const totals = new Array<number>(buckets.length).fill(0);
+    const converted = new Array<number>(buckets.length).fill(0);
+    member.performance_events.forEach((event) => {
+      const eventDate = new Date(event.at);
+      if (Number.isNaN(eventDate.getTime())) return;
+      const bucketIndex = findBucketIndex(eventDate, buckets);
+      if (bucketIndex < 0) return;
+      totals[bucketIndex] += 1;
+      if (event.converted) converted[bucketIndex] += 1;
+    });
+
+    memberPerformanceMap[member.name] = buckets.map((bucket, index) => ({
+      label: bucket.label,
+      value:
+        totals[index] > 0
+          ? Math.round((converted[index] / totals[index]) * 100)
+          : 0,
+    }));
+  });
+
+  return {
+    members,
+    overview: {
+      calls: formatInteger(data.overview.calls),
+      followUps: formatInteger(data.overview.follow_ups),
+      appointments: formatInteger(data.overview.appointments),
+      converted: formatInteger(data.overview.converted),
+      rate: `${data.overview.conversion_rate.toFixed(1)}%`,
+      referrals: formatInteger(data.overview.assigned_leads),
+      revenue: "N/A",
+      sla: "N/A",
+    },
+    memberStatsMap,
+    memberPerformanceMap,
+  };
+};
+
+const EMPTY_TEAM_MEMBERS: Employee[] = [];
+
 const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
   const leads = useSelector(selectLeads) as Lead[];
   const campaigns = useSelector(selectCampaign) as CampaignItem[];
   const selectedClinicId = useSelector(selectClinic)?.id;
   const clinicId = Number(selectedClinicId ?? 0);
+  const requestKey = `${clinicId}:${timeRange}`;
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
-  const [teamMembers, setTeamMembers] = useState<Employee[]>([]);
+  const teamMembers = EMPTY_TEAM_MEMBERS;
+  const [teamResponse, setTeamResponse] = useState<{
+    key: string;
+    data: TeamPerformanceResponse | null;
+    error: string;
+  } | null>(null);
+  const teamData = teamResponse?.key === requestKey ? teamResponse.data : null;
+  const loadError = teamResponse?.key === requestKey ? teamResponse.error : "";
+  const loading = clinicId > 0 && teamResponse?.key !== requestKey;
   const performanceBuckets = useMemo(
     () => getTimeRangeBuckets(timeRange),
     [timeRange],
@@ -241,21 +348,44 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
       performanceBuckets.map((bucket) => ({ label: bucket.label, value: 0 })),
     [performanceBuckets],
   );
-  useEffect(() => {
-    if (!clinicId) {
-      setTeamMembers([]);
-      return;
-    }
 
-    EmployeeAPI.listByClinic(clinicId)
-      .then((employees) => {
-        setTeamMembers(Array.isArray(employees) ? employees : []);
+  useEffect(() => {
+    if (!clinicId) return;
+
+    let cancelled = false;
+
+    dashboardApi
+      .getTeamPerformance(clinicId, timeRange)
+      .then((response) => {
+        if (!cancelled) {
+          setTeamResponse({ key: requestKey, data: response, error: "" });
+        }
       })
-      .catch(() => setTeamMembers([]));
-  }, [clinicId]);
+      .catch(() => {
+        if (!cancelled) {
+          setTeamResponse({
+            key: requestKey,
+            data: null,
+            error: "Unable to load team performance data.",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clinicId, requestKey, timeRange]);
 
   const { members, overview, memberStatsMap, memberPerformanceMap } =
     useMemo(() => {
+      if (teamData) {
+        return buildTeamPerformanceView(teamData, performanceBuckets);
+      }
+
+      if (loading || loadError || (clinicId > 0 && !teamData)) {
+        return emptyTeamPerformanceView();
+      }
+
       const activeLeads = (leads || []).filter(
         (lead) =>
           Boolean(clinicId) &&
@@ -561,7 +691,10 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
       leads,
       performanceBuckets,
       teamMembers,
+      teamData,
       timeRange,
+      loading,
+      loadError,
     ]);
 
   const topPerformer = members.find((m) => m.rank === "1st (Top)");
@@ -611,6 +744,19 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
         overflowY: "auto",
       }}
     >
+      {loading ? (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+          <CircularProgress size={16} />
+          <Typography variant="caption" color="text.secondary">
+            Loading team performance...
+          </Typography>
+        </Stack>
+      ) : null}
+      {loadError ? (
+        <Typography variant="caption" color="error" sx={{ display: "block", mb: 2 }}>
+          {loadError}
+        </Typography>
+      ) : null}
       {/* 1. Member Avatar Bar */}
       <Stack
         direction="row"
@@ -1220,10 +1366,11 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
                             fontWeight={700}
                             sx={{ display: "block" }}
                           >
-                            $
-                            {Math.round(
-                              memberStatsMap[tp.name]?.revenueValue ?? 0,
-                            ).toLocaleString("en-US")}
+                            {teamData?.unavailable_metrics.includes("revenue")
+                              ? "N/A"
+                              : `$${Math.round(
+                                  memberStatsMap[tp.name]?.revenueValue ?? 0,
+                                ).toLocaleString("en-US")}`}
                           </Typography>
                           <Typography
                             variant="caption"

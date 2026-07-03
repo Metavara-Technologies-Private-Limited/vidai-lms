@@ -53,6 +53,9 @@ interface BaseActivity {
   assigneeName?: string;
   assigneeAvatar?: string;
   leadStatus?: string;
+  nextActionType?: string;
+  nextActionDescription?: string;
+  actionStatus?: string;
 }
 
 interface CallActivity extends BaseActivity {
@@ -156,20 +159,28 @@ const getLastActivity = (activity: Activity): string => {
 };
 
 const getNextAction = (activity: Activity): string => {
-  switch (activity.type) {
-    case "call":        return "Send Message";
-    case "sms":         return "Call Patient";
-    case "email":       return "Send Message";
-    case "appointment": return "Book Appointment";
-  }
+  return activity.nextActionType?.trim() || "â€”";
 };
 
 const getNextActionDesc = (activity: Activity): string => {
+  return activity.nextActionDescription?.trim() || "No next-action details";
+};
+
+const getActivityStatus = (activity: Activity): string => {
+  if (activity.actionStatus?.trim()) {
+    return activity.actionStatus.replace(/[_-]+/g, " ");
+  }
+
   switch (activity.type) {
-    case "call":        return "Send appointment confirmation message via...";
-    case "sms":         return "Call patient to confirm preferred consultation t...";
-    case "email":       return "Send appointment confirmation message via...";
-    case "appointment": return "Book initial IVF consultation with available do...";
+    case "call":
+    case "sms":
+      return activity.status?.replace(/[_-]+/g, " ") || "Unknown";
+    case "email":
+      return activity.emailStatus?.replace(/[_-]+/g, " ") || "Unknown";
+    case "appointment":
+      return new Date(activity.appointmentDate).getTime() >= Date.now()
+        ? "Scheduled"
+        : "Completed";
   }
 };
 
@@ -374,8 +385,8 @@ const Activity = () => {
     [user],
   );
 
-  const isSuperAdmin = React.useMemo(
-    () => resolveUserRole(userForRole) === "super_admin",
+  const canViewClinicActivity = React.useMemo(
+    () => resolveUserRole(userForRole) !== "user",
     [userForRole],
   );
 
@@ -404,7 +415,15 @@ const Activity = () => {
             ? apiLeads
             : (Array.isArray(cachedLeads) ? (cachedLeads as Lead[]) : []);
 
-        type LeadInfo = { leadName: string; assigneeId: number | null; assigneeName: string; leadStatus: string };
+        type LeadInfo = {
+          leadName: string;
+          assigneeId: number | null;
+          assigneeName: string;
+          leadStatus: string;
+          nextActionType: string;
+          nextActionDescription: string;
+          actionStatus: string;
+        };
         const leadLookup: Record<string, LeadInfo> = {};
         const leadLookupByPhone: Record<string, LeadInfo> = {};
         const leadLookupByEmail: Record<string, LeadInfo> = {};
@@ -416,6 +435,9 @@ const Activity = () => {
             assigneeId: asNumberOrNull(lead.assigned_to_id),
             assigneeName: lead.assigned_to_name ?? "Unassigned",
             leadStatus: lead.lead_status ?? "new",
+            nextActionType: lead.next_action_type ?? "",
+            nextActionDescription: lead.next_action_description ?? "",
+            actionStatus: lead.action_status ?? lead.next_action_status ?? "",
           };
           const rawLeadId = String(lead.id ?? "").trim();
           const normalizedLeadId = normalizeLeadKey(rawLeadId);
@@ -487,6 +509,9 @@ const Activity = () => {
               assigneeId: info?.assigneeId ?? null,
               assigneeName: firstNonEmptyString(info?.assigneeName, callRecord.assigned_to_name, callRecord.assignee_name, "Unassigned"),
               leadStatus: firstNonEmptyString(info?.leadStatus, callRecord.lead_status),
+              nextActionType: info?.nextActionType,
+              nextActionDescription: info?.nextActionDescription,
+              actionStatus: info?.actionStatus,
               fromNumber: c.from_number, toNumber: c.to_number,
               status: c.status, direction: c.direction,
             } as CallActivity);
@@ -539,6 +564,9 @@ const Activity = () => {
               assigneeId: info?.assigneeId ?? null,
               assigneeName: firstNonEmptyString(info?.assigneeName, smsRecord.assigned_to_name, smsRecord.assignee_name, "Unassigned"),
               leadStatus: firstNonEmptyString(info?.leadStatus, smsRecord.lead_status),
+              nextActionType: info?.nextActionType,
+              nextActionDescription: info?.nextActionDescription,
+              actionStatus: info?.actionStatus,
               body: m.body, fromNumber: m.from_number, toNumber: m.to_number,
               status: m.status, direction: m.direction,
             } as SmsActivity);
@@ -600,6 +628,9 @@ const Activity = () => {
               assigneeId: info?.assigneeId ?? null,
               assigneeName: firstNonEmptyString(info?.assigneeName, emailRecord.assigned_to_name, emailRecord.assignee_name, "Unassigned"),
               leadStatus: firstNonEmptyString(info?.leadStatus, emailRecord.lead_status),
+              nextActionType: info?.nextActionType,
+              nextActionDescription: info?.nextActionDescription,
+              actionStatus: info?.actionStatus,
               subject: e.subject, emailStatus: e.status,
               senderEmail: e.sender_email, sentAt: e.sent_at,
             } as EmailActivity);
@@ -617,13 +648,16 @@ const Activity = () => {
               assigneeId: asNumberOrNull(lead.assigned_to_id),
               assigneeName: lead.assigned_to_name ?? "Unassigned",
               leadStatus: lead.lead_status ?? "appointment",
+              nextActionType: lead.next_action_type ?? "",
+              nextActionDescription: lead.next_action_description ?? "",
+              actionStatus: lead.action_status ?? lead.next_action_status ?? "",
               appointmentDate: lead.appointment_date, slot: lead.slot,
             } as AppointmentActivity);
           }
         });
 
         const userScoped =
-          isSuperAdmin || currentUserId == null
+          canViewClinicActivity || currentUserId == null
             ? merged
             : merged.filter((activity) => {
                 const idCandidates = new Set<number>(currentUserIdCandidates);
@@ -689,7 +723,7 @@ const Activity = () => {
     currentUserEmail,
     currentUserId,
     currentUserName,
-    isSuperAdmin,
+    canViewClinicActivity,
   ]);
 
   React.useEffect(() => { setPage(1); }, [filter, activities.length]);
@@ -826,6 +860,7 @@ const Activity = () => {
                 const lastActivity = getLastActivity(activity);
                 const nextAction = getNextAction(activity);
                 const nextActionDesc = getNextActionDesc(activity);
+                const activityStatus = getActivityStatus(activity);
 
                 return (
                   <TableRow
@@ -938,10 +973,10 @@ const Activity = () => {
                       </Typography>
                     </TableCell>
 
-                    {/* Status (To Do chip) */}
+                    {/* Activity / configured task status */}
                     <TableCell>
                       <Chip
-                        label="To Do"
+                        label={activityStatus}
                         size="small"
                         variant="outlined"
                         sx={{

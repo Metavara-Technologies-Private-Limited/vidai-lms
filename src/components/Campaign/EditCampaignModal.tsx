@@ -32,7 +32,7 @@ import SocialContentBox from "./SocialContentBox";
 import type { Campaign, CampaignAPIType } from "../../types/campaigns.types";
 import {
   CAMPAIGN_AUDIENCE,
-  // CAMPAIGN_MODE,
+  CAMPAIGN_MODE,
   CAMPAIGN_OBJECTIVES,
   // SENDER_EMAIL,
   platformIcons,
@@ -688,8 +688,28 @@ export default function EditCampaignModal({
     e.target.value = "";
   };
 
-  const toggleAccount = (id: string) =>
-    setAccounts((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  const toggleAccount = (id: Platform) => {
+    setAccounts((prev) => {
+      const nextAccounts = prev.includes(id)
+        ? prev.filter((platform) => platform !== id)
+        : [...prev, id];
+      const requiresPaid =
+        nextAccounts.includes("google_ads") || nextAccounts.includes("linkedin");
+
+      if (requiresPaid && mode === "organic") {
+        setMode("");
+        toast.info(
+          "Organic posting is available only for Facebook and Instagram. Please select Paid Advertising.",
+          { toastId: "edit-organic-not-supported" },
+        );
+      }
+
+      return nextAccounts;
+    });
+  };
+
+  const isOrganicDisabled =
+    accounts.includes("google_ads") || accounts.includes("linkedin");
 
   // ─── LinkedIn location helper ─────────────────────────────────
   const getLinkedInLocation = () => {
@@ -1069,6 +1089,11 @@ export default function EditCampaignModal({
       return;
     }
 
+    if (mode === "organic" && isOrganicDisabled) {
+      toast.error("Organic posting is available only for Facebook and Instagram.");
+      return;
+    }
+
     // FIX: validate budgets with accurate error messages before submitting
     if (mode === "paid") {
       for (const platform of accounts as Platform[]) {
@@ -1191,6 +1216,8 @@ export default function EditCampaignModal({
         selected_start: selectedStart,
         selected_end: selectedEnd,
         enter_time: scheduleTime || null,
+        campaign_mode:
+          mode === "organic" ? CAMPAIGN_MODE.ORGANIC : CAMPAIGN_MODE.PAID,
         platform_data: updatedPlatformData,
         budget_data: budgets,
         image_url: resolvedImageUrl,
@@ -1229,15 +1256,31 @@ export default function EditCampaignModal({
         },
       };
 
-      if (accounts.includes("facebook")) {
+      if (mode === "paid" && accounts.includes("facebook")) {
         await CampaignAPI.updateFacebookCampaign(campaign.id, facebookPayload);
       }
 
-      if (accounts.includes("instagram")) {
+      if (mode === "paid" && accounts.includes("instagram")) {
         await CampaignAPI.updateInstagramCampaign(
           campaign.id,
           instagramPayload,
         );
+      }
+
+      if (mode === "organic") {
+        const organicResponse = await CampaignAPI.updateSocialOrganic(
+          campaign.id,
+          {
+            select_ad_accounts: accounts,
+            platform_data: updatedPlatformData,
+          },
+        );
+        const instagramResult = organicResponse.data?.results?.instagram;
+        if (instagramResult?.requires_republish) {
+          toast.info(instagramResult.error, {
+            toastId: "instagram-organic-republish-required",
+          });
+        }
       }
 
       // ─── Google Ads Update ─────────────────────────────────────────────
@@ -1777,19 +1820,21 @@ export default function EditCampaignModal({
                 </p>
                 <div className="mode-row">
                   <div
-                    className={`mode-card ${mode === "organic" ? "selected" : ""} ${isPaidLocked ? "disabled" : ""}`}
+                    className={`mode-card ${mode === "organic" ? "selected" : ""} ${isPaidLocked || isOrganicDisabled ? "disabled" : ""}`}
                     onClick={() => {
-                      if (isPaidLocked) return;
+                      if (isPaidLocked || isOrganicDisabled) return;
                       setMode("organic");
                     }}
                     style={
-                      isPaidLocked
+                      isPaidLocked || isOrganicDisabled
                         ? { opacity: 0.6, cursor: "not-allowed" }
                         : undefined
                     }
                     title={
                       isPaidLocked
                         ? "Paid campaigns cannot be changed back to organic."
+                        : isOrganicDisabled
+                          ? "Organic posting is supported only for Facebook and Instagram."
                         : undefined
                     }
                   >
@@ -1834,6 +1879,14 @@ export default function EditCampaignModal({
                   >
                     This campaign is already paid and cannot be changed back to
                     organic.
+                  </p>
+                )}
+                {!isPaidLocked && isOrganicDisabled && (
+                  <p
+                    className="section-subtitle"
+                    style={{ color: "#b45309", marginTop: 10 }}
+                  >
+                    Deselect Google Ads and LinkedIn to enable organic posting.
                   </p>
                 )}
               </div>

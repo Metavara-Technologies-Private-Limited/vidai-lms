@@ -1161,7 +1161,7 @@ const LeadsTable: React.FC<Props> = ({
                 }}
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  Lead Name | No
+                  Lead Name
                   <Box
                     className="col-sort-icon"
                     component="span"
@@ -1548,9 +1548,6 @@ const LeadsTable: React.FC<Props> = ({
                     <Box>
                       <Typography className="lead-name-text">
                         {lead.full_name}
-                      </Typography>
-                      <Typography className="lead-id-text">
-                        {lead.displayId}
                       </Typography>
                     </Box>
                   </Stack>

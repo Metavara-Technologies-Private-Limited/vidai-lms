@@ -19,6 +19,7 @@ export default function Settings() {
 
   if (location.pathname === "/settings") {
     const subMenus = [
+      { key: "integration", path: "integration" },
       { key: "tickets", path: "tickets" },
       { key: "templates", path: "templates" },
       { key: "users", path: "users" },

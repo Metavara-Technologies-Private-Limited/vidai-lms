@@ -56,6 +56,11 @@ export const CampaignAPI = {
       params: { clinic_id: storedClinicId() },
     }),
 
+  updateSocialOrganic: (campaignId: string, data: unknown) =>
+    http.put(`/social-media-campaign/organic/${campaignId}/update/`, data, {
+      params: { clinic_id: storedClinicId() },
+    }),
+
   createGoogleAds: (data: {
     clinic_id: number;
     customer_id: string;

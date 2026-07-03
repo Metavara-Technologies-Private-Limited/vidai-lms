@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -231,8 +231,13 @@ type ViewMode = "empty" | "summary" | "edit" | "user-summary" | "user-edit";
 
 const STEP_LABELS = ["Module", "Category", "Sub Category"];
 const MODULE_OPTIONS = ["Vidai Leads"];
-const FALLBACK_SUBCATEGORY_OPTIONS = ["Tickets", "Templates", "User"];
-const EXCLUDED_ROW_LABELS = new Set(["vidai leads", "integration"]);
+const FALLBACK_SUBCATEGORY_OPTIONS = [
+  "Integration",
+  "Tickets",
+  "Templates",
+  "User",
+];
+const EXCLUDED_ROW_LABELS = new Set(["vidai leads"]);
 
 const isHiddenPermissionLabel = (label: string): boolean =>
   EXCLUDED_ROW_LABELS.has(normalizePermissionLabel(label));
@@ -520,8 +525,11 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
     });
     return allowed;
   }, [categories, subCategories]);
-  const isAllowedPermissionLabel = (label: string): boolean =>
-    allowedPermissionLabels.has(normalizePermissionLabel(label));
+  const isAllowedPermissionLabel = useCallback(
+    (label: string): boolean =>
+      allowedPermissionLabels.has(normalizePermissionLabel(label)),
+    [allowedPermissionLabels],
+  );
 
   const sanitizeRights = (rights: RoleRights): RoleRights => ({
     modules: rights.modules.filter((label) => isAllowedPermissionLabel(label)),
@@ -577,7 +585,7 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
       )
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([label, perm]) => ({ label, perm }));
-  }, [activeRole, allowedPermissionLabels]);
+  }, [activeRole, isAllowedPermissionLabel]);
 
   const userSummaryRows = useMemo(() => {
     return Object.entries(draftPerms)
@@ -589,14 +597,14 @@ const UserRightsForm: React.FC<Props> = ({ onSave }) => {
       )
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([label, perm]) => ({ label, perm }));
-  }, [draftPerms, allowedPermissionLabels]);
+  }, [draftPerms, isAllowedPermissionLabel]);
 
   const editRows = useMemo(() => {
     const labels = Array.from(
       new Set([...draftRights.modules, ...draftRights.categories, ...draftRights.subCategories]),
     ).filter((label) => shouldShowPermissionRow(label) && isAllowedPermissionLabel(label));
     return labels.map((label) => ({ label, perm: draftPerms[label] ?? emptyPerm() }));
-  }, [draftRights, draftPerms, allowedPermissionLabels]);
+  }, [draftRights, draftPerms, isAllowedPermissionLabel]);
 
   const selectRole = (idx: number) => {
     const role = roles[idx];

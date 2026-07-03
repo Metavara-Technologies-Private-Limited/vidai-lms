@@ -44,10 +44,12 @@ const Integration = () => {
   const integrationAliases = ["integration", "integrations"];
   const canViewIntegration =
     role === "super_admin" ||
+    role === "admin" ||
     hasAnySubcategoryActionPermission(permissions, integrationAliases, "view") ||
     hasAnySubcategoryActionPermission(permissions, integrationAliases, "print");
   const canManageIntegration =
     role === "super_admin" ||
+    role === "admin" ||
     hasAnySubcategoryActionPermission(permissions, integrationAliases, "add") ||
     hasAnySubcategoryActionPermission(permissions, integrationAliases, "edit");
 

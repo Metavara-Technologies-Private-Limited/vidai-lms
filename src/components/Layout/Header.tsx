@@ -230,10 +230,7 @@ const Header = ({
     const profileClinicId =
       userClinics.find((clinic) => clinic.isDefault)?.id ||
       userClinics[0]?.id ||
-      clinics[0]?.id ||
       null;
-
-    let nextClinicId: number | null = profileClinicId;
 
     // if (isSuperAdmin) {
     //   // Superadmin can access any clinic
@@ -251,7 +248,13 @@ const Header = ({
     //   nextClinicId = validStored || profileClinicId;
     // }
 
-    nextClinicId = storedClinicId || profileClinicId;
+    const validStoredClinicId =
+      storedClinicId && clinics.some((clinic) => clinic.id === storedClinicId)
+        ? storedClinicId
+        : null;
+
+    const nextClinicId =
+      profileClinicId || validStoredClinicId || clinics[0]?.id || null;
 
     setSelectedClinicId(nextClinicId);
   }, [
