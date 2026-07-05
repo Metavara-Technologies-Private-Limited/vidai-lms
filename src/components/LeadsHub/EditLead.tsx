@@ -379,6 +379,11 @@ export default function EditLead() {
     leadData.referral_department_name ||
     referralDepartment ||
     "N/A";
+  const referralSourceDisplay =
+    leadData.referral_source_name ||
+    leadData.lead_generated_by_name ||
+    leadData.personal_name ||
+    "N/A";
 
   const handleValidatedSave = () => {
     const nextInvalidFields: Record<string, boolean> = {};
@@ -632,6 +637,8 @@ export default function EditLead() {
                   <TextField
                     fullWidth
                     size="small"
+                    name="lead-full-name"
+                    autoComplete="section-lead organization"
                     value={fullName}
                     onChange={(e) => handleFullNameChange(e.target.value)}
                     sx={inputStyle}
@@ -642,6 +649,9 @@ export default function EditLead() {
                   <TextField
                     fullWidth
                     size="small"
+                    name="lead-contact"
+                    type="tel"
+                    autoComplete="section-lead tel"
                     value={contactNo}
                     onChange={(e) => handleContactChange(e.target.value)}
                     sx={inputStyle}
@@ -652,6 +662,9 @@ export default function EditLead() {
                   <TextField
                     fullWidth
                     size="small"
+                    name="lead-email"
+                    type="email"
+                    autoComplete="section-lead email"
                     value={email}
                     onChange={(e) => handleEmailChange(e.target.value)}
                     sx={inputStyle}
@@ -662,6 +675,8 @@ export default function EditLead() {
                   <TextField
                     fullWidth
                     size="small"
+                    name="lead-location"
+                    autoComplete="section-lead address-level2"
                     value={location}
                     onChange={(e) => handleLocationChange(e.target.value)}
                     sx={inputStyle}
@@ -673,6 +688,8 @@ export default function EditLead() {
                     <TextField
                       fullWidth
                       size="small"
+                      name="lead-address"
+                      autoComplete="section-lead street-address"
                       value={address}
                       onChange={(e) => handleAddressChange(e.target.value)}
                       sx={inputStyle}
@@ -738,6 +755,8 @@ export default function EditLead() {
                     <TextField
                       fullWidth
                       size="small"
+                      name="lead-address"
+                      autoComplete="section-lead street-address"
                       value={address}
                       onChange={(e) => handleAddressChange(e.target.value)}
                       sx={inputStyle}
@@ -826,6 +845,8 @@ export default function EditLead() {
                         <TextField
                           fullWidth
                           size="small"
+                          name="lead-partner-name"
+                          autoComplete="section-lead-partner name"
                           value={partnerName}
                           onChange={(e) =>
                             handlePartnerNameChange(e.target.value)
@@ -883,6 +904,8 @@ export default function EditLead() {
                       <TextField
                         fullWidth
                         size="small"
+                        name="lead-contact-person-name"
+                        autoComplete="section-lead-contact name"
                         value={contactPersonName}
                         onChange={(e) =>
                           handleContactPersonNameChange(e.target.value)
@@ -895,6 +918,8 @@ export default function EditLead() {
                       <TextField
                         fullWidth
                         size="small"
+                        name="lead-contact-designation"
+                        autoComplete="section-lead-contact organization-title"
                         value={designation}
                         onChange={(e) => setDesignation(e.target.value)}
                         sx={inputStyle}
@@ -905,6 +930,9 @@ export default function EditLead() {
                       <TextField
                         fullWidth
                         size="small"
+                        name="lead-contact-person-phone"
+                        type="tel"
+                        autoComplete="section-lead-contact tel"
                         value={contactPersonPhone}
                         onChange={(e) =>
                           handleContactPersonPhoneChange(e.target.value)
@@ -917,6 +945,9 @@ export default function EditLead() {
                       <TextField
                         fullWidth
                         size="small"
+                        name="lead-contact-person-email"
+                        type="email"
+                        autoComplete="section-lead-contact email"
                         value={contactPersonEmail}
                         onChange={(e) =>
                           handleContactPersonEmailChange(e.target.value)
@@ -1117,6 +1148,11 @@ export default function EditLead() {
                         size="small"
                         placeholder="Search assignee"
                         sx={inputStyle}
+                        inputProps={{
+                          ...params.inputProps,
+                          name: "lead-assignee-search",
+                          autoComplete: "off",
+                        }}
                         InputProps={{
                           ...params.InputProps,
                           endAdornment: (
@@ -1133,7 +1169,22 @@ export default function EditLead() {
                   />
                 </Box>
 
-                {/* CONTRACTS: Referral Department is captured on add and kept read-only after creation. */}
+                {/* Referral details are captured on add and kept read-only after creation. */}
+                {IS_CONTRACTS_APP && (
+                  <Box>
+                    <Typography sx={labelStyle}>
+                      Lead Generated By (Referral)
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={referralSourceDisplay}
+                      disabled
+                      sx={readOnlyStyle}
+                    />
+                  </Box>
+                )}
+
                 {IS_CONTRACTS_APP && (
                   <Box>
                     <Typography sx={labelStyle}>Referral Department</Typography>
@@ -1296,6 +1347,8 @@ export default function EditLead() {
                                 : "text"
                           }
                           value={dataCaptureValues[field.key] ?? ""}
+                          name={`lead-custom-${field.key}`}
+                          autoComplete="off"
                           onChange={(e) =>
                             setDataCaptureValues((prev) => ({
                               ...prev,

@@ -723,8 +723,9 @@ const UsersPage: React.FC = () => {
   };
 
   const handleSaveGrantAccess = () => {
+    toast.success("Permissions updated successfully");
     setDetailsView("list");
-    setActiveTab("details");
+    setActiveTab("rights");
   };
 
   const deleteTargetUser =

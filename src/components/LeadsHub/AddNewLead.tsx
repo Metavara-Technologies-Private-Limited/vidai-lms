@@ -32,6 +32,7 @@ import {
   DepartmentAPI,
   InterestAPI,
   LeadFormFieldAPI,
+  LeadEmailAPI,
 } from "../../services/leads.api";
 import type { Department } from "../../services/leads.api";
 // FIX ERROR 3: Import the API-side Interest type under an alias so we can cast
@@ -1295,6 +1296,19 @@ export default function AddNewLead() {
     if (isSubmitting) return;
     try {
       setIsSubmitting(true);
+
+      if (!intOrNull(form.department) && !departments[0]?.id) {
+        toast.error(
+          "No active department is configured for this clinic. Configure a department before creating leads.",
+          {
+            position: "top-right",
+            autoClose: 4000,
+            theme: "colored",
+          },
+        );
+        return;
+      }
+
       const payload = buildPayload();
 
       const shouldSendAppointmentEmail =
@@ -1304,6 +1318,7 @@ export default function AddNewLead() {
       const referralSourceObject: ReferralSourceObject | undefined =
         IS_CONTRACTS_APP && selectedLeadGeneratedBy
           ? {
+              user_id: selectedLeadGeneratedBy.id,
               first_name: selectedLeadGeneratedBy.first_name,
               last_name: selectedLeadGeneratedBy.last_name,
               email: selectedLeadGeneratedBy.email,
@@ -1343,6 +1358,44 @@ export default function AddNewLead() {
             autoClose: 2500,
             theme: "colored",
           });
+        }
+      }
+
+      if (shouldSendAppointmentEmail) {
+        const recipientEmail =
+          response.email?.trim() ||
+          payload.email?.trim() ||
+          form.contactEmail.trim() ||
+          "";
+
+        if (recipientEmail) {
+          try {
+            await LeadEmailAPI.sendNow({
+              lead: response.id,
+              subject: `Appointment Confirmed - ${payload.appointment_date}`,
+              sender_email: selectedClinic?.email || "noreply@clinic.com",
+              email_body: [
+                `Hi ${(response.full_name || payload.full_name || "Patient").split(" ")[0]},`,
+                "",
+                `Your appointment has been successfully scheduled.`,
+                "",
+                `Date: ${payload.appointment_date}`,
+                `Time: ${payload.slot}`,
+                "",
+                `Thank you,`,
+                `${selectedClinic?.name || "Our Clinic"} Team`,
+              ].join("\n"),
+            });
+          } catch {
+            toast.warning(
+              "Lead was created, but appointment email could not be sent.",
+              {
+                position: "top-right",
+                autoClose: 2500,
+                theme: "colored",
+              },
+            );
+          }
         }
       }
 

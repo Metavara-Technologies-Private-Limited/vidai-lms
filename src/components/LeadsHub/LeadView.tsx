@@ -1727,6 +1727,12 @@ export default function LeadDetailView() {
 
   const activeLead: LeadRecord | undefined = fullLead ?? lead;
 
+  const refreshActiveLead = React.useCallback(async () => {
+    if (!id) return;
+    const data = await LeadAPI.getById(decodeURIComponent(id));
+    setFullLead(data as unknown as LeadRecord);
+  }, [id]);
+
   const sendLeadSummaryEmail = React.useCallback(
     async ({
       leadData,
@@ -1916,6 +1922,28 @@ export default function LeadDetailView() {
     fetchSMSHistory,
     fetchEmailHistory,
     id,
+  ]);
+
+  React.useEffect(() => {
+    if (activeTab !== "Next Action" || !activeLead?.id) return;
+
+    // Twilio confirms completed calls asynchronously. Poll only while this
+    // tab is visible so persisted activity and task status refresh together.
+    const refresh = () => {
+      void refreshActiveLead();
+      void fetchCallHistory(activeLead.id);
+      void fetchSMSHistory(activeLead.id);
+      void fetchEmailHistory(activeLead.id);
+    };
+    const timer = window.setInterval(refresh, 5000);
+    return () => window.clearInterval(timer);
+  }, [
+    activeTab,
+    activeLead?.id,
+    refreshActiveLead,
+    fetchCallHistory,
+    fetchSMSHistory,
+    fetchEmailHistory,
   ]);
 
   const handleAddNote = async () => {
@@ -2235,60 +2263,9 @@ export default function LeadDetailView() {
         } as LeadRecord;
       });
       dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-      const recipientEmail = (
-        activeLead?.email ||
-        fullLead?.email ||
-        ""
-      ).trim();
-      if (recipientEmail) {
-        const leadName = (
-          activeLead?.full_name ||
-          activeLead?.name ||
-          "Patient"
-        ).trim();
-        const leadFirstName = leadName.split(/\s+/)[0] || "Patient";
-        const appointmentDate = result.appointment_date || "-";
-        const appointmentSlot = result.slot || "-";
-        const senderEmail = authedUser?.email as string | undefined;
-        const subject = `Appointment Confirmed - ${appointmentDate}`;
-        const emailBody = [
-          `Hi ${leadFirstName},`,
-          "",
-          `Your appointment with ${clinicName} has been successfully scheduled.`,
-          "",
-          `Date: ${appointmentDate}`,
-          `Time: ${appointmentSlot}`,
-          `Doctor: ${result.personnelName || activeLead?.personal_name || "-"}`,
-          `Department: ${result.departmentName || activeLead?.department_name || "-"}`,
-          "",
-          result.remark ? `Note: ${result.remark}` : "",
-          "",
-          `If you need to reschedule or have any questions, please contact us.`,
-          "",
-          `Thank you,`,
-          `${clinicName} Team`,
-        ]
-          .filter((line) => line !== undefined)
-          .join("\n");
-        try {
-          await LeadEmailAPI.sendNow({
-            lead: String(activeLead!.id),
-            subject,
-            sender_email: senderEmail || null,
-            email_body: emailBody,
-          });
-          toast.success("Appointment confirmation email sent.", toastOptions);
-        } catch {
-          toast.warning(
-            "Appointment saved, but confirmation email could not be sent.",
-            toastOptions,
-          );
-        }
-      } else {
-        toast.success("Appointment booked successfully.", toastOptions);
-      }
+      toast.success("Appointment booked successfully.", toastOptions);
     },
-    [activeLead, fullLead, authedUser, clinicName, dispatch],
+    [activeLead, dispatch],
   );
 
   if (loading && !activeLead)
@@ -3178,6 +3155,17 @@ export default function LeadDetailView() {
           onCloseActionDialog={closeActionDialog}
           taskStatus={leadTaskStatus}
           onMarkDone={handleMarkDone}
+          callHistory={callHistory}
+          smsHistory={smsHistory}
+          emailHistory={emailHistory}
+          onEmailOpen={() => setEmailDialogOpen(true)}
+          onSmsSent={() => {
+            void fetchSMSHistory(activeLead.id);
+            void refreshActiveLead();
+          }}
+          onAppointmentBooked={(result) => {
+            void handleAppointmentSaved(result).then(refreshActiveLead);
+          }}
           notes={notes}
           notesLoading={notesLoading}
           notesError={notesError}
@@ -3311,6 +3299,7 @@ export default function LeadDetailView() {
           setActiveTab("History");
           setHistoryView("email");
           fetchEmailHistory(activeLead.id);
+          void refreshActiveLead();
         }}
       />
 

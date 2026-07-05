@@ -47,6 +47,8 @@ import {
   // clearError,
 } from "../../store/leadSlice";
 import { selectUsers } from "../../store/userSlice";
+import { selectUser } from "../../store/authSlice";
+import { resolveUserRole } from "../../utils/roleAccess";
 import { selectClinic } from "../../store/clinicSlice";
 import "../../styles/Leads/leads.css";
 import { MenuButton, Dialogs } from "./LeadsMenuDialogs";
@@ -182,6 +184,13 @@ const SourceCell = ({ source }: { source?: string }) => {
     </Stack>
   );
 };
+
+const ACCESS_BADGES = [
+  { match: "created", label: "Created", color: "#2563EB", border: "#BFDBFE", bg: "#EFF6FF" },
+  { match: "assigned", label: "Assigned", color: "#15803D", border: "#BBF7D0", bg: "#F0FDF4" },
+  { match: "referred", label: "Referred", color: "#7E22CE", border: "#E9D5FF", bg: "#FAF5FF" },
+  { match: "appointment", label: "Appointment", color: "#B45309", border: "#FDE68A", bg: "#FFFBEB" },
+] as const;
 
 const normalizeStatusKey = (value: string): string =>
   value
@@ -455,6 +464,7 @@ const LeadsTable: React.FC<Props> = ({
   canEditLeads = true,
   selectedIndustry = "",
   selectedPipelineId = "",
+  onViewActivity,
 }) => {
   const theme = useTheme();
   const disableStickyActions = useMediaQuery(theme.breakpoints.down("md"));
@@ -476,6 +486,9 @@ const LeadsTable: React.FC<Props> = ({
 
   const leads = useSelector(selectLeads) as RawLead[] | null;
   const users = useSelector(selectUsers);
+  const currentUser = useSelector(selectUser);
+  const showAccessColumn =
+    resolveUserRole(currentUser as unknown as Parameters<typeof resolveUserRole>[0]) === "user";
   const loading = useSelector(selectLeadsLoading) as boolean;
   const error = useSelector(selectLeadsError) as string | null;
   const clinic = useSelector(selectClinic);
@@ -1509,6 +1522,7 @@ const LeadsTable: React.FC<Props> = ({
                   </Box>
                 </Box>
               </TableCell>
+              {showAccessColumn && <TableCell>Visibility</TableCell>}
               <TableCell align="center" sx={contactHeaderStyle}>
                 Contact Option
               </TableCell>
@@ -1674,11 +1688,45 @@ const LeadsTable: React.FC<Props> = ({
                   sx={{ color: "primary.main", fontWeight: 700 }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate("/leads/activity", { state: { lead } });
+                    onViewActivity?.();
                   }}
                 >
                   {lead.activity || "View Activity"}
                 </TableCell>
+
+                {showAccessColumn && (
+                  <TableCell>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minWidth: 90 }}>
+                      {ACCESS_BADGES.map((badge) => {
+                        const reason = lead.user_visibility_reasons?.find((item) =>
+                          item.toLowerCase().includes(badge.match),
+                        );
+                        if (!reason) return null;
+                        return (
+                          <Tooltip key={badge.label} title={reason} arrow>
+                            <Box
+                              component="span"
+                              sx={{
+                                px: 0.75,
+                                py: 0.125,
+                                border: `1px solid ${badge.border}`,
+                                borderRadius: "999px",
+                                bgcolor: badge.bg,
+                                color: badge.color,
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                lineHeight: 1.5,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {badge.label}
+                            </Box>
+                          </Tooltip>
+                        );
+                      })}
+                    </Box>
+                  </TableCell>
+                )}
 
                 <TableCell
                   align="center"

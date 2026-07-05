@@ -172,6 +172,7 @@ export interface ColumnConfig {
   label: string;
   statusKey: string[];
   color: string;
+  allowManualMove?: boolean;
   uiActions?: {
     showCall: boolean;
     showEmail: boolean;

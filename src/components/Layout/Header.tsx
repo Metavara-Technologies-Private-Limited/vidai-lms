@@ -457,10 +457,15 @@ const Header = ({
         typeof leadRecord.full_name === "string" && leadRecord.full_name.trim()
           ? leadRecord.full_name.trim()
           : "Lead";
-      const department =
-        typeof leadRecord.department_name === "string"
-          ? leadRecord.department_name.trim()
-          : "";
+      const leadContext =
+        (typeof leadRecord.lead_status === "string" &&
+          leadRecord.lead_status.trim()) ||
+        (typeof leadRecord.status === "string" && leadRecord.status.trim()) ||
+        (typeof leadRecord.source === "string" && leadRecord.source.trim()) ||
+        "";
+      const leadSubtitle = leadContext
+        ? `${leadName} - ${leadContext}`
+        : leadName;
 
       if (assignedToId === currentUserId) {
         const timestamp =
@@ -469,9 +474,7 @@ const Header = ({
         items.push({
           id: `lead-assigned-${String(leadRecord.id ?? leadName)}`,
           title: "Lead assigned to you",
-          subtitle: department
-            ? `${leadName} (${department})`
-            : `${leadName}`,
+          subtitle: leadSubtitle,
           timestamp,
         });
       } else if (createdById === currentUserId) {
@@ -481,9 +484,7 @@ const Header = ({
         items.push({
           id: `lead-created-${String(leadRecord.id ?? leadName)}`,
           title: "Lead created by you",
-          subtitle: department
-            ? `${leadName} (${department})`
-            : `${leadName}`,
+          subtitle: leadSubtitle,
           timestamp,
         });
       }

@@ -463,6 +463,19 @@ export function Step1({
             <TextField
               fullWidth
               size="small"
+              name={`lead-${field}`}
+              type={field === "email" ? "email" : field === "contact" ? "tel" : "text"}
+              autoComplete={
+                field === "full_name"
+                  ? "section-lead organization"
+                  : field === "contact"
+                    ? "section-lead tel"
+                    : field === "email"
+                      ? "section-lead email"
+                      : field === "location"
+                        ? "section-lead address-level2"
+                        : "section-lead street-address"
+              }
               value={form[field] as string}
               onChange={handleChange(field)}
               error={hasError(field)}
@@ -497,7 +510,7 @@ export function Step1({
           </Box>
           <Box>
             <Typography sx={labelStyle}>Address</Typography>
-            <TextField fullWidth size="small" value={form.address} onChange={handleChange("address")} sx={inputStyle} />
+            <TextField fullWidth size="small" name="lead-address" autoComplete="section-lead street-address" value={form.address} onChange={handleChange("address")} sx={inputStyle} />
           </Box>
         </Box>
       )}
@@ -541,7 +554,7 @@ export function Step1({
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, mb: 4 }}>
               <Box>
                 <Typography sx={labelStyle}>Full Name</Typography>
-                <TextField fullWidth size="small" value={form.partnerName} onChange={handleChange("partnerName")} sx={inputStyle} />
+                <TextField fullWidth size="small" name="lead-partner-name" autoComplete="section-lead-partner name" value={form.partnerName} onChange={handleChange("partnerName")} sx={inputStyle} />
               </Box>
               <Box>
                 <Typography sx={labelStyle}>Age</Typography>
@@ -580,6 +593,17 @@ export function Step1({
                 <TextField
                   fullWidth
                   size="small"
+                  name={`lead-${field}`}
+                  type={field === "contactEmail" ? "email" : field === "contactPhone" ? "tel" : "text"}
+                  autoComplete={
+                    field === "contactFullName"
+                      ? "section-lead-contact name"
+                      : field === "designation"
+                        ? "section-lead-contact organization-title"
+                        : field === "contactPhone"
+                          ? "section-lead-contact tel"
+                          : "section-lead-contact email"
+                  }
                   value={(form[field] as string) ?? ""}
                   onChange={handleChange(field)}
                   inputProps={field === "contactPhone" ? { maxLength: 15, inputMode: "numeric" } : undefined}
@@ -738,6 +762,11 @@ export function Step1({
                 placeholder="Search assignee"
                 error={hasError("assignee")}
                 sx={inputStyleWithError(hasError("assignee"))}
+                inputProps={{
+                  ...params.inputProps,
+                  name: "lead-assignee-search",
+                  autoComplete: "off",
+                }}
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (
@@ -789,6 +818,11 @@ export function Step1({
               renderInput={(params) => (
                 <TextField
                   {...params} fullWidth size="small" placeholder="Search user" sx={inputStyle}
+                  inputProps={{
+                    ...params.inputProps,
+                    name: "lead-generated-by-search",
+                    autoComplete: "off",
+                  }}
                   InputProps={{
                     ...params.InputProps,
                     endAdornment: (
@@ -1000,6 +1034,8 @@ export function Step1({
               const commonProps = {
                 fullWidth: true,
                 size: "small" as const,
+                name: `lead-custom-${field.key}`,
+                autoComplete: "off",
                 value,
                 onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                   onDataCaptureChange?.(field.key, e.target.value),
@@ -1138,7 +1174,7 @@ export function Step2({
       return [...interestOptions];
     }
     // Spread into a new mutable array so readonly tuples are accepted
-    return [...ACTIVE_FLOW_COPY.treatmentOptions];
+    return [];
   }, [interests, interestOptions]);
 
   return (
@@ -1190,7 +1226,11 @@ export function Step2({
           }}
         >
           <MenuItem value="" disabled>
-            {isLoading ? "Loading…" : "Select"}
+            {isLoading
+              ? "Loading…"
+              : resolvedInterestOptions.length === 0
+                ? "No product interests configured"
+                : "Select"}
           </MenuItem>
           {resolvedInterestOptions.map((opt) => (
             <MenuItem key={opt} value={opt}>

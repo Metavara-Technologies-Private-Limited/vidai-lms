@@ -86,6 +86,7 @@ interface Props {
   search: string;
   filters?: FilterValues;
   canEditLeads?: boolean;
+  onViewActivity?: () => void;
 }
 
 const rowsPerPage = 10;
@@ -128,6 +129,7 @@ const LeadsFollowUp: React.FC<Props> = ({
   search,
   filters,
   canEditLeads = true,
+  onViewActivity,
 }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -457,7 +459,7 @@ const LeadsFollowUp: React.FC<Props> = ({
                     sx={{ color: "primary.main", fontWeight: 700 }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate("/leads/activity", { state: { lead } });
+                      onViewActivity?.();
                     }}
                   >
                     {lead.activity || "View Activity"}

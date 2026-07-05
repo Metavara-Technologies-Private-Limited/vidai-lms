@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
+  Avatar,
   Box,
   Button,
   Checkbox,
@@ -32,6 +33,7 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { type UserRecord as User } from "../../../../services/users.api";
+import { getAvatarLetter } from "../../../../utils/avatar";
 import EditUser from "../../../../assets/icons/Edit_User_List.svg";
 
 interface Props {
@@ -527,11 +529,30 @@ const UsersList: React.FC<Props> = ({
             {paginatedUsers.map((user) => (
               <TableRow key={user.id} hover>
                 <TableCell sx={{ ...bodyCellSx, minWidth: 170 }}>
-                  {user.username}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Avatar
+                      src={user.photo || undefined}
+                      alt={user.username}
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        flexShrink: 0,
+                        bgcolor: "#F1EEFF",
+                        color: "#7759D8",
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {getAvatarLetter(user.firstName, user.lastName, user.username)}
+                    </Avatar>
+                    <Typography sx={{ fontSize: 13, color: "#4A4A4A" }}>
+                      {user.username}
+                    </Typography>
+                  </Box>
                 </TableCell>
-                <TableCell
-                  sx={{ ...bodyCellSx, minWidth: 180 }}
-                >{`${user.firstName} ${user.lastName}`}</TableCell>
+                <TableCell sx={{ ...bodyCellSx, minWidth: 180 }}>
+                  {`${user.firstName} ${user.lastName}`.trim() || user.username}
+                </TableCell>
                 <TableCell sx={{ ...bodyCellSx, minWidth: 120 }}>
                   {user.role}
                 </TableCell>

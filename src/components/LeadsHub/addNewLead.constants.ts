@@ -68,6 +68,7 @@ export type LeadGeneratedByObject = {
 // Sent as a separate JSON object to the backend (not inside LeadPayload)
 // Backend uses: first_name, last_name, email, role to create ReferralSource
 export type ReferralSourceObject = {
+  user_id?: number | null;
   first_name: string;
   last_name: string;
   email: string;

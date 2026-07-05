@@ -23,6 +23,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CallOutlinedIcon from "@mui/icons-material/CallOutlined";
 import SmsOutlinedIcon from "@mui/icons-material/SmsOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
+import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import SendIcon from "@mui/icons-material/Send";
 import PhoneIcon from "@mui/icons-material/Phone";
 import { toast } from "react-toastify";
@@ -30,7 +31,7 @@ import { useSelector } from "react-redux";
 
 import type { LeadRecord, NoteData } from "./LeadDetailTypes";
 import { TwilioAPI } from "../../services/leads.api";
-import type { TwilioCall, TwilioSMS } from "../../services/leads.api";
+import type { LeadMailListItem } from "../../services/leads.api";
 import { selectClinic } from "../../store/clinicSlice";
 import {
   pipelineApi,
@@ -74,13 +75,15 @@ interface NextActionTabProps {
    * is considered complete. Any recorded call means the channel is done.
    * Already fetched in LeadDetailView; just pass callHistory={callHistory}.
    */
-  callHistory?: TwilioCall[];
+  callHistory?: unknown[];
   /**
    * SMS activity for this lead — used to derive whether the "SMS" channel
    * is considered complete. Any recorded SMS means the channel is done.
    * Already fetched in LeadDetailView; just pass smsHistory={smsHistory}.
    */
-  smsHistory?: TwilioSMS[];
+  smsHistory?: unknown[];
+  emailHistory?: LeadMailListItem[];
+  onEmailOpen?: () => void;
   notes: NoteData[];
   notesLoading: boolean;
   notesError: string | null;
@@ -104,7 +107,7 @@ interface NextActionTabProps {
   onAddNote: () => void;
   onDeleteNote: (noteId: string) => void;
   onAppointmentBooked?: (result: AppointmentResult) => void;
-  onSmsSent?: (sentItem: TwilioSMS) => void;
+  onSmsSent?: () => void;
 }
 
 // ── Phone normalizer ──
@@ -134,6 +137,8 @@ const extractErrorMessage = (err: unknown, fallback: string): string => {
 // ── Status chip config ──
 const STATUS_CHIP_STYLES: Record<string, { bgcolor: string; color: string }> = {
   completed: { bgcolor: "#F0FDF4", color: "#16A34A" },
+  in_progress: { bgcolor: "#FFFBEB", color: "#D97706" },
+  to_do: { bgcolor: "#EFF6FF", color: "#3B82F6" },
   pending: { bgcolor: "#EFF6FF", color: "#3B82F6" },
   default: { bgcolor: "#EFF6FF", color: "#3B82F6" },
 };
@@ -148,7 +153,7 @@ const STORAGE_KEY_SELECTED_PIPELINE = "leads_selected_pipeline_id";
 const STORAGE_KEY_DEFAULT_PIPELINE = "leads_default_pipeline_id";
 
 type PipelineOption = { value: string; label: string };
-type ChannelKey = "call" | "sms" | "appointment";
+type ChannelKey = "call" | "sms" | "email" | "appointment";
 
 const normalizeStageName = (value?: string | null): string =>
   (value ?? "")
@@ -201,13 +206,14 @@ type ActionChannel = {
 const CHANNEL_RULE_TYPES: Record<ChannelKey, PipelineRuleActionType[]> = {
   call: ["call"],
   sms: ["sms", "whatsapp"],
+  email: ["email"],
   appointment: ["appointment"],
 };
 
 // Stable empty arrays so useMemo deps don't fire on every render when
 // the parent hasn't passed these props yet.
-const EMPTY_CALL_HISTORY: TwilioCall[] = [];
-const EMPTY_SMS_HISTORY: TwilioSMS[] = [];
+const EMPTY_CALL_HISTORY: unknown[] = [];
+const EMPTY_SMS_HISTORY: unknown[] = [];
 
 const NextActionTab: React.FC<NextActionTabProps> = ({
   lead,
@@ -234,6 +240,8 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
   onMarkDone,
   callHistory = EMPTY_CALL_HISTORY,
   smsHistory = EMPTY_SMS_HISTORY,
+  emailHistory = [],
+  onEmailOpen,
   notes,
   notesLoading,
   notesError,
@@ -260,7 +268,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
   onSmsSent,
 }) => {
   void nextActionType;
-  void taskStatus;
+  void nextActionStatus;
 
   const [callDialogOpen, setCallDialogOpen] = React.useState(false);
   const [actionSnackbar, setActionSnackbar] = React.useState<{
@@ -288,9 +296,10 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     () => ({
       call: (callHistory?.length ?? 0) > 0,
       sms: (smsHistory?.length ?? 0) > 0,
+      email: emailHistory.some((item) => String(item.status).toUpperCase() === "SENT"),
       appointment: lead?.book_appointment === true,
     }),
-    [callHistory, smsHistory, lead?.book_appointment],
+    [callHistory, smsHistory, emailHistory, lead?.book_appointment],
   );
 
   // ── Manual overrides ─────────────────────────────────────────────────────
@@ -312,6 +321,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     () => ({
       call: derivedCompleted.call || manualOverrides.call === true,
       sms: derivedCompleted.sms || manualOverrides.sms === true,
+      email: derivedCompleted.email || manualOverrides.email === true,
       appointment: derivedCompleted.appointment || manualOverrides.appointment === true,
     }),
     [derivedCompleted, manualOverrides],
@@ -498,12 +508,12 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     setSmsDialogOpen(true);
   };
 
-  const handleSmsDialogClose = (sent?: boolean, sentItem?: TwilioSMS) => {
+  const handleSmsDialogClose = (sent?: boolean) => {
     setSmsDialogOpen(false);
     if (sent) {
       setManualOverrides((prev) => ({ ...prev, sms: true }));
       setActionSnackbar({ open: true, message: "SMS sent successfully!", severity: "success" });
-      if (sentItem) onSmsSent?.(sentItem);
+      onSmsSent?.();
     }
   };
 
@@ -521,7 +531,7 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
     onAppointmentBooked?.(result);
   };
 
-  const chipStyle = getStatusChipStyle(nextActionStatus);
+  const chipStyle = getStatusChipStyle(taskStatus);
 
   const actionChannels: ActionChannel[] = [
     {
@@ -547,6 +557,18 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
       buttonBg: "#F5F3FF",
       buttonHoverBg: "#EDE9FE",
       onTrigger: handleSmsOpen,
+    },
+    {
+      key: "email",
+      title: "Email",
+      icon: <EmailOutlinedIcon sx={{ color: "#0EA5E9", fontSize: 20 }} />,
+      iconBg: "#F0F9FF",
+      buttonLabel: "Send Email",
+      buttonIcon: <EmailOutlinedIcon sx={{ fontSize: 14 }} />,
+      buttonColor: "#0284C7",
+      buttonBg: "#F0F9FF",
+      buttonHoverBg: "#E0F2FE",
+      onTrigger: () => onEmailOpen?.(),
     },
     {
       key: "appointment",
@@ -680,9 +702,9 @@ const NextActionTab: React.FC<NextActionTabProps> = ({
                               <Box mt={0.25}>
                                 <Chip
                                   label={
-                                    nextActionStatus
-                                      ? nextActionStatus.charAt(0).toUpperCase() + nextActionStatus.slice(1)
-                                      : nextActionStatus
+                                    taskStatus
+                                      ? taskStatus.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())
+                                      : "To do"
                                   }
                                   size="small"
                                   sx={{

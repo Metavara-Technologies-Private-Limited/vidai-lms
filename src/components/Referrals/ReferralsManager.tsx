@@ -13,8 +13,8 @@ import {
 import FilterListIcon from "@mui/icons-material/FilterList";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
-import { ClinicAPI, LeadAPI } from "../../services/leads.api";
-import type { Employee, Lead } from "../../services/leads.api";
+import { LeadAPI } from "../../services/leads.api";
+import type { Lead } from "../../services/leads.api";
 import { useDispatch, useSelector } from "react-redux";
 import {
   clearSources,
@@ -37,7 +37,7 @@ import {
   getInitials,
   getPatientAvatarStyle,
 } from "./referrals.utils";
-import { fetchReferralDepartments } from "../../services/referral.api";
+import { fetchReferralDepartments, fetchReferralSources } from "../../services/referral.api";
 
 interface DoctorRow {
   id: number;
@@ -70,7 +70,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
     title: "Corporate HR",
     // departmentId: 2,
     searchPlaceholder: "Search by Partner name",
-    headers: ["HR Name", "Email | Contact", "Referrals", "Company Name"],
+    headers: ["HR Name", "Email | Contact", "Referrals", "Clinic Name"],
     toRow: (item) => ({
       id: item.id,
       primary: item.name,
@@ -88,7 +88,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
       "Insurance Provider",
       "Email | Contact",
       "Referrals",
-      "Relationship Manager",
+      "Clinic Name",
     ],
     toRow: (item) => ({
       id: item.id,
@@ -103,7 +103,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
     title: "Diagnostic Labs",
     // departmentId: 3,
     searchPlaceholder: "Search by Partner name",
-    headers: ["Lab Name", "Email | Contact", "Referrals", "City"],
+    headers: ["Lab Name", "Email | Contact", "Referrals", "Clinic Name"],
     toRow: (item) => ({
       id: item.id,
       primary: item.name,
@@ -117,7 +117,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
     title: "Zoya Partners",
     // departmentId: 6,
     searchPlaceholder: "Search by Partner name",
-    headers: ["Partner Name", "Email | Contact", "Referrals", "Region"],
+    headers: ["Partner Name", "Email | Contact", "Referrals", "Clinic Name"],
     toRow: (item) => ({
       id: item.id,
       primary: item.name,
@@ -131,13 +131,7 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
     title: "Practo Referrals",
     // departmentId: 5,
     searchPlaceholder: "Search by Partner name",
-    headers: [
-      "Account Manager",
-      "Email | Contact",
-      "Referrals",
-      "Campaign",
-      "City",
-    ],
+    headers: ["Account Manager", "Email | Contact", "Referrals", "Clinic Name"],
     toRow: (item) => ({
       id: item.id,
       primary: item.name,
@@ -145,7 +139,6 @@ const SOURCE_PAGE_CONFIG: Record<string, SourcePageConfig> = {
       phone: item.phone || "",
       referrals: item.referral_count,
       extra1: item.external_clinic_name || "",
-      extra2: "",
     }),
   },
 };
@@ -159,6 +152,7 @@ const SourceDepartmentPage = ({
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const sources = useSelector(selectSources) as ReferralSource[];
+  const clinic = useSelector(selectClinic);
   const config = SOURCE_PAGE_CONFIG[pageKey];
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const loading = useSelector(selectSourcesLoading);
@@ -192,10 +186,11 @@ const SourceDepartmentPage = ({
     () =>
       sources
         .map(config.toRow)
+        .map((item) => ({ ...item, extra1: clinic?.name || item.extra1 || "N/A" }))
         .filter((item) =>
           item.primary.toLowerCase().includes(search.toLowerCase()),
         ),
-    [sources, config, search],
+    [sources, config, search, clinic?.name],
   );
 
   return (
@@ -229,7 +224,6 @@ export const Doctors: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const clinic = useSelector(selectClinic);
-
   const [doctorDeptId, setDoctorDeptId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -247,72 +241,21 @@ export const Doctors: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!doctorDeptId) return;
       try {
         setLoading(true);
-        const allLeads: Lead[] = clinic?.id
-          ? await LeadAPI.list(clinic?.id)
-          : [];
-        const doctorLeads = allLeads.filter(
-          (lead) => lead.referral_department_id === doctorDeptId,
-        );
-        const doctorMap: Record<
-          number,
-          { id: number; name: string; referrals: number }
-        > = {};
-        doctorLeads.forEach((lead) => {
-          if (!lead.assigned_to_id || !lead.assigned_to_name) return;
-          if (doctorMap[lead.assigned_to_id])
-            doctorMap[lead.assigned_to_id].referrals += 1;
-          else
-            doctorMap[lead.assigned_to_id] = {
-              id: lead.assigned_to_id,
-              name: lead.assigned_to_name,
-              referrals: 1,
-            };
+        const sources = await fetchReferralSources({
+          referral_department_id: doctorDeptId,
         });
-
-        const empById: Record<
-          number,
-          Employee & {
-            email?: string;
-            contact_no?: string;
-            clinic_name?: string;
-          }
-        > = {};
-        try {
-          const clinicId = doctorLeads[0]?.clinic_id ?? allLeads[0]?.clinic_id;
-          if (clinicId) {
-            const employees = await ClinicAPI.getEmployees(clinicId);
-            employees.forEach((e) => {
-              empById[e.id] = e as Employee & {
-                email?: string;
-                contact_no?: string;
-                clinic_name?: string;
-              };
-            });
-          }
-        } catch {
-          // keep rows with lead data even if enrichment fails
-        }
-
-        const rows = Object.values(doctorMap)
-          .map((doc): DoctorRow => {
-            const emp = empById[doc.id] as
-              | { email?: string; contact_no?: string; clinic_name?: string }
-              | undefined;
-            return {
-              id: doc.id,
-              name: doc.name,
-              email: emp?.email || "—",
-              phone: emp?.contact_no || "—",
-              referrals: doc.referrals,
-              clinicName:
-                emp?.clinic_name ||
-                doctorLeads.find((l) => l.assigned_to_id === doc.id)
-                  ?.clinic_name ||
-                "—",
-            };
-          })
+        const rows = sources
+          .map((source): DoctorRow => ({
+            id: source.id,
+            name: source.name,
+            email: source.email || "-",
+            phone: source.phone || "-",
+            referrals: source.referral_count,
+            clinicName: clinic?.name || "-",
+          }))
           .sort((a, b) => b.referrals - a.referrals);
 
         setDoctors(rows);
@@ -397,7 +340,7 @@ export const DoctorReferrals: React.FC = () => {
           : [];
         const filtered = allLeads.filter(
           (lead) =>
-            String(lead.assigned_to_id) === String(doctorId) &&
+            String(lead.referral_source_id) === String(doctorId) &&
             lead.referral_department_name === "Doctors",
         );
 

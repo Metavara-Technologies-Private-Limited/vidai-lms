@@ -20,6 +20,7 @@ import { fetchCampaign, selectCampaign } from "../../store/campaignSlice";
 import { CircularProgress } from "@mui/material";
 
 const CommunicationChart = lazy(() => import("./CommunicationChart"));
+const SourcePerformanceChart = lazy(() => import("./SourcePerformanceChart"));
 const ConversionTrendChart = lazy(() => import("./ConversionTrendChart"));
 const LeadPipelineFunnel = lazy(() => import("./LeadPipelineFunnel"));
 const AppointmentsChart = lazy(() => import("./AppointmentsChart"));
@@ -114,6 +115,9 @@ const DashboardLayout = () => {
           >
             {activeTab === "communication" && (
               <CommunicationChart timeRange={timeRange} />
+            )}
+            {activeTab === "source" && (
+              <SourcePerformanceChart timeRange={timeRange} />
             )}
             {activeTab === "conversion" && (
               <ConversionTrendChart timeRange={timeRange} />

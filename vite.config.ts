@@ -130,6 +130,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    allowedHosts: ["ronda-epagogic-claud.ngrok-free.dev"],
     warmup: {
       clientFiles: [
         "./src/main.tsx",

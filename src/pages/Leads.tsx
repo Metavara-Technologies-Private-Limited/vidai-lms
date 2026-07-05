@@ -1886,6 +1886,7 @@ const Leads: React.FC = () => {
                 canEditLeads={canEditLeads}
                 selectedIndustry={selectedIndustry}
                 selectedPipelineId={selectedPipelineId}
+                onViewActivity={() => setTab(4)}
               />
             ) : (
               <LeadsBoard
@@ -1901,6 +1902,7 @@ const Leads: React.FC = () => {
               search={search}
               filters={activeFilters}
               canEditLeads={canEditLeads}
+              onViewActivity={() => setTab(4)}
             />
           )}
           {tab === 2 && (
@@ -1912,6 +1914,7 @@ const Leads: React.FC = () => {
               canEditLeads={canEditLeads}
               selectedIndustry={selectedIndustry}
               selectedPipelineId={selectedPipelineId}
+              onViewActivity={() => setTab(4)}
             />
           )}
           {tab === 3 && <LeadsConversation />}

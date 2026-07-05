@@ -391,6 +391,7 @@ interface LeadCardProps {
   onOpenBook: (lead: LeadItem) => void;
   onOpenCall: (lead: LeadItem) => void;
   canEditLeads?: boolean;
+  allowManualMove?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setLeads: React.Dispatch<React.SetStateAction<any[]>>;
   onDragStart?: (leadId: string) => void;
@@ -409,6 +410,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({
   onOpenBook,
   onOpenCall,
   canEditLeads = true,
+  allowManualMove = true,
   setLeads,
   isDragging = false,
   onDragStart,
@@ -416,15 +418,27 @@ export const LeadCard: React.FC<LeadCardProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  const canDrag = canEditLeads && allowManualMove;
+  const manualMoveTooltip =
+    "Manual movement is not enabled in Pipeline Configuration for this stage.";
+
   return (
+    <Tooltip
+      title={!allowManualMove ? manualMoveTooltip : ""}
+      placement="top"
+      arrow
+    >
     <Paper
       elevation={0}
       onMouseEnter={() => onHover(lead.id)}
       onMouseLeave={() => onHover(null)}
       onClick={() => navigate(`/leads/${lead.id.replace("#", "")}`)}
-      draggable={canEditLeads}
+      draggable={canDrag}
       onDragStart={(event) => {
-        if (!canEditLeads) return;
+        if (!canDrag) {
+          event.preventDefault();
+          return;
+        }
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", lead.id);
         onDragStart?.(lead.id);
@@ -439,7 +453,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({
         transition: "all 0.3s ease",
         width: "100%",
         backgroundColor: "#FFFFFF",
-        cursor: "pointer",
+        cursor: allowManualMove ? "pointer" : "not-allowed",
         opacity: isDragging ? 0.55 : 1,
         ...(isHovered && {
           boxShadow: "0px 12px 24px -4px rgba(145,158,171,0.16)",
@@ -530,6 +544,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({
         onOpenCall={onOpenCall}
       />
     </Paper>
+    </Tooltip>
   );
 };
 
@@ -652,6 +667,7 @@ export const LeadColumn: React.FC<LeadColumnProps> = ({
           onOpenBook={onOpenBook}
           onOpenCall={onOpenCall}
           canEditLeads={canEditLeads}
+          allowManualMove={col.allowManualMove}
           setLeads={setLeads}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}

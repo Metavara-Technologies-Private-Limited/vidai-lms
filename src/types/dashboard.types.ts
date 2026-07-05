@@ -46,6 +46,7 @@ export interface SlaAlert {
   title: string;
   time: string;
   description: string;
+  leadName?: string;
   severity: Severity;
 }
 

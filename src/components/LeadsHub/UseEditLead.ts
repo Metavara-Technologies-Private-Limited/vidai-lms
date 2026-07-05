@@ -9,7 +9,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
-import { LeadAPI, DepartmentAPI, EmployeeAPI, InterestAPI, LeadEmailAPI, LeadFormFieldAPI } from "../../services/leads.api";
+import { LeadAPI, DepartmentAPI, EmployeeAPI, InterestAPI, LeadFormFieldAPI, LeadEmailAPI } from "../../services/leads.api";
 import { authApi } from "../../services/auth.api";
 import {
   pipelineApi,
@@ -1426,104 +1426,55 @@ export function useEditLead() {
 
     doSave()
       .then(async () => {
-        setShowSuccess(true);
-        toast.success("Lead saved successfully!", {
-          position: "top-right", autoClose: 1500, theme: "colored",
-        });
+        if (bookingActive) {
+          const recipientEmail =
+            email?.trim() ||
+            contactPersonEmail?.trim() ||
+            leadData?.email?.trim() ||
+            "";
 
-        // ── Send appointment confirmation email if appointment is booked ──
-        const bookingActive =
-          updateData.book_appointment === true ||
-          isTruthy((leadData as any)?.book_appointment) ||
-          Boolean(
-            ((updateData.appointment_date as string | undefined) || "") &&
-              ((updateData.slot as string | undefined) || "")
-          );
-        const finalAppointmentDate =
-          (updateData.appointment_date as string | undefined) ||
-          (leadData as any)?.appointment_date ||
-          "";
-        const finalSlot =
-          (updateData.slot as string | undefined) ||
-          (leadData as any)?.slot ||
-          "";
-        const finalEmail =
-          email.trim() ||
-          (leadData as any)?.email?.trim() ||
-          "";
-        const resolvedLeadId = String(id || (leadData as any)?.id || "");
-
-        if (
-          bookingActive &&
-          finalAppointmentDate &&
-          finalSlot &&
-          finalEmail &&
-          resolvedLeadId
-        ) {
-          const recipientEmail = finalEmail.trim();
           if (recipientEmail) {
             try {
-              // using LeadEmailAPI from top-level import
-              const leadName = fullName.trim() || "Patient";
-              const leadFirstName = leadName.split(/\s+/)[0] || "Patient";
-              const clinicName = selectedClinic?.name || "Our Clinic";
-              const senderEmail =
-                (authUser?.email as string | undefined)?.trim() || undefined;
-              const personnelName = selectedAppointmentPersonnel
-                ? `${selectedAppointmentPersonnel.first_name ?? ""} ${selectedAppointmentPersonnel.last_name ?? ""}`.trim() ||
-                  selectedAppointmentPersonnel.username ||
-                  "-"
-                : "-";
-              const deptName =
-                departments.find((d) => d.id.toString() === department)?.name ||
-                "-";
-
-              const subject = `Appointment Updated - ${finalAppointmentDate}`;
-              const emailBody = [
-                `Hi ${leadFirstName},`,
-                "",
-                `Your appointment details at ${clinicName} have been updated.`,
-                "",
-                `Date: ${finalAppointmentDate}`,
-                `Time: ${finalSlot}`,
-                `Doctor: ${personnelName}`,
-                `Department: ${deptName}`,
-                "",
-                remark ? `Note: ${remark}` : "",
-                "",
-                `If you have any questions, please contact us.`,
-                "",
-                `Thank you,`,
-                `${clinicName} Team`,
-              ]
-                .filter((line) => line !== undefined)
-                .join("\n");
-
               await LeadEmailAPI.sendNow({
-                lead: resolvedLeadId,
-                subject,
-                sender_email: senderEmail || null,
-                email_body: emailBody,
+                lead: id,
+                subject: `Appointment Confirmed - ${appointmentDate}`,
+                sender_email: selectedClinic?.email || "noreply@clinic.com",
+                email_body: [
+                  `Hi ${fullName.split(" ")[0] || "Patient"},`,
+                  "",
+                  "Your appointment has been successfully scheduled.",
+                  "",
+                  `Date: ${appointmentDate}`,
+                  `Time: ${slot}`,
+                  "",
+                  "Thank you,",
+                  `${selectedClinic?.name || "Our Clinic"} Team`,
+                ].join("\n"),
               });
-            } catch (err) {
-              console.error("[EditLead] Appointment email failed", err, {
-                resolvedLeadId,
-                recipientEmail,
-                finalAppointmentDate,
-                finalSlot,
-              });
+            } catch {
               toast.warning(
-                "Lead saved, but appointment email could not be sent.",
-                { position: "top-right", autoClose: 3000, theme: "colored" },
+                "Lead updated, but appointment email could not be sent.",
+                {
+                  position: "top-right",
+                  autoClose: 2500,
+                  theme: "colored",
+                },
               );
             }
           }
         }
 
+        setShowSuccess(true);
+        toast.success("Lead saved successfully!", {
+          position: "top-right",
+          autoClose: 1500,
+          theme: "colored",
+        });
+
         setTimeout(() => {
-  navigate("/leads", { replace: true });
-  dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
-}, 800);
+          navigate("/leads", { replace: true });
+          dispatch(fetchLeads() as unknown as Parameters<typeof dispatch>[0]);
+        }, 800);
       })
       .catch((err: unknown) => {
         let msg = "Failed to save lead";

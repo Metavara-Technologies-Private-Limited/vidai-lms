@@ -23,6 +23,11 @@ const AlertItem = ({ alert }: { alert: SlaAlert }) => {
           </Typography>
         </Typography>
         <Typography variant="caption" color="text.secondary">
+          {alert.leadName && (
+            <Box component="span" sx={{ fontWeight: 400, color: "text.primary" }}>
+              {alert.leadName}{" "}
+            </Box>
+          )}
           {alert.description}
         </Typography>
       </Box>
@@ -65,7 +70,8 @@ const buildAlertForLead = (lead: Lead, minutesSince: number, id: number): SlaAle
       id,
       title: "Lead at risk of going cold",
       time: formatRelativeTime(minutesSince),
-      description: `${lead.full_name} has no recent follow-up activity`,
+      description: "has no recent follow-up activity",
+      leadName: lead.full_name,
       severity: "high",
     };
   }
@@ -76,6 +82,7 @@ const buildAlertForLead = (lead: Lead, minutesSince: number, id: number): SlaAle
       title: `Hot lead waiting for first contact for ${minutesSince} mins`,
       time: formatRelativeTime(minutesSince),
       description: "Immediate follow-up required to avoid drop-off",
+      leadName: lead.full_name,
       severity: minutesSince >= 30 ? "high" : "medium",
     };
   }
@@ -84,7 +91,8 @@ const buildAlertForLead = (lead: Lead, minutesSince: number, id: number): SlaAle
     id,
     title: "SLA nearing breach for lead follow-up",
     time: formatRelativeTime(minutesSince),
-    description: `${lead.full_name} requires timely action`,
+    description: "requires timely action",
+    leadName: lead.full_name,
     severity: minutesSince >= 30 ? "high" : "medium",
   };
 };

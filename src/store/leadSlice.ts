@@ -90,10 +90,17 @@ const filterLeadsForRole = (
       "generator_id",
       "personal_id",
     ]);
+    const referralIds = collectLeadIds(lead, [
+      "referred_user_id",
+      "referral_user_id",
+      "referred_by_id",
+      "referral_source_referred_user_id",
+    ]);
 
     return (
       assigneeIds.includes(currentUserId) ||
-      creatorIds.includes(currentUserId)
+      creatorIds.includes(currentUserId) ||
+      referralIds.includes(currentUserId)
     );
   });
 };

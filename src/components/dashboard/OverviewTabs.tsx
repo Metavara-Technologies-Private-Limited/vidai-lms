@@ -3,6 +3,7 @@ import { overviewTabsStyles } from "../../styles/dashboard/OverviewTabs.styles";
 
 export type OverviewTab =
   | "communication"
+  | "source"
   | "conversion"
   | "pipeline"
   | "appointments"
@@ -15,6 +16,7 @@ interface Props {
 
 const tabs: { label: string; value: OverviewTab }[] = [
   { label: "Communication", value: "communication" },
+  { label: "Source Performance", value: "source" },
   { label: "Conversion Trend", value: "conversion" },
   { label: "Lead Pipeline Funnel", value: "pipeline" },
   { label: "Appointments", value: "appointments" },

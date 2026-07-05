@@ -36,6 +36,7 @@ export interface RawLead {
   clinic_id?: number | string;
   quality?: "Hot" | "Warm" | "Cold";
   last_interaction_at?: string;
+  user_visibility_reasons?: string[];
 }
 
 export type Quality = "Hot" | "Warm" | "Cold";
@@ -59,6 +60,7 @@ export interface Props {
   canEditLeads?: boolean;
   selectedIndustry?: string;
   selectedPipelineId?: string;
+  onViewActivity?: () => void;
 }
 
 export interface ApiErrorShape {

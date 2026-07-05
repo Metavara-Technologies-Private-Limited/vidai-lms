@@ -1492,6 +1492,21 @@ const LeadsBoard: React.FC<Props> = ({
       ).trim();
       const currentStageId = currentLead.stage_id ?? null;
       const targetStageId = targetColumn.stageId ?? null;
+      const currentColumn = pipelineColumns.find((column) =>
+        currentStageId != null
+          ? String(column.stageId ?? "") === String(currentStageId)
+          : column.statusKey.some(
+              (status) =>
+                status.toLowerCase().trim() === currentLeadStatus.toLowerCase(),
+            ),
+      );
+
+      if (currentColumn?.allowManualMove === false) {
+        toast.warning(
+          "Manual movement is not enabled in Pipeline Configuration for this stage.",
+        );
+        return;
+      }
 
       if (
         String(currentStageId ?? "") === String(targetStageId ?? "") &&
@@ -1521,7 +1536,7 @@ const LeadsBoard: React.FC<Props> = ({
         toast.error(`Failed to move lead to ${targetColumn.label}`);
       }
     },
-    [clinic?.id, dispatch, leads, updateLeadInBoard],
+    [clinic?.id, dispatch, leads, pipelineColumns, updateLeadInBoard],
   );
 
   React.useEffect(() => {
@@ -1598,6 +1613,8 @@ const LeadsBoard: React.FC<Props> = ({
                 stage.stage_color ??
                 ACTION_LABEL_TO_COLOR[actionHint] ??
                 fallbackColorByIndex(index),
+              allowManualMove:
+                stage.rules?.[0]?.allow_manual_move ?? true,
               uiActions,
             };
           });

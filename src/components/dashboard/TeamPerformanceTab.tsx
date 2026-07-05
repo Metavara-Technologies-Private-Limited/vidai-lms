@@ -699,7 +699,9 @@ const TeamPerformanceTab = ({ timeRange }: TeamPerformanceTabProps) => {
 
   const topPerformer = members.find((m) => m.rank === "1st (Top)");
   const otherTops = members.filter((m) => m.rank === "2nd" || m.rank === "3rd");
-  const lowPerformers = members.filter((m) => m.growth.startsWith("-"));
+  // Members are already ranked best-to-worst; the final ranked member is the
+  // low performer even when growth is zero rather than negative.
+  const lowPerformers = members.length > 1 ? [members[members.length - 1]] : [];
 
   const activeSelectedMember = useMemo(() => {
     if (!selectedMember) return null;

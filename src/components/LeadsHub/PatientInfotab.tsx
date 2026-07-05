@@ -845,6 +845,7 @@ const PatientInfoTab: React.FC<PatientInfoTabProps> = ({
                   lead?.personal_name ||
                   "N/A"
                 }
+                isAvatar
               />
               <InfoCell
                 label="REFERRAL DEPARTMENT"
