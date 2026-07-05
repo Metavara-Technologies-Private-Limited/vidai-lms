@@ -17,6 +17,7 @@ import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import PermMediaIcon from "@mui/icons-material/PermMedia";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import UseCaseService, { type UseCase } from "../../services/usecase.api";
 import { http } from "../../services/http"; // ✅ ONLY CHANGE: replaces hardcoded localhost
 
 export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
@@ -32,6 +33,7 @@ export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useCases, setUseCases] = useState<UseCase[]>([]);
 
   // Compose fields
   const [composeTo, setComposeTo] = useState("");
@@ -41,6 +43,9 @@ export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
   useEffect(() => {
     if (open) {
       fetchTemplates();
+      UseCaseService.getUseCases(Number(localStorage.getItem("clinic_id") ?? 0))
+        .then(setUseCases)
+        .catch(() => setUseCases([]));
     }
   }, [open]);
 
@@ -136,6 +141,15 @@ export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
     setComposeOpen(false);
     onClose();
   };
+
+  const previewUseCaseName =
+    previewTemplate?.use_case_name ||
+    (typeof previewTemplate?.use_case === "object"
+      ? previewTemplate.use_case?.name
+      : useCases.find(
+          (item) => String(item.id) === String(previewTemplate?.use_case),
+        )?.name) ||
+    previewTemplate?.use_case;
 
   return (
     <>
@@ -338,9 +352,9 @@ export default function EmailTemplateModal({ open, onClose, onSelect }: any) {
               dangerouslySetInnerHTML={{ __html: previewTemplate?.body || "" }}
             />
 
-            {previewTemplate?.use_case && (
+            {previewUseCaseName && (
               <Typography sx={{ color: "#888", fontSize: "13px", mt: 1 }}>
-                Use Case: {previewTemplate.use_case}
+                Use Case: {previewUseCaseName}
               </Typography>
             )}
           </div>

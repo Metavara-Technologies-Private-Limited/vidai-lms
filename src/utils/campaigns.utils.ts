@@ -33,7 +33,9 @@ export const getComputedCampaignStatus = (c: Campaign) => {
   const now = dayjs();
 
   const start = c.selected_start
-    ? dayjs(c.selected_start.replace("Z", ""))
+    ? c.enter_time
+      ? dayjs(`${dayjs(c.selected_start).format("YYYY-MM-DD")}T${c.enter_time}`)
+      : dayjs(c.selected_start.replace("Z", ""))
     : null;
 
     const end = c.end ? dayjs(c.end) : null;

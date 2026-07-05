@@ -46,7 +46,7 @@ import { selectClinic } from '../../../store/clinicSlice';
 import type { UseCase } from '../../../services/usecase.api'; // ✅ ADDED
 
 const TEMPLATE_NAME_REGEX = /^[A-Za-z0-9\s–-]*$/;
-const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1000;
+const MAX_EMAIL_TEMPLATE_BODY_LENGTH = 1500;
 const SUBJECT_MUST_CONTAIN_LETTER_REGEX = /[A-Za-z]/;
 
 const getDocumentUrl = (doc: TemplateDocument): string => {
@@ -172,7 +172,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
 
   const canUpdateBody = (nextLength: number): boolean => {
     if (nextLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
-      toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+      toast.error('Body cannot exceed 1500 characters', { toastId: 'template-body-limit' });
       return false;
     }
     return true;
@@ -247,7 +247,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
       const currentBodyLength = editor.getText().length;
       if (currentBodyLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
         editor.commands.setContent(lastValidBodyHtmlRef.current, { emitUpdate: false });
-        toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+        toast.error('Body cannot exceed 1500 characters', { toastId: 'template-body-limit' });
         return;
       }
 
@@ -593,7 +593,7 @@ export const NewEmailTemplateForm: React.FC<NewEmailTemplateFormExtendedProps> =
 
     const bodyTextLength = editor?.getText().length ?? 0;
     if (bodyTextLength > MAX_EMAIL_TEMPLATE_BODY_LENGTH) {
-      toast.error('Body cannot exceed 1000 characters', { toastId: 'template-body-limit' });
+      toast.error('Body cannot exceed 1500 characters', { toastId: 'template-body-limit' });
       return;
     }
 

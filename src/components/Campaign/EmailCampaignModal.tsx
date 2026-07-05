@@ -127,6 +127,16 @@ export default function EmailCampaignModal({
 
   const step3Valid = scheduleRange[0] && scheduleRange[1] && scheduleTime;
 
+  const applyAiOptimizedTiming = () => {
+    const now = dayjs();
+    const suggested = now
+      .add(5 - (now.minute() % 5), "minute")
+      .second(0)
+      .millisecond(0);
+    setScheduleRange([suggested.startOf("day"), suggested.startOf("day")]);
+    setScheduleTime(suggested.format("HH:mm"));
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setModalLoading(false);
@@ -618,7 +628,7 @@ export default function EmailCampaignModal({
                     <p>Select date and time to send the email</p>
                   </div>
 
-                  <button className="ai-opt-btn">
+                  <button type="button" className="ai-opt-btn" onClick={applyAiOptimizedTiming}>
                     ✨ AI-Optimization Timing
                   </button>
                 </div>

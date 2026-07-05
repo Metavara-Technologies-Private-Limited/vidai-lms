@@ -85,7 +85,7 @@ export default function CampaignsScreen() {
       let platforms: Platform[] = [];
       let type: CampaignType;
 
-      const isEmailCampaign = api.campaign_mode === CAMPAIGN_MODE.EMAIL;
+      const isEmailCampaign = Number(api.campaign_mode) === CAMPAIGN_MODE.EMAIL;
 
       if (isEmailCampaign) {
         type = CAMPAIGN_TYPE.EMAIL;
@@ -346,6 +346,7 @@ export default function CampaignsScreen() {
             onClose={() => setShowEmailModal(false)}
             onSave={() => {
               setShowEmailModal(false);
+              setTab(CAMPAIGN_TABS.EMAIL);
               dispatch(fetchCampaign());
             }}
           />

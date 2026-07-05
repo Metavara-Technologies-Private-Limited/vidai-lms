@@ -990,6 +990,16 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
       : CAMPAIGN_STATUS.LIVE;
   };
 
+  const applyAiOptimizedTiming = () => {
+    const now = dayjs();
+    const suggested = now
+      .add(5 - (now.minute() % 5), "minute")
+      .second(0)
+      .millisecond(0);
+    setScheduleDate(suggested.format("YYYY-MM-DD"));
+    setScheduleTime(suggested.format("HH:mm"));
+  };
+
   const handleCreateCampaign = async (type: "live" | "draft" | "scheduled") => {
     setSubmitted(true);
 
@@ -2388,7 +2398,7 @@ export default function SocialCampaignModal({ onClose, onSave }: Props) {
                     </p>
                   )}
                 </div>
-                <button className="ai-btn">✨ AI-Optimization Timing</button>
+                <button type="button" className="ai-btn" onClick={applyAiOptimizedTiming}>✨ AI-Optimization Timing</button>
               </div>
 
               <div className="schedule-row">
